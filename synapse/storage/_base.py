@@ -16,6 +16,7 @@
 # limitations under the License.
 import logging
 import random
+from abc import ABCMeta
 
 from six import PY2
 from six.moves import builtins
@@ -30,7 +31,8 @@ from synapse.types import get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-class SQLBaseStore(object):
+# some of our subclasses have abstract methods, so we use the ABCMeta metaclass.
+class SQLBaseStore(metaclass=ABCMeta):
     """Base class for data stores that holds helper functions.
 
     Note that multiple instances of this class will exist as there will be one

@@ -20,13 +20,7 @@ from twisted.internet import defer
 
 from synapse import types
 from synapse.api.constants import MAX_USERID_LENGTH, LoginType
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    ConsentNotGivenError,
-    RegistrationError,
-    SynapseError,
-)
+from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
@@ -165,7 +159,7 @@ class RegistrationHandler(BaseHandler):
         Returns:
             Deferred[str]: user_id
         Raises:
-            RegistrationError if there was a problem registering.
+            SynapseError if there was a problem registering.
         """
         yield self.check_registration_ratelimit(address)
 
@@ -174,7 +168,7 @@ class RegistrationHandler(BaseHandler):
         if password:
             password_hash = yield self._auth_handler.hash(password)
 
-        if localpart:
+        if localpart is not None:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
 
             was_guest = guest_access_token is not None
@@ -182,7 +176,7 @@ class RegistrationHandler(BaseHandler):
             if not was_guest:
                 try:
                     int(localpart)
-                    raise RegistrationError(
+                    raise SynapseError(
                         400, "Numeric user IDs are reserved for guest users."
                     )
                 except ValueError:

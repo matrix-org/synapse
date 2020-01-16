@@ -57,7 +57,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
 
         rooms_for_user = self.get_success(
-            self.store.get_rooms_for_user_where_membership_is(
+            self.store.get_rooms_for_local_user_where_membership_is(
                 self.u_alice, [Membership.JOIN]
             )
         )

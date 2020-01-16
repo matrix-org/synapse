@@ -133,6 +133,11 @@ sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
 sudo yum groupinstall "Development Tools"
 ```
 
+Note that Synapse does not support versions of SQLite before 3.11, and CentOS 7
+uses SQLite 3.7. You may be able to work around this by installing a more
+recent SQLite version, but it is recommended that you instead use a Postgres
+database: see [docs/postgres.md](docs/postgres.md).
+
 #### macOS
 
 Installing prerequisites on macOS:

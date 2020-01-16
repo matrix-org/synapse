@@ -571,6 +571,9 @@ def run_in_background(f, *args, **kwargs):
     yield or await on (for instance because you want to pass it to
     deferred.gatherResults()).
 
+    If f returns a Coroutine object, it will be wrapped into a Deferred (which will have
+    the side effect of executing the coroutine).
+
     Note that if you completely discard the result, you should make sure that
     `f` doesn't raise any deferred exceptions, otherwise a scary-looking
     CRITICAL error about an unhandled error will be logged without much

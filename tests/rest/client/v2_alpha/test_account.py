@@ -285,7 +285,9 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         )
 
         # Make sure the invite is here.
-        pending_invites = self.get_success(store.get_invited_rooms_for_user(invitee_id))
+        pending_invites = self.get_success(
+            store.get_invited_rooms_for_local_user(invitee_id)
+        )
         self.assertEqual(len(pending_invites), 1, pending_invites)
         self.assertEqual(pending_invites[0].room_id, room_id, pending_invites)
 
@@ -293,12 +295,16 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.deactivate(invitee_id, invitee_tok)
 
         # Check that the invite isn't there anymore.
-        pending_invites = self.get_success(store.get_invited_rooms_for_user(invitee_id))
+        pending_invites = self.get_success(
+            store.get_invited_rooms_for_local_user(invitee_id)
+        )
         self.assertEqual(len(pending_invites), 0, pending_invites)
 
         # Check that the membership of @invitee:test in the room is now "leave".
         memberships = self.get_success(
-            store.get_rooms_for_user_where_membership_is(invitee_id, [Membership.LEAVE])
+            store.get_rooms_for_local_user_where_membership_is(
+                invitee_id, [Membership.LEAVE]
+            )
         )
         self.assertEqual(len(memberships), 1, memberships)
         self.assertEqual(memberships[0].room_id, room_id, memberships)

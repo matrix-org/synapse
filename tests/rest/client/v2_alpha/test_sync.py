@@ -15,8 +15,6 @@
 # limitations under the License.
 import json
 
-from mock import Mock
-
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.rest.client.v1 import login, room
@@ -35,13 +33,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         login.register_servlets,
         sync.register_servlets,
     ]
-
-    def make_homeserver(self, reactor, clock):
-
-        hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock()
-        )
-        return hs
 
     def test_sync_argless(self):
         request, channel = self.make_request("GET", "/sync")

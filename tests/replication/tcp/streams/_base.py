@@ -73,6 +73,6 @@ class TestReplicationClientHandler(object):
     def finished_connecting(self):
         pass
 
-    def on_rdata(self, stream_name, token, rows):
+    async def on_rdata(self, stream_name, token, rows):
         for r in rows:
             self.received_rdata_rows.append((stream_name, token, r))
