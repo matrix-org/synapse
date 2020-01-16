@@ -32,6 +32,11 @@ from twisted.internet import defer, reactor
 import synapse
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
+from synapse.logging.context import (
+    LoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
 from synapse.storage.data_stores.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.data_stores.main.deviceinbox import (
     DeviceInboxBackgroundUpdateStore,
@@ -60,11 +65,6 @@ from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util import Clock
 from synapse.util.versionstring import get_version_string
-from synapse.logging.context import (
-    LoggingContext,
-    make_deferred_yieldable,
-    run_in_background,
-)
 
 logger = logging.getLogger("synapse_port_db")
 
