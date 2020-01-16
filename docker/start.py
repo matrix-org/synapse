@@ -173,7 +173,7 @@ def run_generate_config(environ, ownership):
         subprocess.check_output(["chown", ownership, data_dir])
 
         args = ["gosu", ownership] + args
-        os.execv("/sbin/gosu", args)
+        os.execv("/usr/sbin/gosu", args)
     else:
         os.execv("/usr/local/bin/python", args)
 
@@ -250,7 +250,7 @@ def main(args, environ):
     args = ["python", "-m", synapse_worker, "--config-path", config_path]
     if ownership is not None:
         args = ["gosu", ownership] + args
-        os.execv("/sbin/gosu", args)
+        os.execv("/usr/sbin/gosu", args)
     else:
         os.execv("/usr/local/bin/python", args)
 
