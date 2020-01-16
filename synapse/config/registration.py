@@ -212,7 +212,7 @@ class RegistrationConfig(Config):
           #
           #account_renewed_html_path: "account_renewed.html"
 
-          # File within' template_dir' giving the HTML to be displayed when the user
+          # File within 'template_dir' giving the HTML to be displayed when the user
           # tries to renew an account with an invalid renewal token. If not set,
           # default text is used.
           #

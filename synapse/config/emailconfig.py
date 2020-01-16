@@ -299,14 +299,14 @@ class EmailConfig(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
-        # Configuration for sending emails from synapse.
+        # Configuration for sending emails from Synapse.
         #
         email:
-          # the hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
+          # The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
           #
           #smtp_host: mail.server
 
-          # the port on the mail server for outgoing SMTP. Defaults to 25.
+          # The port on the mail server for outgoing SMTP. Defaults to 25.
           #
           #smtp_port: 587
 
@@ -317,8 +317,8 @@ class EmailConfig(Config):
           # smtp_pass: "examplepassword"
 
           # Uncomment the following to require TLS transport security for SMTP.
-          # By default, synapse will connect over plain text, and will then switch to
-          # TLS via STARTTLS *if the server supports it*. If this option is set,
+          # By default, Synapse will connect over plain text, and will then switch to
+          # TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
           # Synapse will refuse to connect unless the server supports STARTTLS.
           #
           #require_transport_security: true
