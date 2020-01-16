@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import argparse
+import asyncio
 import curses
 import logging
 import sys
@@ -189,11 +190,10 @@ class Porter(object):
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
-    @defer.inlineCallbacks
-    def setup_table(self, table):
+    async def setup_table(self, table):
         if table in APPEND_ONLY_TABLES:
             # It's safe to just carry on inserting.
-            row = yield self.postgres_store.db.simple_select_one(
+            row = await self.postgres_store.db.simple_select_one(
                 table="port_from_sqlite3",
                 keyvalues={"table_name": table},
                 retcols=("forward_rowid", "backward_rowid"),
@@ -207,10 +207,10 @@ class Porter(object):
                         forward_chunk,
                         already_ported,
                         total_to_port,
-                    ) = yield self._setup_sent_transactions()
+                    ) = await self._setup_sent_transactions()
                     backward_chunk = 0
                 else:
-                    yield self.postgres_store.db.simple_insert(
+                    await self.postgres_store.db.simple_insert(
                         table="port_from_sqlite3",
                         values={
                             "table_name": table,
@@ -227,7 +227,7 @@ class Porter(object):
                 backward_chunk = row["backward_rowid"]
 
             if total_to_port is None:
-                already_ported, total_to_port = yield self._get_total_count_to_port(
+                already_ported, total_to_port = await self._get_total_count_to_port(
                     table, forward_chunk, backward_chunk
                 )
         else:
@@ -238,9 +238,9 @@ class Porter(object):
                 )
                 txn.execute("TRUNCATE %s CASCADE" % (table,))
 
-            yield self.postgres_store.execute(delete_all)
+            await self.postgres_store.execute(delete_all)
 
-            yield self.postgres_store.db.simple_insert(
+            await self.postgres_store.db.simple_insert(
                 table="port_from_sqlite3",
                 values={"table_name": table, "forward_rowid": 1, "backward_rowid": 0},
             )
@@ -248,7 +248,7 @@ class Porter(object):
             forward_chunk = 1
             backward_chunk = 0
 
-            already_ported, total_to_port = yield self._get_total_count_to_port(
+            already_ported, total_to_port = await self._get_total_count_to_port(
                 table, forward_chunk, backward_chunk
             )
 
@@ -275,7 +275,7 @@ class Porter(object):
         self.progress.add_table(table, postgres_size, table_size)
 
         if table == "event_search":
-            yield self.handle_search_table(
+            await self.handle_search_table(
                 postgres_size, table_size, forward_chunk, backward_chunk
             )
             return
@@ -294,7 +294,7 @@ class Porter(object):
         if table == "user_directory_stream_pos":
             # We need to make sure there is a single row, `(X, null), as that is
             # what synapse expects to be there.
-            yield self.postgres_store.db.simple_insert(
+            await self.postgres_store.db.simple_insert(
                 table=table, values={"stream_id": None}
             )
             self.progress.update(table, table_size)  # Mark table as done
@@ -335,7 +335,7 @@ class Porter(object):
 
                 return headers, forward_rows, backward_rows
 
-            headers, frows, brows = yield self.sqlite_store.db.runInteraction(
+            headers, frows, brows = await self.sqlite_store.db.runInteraction(
                 "select", r
             )
 
@@ -361,7 +361,7 @@ class Porter(object):
                         },
                     )
 
-                yield self.postgres_store.execute(insert)
+                await self.postgres_store.execute(insert)
 
                 postgres_size += len(rows)
 
@@ -390,7 +390,7 @@ class Porter(object):
 
                 return headers, rows
 
-            headers, rows = yield self.sqlite_store.db.runInteraction("select", r)
+            headers, rows = await self.sqlite_store.db.runInteraction("select", r)
 
             if rows:
                 forward_chunk = rows[-1][0] + 1
@@ -438,7 +438,7 @@ class Porter(object):
                         },
                     )
 
-                yield self.postgres_store.execute(insert)
+                await self.postgres_store.execute(insert)
 
                 postgres_size += len(rows)
 
@@ -480,7 +480,7 @@ class Porter(object):
     def run_background_updates_on_postgres(self):
         # Manually apply all background updates on the PostgreSQL database.
         postgres_ready = (
-            yield self.postgres_store.db.updates.has_completed_background_updates()
+            await self.postgres_store.db.updates.has_completed_background_updates()
         )
 
         if not postgres_ready:
@@ -489,8 +489,10 @@ class Porter(object):
             self.progress.set_state("Running background updates on PostgreSQL")
 
         while not postgres_ready:
-            yield self.postgres_store.db.updates.do_next_background_update(100)
-            postgres_ready = yield (
+            await defer.ensureDeferred(
+                self.postgres_store.db.updates.do_next_background_update(100)
+            )
+            postgres_ready = await (
                 self.postgres_store.db.updates.has_completed_background_updates()
             )
 
@@ -505,7 +507,7 @@ class Porter(object):
 
             # Check if all background updates are done, abort if not.
             updates_complete = (
-                yield self.sqlite_store.db.updates.has_completed_background_updates()
+                await self.sqlite_store.db.updates.has_completed_background_updates()
             )
             if not updates_complete:
                 raise Exception(
@@ -518,7 +520,7 @@ class Porter(object):
                 self.hs_config.get_single_database()
             )
 
-            yield self.run_background_updates_on_postgres()
+            await self.run_background_updates_on_postgres()
 
             self.progress.set_state("Creating port tables")
 
@@ -546,22 +548,22 @@ class Porter(object):
                 )
 
             try:
-                yield self.postgres_store.db.runInteraction("alter_table", alter_table)
+                await self.postgres_store.db.runInteraction("alter_table", alter_table)
             except Exception:
                 # On Error Resume Next
                 pass
 
-            yield self.postgres_store.db.runInteraction(
+            await self.postgres_store.db.runInteraction(
                 "create_port_table", create_port_table
             )
 
             # Step 2. Get tables.
             self.progress.set_state("Fetching tables")
-            sqlite_tables = yield self.sqlite_store.db.simple_select_onecol(
+            sqlite_tables = await self.sqlite_store.db.simple_select_onecol(
                 table="sqlite_master", keyvalues={"type": "table"}, retcol="name"
             )
 
-            postgres_tables = yield self.postgres_store.db.simple_select_onecol(
+            postgres_tables = await self.postgres_store.db.simple_select_onecol(
                 table="information_schema.tables",
                 keyvalues={},
                 retcol="distinct table_name",
@@ -572,24 +574,21 @@ class Porter(object):
 
             # Step 3. Figure out what still needs copying
             self.progress.set_state("Checking on port progress")
-            setup_res = yield defer.gatherResults(
-                [
+            setup_res = await asyncio.gather(
+                *[
                     self.setup_table(table)
                     for table in tables
                     if table not in ["schema_version", "applied_schema_deltas"]
                     and not table.startswith("sqlite_")
                 ],
-                consumeErrors=True,
             )
 
             # Step 4. Do the copying.
             self.progress.set_state("Copying to postgres")
-            yield defer.gatherResults(
-                [self.handle_table(*res) for res in setup_res], consumeErrors=True
-            )
+            await asyncio.gather(*[self.handle_table(*res) for res in setup_res])
 
             # Step 5. Do final post-processing
-            yield self._setup_state_group_id_seq()
+            await self._setup_state_group_id_seq()
 
             self.progress.done()
         except Exception:
@@ -655,7 +654,7 @@ class Porter(object):
 
             return headers, [r for r in rows if r[ts_ind] < yesterday]
 
-        headers, rows = yield self.sqlite_store.db.runInteraction("select", r)
+        headers, rows = await self.sqlite_store.db.runInteraction("select", r)
 
         rows = self._convert_rows("sent_transactions", headers, rows)
 
@@ -668,7 +667,7 @@ class Porter(object):
                     txn, "sent_transactions", headers[1:], rows
                 )
 
-            yield self.postgres_store.execute(insert)
+            await self.postgres_store.execute(insert)
         else:
             max_inserted_rowid = 0
 
@@ -685,10 +684,10 @@ class Porter(object):
             else:
                 return 1
 
-        next_chunk = yield self.sqlite_store.execute(get_start_id)
+        next_chunk = await self.sqlite_store.execute(get_start_id)
         next_chunk = max(max_inserted_rowid + 1, next_chunk)
 
-        yield self.postgres_store.db.simple_insert(
+        await self.postgres_store.db.simple_insert(
             table="port_from_sqlite3",
             values={
                 "table_name": "sent_transactions",
@@ -704,7 +703,7 @@ class Porter(object):
             (size,) = txn.fetchone()
             return int(size)
 
-        remaining_count = yield self.sqlite_store.execute(get_sent_table_size)
+        remaining_count = await self.sqlite_store.execute(get_sent_table_size)
 
         total_count = remaining_count + inserted_rows
 
@@ -712,11 +711,11 @@ class Porter(object):
 
     @defer.inlineCallbacks
     def _get_remaining_count_to_port(self, table, forward_chunk, backward_chunk):
-        frows = yield self.sqlite_store.execute_sql(
+        frows = await self.sqlite_store.execute_sql(
             "SELECT count(*) FROM %s WHERE rowid >= ?" % (table,), forward_chunk
         )
 
-        brows = yield self.sqlite_store.execute_sql(
+        brows = await self.sqlite_store.execute_sql(
             "SELECT count(*) FROM %s WHERE rowid <= ?" % (table,), backward_chunk
         )
 
@@ -724,7 +723,7 @@ class Porter(object):
 
     @defer.inlineCallbacks
     def _get_already_ported_count(self, table):
-        rows = yield self.postgres_store.execute_sql(
+        rows = await self.postgres_store.execute_sql(
             "SELECT count(*) FROM %s" % (table,)
         )
 
@@ -732,12 +731,11 @@ class Porter(object):
 
     @defer.inlineCallbacks
     def _get_total_count_to_port(self, table, forward_chunk, backward_chunk):
-        remaining, done = yield defer.gatherResults(
-            [
+        remaining, done = await asyncio.gather(
+            *[
                 self._get_remaining_count_to_port(table, forward_chunk, backward_chunk),
                 self._get_already_ported_count(table),
             ],
-            consumeErrors=True,
         )
 
         remaining = int(remaining) if remaining else 0
@@ -1009,7 +1007,10 @@ if __name__ == "__main__":
             hs_config=config,
         )
 
-        reactor.callWhenRunning(porter.run)
+        def run():
+            return defer.ensureDeferred(porter.run())
+
+        reactor.callWhenRunning(run)
 
         reactor.run()
 
