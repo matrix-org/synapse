@@ -103,7 +103,7 @@ def register_cache(
                     cache_hits.labels(cache_name).set(self.hits)
                     cache_evicted.labels(cache_name).set(self.evicted_size)
                     cache_total.labels(cache_name).set(self.hits + self.misses)
-                    if hasattr(cache, "max_size"):
+                    if getattr(cache, "max_size", None):
                         cache_max_size.labels(cache_name).set(cache.max_size)
                 if collect_callback:
                     collect_callback()

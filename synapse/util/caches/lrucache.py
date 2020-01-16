@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import math
 import threading
 from functools import wraps
 
@@ -81,7 +79,7 @@ class LruCache(object):
 
         # Save the original max size, and apply the default size factor.
         self._original_max_size = max_size
-        self.max_size = math.floor(max_size * cache_config.DEFAULT_CACHE_SIZE_FACTOR)
+        self.max_size = int(max_size * cache_config.DEFAULT_CACHE_SIZE_FACTOR)
 
         list_root = _Node(None, None, None, None)
         list_root.next_node = list_root
@@ -285,7 +283,7 @@ class LruCache(object):
         Returns:
             bool: Whether the cache changed size or not.
         """
-        new_size = math.floor(self._original_max_size * factor)
+        new_size = int(self._original_max_size * factor)
         if new_size != self.max_size:
             self.max_size = new_size
             self._on_resize()

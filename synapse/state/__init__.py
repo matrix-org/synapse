@@ -442,11 +442,10 @@ class StateResolutionHandler(object):
         self._state_cache = None
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
-        cache_size = 100000 * hs.config.caches.get_factor_for("state_cache")
         self._state_cache = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
-            max_len=cache_size,
+            max_len=100000,
             expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             iterable=True,
             reset_expiry_on_get=True,
