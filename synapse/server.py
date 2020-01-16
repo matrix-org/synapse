@@ -239,11 +239,7 @@ class HomeServer(object):
     def setup(self):
         logger.info("Setting up.")
         self.start_time = int(self.get_clock().time())
-<<<<<<< HEAD
-        self.get_clock().looping_call(self.config.caches.resize_caches, 10000)
-=======
         self.datastores = DataStores(self.DATASTORE_CLASS, self)
->>>>>>> origin/develop
         logger.info("Finished setting up.")
 
     def setup_master(self):

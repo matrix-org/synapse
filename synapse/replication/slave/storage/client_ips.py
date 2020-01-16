@@ -15,7 +15,6 @@
 
 from synapse.storage.data_stores.main.client_ips import LAST_SEEN_GRANULARITY
 from synapse.storage.database import Database
-from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.descriptors import Cache
 
 from ._base import BaseSlavedStore

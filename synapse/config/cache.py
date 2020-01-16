@@ -46,6 +46,7 @@ _DEFAULT_CONFIG = """\
 
 def add_resizable_cache(cache_name, cache_resize_callback):
     _CACHES[cache_name.lower()] = cache_resize_callback
+    cache_resize_callback(DEFAULT_CACHE_SIZE_FACTOR)
 
 
 class CacheConfig(Config):

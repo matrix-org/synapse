@@ -34,13 +34,8 @@ from synapse.api.errors import (
     ResourceLimitError,
 )
 from synapse.config.server import is_threepid_reserved
-<<<<<<< HEAD
-from synapse.types import UserID
-from synapse.util.caches import register_cache
-=======
 from synapse.types import StateMap, UserID
-from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
->>>>>>> origin/develop
+from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
