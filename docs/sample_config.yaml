@@ -928,7 +928,7 @@ account_validity:
   #
   #account_renewed_html_path: "account_renewed.html"
 
-  # File within' template_dir' giving the HTML to be displayed when the user
+  # File within 'template_dir' giving the HTML to be displayed when the user
   # tries to renew an account with an invalid renewal token. If not set,
   # default text is used.
   #
@@ -1371,14 +1371,14 @@ password_config:
 
 
 
-# Configuration for sending emails from synapse.
+# Configuration for sending emails from Synapse.
 #
 email:
-  # the hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
+  # The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
   #
   #smtp_host: mail.server
 
-  # the port on the mail server for outgoing SMTP. Defaults to 25.
+  # The port on the mail server for outgoing SMTP. Defaults to 25.
   #
   #smtp_port: 587
 
@@ -1389,8 +1389,8 @@ email:
   # smtp_pass: "examplepassword"
 
   # Uncomment the following to require TLS transport security for SMTP.
-  # By default, synapse will connect over plain text, and will then switch to
-  # TLS via STARTTLS *if the server supports it*. If this option is set,
+  # By default, Synapse will connect over plain text, and will then switch to
+  # TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
   # Synapse will refuse to connect unless the server supports STARTTLS.
   #
   #require_transport_security: true
