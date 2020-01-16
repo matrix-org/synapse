@@ -34,7 +34,6 @@ from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
-from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
@@ -116,9 +115,8 @@ class ASReplicationHandler(ReplicationClientHandler):
         super(ASReplicationHandler, self).__init__(hs.get_datastore())
         self.appservice_handler = hs.get_application_service_handler()
 
-    @defer.inlineCallbacks
-    def on_rdata(self, stream_name, token, rows):
-        yield super(ASReplicationHandler, self).on_rdata(stream_name, token, rows)
+    async def on_rdata(self, stream_name, token, rows):
+        await super(ASReplicationHandler, self).on_rdata(stream_name, token, rows)
 
         if stream_name == "events":
             max_stream_id = self.store.get_room_max_stream_ordering()
@@ -143,8 +141,6 @@ def start(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    database_engine = create_engine(config.database_config)
-
     if config.notify_appservices:
         sys.stderr.write(
             "\nThe appservices must be disabled in the main synapse process"
@@ -159,10 +155,8 @@ def start(config_options):
 
     ps = AppserviceServer(
         config.server_name,
-        db_config=config.database_config,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
-        database_engine=database_engine,
     )
 
     setup_logging(ps, config, use_worker_options=True)

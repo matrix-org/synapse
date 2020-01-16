@@ -46,7 +46,9 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         """Re run the background update to clean up the extremities.
         """
         # Make sure we don't clash with in progress updates.
-        self.assertTrue(self.store._all_done, "Background updates are still ongoing")
+        self.assertTrue(
+            self.store.db.updates._all_done, "Background updates are still ongoing"
+        )
 
         schema_path = os.path.join(
             prepare_database.dir_path,
@@ -62,14 +64,20 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
             prepare_database.executescript(txn, schema_path)
 
         self.get_success(
-            self.store.runInteraction("test_delete_forward_extremities", run_delta_file)
+            self.store.db.runInteraction(
+                "test_delete_forward_extremities", run_delta_file
+            )
         )
 
         # Ugh, have to reset this flag
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
     def test_soft_failed_extremities_handled_correctly(self):
         """Test that extremities are correctly calculated in the presence of

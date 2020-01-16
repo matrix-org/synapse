@@ -26,8 +26,6 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import create_engine
-from synapse.storage.prepare_database import prepare_database
 
 logger = logging.getLogger("update_database")
 
@@ -35,20 +33,10 @@ logger = logging.getLogger("update_database")
 class MockHomeserver(HomeServer):
     DATASTORE_CLASS = DataStore
 
-    def __init__(self, config, database_engine, db_conn, **kwargs):
+    def __init__(self, config, **kwargs):
         super(MockHomeserver, self).__init__(
-            config.server_name,
-            reactor=reactor,
-            config=config,
-            database_engine=database_engine,
-            **kwargs
+            config.server_name, reactor=reactor, config=config, **kwargs
         )
-
-        self.database_engine = database_engine
-        self.db_conn = db_conn
-
-    def get_db_conn(self):
-        return self.db_conn
 
 
 if __name__ == "__main__":
@@ -58,10 +46,10 @@ if __name__ == "__main__":
             " on it."
         )
     )
-    parser.add_argument("-v", action='store_true')
+    parser.add_argument("-v", action="store_true")
     parser.add_argument(
         "--database-config",
-        type=argparse.FileType('r'),
+        type=argparse.FileType("r"),
         required=True,
         help="A database config file for either a SQLite3 database or a PostgreSQL one.",
     )
@@ -85,40 +73,23 @@ if __name__ == "__main__":
     config = HomeServerConfig()
     config.parse_config_dict(hs_config, "", "")
 
-    # Create the database engine and a connection to it.
-    database_engine = create_engine(config.database_config)
-    db_conn = database_engine.module.connect(
-        **{
-            k: v
-            for k, v in config.database_config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-    )
-
-    # Update the database to the latest schema.
-    prepare_database(db_conn, database_engine, config=config)
-    db_conn.commit()
-
     # Instantiate and initialise the homeserver object.
-    hs = MockHomeserver(
-        config,
-        database_engine,
-        db_conn,
-        db_config=config.database_config,
-    )
-    # setup instantiates the store within the homeserver object.
+    hs = MockHomeserver(config)
+
+    # Setup instantiates the store within the homeserver object and updates the
+    # DB.
     hs.setup()
     store = hs.get_datastore()
 
     @defer.inlineCallbacks
     def run_background_updates():
-        yield store.run_background_updates(sleep=False)
+        yield store.db.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 
     # Apply all background updates on the database.
-    reactor.callWhenRunning(lambda: run_as_background_process(
-        "background_updates", run_background_updates
-    ))
+    reactor.callWhenRunning(
+        lambda: run_as_background_process("background_updates", run_background_updates)
+    )
 
     reactor.run()

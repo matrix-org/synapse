@@ -15,6 +15,8 @@
 
 from mock import Mock
 
+from twisted.internet import defer
+
 from synapse.rest.client.v1 import presence
 from synapse.types import UserID
 
@@ -36,6 +38,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         )
 
         hs.presence_handler = Mock()
+        hs.presence_handler.set_state.return_value = defer.succeed(None)
 
         return hs
 

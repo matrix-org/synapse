@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +16,7 @@
 # limitations under the License.
 
 """Contains functions for performing events on rooms."""
+
 import itertools
 import logging
 import math
@@ -30,7 +32,15 @@ from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, Syna
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
-from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
+from synapse.types import (
+    Requester,
+    RoomAlias,
+    RoomID,
+    RoomStreamToken,
+    StateMap,
+    StreamToken,
+    UserID,
+)
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
@@ -183,7 +193,7 @@ class RoomCreationHandler(BaseHandler):
             requester, tombstone_event, tombstone_context
         )
 
-        old_room_state = yield tombstone_context.get_current_state_ids(self.store)
+        old_room_state = yield tombstone_context.get_current_state_ids()
 
         # update any aliases
         yield self._move_aliases_to_new_room(
@@ -205,15 +215,19 @@ class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _update_upgraded_room_pls(
-        self, requester, old_room_id, new_room_id, old_room_state,
+        self,
+        requester: Requester,
+        old_room_id: str,
+        new_room_id: str,
+        old_room_state: StateMap[str],
     ):
         """Send updated power levels in both rooms after an upgrade
 
         Args:
-            requester (synapse.types.Requester): the user requesting the upgrade
-            old_room_id (str): the id of the room to be replaced
-            new_room_id (str): the id of the replacement room
-            old_room_state (dict[tuple[str, str], str]): the state map for the old room
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            new_room_id: the id of the replacement room
+            old_room_state: the state map for the old room
 
         Returns:
             Deferred
@@ -270,7 +284,7 @@ class RoomCreationHandler(BaseHandler):
             except AuthError as e:
                 logger.warning("Unable to update PLs in old room: %s", e)
 
-        logger.info("Setting correct PLs in new room")
+        logger.info("Setting correct PLs in new room to %s", old_room_pl_state.content)
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -364,13 +378,18 @@ class RoomCreationHandler(BaseHandler):
         needed_power_level = max(state_default, ban, max(event_power_levels.values()))
 
         # Raise the requester's power level in the new room if necessary
-        current_power_level = power_levels["users"][requester.user.to_string()]
+        current_power_level = power_levels["users"][user_id]
         if current_power_level < needed_power_level:
-            # Assign this power level to the requester
-            power_levels["users"][requester.user.to_string()] = needed_power_level
+            # make sure we copy the event content rather than overwriting it.
+            # note that if frozen_dicts are enabled, `power_levels` will be a frozen
+            # dict so we can't just copy.deepcopy it.
 
-        # Set the power levels to the modified state
-        initial_state[(EventTypes.PowerLevels, "")] = power_levels
+            new_power_levels = {k: v for k, v in power_levels.items() if k != "users"}
+            new_power_levels["users"] = {
+                k: v for k, v in power_levels.get("users", {}).items() if k != user_id
+            }
+            new_power_levels["users"][user_id] = needed_power_level
+            initial_state[(EventTypes.PowerLevels, "")] = new_power_levels
 
         yield self._send_events_for_new_room(
             requester,
@@ -732,7 +751,7 @@ class RoomCreationHandler(BaseHandler):
         initial_state,
         creation_content,
         room_alias=None,
-        power_level_content_override=None,
+        power_level_content_override=None,  # Doesn't apply when initial state has power level state event content
         creator_join_profile=None,
     ):
         def create(etype, content, **kwargs):
@@ -900,9 +919,16 @@ class RoomContextHandler(object):
             room_id, event_id, before_limit, after_limit, event_filter
         )
 
+        if event_filter:
+            results["events_before"] = event_filter.filter(results["events_before"])
+            results["events_after"] = event_filter.filter(results["events_after"])
+
         results["events_before"] = yield filter_evts(results["events_before"])
         results["events_after"] = yield filter_evts(results["events_after"])
-        results["event"] = event
+        # filter_evts can return a pruned event in case the user is allowed to see that
+        # there's something there but not see the content, so use the event that's in
+        # `filtered` rather than the event we retrieved from the datastore.
+        results["event"] = filtered[0]
 
         if results["events_after"]:
             last_event_id = results["events_after"][-1].event_id
@@ -928,7 +954,12 @@ class RoomContextHandler(object):
         state = yield self.state_store.get_state_for_events(
             [last_event_id], state_filter=state_filter
         )
-        results["state"] = list(state[last_event_id].values())
+
+        state_events = list(state[last_event_id].values())
+        if event_filter:
+            state_events = event_filter.filter(state_events)
+
+        results["state"] = yield filter_evts(state_events)
 
         # We use a dummy token here as we only care about the room portion of
         # the token, which we replace.
@@ -998,15 +1029,3 @@ class RoomEventSource(object):
 
     def get_current_key_for_room(self, room_id):
         return self.store.get_room_events_max_id(room_id)
-
-    @defer.inlineCallbacks
-    def get_pagination_rows(self, user, config, key):
-        events, next_key = yield self.store.paginate_room_events(
-            room_id=key,
-            from_key=config.from_key,
-            to_key=config.to_key,
-            direction=config.direction,
-            limit=config.limit,
-        )
-
-        return (events, next_key)

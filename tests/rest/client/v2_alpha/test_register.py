@@ -391,9 +391,8 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # Email config.
         self.email_attempts = []
 
-        def sendmail(*args, **kwargs):
+        async def sendmail(*args, **kwargs):
             self.email_attempts.append((args, kwargs))
-            return
 
         config["email"] = {
             "enable_notifs": True,

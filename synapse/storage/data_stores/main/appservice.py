@@ -24,6 +24,7 @@ from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
+from synapse.storage.database import Database
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +49,13 @@ def _make_exclusive_regex(services_cache):
 
 
 class ApplicationServiceWorkerStore(SQLBaseStore):
-    def __init__(self, db_conn, hs):
+    def __init__(self, database: Database, db_conn, hs):
         self.services_cache = load_appservices(
             hs.hostname, hs.config.app_service_config_files
         )
         self.exclusive_user_regex = _make_exclusive_regex(self.services_cache)
 
-        super(ApplicationServiceWorkerStore, self).__init__(db_conn, hs)
+        super(ApplicationServiceWorkerStore, self).__init__(database, db_conn, hs)
 
     def get_app_services(self):
         return self.services_cache
@@ -133,7 +134,7 @@ class ApplicationServiceTransactionWorkerStore(
             A Deferred which resolves to a list of ApplicationServices, which
             may be empty.
         """
-        results = yield self._simple_select_list(
+        results = yield self.db.simple_select_list(
             "application_services_state", dict(state=state), ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
@@ -155,7 +156,7 @@ class ApplicationServiceTransactionWorkerStore(
         Returns:
             A Deferred which resolves to ApplicationServiceState.
         """
-        result = yield self._simple_select_one(
+        result = yield self.db.simple_select_one(
             "application_services_state",
             dict(as_id=service.id),
             ["state"],
@@ -175,7 +176,7 @@ class ApplicationServiceTransactionWorkerStore(
         Returns:
             A Deferred which resolves when the state was set successfully.
         """
-        return self._simple_upsert(
+        return self.db.simple_upsert(
             "application_services_state", dict(as_id=service.id), dict(state=state)
         )
 
@@ -216,7 +217,7 @@ class ApplicationServiceTransactionWorkerStore(
             )
             return AppServiceTransaction(service=service, id=new_txn_id, events=events)
 
-        return self.runInteraction("create_appservice_txn", _create_appservice_txn)
+        return self.db.runInteraction("create_appservice_txn", _create_appservice_txn)
 
     def complete_appservice_txn(self, txn_id, service):
         """Completes an application service transaction.
@@ -249,7 +250,7 @@ class ApplicationServiceTransactionWorkerStore(
                 )
 
             # Set current txn_id for AS to 'txn_id'
-            self._simple_upsert_txn(
+            self.db.simple_upsert_txn(
                 txn,
                 "application_services_state",
                 dict(as_id=service.id),
@@ -257,11 +258,13 @@ class ApplicationServiceTransactionWorkerStore(
             )
 
             # Delete txn
-            self._simple_delete_txn(
+            self.db.simple_delete_txn(
                 txn, "application_services_txns", dict(txn_id=txn_id, as_id=service.id)
             )
 
-        return self.runInteraction("complete_appservice_txn", _complete_appservice_txn)
+        return self.db.runInteraction(
+            "complete_appservice_txn", _complete_appservice_txn
+        )
 
     @defer.inlineCallbacks
     def get_oldest_unsent_txn(self, service):
@@ -283,7 +286,7 @@ class ApplicationServiceTransactionWorkerStore(
                 " ORDER BY txn_id ASC LIMIT 1",
                 (service.id,),
             )
-            rows = self.cursor_to_dict(txn)
+            rows = self.db.cursor_to_dict(txn)
             if not rows:
                 return None
 
@@ -291,7 +294,7 @@ class ApplicationServiceTransactionWorkerStore(
 
             return entry
 
-        entry = yield self.runInteraction(
+        entry = yield self.db.runInteraction(
             "get_oldest_unsent_appservice_txn", _get_oldest_unsent_txn
         )
 
@@ -321,7 +324,7 @@ class ApplicationServiceTransactionWorkerStore(
                 "UPDATE appservice_stream_position SET stream_ordering = ?", (pos,)
             )
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "set_appservice_last_pos", set_appservice_last_pos_txn
         )
 
@@ -350,7 +353,7 @@ class ApplicationServiceTransactionWorkerStore(
 
             return upper_bound, [row[1] for row in rows]
 
-        upper_bound, event_ids = yield self.runInteraction(
+        upper_bound, event_ids = yield self.db.runInteraction(
             "get_new_events_for_appservice", get_new_events_for_appservice_txn
         )
 

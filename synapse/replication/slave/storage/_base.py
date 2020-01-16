@@ -14,11 +14,13 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import six
 
-from synapse.storage._base import _CURRENT_STATE_CACHE_NAME, SQLBaseStore
+from synapse.storage._base import SQLBaseStore
+from synapse.storage.data_stores.main.cache import CURRENT_STATE_CACHE_NAME
+from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 
 from ._slaved_id_tracker import SlavedIdTracker
@@ -34,12 +36,12 @@ def __func__(inp):
 
 
 class BaseSlavedStore(SQLBaseStore):
-    def __init__(self, db_conn, hs):
-        super(BaseSlavedStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(BaseSlavedStore, self).__init__(database, db_conn, hs)
         if isinstance(self.database_engine, PostgresEngine):
             self._cache_id_gen = SlavedIdTracker(
                 db_conn, "cache_invalidation_stream", "stream_id"
-            )
+            )  # type: Optional[SlavedIdTracker]
         else:
             self._cache_id_gen = None
 
@@ -60,9 +62,10 @@ class BaseSlavedStore(SQLBaseStore):
 
     def process_replication_rows(self, stream_name, token, rows):
         if stream_name == "caches":
-            self._cache_id_gen.advance(token)
+            if self._cache_id_gen:
+                self._cache_id_gen.advance(token)
             for row in rows:
-                if row.cache_func == _CURRENT_STATE_CACHE_NAME:
+                if row.cache_func == CURRENT_STATE_CACHE_NAME:
                     room_id = row.keys[0]
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)

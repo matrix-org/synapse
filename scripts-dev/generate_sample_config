@@ -7,12 +7,22 @@ set -e
 cd `dirname $0`/..
 
 SAMPLE_CONFIG="docs/sample_config.yaml"
+SAMPLE_LOG_CONFIG="docs/sample_log_config.yaml"
+
+check() {
+    diff -u "$SAMPLE_LOG_CONFIG" <(./scripts/generate_log_config) >/dev/null || return 1
+}
 
 if [ "$1" == "--check" ]; then
     diff -u "$SAMPLE_CONFIG" <(./scripts/generate_config --header-file docs/.sample_config_header.yaml) >/dev/null || {
         echo -e "\e[1m\e[31m$SAMPLE_CONFIG is not up-to-date. Regenerate it with \`scripts-dev/generate_sample_config\`.\e[0m" >&2
         exit 1
     }
+    diff -u "$SAMPLE_LOG_CONFIG" <(./scripts/generate_log_config) >/dev/null || {
+        echo -e "\e[1m\e[31m$SAMPLE_LOG_CONFIG is not up-to-date. Regenerate it with \`scripts-dev/generate_sample_config\`.\e[0m" >&2
+        exit 1
+    }
 else
     ./scripts/generate_config --header-file docs/.sample_config_header.yaml -o "$SAMPLE_CONFIG"
+    ./scripts/generate_log_config -o "$SAMPLE_LOG_CONFIG"
 fi

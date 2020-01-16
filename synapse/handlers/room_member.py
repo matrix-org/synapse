@@ -25,7 +25,7 @@ from twisted.internet import defer
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.types import RoomID, UserID
+from synapse.types import Collection, RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
@@ -149,7 +149,7 @@ class RoomMemberHandler(object):
         target,
         room_id,
         membership,
-        prev_events_and_hashes,
+        prev_event_ids: Collection[str],
         txn_id=None,
         ratelimit=True,
         content=None,
@@ -177,7 +177,7 @@ class RoomMemberHandler(object):
             },
             token_id=requester.access_token_id,
             txn_id=txn_id,
-            prev_events_and_hashes=prev_events_and_hashes,
+            prev_event_ids=prev_event_ids,
             require_consent=require_consent,
         )
 
@@ -193,7 +193,7 @@ class RoomMemberHandler(object):
             requester, event, context, extra_users=[target], ratelimit=ratelimit
         )
 
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
 
         prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
 
@@ -370,8 +370,7 @@ class RoomMemberHandler(object):
             if block_invite:
                 raise SynapseError(403, "Invites have been disabled on this server")
 
-        prev_events_and_hashes = yield self.store.get_prev_events_for_room(room_id)
-        latest_event_ids = (event_id for (event_id, _, _) in prev_events_and_hashes)
+        latest_event_ids = yield self.store.get_prev_events_for_room(room_id)
 
         current_state_ids = yield self.state_handler.get_current_state_ids(
             room_id, latest_event_ids=latest_event_ids
@@ -485,7 +484,7 @@ class RoomMemberHandler(object):
             membership=effective_membership_state,
             txn_id=txn_id,
             ratelimit=ratelimit,
-            prev_events_and_hashes=prev_events_and_hashes,
+            prev_event_ids=latest_event_ids,
             content=content,
             require_consent=require_consent,
         )
@@ -507,6 +506,8 @@ class RoomMemberHandler(object):
         Returns:
             Deferred
         """
+        logger.info("Transferring room state from %s to %s", old_room_id, room_id)
+
         # Find all local users that were in the old room and copy over each user's state
         users = yield self.store.get_users_in_room(old_room_id)
         yield self.copy_user_state_on_room_upgrade(old_room_id, room_id, users)
@@ -601,7 +602,7 @@ class RoomMemberHandler(object):
         if prev_event is not None:
             return
 
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
         if event.membership == Membership.JOIN:
             if requester.is_guest:
                 guest_can_join = yield self._can_guest_join(prev_state_ids)
@@ -689,7 +690,7 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _get_inviter(self, user_id, room_id):
-        invite = yield self.store.get_invite_for_user_in_room(
+        invite = yield self.store.get_invite_for_local_user_in_room(
             user_id=user_id, room_id=room_id
         )
         if invite:

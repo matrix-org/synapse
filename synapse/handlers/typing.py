@@ -257,7 +257,7 @@ class TypingHandler(object):
             "typing_key", self._latest_room_serial, rooms=[member.room_id]
         )
 
-    def get_all_typing_updates(self, last_id, current_id):
+    async def get_all_typing_updates(self, last_id, current_id):
         if last_id == current_id:
             return []
 
@@ -313,10 +313,7 @@ class TypingNotificationEventSource(object):
 
                 events.append(self._make_event_for(room_id))
 
-            return events, handler._latest_room_serial
+            return defer.succeed((events, handler._latest_room_serial))
 
     def get_current_key(self):
         return self.get_typing_handler()._latest_room_serial
-
-    def get_pagination_rows(self, user, pagination_config, key):
-        return [], pagination_config.from_key

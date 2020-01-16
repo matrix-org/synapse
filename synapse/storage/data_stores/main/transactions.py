@@ -24,6 +24,7 @@ from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage.database import Database
 from synapse.util.caches.expiringcache import ExpiringCache
 
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
@@ -52,8 +53,8 @@ class TransactionStore(SQLBaseStore):
     """A collection of queries for handling PDUs.
     """
 
-    def __init__(self, db_conn, hs):
-        super(TransactionStore, self).__init__(db_conn, hs)
+    def __init__(self, database: Database, db_conn, hs):
+        super(TransactionStore, self).__init__(database, db_conn, hs)
 
         self._clock.looping_call(self._start_cleanup_transactions, 30 * 60 * 1000)
 
@@ -77,7 +78,7 @@ class TransactionStore(SQLBaseStore):
             this transaction or a 2-tuple of (int, dict)
         """
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_received_txn_response",
             self._get_received_txn_response,
             transaction_id,
@@ -85,7 +86,7 @@ class TransactionStore(SQLBaseStore):
         )
 
     def _get_received_txn_response(self, txn, transaction_id, origin):
-        result = self._simple_select_one_txn(
+        result = self.db.simple_select_one_txn(
             txn,
             table="received_transactions",
             keyvalues={"transaction_id": transaction_id, "origin": origin},
@@ -119,7 +120,7 @@ class TransactionStore(SQLBaseStore):
             response_json (str)
         """
 
-        return self._simple_insert(
+        return self.db.simple_insert(
             table="received_transactions",
             values={
                 "transaction_id": transaction_id,
@@ -148,7 +149,7 @@ class TransactionStore(SQLBaseStore):
         if result is not SENTINEL:
             return result
 
-        result = yield self.runInteraction(
+        result = yield self.db.runInteraction(
             "get_destination_retry_timings",
             self._get_destination_retry_timings,
             destination,
@@ -160,7 +161,7 @@ class TransactionStore(SQLBaseStore):
         return result
 
     def _get_destination_retry_timings(self, txn, destination):
-        result = self._simple_select_one_txn(
+        result = self.db.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
@@ -187,7 +188,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         self._destination_retry_cache.pop(destination, None)
-        return self.runInteraction(
+        return self.db.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
             destination,
@@ -227,7 +228,7 @@ class TransactionStore(SQLBaseStore):
         # We need to be careful here as the data may have changed from under us
         # due to a worker setting the timings.
 
-        prev_row = self._simple_select_one_txn(
+        prev_row = self.db.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
@@ -236,7 +237,7 @@ class TransactionStore(SQLBaseStore):
         )
 
         if not prev_row:
-            self._simple_insert_txn(
+            self.db.simple_insert_txn(
                 txn,
                 table="destinations",
                 values={
@@ -247,7 +248,7 @@ class TransactionStore(SQLBaseStore):
                 },
             )
         elif retry_interval == 0 or prev_row["retry_interval"] < retry_interval:
-            self._simple_update_one_txn(
+            self.db.simple_update_one_txn(
                 txn,
                 "destinations",
                 keyvalues={"destination": destination},
@@ -270,4 +271,6 @@ class TransactionStore(SQLBaseStore):
         def _cleanup_transactions_txn(txn):
             txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
 
-        return self.runInteraction("_cleanup_transactions", _cleanup_transactions_txn)
+        return self.db.runInteraction(
+            "_cleanup_transactions", _cleanup_transactions_txn
+        )

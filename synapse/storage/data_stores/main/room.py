@@ -17,7 +17,8 @@
 import collections
 import logging
 import re
-from typing import Optional, Tuple
+from abc import abstractmethod
+from typing import List, Optional, Tuple
 
 from six import integer_types
 
@@ -29,6 +30,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.search import SearchStore
+from synapse.storage.database import Database
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -45,6 +47,11 @@ RatelimitOverride = collections.namedtuple(
 
 
 class RoomWorkerStore(SQLBaseStore):
+    def __init__(self, database: Database, db_conn, hs):
+        super(RoomWorkerStore, self).__init__(database, db_conn, hs)
+
+        self.config = hs.config
+
     def get_room(self, room_id):
         """Retrieve a room.
 
@@ -53,7 +60,7 @@ class RoomWorkerStore(SQLBaseStore):
         Returns:
             A dict containing the room information, or None if the room is unknown.
         """
-        return self._simple_select_one(
+        return self.db.simple_select_one(
             table="rooms",
             keyvalues={"room_id": room_id},
             retcols=("room_id", "is_public", "creator"),
@@ -62,7 +69,7 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     def get_public_room_ids(self):
-        return self._simple_select_onecol(
+        return self.db.simple_select_onecol(
             table="rooms",
             keyvalues={"is_public": True},
             retcol="room_id",
@@ -119,7 +126,7 @@ class RoomWorkerStore(SQLBaseStore):
             txn.execute(sql, query_args)
             return txn.fetchone()[0]
 
-        return self.runInteraction("count_public_rooms", _count_public_rooms_txn)
+        return self.db.runInteraction("count_public_rooms", _count_public_rooms_txn)
 
     @defer.inlineCallbacks
     def get_largest_public_rooms(
@@ -252,21 +259,21 @@ class RoomWorkerStore(SQLBaseStore):
         def _get_largest_public_rooms_txn(txn):
             txn.execute(sql, query_args)
 
-            results = self.cursor_to_dict(txn)
+            results = self.db.cursor_to_dict(txn)
 
             if not forwards:
                 results.reverse()
 
             return results
 
-        ret_val = yield self.runInteraction(
+        ret_val = yield self.db.runInteraction(
             "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
         defer.returnValue(ret_val)
 
     @cached(max_entries=10000)
     def is_room_blocked(self, room_id):
-        return self._simple_select_one_onecol(
+        return self.db.simple_select_one_onecol(
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
             retcol="1",
@@ -287,7 +294,7 @@ class RoomWorkerStore(SQLBaseStore):
             of RatelimitOverride are None or 0 then ratelimitng has been
             disabled for that user entirely.
         """
-        row = yield self._simple_select_one(
+        row = yield self.db.simple_select_one(
             table="ratelimit_override",
             keyvalues={"user_id": user_id},
             retcols=("messages_per_second", "burst_count"),
@@ -329,9 +336,9 @@ class RoomWorkerStore(SQLBaseStore):
                 (room_id,),
             )
 
-            return self.cursor_to_dict(txn)
+            return self.db.cursor_to_dict(txn)
 
-        ret = yield self.runInteraction(
+        ret = yield self.db.runInteraction(
             "get_retention_policy_for_room", get_retention_policy_for_room_txn,
         )
 
@@ -359,378 +366,6 @@ class RoomWorkerStore(SQLBaseStore):
 
         defer.returnValue(row)
 
-
-class RoomStore(RoomWorkerStore, SearchStore):
-    def __init__(self, db_conn, hs):
-        super(RoomStore, self).__init__(db_conn, hs)
-
-        self.config = hs.config
-
-        self.register_background_update_handler(
-            "insert_room_retention", self._background_insert_retention,
-        )
-
-    @defer.inlineCallbacks
-    def _background_insert_retention(self, progress, batch_size):
-        """Retrieves a list of all rooms within a range and inserts an entry for each of
-        them into the room_retention table.
-        NULLs the property's columns if missing from the retention event in the room's
-        state (or NULLs all of them if there's no retention event in the room's state),
-        so that we fall back to the server's retention policy.
-        """
-
-        last_room = progress.get("room_id", "")
-
-        def _background_insert_retention_txn(txn):
-            txn.execute(
-                """
-                SELECT state.room_id, state.event_id, events.json
-                FROM current_state_events as state
-                LEFT JOIN event_json AS events ON (state.event_id = events.event_id)
-                WHERE state.room_id > ? AND state.type = '%s'
-                ORDER BY state.room_id ASC
-                LIMIT ?;
-                """
-                % EventTypes.Retention,
-                (last_room, batch_size),
-            )
-
-            rows = self.cursor_to_dict(txn)
-
-            if not rows:
-                return True
-
-            for row in rows:
-                if not row["json"]:
-                    retention_policy = {}
-                else:
-                    ev = json.loads(row["json"])
-                    retention_policy = json.dumps(ev["content"])
-
-                self._simple_insert_txn(
-                    txn=txn,
-                    table="room_retention",
-                    values={
-                        "room_id": row["room_id"],
-                        "event_id": row["event_id"],
-                        "min_lifetime": retention_policy.get("min_lifetime"),
-                        "max_lifetime": retention_policy.get("max_lifetime"),
-                    },
-                )
-
-            logger.info("Inserted %d rows into room_retention", len(rows))
-
-            self._background_update_progress_txn(
-                txn, "insert_room_retention", {"room_id": rows[-1]["room_id"]}
-            )
-
-            if batch_size > len(rows):
-                return True
-            else:
-                return False
-
-        end = yield self.runInteraction(
-            "insert_room_retention", _background_insert_retention_txn,
-        )
-
-        if end:
-            yield self._end_background_update("insert_room_retention")
-
-        defer.returnValue(batch_size)
-
-    @defer.inlineCallbacks
-    def store_room(self, room_id, room_creator_user_id, is_public):
-        """Stores a room.
-
-        Args:
-            room_id (str): The desired room ID, can be None.
-            room_creator_user_id (str): The user ID of the room creator.
-            is_public (bool): True to indicate that this room should appear in
-            public room lists.
-        Raises:
-            StoreError if the room could not be stored.
-        """
-        try:
-
-            def store_room_txn(txn, next_id):
-                self._simple_insert_txn(
-                    txn,
-                    "rooms",
-                    {
-                        "room_id": room_id,
-                        "creator": room_creator_user_id,
-                        "is_public": is_public,
-                    },
-                )
-                if is_public:
-                    self._simple_insert_txn(
-                        txn,
-                        table="public_room_list_stream",
-                        values={
-                            "stream_id": next_id,
-                            "room_id": room_id,
-                            "visibility": is_public,
-                        },
-                    )
-
-            with self._public_room_id_gen.get_next() as next_id:
-                yield self.runInteraction("store_room_txn", store_room_txn, next_id)
-        except Exception as e:
-            logger.error("store_room with room_id=%s failed: %s", room_id, e)
-            raise StoreError(500, "Problem creating room.")
-
-    @defer.inlineCallbacks
-    def set_room_is_public(self, room_id, is_public):
-        def set_room_is_public_txn(txn, next_id):
-            self._simple_update_one_txn(
-                txn,
-                table="rooms",
-                keyvalues={"room_id": room_id},
-                updatevalues={"is_public": is_public},
-            )
-
-            entries = self._simple_select_list_txn(
-                txn,
-                table="public_room_list_stream",
-                keyvalues={
-                    "room_id": room_id,
-                    "appservice_id": None,
-                    "network_id": None,
-                },
-                retcols=("stream_id", "visibility"),
-            )
-
-            entries.sort(key=lambda r: r["stream_id"])
-
-            add_to_stream = True
-            if entries:
-                add_to_stream = bool(entries[-1]["visibility"]) != is_public
-
-            if add_to_stream:
-                self._simple_insert_txn(
-                    txn,
-                    table="public_room_list_stream",
-                    values={
-                        "stream_id": next_id,
-                        "room_id": room_id,
-                        "visibility": is_public,
-                        "appservice_id": None,
-                        "network_id": None,
-                    },
-                )
-
-        with self._public_room_id_gen.get_next() as next_id:
-            yield self.runInteraction(
-                "set_room_is_public", set_room_is_public_txn, next_id
-            )
-        self.hs.get_notifier().on_new_replication_data()
-
-    @defer.inlineCallbacks
-    def set_room_is_public_appservice(
-        self, room_id, appservice_id, network_id, is_public
-    ):
-        """Edit the appservice/network specific public room list.
-
-        Each appservice can have a number of published room lists associated
-        with them, keyed off of an appservice defined `network_id`, which
-        basically represents a single instance of a bridge to a third party
-        network.
-
-        Args:
-            room_id (str)
-            appservice_id (str)
-            network_id (str)
-            is_public (bool): Whether to publish or unpublish the room from the
-                list.
-        """
-
-        def set_room_is_public_appservice_txn(txn, next_id):
-            if is_public:
-                try:
-                    self._simple_insert_txn(
-                        txn,
-                        table="appservice_room_list",
-                        values={
-                            "appservice_id": appservice_id,
-                            "network_id": network_id,
-                            "room_id": room_id,
-                        },
-                    )
-                except self.database_engine.module.IntegrityError:
-                    # We've already inserted, nothing to do.
-                    return
-            else:
-                self._simple_delete_txn(
-                    txn,
-                    table="appservice_room_list",
-                    keyvalues={
-                        "appservice_id": appservice_id,
-                        "network_id": network_id,
-                        "room_id": room_id,
-                    },
-                )
-
-            entries = self._simple_select_list_txn(
-                txn,
-                table="public_room_list_stream",
-                keyvalues={
-                    "room_id": room_id,
-                    "appservice_id": appservice_id,
-                    "network_id": network_id,
-                },
-                retcols=("stream_id", "visibility"),
-            )
-
-            entries.sort(key=lambda r: r["stream_id"])
-
-            add_to_stream = True
-            if entries:
-                add_to_stream = bool(entries[-1]["visibility"]) != is_public
-
-            if add_to_stream:
-                self._simple_insert_txn(
-                    txn,
-                    table="public_room_list_stream",
-                    values={
-                        "stream_id": next_id,
-                        "room_id": room_id,
-                        "visibility": is_public,
-                        "appservice_id": appservice_id,
-                        "network_id": network_id,
-                    },
-                )
-
-        with self._public_room_id_gen.get_next() as next_id:
-            yield self.runInteraction(
-                "set_room_is_public_appservice",
-                set_room_is_public_appservice_txn,
-                next_id,
-            )
-        self.hs.get_notifier().on_new_replication_data()
-
-    def get_room_count(self):
-        """Retrieve a list of all rooms
-        """
-
-        def f(txn):
-            sql = "SELECT count(*)  FROM rooms"
-            txn.execute(sql)
-            row = txn.fetchone()
-            return row[0] or 0
-
-        return self.runInteraction("get_rooms", f)
-
-    def _store_room_topic_txn(self, txn, event):
-        if hasattr(event, "content") and "topic" in event.content:
-            self.store_event_search_txn(
-                txn, event, "content.topic", event.content["topic"]
-            )
-
-    def _store_room_name_txn(self, txn, event):
-        if hasattr(event, "content") and "name" in event.content:
-            self.store_event_search_txn(
-                txn, event, "content.name", event.content["name"]
-            )
-
-    def _store_room_message_txn(self, txn, event):
-        if hasattr(event, "content") and "body" in event.content:
-            self.store_event_search_txn(
-                txn, event, "content.body", event.content["body"]
-            )
-
-    def _store_retention_policy_for_room_txn(self, txn, event):
-        if hasattr(event, "content") and (
-            "min_lifetime" in event.content or "max_lifetime" in event.content
-        ):
-            if (
-                "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), integer_types)
-            ) or (
-                "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), integer_types)
-            ):
-                # Ignore the event if one of the value isn't an integer.
-                return
-
-            self._simple_insert_txn(
-                txn=txn,
-                table="room_retention",
-                values={
-                    "room_id": event.room_id,
-                    "event_id": event.event_id,
-                    "min_lifetime": event.content.get("min_lifetime"),
-                    "max_lifetime": event.content.get("max_lifetime"),
-                },
-            )
-
-            self._invalidate_cache_and_stream(
-                txn, self.get_retention_policy_for_room, (event.room_id,)
-            )
-
-    def add_event_report(
-        self, room_id, event_id, user_id, reason, content, received_ts
-    ):
-        next_id = self._event_reports_id_gen.get_next()
-        return self._simple_insert(
-            table="event_reports",
-            values={
-                "id": next_id,
-                "received_ts": received_ts,
-                "room_id": room_id,
-                "event_id": event_id,
-                "user_id": user_id,
-                "reason": reason,
-                "content": json.dumps(content),
-            },
-            desc="add_event_report",
-        )
-
-    def get_current_public_room_stream_id(self):
-        return self._public_room_id_gen.get_current_token()
-
-    def get_all_new_public_rooms(self, prev_id, current_id, limit):
-        def get_all_new_public_rooms(txn):
-            sql = """
-                SELECT stream_id, room_id, visibility, appservice_id, network_id
-                FROM public_room_list_stream
-                WHERE stream_id > ? AND stream_id <= ?
-                ORDER BY stream_id ASC
-                LIMIT ?
-            """
-
-            txn.execute(sql, (prev_id, current_id, limit))
-            return txn.fetchall()
-
-        if prev_id == current_id:
-            return defer.succeed([])
-
-        return self.runInteraction("get_all_new_public_rooms", get_all_new_public_rooms)
-
-    @defer.inlineCallbacks
-    def block_room(self, room_id, user_id):
-        """Marks the room as blocked. Can be called multiple times.
-
-        Args:
-            room_id (str): Room to block
-            user_id (str): Who blocked it
-
-        Returns:
-            Deferred
-        """
-        yield self._simple_upsert(
-            table="blocked_rooms",
-            keyvalues={"room_id": room_id},
-            values={},
-            insertion_values={"user_id": user_id},
-            desc="block_room",
-        )
-        yield self.runInteraction(
-            "block_room_invalidation",
-            self._invalidate_cache_and_stream,
-            self.is_room_blocked,
-            (room_id,),
-        )
-
     def get_media_mxcs_in_room(self, room_id):
         """Retrieves all the local and remote media MXC URIs in a given room
 
@@ -755,12 +390,16 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
             return local_media_mxcs, remote_media_mxcs
 
-        return self.runInteraction("get_media_ids_in_room", _get_media_mxcs_in_room_txn)
+        return self.db.runInteraction(
+            "get_media_ids_in_room", _get_media_mxcs_in_room_txn
+        )
 
     def quarantine_media_ids_in_room(self, room_id, quarantined_by):
         """For a room loops through all events with media and quarantines
         the associated media
         """
+
+        logger.info("Quarantining media in room: %s", room_id)
 
         def _quarantine_media_in_room_txn(txn):
             local_mxcs, remote_mxcs = self._get_media_mxcs_in_room_txn(txn, room_id)
@@ -794,7 +433,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
             return total_media_quarantined
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "quarantine_media_in_room", _quarantine_media_in_room_txn
         )
 
@@ -811,22 +450,21 @@ class RoomStore(RoomWorkerStore, SearchStore):
         """
         mxc_re = re.compile("^mxc://([^/]+)/([^/#?]+)")
 
-        next_token = self.get_current_events_token() + 1
+        sql = """
+            SELECT stream_ordering, json FROM events
+            JOIN event_json USING (room_id, event_id)
+            WHERE room_id = ?
+                %(where_clause)s
+                AND contains_url = ? AND outlier = ?
+            ORDER BY stream_ordering DESC
+            LIMIT ?
+        """
+        txn.execute(sql % {"where_clause": ""}, (room_id, True, False, 100))
+
         local_media_mxcs = []
         remote_media_mxcs = []
 
-        while next_token:
-            sql = """
-                SELECT stream_ordering, json FROM events
-                JOIN event_json USING (room_id, event_id)
-                WHERE room_id = ?
-                    AND stream_ordering < ?
-                    AND contains_url = ? AND outlier = ?
-                ORDER BY stream_ordering DESC
-                LIMIT ?
-            """
-            txn.execute(sql, (room_id, next_token, True, False, 100))
-
+        while True:
             next_token = None
             for stream_ordering, content_json in txn:
                 next_token = stream_ordering
@@ -847,7 +485,572 @@ class RoomStore(RoomWorkerStore, SearchStore):
                         else:
                             remote_media_mxcs.append((hostname, media_id))
 
+            if next_token is None:
+                # We've gone through the whole room, so we're finished.
+                break
+
+            txn.execute(
+                sql % {"where_clause": "AND stream_ordering < ?"},
+                (room_id, next_token, True, False, 100),
+            )
+
         return local_media_mxcs, remote_media_mxcs
+
+    def quarantine_media_by_id(
+        self, server_name: str, media_id: str, quarantined_by: str,
+    ):
+        """quarantines a single local or remote media id
+
+        Args:
+            server_name: The name of the server that holds this media
+            media_id: The ID of the media to be quarantined
+            quarantined_by: The user ID that initiated the quarantine request
+        """
+        logger.info("Quarantining media: %s/%s", server_name, media_id)
+        is_local = server_name == self.config.server_name
+
+        def _quarantine_media_by_id_txn(txn):
+            local_mxcs = [media_id] if is_local else []
+            remote_mxcs = [(server_name, media_id)] if not is_local else []
+
+            return self._quarantine_media_txn(
+                txn, local_mxcs, remote_mxcs, quarantined_by
+            )
+
+        return self.db.runInteraction(
+            "quarantine_media_by_user", _quarantine_media_by_id_txn
+        )
+
+    def quarantine_media_ids_by_user(self, user_id: str, quarantined_by: str):
+        """quarantines all local media associated with a single user
+
+        Args:
+            user_id: The ID of the user to quarantine media of
+            quarantined_by: The ID of the user who made the quarantine request
+        """
+
+        def _quarantine_media_by_user_txn(txn):
+            local_media_ids = self._get_media_ids_by_user_txn(txn, user_id)
+            return self._quarantine_media_txn(txn, local_media_ids, [], quarantined_by)
+
+        return self.db.runInteraction(
+            "quarantine_media_by_user", _quarantine_media_by_user_txn
+        )
+
+    def _get_media_ids_by_user_txn(self, txn, user_id: str, filter_quarantined=True):
+        """Retrieves local media IDs by a given user
+
+        Args:
+            txn (cursor)
+            user_id: The ID of the user to retrieve media IDs of
+
+        Returns:
+            The local and remote media as a lists of tuples where the key is
+            the hostname and the value is the media ID.
+        """
+        # Local media
+        sql = """
+            SELECT media_id
+            FROM local_media_repository
+            WHERE user_id = ?
+            """
+        if filter_quarantined:
+            sql += "AND quarantined_by IS NULL"
+        txn.execute(sql, (user_id,))
+
+        local_media_ids = [row[0] for row in txn]
+
+        # TODO: Figure out all remote media a user has referenced in a message
+
+        return local_media_ids
+
+    def _quarantine_media_txn(
+        self,
+        txn,
+        local_mxcs: List[str],
+        remote_mxcs: List[Tuple[str, str]],
+        quarantined_by: str,
+    ) -> int:
+        """Quarantine local and remote media items
+
+        Args:
+            txn (cursor)
+            local_mxcs: A list of local mxc URLs
+            remote_mxcs: A list of (remote server, media id) tuples representing
+                remote mxc URLs
+            quarantined_by: The ID of the user who initiated the quarantine request
+        Returns:
+            The total number of media items quarantined
+        """
+        total_media_quarantined = 0
+
+        # Update all the tables to set the quarantined_by flag
+        txn.executemany(
+            """
+            UPDATE local_media_repository
+            SET quarantined_by = ?
+            WHERE media_id = ?
+        """,
+            ((quarantined_by, media_id) for media_id in local_mxcs),
+        )
+
+        txn.executemany(
+            """
+                UPDATE remote_media_cache
+                SET quarantined_by = ?
+                WHERE media_origin = ? AND media_id = ?
+            """,
+            ((quarantined_by, origin, media_id) for origin, media_id in remote_mxcs),
+        )
+
+        total_media_quarantined += len(local_mxcs)
+        total_media_quarantined += len(remote_mxcs)
+
+        return total_media_quarantined
+
+
+class RoomBackgroundUpdateStore(SQLBaseStore):
+    REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
+
+    def __init__(self, database: Database, db_conn, hs):
+        super(RoomBackgroundUpdateStore, self).__init__(database, db_conn, hs)
+
+        self.config = hs.config
+
+        self.db.updates.register_background_update_handler(
+            "insert_room_retention", self._background_insert_retention,
+        )
+
+        self.db.updates.register_background_update_handler(
+            self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE,
+            self._remove_tombstoned_rooms_from_directory,
+        )
+
+    @defer.inlineCallbacks
+    def _background_insert_retention(self, progress, batch_size):
+        """Retrieves a list of all rooms within a range and inserts an entry for each of
+        them into the room_retention table.
+        NULLs the property's columns if missing from the retention event in the room's
+        state (or NULLs all of them if there's no retention event in the room's state),
+        so that we fall back to the server's retention policy.
+        """
+
+        last_room = progress.get("room_id", "")
+
+        def _background_insert_retention_txn(txn):
+            txn.execute(
+                """
+                SELECT state.room_id, state.event_id, events.json
+                FROM current_state_events as state
+                LEFT JOIN event_json AS events ON (state.event_id = events.event_id)
+                WHERE state.room_id > ? AND state.type = '%s'
+                ORDER BY state.room_id ASC
+                LIMIT ?;
+                """
+                % EventTypes.Retention,
+                (last_room, batch_size),
+            )
+
+            rows = self.db.cursor_to_dict(txn)
+
+            if not rows:
+                return True
+
+            for row in rows:
+                if not row["json"]:
+                    retention_policy = {}
+                else:
+                    ev = json.loads(row["json"])
+                    retention_policy = json.dumps(ev["content"])
+
+                self.db.simple_insert_txn(
+                    txn=txn,
+                    table="room_retention",
+                    values={
+                        "room_id": row["room_id"],
+                        "event_id": row["event_id"],
+                        "min_lifetime": retention_policy.get("min_lifetime"),
+                        "max_lifetime": retention_policy.get("max_lifetime"),
+                    },
+                )
+
+            logger.info("Inserted %d rows into room_retention", len(rows))
+
+            self.db.updates._background_update_progress_txn(
+                txn, "insert_room_retention", {"room_id": rows[-1]["room_id"]}
+            )
+
+            if batch_size > len(rows):
+                return True
+            else:
+                return False
+
+        end = yield self.db.runInteraction(
+            "insert_room_retention", _background_insert_retention_txn,
+        )
+
+        if end:
+            yield self.db.updates._end_background_update("insert_room_retention")
+
+        defer.returnValue(batch_size)
+
+    async def _remove_tombstoned_rooms_from_directory(
+        self, progress, batch_size
+    ) -> int:
+        """Removes any rooms with tombstone events from the room directory
+
+        Nowadays this is handled by the room upgrade handler, but we may have some
+        that got left behind
+        """
+
+        last_room = progress.get("room_id", "")
+
+        def _get_rooms(txn):
+            txn.execute(
+                """
+                SELECT room_id
+                FROM rooms r
+                INNER JOIN current_state_events cse USING (room_id)
+                WHERE room_id > ? AND r.is_public
+                AND cse.type = '%s' AND cse.state_key = ''
+                ORDER BY room_id ASC
+                LIMIT ?;
+                """
+                % EventTypes.Tombstone,
+                (last_room, batch_size),
+            )
+
+            return [row[0] for row in txn]
+
+        rooms = await self.db.runInteraction(
+            "get_tombstoned_directory_rooms", _get_rooms
+        )
+
+        if not rooms:
+            await self.db.updates._end_background_update(
+                self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE
+            )
+            return 0
+
+        for room_id in rooms:
+            logger.info("Removing tombstoned room %s from the directory", room_id)
+            await self.set_room_is_public(room_id, False)
+
+        await self.db.updates._background_update_progress(
+            self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE, {"room_id": rooms[-1]}
+        )
+
+        return len(rooms)
+
+    @abstractmethod
+    def set_room_is_public(self, room_id, is_public):
+        # this will need to be implemented if a background update is performed with
+        # existing (tombstoned, public) rooms in the database.
+        #
+        # It's overridden by RoomStore for the synapse master.
+        raise NotImplementedError()
+
+
+class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
+    def __init__(self, database: Database, db_conn, hs):
+        super(RoomStore, self).__init__(database, db_conn, hs)
+
+        self.config = hs.config
+
+    @defer.inlineCallbacks
+    def store_room(self, room_id, room_creator_user_id, is_public):
+        """Stores a room.
+
+        Args:
+            room_id (str): The desired room ID, can be None.
+            room_creator_user_id (str): The user ID of the room creator.
+            is_public (bool): True to indicate that this room should appear in
+            public room lists.
+        Raises:
+            StoreError if the room could not be stored.
+        """
+        try:
+
+            def store_room_txn(txn, next_id):
+                self.db.simple_insert_txn(
+                    txn,
+                    "rooms",
+                    {
+                        "room_id": room_id,
+                        "creator": room_creator_user_id,
+                        "is_public": is_public,
+                    },
+                )
+                if is_public:
+                    self.db.simple_insert_txn(
+                        txn,
+                        table="public_room_list_stream",
+                        values={
+                            "stream_id": next_id,
+                            "room_id": room_id,
+                            "visibility": is_public,
+                        },
+                    )
+
+            with self._public_room_id_gen.get_next() as next_id:
+                yield self.db.runInteraction("store_room_txn", store_room_txn, next_id)
+        except Exception as e:
+            logger.error("store_room with room_id=%s failed: %s", room_id, e)
+            raise StoreError(500, "Problem creating room.")
+
+    @defer.inlineCallbacks
+    def set_room_is_public(self, room_id, is_public):
+        def set_room_is_public_txn(txn, next_id):
+            self.db.simple_update_one_txn(
+                txn,
+                table="rooms",
+                keyvalues={"room_id": room_id},
+                updatevalues={"is_public": is_public},
+            )
+
+            entries = self.db.simple_select_list_txn(
+                txn,
+                table="public_room_list_stream",
+                keyvalues={
+                    "room_id": room_id,
+                    "appservice_id": None,
+                    "network_id": None,
+                },
+                retcols=("stream_id", "visibility"),
+            )
+
+            entries.sort(key=lambda r: r["stream_id"])
+
+            add_to_stream = True
+            if entries:
+                add_to_stream = bool(entries[-1]["visibility"]) != is_public
+
+            if add_to_stream:
+                self.db.simple_insert_txn(
+                    txn,
+                    table="public_room_list_stream",
+                    values={
+                        "stream_id": next_id,
+                        "room_id": room_id,
+                        "visibility": is_public,
+                        "appservice_id": None,
+                        "network_id": None,
+                    },
+                )
+
+        with self._public_room_id_gen.get_next() as next_id:
+            yield self.db.runInteraction(
+                "set_room_is_public", set_room_is_public_txn, next_id
+            )
+        self.hs.get_notifier().on_new_replication_data()
+
+    @defer.inlineCallbacks
+    def set_room_is_public_appservice(
+        self, room_id, appservice_id, network_id, is_public
+    ):
+        """Edit the appservice/network specific public room list.
+
+        Each appservice can have a number of published room lists associated
+        with them, keyed off of an appservice defined `network_id`, which
+        basically represents a single instance of a bridge to a third party
+        network.
+
+        Args:
+            room_id (str)
+            appservice_id (str)
+            network_id (str)
+            is_public (bool): Whether to publish or unpublish the room from the
+                list.
+        """
+
+        def set_room_is_public_appservice_txn(txn, next_id):
+            if is_public:
+                try:
+                    self.db.simple_insert_txn(
+                        txn,
+                        table="appservice_room_list",
+                        values={
+                            "appservice_id": appservice_id,
+                            "network_id": network_id,
+                            "room_id": room_id,
+                        },
+                    )
+                except self.database_engine.module.IntegrityError:
+                    # We've already inserted, nothing to do.
+                    return
+            else:
+                self.db.simple_delete_txn(
+                    txn,
+                    table="appservice_room_list",
+                    keyvalues={
+                        "appservice_id": appservice_id,
+                        "network_id": network_id,
+                        "room_id": room_id,
+                    },
+                )
+
+            entries = self.db.simple_select_list_txn(
+                txn,
+                table="public_room_list_stream",
+                keyvalues={
+                    "room_id": room_id,
+                    "appservice_id": appservice_id,
+                    "network_id": network_id,
+                },
+                retcols=("stream_id", "visibility"),
+            )
+
+            entries.sort(key=lambda r: r["stream_id"])
+
+            add_to_stream = True
+            if entries:
+                add_to_stream = bool(entries[-1]["visibility"]) != is_public
+
+            if add_to_stream:
+                self.db.simple_insert_txn(
+                    txn,
+                    table="public_room_list_stream",
+                    values={
+                        "stream_id": next_id,
+                        "room_id": room_id,
+                        "visibility": is_public,
+                        "appservice_id": appservice_id,
+                        "network_id": network_id,
+                    },
+                )
+
+        with self._public_room_id_gen.get_next() as next_id:
+            yield self.db.runInteraction(
+                "set_room_is_public_appservice",
+                set_room_is_public_appservice_txn,
+                next_id,
+            )
+        self.hs.get_notifier().on_new_replication_data()
+
+    def get_room_count(self):
+        """Retrieve a list of all rooms
+        """
+
+        def f(txn):
+            sql = "SELECT count(*)  FROM rooms"
+            txn.execute(sql)
+            row = txn.fetchone()
+            return row[0] or 0
+
+        return self.db.runInteraction("get_rooms", f)
+
+    def _store_room_topic_txn(self, txn, event):
+        if hasattr(event, "content") and "topic" in event.content:
+            self.store_event_search_txn(
+                txn, event, "content.topic", event.content["topic"]
+            )
+
+    def _store_room_name_txn(self, txn, event):
+        if hasattr(event, "content") and "name" in event.content:
+            self.store_event_search_txn(
+                txn, event, "content.name", event.content["name"]
+            )
+
+    def _store_room_message_txn(self, txn, event):
+        if hasattr(event, "content") and "body" in event.content:
+            self.store_event_search_txn(
+                txn, event, "content.body", event.content["body"]
+            )
+
+    def _store_retention_policy_for_room_txn(self, txn, event):
+        if hasattr(event, "content") and (
+            "min_lifetime" in event.content or "max_lifetime" in event.content
+        ):
+            if (
+                "min_lifetime" in event.content
+                and not isinstance(event.content.get("min_lifetime"), integer_types)
+            ) or (
+                "max_lifetime" in event.content
+                and not isinstance(event.content.get("max_lifetime"), integer_types)
+            ):
+                # Ignore the event if one of the value isn't an integer.
+                return
+
+            self.db.simple_insert_txn(
+                txn=txn,
+                table="room_retention",
+                values={
+                    "room_id": event.room_id,
+                    "event_id": event.event_id,
+                    "min_lifetime": event.content.get("min_lifetime"),
+                    "max_lifetime": event.content.get("max_lifetime"),
+                },
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_retention_policy_for_room, (event.room_id,)
+            )
+
+    def add_event_report(
+        self, room_id, event_id, user_id, reason, content, received_ts
+    ):
+        next_id = self._event_reports_id_gen.get_next()
+        return self.db.simple_insert(
+            table="event_reports",
+            values={
+                "id": next_id,
+                "received_ts": received_ts,
+                "room_id": room_id,
+                "event_id": event_id,
+                "user_id": user_id,
+                "reason": reason,
+                "content": json.dumps(content),
+            },
+            desc="add_event_report",
+        )
+
+    def get_current_public_room_stream_id(self):
+        return self._public_room_id_gen.get_current_token()
+
+    def get_all_new_public_rooms(self, prev_id, current_id, limit):
+        def get_all_new_public_rooms(txn):
+            sql = """
+                SELECT stream_id, room_id, visibility, appservice_id, network_id
+                FROM public_room_list_stream
+                WHERE stream_id > ? AND stream_id <= ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (prev_id, current_id, limit))
+            return txn.fetchall()
+
+        if prev_id == current_id:
+            return defer.succeed([])
+
+        return self.db.runInteraction(
+            "get_all_new_public_rooms", get_all_new_public_rooms
+        )
+
+    @defer.inlineCallbacks
+    def block_room(self, room_id, user_id):
+        """Marks the room as blocked. Can be called multiple times.
+
+        Args:
+            room_id (str): Room to block
+            user_id (str): Who blocked it
+
+        Returns:
+            Deferred
+        """
+        yield self.db.simple_upsert(
+            table="blocked_rooms",
+            keyvalues={"room_id": room_id},
+            values={},
+            insertion_values={"user_id": user_id},
+            desc="block_room",
+        )
+        yield self.db.runInteraction(
+            "block_room_invalidation",
+            self._invalidate_cache_and_stream,
+            self.is_room_blocked,
+            (room_id,),
+        )
 
     @defer.inlineCallbacks
     def get_rooms_for_retention_period_in_range(
@@ -899,7 +1102,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
             txn.execute(sql, args)
 
-            rows = self.cursor_to_dict(txn)
+            rows = self.db.cursor_to_dict(txn)
             rooms_dict = {}
 
             for row in rows:
@@ -915,7 +1118,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
                 txn.execute(sql)
 
-                rows = self.cursor_to_dict(txn)
+                rows = self.db.cursor_to_dict(txn)
 
                 # If a room isn't already in the dict (i.e. it doesn't have a retention
                 # policy in its state), add it with a null policy.
@@ -928,7 +1131,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
 
             return rooms_dict
 
-        rooms = yield self.runInteraction(
+        rooms = yield self.db.runInteraction(
             "get_rooms_for_retention_period_in_range",
             get_rooms_for_retention_period_in_range_txn,
         )

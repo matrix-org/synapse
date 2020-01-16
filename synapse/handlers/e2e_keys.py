@@ -284,29 +284,26 @@ class E2eKeysHandler(object):
         self_signing_keys = {}
         user_signing_keys = {}
 
-        for user_id in query:
-            # XXX: consider changing the store functions to allow querying
-            # multiple users simultaneously.
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "master", from_user_id
-            )
-            if key:
-                master_keys[user_id] = key
+        user_ids = list(query)
 
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "self_signing", from_user_id
-            )
-            if key:
-                self_signing_keys[user_id] = key
+        keys = yield self.store.get_e2e_cross_signing_keys_bulk(user_ids, from_user_id)
 
+        for user_id, user_info in keys.items():
+            if user_info is None:
+                continue
+            if "master" in user_info:
+                master_keys[user_id] = user_info["master"]
+            if "self_signing" in user_info:
+                self_signing_keys[user_id] = user_info["self_signing"]
+
+        if (
+            from_user_id in keys
+            and keys[from_user_id] is not None
+            and "user_signing" in keys[from_user_id]
+        ):
             # users can see other users' master and self-signing keys, but can
             # only see their own user-signing keys
-            if from_user_id == user_id:
-                key = yield self.store.get_e2e_cross_signing_key(
-                    user_id, "user_signing", from_user_id
-                )
-                if key:
-                    user_signing_keys[user_id] = key
+            user_signing_keys[from_user_id] = keys[from_user_id]["user_signing"]
 
         return {
             "master_keys": master_keys,

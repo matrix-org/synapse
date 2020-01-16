@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
-from twisted.internet import defer
 
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
@@ -30,19 +30,18 @@ class ProfileDisplaynameRestServlet(RestServlet):
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         requester_user = None
 
         if self.hs.config.require_auth_for_profile_requests:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
         user = UserID.from_string(user_id)
 
-        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+        await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        displayname = yield self.profile_handler.get_displayname(user)
+        displayname = await self.profile_handler.get_displayname(user)
 
         ret = {}
         if displayname is not None:
@@ -50,11 +49,10 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
         return 200, ret
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_PUT(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user = UserID.from_string(user_id)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        is_admin = await self.auth.is_server_admin(requester.user)
 
         content = parse_json_object_from_request(request)
 
@@ -63,7 +61,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
         except Exception:
             return 400, "Unable to parse name"
 
-        yield self.profile_handler.set_displayname(user, requester, new_name, is_admin)
+        await self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
         return 200, {}
 
@@ -80,19 +78,18 @@ class ProfileAvatarURLRestServlet(RestServlet):
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         requester_user = None
 
         if self.hs.config.require_auth_for_profile_requests:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
         user = UserID.from_string(user_id)
 
-        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+        await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        avatar_url = yield self.profile_handler.get_avatar_url(user)
+        avatar_url = await self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if avatar_url is not None:
@@ -100,19 +97,22 @@ class ProfileAvatarURLRestServlet(RestServlet):
 
         return 200, ret
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
-        is_admin = yield self.auth.is_server_admin(requester.user)
+        is_admin = await self.auth.is_server_admin(requester.user)
 
         content = parse_json_object_from_request(request)
         try:
-            new_name = content["avatar_url"]
-        except Exception:
-            return 400, "Unable to parse name"
+            new_avatar_url = content["avatar_url"]
+        except KeyError:
+            raise SynapseError(
+                400, "Missing key 'avatar_url'", errcode=Codes.MISSING_PARAM
+            )
 
-        yield self.profile_handler.set_avatar_url(user, requester, new_name, is_admin)
+        await self.profile_handler.set_avatar_url(
+            user, requester, new_avatar_url, is_admin
+        )
 
         return 200, {}
 
@@ -129,20 +129,19 @@ class ProfileRestServlet(RestServlet):
         self.profile_handler = hs.get_profile_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
+    async def on_GET(self, request, user_id):
         requester_user = None
 
         if self.hs.config.require_auth_for_profile_requests:
-            requester = yield self.auth.get_user_by_req(request)
+            requester = await self.auth.get_user_by_req(request)
             requester_user = requester.user
 
         user = UserID.from_string(user_id)
 
-        yield self.profile_handler.check_profile_query_allowed(user, requester_user)
+        await self.profile_handler.check_profile_query_allowed(user, requester_user)
 
-        displayname = yield self.profile_handler.get_displayname(user)
-        avatar_url = yield self.profile_handler.get_avatar_url(user)
+        displayname = await self.profile_handler.get_displayname(user)
+        avatar_url = await self.profile_handler.get_avatar_url(user)
 
         ret = {}
         if displayname is not None:

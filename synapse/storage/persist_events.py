@@ -183,7 +183,7 @@ class EventsPersistenceStorage(object):
         # so we use separate variables here even though they point to the same
         # store for now.
         self.main_store = stores.main
-        self.state_store = stores.main
+        self.state_store = stores.state
 
         self._clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id

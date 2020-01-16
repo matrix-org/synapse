@@ -295,12 +295,16 @@ class BaseProfileHandler(BaseHandler):
                 be found to be in any room the server is in, and therefore the query
                 is denied.
         """
+
         # Implementation of MSC1301: don't allow looking up profiles if the
         # requester isn't in the same room as the target. We expect requester to
         # be None when this function is called outside of a profile query, e.g.
         # when building a membership event. In this case, we must allow the
         # lookup.
-        if not self.hs.config.require_auth_for_profile_requests or not requester:
+        if (
+            not self.hs.config.limit_profile_requests_to_users_who_share_rooms
+            or not requester
+        ):
             return
 
         # Always allow the user to query their own profile.
