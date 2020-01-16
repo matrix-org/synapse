@@ -71,6 +71,8 @@ class VersionsRestServlet(RestServlet):
                     # Implements support for label-based filtering as described in
                     # MSC2326.
                     "org.matrix.label_based_filtering": True,
+                    # Implements support for cross signing as described in MSC1756
+                    "org.matrix.e2e_cross_signing": True,
                 },
             },
         )
