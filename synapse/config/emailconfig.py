@@ -298,7 +298,7 @@ class EmailConfig(Config):
                     raise ConfigError("Unable to find email template file %s" % (p,))
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """
+        return """\
         # Configuration for sending emails from Synapse.
         #
         email:
