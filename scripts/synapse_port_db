@@ -31,6 +31,7 @@ import yaml
 from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
+import synapse
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.logging.context import PreserveLoggingContext
@@ -62,6 +63,7 @@ from synapse.storage.database import Database, make_conn
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util import Clock
+from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse_port_db")
 
@@ -178,6 +180,7 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server_name
+        self.version_string = "Synapse/"+get_version_string(synapse)
 
     def get_clock(self):
         return self.clock

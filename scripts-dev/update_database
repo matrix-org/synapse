@@ -22,10 +22,12 @@ import yaml
 
 from twisted.internet import defer, reactor
 
+import synapse
 from synapse.config.homeserver import HomeServerConfig
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("update_database")
 
@@ -37,6 +39,8 @@ class MockHomeserver(HomeServer):
         super(MockHomeserver, self).__init__(
             config.server_name, reactor=reactor, config=config, **kwargs
         )
+
+        self.version_string = "Synapse/"+get_version_string(synapse)
 
 
 if __name__ == "__main__":
