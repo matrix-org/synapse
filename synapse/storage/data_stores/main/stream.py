@@ -539,7 +539,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return self.db.runInteraction(
             "get_room_event_after_stream_ordering",
             self.get_room_event_around_stream_ordering_txn,
-            room_id, stream_ordering, "f",
+            room_id,
+            stream_ordering,
+            "f",
         )
 
     def get_room_event_before_stream_ordering(self, room_id, stream_ordering):
@@ -556,7 +558,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         return self.db.runInteraction(
             "get_room_event_before_stream_ordering",
             self.get_room_event_around_stream_ordering_txn,
-            room_id, stream_ordering, "b",
+            room_id,
+            stream_ordering,
+            "b",
         )
 
     def get_room_event_around_stream_ordering_txn(
@@ -575,6 +579,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             Deferred[(int, int, str)]:
                 (stream ordering, topological ordering, event_id)
         """
+        # Figure out which comparison operation to perform and how to order the results,
+        # using the provided direction.
+        op = "<=" if dir == "b" else ">="
+        order = "DESC" if dir == "b" else "ASC"
+
         sql = (
             "SELECT stream_ordering, topological_ordering, event_id"
             " FROM events"
@@ -582,10 +591,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             " AND NOT outlier"
             " ORDER BY stream_ordering %s"
             " LIMIT 1"
-        ) % (
-            "<=" if dir == "b" else ">=",
-            "DESC" if dir == "b" else "ASC",
-        )
+        ) % (op, order)
         txn.execute(sql, (room_id, stream_ordering))
         return txn.fetchone()
 
