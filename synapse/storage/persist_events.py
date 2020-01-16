@@ -22,6 +22,7 @@ from typing import Iterable, List, Optional, Tuple
 from six import iteritems
 from six.moves import range
 
+import attr
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -69,6 +70,19 @@ stale_forward_extremities_counter = Histogram(
     "Number of unchanged forward extremities for each new event",
     buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
+
+
+@attr.s(slots=True, frozen=True)
+class DeltaState:
+    """Deltas to use to update the `current_state_events` table.
+
+    Attributes:
+        to_delete: List of type/state_keys to delete from current state
+        to_insert: Map of state to upsert into current state
+    """
+
+    to_delete = attr.ib(type=List[Tuple[str, str]])
+    to_insert = attr.ib(type=StateMap[str])
 
 
 class _EventPeristenceQueue(object):
@@ -386,7 +400,7 @@ class EventsPersistenceStorage(object):
                             # If there is a delta we know that we've
                             # only added or replaced state, never
                             # removed keys entirely.
-                            state_delta_for_room[room_id] = ([], delta_ids)
+                            state_delta_for_room[room_id] = DeltaState([], delta_ids)
                         elif current_state is not None:
                             with Measure(
                                 self._clock, "persist_events.calculate_state_delta"
@@ -630,15 +644,10 @@ class EventsPersistenceStorage(object):
 
     async def _calculate_state_delta(
         self, room_id: str, current_state: StateMap[str]
-    ) -> Tuple[List[Tuple[str, str]], StateMap[str]]:
+    ) -> DeltaState:
         """Calculate the new state deltas for a room.
 
         Assumes that we are only persisting events for one room at a time.
-
-        Returns:
-            (to_delete, to_insert): where to_delete are the
-            type/state_keys to remove from current_state_events and `to_insert`
-            are the updates to current_state_events.
         """
         existing_state = await self.main_store.get_current_state_ids(room_id)
 
@@ -650,4 +659,4 @@ class EventsPersistenceStorage(object):
             if ev_id != existing_state.get(key)
         }
 
-        return to_delete, to_insert
+        return DeltaState(to_delete=to_delete, to_insert=to_insert)
