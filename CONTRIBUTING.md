@@ -101,8 +101,8 @@ in the format of `PRnumber.type`. The type can be one of the following:
 The content of the file is your changelog entry, which should be a short
 description of your change in the same style as the rest of our [changelog](
 https://github.com/matrix-org/synapse/blob/master/CHANGES.md). The file can
-contain Markdown formatting, and should end with a full stop ('.') for
-consistency.
+contain Markdown formatting, and should end with a full stop (.) or an
+exclamation mark (!) for consistency.
 
 Adding credits to the changelog is encouraged, we value your
 contributions and would like to have you shouted out in the release notes!
