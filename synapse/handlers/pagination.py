@@ -133,7 +133,7 @@ class PaginationHandler(object):
             include_null = False
 
         logger.info(
-            "[purge] Running purge job for range ] %d ; %d ] (include NULLs = %s",
+            "[purge] Running purge job for range ] %d ; %d ] (include NULLs = %s)",
             min_ms,
             max_ms,
             include_null,
