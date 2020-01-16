@@ -28,14 +28,11 @@ from six import string_types
 
 import yaml
 
-from twisted.enterprise import adbapi
 from twisted.internet import defer, reactor
 
 import synapse
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
-from synapse.logging.context import PreserveLoggingContext
-from synapse.storage._base import LoggingTransaction
 from synapse.storage.data_stores.main.client_ips import ClientIpBackgroundUpdateStore
 from synapse.storage.data_stores.main.deviceinbox import (
     DeviceInboxBackgroundUpdateStore,
