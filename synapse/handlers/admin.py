@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 from synapse.api.constants import Membership
 from synapse.events import FrozenEvent

@@ -14,11 +14,10 @@
 # limitations under the License.
 
 import json
-import urllib.parse
-from typing import List, Optional
 import os
 import urllib.parse
 from binascii import unhexlify
+from typing import List, Optional
 
 from mock import Mock
 
@@ -470,9 +469,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Extract media ID from the response
-        server_name_and_media_id = response["content_uri"][
-                                   6:
-                                   ]  # Cut off the 'mxc://' bit
+        server_name_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
         server_name, media_id = server_name_and_media_id.split("/")
 
         # Attempt to access the media
