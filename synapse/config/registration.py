@@ -197,6 +197,9 @@ class RegistrationConfig(Config):
           # used as a placeholder for the 'app_name' parameter from the 'email'
           # section.
           #
+          # Note that the placeholder must be written '%%(app)s', including the
+          # trailing 's'.
+          #
           # If this is not set, a default value is used.
           #
           #renew_email_subject: "Renew your %%(app)s account"
