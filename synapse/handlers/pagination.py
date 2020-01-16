@@ -88,6 +88,8 @@ class PaginationHandler(object):
         if hs.config.retention_enabled:
             # Run the purge jobs described in the configuration file.
             for job in hs.config.retention_purge_jobs:
+                logger.info("Setting up purge job with config: %s", job)
+
                 self.clock.looping_call(
                     run_as_background_process,
                     job["interval"],
@@ -130,9 +132,18 @@ class PaginationHandler(object):
         else:
             include_null = False
 
+        logger.info(
+            "[purge] Running purge job for range ] %d ; %d ] (include NULLs = %s",
+            min_ms,
+            max_ms,
+            include_null,
+        )
+
         rooms = yield self.store.get_rooms_for_retention_period_in_range(
             min_ms, max_ms, include_null
         )
+
+        logger.debug("[purge] Rooms to purge: %s", rooms)
 
         for room_id, retention_policy in iteritems(rooms):
             if room_id in self._purges_in_progress_by_room:
