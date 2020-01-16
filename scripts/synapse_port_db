@@ -17,7 +17,6 @@
 # limitations under the License.
 
 import argparse
-import asyncio
 import curses
 import logging
 import sys
@@ -252,12 +251,9 @@ class Porter(object):
                 table, forward_chunk, backward_chunk
             )
 
-        defer.returnValue(
-            (table, already_ported, total_to_port, forward_chunk, backward_chunk)
-        )
+        return table, already_ported, total_to_port, forward_chunk, backward_chunk
 
-    @defer.inlineCallbacks
-    def handle_table(
+    async def handle_table(
         self, table, postgres_size, table_size, forward_chunk, backward_chunk
     ):
         logger.info(
@@ -369,8 +365,7 @@ class Porter(object):
             else:
                 return
 
-    @defer.inlineCallbacks
-    def handle_search_table(
+    async def handle_search_table(
         self, postgres_size, table_size, forward_chunk, backward_chunk
     ):
         select = (
@@ -476,8 +471,7 @@ class Porter(object):
 
         return store
 
-    @defer.inlineCallbacks
-    def run_background_updates_on_postgres(self):
+    async def run_background_updates_on_postgres(self):
         # Manually apply all background updates on the PostgreSQL database.
         postgres_ready = (
             await self.postgres_store.db.updates.has_completed_background_updates()
@@ -489,15 +483,12 @@ class Porter(object):
             self.progress.set_state("Running background updates on PostgreSQL")
 
         while not postgres_ready:
-            await defer.ensureDeferred(
-                self.postgres_store.db.updates.do_next_background_update(100)
-            )
+            await self.postgres_store.db.updates.do_next_background_update(100)
             postgres_ready = await (
                 self.postgres_store.db.updates.has_completed_background_updates()
             )
 
-    @defer.inlineCallbacks
-    def run(self):
+    async def run(self):
         try:
             # we allow people to port away from outdated versions of sqlite.
             self.sqlite_store = self.build_db_store(
@@ -632,8 +623,7 @@ class Porter(object):
 
         return outrows
 
-    @defer.inlineCallbacks
-    def _setup_sent_transactions(self):
+    async def _setup_sent_transactions(self):
         # Only save things from the last day
         yesterday = int(time.time() * 1000) - 86400000
 
@@ -707,10 +697,9 @@ class Porter(object):
 
         total_count = remaining_count + inserted_rows
 
-        defer.returnValue((next_chunk, inserted_rows, total_count))
+        return next_chunk, inserted_rows, total_count
 
-    @defer.inlineCallbacks
-    def _get_remaining_count_to_port(self, table, forward_chunk, backward_chunk):
+    async def _get_remaining_count_to_port(self, table, forward_chunk, backward_chunk):
         frows = await self.sqlite_store.execute_sql(
             "SELECT count(*) FROM %s WHERE rowid >= ?" % (table,), forward_chunk
         )
@@ -719,29 +708,34 @@ class Porter(object):
             "SELECT count(*) FROM %s WHERE rowid <= ?" % (table,), backward_chunk
         )
 
-        defer.returnValue(frows[0][0] + brows[0][0])
+        return frows[0][0] + brows[0][0]
 
-    @defer.inlineCallbacks
-    def _get_already_ported_count(self, table):
+    async def _get_already_ported_count(self, table):
         rows = await self.postgres_store.execute_sql(
             "SELECT count(*) FROM %s" % (table,)
         )
 
-        defer.returnValue(rows[0][0])
+        return rows[0][0]
 
-    @defer.inlineCallbacks
-    def _get_total_count_to_port(self, table, forward_chunk, backward_chunk):
-        remaining, done = await asyncio.gather(
-            *[
-                self._get_remaining_count_to_port(table, forward_chunk, backward_chunk),
-                self._get_already_ported_count(table),
-            ],
+    async def _get_total_count_to_port(self, table, forward_chunk, backward_chunk):
+        remaining, done = await make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(
+                        self._get_remaining_count_to_port,
+                        table,
+                        forward_chunk,
+                        backward_chunk,
+                    ),
+                    run_in_background(self._get_already_ported_count, table),
+                ],
+            )
         )
 
         remaining = int(remaining) if remaining else 0
         done = int(done) if done else 0
 
-        defer.returnValue((done, remaining + done))
+        return done, remaining + done
 
     def _setup_state_group_id_seq(self):
         def r(txn):
