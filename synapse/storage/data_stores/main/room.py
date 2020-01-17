@@ -31,6 +31,7 @@ from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.search import SearchStore
 from synapse.storage.database import Database
+from synapse.storage.engines import PostgresEngine
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -343,16 +344,26 @@ class RoomWorkerStore(SQLBaseStore):
             "ASC" if order_by_asc else "DESC",
         )
 
+        # We don't want a LIMIT on the count query. SQLite can't handle an OFFSET
+        # without a LIMIT, however you can hand it `LIMIT -1` to mean "no limit".
+        # Postgres doesn't like this however, and wants you to eliminate the LIMIT
+        # keyword altogether
+        if isinstance(self.database_engine, PostgresEngine):
+            limit_statement = ""
+        else:
+            limit_statement = "LIMIT -1"
+
         # Use a nested SELECT statement as SQL can't count(*) with an OFFSET
         count_sql = """
             SELECT count(*) FROM (
               SELECT room_id FROM room_stats_state state
               %s
-              LIMIT ?
+              %s
               OFFSET ?
             ) AS get_room_ids
         """ % (
             where_statement,
+            limit_statement,
         )
 
         def _get_rooms_paginate_txn(txn):
@@ -365,7 +376,7 @@ class RoomWorkerStore(SQLBaseStore):
             rows = [row for row in txn]
 
             # Execute the count query
-            sql_values = (-1, start)  # Set LIMIT to -1. OFFSET can't be used on its own
+            sql_values = (start,)
             if search_term:
                 # Add the search term into the WHERE clause
                 sql_values = (search_term,) + sql_values
