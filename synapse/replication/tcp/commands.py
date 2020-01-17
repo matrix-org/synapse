@@ -395,10 +395,10 @@ class RemoteServerUpCommand(Command):
 
     Format::
 
-        REMOTE_SEREVER_UP <server>
+        REMOTE_SERVER_UP <server>
     """
 
-    NAME = "REMOTE_SEREVER_UP"
+    NAME = "REMOTE_SERVER_UP"
 
 
 _COMMANDS = (
