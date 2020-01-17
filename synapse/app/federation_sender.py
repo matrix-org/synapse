@@ -158,6 +158,13 @@ class FederationSenderReplicationHandler(ReplicationClientHandler):
         args.update(self.send_handler.stream_positions())
         return args
 
+    def on_remote_server_up(self, server: str):
+        """Called when get a new REMOTE_SERVER_UP command."""
+
+        # Let's wake up the transaction queue for the server in case we have
+        # pending stuff to send to it.
+        self.send_handler.wake_destination(server)
+
 
 def start(config_options):
     try:
@@ -205,7 +212,7 @@ class FederationSenderHandler(object):
     to the federation sender.
     """
 
-    def __init__(self, hs, replication_client):
+    def __init__(self, hs: FederationSenderServer, replication_client):
         self.store = hs.get_datastore()
         self._is_mine_id = hs.is_mine_id
         self.federation_sender = hs.get_federation_sender()
@@ -225,6 +232,9 @@ class FederationSenderHandler(object):
         self.federation_sender.notify_new_events(
             self.store.get_room_max_stream_ordering()
         )
+
+    def wake_destination(self, server: str):
+        self.federation_sender.wake_destination(server)
 
     def stream_positions(self):
         return {"federation": self.federation_position}

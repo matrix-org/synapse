@@ -33,13 +33,13 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.types import get_verify_key_from_cross_signing_key
-from synapse.util import batch_iter
 from synapse.util.caches.descriptors import (
     Cache,
     cached,
     cachedInlineCallbacks,
     cachedList,
 )
+from synapse.util.iterutils import batch_iter
 
 logger = logging.getLogger(__name__)
 

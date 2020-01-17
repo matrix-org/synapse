@@ -76,6 +76,7 @@ from synapse.replication.tcp.commands import (
     PingCommand,
     PositionCommand,
     RdataCommand,
+    RemoteServerUpCommand,
     ReplicateCommand,
     ServerCommand,
     SyncCommand,
@@ -460,6 +461,9 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     async def on_INVALIDATE_CACHE(self, cmd):
         self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
 
+    async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
+        self.streamer.on_remote_server_up(cmd.data)
+
     async def on_USER_IP(self, cmd):
         self.streamer.on_user_ip(
             cmd.user_id,
@@ -555,6 +559,9 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     def send_sync(self, data):
         self.send_command(SyncCommand(data))
 
+    def send_remote_server_up(self, server: str):
+        self.send_command(RemoteServerUpCommand(server))
+
     def on_connection_closed(self):
         BaseReplicationStreamProtocol.on_connection_closed(self)
         self.streamer.lost_connection(self)
@@ -586,6 +593,11 @@ class AbstractReplicationClientHandler(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def on_sync(self, data):
         """Called when get a new SYNC command."""
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def on_remote_server_up(self, server: str):
+        """Called when get a new REMOTE_SERVER_UP command."""
         raise NotImplementedError()
 
     @abc.abstractmethod
@@ -706,6 +718,9 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
     async def on_SYNC(self, cmd):
         self.handler.on_sync(cmd.data)
+
+    async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
+        self.handler.on_remote_server_up(cmd.data)
 
     def replicate(self, stream_name, token):
         """Send the subscription request to the server

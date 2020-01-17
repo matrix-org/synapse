@@ -32,6 +32,7 @@ from synapse.types import (
     mxid_localpart_allowed_characters,
 )
 from synapse.util.async_helpers import Linearizer
+from synapse.util.iterutils import chunk_seq
 
 logger = logging.getLogger(__name__)
 
@@ -132,16 +133,27 @@ class SamlHandler:
             logger.warning("SAML2 response was not signed")
             raise SynapseError(400, "SAML2 response was not signed")
 
-        logger.info("SAML2 response: %s", saml2_auth.origxml)
+        logger.debug("SAML2 response: %s", saml2_auth.origxml)
+        for assertion in saml2_auth.assertions:
+            # kibana limits the length of a log field, whereas this is all rather
+            # useful, so split it up.
+            count = 0
+            for part in chunk_seq(str(assertion), 10000):
+                logger.info(
+                    "SAML2 assertion: %s%s", "(%i)..." % (count,) if count else "", part
+                )
+                count += 1
+
         logger.info("SAML2 mapped attributes: %s", saml2_auth.ava)
 
-        try:
-            remote_user_id = saml2_auth.ava["uid"][0]
-        except KeyError:
-            logger.warning("SAML2 response lacks a 'uid' attestation")
-            raise SynapseError(400, "'uid' not in SAML2 response")
-
         self._outstanding_requests_dict.pop(saml2_auth.in_response_to, None)
+
+        remote_user_id = self._user_mapping_provider.get_remote_user_id(
+            saml2_auth, client_redirect_url
+        )
+
+        if not remote_user_id:
+            raise Exception("Failed to extract remote user id from SAML response")
 
         with (await self._mapping_lock.queue(self._auth_provider_id)):
             # first of all, check if we already have a mapping for this user
@@ -278,6 +290,20 @@ class DefaultSamlMappingProvider(object):
         """
         self._mxid_source_attribute = parsed_config.mxid_source_attribute
         self._mxid_mapper = parsed_config.mxid_mapper
+
+        self._grandfathered_mxid_source_attribute = (
+            module_api._hs.config.saml2_grandfathered_mxid_source_attribute
+        )
+
+    def get_remote_user_id(
+        self, saml_response: saml2.response.AuthnResponse, client_redirect_url: str
+    ):
+        """Extracts the remote user id from the SAML response"""
+        try:
+            return saml_response.ava["uid"][0]
+        except KeyError:
+            logger.warning("SAML2 response lacks a 'uid' attestation")
+            raise SynapseError(400, "'uid' not in SAML2 response")
 
     def saml_response_to_user_attributes(
         self,
