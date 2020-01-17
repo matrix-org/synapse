@@ -153,7 +153,7 @@ class RoomCreationHandler(BaseHandler):
         if r is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
         new_room_id = yield self._generate_room_id(
-            creator_id=user_id, is_public=r["is_public"]
+            creator_id=user_id, is_public=r["is_public"], room_version=new_version,
         )
 
         logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
@@ -638,7 +638,9 @@ class RoomCreationHandler(BaseHandler):
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
 
-        room_id = yield self._generate_room_id(creator_id=user_id, is_public=is_public)
+        room_id = yield self._generate_room_id(
+            creator_id=user_id, is_public=is_public, room_version=room_version,
+        )
 
         directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
@@ -856,7 +858,9 @@ class RoomCreationHandler(BaseHandler):
             yield send(etype=etype, state_key=state_key, content=content)
 
     @defer.inlineCallbacks
-    def _generate_room_id(self, creator_id, is_public):
+    def _generate_room_id(
+        self, creator_id: str, is_public: str, room_version: RoomVersion,
+    ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
         attempts = 0
@@ -870,6 +874,7 @@ class RoomCreationHandler(BaseHandler):
                     room_id=gen_room_id,
                     room_creator_user_id=creator_id,
                     is_public=is_public,
+                    room_version=room_version,
                 )
                 return gen_room_id
             except StoreError:

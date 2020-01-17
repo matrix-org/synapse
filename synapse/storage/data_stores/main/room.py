@@ -28,6 +28,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
+from synapse.api.room_versions import RoomVersion
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.search import SearchStore
 from synapse.storage.database import Database
@@ -758,14 +759,21 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         self.config = hs.config
 
     @defer.inlineCallbacks
-    def store_room(self, room_id, room_creator_user_id, is_public):
+    def store_room(
+        self,
+        room_id: str,
+        room_creator_user_id: str,
+        is_public: bool,
+        room_version: RoomVersion,
+    ):
         """Stores a room.
 
         Args:
-            room_id (str): The desired room ID, can be None.
-            room_creator_user_id (str): The user ID of the room creator.
-            is_public (bool): True to indicate that this room should appear in
-            public room lists.
+            room_id: The desired room ID, can be None.
+            room_creator_user_id: The user ID of the room creator.
+            is_public: True to indicate that this room should appear in
+                public room lists.
+            room_version: The version of the room
         Raises:
             StoreError if the room could not be stored.
         """
@@ -779,6 +787,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                         "room_id": room_id,
                         "creator": room_creator_user_id,
                         "is_public": is_public,
+                        "room_version": room_version.identifier,
                     },
                 )
                 if is_public:
