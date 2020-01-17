@@ -236,7 +236,7 @@ in which case the `<token>` must be set to `NOW`.
 
 ### REMOTE_SERVER_UP (S, C)
 
-    Inform other processes that a remote server may have come back online.
+   Inform other processes that a remote server may have come back online.
 
 See `synapse/replication/tcp/commands.py` for a detailed description and
 the format of each command.
