@@ -366,6 +366,8 @@ class RoomWorkerStore(SQLBaseStore):
             limit_statement,
         )
 
+        logger.info("info sql: %s count_sql: %s", info_sql, count_sql)
+
         def _get_rooms_paginate_txn(txn):
             # Execute the data query
             sql_values = (limit, start)

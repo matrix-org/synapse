@@ -955,6 +955,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _order_test("size", [room_id_3, room_id_2, room_id_1])
         _order_test("size", [room_id_1, room_id_2, room_id_3], reverse=True)
 
+    @unittest.DEBUG
     def test_search_term(self):
         """Test that searching for a room works correctly"""
         # Create two test rooms
