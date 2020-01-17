@@ -47,7 +47,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
-from synapse.events import EventBase
+from synapse.events import EventBase, room_version_to_event_format
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.logging.context import (
@@ -1186,7 +1186,7 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event, event_format_version = yield self._make_and_verify_event(
+        origin, event, room_version = yield self._make_and_verify_event(
             target_hosts,
             room_id,
             joinee,
@@ -1214,6 +1214,8 @@ class FederationHandler(BaseHandler):
                 target_hosts.insert(0, origin)
             except ValueError:
                 pass
+
+            event_format_version = room_version_to_event_format(room_version.identifier)
             ret = yield self.federation_client.send_join(
                 target_hosts, event, event_format_version
             )
@@ -1486,7 +1488,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id, content):
-        origin, event, event_format_version = yield self._make_and_verify_event(
+        origin, event, room_version = yield self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
         # Mark as outlier as we don't have any state for this event; we're not
@@ -1513,7 +1515,11 @@ class FederationHandler(BaseHandler):
     def _make_and_verify_event(
         self, target_hosts, room_id, user_id, membership, content={}, params=None
     ):
-        origin, event, format_ver = yield self.federation_client.make_membership_event(
+        (
+            origin,
+            event,
+            room_version,
+        ) = yield self.federation_client.make_membership_event(
             target_hosts, room_id, user_id, membership, content, params=params
         )
 
@@ -1525,7 +1531,7 @@ class FederationHandler(BaseHandler):
         assert event.user_id == user_id
         assert event.state_key == user_id
         assert event.room_id == room_id
-        return origin, event, format_ver
+        return origin, event, room_version
 
     @defer.inlineCallbacks
     @log_function
