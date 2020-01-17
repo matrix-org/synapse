@@ -483,7 +483,7 @@ class FederationSender(object):
 
     def send_device_messages(self, destination):
         if destination == self.server_name:
-            logger.info("Not sending device update to ourselves")
+            logger.warning("Not sending device update to ourselves")
             return
 
         self._get_per_destination_queue(destination).attempt_new_transaction()
@@ -492,11 +492,11 @@ class FederationSender(object):
         """Called when we want to retry sending transactions to a remote.
 
         This is mainly useful if the remote server has been down and we think it
-        migtht have come back.
+        might have come back.
         """
 
         if destination == self.server_name:
-            logger.info("Not waking up ourselves")
+            logger.warning("Not waking up ourselves")
             return
 
         self._get_per_destination_queue(destination).attempt_new_transaction()
