@@ -28,10 +28,10 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
-from synapse.api.room_versions import RoomVersion
+from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.search import SearchStore
-from synapse.storage.database import Database
+from synapse.storage.database import Database, LoggingTransaction
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -612,6 +612,7 @@ class RoomWorkerStore(SQLBaseStore):
 
 class RoomBackgroundUpdateStore(SQLBaseStore):
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
+    ADD_ROOMS_ROOM_VERSION_COLUMN = "add_rooms_room_version_column"
 
     def __init__(self, database: Database, db_conn, hs):
         super(RoomBackgroundUpdateStore, self).__init__(database, db_conn, hs)
@@ -625,6 +626,11 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
         self.db.updates.register_background_update_handler(
             self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE,
             self._remove_tombstoned_rooms_from_directory,
+        )
+
+        self.db.updates.register_background_update_handler(
+            self.ADD_ROOMS_ROOM_VERSION_COLUMN,
+            self._background_add_rooms_room_version_column,
         )
 
     @defer.inlineCallbacks
@@ -694,6 +700,69 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             yield self.db.updates._end_background_update("insert_room_retention")
 
         defer.returnValue(batch_size)
+
+    async def _background_add_rooms_room_version_column(
+        self, progress: dict, batch_size: int
+    ):
+        """Background update to go and add room version inforamtion to `rooms`
+        table from `current_state_events` table.
+        """
+
+        last_room_id = progress.get("room_id", "")
+
+        def _background_add_rooms_room_version_column_txn(txn: LoggingTransaction):
+            sql = """
+                SELECT room_id, json FROM current_state_events
+                INNER JOIN event_json USING (room_id, event_id)
+                WHERE room_id > ? AND type = 'm.room.create' AND state_key = ''
+                ORDER BY room_id
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_room_id, batch_size))
+
+            updates = []
+            for room_id, event_json in txn:
+                event_dict = json.loads(event_json)
+                room_version_id = event_dict.get("content", {}).get(
+                    "room_version", RoomVersions.V1.identifier
+                )
+
+                creator = event_dict.get("content").get("creator")
+
+                updates.append((room_id, creator, room_version_id))
+
+            if not updates:
+                return True
+
+            new_last_room_id = ""
+            for room_id, creator, room_version_id in updates:
+                self.db.simple_upsert_txn(
+                    txn,
+                    table="rooms",
+                    keyvalues={"room_id": room_id},
+                    values={"room_version": room_version_id},
+                    insertion_values={"is_public": False, "creator": creator},
+                )
+                new_last_room_id = room_id
+
+            self.db.updates._background_update_progress_txn(
+                txn, self.ADD_ROOMS_ROOM_VERSION_COLUMN, {"room_id": new_last_room_id}
+            )
+
+            return False
+
+        end = await self.db.runInteraction(
+            "_background_add_rooms_room_version_column",
+            _background_add_rooms_room_version_column_txn,
+        )
+
+        if end:
+            await self.db.updates._end_background_update(
+                self.ADD_ROOMS_ROOM_VERSION_COLUMN
+            )
+
+        return batch_size
 
     async def _remove_tombstoned_rooms_from_directory(
         self, progress, batch_size
