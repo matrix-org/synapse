@@ -44,7 +44,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase, room_version_to_event_format
@@ -1242,7 +1242,9 @@ class FederationHandler(BaseHandler):
                 # FIXME
                 pass
 
-            yield self._persist_auth_tree(origin, auth_chain, state, event)
+            yield self._persist_auth_tree(
+                origin, auth_chain, state, event, room_version
+            )
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
@@ -1816,7 +1818,14 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _persist_auth_tree(self, origin, auth_events, state, event):
+    def _persist_auth_tree(
+        self,
+        origin: str,
+        auth_events: List[EventBase],
+        state: List[EventBase],
+        event: EventBase,
+        room_version: RoomVersion,
+    ):
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -1825,10 +1834,10 @@ class FederationHandler(BaseHandler):
         Will attempt to fetch missing auth events.
 
         Args:
-            origin (str): Where the events came from
-            auth_events (list)
-            state (list)
-            event (Event)
+            origin: Where the events came from
+            auth_events
+            state
+            event
 
         Returns:
             Deferred
@@ -1854,9 +1863,12 @@ class FederationHandler(BaseHandler):
             # invalid, and it would fail auth checks anyway.
             raise SynapseError(400, "No create event in state")
 
-        room_version = create_event.content.get(
+        room_version_id = create_event.content.get(
             "room_version", RoomVersions.V1.identifier
         )
+
+        if room_version.identifier != room_version_id:
+            raise SynapseError(400, "Room version mismatch")
 
         missing_auth_events = set()
         for e in itertools.chain(auth_events, state, [event]):
