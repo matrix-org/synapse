@@ -209,7 +209,7 @@ Where `<token>` may be either:
  * a numeric stream_id to stream updates since (exclusive)
  * `NOW` to stream all subsequent updates.
 
-The `<stream_name>` is the name of a replication stream to subscribe 
+The `<stream_name>` is the name of a replication stream to subscribe
 to (see [here](../synapse/replication/tcp/streams/_base.py) for a list
 of streams). It can also be `ALL` to subscribe to all known streams,
 in which case the `<token>` must be set to `NOW`.
@@ -233,6 +233,10 @@ in which case the `<token>` must be set to `NOW`.
 #### SYNC (S, C)
 
    Used exclusively in tests
+
+### REMOTE_SERVER_UP (S, C)
+
+    Inform other processes that a remote server may have come back online.
 
 See `synapse/replication/tcp/commands.py` for a detailed description and
 the format of each command.
