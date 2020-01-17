@@ -18,6 +18,7 @@ import errno
 import logging
 import os
 import shutil
+from typing import Dict, Tuple
 
 from six import iteritems
 
@@ -605,7 +606,7 @@ class MediaRepository(object):
 
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
         # they have the same dimensions of a scaled one.
-        thumbnails = {}
+        thumbnails = {}  # type: Dict[Tuple[int, int, str], str]
         for r_width, r_height, r_method, r_type in requirements:
             if r_method == "crop":
                 thumbnails.setdefault((r_width, r_height, r_type), r_method)
