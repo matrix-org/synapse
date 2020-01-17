@@ -78,6 +78,7 @@ class EventRestServlet(RestServlet):
         super(EventRestServlet, self).__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
+        self.auth = hs.get_auth()
         self._event_serializer = hs.get_event_client_serializer()
 
     async def on_GET(self, request, event_id):
