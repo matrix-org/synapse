@@ -182,21 +182,28 @@ class ListRoomRestServlet(RestServlet):
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
         order_by = parse_string(request, "order_by", default="alphabetical")
-        search_term = parse_string(request, "search_term")
-
-        direction = parse_string(request, "dir", default="f")
-        if direction != "f" and direction != "b":
+        if order_by != "alphabetical" and order_by != "size":
             raise SynapseError(
-                400, "Unknown direction: %s" % direction, errcode=Codes.INVALID_PARAM
+                400,
+                "Unknown value for order_by: %s" % (order_by,),
+                errcode=Codes.INVALID_PARAM,
             )
-        reverse_order = True if direction == "b" else False
 
+        search_term = parse_string(request, "search_term")
         if search_term == "":
             raise SynapseError(
                 400,
                 "search_term cannot be an empty string",
                 errcode=Codes.INVALID_PARAM,
             )
+
+        direction = parse_string(request, "dir", default="f")
+        if direction != "f" and direction != "b":
+            raise SynapseError(
+                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
+            )
+
+        reverse_order = True if direction == "b" else False
 
         # Return list of rooms according to parameters
         rooms, next_token = await self.admin_handler.get_rooms_paginate(

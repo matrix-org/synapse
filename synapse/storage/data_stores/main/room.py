@@ -300,7 +300,10 @@ class RoomWorkerStore(SQLBaseStore):
             reverse_order: whether to reverse the room list
             search_term: a string to filter room names by
         Returns:
-            defer.Deferred: a json list[dict[str, Any]]
+            defer.Deferred: a tuple of list[dict[str, Any]], int|None. A list of
+                room dicts and an integer, if not None, signifies more results can
+                be returned if the same call if repeated, substituting the value of
+                `start` for that of the returned int.
         """
         # Filter room names by a string
         where_statement = ""
@@ -311,10 +314,12 @@ class RoomWorkerStore(SQLBaseStore):
         if order_by == "size":
             order_by_column = "curr.joined_members"
             order_by_asc = False
-        else:
+        elif order_by == "alphabetical":
             # Sort alphabetically
             order_by_column = "state.name"
             order_by_asc = True
+        else:
+            raise StoreError(500, "Incorrect value for order_by provided: %s", order_by)
 
         # Whether to return the list in reverse order
         if reverse_order:
@@ -378,7 +383,7 @@ class RoomWorkerStore(SQLBaseStore):
         )
         rooms = []
 
-        # Refactor rooms into structured dictionary
+        # Refactor rooms into a structured dictionary
         for room in room_tuples:
             rooms.append(
                 {
@@ -1142,49 +1147,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         return self.db.runInteraction(
             "get_all_new_public_rooms", get_all_new_public_rooms
-        )
-
-    @defer.inlineCallbacks
-    def get_all_rooms_with_alias(
-        self, offset: int, limit: int
-    ) -> List[Tuple[str, str, str]]:
-        """Retrieves a list of all rooms the server is in as well as all room
-        aliases for that room. Rooms are retrieved in alphabetical order by room ID.
-
-        Args:
-            offset: What to offset the list of rooms by
-            limit: The maximum number of rooms to return
-
-        Returns:
-            A list of tuples containing the (room_id, room_name, main room_alias)
-        """
-
-        def get_all_rooms_with_alias_txn(txn):
-            # Retrieve all known room_ids and aliases
-            sql = """
-                SELECT rooms.room_id, room_aliases.room_alias
-                FROM rooms
-                INNER JOIN room_aliases on room_aliases.room_id = rooms.room_id
-                ORDER BY rooms.room_id ASC
-                LIMIT ?
-                OFFSET ?
-            """
-
-            txn.execute(sql, (limit, offset))
-            room_ids_and_aliases = txn.fetchall()
-
-            # Extract all known aliases for a room
-            room_id_to_alias_list = {}
-            for room_id, room_alias in room_ids_and_aliases:
-                if room_id in room_id_to_alias_list:
-                    room_id_to_alias_list[room_id].append(room_alias)
-                else:
-                    room_id_to_alias_list[room_id] = [room_alias]
-
-            return room_id_to_alias_list
-
-        return self.db.runInteraction(
-            "get_all_rooms_with_alias", get_all_rooms_with_alias_txn
         )
 
     @defer.inlineCallbacks

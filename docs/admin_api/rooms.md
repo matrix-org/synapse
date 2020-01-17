@@ -14,9 +14,9 @@ The following query parameters are available:
   - `"alphabetical"` - Rooms are ordered alphabetically by room name. This is the default.
   - `"size"` - Rooms are ordered by the number of members. Largest to smallest.
 * `dir` - Direction of room order. Either `"f"` for forwards or `b` for backwards. Setting
-this value to `b` will reverse the above sort order. Defaults to `f`.
+          this value to `b` will reverse the above sort order. Defaults to `f`.
 * `search_term` - Filter rooms by their room name. Search term can be contained in any
-part of the room name. Defaults to no filtering.
+                  part of the room name. Defaults to no filtering.
 
 The following fields are possible in the JSON response body:
 
@@ -27,9 +27,10 @@ The following fields are possible in the JSON response body:
     - `canonical_alias` - The canonical (main) alias address of the room.
     - `joined_members` - How many users are currently in the room.
 * `next_token` - If this field is present, we know that there are potentially
-more rooms on the server that did not all fit into this response. We can use
-`next_token` to get the "next page" of results. To do so, simply repeat your
-request, setting the `from` parameter to the value of `next_token`.
+                 more rooms on the server that did not all fit into this response.
+                 We can use `next_token` to get the "next page" of results. To do
+                 so, simply repeat your request, setting the `from` parameter to
+                 the value of `next_token`.
 
 ## Usage
 
@@ -117,9 +118,10 @@ Response:
 }
 ```
 
-The presence of the `next_token` parameter tells us that there are more rooms that stated in
-this request, and we need to make another request to get them. To get the next batch of room
-results, we repeat our request, setting the `from` parameter to the value of `next_token`.
+The presence of the `next_token` parameter tells us that there are more rooms
+than returned in this request, and we need to make another request to get them.
+To get the next batch of room results, we repeat our request, setting the `from`
+parameter to the value of `next_token`.
 
 ```
 GET /_synapse/admin/rooms?order_by=size&from=100
@@ -149,4 +151,5 @@ Response:
 }
 ```
 
-Once the `next_token` parameter is not present, we know we've reached the end of the list.
+Once the `next_token` parameter is not present, we know we've reached the end of
+the list.
