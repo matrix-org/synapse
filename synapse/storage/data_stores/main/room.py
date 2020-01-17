@@ -374,6 +374,7 @@ class RoomWorkerStore(SQLBaseStore):
             if search_term:
                 # Add the search term into the WHERE clause
                 sql_values = (search_term,) + sql_values
+            logging.info("info sql_values: %s", sql_values)
             txn.execute(info_sql, sql_values)
             rows = [row for row in txn]
 
@@ -382,6 +383,7 @@ class RoomWorkerStore(SQLBaseStore):
             if search_term:
                 # Add the search term into the WHERE clause
                 sql_values = (search_term,) + sql_values
+            logging.info("count sql_values: %s", sql_values)
             txn.execute(count_sql, sql_values)
             room_count = txn.fetchone()
             if room_count:
