@@ -290,7 +290,6 @@ class ReplicationStreamer(object):
         await self._server_notices_sender.on_user_ip(user_id)
 
     @measure_func("repl.on_remote_server_up")
-    @defer.inlineCallbacks
     def on_remote_server_up(self, server: str):
         self.notifier.notify_remote_server_up(server)
 
