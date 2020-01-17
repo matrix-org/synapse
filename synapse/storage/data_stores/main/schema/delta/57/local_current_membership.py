@@ -56,7 +56,7 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
             INSERT INTO local_current_membership (room_id, user_id, event_id, membership)
                 SELECT c.room_id, state_key AS user_id, event_id, c.membership
                 FROM current_state_events AS c
-                WHERE type = 'm.room.member' AND c.membership IS NOT NULL AND state_key like '%' || ?
+                WHERE type = 'm.room.member' AND c.membership IS NOT NULL AND state_key LIKE ?
         """
     else:
         # We can't rely on the membership column, so we need to join against
@@ -66,9 +66,10 @@ def run_upgrade(cur, database_engine, config, *args, **kwargs):
                 SELECT c.room_id, state_key AS user_id, event_id, r.membership
                 FROM current_state_events AS c
                 INNER JOIN room_memberships AS r USING (event_id)
-                WHERE type = 'm.room.member' and state_key like '%' || ?
+                WHERE type = 'm.room.member' AND state_key LIKE ?
         """
-    cur.execute(sql, (config.server_name,))
+    sql = database_engine.convert_param_style(sql)
+    cur.execute(sql, ("%:" + config.server_name,))
 
     cur.execute(
         "CREATE UNIQUE INDEX local_current_membership_idx ON local_current_membership(user_id, room_id)"
