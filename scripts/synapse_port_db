@@ -494,7 +494,7 @@ class Porter(object):
             self.progress.set_state("Running background updates on PostgreSQL")
 
         while not postgres_ready:
-            yield self.postgres_store.db.updates.do_next_background_update(100)
+            await self.postgres_store.db.updates.do_next_background_update(100)
             postgres_ready = yield (
                 self.postgres_store.db.updates.has_completed_background_updates()
             )
