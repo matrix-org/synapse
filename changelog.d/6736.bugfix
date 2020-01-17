@@ -1,0 +1,1 @@
+Fixed synapse_port_db bug from async upgrade. With love, Salem Elrahal.
