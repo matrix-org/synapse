@@ -13,7 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 from ._base import IncorrectDatabaseSetup
+
+logger = logging.getLogger(__name__)
 
 
 class PostgresEngine(object):
@@ -50,6 +54,20 @@ class PostgresEngine(object):
                 raise IncorrectDatabaseSetup(
                     "Database has incorrect encoding: '%s' instead of 'UTF8'\n"
                     "See docs/postgres.rst for more information." % (rows[0][0],)
+                )
+
+            txn.execute(
+                "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
+            )
+            collation, ctype = txn.fetchone()
+            if collation != "C":
+                logger.warning(
+                    "Database has incorrect collation of %r. Should be 'C'", collation
+                )
+
+            if ctype != "C":
+                logger.warning(
+                    "Database has incorrect ctype of %r. Should be 'C'", ctype
                 )
 
     def convert_param_style(self, sql):
