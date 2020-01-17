@@ -345,7 +345,7 @@ class RoomWorkerStore(SQLBaseStore):
               %s
               LIMIT ?
               OFFSET ?
-            )
+            ) AS get_room_ids
         """ % (
             where_statement,
         )
