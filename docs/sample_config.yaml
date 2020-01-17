@@ -874,23 +874,6 @@ media_store_path: "DATADIR/media_store"
 # Optional account validity configuration. This allows for accounts to be denied
 # any request after a given period.
 #
-# ``enabled`` defines whether the account validity feature is enabled. Defaults
-# to False.
-#
-# ``period`` allows setting the period after which an account is valid
-# after its registration. When renewing the account, its validity period
-# will be extended by this amount of time. This parameter is required when using
-# the account validity feature.
-#
-# ``renew_at`` is the amount of time before an account's expiry date at which
-# Synapse will send an email to the account's email address with a renewal link.
-# This needs the ``email`` and ``public_baseurl`` configuration sections to be
-# filled.
-#
-# ``renew_email_subject`` is the subject of the email sent out with the renewal
-# link. ``%(app)s`` can be used as a placeholder for the ``app_name`` parameter
-# from the ``email`` section.
-#
 # Once this feature is enabled, Synapse will look for registered users without an
 # expiration date at startup and will add one to every account it found using the
 # current settings at that time.
@@ -901,21 +884,55 @@ media_store_path: "DATADIR/media_store"
 # date will be randomly selected within a range [now + period - d ; now + period],
 # where d is equal to 10% of the validity period.
 #
-#account_validity:
-#  enabled: true
-#  period: 6w
-#  renew_at: 1w
-#  renew_email_subject: "Renew your %(app)s account"
-#  # Directory in which Synapse will try to find the HTML files to serve to the
-#  # user when trying to renew an account. Optional, defaults to
-#  # synapse/res/templates.
-#  template_dir: "res/templates"
-#  # HTML to be displayed to the user after they successfully renewed their
-#  # account. Optional.
-#  account_renewed_html_path: "account_renewed.html"
-#  # HTML to be displayed when the user tries to renew an account with an invalid
-#  # renewal token. Optional.
-#  invalid_token_html_path: "invalid_token.html"
+account_validity:
+  # The account validity feature is disabled by default. Uncomment the
+  # following line to enable it.
+  #
+  #enabled: true
+
+  # The period after which an account is valid after its registration. When
+  # renewing the account, its validity period will be extended by this amount
+  # of time. This parameter is required when using the account validity
+  # feature.
+  #
+  #period: 6w
+
+  # The amount of time before an account's expiry date at which Synapse will
+  # send an email to the account's email address with a renewal link. By
+  # default, no such emails are sent.
+  #
+  # If you enable this setting, you will also need to fill out the 'email' and
+  # 'public_baseurl' configuration sections.
+  #
+  #renew_at: 1w
+
+  # The subject of the email sent out with the renewal link. '%(app)s' can be
+  # used as a placeholder for the 'app_name' parameter from the 'email'
+  # section.
+  #
+  # Note that the placeholder must be written '%(app)s', including the
+  # trailing 's'.
+  #
+  # If this is not set, a default value is used.
+  #
+  #renew_email_subject: "Renew your %(app)s account"
+
+  # Directory in which Synapse will try to find templates for the HTML files to
+  # serve to the user when trying to renew an account. If not set, default
+  # templates from within the Synapse package will be used.
+  #
+  #template_dir: "res/templates"
+
+  # File within 'template_dir' giving the HTML to be displayed to the user after
+  # they successfully renewed their account. If not set, default text is used.
+  #
+  #account_renewed_html_path: "account_renewed.html"
+
+  # File within 'template_dir' giving the HTML to be displayed when the user
+  # tries to renew an account with an invalid renewal token. If not set,
+  # default text is used.
+  #
+  #invalid_token_html_path: "invalid_token.html"
 
 # Time that a user's session remains valid for, after they log in.
 #
@@ -1353,107 +1370,110 @@ password_config:
    #pepper: "EVEN_MORE_SECRET"
 
 
+# Configuration for sending emails from Synapse.
+#
+email:
+  # The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
+  #
+  #smtp_host: mail.server
 
-# Enable sending emails for password resets, notification events or
-# account expiry notices
-#
-# If your SMTP server requires authentication, the optional smtp_user &
-# smtp_pass variables should be used
-#
-#email:
-#   enable_notifs: false
-#   smtp_host: "localhost"
-#   smtp_port: 25 # SSL: 465, STARTTLS: 587
-#   smtp_user: "exampleusername"
-#   smtp_pass: "examplepassword"
-#   require_transport_security: false
-#
-#   # notif_from defines the "From" address to use when sending emails.
-#   # It must be set if email sending is enabled.
-#   #
-#   # The placeholder '%(app)s' will be replaced by the application name,
-#   # which is normally 'app_name' (below), but may be overridden by the
-#   # Matrix client application.
-#   #
-#   # Note that the placeholder must be written '%(app)s', including the
-#   # trailing 's'.
-#   #
-#   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
-#
-#   # app_name defines the default value for '%(app)s' in notif_from. It
-#   # defaults to 'Matrix'.
-#   #
-#   #app_name: my_branded_matrix_server
-#
-#   # Enable email notifications by default
-#   #
-#   notif_for_new_users: true
-#
-#   # Defining a custom URL for Riot is only needed if email notifications
-#   # should contain links to a self-hosted installation of Riot; when set
-#   # the "app_name" setting is ignored
-#   #
-#   riot_base_url: "http://localhost/riot"
-#
-#   # Configure the time that a validation email or text message code
-#   # will expire after sending
-#   #
-#   # This is currently used for password resets
-#   #
-#   #validation_token_lifetime: 1h
-#
-#   # Template directory. All template files should be stored within this
-#   # directory. If not set, default templates from within the Synapse
-#   # package will be used
-#   #
-#   # For the list of default templates, please see
-#   # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-#   #
-#   #template_dir: res/templates
-#
-#   # Templates for email notifications
-#   #
-#   notif_template_html: notif_mail.html
-#   notif_template_text: notif_mail.txt
-#
-#   # Templates for account expiry notices
-#   #
-#   expiry_template_html: notice_expiry.html
-#   expiry_template_text: notice_expiry.txt
-#
-#   # Templates for password reset emails sent by the homeserver
-#   #
-#   #password_reset_template_html: password_reset.html
-#   #password_reset_template_text: password_reset.txt
-#
-#   # Templates for registration emails sent by the homeserver
-#   #
-#   #registration_template_html: registration.html
-#   #registration_template_text: registration.txt
-#
-#   # Templates for validation emails sent by the homeserver when adding an email to
-#   # your user account
-#   #
-#   #add_threepid_template_html: add_threepid.html
-#   #add_threepid_template_text: add_threepid.txt
-#
-#   # Templates for password reset success and failure pages that a user
-#   # will see after attempting to reset their password
-#   #
-#   #password_reset_template_success_html: password_reset_success.html
-#   #password_reset_template_failure_html: password_reset_failure.html
-#
-#   # Templates for registration success and failure pages that a user
-#   # will see after attempting to register using an email or phone
-#   #
-#   #registration_template_success_html: registration_success.html
-#   #registration_template_failure_html: registration_failure.html
-#
-#   # Templates for success and failure pages that a user will see after attempting
-#   # to add an email or phone to their account
-#   #
-#   #add_threepid_success_html: add_threepid_success.html
-#   #add_threepid_failure_html: add_threepid_failure.html
+  # The port on the mail server for outgoing SMTP. Defaults to 25.
+  #
+  #smtp_port: 587
+
+  # Username/password for authentication to the SMTP server. By default, no
+  # authentication is attempted.
+  #
+  # smtp_user: "exampleusername"
+  # smtp_pass: "examplepassword"
+
+  # Uncomment the following to require TLS transport security for SMTP.
+  # By default, Synapse will connect over plain text, and will then switch to
+  # TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
+  # Synapse will refuse to connect unless the server supports STARTTLS.
+  #
+  #require_transport_security: true
+
+  # Enable sending emails for messages that the user has missed
+  #
+  #enable_notifs: false
+
+  # notif_from defines the "From" address to use when sending emails.
+  # It must be set if email sending is enabled.
+  #
+  # The placeholder '%(app)s' will be replaced by the application name,
+  # which is normally 'app_name' (below), but may be overridden by the
+  # Matrix client application.
+  #
+  # Note that the placeholder must be written '%(app)s', including the
+  # trailing 's'.
+  #
+  #notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
+
+  # app_name defines the default value for '%(app)s' in notif_from. It
+  # defaults to 'Matrix'.
+  #
+  #app_name: my_branded_matrix_server
+
+  # Uncomment the following to disable automatic subscription to email
+  # notifications for new users. Enabled by default.
+  #
+  #notif_for_new_users: false
+
+  # Custom URL for client links within the email notifications. By default
+  # links will be based on "https://matrix.to".
+  #
+  # (This setting used to be called riot_base_url; the old name is still
+  # supported for backwards-compatibility but is now deprecated.)
+  #
+  #client_base_url: "http://localhost/riot"
+
+  # Configure the time that a validation email will expire after sending.
+  # Defaults to 1h.
+  #
+  #validation_token_lifetime: 15m
+
+  # Directory in which Synapse will try to find the template files below.
+  # If not set, default templates from within the Synapse package will be used.
+  #
+  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+  # If you *do* uncomment it, you will need to make sure that all the templates
+  # below are in the directory.
+  #
+  # Synapse will look for the following templates in this directory:
+  #
+  # * The contents of email notifications of missed events: 'notif_mail.html' and
+  #   'notif_mail.txt'.
+  #
+  # * The contents of account expiry notice emails: 'notice_expiry.html' and
+  #   'notice_expiry.txt'.
+  #
+  # * The contents of password reset emails sent by the homeserver:
+  #   'password_reset.html' and 'password_reset.txt'
+  #
+  # * HTML pages for success and failure that a user will see when they follow
+  #   the link in the password reset email: 'password_reset_success.html' and
+  #   'password_reset_failure.html'
+  #
+  # * The contents of address verification emails sent during registration:
+  #   'registration.html' and 'registration.txt'
+  #
+  # * HTML pages for success and failure that a user will see when they follow
+  #   the link in an address verification email sent during registration:
+  #   'registration_success.html' and 'registration_failure.html'
+  #
+  # * The contents of address verification emails sent when an address is added
+  #   to a Matrix account: 'add_threepid.html' and 'add_threepid.txt'
+  #
+  # * HTML pages for success and failure that a user will see when they follow
+  #   the link in an address verification email sent when an address is added
+  #   to a Matrix account: 'add_threepid_success.html' and
+  #   'add_threepid_failure.html'
+  #
+  # You can see the default templates at:
+  # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+  #
+  #template_dir: "res/templates"
 
 
 #password_providers:
