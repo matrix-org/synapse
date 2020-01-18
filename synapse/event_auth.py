@@ -225,12 +225,9 @@ def _is_membership_change_allowed(event, auth_events):
 
     key = (EventTypes.JoinRules, "")
     join_rule_event = auth_events.get(key)
-    print(auth_events)
-    print(join_rule_event)
     if join_rule_event:
         join_rule = join_rule_event.content.get("join_rule", JoinRules.INVITE)
     else:
-        print("No such event")
         join_rule = JoinRules.INVITE
 
     user_level = get_user_power_level(event.user_id, auth_events)
@@ -317,9 +314,6 @@ def _is_membership_change_allowed(event, auth_events):
             raise AuthError(403, "You don't have permission to ban")
     elif Membership.KNOCK == membership:
         # check that we have the leave event
-        print("====================")
-        print(join_rule)
-        print(user_level, knock_level)
         if target and target.membership != Membership.LEAVE:
             raise AuthError(403, "You don't have permission to knock")
         elif join_rule != JoinRules.INVITE:

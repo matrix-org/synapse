@@ -478,8 +478,6 @@ class RoomMemberHandler(object):
                     )
                     return res
         elif effective_membership_state == Membership.KNOCK:
-            print("===========================")
-            print("blah")
             if not is_host_in_room:
                 # The knock needs to be send over federation
                 remote_room_hosts.append(room_id.split(":", 1)[1])
