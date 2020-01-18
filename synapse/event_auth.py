@@ -225,9 +225,12 @@ def _is_membership_change_allowed(event, auth_events):
 
     key = (EventTypes.JoinRules, "")
     join_rule_event = auth_events.get(key)
+    print(auth_events)
+    print(join_rule_event)
     if join_rule_event:
         join_rule = join_rule_event.content.get("join_rule", JoinRules.INVITE)
     else:
+        print("No such event")
         join_rule = JoinRules.INVITE
 
     user_level = get_user_power_level(event.user_id, auth_events)
@@ -235,6 +238,7 @@ def _is_membership_change_allowed(event, auth_events):
 
     # FIXME (erikj): What should we do here as the default?
     ban_level = _get_named_level(auth_events, "ban", 50)
+    knock_level = _get_named_level(auth_events, "knock", 0)
 
     logger.debug(
         "_is_membership_change_allowed: %s",
@@ -257,7 +261,7 @@ def _is_membership_change_allowed(event, auth_events):
             raise AuthError(403, "%s is banned from the room" % (target_user_id,))
         return
 
-    if Membership.JOIN != membership:
+    if Membership.JOIN != membership and Membership.KNOCK != membership:
         if (
             caller_invited
             and Membership.LEAVE == membership
@@ -311,6 +315,17 @@ def _is_membership_change_allowed(event, auth_events):
     elif Membership.BAN == membership:
         if user_level < ban_level or user_level <= target_level:
             raise AuthError(403, "You don't have permission to ban")
+    elif Membership.KNOCK == membership:
+        # check that we have the leave event
+        print("====================")
+        print(join_rule)
+        print(user_level, knock_level)
+        if target and target.membership != Membership.LEAVE:
+            raise AuthError(403, "You don't have permission to knock")
+        elif join_rule != JoinRules.INVITE:
+            raise AuthError(403, "You don't have permission to knock")
+        elif user_level < knock_level:
+            raise AuthError(403, "You don't have permission to knock")
     else:
         raise AuthError(500, "Unknown membership %s" % membership)
 
@@ -653,7 +668,7 @@ def auth_types_for_event(event) -> Set[Tuple[str]]:
 
     if event.type == EventTypes.Member:
         membership = event.content["membership"]
-        if membership in [Membership.JOIN, Membership.INVITE]:
+        if membership in [Membership.JOIN, Membership.INVITE, Membership.KNOCK]:
             auth_types.add((EventTypes.JoinRules, ""))
 
         auth_types.add((EventTypes.Member, event.state_key))

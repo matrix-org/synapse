@@ -40,6 +40,7 @@ ABSOLUTE_STATS_FIELDS = {
         "left_members",
         "banned_members",
         "local_users_in_room",
+        "knock_members",
     ),
     "user": ("joined_rooms",),
 }

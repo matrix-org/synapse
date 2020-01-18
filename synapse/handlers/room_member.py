@@ -2,6 +2,7 @@
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -476,6 +477,21 @@ class RoomMemberHandler(object):
                         requester, remote_room_hosts, room_id, target, content,
                     )
                     return res
+        elif effective_membership_state == Membership.KNOCK:
+            print("===========================")
+            print("blah")
+            if not is_host_in_room:
+                # The knock needs to be send over federation
+                remote_room_hosts.append(room_id.split(":", 1)[1])
+
+                content["membership"] = Membership.KNOCK
+
+                profile = self.profile_handler
+                if not content_specified:
+                    content["displayname"] = yield profile.get_displayname(target)
+                    content["avatar_url"] = yield profile.get_avatar_url(target)
+
+                raise SynapseError(500, "Not yet implemented")
 
         res = yield self._local_membership_update(
             requester=requester,

@@ -2,6 +2,7 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyrignt 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -471,7 +472,7 @@ class EventCreationHandler(object):
             membership = builder.content.get("membership", None)
             target = UserID.from_string(builder.state_key)
 
-            if membership in {Membership.JOIN, Membership.INVITE}:
+            if membership in {Membership.JOIN, Membership.INVITE, Membership.KNOCK}:
                 # If event doesn't include a display name, add one.
                 profile = self.profile_handler
                 content = builder.content
