@@ -72,7 +72,7 @@ class KnockServlet(TransactionRestServlet):
         )
 
 
-class KnockRoomALiasServlet(TransactionRestServlet):
+class KnockRoomAliasServlet(TransactionRestServlet):
     """
     POST /knock/{roomIdOrAlias}
     """
@@ -80,7 +80,7 @@ class KnockRoomALiasServlet(TransactionRestServlet):
     PATTERNS = client_patterns("/knock/(?P<room_identifier>[^/]*)")
 
     def __init__(self, hs):
-        super(KnockRoomALiasServlet, self).__init__(hs)
+        super(KnockRoomAliasServlet, self).__init__(hs)
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
@@ -133,4 +133,4 @@ class KnockRoomALiasServlet(TransactionRestServlet):
 
 def register_servlets(hs, http_server):
     KnockServlet(hs).register(http_server)
-    KnockRoomALiasServlet(hs).register(http_server)
+    KnockRoomAliasServlet(hs).register(http_server)
