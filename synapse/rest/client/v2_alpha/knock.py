@@ -15,28 +15,29 @@
 
 import logging
 
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.types import RoomAlias, RoomID
 
 from ._base import client_patterns
 
 logger = logging.getLogger(__name__)
+
 
 class TransactionRestServlet(RestServlet):
     def __init__(self, hs):
         super(TransactionRestServlet, self).__init__()
         self.txns = HttpTransactionCache(hs)
 
+
 class KnockServlet(TransactionRestServlet):
     """
     POST /rooms/{roomId}/knock
     """
 
-    PATTERNS = client_patterns(
-        "/rooms/(?P<room_id>[^/]*)/knock"
-    )
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/knock")
 
     def __init__(self, hs):
         super(KnockServlet, self).__init__(hs)
@@ -70,14 +71,13 @@ class KnockServlet(TransactionRestServlet):
             request, self.on_POST, request, room_id, txn_id
         )
 
+
 class KnockRoomALiasServlet(TransactionRestServlet):
     """
     POST /knock/{roomIdOrAlias}
     """
 
-    PATTERNS = client_patterns(
-        "/knock/(?P<room_identifier>[^/]*)"
-    )
+    PATTERNS = client_patterns("/knock/(?P<room_identifier>[^/]*)")
 
     def __init__(self, hs):
         super(KnockRoomALiasServlet, self).__init__(hs)
@@ -129,6 +129,7 @@ class KnockRoomALiasServlet(TransactionRestServlet):
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_identifier, txn_id
         )
+
 
 def register_servlets(hs, http_server):
     KnockServlet(hs).register(http_server)

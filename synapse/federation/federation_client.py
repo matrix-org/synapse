@@ -823,7 +823,7 @@ class FederationClient(FederationBase):
             destination=destination,
             room_id=pdu.room_id,
             event_id=pdu.event_id,
-            content=pdu.get_pdu_json(time_now)
+            content=pdu.get_pdu_json(time_now),
         )
 
         return content

@@ -485,9 +485,9 @@ class RoomMemberHandler(object):
                 content["membership"] = Membership.KNOCK
 
                 profile = self.profile_handler
-                if not "displayname" in content:
+                if "displayname" not in content:
                     content["displayname"] = yield profile.get_displayname(target)
-                if not "avatar_url" in content:
+                if "avatar_url" not in content:
                     content["avatar_url"] = yield profile.get_avatar_url(target)
 
                 remote_knock_response = yield self._remote_knock(

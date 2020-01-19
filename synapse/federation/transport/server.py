@@ -549,12 +549,14 @@ class FederationMakeKnockServlet(BaseFederationServlet):
         content = await self.handler.on_make_knock_request(origin, context, user_id)
         return 200, content
 
+
 class FederationV1MakeKnockServlet(BaseFederationServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
         content = await self.handler.on_send_knock_request(origin, content, room_id)
         return 200, content
+
 
 class FederationEventAuthServlet(BaseFederationServlet):
     PATH = "/event_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
