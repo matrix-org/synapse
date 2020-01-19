@@ -485,8 +485,9 @@ class RoomMemberHandler(object):
                 content["membership"] = Membership.KNOCK
 
                 profile = self.profile_handler
-                if not content_specified:
+                if not "displayname" in content:
                     content["displayname"] = yield profile.get_displayname(target)
+                if not "avatar_url" in content:
                     content["avatar_url"] = yield profile.get_avatar_url(target)
 
                 remote_knock_response = yield self._remote_knock(
@@ -1026,6 +1027,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
+        fed_handler = self.federation_handler
         ret = yield fed_handler.do_knock(
             remote_room_hosts, room_id, user.to_string(), content=content,
         )

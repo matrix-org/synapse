@@ -462,6 +462,33 @@ class FederationServer(FederationBase):
         await self.handler.on_send_leave_request(origin, pdu)
         return {}
 
+    async def on_make_knock_request(self, origin, room_id, user_id):
+        origin_host, _ = parse_server_name(origin)
+        await self.check_server_matches_acl(origin_host, room_id)
+        pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
+
+        room_version = await self.store.get_room_version(room_id)
+
+        time_now = self._clock.time_msec()
+        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
+
+    async def on_send_knock_request(self, origin, content, room_id):
+        logger.debug("on_send_knock_request: content: %s", content)
+
+        room_version = await self.store.get_room_version(room_id)
+        format_ver = room_version_to_event_format(room_version)
+        pdu = event_from_pdu_json(content, format_ver)
+
+        origin_host, _ = parse_server_name(origin)
+        await self.check_server_matches_acl(origin_host, pdu.room_id)
+
+        logger.debug("on_send_knock_request: pdu sigs: %s", pdu.signatures)
+
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
+
+        await self.handler.on_send_knock_request(origin, pdu)
+        return {}
+
     async def on_event_auth(self, origin, room_id, event_id):
         with (await self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)

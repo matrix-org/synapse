@@ -212,7 +212,7 @@ class TransportLayerClient(object):
             Fails with ``FederationDeniedError`` if the remote destination
             is not in our federation whitelist
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -302,8 +302,8 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_knock_v2(self, destination, room_id, event_id, content):
-        path = _create_v2_path("/send_knock/%s/%s", room_id, event_id)
+    def send_knock_v1(self, destination, room_id, event_id, content):
+        path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
             destination=destination, path=path, data=content

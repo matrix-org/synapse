@@ -1659,7 +1659,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     @log_function
-    def on_make_kock_request(self, origin, room_id, user_id):
+    def on_make_knock_request(self, origin, room_id, user_id):
         """ We've received a /make_knock/ request, so we create a partial
         knock event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.

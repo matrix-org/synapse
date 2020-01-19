@@ -818,8 +818,8 @@ class FederationClient(FederationBase):
     def _do_send_knock(self, destination, pdu):
         time_now = self._clock.time_msec()
 
-        # knock only has the v2 api, no need to fall back to v1
-        content = yield self.transport_layer.send_knock_v2(
+        # Only v1 exists!
+        content = yield self.transport_layer.send_knock_v1(
             destination=destination,
             room_id=pdu.room_id,
             event_id=pdu.event_id,
