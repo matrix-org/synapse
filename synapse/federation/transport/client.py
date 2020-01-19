@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -295,6 +296,17 @@ class TransportLayerClient(object):
             # server was just having a momentary blip, the room will be out of
             # sync.
             ignore_backoff=True,
+        )
+
+        return response
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_knock_v2(self, destination, room_id, event_id, content):
+        path = _create_v2_path("/send_knock/%s/%s", room_id, event_id)
+
+        response = yield self.client.put_json(
+            destination=destination, path=path, data=content
         )
 
         return response

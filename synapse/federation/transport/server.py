@@ -2,6 +2,7 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -540,6 +541,22 @@ class FederationV2SendLeaveServlet(BaseFederationServlet):
         content = await self.handler.on_send_leave_request(origin, content, room_id)
         return 200, content
 
+
+class FederationMakeKnockServlet(BaseFederationServlet):
+    PATH = "/make_knock/(?P<context>[^/]*)/(?P<user_id>[^/]*)"
+
+    async def on_GET(self, origin, content, query, context, user_id):
+        content = await self.handler.on_make_knock_request(origin, context, user_id)
+        return 200, content
+
+class FederationV2MakeKnockServlet(BaseFederationServlet):
+    PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+
+    PREFIX = FEDERATION_V2_PREFIX
+
+    async def on_PUT(self, origin, content, query, room_id, event_id):
+        content = await self.handler.on_send_knock_request(origin, content, room_id)
+        return 200, content
 
 class FederationEventAuthServlet(BaseFederationServlet):
     PATH = "/event_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"

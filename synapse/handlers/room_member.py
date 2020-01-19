@@ -489,7 +489,11 @@ class RoomMemberHandler(object):
                     content["displayname"] = yield profile.get_displayname(target)
                     content["avatar_url"] = yield profile.get_avatar_url(target)
 
-                raise SynapseError(500, "Not yet implemented")
+                remote_knock_response = yield self._remote_knock(
+                    requester, remote_room_hosts, room_id, target, content
+                )
+
+                return remote_knock_response
 
         res = yield self._local_membership_update(
             requester=requester,
@@ -1011,6 +1015,25 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
             yield self.store.locally_reject_invite(target.to_string(), room_id)
             return {}
+
+    @defer.inlineCallbacks
+    def _remote_knock(self, requester, remote_room_hosts, room_id, user, content):
+        # filter ourselves out of remote_room_hosts
+        remote_room_hosts = [
+            host for host in remote_room_hosts if host != self.hs.hostname
+        ]
+
+        if len(remote_room_hosts) == 0:
+            raise SynapseError(404, "No known servers")
+
+        ret = yield fed_handler.do_knock(
+            remote_room_hosts, room_id, user.to_string(), content=content,
+        )
+        return ret
+
+        yield self.federation_handler.send_knock(
+            remote_room_hosts, room_id, user.to_string(), content
+        )
 
     def _user_joined_room(self, target, room_id):
         """Implements RoomMemberHandler._user_joined_room

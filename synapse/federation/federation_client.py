@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyrignt 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -438,7 +439,7 @@ class FederationClient(FederationBase):
 
             Fails with a ``RuntimeError`` if no servers were reachable.
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -784,6 +785,48 @@ class FederationClient(FederationBase):
         # We expect the v1 API to respond with [200, content], so we only return the
         # content.
         return resp[1]
+
+    def send_knock(self, destinations, pdu):
+        """Sends a knock event to one of a list of homeservers.
+
+        Doing so will cause the remote server to add teh event to the graph,
+        and send the event out to the rest of the federation.
+
+        Args:
+            destinations (str): Candidate homeservers which are probably participating in the room.
+            pdu (BaseEvent): event to be sent
+
+        Return:
+            Deferred: resolves to None.
+
+            Fails with a ``SynapseError`` if the chosen remote server
+            returns a 300/400 code.
+
+            Fails with a ``RuntimeError`` if no servers were reachable.
+        """
+
+        @defer.inlineCallbacks
+        def send_request(destination):
+            content = yield self._do_send_knock(destination, pdu)
+
+            logger.debug("Got content: %s", content)
+            return None
+
+        return self._try_destination_list("send_knock", destinations, send_request)
+
+    @defer.inlineCallbacks
+    def _do_send_knock(self, destination, pdu):
+        time_now = self._clock.time_msec()
+
+        # knock only has the v2 api, no need to fall back to v1
+        content = yield self.transport_layer.send_knock_v2(
+            destination=destination,
+            room_id=pdu.room_id,
+            event_id=pdu.event_id,
+            content=pdu.get_pdu_json(time_now)
+        )
+
+        return content
 
     def get_public_rooms(
         self,

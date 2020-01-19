@@ -2,6 +2,7 @@
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1273,6 +1274,34 @@ class FederationHandler(BaseHandler):
 
         return True
 
+    @log_function
+    @defer.inlineCallbacks
+    def do_knock(self, target_hosts, room_id, knockee, content):
+        """ Sends the knock to the remote server.
+
+        This first triggers a /make_knock/ request that returns a partial
+        event that we can fill out and sign. This is then sent to the
+        remote server via /send_knock/.
+
+        Knockees must be signed by the knockee's server before distributing.
+        """
+        logger.debug("Knocking %s to %s", knockee, room_id)
+
+        origin, event, event_format_version = yield self._make_and_verify_event(
+            target_hosts, room_id, knockee, "knock", content,
+        )
+
+        # Try the host that we successfully called /make_knock/ on first for
+        # the /send_knock/ request.
+        try:
+            target_hosts.remove(origin)
+            target_hosts.insert(0, origin)
+        except ValueError:
+            pass
+
+        yield self.federation_client.send_knock(target_hosts, event)
+        return event
+
     async def _handle_queued_pdus(self, room_queue):
         """Process PDUs which got queued up while we were busy send_joining.
 
@@ -1622,6 +1651,107 @@ class FederationHandler(BaseHandler):
 
         logger.debug(
             "on_send_leave_request: After _handle_new_event: %s, sigs: %s",
+            event.event_id,
+            event.signatures,
+        )
+
+        return None
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_make_kock_request(self, origin, room_id, user_id):
+        """ We've received a /make_knock/ request, so we create a partial
+        knock event for the room and return that. We do *not* persist or
+        process it until the other server has signed it and sent it back.
+
+        Args:
+            origin (str): The (verified) server name of the requesting server.
+            room_id (str): Room to create knock event in
+            user_id (str): The user to create the knock for
+
+        Returns:
+            Deferred[FrozenEvent]
+        """
+        if get_domain_from_id(user_id) != origin:
+            logger.info(
+                "Get /make_knock request for user %r from different origin %s, ignoring",
+                user_id,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
+        room_version = yield self.store.get_room_version(room_id)
+        builder = self.event_builder_factory.new(
+            room_version,
+            {
+                "type": EventTypes.Member,
+                "content": {"membership": Membership.KNOCK},
+                "room_id": room_id,
+                "sender": user_id,
+                "state_key": user_id,
+            },
+        )
+
+        event, context = yield self.event_creation_handler.create_new_client_event(
+            builder=builder
+        )
+
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context
+        )
+        if not event_allowed:
+            logger.warning("Creation of leave %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN
+            )
+
+        try:
+            # The remote hasn't signed it yet, obviously. We'll do the full checks
+            # when we get the event back in `on_send_knock_request`
+            yield self.auth.check_from_context(
+                room_version, event, context, do_sig_check=False
+            )
+        except AuthError as e:
+            logger.warning("Failed to create new knock %r because %s", event, e)
+            raise e
+
+        return event
+
+    @defer.inlineCallbacks
+    @log_function
+    def on_send_knock_request(self, origin, pdu):
+        """ We have received a knock event for a room. Fully process it."""
+        event = pdu
+
+        logger.debug(
+            "on_send_knock_request: Got event: %s, signatures: %s",
+            event.event_id,
+            event.signatures,
+        )
+
+        if get_domain_from_id(event.sender) != origin:
+            logger.info(
+                "Got /send_knock request for user %r from different origin %s",
+                event.sender,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
+        event.internal_metadata.outlier = False
+
+        context = yield self._handle_new_event(origin, event)
+
+        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event, context
+        )
+        if not event_allowed:
+            logger.info("Sending of leave %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN
+            )
+
+        logger.debug(
+            "on_send_knock_request: After _handle_new_event: %s, sigs: %s",
             event.event_id,
             event.signatures,
         )
