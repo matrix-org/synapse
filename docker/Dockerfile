@@ -10,6 +10,9 @@
 #
 #    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
 #
+# There is also the EXTRA_PYPI_DEPS build argument which allows for the
+# installation of additional Python dependencies from PyPI during build.
+#
 
 ARG PYTHON_VERSION=3.7
 
@@ -17,6 +20,8 @@ ARG PYTHON_VERSION=3.7
 ### Stage 0: builder
 ###
 FROM docker.io/python:${PYTHON_VERSION}-alpine3.10 as builder
+
+ARG EXTRA_PYPI_DEPS=
 
 # install the OS build deps
 
@@ -36,7 +41,7 @@ RUN apk add \
 # (we really just care about caching a wheel here, as the "pip install" below
 # will install them again.)
 
-RUN pip install --prefix="/install" --no-warn-script-location \
+RUN pip install --prefix="/install" --no-warn-script-location --no-cache-dir \
         cryptography \
         msgpack-python \
         pillow \
@@ -48,8 +53,8 @@ COPY synapse /synapse/synapse/
 COPY scripts /synapse/scripts/
 COPY MANIFEST.in README.rst setup.py synctl /synapse/
 
-RUN pip install --prefix="/install" --no-warn-script-location \
-        /synapse[all]
+RUN pip install --prefix="/install" --no-warn-script-location --no-cache-dir \
+        /synapse[all] $EXTRA_PYPI_DEPS
 
 ###
 ### Stage 1: runtime
