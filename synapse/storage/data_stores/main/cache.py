@@ -44,6 +44,14 @@ class CacheInvalidationStore(SQLBaseStore):
         txn.call_after(cache_func.invalidate, keys)
         self._send_invalidation_to_replication(txn, cache_func.__name__, keys)
 
+    def _invalidate_all_cache_and_stream(self, txn, cache_func):
+        """Invalidates the entire cache and adds it to the cache stream so slaves
+        will know to invalidate their caches.
+        """
+
+        txn.call_after(cache_func.invalidate_all)
+        self._send_invalidation_to_replication(txn, cache_func.__name__, None)
+
     def _invalidate_state_caches_and_stream(self, txn, room_id, members_changed):
         """Special case invalidation of caches based on current state.
 
