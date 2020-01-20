@@ -70,6 +70,25 @@ class PostgresEngine(object):
                     "Database has incorrect ctype of %r. Should be 'C'", ctype
                 )
 
+    def check_new_database(self, txn):
+        """Gets called when setting up a brand new database. This allows us to
+        apply stricter checks on new databases versus existing database.
+        """
+
+        txn.execute(
+            "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
+        )
+        collation, ctype = txn.fetchone()
+        if collation != "C":
+            raise IncorrectDatabaseSetup(
+                "Database has incorrect collation of %r. Should be 'C'" % (collation,)
+            )
+
+        if ctype != "C":
+            raise IncorrectDatabaseSetup(
+                "Database has incorrect ctype of %r. Should be 'C'" % (collation,)
+            )
+
     def convert_param_style(self, sql):
         return sql.replace("?", "%s")
 
