@@ -32,7 +32,7 @@ Assuming your PostgreSQL database user is called `postgres`, first authenticate 
     su - postgres
     # Or, if your system uses sudo to get administrative rights
     sudo -u postgres bash
-  
+
 Then, create a user ``synapse_user`` with:
 
     createuser --pwprompt synapse_user
@@ -62,6 +62,20 @@ Note that the PostgreSQL database *must* have the correct encoding set
 You may need to enable password authentication so `synapse_user` can
 connect to the database. See
 <https://www.postgresql.org/docs/11/auth-pg-hba-conf.html>.
+
+### Fixing incorrect `COLLATE` or `CTYPE`
+
+Synapse will refuse to set up a new database if it has the wrong values of
+`COLLATE` and `CTYPE` set, and will log warnings on existing databases. Using
+different locales can cause issues if the locale library is updated from
+underneath the database, or if a different version of the locale is used on any
+replicas.
+
+The safest way to fix the issue is to take a dump and recreate the database with
+the correct `COLLATE` and `CTYPE` parameters (as per
+[docs/postgres.md](docs/postgres.md)). It is also possible to change the
+parameters on a live database and run a `REINDEX` on the entire database,
+however extreme care must be taken to avoid database corruption.
 
 ## Tuning Postgres
 

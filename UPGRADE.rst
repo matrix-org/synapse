@@ -80,16 +80,9 @@ Upgrading to **<NEXT_VERSION>**
 ===============================
 
 Synapse will now log a warning on start up if used with a PostgreSQL database
-that has a non-recommended locale set. Using a different locale can cause issues
-if the locale library is updated from underneath the database, or if a different
-version of the locale is used on any replicas. In particular this can happen
-when upgrading the underlying OS.
+that has a non-recommended locale set.
 
-The safest way to fix the issue is to take a dump and recreate the database with
-the correct `COLLATE` and `CTYPE` parameters (as per
-[docs/postgres.md](docs/postgres.md)). It is also possible to change the
-parameters on a live database and run a `REINDEX` on the entire database,
-however extreme care must be taken to avoid table corruption.
+See [docs/postgres.md](docs/postgres.md) for details.
 
 
 Upgrading to v1.8.0
