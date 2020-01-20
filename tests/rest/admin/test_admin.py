@@ -736,13 +736,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         # Check their room_ids match
         returned_room_ids = [room["room_id"] for room in channel.json_body["rooms"]]
-        common_room_ids = set(room_ids) & set(returned_room_ids)
-        self.assertEqual(
-            len(common_room_ids),
-            total_rooms,
-            msg="Different room_ids than expected returned. "
-            "Expected:\n%s\nReturned:\n%s" % (room_ids, returned_room_ids),
-        )
+        self.assertEqual(room_ids, returned_room_ids)
 
         # Check that all fields are available
         for r in channel.json_body["rooms"]:
@@ -751,7 +745,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             self.assertIn("joined_members", r)
 
         # We shouldn't receive a next token here as there's no further rooms to show
-        self.assertTrue("next_token" not in channel.json_body)
+        self.assertNotIn("next_token", channel.json_body)
 
     def test_list_rooms_pagination(self):
         """Test that we can get a full list of rooms through pagination"""
@@ -799,17 +793,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             run_count,
             3,
-            msg="Should've queried 3 times for 5 rooms with " "limit 2 per query",
+            msg="Should've queried 3 times for 5 rooms with limit 2 per query",
         )
 
         # Check that we received all of the room ids
-        common_room_ids = set(room_ids) & set(returned_room_ids)
-        self.assertEqual(
-            len(common_room_ids),
-            total_rooms,
-            msg="Different room_ids than expected returned. "
-            "Expected:\n%s\nReturned:\n%s" % (room_ids, returned_room_ids),
-        )
+        self.assertEqual(room_ids, returned_room_ids)
 
         url = "/_synapse/admin/v1/rooms?from=%d&limit=%d" % (start, limit)
         request, channel = self.make_request(
@@ -955,7 +943,6 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _order_test("size", [room_id_3, room_id_2, room_id_1])
         _order_test("size", [room_id_1, room_id_2, room_id_3], reverse=True)
 
-    @unittest.DEBUG
     def test_search_term(self):
         """Test that searching for a room works correctly"""
         # Create two test rooms

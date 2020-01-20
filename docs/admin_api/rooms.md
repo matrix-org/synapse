@@ -11,9 +11,9 @@ The following query parameters are available:
 * `from` - Offset in the returned list. Defaults to `0`.
 * `limit` - Maximum amount of rooms to return. Defaults to `100`.
 * `order_by` - The method in which to sort the returned list of rooms. Valid values are:
-  - `"alphabetical"` - Rooms are ordered alphabetically by room name. This is the default.
-  - `"size"` - Rooms are ordered by the number of members. Largest to smallest.
-* `dir` - Direction of room order. Either `"f"` for forwards or `b` for backwards. Setting
+  - `alphabetical` - Rooms are ordered alphabetically by room name. This is the default.
+  - `size` - Rooms are ordered by the number of members. Largest to smallest.
+* `dir` - Direction of room order. Either `f` for forwards or `b` for backwards. Setting
           this value to `b` will reverse the above sort order. Defaults to `f`.
 * `search_term` - Filter rooms by their room name. Search term can be contained in any
                   part of the room name. Defaults to no filtering.
@@ -26,6 +26,7 @@ The following fields are possible in the JSON response body:
     - `name` - The name of the room.
     - `canonical_alias` - The canonical (main) alias address of the room.
     - `joined_members` - How many users are currently in the room.
+* `total_rooms` - The total number of rooms this query can return.
 * `next_token` - If this field is present, we know that there are potentially
                  more rooms on the server that did not all fit into this response.
                  We can use `next_token` to get the "next page" of results. To do
@@ -60,7 +61,8 @@ Response:
       "canonical_alias": "#twim:matrix.org",
       "joined_members": 314
     }
-  ]
+  ],
+  "total_rooms": 10
 }
 ```
 
@@ -83,7 +85,8 @@ Response:
       "canonical_alias": "#twim:matrix.org",
       "joined_members": 314
     }
-  ]
+  ],
+  "total_rooms": 1
 }
 ```
 
@@ -114,6 +117,7 @@ Response:
       "joined_members": 314
     }
   ],
+  "total_rooms": 150
   "next_token": 100
 }
 ```
@@ -140,14 +144,15 @@ Response:
       "canonical_alias": "#musictheory:matrix.org",
       "joined_members": 127
     },
-    ... (65 hidden items) ...
+    ... (48 hidden items) ...
     {
       "room_id": "!twcBhHVdZlQWuuxBhN:termina.org.uk",
       "name": "weechat-matrix",
       "canonical_alias": "#weechat-matrix:termina.org.uk",
       "joined_members": 137
     }
-  ]
+  ],
+  "total_rooms": 150
 }
 ```
 

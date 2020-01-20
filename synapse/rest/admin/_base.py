@@ -14,6 +14,8 @@
 # limitations under the License.
 
 import re
+from sre_parse import Pattern
+from typing import List
 
 from synapse.api.errors import AuthError
 
@@ -38,6 +40,18 @@ def historical_admin_path_patterns(path_regex):
             "^/_matrix/client/r0/admin",
         )
     )
+
+
+def admin_patterns(path_regex: str) -> List[Pattern]:
+    """Returns the list of patterns for an admin endpoint
+
+    Args:
+        path_regex: The regex string to match. This should NOT have a ^
+        as this will be prefixed.
+    """
+    admin_prefix = "^/_synapse/admin/v1"
+    regex = re.compile(admin_prefix + path_regex)
+    return [regex]
 
 
 async def assert_requester_is_admin(auth, request):

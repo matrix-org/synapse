@@ -18,7 +18,8 @@ import collections
 import logging
 import re
 from abc import abstractmethod
-from typing import List, Optional, Tuple
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 from six import integer_types
 
@@ -31,7 +32,6 @@ from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.search import SearchStore
 from synapse.storage.database import Database
-from synapse.storage.engines import PostgresEngine
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -45,6 +45,18 @@ OpsLevel = collections.namedtuple(
 RatelimitOverride = collections.namedtuple(
     "RatelimitOverride", ("messages_per_second", "burst_count")
 )
+
+
+class RoomSortOrder(Enum):
+    """
+    Enum to define the sorting method used when returning rooms with get_rooms_paginate
+
+    ALPHABETICAL = sort rooms alphabetically by name
+    SIZE = sort rooms by membership size, highest to lowest
+    """
+
+    ALPHABETICAL = "alphabetical"
+    SIZE = "size"
 
 
 class RoomWorkerStore(SQLBaseStore):
@@ -286,18 +298,16 @@ class RoomWorkerStore(SQLBaseStore):
         self,
         start: int,
         limit: int,
-        order_by: str,
+        order_by: RoomSortOrder,
         reverse_order: bool,
         search_term: Optional[str],
-    ):
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """Function to retrieve a paginated list of rooms as json.
 
         Args:
             start: offset in the list
             limit: maximum amount of rooms to retrieve
-            order_by: the sort order of the returned list. valid values:
-                * alphabetical (default)
-                * size
+            order_by: the sort order of the returned list
             reverse_order: whether to reverse the room list
             search_term: a string to filter room names by
         Returns:
@@ -319,15 +329,17 @@ class RoomWorkerStore(SQLBaseStore):
             search_term = "%" + search_term + "%"
 
         # Set ordering
-        if order_by == "size":
+        if RoomSortOrder(order_by) == RoomSortOrder.SIZE:
             order_by_column = "curr.joined_members"
             order_by_asc = False
-        elif order_by == "alphabetical":
+        elif RoomSortOrder(order_by) == RoomSortOrder.ALPHABETICAL:
             # Sort alphabetically
             order_by_column = "state.name"
             order_by_asc = True
         else:
-            raise StoreError(500, "Incorrect value for order_by provided: %s", order_by)
+            raise StoreError(
+                500, "Incorrect value for order_by provided: %s" % order_by
+            )
 
         # Whether to return the list in reverse order
         if reverse_order:
@@ -340,7 +352,7 @@ class RoomWorkerStore(SQLBaseStore):
         info_sql = """
             SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members
             FROM room_stats_state state
-            LEFT JOIN room_stats_current curr ON state.room_id = curr.room_id
+            INNER JOIN room_stats_current curr USING (room_id)
             %s
             ORDER BY %s %s
             LIMIT ?
@@ -351,29 +363,15 @@ class RoomWorkerStore(SQLBaseStore):
             "ASC" if order_by_asc else "DESC",
         )
 
-        # We don't want a LIMIT on the count query. SQLite can't handle an OFFSET
-        # without a LIMIT, however you can hand it `LIMIT -1` to mean "no limit".
-        # Postgres doesn't like this however, and wants you to eliminate the LIMIT
-        # keyword altogether
-        if isinstance(self.database_engine, PostgresEngine):
-            limit_statement = ""
-        else:
-            limit_statement = "LIMIT -1"
-
         # Use a nested SELECT statement as SQL can't count(*) with an OFFSET
         count_sql = """
             SELECT count(*) FROM (
               SELECT room_id FROM room_stats_state state
               %s
-              %s
-              OFFSET ?
             ) AS get_room_ids
         """ % (
             where_statement,
-            limit_statement,
         )
-
-        logger.info("info sql: %s count_sql: %s", info_sql, count_sql)
 
         def _get_rooms_paginate_txn(txn):
             # Execute the data query
@@ -381,49 +379,32 @@ class RoomWorkerStore(SQLBaseStore):
             if search_term:
                 # Add the search term into the WHERE clause
                 sql_values = (search_term,) + sql_values
-            logging.info("info sql_values: %s", sql_values)
             txn.execute(info_sql, sql_values)
-            rows = [row for row in txn]
+
+            # Refactor room query data into a structured dictionary
+            rooms = []
+            for room in txn:
+                rooms.append(
+                    {
+                        "room_id": room[0],
+                        "name": room[1],
+                        "canonical_alias": room[2],
+                        "joined_members": room[3],
+                    }
+                )
 
             # Execute the count query
-            sql_values = (start,)
-            if search_term:
-                # Add the search term into the WHERE clause
-                sql_values = (search_term,) + sql_values
-            logging.info("count sql_values: %s", sql_values)
+
+            # Add the search term into the WHERE clause if present
+            sql_values = (search_term,) if search_term else ()
             txn.execute(count_sql, sql_values)
+
             room_count = txn.fetchone()
-            if room_count:
-                return rows, room_count[0]
+            return rooms, room_count[0]
 
-            # room_count can be None if there are no rows and OFFSET > 1
-            # Set to 0 instead
-            return rows, 0
-
-        room_tuples, total_rooms = await self.db.runInteraction(
+        return await self.db.runInteraction(
             "get_rooms_paginate", _get_rooms_paginate_txn,
         )
-        rooms = []
-
-        # Refactor rooms into a structured dictionary
-        for room in room_tuples:
-            rooms.append(
-                {
-                    "room_id": room[0],
-                    "name": room[1],
-                    "canonical_alias": room[2],
-                    "joined_members": room[3],
-                }
-            )
-
-        # Are there more rooms to paginate through after this?
-        next_token = None
-        if total_rooms > len(room_tuples):
-            # There are. Calculate where the query should start from next time to get
-            # the next part of the list
-            next_token = start + limit
-
-        return rooms, next_token
 
     @cachedInlineCallbacks(max_entries=10000)
     def get_ratelimit_for_user(self, user_id):

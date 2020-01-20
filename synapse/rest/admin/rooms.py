@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import re
 
 from synapse.api.constants import Membership
 from synapse.api.errors import Codes, SynapseError
@@ -25,9 +24,11 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
+from synapse.storage.data_stores.main.room import RoomSortOrder
 from synapse.types import create_requester
 from synapse.util.async_helpers import maybe_awaitable
 
@@ -167,9 +168,10 @@ class ListRoomRestServlet(RestServlet):
     in a dictionary containing room information. Supports pagination.
     """
 
-    PATTERNS = [re.compile("^/_synapse/admin/v1/rooms")]
+    PATTERNS = admin_patterns("/rooms")
 
     def __init__(self, hs):
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
 
@@ -181,7 +183,10 @@ class ListRoomRestServlet(RestServlet):
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
         order_by = parse_string(request, "order_by", default="alphabetical")
-        if order_by != "alphabetical" and order_by != "size":
+        if RoomSortOrder(order_by) not in (
+            RoomSortOrder.ALPHABETICAL,
+            RoomSortOrder.SIZE,
+        ):
             raise SynapseError(
                 400,
                 "Unknown value for order_by: %s" % (order_by,),
@@ -197,7 +202,7 @@ class ListRoomRestServlet(RestServlet):
             )
 
         direction = parse_string(request, "dir", default="f")
-        if direction != "f" and direction != "b":
+        if direction not in ("f", "b"):
             raise SynapseError(
                 400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
             )
@@ -205,12 +210,18 @@ class ListRoomRestServlet(RestServlet):
         reverse_order = True if direction == "b" else False
 
         # Return list of rooms according to parameters
-        rooms, next_token = await self.admin_handler.get_rooms_paginate(
+        rooms, total_rooms = await self.store.get_rooms_paginate(
             start, limit, order_by, reverse_order, search_term
         )
-        response = {"rooms": rooms}
+        response = {
+            "rooms": rooms,
+            "total_rooms": total_rooms,
+        }
 
-        if next_token:
-            response["next_token"] = next_token
+        # Are there more rooms to paginate through after this?
+        if (start + limit) < total_rooms:
+            # There are. Calculate where the query should start from next time
+            # to get the next part of the list
+            response["next_token"] = start + limit
 
         return 200, response
