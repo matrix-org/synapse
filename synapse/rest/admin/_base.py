@@ -47,7 +47,7 @@ def admin_patterns(path_regex: str) -> List[Pattern]:
 
     Args:
         path_regex: The regex string to match. This should NOT have a ^
-        as this will be prefixed.
+            as this will be prefixed.
     """
     admin_prefix = "^/_synapse/admin/v1"
     regex = re.compile(admin_prefix + path_regex)
