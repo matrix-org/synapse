@@ -21,6 +21,7 @@ from typing import List, Union
 from six import string_types
 
 import synapse
+import synapse.api.auth
 import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -405,7 +406,7 @@ class RegisterRestServlet(RestServlet):
             return ret
         elif kind != b"user":
             raise UnrecognizedRequestError(
-                "Do not understand membership kind: %s" % (kind,)
+                "Do not understand membership kind: %s" % (kind.decode("utf8"),)
             )
 
         # we do basic sanity checks here because the auth layer will store these

@@ -338,21 +338,22 @@ class UserRegisterServlet(RestServlet):
 
         got_mac = body["mac"]
 
-        want_mac = hmac.new(
+        want_mac_builder = hmac.new(
             key=self.hs.config.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
-        want_mac.update(nonce.encode("utf8"))
-        want_mac.update(b"\x00")
-        want_mac.update(username)
-        want_mac.update(b"\x00")
-        want_mac.update(password)
-        want_mac.update(b"\x00")
-        want_mac.update(b"admin" if admin else b"notadmin")
+        want_mac_builder.update(nonce.encode("utf8"))
+        want_mac_builder.update(b"\x00")
+        want_mac_builder.update(username)
+        want_mac_builder.update(b"\x00")
+        want_mac_builder.update(password)
+        want_mac_builder.update(b"\x00")
+        want_mac_builder.update(b"admin" if admin else b"notadmin")
         if user_type:
-            want_mac.update(b"\x00")
-            want_mac.update(user_type.encode("utf8"))
-        want_mac = want_mac.hexdigest()
+            want_mac_builder.update(b"\x00")
+            want_mac_builder.update(user_type.encode("utf8"))
+
+        want_mac = want_mac_builder.hexdigest()
 
         if not hmac.compare_digest(want_mac.encode("ascii"), got_mac.encode("ascii")):
             raise SynapseError(403, "HMAC incorrect")
