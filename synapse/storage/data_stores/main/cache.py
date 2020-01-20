@@ -16,6 +16,7 @@
 
 import itertools
 import logging
+from typing import Any, Iterable, Optional
 
 from twisted.internet import defer
 
@@ -73,16 +74,23 @@ class CacheInvalidationStore(SQLBaseStore):
                 txn, CURRENT_STATE_CACHE_NAME, [room_id]
             )
 
-    def _send_invalidation_to_replication(self, txn, cache_name, keys):
+    def _send_invalidation_to_replication(
+        self, txn, cache_name: str, keys: Optional[Iterable[Any]]
+    ):
         """Notifies replication that given cache has been invalidated.
 
         Note that this does *not* invalidate the cache locally.
 
         Args:
             txn
-            cache_name (str)
-            keys (iterable[str])
+            cache_name
+            keys: Entry to invalidate. If None will invalidate all.
         """
+
+        if cache_name == CURRENT_STATE_CACHE_NAME and keys is None:
+            raise Exception(
+                "Can't stream invalidate all with magic current state cache"
+            )
 
         if isinstance(self.database_engine, PostgresEngine):
             # get_next() returns a context manager which is designed to wrap
