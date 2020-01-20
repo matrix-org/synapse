@@ -6,6 +6,7 @@ services:
     image: postgres:9.5
     environment:
       POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--lc-collate C --lc-ctype C"
     command: -c fsync=off
 
   testenv:
