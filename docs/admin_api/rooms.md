@@ -54,7 +54,7 @@ Response:
       "canonical_alias": "#matrix:matrix.org",
       "joined_members": 8326
     },
-    ...
+    ... (8 hidden items) ...
     {
       "room_id": "!xYvNcQPhnkrdUmYczI:matrix.org",
       "name": "This Week In Matrix (TWIM)",
