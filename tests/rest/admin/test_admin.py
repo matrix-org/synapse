@@ -761,9 +761,14 @@ class RoomTestCase(unittest.HomeserverTestCase):
             )
             room_ids.append(room_id)
 
-        returned_room_ids = []
+        # Set the name of the rooms so we get a consistent returned ordering
+        for idx, room_id in enumerate(room_ids):
+            self.helper.send_state(
+                room_id, "m.room.name", {"name": str(idx)}, tok=self.admin_user_tok,
+            )
 
         # Request the list of rooms
+        returned_room_ids = []
         start = 0
         limit = 2
 
@@ -772,7 +777,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
         while should_repeat:
             run_count += 1
 
-            url = "/_synapse/admin/v1/rooms?from=%d&limit=%d" % (start, limit)
+            url = "/_synapse/admin/v1/rooms?from=%d&limit=%d&order_by=%s" % (
+                start,
+                limit,
+                "alphabetical",
+            )
             request, channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
             )
