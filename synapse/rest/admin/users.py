@@ -193,8 +193,8 @@ class UserRestServletV2(RestServlet):
                     raise SynapseError(400, "Invalid password")
                 else:
                     new_password = body["password"]
-                    await self._set_password_handler.set_password(
-                        target_user, new_password, requester
+                    await self.set_password_handler.set_password(
+                        target_user.to_string(), new_password, requester
                     )
 
             if "deactivated" in body:
