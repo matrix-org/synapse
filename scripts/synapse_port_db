@@ -129,6 +129,7 @@ APPEND_ONLY_TABLES = [
 ]
 
 
+end_error = None
 end_error_exec_info = None
 
 
@@ -494,6 +495,7 @@ class Porter(object):
             )
 
     async def run(self):
+        global end_error
         try:
             # we allow people to port away from outdated versions of sqlite.
             self.sqlite_store = self.build_db_store(
@@ -506,11 +508,12 @@ class Porter(object):
                 await self.sqlite_store.db.updates.has_completed_background_updates()
             )
             if not updates_complete:
-                raise Exception(
+                end_error = (
                     "Pending background updates exist in the SQLite3 database."
                     " Please start Synapse again and wait until every update has finished"
                     " before running this script.\n"
                 )
+                return
 
             self.postgres_store = self.build_db_store(
                 self.hs_config.get_single_database()
@@ -595,8 +598,9 @@ class Porter(object):
             await self._setup_state_group_id_seq()
 
             self.progress.done()
-        except Exception:
+        except Exception as e:
             global end_error_exec_info
+            end_error = e
             end_error_exec_info = sys.exc_info()
             logger.exception("")
         finally:
@@ -1028,7 +1032,11 @@ if __name__ == "__main__":
     else:
         start()
 
-    if end_error_exec_info:
-        exc_type, exc_value, exc_traceback = end_error_exec_info
-        traceback.print_exception(exc_type, exc_value, exc_traceback)
+    if end_error:
+        sys.stderr.write(end_error)
+
+        if end_error_exec_info:
+            exc_type, exc_value, exc_traceback = end_error_exec_info
+            traceback.print_exception(exc_type, exc_value, exc_traceback)
+
         sys.exit(5)
