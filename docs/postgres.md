@@ -77,6 +77,10 @@ the correct `COLLATE` and `CTYPE` parameters (as per
 parameters on a live database and run a `REINDEX` on the entire database,
 however extreme care must be taken to avoid database corruption.
 
+Note that the above may fail with an error about duplicate rows if corruption
+has already occurred, and such duplicate rows will need to be manually removed.
+
+
 ## Tuning Postgres
 
 The default settings should be fine for most deployments. For larger
