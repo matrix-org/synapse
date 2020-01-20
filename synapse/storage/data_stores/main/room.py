@@ -311,10 +311,8 @@ class RoomWorkerStore(SQLBaseStore):
             reverse_order: whether to reverse the room list
             search_term: a string to filter room names by
         Returns:
-            defer.Deferred: a tuple of list[dict[str, Any]], int|None. A list of
-                room dicts and an integer, if not None, signifies more results can
-                be returned if the same call if repeated, substituting the value of
-                `start` for that of the returned int.
+            A list of room dicts and an integer representing the total number of
+            rooms that exist given this query
         """
         # Filter room names by a string
         where_statement = ""
