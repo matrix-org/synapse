@@ -294,6 +294,14 @@ class ServerConfig(Config):
             self.retention_default_min_lifetime = None
             self.retention_default_max_lifetime = None
 
+        if self.retention_enabled:
+            logger.info(
+                "Message retention policies support enabled with the following default"
+                " policy: min_lifetime = %s ; max_lifetime = %s",
+                self.retention_default_min_lifetime,
+                self.retention_default_max_lifetime,
+            )
+
         self.retention_allowed_lifetime_min = retention_config.get(
             "allowed_lifetime_min"
         )

@@ -107,7 +107,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
             stream_ordering = await self.store.find_first_stream_ordering_after_ts(ts)
 
-            r = await self.store.get_room_event_after_stream_ordering(
+            r = await self.store.get_room_event_before_stream_ordering(
                 room_id, stream_ordering
             )
             if not r:

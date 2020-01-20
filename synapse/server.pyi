@@ -1,3 +1,5 @@
+import twisted.internet
+
 import synapse.api.auth
 import synapse.config.homeserver
 import synapse.federation.sender
@@ -9,10 +11,12 @@ import synapse.handlers.deactivate_account
 import synapse.handlers.device
 import synapse.handlers.e2e_keys
 import synapse.handlers.message
+import synapse.handlers.presence
 import synapse.handlers.room
 import synapse.handlers.room_member
 import synapse.handlers.set_password
 import synapse.http.client
+import synapse.notifier
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
@@ -84,4 +88,12 @@ class HomeServer(object):
     def get_server_notices_sender(
         self,
     ) -> synapse.server_notices.server_notices_sender.ServerNoticesSender:
+        pass
+    def get_notifier(self) -> synapse.notifier.Notifier:
+        pass
+    def get_presence_handler(self) -> synapse.handlers.presence.PresenceHandler:
+        pass
+    def get_clock(self) -> synapse.util.Clock:
+        pass
+    def get_reactor(self) -> twisted.internet.base.ReactorBase:
         pass

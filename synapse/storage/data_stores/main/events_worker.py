@@ -37,8 +37,8 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.types import get_domain_from_id
-from synapse.util import batch_iter
 from synapse.util.caches.descriptors import Cache
+from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
