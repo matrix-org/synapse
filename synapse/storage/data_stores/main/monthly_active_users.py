@@ -210,19 +210,22 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
 
                     txn.execute(sql, query_args)
 
+            # It seems poor to invalidate the whole cache, Postgres supports
+            # 'Returning' which would allow me to invalidate only the
+            # specific users, but sqlite has no way to do this and instead
+            # I would need to SELECT and the DELETE which without locking
+            # is racy.
+            # Have resolved to invalidate the whole cache for now and do
+            # something about it if and when the perf becomes significant
+            self._invalidate_all_cache_and_stream(
+                txn, self.user_last_seen_monthly_active
+            )
+            self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
+
         reserved_users = yield self.get_registered_reserved_users()
         yield self.db.runInteraction(
             "reap_monthly_active_users", _reap_users, reserved_users
         )
-        # It seems poor to invalidate the whole cache, Postgres supports
-        # 'Returning' which would allow me to invalidate only the
-        # specific users, but sqlite has no way to do this and instead
-        # I would need to SELECT and the DELETE which without locking
-        # is racy.
-        # Have resolved to invalidate the whole cache for now and do
-        # something about it if and when the perf becomes significant
-        self.user_last_seen_monthly_active.invalidate_all()
-        self.get_monthly_active_count.invalidate_all()
 
     @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
