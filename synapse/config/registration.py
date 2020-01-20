@@ -29,6 +29,7 @@ class AccountValidityConfig(Config):
     def __init__(self, config, synapse_config):
         if config is None:
             return
+        super(AccountValidityConfig, self).__init__()
         self.enabled = config.get("enabled", False)
         self.renew_by_email_enabled = "renew_at" in config
 
@@ -93,7 +94,7 @@ class RegistrationConfig(Config):
             )
 
         self.account_validity = AccountValidityConfig(
-            config.get("account_validity", {}), config
+            config.get("account_validity") or {}, config
         )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
