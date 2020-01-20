@@ -70,7 +70,6 @@ class EventStreamRestServlet(RestServlet):
         return 200, {}
 
 
-# TODO: Unit test gets, with and without auth, with different kinds of events.
 class EventRestServlet(RestServlet):
     PATTERNS = client_patterns("/events/(?P<event_id>[^/]*)$", v1=True)
 
