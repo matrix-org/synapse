@@ -50,8 +50,8 @@ def admin_patterns(path_regex: str) -> List[Pattern]:
             as this will be prefixed.
     """
     admin_prefix = "^/_synapse/admin/v1"
-    regex = re.compile(admin_prefix + path_regex)
-    return [regex]
+    patterns = [re.compile(admin_prefix + path_regex)]
+    return patterns
 
 
 async def assert_requester_is_admin(auth, request):
