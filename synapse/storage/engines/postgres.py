@@ -79,14 +79,18 @@ class PostgresEngine(object):
             "SELECT datcollate, datctype FROM pg_database WHERE datname = current_database()"
         )
         collation, ctype = txn.fetchone()
+
+        errors = []
+
         if collation != "C":
-            raise IncorrectDatabaseSetup(
-                "Database has incorrect collation of %r. Should be 'C'" % (collation,)
-            )
+            errors.append("    - 'COLLATE' is set to %r. Should be 'C'" % (collation,))
 
         if ctype != "C":
+            errors.append("    - 'CTYPE' is set to %r. Should be 'C'" % (collation,))
+
+        if errors:
             raise IncorrectDatabaseSetup(
-                "Database has incorrect ctype of %r. Should be 'C'" % (collation,)
+                "Database is incorrectly configured:\n%s" % ("\n".join(errors))
             )
 
     def convert_param_style(self, sql):
