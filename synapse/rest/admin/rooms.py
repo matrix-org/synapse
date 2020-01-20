@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 
 from synapse.api.constants import Membership
 from synapse.api.errors import Codes, SynapseError
@@ -166,11 +167,9 @@ class ListRoomRestServlet(RestServlet):
     in a dictionary containing room information. Supports pagination.
     """
 
-    PATTERNS = historical_admin_path_patterns("/rooms")
+    PATTERNS = [re.compile("^/_synapse/admin/v1/rooms")]
 
     def __init__(self, hs):
-        self.hs = hs
-        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
 

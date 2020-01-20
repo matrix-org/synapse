@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict, Any
 
 from synapse.api.constants import Membership
 from synapse.events import FrozenEvent
@@ -99,7 +99,7 @@ class AdminHandler(BaseHandler):
         order_by: str,
         reverse_order: bool,
         search_term: Optional[str],
-    ):
+    ) -> Tuple[List[Dict[str, Any]], Optional[int]]:
         """Function to retrieve a paginated list of rooms as json.
 
         Args:
@@ -111,10 +111,9 @@ class AdminHandler(BaseHandler):
             reverse_order: whether to reverse the room list
             search_term: a string to filter room names by
         Returns:
-            defer.Deferred: a tuple of list[dict[str, Any]], int|None. A list of
-                room dicts and an integer, if not None, signifies more results can
-                be returned if the same call if repeated, substituting the value of
-                `start` for that of the returned int.
+            A list of room dicts and an integer, if not None, signifies more
+            results can be returned if the same call if repeated, substituting
+            the value of `start` for that of the returned int.
         """
         return await self.store.get_rooms_paginate(
             start, limit, order_by, reverse_order, search_term
