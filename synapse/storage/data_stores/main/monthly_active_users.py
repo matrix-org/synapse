@@ -33,25 +33,6 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         self._clock = hs.get_clock()
         self.hs = hs
 
-    def _initialise_reserved_users(self, txn, threepids):
-        """Ensures that reserved threepids are accounted for in the MAU table, should
-        be called on start up.
-
-        Args:
-            txn (cursor):
-            threepids (list[dict]): List of threepid dicts to reserve
-        """
-
-        for tp in threepids:
-            user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])
-
-            if user_id:
-                is_support = self.is_support_user_txn(txn, user_id)
-                if not is_support:
-                    self.upsert_monthly_active_user_txn(txn, user_id)
-            else:
-                logger.warning("mau limit reserved threepid %s not found in db" % tp)
-
     @cached(num_args=0)
     def get_monthly_active_count(self):
         """Generates current count of monthly active users
@@ -90,47 +71,6 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
         return users
 
-    def upsert_monthly_active_user_txn(self, txn, user_id):
-        """Updates or inserts monthly active user member
-
-        Note that, after calling this method, it will generally be necessary
-        to invalidate the caches on user_last_seen_monthly_active and
-        get_monthly_active_count. We can't do that here, because we are running
-        in a database thread rather than the main thread, and we can't call
-        txn.call_after because txn may not be a LoggingTransaction.
-
-        We consciously do not call is_support_txn from this method because it
-        is not possible to cache the response. is_support_txn will be false in
-        almost all cases, so it seems reasonable to call it only for
-        upsert_monthly_active_user and to call is_support_txn manually
-        for cases where upsert_monthly_active_user_txn is called directly,
-        like _initialise_reserved_users
-
-        In short, don't call this method with support users. (Support users
-        should not appear in the MAU stats).
-
-        Args:
-            txn (cursor):
-            user_id (str): user to add/update
-
-        Returns:
-            bool: True if a new entry was created, False if an
-            existing one was updated.
-        """
-
-        # Am consciously deciding to lock the table on the basis that is ought
-        # never be a big table and alternative approaches (batching multiple
-        # upserts into a single txn) introduced a lot of extra complexity.
-        # See https://github.com/matrix-org/synapse/issues/3854 for more
-        is_insert = self.db.simple_upsert_txn(
-            txn,
-            table="monthly_active_users",
-            keyvalues={"user_id": user_id},
-            values={"timestamp": int(self._clock.time_msec())},
-        )
-
-        return is_insert
-
     @cached(num_args=1)
     def user_last_seen_monthly_active(self, user_id):
         """
@@ -154,7 +94,9 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
     def __init__(self, database: Database, db_conn, hs):
         super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
+
         # Do not add more reserved users than the total allowable number
+        # cur = LoggingTransaction(
         self.db.new_transaction(
             db_conn,
             "initialise_mau_threepids",
@@ -163,6 +105,25 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             self._initialise_reserved_users,
             hs.config.mau_limits_reserved_threepids[: self.hs.config.max_mau_value],
         )
+
+    def _initialise_reserved_users(self, txn, threepids):
+        """Ensures that reserved threepids are accounted for in the MAU table, should
+        be called on start up.
+
+        Args:
+            txn (cursor):
+            threepids (list[dict]): List of threepid dicts to reserve
+        """
+
+        for tp in threepids:
+            user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])
+
+            if user_id:
+                is_support = self.is_support_user_txn(txn, user_id)
+                if not is_support:
+                    self.upsert_monthly_active_user_txn(txn, user_id)
+            else:
+                logger.warning("mau limit reserved threepid %s not found in db" % tp)
 
     @defer.inlineCallbacks
     def reap_monthly_active_users(self):
@@ -287,13 +248,45 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn, user_id
         )
 
-        user_in_mau = self.user_last_seen_monthly_active.cache.get(
-            (user_id,), None, update_metrics=False
-        )
-        if user_in_mau is None:
-            self.get_monthly_active_count.invalidate(())
+    def upsert_monthly_active_user_txn(self, txn, user_id):
+        """Updates or inserts monthly active user member
 
-        self.user_last_seen_monthly_active.invalidate((user_id,))
+        We consciously do not call is_support_txn from this method because it
+        is not possible to cache the response. is_support_txn will be false in
+        almost all cases, so it seems reasonable to call it only for
+        upsert_monthly_active_user and to call is_support_txn manually
+        for cases where upsert_monthly_active_user_txn is called directly,
+        like _initialise_reserved_users
+
+        In short, don't call this method with support users. (Support users
+        should not appear in the MAU stats).
+
+        Args:
+            txn (cursor):
+            user_id (str): user to add/update
+
+        Returns:
+            bool: True if a new entry was created, False if an
+            existing one was updated.
+        """
+
+        # Am consciously deciding to lock the table on the basis that is ought
+        # never be a big table and alternative approaches (batching multiple
+        # upserts into a single txn) introduced a lot of extra complexity.
+        # See https://github.com/matrix-org/synapse/issues/3854 for more
+        is_insert = self.db.simple_upsert_txn(
+            txn,
+            table="monthly_active_users",
+            keyvalues={"user_id": user_id},
+            values={"timestamp": int(self._clock.time_msec())},
+        )
+
+        self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
+        self._invalidate_cache_and_stream(
+            txn, self.user_last_seen_monthly_active, (user_id,)
+        )
+
+        return is_insert
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):
