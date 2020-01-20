@@ -1,0 +1,1 @@
+Fix infinite recursion and dictionary access bug when setting `account_validity` to an empty block in the homeserver config. Thanks to @Sorunome for reporting.
