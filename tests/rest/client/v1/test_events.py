@@ -134,3 +134,30 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
 
         # someone else set topic, expect 6 (join,send,topic,join,send,topic)
         pass
+
+
+class GetEventsTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        events.register_servlets,
+        room.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+    ]
+
+    def prepare(self, hs, reactor, clock):
+
+        # register an account
+        self.user_id = self.register_user("sid1", "pass")
+        self.token = self.login(self.user_id, "pass")
+
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+    def test_get_event_via_events(self):
+        resp = self.helper.send(self.room_id, tok=self.token)
+        event_id = resp["event_id"]
+
+        request, channel = self.make_request(
+            "GET", "/events/" + event_id, access_token=self.token,
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 200, msg=channel.result)
