@@ -118,9 +118,6 @@ def register_cache(
             resize_callback = getattr(cache, "set_cache_factor")
         add_resizable_cache(cache_name, resize_callback)
 
-    # Check if the metric is already registered. Unregister it, if so.
-    # This usually happens during tests, as at runtime these caches are
-    # effectively singletons.
     metric = CacheMetric(cache, cache_type, cache_name, collect_callback)
     metric_name = "cache_%s_%s" % (cache_type, cache_name)
     caches_by_name[cache_name] = cache
