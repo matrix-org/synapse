@@ -183,9 +183,9 @@ class ListRoomRestServlet(RestServlet):
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
         order_by = parse_string(request, "order_by", default="alphabetical")
-        if RoomSortOrder(order_by) not in (
-            RoomSortOrder.ALPHABETICAL,
-            RoomSortOrder.SIZE,
+        if order_by not in (
+            RoomSortOrder.ALPHABETICAL.value,
+            RoomSortOrder.SIZE.value,
         ):
             raise SynapseError(
                 400,
