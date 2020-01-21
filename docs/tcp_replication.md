@@ -254,6 +254,11 @@ and they key to invalidate. For example:
 
     > RDATA caches 550953771 ["get_user_by_id", ["@bob:example.com"], 1550574873251]
 
+Alternatively, an entire cache can be invalidated by sending down a `null`
+instead of the key. For example:
+
+    > RDATA caches 550953772 ["get_user_by_id", null, 1550574873252]
+
 However, there are times when a number of caches need to be invalidated
 at the same time with the same key. To reduce traffic we batch those
 invalidations into a single poke by defining a special cache name that
