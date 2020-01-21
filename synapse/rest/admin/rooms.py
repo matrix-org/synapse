@@ -224,6 +224,16 @@ class ListRoomRestServlet(RestServlet):
         if (start + limit) < total_rooms:
             # There are. Calculate where the query should start from next time
             # to get the next part of the list
-            response["next_token"] = start + limit
+            response["next_batch"] = start + limit
+
+        # Is it possible to paginate backwards? Check if we currently have an
+        # offset
+        if start > 0:
+            if start > limit:
+                # Going back one iteration won't take us to the start.
+                # Calculate new offset
+                response["prev_batch"] = start - limit
+            else:
+                response["prev_batch"] = 0
 
         return 200, response

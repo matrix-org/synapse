@@ -751,8 +751,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Should be 0 as we aren't paginating
         self.assertEqual(channel.json_body["offset"], 0)
 
+        # Check that the prev_batch parameter is not present
+        self.assertNotIn("prev_batch", channel.json_body)
+
         # We shouldn't receive a next token here as there's no further rooms to show
-        self.assertNotIn("next_token", channel.json_body)
+        self.assertNotIn("next_batch", channel.json_body)
 
     def test_list_rooms_pagination(self):
         """Test that we can get a full list of rooms through pagination"""
@@ -805,12 +808,16 @@ class RoomTestCase(unittest.HomeserverTestCase):
             # We're only getting 2 rooms each page, so should be 2 * last run_count
             self.assertEqual(channel.json_body["offset"], 2 * (run_count - 1))
 
-            if "next_token" not in channel.json_body:
+            if run_count > 1:
+                # Check the value of prev_batch is correct
+                self.assertEqual(channel.json_body["prev_batch"], 2 * (run_count - 2))
+
+            if "next_batch" not in channel.json_body:
                 # We have reached the end of the list
                 should_repeat = False
             else:
                 # Make another query with an updated start value
-                start = channel.json_body["next_token"]
+                start = channel.json_body["next_batch"]
 
         # We should've queried the endpoint 3 times
         self.assertEqual(
@@ -895,8 +902,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # We're not paginating, so should be 0
         self.assertEqual(channel.json_body["offset"], 0)
 
-        # Check that there is no `next_token`
-        self.assertNotIn("next_token", channel.json_body)
+        # Check that there is no `prev_batch`
+        self.assertNotIn("prev_batch", channel.json_body)
+
+        # Check that there is no `next_batch`
+        self.assertNotIn("next_batch", channel.json_body)
 
         # Check that all provided attributes are set
         r = rooms[0]
@@ -969,6 +979,12 @@ class RoomTestCase(unittest.HomeserverTestCase):
             # We're not paginating, so should be 0
             self.assertEqual(channel.json_body["offset"], 0)
 
+            # Check that there is no `prev_batch`
+            self.assertNotIn("prev_batch", channel.json_body)
+
+            # Check that there is no `next_batch`
+            self.assertNotIn("next_batch", channel.json_body)
+
             # Check that rooms were returned in alphabetical order
             returned_order = [r["room_id"] for r in rooms]
             self.assertListEqual(expected_room_list, returned_order)  # order is checked
@@ -1032,6 +1048,12 @@ class RoomTestCase(unittest.HomeserverTestCase):
             # Check that the offset is correct
             # We're not paginating, so should be 0
             self.assertEqual(channel.json_body["offset"], 0)
+
+            # Check that there is no `prev_batch`
+            self.assertNotIn("prev_batch", channel.json_body)
+
+            # Check that there is no `next_batch`
+            self.assertNotIn("next_batch", channel.json_body)
 
             if expected_room_id:
                 # Check that the first returned room id is correct

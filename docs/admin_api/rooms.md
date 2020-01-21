@@ -32,11 +32,14 @@ The following fields are possible in the JSON response body:
 * `total_rooms` - The total number of rooms this query can return. Using this
                   and `offset`, you have enough information to know the current
                   progression through the list.
-* `next_token` - If this field is present, we know that there are potentially
+* `next_batch` - If this field is present, we know that there are potentially
                  more rooms on the server that did not all fit into this response.
-                 We can use `next_token` to get the "next page" of results. To do
+                 We can use `next_batch` to get the "next page" of results. To do
                  so, simply repeat your request, setting the `from` parameter to
-                 the value of `next_token`.
+                 the value of `next_batch`.
+* `prev_batch` - If this field is present, it is possible to paginate backwards.
+                 Use `prev_batch` for the `from` value in the next request to
+                 get the "previous page" of results.
 
 ## Usage
 
@@ -160,7 +163,8 @@ Response:
       "joined_members": 137
     }
   ],
-  "offset": 0,
+  "offset": 100,
+  "prev_batch": 0,
   "total_rooms": 150
 }
 ```
