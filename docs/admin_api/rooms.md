@@ -26,7 +26,12 @@ The following fields are possible in the JSON response body:
     - `name` - The name of the room.
     - `canonical_alias` - The canonical (main) alias address of the room.
     - `joined_members` - How many users are currently in the room.
-* `total_rooms` - The total number of rooms this query can return.
+* `offset` - The current pagination offset in rooms. This parameter should be
+             used instead of `next_token` for room offset as `next_token` is
+             not intended to be parsed.
+* `total_rooms` - The total number of rooms this query can return. Using this
+                  and `offset`, you have enough information to know the current
+                  progression through the list.
 * `next_token` - If this field is present, we know that there are potentially
                  more rooms on the server that did not all fit into this response.
                  We can use `next_token` to get the "next page" of results. To do
@@ -62,6 +67,7 @@ Response:
       "joined_members": 314
     }
   ],
+  "offset": 0,
   "total_rooms": 10
 }
 ```
@@ -86,6 +92,7 @@ Response:
       "joined_members": 314
     }
   ],
+  "offset": 0,
   "total_rooms": 1
 }
 ```
@@ -117,6 +124,7 @@ Response:
       "joined_members": 314
     }
   ],
+  "offset": 0,
   "total_rooms": 150
   "next_token": 100
 }
@@ -152,9 +160,10 @@ Response:
       "joined_members": 137
     }
   ],
+  "offset": 0,
   "total_rooms": 150
 }
 ```
 
-Once the `next_token` parameter is not present, we know we've reached the end of
-the list.
+Once the `next_token` parameter is no longer present, we know we've reached the
+end of the list.

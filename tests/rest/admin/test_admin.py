@@ -747,6 +747,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Check that the correct number of total rooms was returned
         self.assertEqual(channel.json_body["total_rooms"], total_rooms)
 
+        # Check that the offset is correct
+        # Should be 0 as we aren't paginating
+        self.assertEqual(channel.json_body["offset"], 0)
+
         # We shouldn't receive a next token here as there's no further rooms to show
         self.assertNotIn("next_token", channel.json_body)
 
@@ -796,6 +800,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
             # Check that the correct number of total rooms was returned
             self.assertEqual(channel.json_body["total_rooms"], total_rooms)
+
+            # Check that the offset is correct
+            # We're only getting 2 rooms each page, so should be 2 * last run_count
+            self.assertEqual(channel.json_body["offset"], 2 * (run_count - 1))
 
             if "next_token" not in channel.json_body:
                 # We have reached the end of the list
@@ -883,6 +891,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # And that the value of the total_rooms key was correct
         self.assertEqual(channel.json_body["total_rooms"], 1)
 
+        # Check that the offset is correct
+        # We're not paginating, so should be 0
+        self.assertEqual(channel.json_body["offset"], 0)
+
         # Check that there is no `next_token`
         self.assertNotIn("next_token", channel.json_body)
 
@@ -953,6 +965,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
             # Check for the correct total_rooms value
             self.assertEqual(channel.json_body["total_rooms"], 3)
 
+            # Check that the offset is correct
+            # We're not paginating, so should be 0
+            self.assertEqual(channel.json_body["offset"], 0)
+
             # Check that rooms were returned in alphabetical order
             returned_order = [r["room_id"] for r in rooms]
             self.assertListEqual(expected_room_list, returned_order)  # order is checked
@@ -1012,6 +1028,10 @@ class RoomTestCase(unittest.HomeserverTestCase):
             expected_room_count = 1 if expected_room_id else 0
             self.assertEqual(len(rooms), expected_room_count)
             self.assertEqual(channel.json_body["total_rooms"], expected_room_count)
+
+            # Check that the offset is correct
+            # We're not paginating, so should be 0
+            self.assertEqual(channel.json_body["offset"], 0)
 
             if expected_room_id:
                 # Check that the first returned room id is correct

@@ -214,6 +214,8 @@ class ListRoomRestServlet(RestServlet):
             start, limit, order_by, reverse_order, search_term
         )
         response = {
+            # next_token should be opaque, so return a value the client can parse
+            "offset": start,
             "rooms": rooms,
             "total_rooms": total_rooms,
         }
