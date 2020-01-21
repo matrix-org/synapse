@@ -90,7 +90,8 @@ class PostgresEngine(object):
 
         if errors:
             raise IncorrectDatabaseSetup(
-                "Database is incorrectly configured:\n%s" % ("\n".join(errors))
+                "Database is incorrectly configured:\n\n%s\n\n"
+                "See docs/postgres.md for more information." % ("\n".join(errors))
             )
 
     def convert_param_style(self, sql):
