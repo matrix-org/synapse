@@ -17,15 +17,11 @@ import os
 from collections import defaultdict
 from typing import DefaultDict
 
-from twisted.logger import Logger
-
 from ._base import Config, ConfigError
 
-log = Logger()
-
 _CACHES = {}
-DEFAULT_CACHE_SIZE_FACTOR = float(os.environ.get("SYNAPSE_CACHE_FACTOR", 0.5))
-
+_CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
+DEFAULT_CACHE_SIZE_FACTOR = float(os.environ.get(_CACHE_PREFIX, 0.5))
 
 _DEFAULT_CONFIG = """\
 # Cache configuration
@@ -51,6 +47,7 @@ def add_resizable_cache(cache_name, cache_resize_callback):
 
 class CacheConfig(Config):
     section = "caches"
+    _environ = os.environ
 
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
@@ -68,9 +65,19 @@ class CacheConfig(Config):
         # Set the global one so that it's reflected in new caches
         DEFAULT_CACHE_SIZE_FACTOR = self.global_factor
 
-        individual_factors = cache_config.get("per_cache_factors", {}) or {}
-        if not isinstance(individual_factors, dict):
+        # Load cache factors from the environment, but override them with the
+        # ones in the config file if they exist
+        individual_factors = {
+            key[len(_CACHE_PREFIX) + 1 :].lower(): float(val)
+            for key, val in self._environ.items()
+            if key.startswith(_CACHE_PREFIX + "_")
+        }
+
+        individual_factors_config = cache_config.get("per_cache_factors", {}) or {}
+        if not isinstance(individual_factors_config, dict):
             raise ConfigError("caches.per_cache_factors must be a dictionary")
+
+        individual_factors.update(individual_factors_config)
 
         self.cache_factors = defaultdict(
             lambda: self.global_factor
@@ -82,22 +89,3 @@ class CacheConfig(Config):
                     "caches.per_cache_factors.%s must be a number" % (cache.lower(),)
                 )
             self.cache_factors[cache.lower()] = factor
-
-    def resize_caches(self):
-        for cache_name, cache_resize_callback in _CACHES.items():
-            cache_factor = self.cache_factors[cache_name]
-            log.debug(
-                "Setting cache factor for {cache_name} to {new_cache_factor}",
-                cache_name=cache_name,
-                new_cache_factor=cache_factor,
-            )
-            changed = cache_resize_callback(cache_factor)
-            if changed:
-                log.info(
-                    "Cache factor for {cache_name} set to {new_cache_factor}",
-                    cache_name=cache_name,
-                    new_cache_factor=cache_factor,
-                )
-
-    def get_factor_for(self, cache_name):
-        return self.cache_factors[cache_name.lower()]
