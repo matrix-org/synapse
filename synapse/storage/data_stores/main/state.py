@@ -80,7 +80,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             allow_none=True,
         )
 
-        if version:
+        if version is not None:
             return version
 
         # Retrieve the room's create event
