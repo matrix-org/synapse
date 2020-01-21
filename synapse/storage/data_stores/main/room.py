@@ -737,6 +737,10 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
             new_last_room_id = ""
             for room_id, creator, room_version_id in updates:
+                # We upsert here just in case we don't already have a row,
+                # mainly for paranoia as much badness would happen if we don't
+                # insert the row and then try and get the room version for the
+                # room.
                 self.db.simple_upsert_txn(
                     txn,
                     table="rooms",

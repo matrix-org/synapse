@@ -72,6 +72,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         # rooms we might not have added the room version to it yet so we fall
         # back to previous behaviour and look in current state events.
 
+        # We really should have an entry in the rooms table for every room we
+        # care about, but let's be a bit paranoid (at least while the background
+        # update is happening) to avoid breaking existing rooms.
         version = await self.db.simple_select_one_onecol(
             table="rooms",
             keyvalues={"room_id": room_id},
