@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import Callable, Dict, Optional
 
 import six
 from six.moves import intern
 
+import attr
 from prometheus_client.core import Gauge
 
 from synapse.config.cache import add_resizable_cache
@@ -43,22 +44,71 @@ response_cache_evicted = Gauge(
 response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
 
 
+@attr.s
+class CacheMetric(object):
+
+    _cache = attr.ib()
+    _cache_type = attr.ib(type=str)
+    _cache_name = attr.ib(type=str)
+    _collect_callback = attr.ib(type=Optional[Callable])
+
+    hits = attr.ib(default=0)
+    misses = attr.ib(default=0)
+    evicted_size = attr.ib(default=0)
+
+    def inc_hits(self):
+        self.hits += 1
+
+    def inc_misses(self):
+        self.misses += 1
+
+    def inc_evictions(self, size=1):
+        self.evicted_size += size
+
+    def describe(self):
+        return []
+
+    def collect(self):
+        try:
+            if self._cache_type == "response_cache":
+                response_cache_size.labels(self._cache_name).set(len(self._cache))
+                response_cache_hits.labels(self._cache_name).set(self.hits)
+                response_cache_evicted.labels(self._cache_name).set(self.evicted_size)
+                response_cache_total.labels(self._cache_name).set(
+                    self.hits + self.misses
+                )
+            else:
+                cache_size.labels(self._cache_name).set(len(self._cache))
+                cache_hits.labels(self._cache_name).set(self.hits)
+                cache_evicted.labels(self._cache_name).set(self.evicted_size)
+                cache_total.labels(self._cache_name).set(self.hits + self.misses)
+                if getattr(self._cache, "max_size", None):
+                    cache_max_size.labels(self._cache_name).set(self._cache.max_size)
+            if self._collect_callback:
+                self._collect_callback()
+        except Exception as e:
+            logger.warning("Error calculating metrics for %s: %s", self._cache_name, e)
+            raise
+
+
 def register_cache(
-    cache_type,
-    cache_name,
+    cache_type: str,
+    cache_name: str,
     cache,
-    collect_callback=None,
-    resizable=True,
-    resize_callback=None,
-):
+    collect_callback: Optional[Callable] = None,
+    resizable: bool = True,
+    resize_callback: Optional[Callable] = None,
+) -> CacheMetric:
     """Register a cache object for metric collection and resizing.
 
     Args:
-        cache_type (str):
-        cache_name (str): name of the cache
-        cache (object): cache itself
-        collect_callback (callable|None): if not None, a function which is called during
-            metric collection to update additional metrics.
+        cache_type
+        cache_name: name of the cache
+        cache: cache itself
+        collect_callback: If given, a function which is called during metric
+            collection to update additional metrics.
+        resizable: Whether this cache supports being resized.
+        resize_callback: A function which can be called to resize the cache.
 
     Returns:
         CacheMetric: an object which provides inc_{hits,misses,evictions} methods
@@ -71,47 +121,8 @@ def register_cache(
     # Check if the metric is already registered. Unregister it, if so.
     # This usually happens during tests, as at runtime these caches are
     # effectively singletons.
+    metric = CacheMetric(cache, cache_type, cache_name, collect_callback)
     metric_name = "cache_%s_%s" % (cache_type, cache_name)
-
-    class CacheMetric(object):
-
-        hits = 0
-        misses = 0
-        evicted_size = 0
-
-        def inc_hits(self):
-            self.hits += 1
-
-        def inc_misses(self):
-            self.misses += 1
-
-        def inc_evictions(self, size=1):
-            self.evicted_size += size
-
-        def describe(self):
-            return []
-
-        def collect(self):
-            try:
-                if cache_type == "response_cache":
-                    response_cache_size.labels(cache_name).set(len(cache))
-                    response_cache_hits.labels(cache_name).set(self.hits)
-                    response_cache_evicted.labels(cache_name).set(self.evicted_size)
-                    response_cache_total.labels(cache_name).set(self.hits + self.misses)
-                else:
-                    cache_size.labels(cache_name).set(len(cache))
-                    cache_hits.labels(cache_name).set(self.hits)
-                    cache_evicted.labels(cache_name).set(self.evicted_size)
-                    cache_total.labels(cache_name).set(self.hits + self.misses)
-                    if getattr(cache, "max_size", None):
-                        cache_max_size.labels(cache_name).set(cache.max_size)
-                if collect_callback:
-                    collect_callback()
-            except Exception as e:
-                logger.warning("Error calculating metrics for %s: %s", cache_name, e)
-                raise
-
-    metric = CacheMetric()
     caches_by_name[cache_name] = cache
     collectors_by_name[metric_name] = metric
     return metric
