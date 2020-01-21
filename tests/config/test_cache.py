@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 from synapse.config._base import Config, RootConfig
 from synapse.config.cache import CacheConfig
 
