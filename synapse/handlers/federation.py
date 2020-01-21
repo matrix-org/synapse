@@ -1853,6 +1853,8 @@ class FederationHandler(BaseHandler):
             auth_events
             state
             event
+            room_version: The room version we expect this room to have, and
+                will raise if it doesn't match the version in the create event.
 
         Returns:
             Deferred
