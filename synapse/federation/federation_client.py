@@ -30,6 +30,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
     SynapseError,
+    UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -461,6 +462,9 @@ class FederationClient(FederationBase):
             # however either way the event format version will be v1.
             room_version_id = ret.get("room_version", RoomVersions.V1.identifier)
             room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version:
+                raise UnsupportedRoomVersionError()
+
             event_format = room_version_to_event_format(room_version_id)
 
             pdu_dict = ret.get("event", None)
