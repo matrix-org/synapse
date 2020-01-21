@@ -129,7 +129,13 @@ APPEND_ONLY_TABLES = [
 ]
 
 
+# Error returned by the run function. Used at the top-level part of the script to
+# handle errors and return codes.
 end_error = None
+# The exec_info for the error, if any. If error is defined but not exec_info the script
+# will show only the error message without the stacktrace, if exec_info is defined but
+# not the error then the script will show nothing outside of what's printed in the run
+# function. If both are defined, the script will print both the error and the stacktrace.
 end_error_exec_info = None
 
 
@@ -495,7 +501,14 @@ class Porter(object):
             )
 
     async def run(self):
+        """Ports the SQLite database to a PostgreSQL database.
+
+        When a fatal error is met, its message is assigned to the global "end_error"
+        variable. When this error comes with a stacktrace, its exec_info is assigned to
+        the global "end_error_exec_info" variable.
+        """
         global end_error
+
         try:
             # we allow people to port away from outdated versions of sqlite.
             self.sqlite_store = self.build_db_store(
@@ -1033,10 +1046,10 @@ if __name__ == "__main__":
         start()
 
     if end_error:
-        sys.stderr.write(end_error)
-
         if end_error_exec_info:
             exc_type, exc_value, exc_traceback = end_error_exec_info
             traceback.print_exception(exc_type, exc_value, exc_traceback)
+
+        sys.stderr.write(end_error)
 
         sys.exit(5)
