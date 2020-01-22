@@ -17,7 +17,7 @@
 import os
 import shutil
 import tempfile
-from binascii import unhexlify, hexlify
+from binascii import unhexlify
 
 from mock import Mock
 from six.moves.urllib import parse
