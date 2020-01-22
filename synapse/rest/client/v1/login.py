@@ -514,7 +514,7 @@ class CasTicketServlet(RestServlet):
             if user is None:
                 raise Exception("CAS response does not contain user")
         except Exception:
-            logger.error("Error parsing CAS response", exc_info=1)
+            logger.exception("Error parsing CAS response")
             raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
         if not success:
             raise LoginError(
