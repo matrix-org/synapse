@@ -29,7 +29,7 @@ class SlavedPresenceStore(BaseSlavedStore):
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 
-        self.presence_stream_cache = self.presence_stream_cache = StreamChangeCache(
+        self.presence_stream_cache = StreamChangeCache(
             "PresenceStreamChangeCache", self._presence_id_gen.get_current_token()
         )
 

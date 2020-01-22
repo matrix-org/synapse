@@ -37,7 +37,7 @@ class FederationStream(Stream):
     def __init__(self, hs):
         federation_sender = hs.get_federation_sender()
 
-        self.current_token = federation_sender.get_current_token
-        self.update_function = federation_sender.get_replication_rows
+        self.current_token = federation_sender.get_current_token  # type: ignore
+        self.update_function = federation_sender.get_replication_rows  # type: ignore
 
         super(FederationStream, self).__init__(hs)

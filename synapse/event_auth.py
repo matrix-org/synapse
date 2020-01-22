@@ -634,7 +634,7 @@ def get_public_keys(invite_event):
     return public_keys
 
 
-def auth_types_for_event(event) -> Set[Tuple[str]]:
+def auth_types_for_event(event) -> Set[Tuple[str, str]]:
     """Given an event, return a list of (EventType, StateKey) that may be
     needed to auth the event. The returned list may be a superset of what
     would actually be required depending on the full state of the room.

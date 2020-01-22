@@ -54,6 +54,9 @@ from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.room import RoomInitialSyncRestServlet
 from synapse.rest.client.v2_alpha import sync
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.monthly_active_users import (
+    MonthlyActiveUsersWorkerStore,
+)
 from synapse.storage.data_stores.main.presence import UserPresenceState
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
@@ -77,6 +80,7 @@ class SynchrotronSlavedStore(
     SlavedEventStore,
     SlavedClientIpStore,
     RoomStore,
+    MonthlyActiveUsersWorkerStore,
     BaseSlavedStore,
 ):
     pass
@@ -358,9 +362,8 @@ class SyncReplicationHandler(ReplicationClientHandler):
         self.presence_handler = hs.get_presence_handler()
         self.notifier = hs.get_notifier()
 
-    @defer.inlineCallbacks
-    def on_rdata(self, stream_name, token, rows):
-        yield super(SyncReplicationHandler, self).on_rdata(stream_name, token, rows)
+    async def on_rdata(self, stream_name, token, rows):
+        await super(SyncReplicationHandler, self).on_rdata(stream_name, token, rows)
         run_in_background(self.process_and_notify, stream_name, token, rows)
 
     def get_streams_to_replicate(self):

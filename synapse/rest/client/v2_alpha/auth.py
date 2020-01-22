@@ -206,10 +206,6 @@ class AuthRestServlet(RestServlet):
 
             return None
         elif stagetype == LoginType.TERMS:
-            if ("session" not in request.args or len(request.args["session"])) == 0:
-                raise SynapseError(400, "No session supplied")
-
-            session = request.args["session"][0]
             authdict = {"session": session}
 
             success = await self.auth_handler.add_oob_auth(

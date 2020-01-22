@@ -27,6 +27,9 @@ class AccountValidityConfig(Config):
     section = "accountvalidity"
 
     def __init__(self, config, synapse_config):
+        if config is None:
+            return
+        super(AccountValidityConfig, self).__init__()
         self.enabled = config.get("enabled", False)
         self.renew_by_email_enabled = "renew_at" in config
 
@@ -91,7 +94,7 @@ class RegistrationConfig(Config):
             )
 
         self.account_validity = AccountValidityConfig(
-            config.get("account_validity", {}), config
+            config.get("account_validity") or {}, config
         )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
@@ -159,23 +162,6 @@ class RegistrationConfig(Config):
         # Optional account validity configuration. This allows for accounts to be denied
         # any request after a given period.
         #
-        # ``enabled`` defines whether the account validity feature is enabled. Defaults
-        # to False.
-        #
-        # ``period`` allows setting the period after which an account is valid
-        # after its registration. When renewing the account, its validity period
-        # will be extended by this amount of time. This parameter is required when using
-        # the account validity feature.
-        #
-        # ``renew_at`` is the amount of time before an account's expiry date at which
-        # Synapse will send an email to the account's email address with a renewal link.
-        # This needs the ``email`` and ``public_baseurl`` configuration sections to be
-        # filled.
-        #
-        # ``renew_email_subject`` is the subject of the email sent out with the renewal
-        # link. ``%%(app)s`` can be used as a placeholder for the ``app_name`` parameter
-        # from the ``email`` section.
-        #
         # Once this feature is enabled, Synapse will look for registered users without an
         # expiration date at startup and will add one to every account it found using the
         # current settings at that time.
@@ -186,21 +172,55 @@ class RegistrationConfig(Config):
         # date will be randomly selected within a range [now + period - d ; now + period],
         # where d is equal to 10%% of the validity period.
         #
-        #account_validity:
-        #  enabled: true
-        #  period: 6w
-        #  renew_at: 1w
-        #  renew_email_subject: "Renew your %%(app)s account"
-        #  # Directory in which Synapse will try to find the HTML files to serve to the
-        #  # user when trying to renew an account. Optional, defaults to
-        #  # synapse/res/templates.
-        #  template_dir: "res/templates"
-        #  # HTML to be displayed to the user after they successfully renewed their
-        #  # account. Optional.
-        #  account_renewed_html_path: "account_renewed.html"
-        #  # HTML to be displayed when the user tries to renew an account with an invalid
-        #  # renewal token. Optional.
-        #  invalid_token_html_path: "invalid_token.html"
+        account_validity:
+          # The account validity feature is disabled by default. Uncomment the
+          # following line to enable it.
+          #
+          #enabled: true
+
+          # The period after which an account is valid after its registration. When
+          # renewing the account, its validity period will be extended by this amount
+          # of time. This parameter is required when using the account validity
+          # feature.
+          #
+          #period: 6w
+
+          # The amount of time before an account's expiry date at which Synapse will
+          # send an email to the account's email address with a renewal link. By
+          # default, no such emails are sent.
+          #
+          # If you enable this setting, you will also need to fill out the 'email' and
+          # 'public_baseurl' configuration sections.
+          #
+          #renew_at: 1w
+
+          # The subject of the email sent out with the renewal link. '%%(app)s' can be
+          # used as a placeholder for the 'app_name' parameter from the 'email'
+          # section.
+          #
+          # Note that the placeholder must be written '%%(app)s', including the
+          # trailing 's'.
+          #
+          # If this is not set, a default value is used.
+          #
+          #renew_email_subject: "Renew your %%(app)s account"
+
+          # Directory in which Synapse will try to find templates for the HTML files to
+          # serve to the user when trying to renew an account. If not set, default
+          # templates from within the Synapse package will be used.
+          #
+          #template_dir: "res/templates"
+
+          # File within 'template_dir' giving the HTML to be displayed to the user after
+          # they successfully renewed their account. If not set, default text is used.
+          #
+          #account_renewed_html_path: "account_renewed.html"
+
+          # File within 'template_dir' giving the HTML to be displayed when the user
+          # tries to renew an account with an invalid renewal token. If not set,
+          # default text is used.
+          #
+          #invalid_token_html_path: "invalid_token.html"
 
         # Time that a user's session remains valid for, after they log in.
         #

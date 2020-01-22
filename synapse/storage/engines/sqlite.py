@@ -53,8 +53,11 @@ class Sqlite3Engine(object):
         """
         return False
 
-    def check_database(self, txn):
-        pass
+    def check_database(self, db_conn, allow_outdated_version: bool = False):
+        if not allow_outdated_version:
+            version = self.module.sqlite_version_info
+            if version < (3, 11, 0):
+                raise RuntimeError("Synapse requires sqlite 3.11 or above.")
 
     def convert_param_style(self, sql):
         return sql

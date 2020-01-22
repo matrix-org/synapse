@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
+from collections import OrderedDict
+from typing import Any, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
 
@@ -23,7 +24,9 @@ class Ratelimiter(object):
     """
 
     def __init__(self):
-        self.message_counts = collections.OrderedDict()
+        self.message_counts = (
+            OrderedDict()
+        )  # type: OrderedDict[Any, Tuple[float, int, Optional[float]]]
 
     def can_do_action(self, key, time_now_s, rate_hz, burst_count, update=True):
         """Can the entity (e.g. user or IP address) perform the action?

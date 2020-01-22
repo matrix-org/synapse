@@ -45,6 +45,7 @@ class UsersRestServlet(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
 
@@ -55,7 +56,7 @@ class UsersRestServlet(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
 
-        ret = await self.admin_handler.get_users()
+        ret = await self.store.get_users()
 
         return 200, ret
 
@@ -80,6 +81,7 @@ class UsersRestServletV2(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
 
@@ -92,7 +94,7 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
-        users = await self.admin_handler.get_users_paginate(
+        users = await self.store.get_users_paginate(
             start, limit, user_id, guests, deactivated
         )
         ret = {"users": users}
@@ -193,8 +195,8 @@ class UserRestServletV2(RestServlet):
                     raise SynapseError(400, "Invalid password")
                 else:
                     new_password = body["password"]
-                    await self._set_password_handler.set_password(
-                        target_user, new_password, requester
+                    await self.set_password_handler.set_password(
+                        target_user.to_string(), new_password, requester
                     )
 
             if "deactivated" in body:
@@ -338,21 +340,22 @@ class UserRegisterServlet(RestServlet):
 
         got_mac = body["mac"]
 
-        want_mac = hmac.new(
+        want_mac_builder = hmac.new(
             key=self.hs.config.registration_shared_secret.encode(),
             digestmod=hashlib.sha1,
         )
-        want_mac.update(nonce.encode("utf8"))
-        want_mac.update(b"\x00")
-        want_mac.update(username)
-        want_mac.update(b"\x00")
-        want_mac.update(password)
-        want_mac.update(b"\x00")
-        want_mac.update(b"admin" if admin else b"notadmin")
+        want_mac_builder.update(nonce.encode("utf8"))
+        want_mac_builder.update(b"\x00")
+        want_mac_builder.update(username)
+        want_mac_builder.update(b"\x00")
+        want_mac_builder.update(password)
+        want_mac_builder.update(b"\x00")
+        want_mac_builder.update(b"admin" if admin else b"notadmin")
         if user_type:
-            want_mac.update(b"\x00")
-            want_mac.update(user_type.encode("utf8"))
-        want_mac = want_mac.hexdigest()
+            want_mac_builder.update(b"\x00")
+            want_mac_builder.update(user_type.encode("utf8"))
+
+        want_mac = want_mac_builder.hexdigest()
 
         if not hmac.compare_digest(want_mac.encode("ascii"), got_mac.encode("ascii")):
             raise SynapseError(403, "HMAC incorrect")
@@ -515,8 +518,8 @@ class SearchUsersRestServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
-        self.store = hs.get_datastore()
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -539,7 +542,7 @@ class SearchUsersRestServlet(RestServlet):
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
-        ret = await self.handlers.admin_handler.search_users(term)
+        ret = await self.handlers.store.search_users(term)
         return 200, ret
 
 
@@ -573,8 +576,8 @@ class UserAdminServlet(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
 
     async def on_GET(self, request, user_id):
         await assert_requester_is_admin(self.auth, request)
@@ -584,8 +587,7 @@ class UserAdminServlet(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Only local users can be admins of this homeserver")
 
-        is_admin = await self.handlers.admin_handler.get_user_server_admin(target_user)
-        is_admin = bool(is_admin)
+        is_admin = await self.store.is_server_admin(target_user)
 
         return 200, {"admin": is_admin}
 
@@ -608,8 +610,6 @@ class UserAdminServlet(RestServlet):
         if target_user == auth_user and not set_admin_to:
             raise SynapseError(400, "You may not demote yourself.")
 
-        await self.handlers.admin_handler.set_user_server_admin(
-            target_user, set_admin_to
-        )
+        await self.store.set_user_server_admin(target_user, set_admin_to)
 
         return 200, {}
