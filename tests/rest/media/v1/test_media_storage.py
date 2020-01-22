@@ -162,9 +162,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def _req(self, content_disposition):
 
-        request, channel = self.make_request(
-            "GET", self.media_id, shorthand=False
-        )
+        request, channel = self.make_request("GET", self.media_id, shorthand=False)
         request.render(self.download_resource)
         self.pump()
 
