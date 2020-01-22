@@ -65,11 +65,16 @@ class BaseSlavedStore(SQLBaseStore):
             self._cache_id_gen.advance(token)
             for row in rows:
                 if row.cache_func == CURRENT_STATE_CACHE_NAME:
+                    if row.keys is None:
+                        raise Exception(
+                            "Can't send an 'invalidate all' for current state cache"
+                        )
+
                     room_id = row.keys[0]
                     members_changed = set(row.keys[1:])
                     self._invalidate_state_caches(room_id, members_changed)
                 else:
-                    self._attempt_to_invalidate_cache(row.cache_func, tuple(row.keys))
+                    self._attempt_to_invalidate_cache(row.cache_func, row.keys)
 
     def _invalidate_cache_and_stream(self, txn, cache_func, keys):
         txn.call_after(cache_func.invalidate, keys)
