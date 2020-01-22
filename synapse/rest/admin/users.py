@@ -151,7 +151,8 @@ class UserRestServletV2(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        await assert_requester_is_admin(self.auth, request)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
         target_user = UserID.from_string(user_id)
         body = parse_json_object_from_request(request)
@@ -162,8 +163,6 @@ class UserRestServletV2(RestServlet):
         user = await self.admin_handler.get_user(target_user)
 
         if user:  # modify user
-            requester = await self.auth.get_user_by_req(request)
-
             if "displayname" in body:
                 await self.profile_handler.set_displayname(
                     target_user, requester, body["displayname"], True
@@ -210,11 +209,8 @@ class UserRestServletV2(RestServlet):
             return 200, user
 
         else:  # create user
-            if "password" not in body:
-                raise SynapseError(
-                    400, "password must be specified", errcode=Codes.BAD_JSON
-                )
-            elif (
+            password = body.get("password")
+            if password is not None and (
                 not isinstance(body["password"], text_type)
                 or len(body["password"]) > 512
             ):
@@ -229,7 +225,7 @@ class UserRestServletV2(RestServlet):
 
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
-                password=body["password"],
+                password=password,
                 admin=bool(admin),
                 default_display_name=displayname,
                 user_type=user_type,
