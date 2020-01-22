@@ -113,48 +113,37 @@ FuncType = Callable[..., Any]
 F = TypeVar("F", bound=FuncType)
 
 
-class _InjectionDescriptor(object):
-    """A decorator for HomeServer class to implement dependency injection, i.e.
-    caching built classes and detecting cyclic dependencies.
-    """
-
-    def __init__(self, f: F):
-        self.f = f
-
-        if not f.__name__.startswith("get_"):
-            raise Exception("Function must be named `get_*`")
-
-        self.depname = self.f.__name__[len("get_") :]  # type: str
-
-    def __get__(self, obj, objtype=None):
-        @wraps(self.f)
-        def build():
-            try:
-                return getattr(obj, self.depname)
-            except AttributeError:
-                pass
-
-            # Prevent cyclic dependencies from deadlocking
-            if self.depname in obj._building:
-                raise ValueError(
-                    "Cyclic dependency while building %s" % (self.depname,)
-                )
-            obj._building[self.depname] = True
-
-            dep = self.f(obj)
-
-            setattr(obj, self.depname, dep)
-
-            return dep
-
-        return build
-
-
 def builder(f: F) -> F:
     """Decorator to wrap a HomeServer method to cache result and detect
     cyclical dependencies.
     """
-    return cast(F, _InjectionDescriptor(f))
+    if not f.__name__.startswith("get_"):
+        raise Exception("Function must be named `get_*`")
+
+    depname = f.__name__[len("get_") :]  # type: str
+
+    @wraps(f)
+    def _get(self):
+        try:
+            return getattr(self, depname)
+        except AttributeError:
+            pass
+
+        # Prevent cyclic dependencies from deadlocking
+        if depname in self._building:
+            raise ValueError("Cyclic dependency while building %s" % (depname,))
+
+        try:
+            self._building[depname] = True
+            dep = f(self)
+        finally:
+            self._building.pop(depname, None)
+
+        setattr(self, self.depname, dep)
+
+        return dep
+
+    return cast(F, _get)
 
 
 class HomeServer(object):
