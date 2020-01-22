@@ -1,0 +1,1 @@
+Validate all uses of the `client_secret` parameter using the regex provided by the Client-Server API.
