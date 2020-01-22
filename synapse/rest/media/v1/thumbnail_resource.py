@@ -331,7 +331,7 @@ class ThumbnailResource(DirectServeResource):
                             )
                         )
             if crop_info_list:
-                return min(crop_info_list2)[-1]
+                return min(crop_info_list)[-1]
             else:
                 return min(crop_info_list2)[-1]
         else:
