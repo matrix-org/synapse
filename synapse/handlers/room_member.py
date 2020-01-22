@@ -710,7 +710,7 @@ class RoomMemberHandler(object):
 
     @defer.inlineCallbacks
     def _get_inviter(self, user_id, room_id):
-        invite = yield self.store.get_invite_for_user_in_room(
+        invite = yield self.store.get_invite_for_local_user_in_room(
             user_id=user_id, room_id=room_id
         )
         if invite:

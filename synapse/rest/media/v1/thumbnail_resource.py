@@ -296,8 +296,8 @@ class ThumbnailResource(DirectServeResource):
         d_h = desired_height
 
         if desired_method.lower() == "crop":
-            info_list = []
-            info_list2 = []
+            crop_info_list = []
+            crop_info_list2 = []
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
                 t_h = info["thumbnail_height"]
@@ -309,7 +309,7 @@ class ThumbnailResource(DirectServeResource):
                     type_quality = desired_type != info["thumbnail_type"]
                     length_quality = info["thumbnail_length"]
                     if t_w >= d_w or t_h >= d_h:
-                        info_list.append(
+                        crop_info_list.append(
                             (
                                 aspect_quality,
                                 min_quality,
@@ -320,7 +320,7 @@ class ThumbnailResource(DirectServeResource):
                             )
                         )
                     else:
-                        info_list2.append(
+                        crop_info_list2.append(
                             (
                                 aspect_quality,
                                 min_quality,
@@ -330,10 +330,10 @@ class ThumbnailResource(DirectServeResource):
                                 info,
                             )
                         )
-            if info_list:
-                return min(info_list)[-1]
+            if crop_info_list:
+                return min(crop_info_list)[-1]
             else:
-                return min(info_list2)[-1]
+                return min(crop_info_list2)[-1]
         else:
             info_list = []
             info_list2 = []

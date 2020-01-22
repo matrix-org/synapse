@@ -259,7 +259,9 @@ class FederationRemoteSendQueue(object):
     def federation_ack(self, token):
         self._clear_queue_before_pos(token)
 
-    def get_replication_rows(self, from_token, to_token, limit, federation_ack=None):
+    async def get_replication_rows(
+        self, from_token, to_token, limit, federation_ack=None
+    ):
         """Get rows to be sent over federation between the two tokens
 
         Args:

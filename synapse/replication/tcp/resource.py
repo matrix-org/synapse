@@ -17,12 +17,12 @@
 
 import logging
 import random
+from typing import List
 
 from six import itervalues
 
 from prometheus_client import Counter
 
-from twisted.internet import defer
 from twisted.internet.protocol import Factory
 
 from synapse.metrics import LaterGauge
@@ -79,7 +79,7 @@ class ReplicationStreamer(object):
         self._replication_torture_level = hs.config.replication_torture_level
 
         # Current connections.
-        self.connections = []
+        self.connections = []  # type: List[ServerReplicationStreamProtocol]
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",
@@ -120,6 +120,7 @@ class ReplicationStreamer(object):
             self.federation_sender = hs.get_federation_sender()
 
         self.notifier.add_replication_callback(self.on_notifier_poke)
+        self.notifier.add_remote_server_up_callback(self.send_remote_server_up)
 
         # Keeps track of whether we are currently checking for updates
         self.is_looping = False
@@ -154,8 +155,7 @@ class ReplicationStreamer(object):
 
         run_as_background_process("replication_notifier", self._run_notifier_loop)
 
-    @defer.inlineCallbacks
-    def _run_notifier_loop(self):
+    async def _run_notifier_loop(self):
         self.is_looping = True
 
         try:
@@ -184,7 +184,7 @@ class ReplicationStreamer(object):
                             continue
 
                         if self._replication_torture_level:
-                            yield self.clock.sleep(
+                            await self.clock.sleep(
                                 self._replication_torture_level / 1000.0
                             )
 
@@ -195,7 +195,7 @@ class ReplicationStreamer(object):
                             stream.upto_token,
                         )
                         try:
-                            updates, current_token = yield stream.get_updates()
+                            updates, current_token = await stream.get_updates()
                         except Exception:
                             logger.info("Failed to handle stream %s", stream.NAME)
                             raise
@@ -232,7 +232,7 @@ class ReplicationStreamer(object):
             self.is_looping = False
 
     @measure_func("repl.get_stream_updates")
-    def get_stream_updates(self, stream_name, token):
+    async def get_stream_updates(self, stream_name, token):
         """For a given stream get all updates since token. This is called when
         a client first subscribes to a stream.
         """
@@ -240,7 +240,7 @@ class ReplicationStreamer(object):
         if not stream:
             raise Exception("unknown stream %s", stream_name)
 
-        return stream.get_updates_since(token)
+        return await stream.get_updates_since(token)
 
     @measure_func("repl.federation_ack")
     def federation_ack(self, token):
@@ -251,22 +251,20 @@ class ReplicationStreamer(object):
             self.federation_sender.federation_ack(token)
 
     @measure_func("repl.on_user_sync")
-    @defer.inlineCallbacks
-    def on_user_sync(self, conn_id, user_id, is_syncing, last_sync_ms):
+    async def on_user_sync(self, conn_id, user_id, is_syncing, last_sync_ms):
         """A client has started/stopped syncing on a worker.
         """
         user_sync_counter.inc()
-        yield self.presence_handler.update_external_syncs_row(
+        await self.presence_handler.update_external_syncs_row(
             conn_id, user_id, is_syncing, last_sync_ms
         )
 
     @measure_func("repl.on_remove_pusher")
-    @defer.inlineCallbacks
-    def on_remove_pusher(self, app_id, push_key, user_id):
+    async def on_remove_pusher(self, app_id, push_key, user_id):
         """A client has asked us to remove a pusher
         """
         remove_pusher_counter.inc()
-        yield self.store.delete_pusher_by_app_id_pushkey_user_id(
+        await self.store.delete_pusher_by_app_id_pushkey_user_id(
             app_id=app_id, pushkey=push_key, user_id=user_id
         )
 
@@ -280,15 +278,24 @@ class ReplicationStreamer(object):
         getattr(self.store, cache_func).invalidate(tuple(keys))
 
     @measure_func("repl.on_user_ip")
-    @defer.inlineCallbacks
-    def on_user_ip(self, user_id, access_token, ip, user_agent, device_id, last_seen):
+    async def on_user_ip(
+        self, user_id, access_token, ip, user_agent, device_id, last_seen
+    ):
         """The client saw a user request
         """
         user_ip_cache_counter.inc()
-        yield self.store.insert_client_ip(
+        await self.store.insert_client_ip(
             user_id, access_token, ip, user_agent, device_id, last_seen
         )
-        yield self._server_notices_sender.on_user_ip(user_id)
+        await self._server_notices_sender.on_user_ip(user_id)
+
+    @measure_func("repl.on_remote_server_up")
+    def on_remote_server_up(self, server: str):
+        self.notifier.notify_remote_server_up(server)
+
+    def send_remote_server_up(self, server: str):
+        for conn in self.connections:
+            conn.send_remote_server_up(server)
 
     def send_sync_to_all_connections(self, data):
         """Sends a SYNC command to all clients.

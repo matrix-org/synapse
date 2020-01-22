@@ -172,9 +172,8 @@ class UserDirectoryReplicationHandler(ReplicationClientHandler):
         super(UserDirectoryReplicationHandler, self).__init__(hs.get_datastore())
         self.user_directory = hs.get_user_directory_handler()
 
-    @defer.inlineCallbacks
-    def on_rdata(self, stream_name, token, rows):
-        yield super(UserDirectoryReplicationHandler, self).on_rdata(
+    async def on_rdata(self, stream_name, token, rows):
+        await super(UserDirectoryReplicationHandler, self).on_rdata(
             stream_name, token, rows
         )
         if stream_name == EventsStream.NAME:

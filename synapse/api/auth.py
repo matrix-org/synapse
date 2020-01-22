@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Tuple
 
 from six import itervalues
 
@@ -35,7 +34,7 @@ from synapse.api.errors import (
     ResourceLimitError,
 )
 from synapse.config.server import is_threepid_reserved
-from synapse.types import UserID
+from synapse.types import StateMap, UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
@@ -509,10 +508,7 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     def compute_auth_events(
-        self,
-        event,
-        current_state_ids: Dict[Tuple[str, str], str],
-        for_verification: bool = False,
+        self, event, current_state_ids: StateMap[str], for_verification: bool = False,
     ):
         """Given an event and current state return the list of event IDs used
         to auth an event.

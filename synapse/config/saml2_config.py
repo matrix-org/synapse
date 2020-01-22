@@ -121,6 +121,7 @@ class SAML2Config(Config):
         required_methods = [
             "get_saml_attributes",
             "saml_response_to_user_attributes",
+            "get_remote_user_id",
         ]
         missing_methods = [
             method

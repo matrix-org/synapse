@@ -115,9 +115,8 @@ class ASReplicationHandler(ReplicationClientHandler):
         super(ASReplicationHandler, self).__init__(hs.get_datastore())
         self.appservice_handler = hs.get_application_service_handler()
 
-    @defer.inlineCallbacks
-    def on_rdata(self, stream_name, token, rows):
-        yield super(ASReplicationHandler, self).on_rdata(stream_name, token, rows)
+    async def on_rdata(self, stream_name, token, rows):
+        await super(ASReplicationHandler, self).on_rdata(stream_name, token, rows)
 
         if stream_name == "events":
             max_stream_id = self.store.get_room_max_stream_ordering()

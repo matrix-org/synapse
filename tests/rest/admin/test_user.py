@@ -435,6 +435,19 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, channel.json_body["is_guest"])
         self.assertEqual(0, channel.json_body["deactivated"])
 
+        # Change password
+        body = json.dumps({"password": "hahaha"})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
         # Modify user
         body = json.dumps({"displayname": "foobar", "deactivated": True})
 

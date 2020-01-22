@@ -15,7 +15,7 @@
 
 import hashlib
 import logging
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 from six import iteritems, iterkeys, itervalues
 
@@ -26,6 +26,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
+from synapse.types import StateMap
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ POWER_KEY = (EventTypes.PowerLevels, "")
 @defer.inlineCallbacks
 def resolve_events_with_store(
     room_id: str,
-    state_sets: List[Dict[Tuple[str, str], str]],
+    state_sets: List[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_map_factory: Callable,
 ):

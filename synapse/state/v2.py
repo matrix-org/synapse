@@ -16,7 +16,7 @@
 import heapq
 import itertools
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from six import iteritems, itervalues
 
@@ -27,6 +27,7 @@ from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
+from synapse.types import StateMap
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 def resolve_events_with_store(
     room_id: str,
     room_version: str,
-    state_sets: List[Dict[Tuple[str, str], str]],
+    state_sets: List[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_res_store: "synapse.state.StateResolutionStore",
 ):
@@ -393,12 +394,12 @@ def _iterative_auth_checks(
         room_id (str)
         room_version (str)
         event_ids (list[str]): Ordered list of events to apply auth checks to
-        base_state (dict[tuple[str, str], str]): The set of state to start with
+        base_state (StateMap[str]): The set of state to start with
         event_map (dict[str,FrozenEvent])
         state_res_store (StateResolutionStore)
 
     Returns:
-        Deferred[dict[tuple[str, str], str]]: Returns the final updated state
+        Deferred[StateMap[str]]: Returns the final updated state
     """
     resolved_state = base_state.copy()
 
