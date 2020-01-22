@@ -3,7 +3,7 @@ Synapse 1.9.0rc1 (2020-01-22)
 
 **WARNING**: As of this release, Synapse no longer supports versions of SQLite before 3.11, and will refuse to start when configured to use an older version. Administrators are recommended to migrate their database to Postgres (see instructions [here](docs/postgres.md)).
 
-If your Synapse deployment uses workers, note that the reverse-proxy configurations have changed, with the addition of a few paths (see the updated configurations [here](docs/workers.md#available-worker-applications)).
+If your Synapse deployment uses workers, note that the reverse-proxy configurations for the `synapse.app.media_repository`, `synapse.app.federation_reader` and `synapse.app.event_creator` have changed, with the addition of a few paths (see the updated configurations [here](docs/workers.md#available-worker-applications)).
 
 Features
 --------
