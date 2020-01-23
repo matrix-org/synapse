@@ -65,6 +65,9 @@ class DeviceMessageHandler(object):
                 logger.warning("Request for keys for non-local user %s", user_id)
                 raise SynapseError(400, "Not a user here")
 
+            if not by_device:
+                continue
+
             messages_by_device = {
                 device_id: {
                     "content": message_content,
@@ -73,8 +76,44 @@ class DeviceMessageHandler(object):
                 }
                 for device_id, message_content in by_device.items()
             }
-            if messages_by_device:
-                local_messages[user_id] = messages_by_device
+            local_messages[user_id] = messages_by_device
+
+            if message_type == "m.room_key_request":
+                # Get the sending device IDs
+                requesting_device_ids = set()
+                for message_content in by_device.values():
+                    device_id = message_content.get("requesting_device_id")
+                    requesting_device_ids.add(device_id)
+
+                # Check if we are tracking the devices of the remote user.
+                room_ids = yield self.store.get_rooms_for_user(sender_user_id)
+                if not room_ids:
+                    logger.info(
+                        "Received device message from remote device we don't"
+                        " share a room with: %s %s",
+                        sender_user_id,
+                        requesting_device_ids,
+                    )
+                    continue
+
+                # If we are tracking check that we know about the sending
+                # devices.
+                cached_devices = yield self.store.get_cached_devices_for_user(
+                    sender_user_id
+                )
+
+                unknown_devices = requesting_device_ids - set(cached_devices)
+                if unknown_devices:
+                    logger.info(
+                        "Received device message from remote device not in our cache: %s %s",
+                        sender_user_id,
+                        unknown_devices,
+                    )
+                    yield self.store.mark_remote_user_device_cache_as_stale(
+                        sender_user_id
+                    )
+                    # TODO: Poke something to start trying to refetch user's
+                    # keys.
 
         stream_id = yield self.store.add_messages_from_remote_to_device_inbox(
             origin, message_id, local_messages
