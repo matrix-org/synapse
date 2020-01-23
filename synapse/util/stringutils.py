@@ -27,7 +27,7 @@ from synapse.api.errors import Codes, SynapseError
 _string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
 
 # https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-register-email-requesttoken
-client_secret_regex = re.compile(r"^[0-9a-zA-Z.=_-]+$")
+client_secret_regex = re.compile(r"^[0-9a-zA-Z\.\=\_\-\:]+")
 
 # random_string and random_string_with_symbols are used for a range of things,
 # some cryptographically important, some less so. We use SystemRandom to make sure
