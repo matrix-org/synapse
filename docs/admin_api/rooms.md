@@ -46,7 +46,7 @@ The following fields are possible in the JSON response body:
 A standard request with no filtering:
 
 ```
-GET /_synapse/admin/rooms
+GET /_synapse/admin/v1/rooms
 
 {}
 ```
@@ -78,7 +78,7 @@ Response:
 Filtering by room name:
 
 ```
-GET /_synapse/admin/rooms?search_term=TWIM
+GET /_synapse/admin/v1/rooms?search_term=TWIM
 
 {}
 ```
@@ -103,7 +103,7 @@ Response:
 Paginating through a list of rooms:
 
 ```
-GET /_synapse/admin/rooms?order_by=size
+GET /_synapse/admin/v1/rooms?order_by=size
 
 {}
 ```
@@ -139,7 +139,7 @@ To get the next batch of room results, we repeat our request, setting the `from`
 parameter to the value of `next_token`.
 
 ```
-GET /_synapse/admin/rooms?order_by=size&from=100
+GET /_synapse/admin/v1/rooms?order_by=size&from=100
 
 {}
 ```
