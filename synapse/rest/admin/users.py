@@ -170,6 +170,30 @@ class UserRestServletV2(RestServlet):
                     target_user, requester, body["displayname"], True
                 )
 
+            if "emails" in body:
+                # remove old email addresses from user
+                threepids = await self.datastore.user_get_threepids(target_user)
+                for threepid in threepids:
+                    if threepid["medium"] == "email":
+                        result = await self.auth_handler.delete_threepid(
+                            target_user, threepid["medium"], threepid["address"], None)
+                        )
+                    if not result:
+                        raise SynapseError(500, "Could not remove email address")
+                
+                # add new email addresses to user
+                current_time = self.hs.get_clock().time_msec()
+                for email in emails:
+                    # generate threepid dict
+                    threepid_dict = {
+                        "medium": "email",
+                        "address": email,
+                        "validated_at": current_time,
+                    }
+
+                    # Bind email to account
+                    await self.registration_handler._register_email_threepid(target_user, threepid_dict, None)
+
             if "avatar_url" in body:
                 await self.profile_handler.set_avatar_url(
                     target_user, requester, body["avatar_url"], True
@@ -221,6 +245,7 @@ class UserRestServletV2(RestServlet):
             admin = body.get("admin", None)
             user_type = body.get("user_type", None)
             displayname = body.get("displayname", None)
+            emails = body.get("emails", None)
 
             if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
                 raise SynapseError(400, "Invalid user type")
@@ -230,6 +255,7 @@ class UserRestServletV2(RestServlet):
                 password=password,
                 admin=bool(admin),
                 default_display_name=displayname,
+                bind_emails=emails,
                 user_type=user_type,
             )
             if "avatar_url" in body:
