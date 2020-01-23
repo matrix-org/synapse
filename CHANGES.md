@@ -1,7 +1,10 @@
 Synapse 1.9.0 (2020-01-23)
 ==========================
 
-No significant changes.
+Improved Documentation
+----------------------
+
+- Fix endpoint documentation for the List Rooms admin api. ([\#6770](https://github.com/matrix-org/synapse/issues/6770))
 
 
 Synapse 1.9.0rc1 (2020-01-22)
