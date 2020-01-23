@@ -9,7 +9,7 @@ If your Synapse deployment uses workers, note that the reverse-proxy configurati
 Improved Documentation
 ----------------------
 
-- Fix endpoint documentation for the List Rooms admin api. ([\#6770](https://github.com/matrix-org/synapse/issues/6770))
+- Fix endpoint documentation for the List Rooms admin API. ([\#6770](https://github.com/matrix-org/synapse/issues/6770))
 
 
 Synapse 1.9.0rc1 (2020-01-22)
