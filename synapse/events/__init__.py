@@ -116,15 +116,31 @@ class _EventInternalMetadata(object):
         return getattr(self, "redacted", False)
 
 
-def _event_dict_property(key):
+_SENTINEL = object()
+
+
+def _event_dict_property(key, default=_SENTINEL):
+    """Creates a new property for the given key that delegates access to
+    `self._event_dict`.
+
+    The default is used if the key is missing from the `_event_dict`, if given,
+    otherwise an AttributeError will be raised.
+
+    Note: If a default is given then `hasattr` will always return true.
+    """
+
     # We want to be able to use hasattr with the event dict properties.
     # However, (on python3) hasattr expects AttributeError to be raised. Hence,
     # we need to transform the KeyError into an AttributeError
-    def getter(self):
+
+    def getter_raises(self):
         try:
             return self._event_dict[key]
         except KeyError:
             raise AttributeError(key)
+
+    def getter_default(self):
+        return self._event_dict.get(key, default)
 
     def setter(self, v):
         try:
@@ -138,7 +154,11 @@ def _event_dict_property(key):
         except KeyError:
             raise AttributeError(key)
 
-    return property(getter, setter, delete)
+    if default is _SENTINEL:
+        # No default given, so use the getter that raises
+        return property(getter_raises, setter, delete)
+    else:
+        return property(getter_default, setter, delete)
 
 
 class EventBase(object):
@@ -165,7 +185,7 @@ class EventBase(object):
     origin = _event_dict_property("origin")
     origin_server_ts = _event_dict_property("origin_server_ts")
     prev_events = _event_dict_property("prev_events")
-    redacts = _event_dict_property("redacts")
+    redacts = _event_dict_property("redacts", None)
     room_id = _event_dict_property("room_id")
     sender = _event_dict_property("sender")
     user_id = _event_dict_property("sender")
