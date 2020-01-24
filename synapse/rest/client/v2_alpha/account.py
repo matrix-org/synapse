@@ -339,7 +339,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
 
         assert_valid_client_secret(body["client_secret"])
 
-        valid, _ = yield self.datastore.validate_threepid_validation_token(
+        valid, _ = yield self.datastore.validate_threepid_session(
             body['sid'],
             body['client_secret'],
             body['token'],
