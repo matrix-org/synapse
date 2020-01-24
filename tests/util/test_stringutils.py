@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.util.stringutils import client_secret_regex
+from synapse.api.errors import SynapseError
+from synapse.util.stringutils import assert_valid_client_secret
 
 from .. import unittest
 
@@ -43,13 +44,8 @@ class StringUtilsTestCase(unittest.TestCase):
         ]
 
         for client_secret in good:
-            self.assertIsNotNone(
-                client_secret_regex.match(client_secret),
-                msg="Expected %s to pass" % client_secret,
-            )
+            assert_valid_client_secret(client_secret)
 
         for client_secret in bad:
-            self.assertIsNone(
-                client_secret_regex.match(client_secret),
-                msg="Expected %s to fail" % client_secret,
-            )
+            with self.assertRaises(SynapseError):
+                assert_valid_client_secret(client_secret)
