@@ -185,6 +185,9 @@ reverse-proxy configuration.
 The `^/_matrix/federation/v1/send/` endpoint must only be handled by a single
 instance.
 
+Note that the `worker_listeners.resources.name` needs to be set to `federation`
+for this worker.
+
 ### `synapse.app.federation_sender`
 
 Handles sending federation traffic to other servers. Doesn't handle any
@@ -264,6 +267,10 @@ Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:
 
     ^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$
+
+When using this worker you must also set `update_user_directory: False` in the 
+shared configuration file to stop the main synapse running background 
+jobs related to updating the user directory.
 
 ### `synapse.app.frontend_proxy`
 
