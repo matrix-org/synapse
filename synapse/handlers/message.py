@@ -800,9 +800,7 @@ class EventCreationHandler(object):
         else:
             error_message = "This event is not allowed in this context"
         if not event_allowed:
-            raise SynapseError(
-                403, error_message, Codes.FORBIDDEN
-            )
+            raise SynapseError(403, error_message, Codes.FORBIDDEN)
 
         try:
             yield self.auth.check_from_context(room_version, event, context)
