@@ -795,9 +795,13 @@ class EventCreationHandler(object):
         event_allowed = yield self.third_party_event_rules.check_event_allowed(
             event, context
         )
+        if type(event_allowed) is tuple:
+            event_allowed, error_message = event_allowed
+        else:
+            error_message = "This event is not allowed in this context"
         if not event_allowed:
             raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
+                403, error_message, Codes.FORBIDDEN
             )
 
         try:
