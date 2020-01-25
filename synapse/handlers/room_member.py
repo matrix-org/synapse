@@ -725,7 +725,9 @@ class RoomMemberHandler(object):
         if type(can_invite) is tuple:
             can_invite, error_message = can_invite
         else:
-            error_message = "This third-party identifier can not be invited in this room"
+            error_message = (
+                "This third-party identifier can not be invited in this room"
+            )
         if not can_invite:
             raise SynapseError(403, error_message, Codes.FORBIDDEN)
 
