@@ -2022,6 +2022,7 @@ class FederationHandler(BaseHandler):
 
         if do_soft_fail_check:
             room_version = yield self.store.get_room_version(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             # Calculate the "current state".
             if state is not None:
@@ -2071,7 +2072,9 @@ class FederationHandler(BaseHandler):
             }
 
             try:
-                event_auth.check(room_version, event, auth_events=current_auth_events)
+                event_auth.check(
+                    room_version_obj, event, auth_events=current_auth_events
+                )
             except AuthError as e:
                 logger.warning("Soft-failing %r because %s", event, e)
                 event.internal_metadata.soft_failed = True
@@ -2155,6 +2158,7 @@ class FederationHandler(BaseHandler):
             defer.Deferred[EventContext]: updated context object
         """
         room_version = yield self.store.get_room_version(event.room_id)
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
         try:
             context = yield self._update_auth_events_and_context_for_auth(
@@ -2172,7 +2176,7 @@ class FederationHandler(BaseHandler):
             )
 
         try:
-            event_auth.check(room_version, event, auth_events=auth_events)
+            event_auth.check(room_version_obj, event, auth_events=auth_events)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
