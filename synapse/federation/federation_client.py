@@ -387,6 +387,8 @@ class FederationClient(FederationBase):
                 return res
             except InvalidResponseError as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
+            except UnsupportedRoomVersionError:
+                raise
             except HttpResponseException as e:
                 if not 500 <= e.code < 600:
                     raise e.to_synapse_error()
@@ -439,6 +441,9 @@ class FederationClient(FederationBase):
             `(origin, event, room_version)` where origin is the remote
             homeserver which generated the event, and room_version is the
             version of the room.
+
+            Fails with a `UnsupportedRoomVersionError` if remote responds with
+            a room version we don't understand.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
