@@ -36,7 +36,7 @@ class QuarantineMediaInRoom(RestServlet):
         historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
         +
         # This path kept around for legacy reasons
-        historical_admin_path_patterns("/quarantine_media/(?P<room_id>![^/]+)")
+        historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
     )
 
     def __init__(self, hs):

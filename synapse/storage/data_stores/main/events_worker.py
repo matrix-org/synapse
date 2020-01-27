@@ -287,7 +287,7 @@ class EventsWorkerStore(SQLBaseStore):
             # we have to recheck auth now.
 
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
-                if not hasattr(entry.event, "redacts"):
+                if entry.event.redacts is None:
                     # A redacted redaction doesn't have a `redacts` key, in
                     # which case lets just withhold the event.
                     #

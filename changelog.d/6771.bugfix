@@ -1,0 +1,1 @@
+Fix persisting redaction events that have been redacted (or otherwise don't have a redacts key).
