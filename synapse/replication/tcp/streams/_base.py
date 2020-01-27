@@ -17,7 +17,9 @@
 import itertools
 import logging
 from collections import namedtuple
-from typing import Any
+from typing import Any, List, Optional
+
+import attr
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +67,24 @@ PushersStreamRow = namedtuple(
     "PushersStreamRow",
     ("user_id", "app_id", "pushkey", "deleted"),  # str  # str  # str  # bool
 )
-CachesStreamRow = namedtuple(
-    "CachesStreamRow",
-    ("cache_func", "keys", "invalidation_ts"),  # str  # list(str)  # int
-)
+
+
+@attr.s
+class CachesStreamRow:
+    """Stream to inform workers they should invalidate their cache.
+
+    Attributes:
+        cache_func: Name of the cached function.
+        keys: The entry in the cache to invalidate. If None then will
+            invalidate all.
+        invalidation_ts: Timestamp of when the invalidation took place.
+    """
+
+    cache_func = attr.ib(type=str)
+    keys = attr.ib(type=Optional[List[Any]])
+    invalidation_ts = attr.ib(type=int)
+
+
 PublicRoomsStreamRow = namedtuple(
     "PublicRoomsStreamRow",
     (

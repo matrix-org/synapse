@@ -70,7 +70,6 @@ class EventStreamRestServlet(RestServlet):
         return 200, {}
 
 
-# TODO: Unit test gets, with and without auth, with different kinds of events.
 class EventRestServlet(RestServlet):
     PATTERNS = client_patterns("/events/(?P<event_id>[^/]*)$", v1=True)
 
@@ -78,6 +77,7 @@ class EventRestServlet(RestServlet):
         super(EventRestServlet, self).__init__()
         self.clock = hs.get_clock()
         self.event_handler = hs.get_event_handler()
+        self.auth = hs.get_auth()
         self._event_serializer = hs.get_event_client_serializer()
 
     async def on_GET(self, request, event_id):

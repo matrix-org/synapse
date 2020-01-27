@@ -291,7 +291,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="is_server_admin",
         )
 
-        return res if res else False
+        return bool(res) if res else False
 
     def set_server_admin(self, user, admin):
         """Sets whether a user is an admin of this homeserver.
