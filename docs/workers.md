@@ -185,8 +185,18 @@ reverse-proxy configuration.
 The `^/_matrix/federation/v1/send/` endpoint must only be handled by a single
 instance.
 
-Note that the `worker_listeners.resources.name` needs to be set to `federation`
-for this worker.
+Note that `federation` must be added to the listener resources in the worker config:
+
+```yaml
+worker_app: synapse.app.federation_reader
+...
+worker_listeners:
+ - type: http
+   port: <port>
+   resources:
+     - names:
+       - federation
+```
 
 ### `synapse.app.federation_sender`
 
