@@ -56,6 +56,9 @@ from synapse.rest.client.v1.room import (
     RoomStateEventRestServlet,
 )
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.monthly_active_users import (
+    MonthlyActiveUsersWorkerStore,
+)
 from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
@@ -81,6 +84,7 @@ class EventCreatorSlavedStore(
     SlavedEventStore,
     SlavedRegistrationStore,
     RoomStore,
+    MonthlyActiveUsersWorkerStore,
     BaseSlavedStore,
 ):
     pass

@@ -54,6 +54,9 @@ from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.room import RoomInitialSyncRestServlet
 from synapse.rest.client.v2_alpha import sync
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.monthly_active_users import (
+    MonthlyActiveUsersWorkerStore,
+)
 from synapse.storage.data_stores.main.presence import UserPresenceState
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
@@ -77,6 +80,7 @@ class SynchrotronSlavedStore(
     SlavedEventStore,
     SlavedClientIpStore,
     RoomStore,
+    MonthlyActiveUsersWorkerStore,
     BaseSlavedStore,
 ):
     pass
