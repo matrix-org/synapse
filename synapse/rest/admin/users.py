@@ -243,7 +243,7 @@ class UserRestServletV2(RestServlet):
             admin = body.get("admin", None)
             user_type = body.get("user_type", None)
             displayname = body.get("displayname", None)
-            emails = body.get("emails", None)
+            threepids = body.get("threepids", None)
 
             if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
                 raise SynapseError(400, "Invalid user type")
@@ -253,9 +253,16 @@ class UserRestServletV2(RestServlet):
                 password=password,
                 admin=bool(admin),
                 default_display_name=displayname,
-                bind_emails=emails,
                 user_type=user_type,
             )
+
+            if "threepids" in body:
+                current_time = self.hs.get_clock().time_msec()
+                for threepid in body["threepids"]:
+                    await self.auth_handler.add_threepid(
+                        user_id, threepid["medium"], threepid["address"], current_time
+                    )
+
             if "avatar_url" in body:
                 await self.profile_handler.set_avatar_url(
                     user_id, requester, body["avatar_url"], True
