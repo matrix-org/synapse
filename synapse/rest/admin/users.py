@@ -184,7 +184,7 @@ class UserRestServletV2(RestServlet):
                     except Exception:
                         logger.exception("Failed to remove threepids")
                         raise SynapseError(500, "Failed to remove threepids")
-                
+
                 # add new threepids to user
                 current_time = self.hs.get_clock().time_msec()
                 for threepid in body["threepids"]:
