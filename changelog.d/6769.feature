@@ -1,1 +1,1 @@
-Admin API to add an email address to user accounts.
+Admin API to add or modify threepids of user accounts.

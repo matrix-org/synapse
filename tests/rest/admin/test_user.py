@@ -407,7 +407,18 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         self.hs.config.registration_shared_secret = None
 
-        body = json.dumps({"password": "abc123", "admin": True})
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "admin": True,
+                "threepids": [
+                    {
+                        "medium": "email",
+                        "address": "bob@bob.bob"
+                    }
+                ]
+            }
+        )
 
         # Create user
         request, channel = self.make_request(
@@ -421,6 +432,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
         # Get user
         request, channel = self.make_request(
@@ -449,7 +462,18 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Modify user
-        body = json.dumps({"displayname": "foobar", "deactivated": True})
+        body = json.dumps(
+            {
+                "displayname": "foobar",
+                "deactivated": True,
+                "threepids": [
+                    {
+                        "medium": "email",
+                        "address": "bob2@bob.bob"
+                    }
+                ]
+            }
+        )
 
         request, channel = self.make_request(
             "PUT",
@@ -463,6 +487,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("foobar", channel.json_body["displayname"])
         self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][0]["address"])
 
         # Get user
         request, channel = self.make_request(

@@ -136,6 +136,8 @@ class UserRestServletV2(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
+        self.store = hs.get_datastore()
+        self.auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.set_password_handler = hs.get_set_password_handler()
         self.deactivate_account_handler = hs.get_deactivate_account_handler()
@@ -163,6 +165,7 @@ class UserRestServletV2(RestServlet):
             raise SynapseError(400, "This endpoint can only be used with local users")
 
         user = await self.admin_handler.get_user(target_user)
+        user_id = target_user.to_string()
 
         if user:  # modify user
             if "displayname" in body:
@@ -170,29 +173,24 @@ class UserRestServletV2(RestServlet):
                     target_user, requester, body["displayname"], True
                 )
 
-            if "emails" in body:
-                # remove old email addresses from user
-                threepids = await self.datastore.user_get_threepids(target_user)
+            if "threepids" in body:
+                # remove old threepids from user
+                threepids = await self.store.user_get_threepids(user_id)
                 for threepid in threepids:
-                    if threepid["medium"] == "email":
-                        result = await self.auth_handler.delete_threepid(
-                            target_user, threepid["medium"], threepid["address"], None)
+                    try:
+                        await self.auth_handler.delete_threepid(
+                            user_id, threepid["medium"], threepid["address"], None
                         )
-                    if not result:
-                        raise SynapseError(500, "Could not remove email address")
+                    except Exception:
+                        logger.exception("Failed to remove threepids")
+                        raise SynapseError(500, "Failed to remove threepids")
                 
-                # add new email addresses to user
+                # add new threepids to user
                 current_time = self.hs.get_clock().time_msec()
-                for email in emails:
-                    # generate threepid dict
-                    threepid_dict = {
-                        "medium": "email",
-                        "address": email,
-                        "validated_at": current_time,
-                    }
-
-                    # Bind email to account
-                    await self.registration_handler._register_email_threepid(target_user, threepid_dict, None)
+                for threepid in body["threepids"]:
+                    await self.auth_handler.add_threepid(
+                        user_id, threepid["medium"], threepid["address"], current_time
+                    )
 
             if "avatar_url" in body:
                 await self.profile_handler.set_avatar_url(
