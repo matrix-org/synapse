@@ -639,8 +639,16 @@ def create_room(hs, room_id, creator_id):
     """
 
     persistence_store = hs.get_storage().persistence
+    store = hs.get_datastore()
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
+
+    yield store.store_room(
+        room_id=room_id,
+        room_creator_user_id=creator_id,
+        is_public=False,
+        room_version=RoomVersions.V1,
+    )
 
     builder = event_builder_factory.for_room_version(
         RoomVersions.V1,

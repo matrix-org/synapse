@@ -44,10 +44,10 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
-from synapse.events import EventBase
+from synapse.events import EventBase, room_version_to_event_format
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.logging.context import (
@@ -703,8 +703,20 @@ class FederationHandler(BaseHandler):
 
         if not room:
             try:
+                prev_state_ids = await context.get_prev_state_ids()
+                create_event = await self.store.get_event(
+                    prev_state_ids[(EventTypes.Create, "")]
+                )
+
+                room_version_id = create_event.content.get(
+                    "room_version", RoomVersions.V1.identifier
+                )
+
                 await self.store.store_room(
-                    room_id=room_id, room_creator_user_id="", is_public=False
+                    room_id=room_id,
+                    room_creator_user_id="",
+                    is_public=False,
+                    room_version=KNOWN_ROOM_VERSIONS[room_version_id],
                 )
             except StoreError:
                 logger.exception("Failed to store room.")
@@ -1186,7 +1198,7 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event, event_format_version = yield self._make_and_verify_event(
+        origin, event, room_version = yield self._make_and_verify_event(
             target_hosts,
             room_id,
             joinee,
@@ -1214,6 +1226,8 @@ class FederationHandler(BaseHandler):
                 target_hosts.insert(0, origin)
             except ValueError:
                 pass
+
+            event_format_version = room_version_to_event_format(room_version.identifier)
             ret = yield self.federation_client.send_join(
                 target_hosts, event, event_format_version
             )
@@ -1234,13 +1248,18 @@ class FederationHandler(BaseHandler):
 
             try:
                 yield self.store.store_room(
-                    room_id=room_id, room_creator_user_id="", is_public=False
+                    room_id=room_id,
+                    room_creator_user_id="",
+                    is_public=False,
+                    room_version=room_version,
                 )
             except Exception:
                 # FIXME
                 pass
 
-            yield self._persist_auth_tree(origin, auth_chain, state, event)
+            yield self._persist_auth_tree(
+                origin, auth_chain, state, event, room_version
+            )
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
@@ -1486,7 +1505,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id, content):
-        origin, event, event_format_version = yield self._make_and_verify_event(
+        origin, event, room_version = yield self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
         # Mark as outlier as we don't have any state for this event; we're not
@@ -1513,7 +1532,11 @@ class FederationHandler(BaseHandler):
     def _make_and_verify_event(
         self, target_hosts, room_id, user_id, membership, content={}, params=None
     ):
-        origin, event, format_ver = yield self.federation_client.make_membership_event(
+        (
+            origin,
+            event,
+            room_version,
+        ) = yield self.federation_client.make_membership_event(
             target_hosts, room_id, user_id, membership, content, params=params
         )
 
@@ -1525,7 +1548,7 @@ class FederationHandler(BaseHandler):
         assert event.user_id == user_id
         assert event.state_key == user_id
         assert event.room_id == room_id
-        return origin, event, format_ver
+        return origin, event, room_version
 
     @defer.inlineCallbacks
     @log_function
@@ -1810,7 +1833,14 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _persist_auth_tree(self, origin, auth_events, state, event):
+    def _persist_auth_tree(
+        self,
+        origin: str,
+        auth_events: List[EventBase],
+        state: List[EventBase],
+        event: EventBase,
+        room_version: RoomVersion,
+    ):
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -1819,10 +1849,12 @@ class FederationHandler(BaseHandler):
         Will attempt to fetch missing auth events.
 
         Args:
-            origin (str): Where the events came from
-            auth_events (list)
-            state (list)
-            event (Event)
+            origin: Where the events came from
+            auth_events
+            state
+            event
+            room_version: The room version we expect this room to have, and
+                will raise if it doesn't match the version in the create event.
 
         Returns:
             Deferred
@@ -1848,9 +1880,12 @@ class FederationHandler(BaseHandler):
             # invalid, and it would fail auth checks anyway.
             raise SynapseError(400, "No create event in state")
 
-        room_version = create_event.content.get(
+        room_version_id = create_event.content.get(
             "room_version", RoomVersions.V1.identifier
         )
+
+        if room_version.identifier != room_version_id:
+            raise SynapseError(400, "Room version mismatch")
 
         missing_auth_events = set()
         for e in itertools.chain(auth_events, state, [event]):
