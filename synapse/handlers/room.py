@@ -30,6 +30,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.events.utils import copy_power_levels_contents
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -367,6 +368,15 @@ class RoomCreationHandler(BaseHandler):
             if old_event:
                 initial_state[k] = old_event.content
 
+        # deep-copy the power-levels event before we start modifying it
+        # note that if frozen_dicts are enabled, `power_levels` will be a frozen
+        # dict so we can't just copy.deepcopy it.
+        initial_state[
+            (EventTypes.PowerLevels, "")
+        ] = power_levels = copy_power_levels_contents(
+            initial_state[(EventTypes.PowerLevels, "")]
+        )
+
         # Resolve the minimum power level required to send any state event
         # We will give the upgrading user this power level temporarily (if necessary) such that
         # they are able to copy all of the state events over, then revert them back to their
@@ -374,8 +384,6 @@ class RoomCreationHandler(BaseHandler):
 
         # Copy over user power levels now as this will not be possible with >100PL users once
         # the room has been created
-
-        power_levels = initial_state[(EventTypes.PowerLevels, "")]
 
         # Calculate the minimum power level needed to clone the room
         event_power_levels = power_levels.get("events", {})
@@ -386,16 +394,7 @@ class RoomCreationHandler(BaseHandler):
         # Raise the requester's power level in the new room if necessary
         current_power_level = power_levels["users"][user_id]
         if current_power_level < needed_power_level:
-            # make sure we copy the event content rather than overwriting it.
-            # note that if frozen_dicts are enabled, `power_levels` will be a frozen
-            # dict so we can't just copy.deepcopy it.
-
-            new_power_levels = {k: v for k, v in power_levels.items() if k != "users"}
-            new_power_levels["users"] = {
-                k: v for k, v in power_levels.get("users", {}).items() if k != user_id
-            }
-            new_power_levels["users"][user_id] = needed_power_level
-            initial_state[(EventTypes.PowerLevels, "")] = new_power_levels
+            power_levels["users"][user_id] = needed_power_level
 
         yield self._send_events_for_new_room(
             requester,
