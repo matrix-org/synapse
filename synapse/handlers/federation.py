@@ -1198,7 +1198,7 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event, room_version = yield self._make_and_verify_event(
+        origin, event, room_version_obj = yield self._make_and_verify_event(
             target_hosts,
             room_id,
             joinee,
@@ -1227,7 +1227,7 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
-            event_format_version = room_version_to_event_format(room_version.identifier)
+            event_format_version = room_version_obj.event_format
             ret = yield self.federation_client.send_join(
                 target_hosts, event, event_format_version
             )
@@ -1251,14 +1251,14 @@ class FederationHandler(BaseHandler):
                     room_id=room_id,
                     room_creator_user_id="",
                     is_public=False,
-                    room_version=room_version,
+                    room_version=room_version_obj,
                 )
             except Exception:
                 # FIXME
                 pass
 
             yield self._persist_auth_tree(
-                origin, auth_chain, state, event, room_version
+                origin, auth_chain, state, event, room_version_obj
             )
 
             # Check whether this room is the result of an upgrade of a room we already know

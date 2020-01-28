@@ -35,12 +35,16 @@ logger = logging.getLogger(__name__)
 
 
 def check(
-    room_version: RoomVersion, event, auth_events, do_sig_check=True, do_size_check=True
+    room_version_obj: RoomVersion,
+    event,
+    auth_events,
+    do_sig_check=True,
+    do_size_check=True,
 ):
     """ Checks if this event is correctly authed.
 
     Args:
-        room_version: the version of the room
+        room_version_obj: the version of the room
         event: the event being checked.
         auth_events (dict: event-key -> event): the existing room state.
 
@@ -168,7 +172,7 @@ def check(
         _check_power_levels(event, auth_events)
 
     if event.type == EventTypes.Redaction:
-        check_redaction(room_version, event, auth_events)
+        check_redaction(room_version_obj, event, auth_events)
 
     logger.debug("Allowing! %s", event)
 
@@ -394,7 +398,7 @@ def _can_send_event(event, auth_events):
     return True
 
 
-def check_redaction(room_version: RoomVersion, event, auth_events):
+def check_redaction(room_version_obj: RoomVersion, event, auth_events):
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
@@ -414,7 +418,7 @@ def check_redaction(room_version: RoomVersion, event, auth_events):
     if user_level >= redact_level:
         return False
 
-    if room_version.event_format == EventFormatVersions.V1:
+    if room_version_obj.event_format == EventFormatVersions.V1:
         redacter_domain = get_domain_from_id(event.event_id)
         redactee_domain = get_domain_from_id(event.redacts)
         if redacter_domain == redactee_domain:
