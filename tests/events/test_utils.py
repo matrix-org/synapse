@@ -15,7 +15,12 @@
 
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
-from synapse.events.utils import prune_event, serialize_event
+from synapse.events.utils import (
+    copy_power_levels_contents,
+    prune_event,
+    serialize_event,
+)
+from synapse.util.frozenutils import freeze
 
 from tests import unittest
 
@@ -273,3 +278,39 @@ class SerializeEventTestCase(unittest.TestCase):
             self.serialize(
                 MockEvent(room_id="!foo:bar", content={"foo": "bar"}), ["room_id", 4]
             )
+
+
+class CopyPowerLevelsContentTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.test_content = {
+            "ban": 50,
+            "events": {"m.room.name": 100, "m.room.power_levels": 100},
+            "events_default": 0,
+            "invite": 50,
+            "kick": 50,
+            "notifications": {"room": 20},
+            "redact": 50,
+            "state_default": 50,
+            "users": {"@example:localhost": 100},
+            "users_default": 0,
+        }
+
+    def _test(self, input):
+        a = copy_power_levels_contents(input)
+
+        self.assertEqual(a["ban"], 50)
+        self.assertEqual(a["events"]["m.room.name"], 100)
+
+        # make sure that changing the copy changes the copy and not the orig
+        a["ban"] = 10
+        a["events"]["m.room.power_levels"] = 20
+
+        self.assertEqual(input["ban"], 50)
+        self.assertEqual(input["events"]["m.room.power_levels"], 100)
+
+    def test_unfrozen(self):
+        self._test(self.test_content)
+
+    def test_frozen(self):
+        input = freeze(self.test_content)
+        self._test(input)

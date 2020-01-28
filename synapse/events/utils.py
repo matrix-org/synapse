@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import collections
 import re
+from typing import Mapping, Union
 
 from six import string_types
 
@@ -414,3 +415,37 @@ class EventClientSerializer(object):
         return yieldable_gather_results(
             self.serialize_event, events, time_now=time_now, **kwargs
         )
+
+
+def copy_power_levels_contents(
+    old_power_levels: Mapping[str, Union[int, Mapping[str, int]]]
+):
+    """Copy the content of a power_levels event, unfreezing frozendicts along the way
+
+    Raises:
+        TypeError if the input does not look like a valid power levels event content
+    """
+    if not isinstance(old_power_levels, collections.Mapping):
+        raise TypeError("Not a valid power-levels content: %r" % (old_power_levels,))
+
+    power_levels = {}
+    for k, v in old_power_levels.items():
+
+        if isinstance(v, int):
+            power_levels[k] = v
+            continue
+
+        if isinstance(v, collections.Mapping):
+            power_levels[k] = h = {}
+            for k1, v1 in v.items():
+                # we should only have one level of nesting
+                if not isinstance(v1, int):
+                    raise TypeError(
+                        "Invalid power_levels value for %s.%s: %r" % (k, k1, v1)
+                    )
+                h[k1] = v1
+            continue
+
+        raise TypeError("Invalid power_levels value for %s: %r" % (k, v))
+
+    return power_levels
