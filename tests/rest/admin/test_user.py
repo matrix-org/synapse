@@ -411,12 +411,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             {
                 "password": "abc123",
                 "admin": True,
-                "threepids": [
-                    {
-                        "medium": "email",
-                        "address": "bob@bob.bob"
-                    }
-                ]
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
             }
         )
 
@@ -466,12 +461,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             {
                 "displayname": "foobar",
                 "deactivated": True,
-                "threepids": [
-                    {
-                        "medium": "email",
-                        "address": "bob2@bob.bob"
-                    }
-                ]
+                "threepids": [{"medium": "email", "address": "bob2@bob.bob"}],
             }
         )
 
