@@ -449,7 +449,7 @@ def copy_power_levels_contents(
                 # we should only have one level of nesting
                 if not isinstance(v1, int):
                     raise TypeError(
-                        "Invalid power_levels value for %s.%s: %r" % (k, k1, v)
+                        "Invalid power_levels value for %s.%s: %r" % (k, k1, v1)
                     )
                 h[k1] = v1
             continue

@@ -287,7 +287,16 @@ class RoomCreationHandler(BaseHandler):
             except AuthError as e:
                 logger.warning("Unable to update PLs in old room: %s", e)
 
-        logger.info("Setting correct PLs in new room to %s", old_room_pl_state.content)
+        new_pl_content = copy_power_levels_contents(old_room_pl_state.content)
+
+        # pre-msc2260 rooms may not have the right setting for aliases. If no other
+        # value is set, set it now.
+        events_default = new_pl_content.get("events_default", 0)
+        new_pl_content.setdefault("events", {}).setdefault(
+            EventTypes.Aliases, events_default
+        )
+
+        logger.info("Setting correct PLs in new room to %s", new_pl_content)
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -295,7 +304,7 @@ class RoomCreationHandler(BaseHandler):
                 "state_key": "",
                 "room_id": new_room_id,
                 "sender": requester.user.to_string(),
-                "content": old_room_pl_state.content,
+                "content": new_pl_content,
             },
             ratelimit=False,
         )
@@ -812,6 +821,10 @@ class RoomCreationHandler(BaseHandler):
                     EventTypes.RoomHistoryVisibility: 100,
                     EventTypes.CanonicalAlias: 50,
                     EventTypes.RoomAvatar: 50,
+                    # MSC2260: Allow everybody to send alias events by default
+                    # This will be reudundant on pre-MSC2260 rooms, since the
+                    # aliases event is special-cased.
+                    EventTypes.Aliases: 0,
                 },
                 "events_default": 0,
                 "state_default": 50,
