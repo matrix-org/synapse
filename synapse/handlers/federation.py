@@ -742,6 +742,26 @@ class FederationHandler(BaseHandler):
                     user = UserID.from_string(event.state_key)
                     await self.user_joined_room(user, room_id)
 
+        # For encrypted messages we check that we know about the sending device,
+        # if we don't then we mark the device cache for that user as stale.
+        if event.type == EventTypes.Encryption:
+            device_id = event.content.get("device_id")
+            if device_id is not None:
+                cached_devices = await self.store.get_cached_devices_for_user(
+                    event.sender
+                )
+                if device_id not in cached_devices:
+                    logger.info(
+                        "Received event from remote device not in our cache: %s %s",
+                        event.sender,
+                        device_id,
+                    )
+                    await self.store.mark_remote_user_device_cache_as_stale(
+                        event.sender
+                    )
+                    # TODO: Poke something to start trying to refetch user's
+                    # keys.
+
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
         """ Trigger a backfill request to `dest` for the given `room_id`
