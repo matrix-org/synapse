@@ -121,7 +121,13 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             if user_id:
                 is_support = self.is_support_user_txn(txn, user_id)
                 if not is_support:
-                    self.upsert_monthly_active_user_txn(txn, user_id)
+                    # We do this manually here to avoid hitting #6791
+                    self.db.simple_upsert_txn(
+                        txn,
+                        table="monthly_active_users",
+                        keyvalues={"user_id": user_id},
+                        values={"timestamp": int(self._clock.time_msec())},
+                    )
             else:
                 logger.warning("mau limit reserved threepid %s not found in db" % tp)
 
