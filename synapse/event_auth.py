@@ -100,7 +100,12 @@ def check(
             if not event.signatures.get(event_id_domain):
                 raise AuthError(403, "Event not signed by sending server")
 
+    # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
+    #
+    # 1. If type is m.room.create:
     if event.type == EventTypes.Create:
+        # 1b. If the domain of the room_id does not match the domain of the sender,
+        # reject.
         sender_domain = get_domain_from_id(event.sender)
         room_id_domain = get_domain_from_id(event.room_id)
         if room_id_domain != sender_domain:
@@ -108,40 +113,49 @@ def check(
                 403, "Creation event's room_id domain does not match sender's"
             )
 
+        # 1c. If content.room_version is present and is not a recognised version, reject
         room_version_prop = event.content.get("room_version", "1")
         if room_version_prop not in KNOWN_ROOM_VERSIONS:
             raise AuthError(
                 403,
                 "room appears to have unsupported version %s" % (room_version_prop,),
             )
-        # FIXME
+
         logger.debug("Allowing! %s", event)
         return
 
+    # 3. If event does not have a m.room.create in its auth_events, reject.
     creation_event = auth_events.get((EventTypes.Create, ""), None)
-
     if not creation_event:
         raise AuthError(403, "No create event in auth events")
 
+    # additional check for m.federate
     creating_domain = get_domain_from_id(event.room_id)
     originating_domain = get_domain_from_id(event.sender)
     if creating_domain != originating_domain:
         if not _can_federate(event, auth_events):
             raise AuthError(403, "This room has been marked as unfederatable.")
 
-    # FIXME: Temp hack
+    # 4. If type is m.room.aliases
     if event.type == EventTypes.Aliases:
+        # 4a. If event has no state_key, reject
         if not event.is_state():
             raise AuthError(403, "Alias event must be a state event")
         if not event.state_key:
             raise AuthError(403, "Alias event must have non-empty state_key")
+
+        # 4b. If sender's domain doesn't matches [sic] state_key, reject
         sender_domain = get_domain_from_id(event.sender)
         if event.state_key != sender_domain:
             raise AuthError(
                 403, "Alias event's state_key does not match sender's domain"
             )
-        logger.debug("Allowing! %s", event)
-        return
+
+        # 4c. Otherwise, allow.
+        # This is removed by https://github.com/matrix-org/matrix-doc/pull/2260
+        if room_version_obj.special_case_aliases_auth:
+            logger.debug("Allowing! %s", event)
+            return
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])
