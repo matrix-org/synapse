@@ -153,7 +153,7 @@ def check(
 
         # 4c. Otherwise, allow.
         # This is removed by https://github.com/matrix-org/matrix-doc/pull/2260
-        if room_version.special_case_aliases_auth:
+        if room_version_obj.special_case_aliases_auth:
             logger.debug("Allowing! %s", event)
             return
 
