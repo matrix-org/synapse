@@ -47,7 +47,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
-from synapse.events import EventBase, room_version_to_event_format
+from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.logging.context import (
@@ -1198,7 +1198,7 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event, room_version = yield self._make_and_verify_event(
+        origin, event, room_version_obj = yield self._make_and_verify_event(
             target_hosts,
             room_id,
             joinee,
@@ -1227,7 +1227,7 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
-            event_format_version = room_version_to_event_format(room_version.identifier)
+            event_format_version = room_version_obj.event_format
             ret = yield self.federation_client.send_join(
                 target_hosts, event, event_format_version
             )
@@ -1251,14 +1251,14 @@ class FederationHandler(BaseHandler):
                     room_id=room_id,
                     room_creator_user_id="",
                     is_public=False,
-                    room_version=room_version,
+                    room_version=room_version_obj,
                 )
             except Exception:
                 # FIXME
                 pass
 
             yield self._persist_auth_tree(
-                origin, auth_chain, state, event, room_version
+                origin, auth_chain, state, event, room_version_obj
             )
 
             # Check whether this room is the result of an upgrade of a room we already know
@@ -2022,6 +2022,7 @@ class FederationHandler(BaseHandler):
 
         if do_soft_fail_check:
             room_version = yield self.store.get_room_version(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             # Calculate the "current state".
             if state is not None:
@@ -2071,7 +2072,9 @@ class FederationHandler(BaseHandler):
             }
 
             try:
-                event_auth.check(room_version, event, auth_events=current_auth_events)
+                event_auth.check(
+                    room_version_obj, event, auth_events=current_auth_events
+                )
             except AuthError as e:
                 logger.warning("Soft-failing %r because %s", event, e)
                 event.internal_metadata.soft_failed = True
@@ -2155,6 +2158,7 @@ class FederationHandler(BaseHandler):
             defer.Deferred[EventContext]: updated context object
         """
         room_version = yield self.store.get_room_version(event.room_id)
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
         try:
             context = yield self._update_auth_events_and_context_for_auth(
@@ -2172,7 +2176,7 @@ class FederationHandler(BaseHandler):
             )
 
         try:
-            event_auth.check(room_version, event, auth_events=auth_events)
+            event_auth.check(room_version_obj, event, auth_events=auth_events)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR

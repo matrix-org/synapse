@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,17 +24,27 @@ from unpaddedbase64 import decode_base64
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, EventSizeError, SynapseError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    RoomVersion,
+)
 from synapse.types import UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
 
-def check(room_version, event, auth_events, do_sig_check=True, do_size_check=True):
+def check(
+    room_version_obj: RoomVersion,
+    event,
+    auth_events,
+    do_sig_check=True,
+    do_size_check=True,
+):
     """ Checks if this event is correctly authed.
 
     Args:
-        room_version (str): the version of the room
+        room_version_obj: the version of the room
         event: the event being checked.
         auth_events (dict: event-key -> event): the existing room state.
 
@@ -97,10 +108,11 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
                 403, "Creation event's room_id domain does not match sender's"
             )
 
-        room_version = event.content.get("room_version", "1")
-        if room_version not in KNOWN_ROOM_VERSIONS:
+        room_version_prop = event.content.get("room_version", "1")
+        if room_version_prop not in KNOWN_ROOM_VERSIONS:
             raise AuthError(
-                403, "room appears to have unsupported version %s" % (room_version,)
+                403,
+                "room appears to have unsupported version %s" % (room_version_prop,),
             )
         # FIXME
         logger.debug("Allowing! %s", event)
@@ -160,7 +172,7 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
         _check_power_levels(event, auth_events)
 
     if event.type == EventTypes.Redaction:
-        check_redaction(room_version, event, auth_events)
+        check_redaction(room_version_obj, event, auth_events)
 
     logger.debug("Allowing! %s", event)
 
@@ -386,7 +398,7 @@ def _can_send_event(event, auth_events):
     return True
 
 
-def check_redaction(room_version, event, auth_events):
+def check_redaction(room_version_obj: RoomVersion, event, auth_events):
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
@@ -406,11 +418,7 @@ def check_redaction(room_version, event, auth_events):
     if user_level >= redact_level:
         return False
 
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-    if not v:
-        raise RuntimeError("Unrecognized room version %r" % (room_version,))
-
-    if v.event_format == EventFormatVersions.V1:
+    if room_version_obj.event_format == EventFormatVersions.V1:
         redacter_domain = get_domain_from_id(event.event_id)
         redactee_domain = get_domain_from_id(event.redacts)
         if redacter_domain == redactee_domain:

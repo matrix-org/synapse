@@ -40,7 +40,7 @@ from synapse.api.errors import (
     NotFoundError,
     SynapseError,
 )
-from synapse.api.room_versions import RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
 from synapse.events.validator import EventValidator
 from synapse.logging.context import run_in_background
@@ -962,9 +962,13 @@ class EventCreationHandler(object):
             )
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
-            room_version = yield self.store.get_room_version(event.room_id)
 
-            if event_auth.check_redaction(room_version, event, auth_events=auth_events):
+            room_version = yield self.store.get_room_version(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+            if event_auth.check_redaction(
+                room_version_obj, event, auth_events=auth_events
+            ):
                 # this user doesn't have 'redact' rights, so we need to do some more
                 # checks on the original event. Let's start by checking the original
                 # event exists.
