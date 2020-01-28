@@ -495,30 +495,12 @@ class EventsStore(
                         room_id,
                         etype,
                         state_key,
-                        None,
+                        to_insert.get((etype, state_key)),
                         room_id,
                         etype,
                         state_key,
                     )
-                    for etype, state_key in to_delete
-                    # We sanity check that we're deleting rather than updating
-                    if (etype, state_key) not in to_insert
-                ),
-            )
-            txn.executemany(
-                sql,
-                (
-                    (
-                        stream_id,
-                        room_id,
-                        etype,
-                        state_key,
-                        ev_id,
-                        room_id,
-                        etype,
-                        state_key,
-                    )
-                    for (etype, state_key), ev_id in iteritems(to_insert)
+                    for etype, state_key in itertools.chain(to_delete, to_insert)
                 ),
             )
 
