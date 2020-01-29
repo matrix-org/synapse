@@ -689,8 +689,18 @@ class EventsPersistenceStorage(object):
         delta: DeltaState,
         current_state: Optional[StateMap[str]],
     ) -> bool:
-        # Now we check if we're actually still in the room,
-        # or if all our users have left.
+        """Check if the server will still be joined after the given events have
+        been persised.
+
+        Args:
+            room_id
+            ev_ctx_rm
+            delta: The delta of current state between what is in the database
+                and what the new current state will be.
+            current_state: The new current state if it already been calculated,
+                otherwise None.
+        """
+
         if not any(
             self.is_mine_id(state_key)
             for typ, state_key in itertools.chain(delta.to_delete, delta.to_insert)
