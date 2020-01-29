@@ -554,7 +554,7 @@ class EventsStore(
                 )
 
             # We now update `local_current_membership`. We do this regardless
-            # of if we're still in the room or not to handle the case where
+            # of whether we're still in the room or not to handle the case where
             # e.g. we just got banned (where we need to record that fact here).
 
             # Note: Do we really want to delete rows here (that we do not
