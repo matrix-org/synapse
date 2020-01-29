@@ -255,7 +255,7 @@ def create_local_event_from_event_dict(
 
     event_dict.setdefault("signatures", {})
 
-    add_hashes_and_signatures(event_dict, hostname, signing_key)
+    add_hashes_and_signatures(room_version, event_dict, hostname, signing_key)
     return event_type_from_format_version(format_version)(
         event_dict, internal_metadata_dict=internal_metadata_dict
     )
