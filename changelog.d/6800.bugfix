@@ -1,0 +1,1 @@
+Fix race in federation sender worker that delayed sending of device updates.
