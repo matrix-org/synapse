@@ -12,8 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 import attr
+from nacl.signing import SigningKey
 
 from twisted.internet import defer
 
@@ -26,10 +28,14 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.types import EventID
+from synapse.events import (
+    EventBase,
+    _EventInternalMetadata,
+    event_type_from_format_version,
+)
+from synapse.types import EventID, JsonDict
+from synapse.util import Clock
 from synapse.util.stringutils import random_string
-
-from . import _EventInternalMetadata, event_type_from_format_version
 
 
 @attr.s(slots=True, cmp=False, frozen=True)
@@ -150,7 +156,7 @@ class EventBuilder(object):
             clock=self._clock,
             hostname=self._hostname,
             signing_key=self._signing_key,
-            format_version=format_version,
+            room_version=self.room_version,
             event_dict=event_dict,
             internal_metadata_dict=self.internal_metadata.get_dict(),
         )
@@ -216,29 +222,19 @@ class EventBuilderFactory(object):
 
 
 def create_local_event_from_event_dict(
-    clock,
-    hostname,
-    signing_key,
-    format_version,
-    event_dict,
-    internal_metadata_dict=None,
-):
+    clock: Clock,
+    hostname: str,
+    signing_key: SigningKey,
+    room_version: RoomVersion,
+    event_dict: JsonDict,
+    internal_metadata_dict: Optional[JsonDict] = None,
+) -> EventBase:
     """Takes a fully formed event dict, ensuring that fields like `origin`
     and `origin_server_ts` have correct values for a locally produced event,
     then signs and hashes it.
-
-    Args:
-        clock (Clock)
-        hostname (str)
-        signing_key
-        format_version (int)
-        event_dict (dict)
-        internal_metadata_dict (dict|None)
-
-    Returns:
-        FrozenEvent
     """
 
+    format_version = room_version.event_format
     if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
         raise Exception("No event format defined for version %r" % (format_version,))
 
