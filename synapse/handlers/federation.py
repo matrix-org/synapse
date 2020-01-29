@@ -1482,13 +1482,13 @@ class FederationHandler(BaseHandler):
         return {"state": list(state.values()), "auth_chain": auth_chain}
 
     @defer.inlineCallbacks
-    def on_invite_request(self, origin, pdu):
+    def on_invite_request(
+        self, origin: str, event: EventBase, room_version: RoomVersion
+    ):
         """ We've got an invite event. Process and persist it. Sign it.
 
         Respond with the now signed event.
         """
-        event = pdu
-
         if event.state_key is None:
             raise SynapseError(400, "The invite event did not have a state key")
 
