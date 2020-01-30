@@ -29,9 +29,9 @@ the reverse proxy and the homeserver.
 
 ## Webserver configuration examples
 
-> **NOTE**: You only need one of these.
+> **NOTE**: You only need one of these. -
 
-### nginx
+### nginx (subdomain)
 
         server {
             listen 443 ssl;
@@ -43,7 +43,7 @@ the reverse proxy and the homeserver.
                 proxy_set_header X-Forwarded-For $remote_addr;
             }
         }
-
+### Nginx (Native Domain)
         server {
             listen 8448 ssl default_server;
             listen [::]:8448 ssl default_server;
