@@ -711,8 +711,8 @@ class EventsPersistenceStorage(object):
                 and what the new current state will be.
             current_state: The new current state if it already been calculated,
                 otherwise None.
-            potentially_left_users: If the server has left the room then joined
-                remote users will be added to the set to indicate that the
+            potentially_left_users: If the server has left the room, then joined
+                remote users will be added to this set to indicate that the
                 server may no longer be sharing a room with them.
         """
 
