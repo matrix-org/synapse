@@ -32,7 +32,7 @@ from synapse.logging.opentracing import (
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
-from synapse.types import get_verify_key_from_cross_signing_key
+from synapse.types import Collection, get_verify_key_from_cross_signing_key
 from synapse.util.caches.descriptors import (
     Cache,
     cached,
@@ -443,8 +443,15 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         user_ids = set(user_id for user_id, _ in query_list)
         user_map = yield self.get_device_list_last_stream_id_for_remotes(list(user_ids))
-        user_ids_in_cache = set(
-            user_id for user_id, stream_id in user_map.items() if stream_id
+
+        # We go and check if any of the users need to have their device lists
+        # resynced. If they do then we remove them from the cached list.
+        users_needing_resync = yield self.get_user_ids_requiring_device_list_resync(
+            user_ids
+        )
+        user_ids_in_cache = (
+            set(user_id for user_id, stream_id in user_map.items() if stream_id)
+            - users_needing_resync
         )
         user_ids_not_in_cache = user_ids - user_ids_in_cache
 
@@ -640,6 +647,25 @@ class DeviceWorkerStore(SQLBaseStore):
         results.update({row["user_id"]: row["stream_id"] for row in rows})
 
         return results
+
+    @defer.inlineCallbacks
+    def get_user_ids_requiring_device_list_resync(self, user_ids: Collection[str]):
+        """Given a list of remote users return the list of users that we
+        should resync the device lists for.
+
+        Returns:
+            Deferred[Set[str]]
+        """
+
+        rows = yield self.db.simple_select_many_batch(
+            table="device_lists_remote_resync",
+            column="user_id",
+            iterable=user_ids,
+            retcols=("user_id",),
+            desc="get_user_ids_requiring_device_list_resync",
+        )
+
+        return {row["user_id"] for row in rows}
 
     def mark_remote_user_device_cache_as_stale(self, user_id: str):
         """Records that the server has reason to believe the cache of the devices
