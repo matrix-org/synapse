@@ -1,0 +1,1 @@
+Fix bug where Synapse didn't invalidate cache of remote users' devices when Synapse left a room.
