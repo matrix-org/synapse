@@ -365,6 +365,8 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
             left_rooms = set(room_ids) - joined_room_ids
 
+            logger.info("Deleting current state left rooms: %r", left_rooms)
+
             # First we get all users that we still think were joined to the
             # room. This is so that we can mark those device lists as
             # potentially stale, since there may have been a period where the
