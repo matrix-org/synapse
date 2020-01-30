@@ -18,6 +18,7 @@
 import functools
 import logging
 import re
+from typing import Optional, Tuple, Type
 
 from twisted.internet.defer import maybeDeferred
 
@@ -267,6 +268,8 @@ class BaseFederationServlet(object):
                 returned.
     """
 
+    PATH = ""  # Overriden in subclasses, the regex to match against the path.
+
     REQUIRE_AUTH = True
 
     PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
@@ -346,9 +349,6 @@ class BaseFederationServlet(object):
                     )
 
             return response
-
-        # Extra logic that functools.wraps() doesn't finish
-        new_func.__self__ = func.__self__
 
         return new_func
 
@@ -824,7 +824,7 @@ class PublicRoomList(BaseFederationServlet):
         if not self.allow_access:
             raise FederationDeniedError(origin)
 
-        limit = int(content.get("limit", 100))
+        limit = int(content.get("limit", 100))  # type: Optional[int]
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
@@ -1422,11 +1422,13 @@ FEDERATION_SERVLET_CLASSES = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-OPENID_SERVLET_CLASSES = (OpenIdUserInfo,)
+OPENID_SERVLET_CLASSES = (
+    OpenIdUserInfo,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-ROOM_LIST_CLASSES = (PublicRoomList,)
+ROOM_LIST_CLASSES = (PublicRoomList,)  # type: Tuple[Type[PublicRoomList], ...]
 
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
@@ -1447,17 +1449,19 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
     FederationGroupsSettingJoinPolicyServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
 GROUP_LOCAL_SERVLET_CLASSES = (
     FederationGroupsLocalInviteServlet,
     FederationGroupsRemoveLocalUserServlet,
     FederationGroupsBulkPublicisedServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
-GROUP_ATTESTATION_SERVLET_CLASSES = (FederationGroupsRenewAttestaionServlet,)
+GROUP_ATTESTATION_SERVLET_CLASSES = (
+    FederationGroupsRenewAttestaionServlet,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 DEFAULT_SERVLET_GROUPS = (
     "federation",

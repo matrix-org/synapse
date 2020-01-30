@@ -2,8 +2,8 @@ import twisted.internet
 
 import synapse.api.auth
 import synapse.config.homeserver
+import synapse.crypto.keyring
 import synapse.federation.sender
-import synapse.federation.transaction_queue
 import synapse.federation.transport.client
 import synapse.handlers
 import synapse.handlers.auth
@@ -17,6 +17,7 @@ import synapse.handlers.room_member
 import synapse.handlers.set_password
 import synapse.http.client
 import synapse.notifier
+import synapse.replication.tcp.client
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
@@ -26,6 +27,9 @@ import synapse.storage
 class HomeServer(object):
     @property
     def config(self) -> synapse.config.homeserver.HomeServerConfig:
+        pass
+    @property
+    def hostname(self) -> str:
         pass
     def get_auth(self) -> synapse.api.auth.Auth:
         pass
@@ -96,4 +100,10 @@ class HomeServer(object):
     def get_clock(self) -> synapse.util.Clock:
         pass
     def get_reactor(self) -> twisted.internet.base.ReactorBase:
+        pass
+    def get_keyring(self) -> synapse.crypto.keyring.Keyring:
+        pass
+    def get_tcp_replication(
+        self,
+    ) -> synapse.replication.tcp.client.ReplicationClientHandler:
         pass
