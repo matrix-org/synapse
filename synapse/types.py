@@ -17,7 +17,7 @@ import re
 import string
 import sys
 from collections import namedtuple
-from typing import Dict, Tuple, TypeVar
+from typing import Any, Dict, Tuple, TypeVar
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -41,6 +41,11 @@ else:
 # event)
 T = TypeVar("T")
 StateMap = Dict[Tuple[str, str], T]
+
+
+# the type of a JSON-serialisable dict. This could be made stronger, but it will
+# do for now.
+JsonDict = Dict[str, Any]
 
 
 class Requester(
