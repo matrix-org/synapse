@@ -19,7 +19,7 @@ from mock import Mock, call
 from signedjson.key import generate_signing_key
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
-from synapse.events import room_version_to_event_format
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events.builder import EventBuilder
 from synapse.handlers.presence import (
     EXTERNAL_PROCESS_EXPIRY,
@@ -597,7 +597,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             clock=self.clock,
             hostname=hostname,
             signing_key=self.random_signing_key,
-            format_version=room_version_to_event_format(room_version),
+            room_version=KNOWN_ROOM_VERSIONS[room_version],
             room_id=room_id,
             type=EventTypes.Member,
             sender=user_id,
