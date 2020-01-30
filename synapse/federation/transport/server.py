@@ -268,7 +268,7 @@ class BaseFederationServlet(object):
                 returned.
     """
 
-    PATH = ""  # Overriden in subclasses, the regex to match against the path.
+    PATH = ""  # Overridden in subclasses, the regex to match against the path.
 
     REQUIRE_AUTH = True
 
