@@ -57,6 +57,7 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.utils import log_function
+from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
@@ -155,6 +156,13 @@ class FederationHandler(BaseHandler):
         self._clean_room_for_join_client = ReplicationCleanRoomRestServlet.make_client(
             hs
         )
+
+        if hs.config.worker_app:
+            self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
+                hs
+            )
+        else:
+            self._device_list_updater = hs.get_device_handler().device_list_updater
 
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
@@ -759,8 +767,14 @@ class FederationHandler(BaseHandler):
                     await self.store.mark_remote_user_device_cache_as_stale(
                         event.sender
                     )
-                    # TODO: Poke something to start trying to refetch user's
-                    # keys.
+
+                    # Immediately attempt a resync in the background
+                    if self.config.worker_app:
+                        return run_in_background(self._user_device_resync, event.sender)
+                    else:
+                        return run_in_background(
+                            self._device_list_updater.user_device_resync, event.sender
+                        )
 
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
