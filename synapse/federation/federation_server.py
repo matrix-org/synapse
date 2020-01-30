@@ -410,7 +410,7 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
         pdu = await self._check_sigs_and_hash(room_version, pdu)
-        ret_pdu = await self.handler.on_invite_request(origin, pdu)
+        ret_pdu = await self.handler.on_invite_request(origin, pdu, room_version)
         time_now = self._clock.time_msec()
         return {"event": ret_pdu.get_pdu_json(time_now)}
 
