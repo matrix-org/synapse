@@ -1915,7 +1915,11 @@ class FederationHandler(BaseHandler):
 
         for e_id in missing_auth_events:
             m_ev = yield self.federation_client.get_pdu(
-                [origin], e_id, room_version=room_version, outlier=True, timeout=10000
+                [origin],
+                e_id,
+                room_version=room_version.identifier,
+                outlier=True,
+                timeout=10000,
             )
             if m_ev and m_ev.event_id == e_id:
                 event_map[e_id] = m_ev
