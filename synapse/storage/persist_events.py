@@ -785,4 +785,4 @@ class EventsPersistenceStorage(object):
         left_users = user_ids - joined_users
 
         for user_id in left_users:
-            await self.main_store.mark_remote_user_device_cache_as_stale(user_id)
+            await self.main_store.mark_remote_user_device_list_as_unsubscribed(user_id)
