@@ -281,7 +281,7 @@ class PaginationHandler(object):
         """Purge the given room from the database"""
         with (await self.pagination_lock.write(room_id)):
             # check we know about the room
-            await self.store.get_room_version(room_id)
+            await self.store.get_room_version_id(room_id)
 
             # first check that we have no users in this room
             joined = await defer.maybeDeferred(

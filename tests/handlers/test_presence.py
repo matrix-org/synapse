@@ -588,7 +588,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         hostname = get_domain_from_id(user_id)
 
-        room_version = self.get_success(self.store.get_room_version(room_id))
+        room_version = self.get_success(self.store.get_room_version_id(room_id))
 
         builder = EventBuilder(
             state=self.state,
