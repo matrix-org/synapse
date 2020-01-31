@@ -20,10 +20,13 @@ import logging
 
 from canonicaljson import encode_canonical_json
 from signedjson.sign import sign_json
+from signedjson.types import SigningKey
 from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.api.room_versions import RoomVersion
 from synapse.events.utils import prune_event, prune_event_dict
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -137,20 +140,23 @@ def compute_event_signature(event_dict, signature_name, signing_key):
 
 
 def add_hashes_and_signatures(
-    event_dict, signature_name, signing_key, hash_algorithm=hashlib.sha256
+    room_version: RoomVersion,
+    event_dict: JsonDict,
+    signature_name: str,
+    signing_key: SigningKey,
 ):
     """Add content hash and sign the event
 
     Args:
-        event_dict (dict): The event to add hashes to and sign
-        signature_name (str): The name of the entity signing the event
+        room_version: the version of the room this event is in
+
+        event_dict: The event to add hashes to and sign
+        signature_name: The name of the entity signing the event
             (typically the server's hostname).
-        signing_key (syutil.crypto.SigningKey): The key to sign with
-        hash_algorithm: A hasher from `hashlib`, e.g. hashlib.sha256, to use
-            to hash the event
+        signing_key: The key to sign with
     """
 
-    name, digest = compute_content_hash(event_dict, hash_algorithm=hash_algorithm)
+    name, digest = compute_content_hash(event_dict, hash_algorithm=hashlib.sha256)
 
     event_dict.setdefault("hashes", {})[name] = encode_base64(digest)
 

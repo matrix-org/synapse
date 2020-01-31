@@ -470,8 +470,6 @@ class FederationClient(FederationBase):
             if not room_version:
                 raise UnsupportedRoomVersionError()
 
-            event_format = room_version_to_event_format(room_version_id)
-
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
                 raise InvalidResponseError("Bad 'event' field in response")
@@ -490,7 +488,7 @@ class FederationClient(FederationBase):
                 self._clock,
                 self.hostname,
                 self.signing_key,
-                format_version=event_format,
+                room_version=room_version,
                 event_dict=pdu_dict,
             )
 
