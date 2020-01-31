@@ -230,7 +230,7 @@ class FederationClient(FederationBase):
         self,
         destinations: Iterable[str],
         event_id: str,
-        room_version: str,
+        room_version: RoomVersion,
         outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
@@ -262,7 +262,7 @@ class FederationClient(FederationBase):
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
-        format_ver = room_version_to_event_format(room_version)
+        format_ver = room_version.event_format
 
         signed_pdu = None
         for destination in destinations:
@@ -292,7 +292,9 @@ class FederationClient(FederationBase):
                     pdu = pdu_list[0]
 
                     # Check signatures are correct.
-                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+                    signed_pdu = await self._check_sigs_and_hash(
+                        room_version.identifier, pdu
+                    )
 
                     break
 
