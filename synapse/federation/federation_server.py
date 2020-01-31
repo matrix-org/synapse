@@ -54,7 +54,7 @@ from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
-from synapse.types import get_domain_from_id
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import glob_to_regex, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
@@ -396,20 +396,23 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    async def on_invite_request(self, origin, content, room_version):
-        if room_version not in KNOWN_ROOM_VERSIONS:
+    async def on_invite_request(
+        self, origin: str, content: JsonDict, room_version_id: str
+    ):
+        room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
+        if not room_version:
             raise SynapseError(
                 400,
                 "Homeserver does not support this room version",
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
-        format_ver = room_version_to_event_format(room_version)
+        format_ver = room_version.event_format
 
         pdu = event_from_pdu_json(content, format_ver)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
         ret_pdu = await self.handler.on_invite_request(origin, pdu, room_version)
         time_now = self._clock.time_msec()
         return {"event": ret_pdu.get_pdu_json(time_now)}
