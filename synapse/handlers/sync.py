@@ -14,10 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import itertools
 import logging
-from typing import List, Set
+from typing import Any, List, Optional, Set, Tuple
 
 from six import iteritems, itervalues
 
@@ -25,11 +24,13 @@ import attr
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.filtering import FilterCollection
+from synapse.events import EventBase
 from synapse.logging.context import LoggingContext
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
-from synapse.types import RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken, StateMap, StreamToken, UserID
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
@@ -64,17 +65,22 @@ LAZY_LOADED_MEMBERS_CACHE_MAX_AGE = 30 * 60 * 1000
 LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE = 100
 
 
-SyncConfig = collections.namedtuple(
-    "SyncConfig", ["user", "filter_collection", "is_guest", "request_key", "device_id"]
-)
+@attr.s(slots=True, frozen=True)
+class SyncConfig:
+    user = attr.ib(type=UserID)
+    filter_collection = attr.ib(type=FilterCollection)
+    is_guest = attr.ib(type=bool)
+    request_key = attr.ib(type=Tuple[Any, ...])
+    device_id = attr.ib(type=str)
 
 
-class TimelineBatch(
-    collections.namedtuple("TimelineBatch", ["prev_batch", "events", "limited"])
-):
-    __slots__ = []
+@attr.s(slots=True, frozen=True)
+class TimelineBatch:
+    prev_batch = attr.ib(type=str)
+    events = attr.ib(type=List[EventBase])
+    limited = attr.ib(bool)
 
-    def __nonzero__(self):
+    def __nonzero__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
@@ -83,23 +89,17 @@ class TimelineBatch(
     __bool__ = __nonzero__  # python3
 
 
-class JoinedSyncResult(
-    collections.namedtuple(
-        "JoinedSyncResult",
-        [
-            "room_id",  # str
-            "timeline",  # TimelineBatch
-            "state",  # dict[(str, str), FrozenEvent]
-            "ephemeral",
-            "account_data",
-            "unread_notifications",
-            "summary",
-        ],
-    )
-):
-    __slots__ = []
+@attr.s(slots=True, frozen=True)
+class JoinedSyncResult:
+    room_id = attr.ib(type=bool)
+    timeline = attr.ib(type=TimelineBatch)
+    state = attr.ib(type=StateMap[EventBase])
+    ephemeral = attr.ib(type=List[JsonDict])
+    account_data = attr.ib(type=List[JsonDict])
+    unread_notifications = attr.ib(type=JsonDict)
+    summary = attr.ib(type=JsonDict)
 
-    def __nonzero__(self):
+    def __nonzero__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
@@ -115,20 +115,14 @@ class JoinedSyncResult(
     __bool__ = __nonzero__  # python3
 
 
-class ArchivedSyncResult(
-    collections.namedtuple(
-        "ArchivedSyncResult",
-        [
-            "room_id",  # str
-            "timeline",  # TimelineBatch
-            "state",  # dict[(str, str), FrozenEvent]
-            "account_data",
-        ],
-    )
-):
-    __slots__ = []
+@attr.s(slots=True, frozen=True)
+class ArchivedSyncResult:
+    room_id = attr.ib(type=str)
+    timeline = attr.ib(type=TimelineBatch)
+    state = attr.ib(type=StateMap[EventBase])
+    account_data = attr.ib(type=List[JsonDict])
 
-    def __nonzero__(self):
+    def __nonzero__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if room needs to be part of the sync result.
         """
@@ -137,44 +131,42 @@ class ArchivedSyncResult(
     __bool__ = __nonzero__  # python3
 
 
-class InvitedSyncResult(
-    collections.namedtuple(
-        "InvitedSyncResult",
-        ["room_id", "invite"],  # str  # FrozenEvent: the invite event
-    )
-):
-    __slots__ = []
+@attr.s(slots=True, frozen=True)
+class InvitedSyncResult:
+    room_id = attr.ib(type=str)
+    invite = attr.ib(type=EventBase)
 
-    def __nonzero__(self):
+    def __nonzero__(self) -> bool:
         """Invited rooms should always be reported to the client"""
         return True
 
     __bool__ = __nonzero__  # python3
 
 
-class GroupsSyncResult(
-    collections.namedtuple("GroupsSyncResult", ["join", "invite", "leave"])
-):
-    __slots__ = []
+@attr.s(slots=True, frozen=True)
+class GroupsSyncResult:
+    join = attr.ib(type=JsonDict)
+    invite = attr.ib(type=JsonDict)
+    leave = attr.ib(type=JsonDict)
 
-    def __nonzero__(self):
+    def __nonzero__(self) -> bool:
         return bool(self.join or self.invite or self.leave)
 
     __bool__ = __nonzero__  # python3
 
 
-class DeviceLists(
-    collections.namedtuple(
-        "DeviceLists",
-        [
-            "changed",  # list of user_ids whose devices may have changed
-            "left",  # list of user_ids whose devices we no longer track
-        ],
-    )
-):
-    __slots__ = []
+@attr.s(slots=True, frozen=True)
+class DeviceLists:
+    """
+    Attributes:
+        changed: List of user_ids whose devices may have changed
+        left: List of user_ids whose devices we no longer track
+    """
 
-    def __nonzero__(self):
+    changed = attr.ib(type=List[str])
+    left = attr.ib(type=List[str])
+
+    def __nonzero__(self) -> bool:
         return bool(self.changed or self.left)
 
     __bool__ = __nonzero__  # python3
@@ -192,27 +184,35 @@ class _RoomChanges:
     newly_left_rooms = attr.ib(type=List[str])
 
 
-class SyncResult(
-    collections.namedtuple(
-        "SyncResult",
-        [
-            "next_batch",  # Token for the next sync
-            "presence",  # List of presence events for the user.
-            "account_data",  # List of account_data events for the user.
-            "joined",  # JoinedSyncResult for each joined room.
-            "invited",  # InvitedSyncResult for each invited room.
-            "archived",  # ArchivedSyncResult for each archived room.
-            "to_device",  # List of direct messages for the device.
-            "device_lists",  # List of user_ids whose devices have changed
-            "device_one_time_keys_count",  # Dict of algorithm to count for one time keys
-            # for this device
-            "groups",
-        ],
-    )
-):
-    __slots__ = []
+@attr.s(slots=True, frozen=True)
+class SyncResult:
+    """
+    Attributes:
+        next_batch: Token for the next sync
+        presence: List of presence events for the user.
+        account_data: List of account_data events for the user.
+        joined: JoinedSyncResult for each joined room.
+        invited: InvitedSyncResult for each invited room.
+        archived: ArchivedSyncResult for each archived room.
+        to_device: List of direct messages for the device.
+        device_lists: List of user_ids whose devices have changed
+        device_one_time_keys_count: Dict of algorithm to count for one time keys
+            for this device
+        groups: Group updates
+    """
 
-    def __nonzero__(self):
+    next_batch = attr.ib(type=StreamToken)
+    presence = attr.ib(type=List[JsonDict])
+    account_data = attr.ib(type=List[JsonDict])
+    joined = attr.ib(type=List[JoinedSyncResult])
+    invited = attr.ib(type=List[InvitedSyncResult])
+    archived = attr.ib(type=List[ArchivedSyncResult])
+    to_device = attr.ib(type=List[JsonDict])
+    device_lists = attr.ib(type=DeviceLists)
+    device_one_time_keys_count = attr.ib(type=JsonDict)
+    groups = attr.ib(type=GroupsSyncResult)
+
+    def __nonzero__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
         to tell if the notifier needs to wait for more events when polling for
         events.
@@ -1983,15 +1983,16 @@ def _calculate_state(
     return {event_id_to_key[e]: e for e in state_ids}
 
 
-class SyncResultBuilder(object):
+@attr.s
+class SyncResultBuilder:
     """Used to help build up a new SyncResult for a user
 
     Attributes:
-        sync_config (SyncConfig)
-        full_state (bool)
-        since_token (StreamToken)
-        now_token (StreamToken)
-        joined_room_ids (list[str])
+        sync_config
+        full_state: The full_state flag as specified by user
+        since_token: The token supplied by user, or None.
+        now_token: The token to sync up to.
+        joined_room_ids: List of rooms the user is joined to
 
         # The following mirror the fields in a sync response
         presence (list)
@@ -1999,61 +2000,45 @@ class SyncResultBuilder(object):
         joined (list[JoinedSyncResult])
         invited (list[InvitedSyncResult])
         archived (list[ArchivedSyncResult])
-        device (list)
         groups (GroupsSyncResult|None)
         to_device (list)
     """
 
-    def __init__(
-        self, sync_config, full_state, since_token, now_token, joined_room_ids
-    ):
-        """
-        Args:
-            sync_config (SyncConfig)
-            full_state (bool): The full_state flag as specified by user
-            since_token (StreamToken): The token supplied by user, or None.
-            now_token (StreamToken): The token to sync up to.
-            joined_room_ids (list[str]): List of rooms the user is joined to
-        """
-        self.sync_config = sync_config
-        self.full_state = full_state
-        self.since_token = since_token
-        self.now_token = now_token
-        self.joined_room_ids = joined_room_ids
+    sync_config = attr.ib(type=SyncConfig)
+    full_state = attr.ib(type=bool)
+    since_token = attr.ib(type=Optional[StreamToken])
+    now_token = attr.ib(type=StreamToken)
+    joined_room_ids = attr.ib(type=List[str])
 
-        self.presence = []
-        self.account_data = []
-        self.joined = []
-        self.invited = []
-        self.archived = []
-        self.device = []
-        self.groups = None
-        self.to_device = []
+    presence = attr.ib(type=List[JsonDict], default=attr.Factory(list))
+    account_data = attr.ib(type=List[JsonDict], default=attr.Factory(list))
+    joined = attr.ib(type=List[JoinedSyncResult], default=attr.Factory(list))
+    invited = attr.ib(type=List[InvitedSyncResult], default=attr.Factory(list))
+    archived = attr.ib(type=List[ArchivedSyncResult], default=attr.Factory(list))
+    groups = attr.ib(type=Optional[GroupsSyncResult], default=None)
+    to_device = attr.ib(type=List[JsonDict], default=attr.Factory(list))
 
 
+@attr.s
 class RoomSyncResultBuilder(object):
     """Stores information needed to create either a `JoinedSyncResult` or
     `ArchivedSyncResult`.
+
+    Attributes:
+        room_id
+        rtype: One of `"joined"` or `"archived"`
+        events: List of events to include in the room (more events may be added
+            when generating result).
+        newly_joined: If the user has newly joined the room
+        full_state: Whether the full state should be sent in result
+        since_token: Earliest point to return events from, or None
+        upto_token: Latest point to return events from.
     """
 
-    def __init__(
-        self, room_id, rtype, events, newly_joined, full_state, since_token, upto_token
-    ):
-        """
-        Args:
-            room_id(str)
-            rtype(str): One of `"joined"` or `"archived"`
-            events(list[FrozenEvent]): List of events to include in the room
-                (more events may be added when generating result).
-            newly_joined(bool): If the user has newly joined the room
-            full_state(bool): Whether the full state should be sent in result
-            since_token(StreamToken): Earliest point to return events from, or None
-            upto_token(StreamToken): Latest point to return events from.
-        """
-        self.room_id = room_id
-        self.rtype = rtype
-        self.events = events
-        self.newly_joined = newly_joined
-        self.full_state = full_state
-        self.since_token = since_token
-        self.upto_token = upto_token
+    room_id = attr.ib(type=str)
+    rtype = attr.ib(type=str)
+    events = attr.ib(type=Optional[List[EventBase]])
+    newly_joined = attr.ib(type=bool)
+    full_state = attr.ib(type=bool)
+    since_token = attr.ib(type=Optional[StreamToken])
+    upto_token = attr.ib(type=Optional[StreamToken])
