@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +15,21 @@
 # limitations under the License.
 
 import random
+import re
 import string
 
 import six
 from six import PY2, PY3
 from six.moves import range
 
+from synapse.api.errors import Codes, SynapseError
+
 _string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
+
+# https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-register-email-requesttoken
+# Note: The : character is allowed here for older clients, but will be removed in a
+# future release. Context: https://github.com/matrix-org/synapse/issues/6766
+client_secret_regex = re.compile(r"^[0-9a-zA-Z\.\=\_\-\:]+$")
 
 # random_string and random_string_with_symbols are used for a range of things,
 # some cryptographically important, some less so. We use SystemRandom to make sure
@@ -109,3 +118,11 @@ def exception_to_unicode(e):
         return msg.decode("utf-8", errors="replace")
     else:
         return msg
+
+
+def assert_valid_client_secret(client_secret):
+    """Validate that a given string matches the client_secret regex defined by the spec"""
+    if client_secret_regex.match(client_secret) is None:
+        raise SynapseError(
+            400, "Invalid client_secret parameter", errcode=Codes.INVALID_PARAM
+        )

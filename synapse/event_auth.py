@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,17 +24,27 @@ from unpaddedbase64 import decode_base64
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, EventSizeError, SynapseError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    RoomVersion,
+)
 from synapse.types import UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
 
-def check(room_version, event, auth_events, do_sig_check=True, do_size_check=True):
+def check(
+    room_version_obj: RoomVersion,
+    event,
+    auth_events,
+    do_sig_check=True,
+    do_size_check=True,
+):
     """ Checks if this event is correctly authed.
 
     Args:
-        room_version (str): the version of the room
+        room_version_obj: the version of the room
         event: the event being checked.
         auth_events (dict: event-key -> event): the existing room state.
 
@@ -89,7 +100,12 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
             if not event.signatures.get(event_id_domain):
                 raise AuthError(403, "Event not signed by sending server")
 
+    # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
+    #
+    # 1. If type is m.room.create:
     if event.type == EventTypes.Create:
+        # 1b. If the domain of the room_id does not match the domain of the sender,
+        # reject.
         sender_domain = get_domain_from_id(event.sender)
         room_id_domain = get_domain_from_id(event.room_id)
         if room_id_domain != sender_domain:
@@ -97,39 +113,49 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
                 403, "Creation event's room_id domain does not match sender's"
             )
 
-        room_version = event.content.get("room_version", "1")
-        if room_version not in KNOWN_ROOM_VERSIONS:
+        # 1c. If content.room_version is present and is not a recognised version, reject
+        room_version_prop = event.content.get("room_version", "1")
+        if room_version_prop not in KNOWN_ROOM_VERSIONS:
             raise AuthError(
-                403, "room appears to have unsupported version %s" % (room_version,)
+                403,
+                "room appears to have unsupported version %s" % (room_version_prop,),
             )
-        # FIXME
+
         logger.debug("Allowing! %s", event)
         return
 
+    # 3. If event does not have a m.room.create in its auth_events, reject.
     creation_event = auth_events.get((EventTypes.Create, ""), None)
-
     if not creation_event:
         raise AuthError(403, "No create event in auth events")
 
+    # additional check for m.federate
     creating_domain = get_domain_from_id(event.room_id)
     originating_domain = get_domain_from_id(event.sender)
     if creating_domain != originating_domain:
         if not _can_federate(event, auth_events):
             raise AuthError(403, "This room has been marked as unfederatable.")
 
-    # FIXME: Temp hack
+    # 4. If type is m.room.aliases
     if event.type == EventTypes.Aliases:
+        # 4a. If event has no state_key, reject
         if not event.is_state():
             raise AuthError(403, "Alias event must be a state event")
         if not event.state_key:
             raise AuthError(403, "Alias event must have non-empty state_key")
+
+        # 4b. If sender's domain doesn't matches [sic] state_key, reject
         sender_domain = get_domain_from_id(event.sender)
         if event.state_key != sender_domain:
             raise AuthError(
                 403, "Alias event's state_key does not match sender's domain"
             )
-        logger.debug("Allowing! %s", event)
-        return
+
+        # 4c. Otherwise, allow.
+        # This is removed by https://github.com/matrix-org/matrix-doc/pull/2260
+        if room_version_obj.special_case_aliases_auth:
+            logger.debug("Allowing! %s", event)
+            return
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])
@@ -160,7 +186,7 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
         _check_power_levels(event, auth_events)
 
     if event.type == EventTypes.Redaction:
-        check_redaction(room_version, event, auth_events)
+        check_redaction(room_version_obj, event, auth_events)
 
     logger.debug("Allowing! %s", event)
 
@@ -386,7 +412,7 @@ def _can_send_event(event, auth_events):
     return True
 
 
-def check_redaction(room_version, event, auth_events):
+def check_redaction(room_version_obj: RoomVersion, event, auth_events):
     """Check whether the event sender is allowed to redact the target event.
 
     Returns:
@@ -406,11 +432,7 @@ def check_redaction(room_version, event, auth_events):
     if user_level >= redact_level:
         return False
 
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-    if not v:
-        raise RuntimeError("Unrecognized room version %r" % (room_version,))
-
-    if v.event_format == EventFormatVersions.V1:
+    if room_version_obj.event_format == EventFormatVersions.V1:
         redacter_domain = get_domain_from_id(event.event_id)
         redactee_domain = get_domain_from_id(event.redacts)
         if redacter_domain == redactee_domain:
@@ -634,7 +656,7 @@ def get_public_keys(invite_event):
     return public_keys
 
 
-def auth_types_for_event(event) -> Set[Tuple[str]]:
+def auth_types_for_event(event) -> Set[Tuple[str, str]]:
     """Given an event, return a list of (EventType, StateKey) that may be
     needed to auth the event. The returned list may be a superset of what
     would actually be required depending on the full state of the room.

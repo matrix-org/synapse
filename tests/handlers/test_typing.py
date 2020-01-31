@@ -81,6 +81,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ]
         )
 
+        # the tests assume that we are starting at unix time 1000
+        reactor.pump((1000,))
+
         hs = self.setup_test_homeserver(
             notifier=Mock(), http_client=mock_federation_client, keyring=mock_keyring
         )
@@ -90,9 +93,6 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
-        # the tests assume that we are starting at unix time 1000
-        reactor.pump((1000,))
-
         mock_notifier = hs.get_notifier()
         self.on_new_event = mock_notifier.on_new_event
 

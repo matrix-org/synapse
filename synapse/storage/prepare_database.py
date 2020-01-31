@@ -136,6 +136,11 @@ def _setup_new_database(cur, database_engine, data_stores):
         data_stores (list[str]): The names of the data stores to instantiate
             on the given database.
     """
+
+    # We're about to set up a brand new database so we check that its
+    # configured to our liking.
+    database_engine.check_new_database(cur)
+
     current_dir = os.path.join(dir_path, "schema", "full_schemas")
     directory_entries = os.listdir(current_dir)
 
