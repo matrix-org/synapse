@@ -17,9 +17,11 @@
 import collections
 import itertools
 import logging
+from typing import List, Set
 
 from six import iteritems, itervalues
 
+import attr
 from prometheus_client import Counter
 
 from synapse.api.constants import EventTypes, Membership
@@ -176,6 +178,18 @@ class DeviceLists(
         return bool(self.changed or self.left)
 
     __bool__ = __nonzero__  # python3
+
+
+@attr.s
+class _RoomChanges:
+    """The set of room entries to include in the sync, plus the set of joined
+    and left room IDs since last sync.
+    """
+
+    room_entries = attr.ib(type=List["RoomSyncResultBuilder"])
+    invited = attr.ib(type=List[InvitedSyncResult])
+    newly_joined_rooms = attr.ib(type=List[str])
+    newly_left_rooms = attr.ib(type=List[str])
 
 
 class SyncResult(
@@ -1340,18 +1354,21 @@ class SyncHandler(object):
             ignored_users = frozenset()
 
         if since_token:
-            res = await self._get_rooms_changed(sync_result_builder, ignored_users)
-            room_entries, invited, newly_joined_rooms, newly_left_rooms = res
-
+            room_changes = await self._get_rooms_changed(
+                sync_result_builder, ignored_users
+            )
             tags_by_room = await self.store.get_updated_tags(
                 user_id, since_token.account_data_key
             )
         else:
-            res = await self._get_all_rooms(sync_result_builder, ignored_users)
-            room_entries, invited, newly_joined_rooms = res
-            newly_left_rooms = []
+            room_changes = await self._get_all_rooms(sync_result_builder, ignored_users)
 
             tags_by_room = await self.store.get_tags_for_user(user_id)
+
+        room_entries = room_changes.room_entries
+        invited = room_changes.invited
+        newly_joined_rooms = room_changes.newly_joined_rooms
+        newly_left_rooms = room_changes.newly_left_rooms
 
         def handle_room_entries(room_entry):
             return self._generate_room_entry(
@@ -1422,22 +1439,10 @@ class SyncHandler(object):
                 return True
         return False
 
-    async def _get_rooms_changed(self, sync_result_builder, ignored_users):
+    async def _get_rooms_changed(
+        self, sync_result_builder: "SyncResultBuilder", ignored_users: Set[str]
+    ) -> _RoomChanges:
         """Gets the the changes that have happened since the last sync.
-
-        Args:
-            sync_result_builder(SyncResultBuilder)
-            ignored_users(set(str)): Set of users ignored by user.
-
-        Returns:
-            Deferred(tuple): Returns a tuple of the form:
-            `(room_entries, invited_rooms, newly_joined_rooms, newly_left_rooms)`
-
-            where:
-                room_entries is a list [RoomSyncResultBuilder]
-                invited_rooms is a list [InvitedSyncResult]
-                newly_joined_rooms is a list[str] of room ids
-                newly_left_rooms is a list[str] of room ids
         """
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
@@ -1636,18 +1641,17 @@ class SyncHandler(object):
                 )
             room_entries.append(entry)
 
-        return room_entries, invited, newly_joined_rooms, newly_left_rooms
+        return _RoomChanges(room_entries, invited, newly_joined_rooms, newly_left_rooms)
 
-    async def _get_all_rooms(self, sync_result_builder, ignored_users):
+    async def _get_all_rooms(
+        self, sync_result_builder: "SyncResultBuilder", ignored_users: Set[str]
+    ) -> _RoomChanges:
         """Returns entries for all rooms for the user.
 
         Args:
-            sync_result_builder(SyncResultBuilder)
-            ignored_users(set(str)): Set of users ignored by user.
+            sync_result_builder
+            ignored_users: Set of users ignored by user.
 
-        Returns:
-            Deferred(tuple): Returns a tuple of the form:
-            `([RoomSyncResultBuilder], [InvitedSyncResult], [])`
         """
 
         user_id = sync_result_builder.sync_config.user.to_string()
@@ -1709,7 +1713,7 @@ class SyncHandler(object):
                     )
                 )
 
-        return room_entries, invited, []
+        return _RoomChanges(room_entries, invited, [], [])
 
     async def _generate_room_entry(
         self,
