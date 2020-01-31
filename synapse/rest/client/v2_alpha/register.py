@@ -49,6 +49,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.stringutils import assert_valid_client_secret
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -116,6 +117,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
         # Extract params from body
         client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
+
         email = body["email"]
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param

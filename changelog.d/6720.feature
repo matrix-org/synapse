@@ -1,1 +1,0 @@
-Add a new admin API to list and filter rooms on the server.

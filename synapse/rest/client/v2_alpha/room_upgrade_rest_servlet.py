@@ -64,7 +64,8 @@ class RoomUpgradeRestServlet(RestServlet):
         assert_params_in_dict(content, ("new_version",))
         new_version = content["new_version"]
 
-        if new_version not in KNOWN_ROOM_VERSIONS:
+        new_version = KNOWN_ROOM_VERSIONS.get(content["new_version"])
+        if new_version is None:
             raise SynapseError(
                 400,
                 "Your homeserver does not support this room version",

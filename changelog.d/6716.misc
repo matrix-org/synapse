@@ -1,1 +1,0 @@
-Add a `DeltaState` to track changes to be made to current state during event persistence.

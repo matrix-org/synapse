@@ -1,1 +1,0 @@
-Fix a bug causing the `synapse_port_db` script to return 0 in a specific error case.

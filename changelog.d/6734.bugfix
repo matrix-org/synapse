@@ -1,0 +1,1 @@
+Warn if postgres database has a non-C locale, as that can cause issues when upgrading locales (e.g. due to upgrading OS).
