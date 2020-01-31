@@ -725,7 +725,7 @@ class SyncHandler(object):
 
         return summary
 
-    def get_lazy_loaded_members_cache(self, cache_key: Tuple[str,str]) -> LruCache:
+    def get_lazy_loaded_members_cache(self, cache_key: Tuple[str, str]) -> LruCache:
         cache = self.lazy_loaded_members_cache.get(cache_key)
         if cache is None:
             logger.debug("creating LruCache for %r", cache_key)
@@ -1053,7 +1053,7 @@ class SyncHandler(object):
     @measure_func("_generate_sync_entry_for_groups")
     async def _generate_sync_entry_for_groups(
         self, sync_result_builder: "SyncResultBuilder"
-    ):
+    ) -> None:
         user_id = sync_result_builder.sync_config.user.to_string()
         since_token = sync_result_builder.since_token
         now_token = sync_result_builder.now_token
@@ -1103,7 +1103,7 @@ class SyncHandler(object):
         newly_joined_or_invited_users: Set[str],
         newly_left_rooms: Set[str],
         newly_left_users: Set[str],
-    ):
+    ) -> DeviceLists:
         """Generate the DeviceLists section of sync
 
         Args:
@@ -1176,7 +1176,7 @@ class SyncHandler(object):
 
     async def _generate_sync_entry_for_to_device(
         self, sync_result_builder: "SyncResultBuilder"
-    ):
+    ) -> None:
         """Generates the portion of the sync response. Populates
         `sync_result_builder` with the result.
         """
