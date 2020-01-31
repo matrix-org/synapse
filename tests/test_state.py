@@ -119,7 +119,7 @@ class StateGroupStore(object):
     def register_event_id_state_group(self, event_id, state_group):
         self._event_to_state_group[event_id] = state_group
 
-    def get_room_version(self, room_id):
+    def get_room_version_id(self, room_id):
         return RoomVersions.V1.identifier
 
 

@@ -62,7 +62,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         super(StateGroupWorkerStore, self).__init__(database, db_conn, hs)
 
     @cached(max_entries=10000)
-    async def get_room_version(self, room_id: str) -> str:
+    async def get_room_version_id(self, room_id: str) -> str:
         """Get the room_version of a given room
 
         Raises:

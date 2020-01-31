@@ -459,7 +459,9 @@ class EventCreationHandler(object):
             room_version = event_dict["content"]["room_version"]
         else:
             try:
-                room_version = yield self.store.get_room_version(event_dict["room_id"])
+                room_version = yield self.store.get_room_version_id(
+                    event_dict["room_id"]
+                )
             except NotFoundError:
                 raise AuthError(403, "Unknown room")
 
@@ -788,7 +790,7 @@ class EventCreationHandler(object):
         ):
             room_version = event.content.get("room_version", RoomVersions.V1.identifier)
         else:
-            room_version = yield self.store.get_room_version(event.room_id)
+            room_version = yield self.store.get_room_version_id(event.room_id)
 
         event_allowed = yield self.third_party_event_rules.check_event_allowed(
             event, context
@@ -963,7 +965,7 @@ class EventCreationHandler(object):
             auth_events = yield self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
-            room_version = yield self.store.get_room_version(event.room_id)
+            room_version = yield self.store.get_room_version_id(event.room_id)
             room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             if event_auth.check_redaction(
