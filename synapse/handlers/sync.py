@@ -725,7 +725,7 @@ class SyncHandler(object):
 
         return summary
 
-    def get_lazy_loaded_members_cache(self, cache_key: Any) -> LruCache:
+    def get_lazy_loaded_members_cache(self, cache_key: Tuple[str,str]) -> LruCache:
         cache = self.lazy_loaded_members_cache.get(cache_key)
         if cache is None:
             logger.debug("creating LruCache for %r", cache_key)
@@ -1274,7 +1274,7 @@ class SyncHandler(object):
         sync_result_builder: "SyncResultBuilder",
         newly_joined_rooms: Set[str],
         newly_joined_or_invited_users: Set[str],
-    ):
+    ) -> None:
         """Generates the presence portion of the sync response. Populates the
         `sync_result_builder` with the result.
 
