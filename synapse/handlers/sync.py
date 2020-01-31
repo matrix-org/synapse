@@ -16,7 +16,7 @@
 
 import itertools
 import logging
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any, List, Optional, Set, Tuple, FrozenSet, Dict
 
 from six import iteritems, itervalues
 
@@ -198,7 +198,7 @@ class SyncResult:
         device_lists: List of user_ids whose devices have changed
         device_one_time_keys_count: Dict of algorithm to count for one time keys
             for this device
-        groups: Group updates
+        groups: Group updates, if any
     """
 
     next_batch = attr.ib(type=StreamToken)
@@ -210,7 +210,7 @@ class SyncResult:
     to_device = attr.ib(type=List[JsonDict])
     device_lists = attr.ib(type=DeviceLists)
     device_one_time_keys_count = attr.ib(type=JsonDict)
-    groups = attr.ib(type=GroupsSyncResult)
+    groups = attr.ib(type=Optional[GroupsSyncResult])
 
     def __nonzero__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -362,7 +362,7 @@ class SyncHandler(object):
             )
             now_token = now_token.copy_and_replace("typing_key", typing_key)
 
-            ephemeral_by_room = {}
+            ephemeral_by_room = {}  # type: JsonDict
 
             for event in typing:
                 # we want to exclude the room_id from the event, but modifying the
@@ -422,10 +422,10 @@ class SyncHandler(object):
                 # We check if there are any state events, if there are then we pass
                 # all current state events to the filter_events function. This is to
                 # ensure that we always include current state in the timeline
-                current_state_ids = frozenset()
+                current_state_ids = frozenset()  # type: FrozenSet[str]
                 if any(e.is_state() for e in recents):
-                    current_state_ids = await self.state.get_current_state_ids(room_id)
-                    current_state_ids = frozenset(itervalues(current_state_ids))
+                    current_state_ids_map = await self.state.get_current_state_ids(room_id)
+                    current_state_ids = frozenset(itervalues(current_state_ids_map))
 
                 recents = await filter_events_for_client(
                     self.storage,
@@ -477,8 +477,8 @@ class SyncHandler(object):
                 # ensure that we always include current state in the timeline
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in loaded_recents):
-                    current_state_ids = await self.state.get_current_state_ids(room_id)
-                    current_state_ids = frozenset(itervalues(current_state_ids))
+                    current_state_ids_map = await self.state.get_current_state_ids(room_id)
+                    current_state_ids = frozenset(itervalues(current_state_ids_map))
 
                 loaded_recents = await filter_events_for_client(
                     self.storage,
@@ -888,7 +888,7 @@ class SyncHandler(object):
                     if t[0] == EventTypes.Member:
                         cache.set(t[1], event_id)
 
-        state = {}
+        state = {}  # type: Dict[str, EventBase]
         if state_ids:
             state = await self.store.get_events(list(state_ids.values()))
 
@@ -907,7 +907,6 @@ class SyncHandler(object):
                 receipt_type="m.read",
             )
 
-            notifs = []
             if last_unread_event_id:
                 notifs = await self.store.get_unread_event_push_actions_by_room_for_user(
                     room_id, sync_config.user.to_string(), last_unread_event_id
@@ -991,7 +990,7 @@ class SyncHandler(object):
         )
 
         device_id = sync_config.device_id
-        one_time_key_counts = {}
+        one_time_key_counts = {}  # type: JsonDict
         if device_id:
             one_time_key_counts = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
@@ -1321,7 +1320,7 @@ class SyncHandler(object):
         )
 
         if block_all_room_ephemeral:
-            ephemeral_by_room = {}
+            ephemeral_by_room = {}  # type: Dict[str, List[JsonDict]]
         else:
             now_token, ephemeral_by_room = await self.ephemeral_by_room(
                 sync_result_builder,
@@ -1456,7 +1455,7 @@ class SyncHandler(object):
             user_id, since_token.room_key, now_token.room_key
         )
 
-        mem_change_events_by_room_id = {}
+        mem_change_events_by_room_id = {}  # type: Dict[str, List[EventBase]]
         for event in rooms_changed:
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
@@ -1575,7 +1574,7 @@ class SyncHandler(object):
                 # This is all screaming out for a refactor, as the logic here is
                 # subtle and the moving parts numerous.
                 if leave_event.internal_metadata.is_out_of_band_membership():
-                    batch_events = [leave_event]
+                    batch_events = [leave_event]  # type: Optional[List[EventBase]]
                 else:
                     batch_events = None
 
@@ -1813,7 +1812,7 @@ class SyncHandler(object):
             room_id, batch, sync_config, since_token, now_token, full_state=full_state
         )
 
-        summary = {}
+        summary = {}  # type: JsonDict
 
         # we include a summary in room responses when we're lazy loading
         # members (as the client otherwise doesn't have enough info to form
@@ -1837,7 +1836,7 @@ class SyncHandler(object):
             )
 
         if room_builder.rtype == "joined":
-            unread_notifications = {}
+            unread_notifications = {}  # type: Dict[str, str]
             room_sync = JoinedSyncResult(
                 room_id=room_id,
                 timeline=batch,
@@ -1864,14 +1863,14 @@ class SyncHandler(object):
                     % (room_id, user_id, len(state))
                 )
         elif room_builder.rtype == "archived":
-            room_sync = ArchivedSyncResult(
+            archived_room_sync = ArchivedSyncResult(
                 room_id=room_id,
                 timeline=batch,
                 state=state,
                 account_data=account_data_events,
             )
-            if room_sync or always_include:
-                sync_result_builder.archived.append(room_sync)
+            if archived_room_sync or always_include:
+                sync_result_builder.archived.append(archived_room_sync)
         else:
             raise Exception("Unrecognized rtype: %r", room_builder.rtype)
 
@@ -1915,8 +1914,7 @@ class SyncHandler(object):
             if user_id in users_in_room:
                 joined_room_ids.add(room_id)
 
-        joined_room_ids = frozenset(joined_room_ids)
-        return joined_room_ids
+        return frozenset(joined_room_ids)
 
 
 def _action_has_highlight(actions):
