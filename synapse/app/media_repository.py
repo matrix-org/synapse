@@ -21,7 +21,7 @@ from twisted.web.resource import NoResource
 
 import synapse
 from synapse import events
-from synapse.api.urls import CONTENT_REPO_PREFIX, LEGACY_MEDIA_PREFIX, MEDIA_PREFIX
+from synapse.api.urls import LEGACY_MEDIA_PREFIX, MEDIA_PREFIX
 from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
@@ -34,13 +34,12 @@ from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
+from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
 from synapse.storage.data_stores.main.media_repository import MediaRepositoryStore
-from synapse.storage.engines import create_engine
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
@@ -49,6 +48,7 @@ logger = logging.getLogger("synapse.app.media_repository")
 
 
 class MediaRepositorySlavedStore(
+    RoomStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedClientIpStore,
@@ -83,9 +83,6 @@ class MediaRepositoryServer(HomeServer):
                         {
                             MEDIA_PREFIX: media_repo,
                             LEGACY_MEDIA_PREFIX: media_repo,
-                            CONTENT_REPO_PREFIX: ContentRepoResource(
-                                self, self.config.uploads_path
-                            ),
                             "/_synapse/admin": admin_resource,
                         }
                     )
@@ -157,14 +154,10 @@ def start(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    database_engine = create_engine(config.database_config)
-
     ss = MediaRepositoryServer(
         config.server_name,
-        db_config=config.database_config,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
-        database_engine=database_engine,
     )
 
     setup_logging(ss, config, use_worker_options=True)

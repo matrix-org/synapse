@@ -16,7 +16,7 @@
 """
 
 import logging
-from typing import Dict
+from typing import Dict, List, Optional
 
 from twisted.internet import defer
 from twisted.internet.protocol import ReconnectingClientFactory
@@ -28,6 +28,7 @@ from synapse.replication.tcp.protocol import (
 )
 
 from .commands import (
+    Command,
     FederationAckCommand,
     InvalidateCacheCommand,
     RemovePusherCommand,
@@ -46,7 +47,8 @@ class ReplicationClientFactory(ReconnectingClientFactory):
     is required.
     """
 
-    maxDelay = 30  # Try at least once every N seconds
+    initialDelay = 0.1
+    maxDelay = 1  # Try at least once every N seconds
 
     def __init__(self, hs, client_name, handler: AbstractReplicationClientHandler):
         self.client_name = client_name
@@ -88,15 +90,15 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
 
         # Any pending commands to be sent once a new connection has been
         # established
-        self.pending_commands = []
+        self.pending_commands = []  # type: List[Command]
 
         # Map from string -> deferred, to wake up when receiveing a SYNC with
         # the given string.
         # Used for tests.
-        self.awaiting_syncs = {}
+        self.awaiting_syncs = {}  # type: Dict[str, defer.Deferred]
 
         # The factory used to create connections.
-        self.factory = None
+        self.factory = None  # type: Optional[ReplicationClientFactory]
 
     def start_replication(self, hs):
         """Helper method to start a replication connection to the remote server
@@ -108,7 +110,7 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         port = hs.config.worker_replication_port
         hs.get_reactor().connectTCP(host, port, self.factory)
 
-    def on_rdata(self, stream_name, token, rows):
+    async def on_rdata(self, stream_name, token, rows):
         """Called to handle a batch of replication data with a given stream token.
 
         By default this just pokes the slave store. Can be overridden in subclasses to
@@ -119,20 +121,17 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
             token (int): stream token for this batch of rows
             rows (list): a list of Stream.ROW_TYPE objects as returned by
                 Stream.parse_row.
-
-        Returns:
-            Deferred|None
         """
         logger.debug("Received rdata %s -> %s", stream_name, token)
-        return self.store.process_replication_rows(stream_name, token, rows)
+        self.store.process_replication_rows(stream_name, token, rows)
 
-    def on_position(self, stream_name, token):
+    async def on_position(self, stream_name, token):
         """Called when we get new position data. By default this just pokes
         the slave store.
 
         Can be overriden in subclasses to handle more.
         """
-        return self.store.process_replication_rows(stream_name, token, [])
+        self.store.process_replication_rows(stream_name, token, [])
 
     def on_sync(self, data):
         """When we received a SYNC we wake up any deferreds that were waiting
@@ -143,6 +142,9 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         d = self.awaiting_syncs.pop(data, None)
         if d:
             d.callback(data)
+
+    def on_remote_server_up(self, server: str):
+        """Called when get a new REMOTE_SERVER_UP command."""
 
     def get_streams_to_replicate(self) -> Dict[str, int]:
         """Called when a new connection has been established and we need to
@@ -234,4 +236,5 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         # We don't reset the delay any earlier as otherwise if there is a
         # problem during start up we'll end up tight looping connecting to the
         # server.
-        self.factory.resetDelay()
+        if self.factory:
+            self.factory.resetDelay()

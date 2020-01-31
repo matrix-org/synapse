@@ -16,8 +16,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import GroupID
 
@@ -38,24 +36,22 @@ class GroupServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        group_description = yield self.groups_handler.get_group_profile(
+        group_description = await self.groups_handler.get_group_profile(
             group_id, requester_user_id
         )
 
         return 200, group_description
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        yield self.groups_handler.update_group_profile(
+        await self.groups_handler.update_group_profile(
             group_id, requester_user_id, content
         )
 
@@ -74,12 +70,11 @@ class GroupSummaryServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        get_group_summary = yield self.groups_handler.get_group_summary(
+        get_group_summary = await self.groups_handler.get_group_summary(
             group_id, requester_user_id
         )
 
@@ -106,13 +101,12 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, category_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, category_id, room_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_summary_room(
+        resp = await self.groups_handler.update_group_summary_room(
             group_id,
             requester_user_id,
             room_id=room_id,
@@ -122,12 +116,11 @@ class GroupSummaryRoomsCatServlet(RestServlet):
 
         return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, category_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_DELETE(self, request, group_id, category_id, room_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_summary_room(
+        resp = await self.groups_handler.delete_group_summary_room(
             group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
 
@@ -148,35 +141,32 @@ class GroupCategoryServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id, category_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id, category_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_category(
+        category = await self.groups_handler.get_group_category(
             group_id, requester_user_id, category_id=category_id
         )
 
         return 200, category
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, category_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, category_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_category(
+        resp = await self.groups_handler.update_group_category(
             group_id, requester_user_id, category_id=category_id, content=content
         )
 
         return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, category_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_DELETE(self, request, group_id, category_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_category(
+        resp = await self.groups_handler.delete_group_category(
             group_id, requester_user_id, category_id=category_id
         )
 
@@ -195,12 +185,11 @@ class GroupCategoriesServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_categories(
+        category = await self.groups_handler.get_group_categories(
             group_id, requester_user_id
         )
 
@@ -219,35 +208,32 @@ class GroupRoleServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id, role_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id, role_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_role(
+        category = await self.groups_handler.get_group_role(
             group_id, requester_user_id, role_id=role_id
         )
 
         return 200, category
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, role_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, role_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_role(
+        resp = await self.groups_handler.update_group_role(
             group_id, requester_user_id, role_id=role_id, content=content
         )
 
         return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, role_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_DELETE(self, request, group_id, role_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_role(
+        resp = await self.groups_handler.delete_group_role(
             group_id, requester_user_id, role_id=role_id
         )
 
@@ -266,12 +252,11 @@ class GroupRolesServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_roles(
+        category = await self.groups_handler.get_group_roles(
             group_id, requester_user_id
         )
 
@@ -298,13 +283,12 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, role_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, role_id, user_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_summary_user(
+        resp = await self.groups_handler.update_group_summary_user(
             group_id,
             requester_user_id,
             user_id=user_id,
@@ -314,12 +298,11 @@ class GroupSummaryUsersRoleServlet(RestServlet):
 
         return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, role_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_DELETE(self, request, group_id, role_id, user_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_summary_user(
+        resp = await self.groups_handler.delete_group_summary_user(
             group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
 
@@ -338,12 +321,11 @@ class GroupRoomServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_rooms_in_group(
+        result = await self.groups_handler.get_rooms_in_group(
             group_id, requester_user_id
         )
 
@@ -362,12 +344,11 @@ class GroupUsersServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_users_in_group(
+        result = await self.groups_handler.get_users_in_group(
             group_id, requester_user_id
         )
 
@@ -386,12 +367,11 @@ class GroupInvitedUsersServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_invited_users_in_group(
+        result = await self.groups_handler.get_invited_users_in_group(
             group_id, requester_user_id
         )
 
@@ -409,14 +389,13 @@ class GroupSettingJoinPolicyServlet(RestServlet):
         self.auth = hs.get_auth()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
 
-        result = yield self.groups_handler.set_group_join_policy(
+        result = await self.groups_handler.set_group_join_policy(
             group_id, requester_user_id, content
         )
 
@@ -436,9 +415,8 @@ class GroupCreateServlet(RestServlet):
         self.groups_handler = hs.get_groups_local_handler()
         self.server_name = hs.hostname
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         # TODO: Create group on remote server
@@ -446,7 +424,7 @@ class GroupCreateServlet(RestServlet):
         localpart = content.pop("localpart")
         group_id = GroupID(localpart, self.server_name).to_string()
 
-        result = yield self.groups_handler.create_group(
+        result = await self.groups_handler.create_group(
             group_id, requester_user_id, content
         )
 
@@ -467,24 +445,22 @@ class GroupAdminRoomsServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, room_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.add_room_to_group(
+        result = await self.groups_handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
         )
 
         return 200, result
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_DELETE(self, request, group_id, room_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.remove_room_from_group(
+        result = await self.groups_handler.remove_room_from_group(
             group_id, requester_user_id, room_id
         )
 
@@ -506,13 +482,12 @@ class GroupAdminRoomsConfigServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, room_id, config_key):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, room_id, config_key):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.update_room_in_group(
+        result = await self.groups_handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
 
@@ -535,14 +510,13 @@ class GroupAdminUsersInviteServlet(RestServlet):
         self.store = hs.get_datastore()
         self.is_mine_id = hs.is_mine_id
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, user_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         config = content.get("config", {})
-        result = yield self.groups_handler.invite(
+        result = await self.groups_handler.invite(
             group_id, user_id, requester_user_id, config
         )
 
@@ -563,13 +537,12 @@ class GroupAdminUsersKickServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id, user_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_user_from_group(
+        result = await self.groups_handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content
         )
 
@@ -588,13 +561,12 @@ class GroupSelfLeaveServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_user_from_group(
+        result = await self.groups_handler.remove_user_from_group(
             group_id, requester_user_id, requester_user_id, content
         )
 
@@ -613,13 +585,12 @@ class GroupSelfJoinServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.join_group(
+        result = await self.groups_handler.join_group(
             group_id, requester_user_id, content
         )
 
@@ -638,13 +609,12 @@ class GroupSelfAcceptInviteServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.accept_invite(
+        result = await self.groups_handler.accept_invite(
             group_id, requester_user_id, content
         )
 
@@ -663,14 +633,13 @@ class GroupSelfUpdatePublicityServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, group_id):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         publicise = content["publicise"]
-        yield self.store.update_group_publicity(group_id, requester_user_id, publicise)
+        await self.store.update_group_publicity(group_id, requester_user_id, publicise)
 
         return 200, {}
 
@@ -688,11 +657,10 @@ class PublicisedGroupsForUserServlet(RestServlet):
         self.store = hs.get_datastore()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, user_id):
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
-        result = yield self.groups_handler.get_publicised_groups_for_user(user_id)
+        result = await self.groups_handler.get_publicised_groups_for_user(user_id)
 
         return 200, result
 
@@ -710,14 +678,13 @@ class PublicisedGroupsForUsersServlet(RestServlet):
         self.store = hs.get_datastore()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_POST(self, request):
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
         content = parse_json_object_from_request(request)
         user_ids = content["user_ids"]
 
-        result = yield self.groups_handler.bulk_get_publicised_groups(user_ids)
+        result = await self.groups_handler.bulk_get_publicised_groups(user_ids)
 
         return 200, result
 
@@ -734,12 +701,11 @@ class GroupsForUserServlet(RestServlet):
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_joined_groups(requester_user_id)
+        result = await self.groups_handler.get_joined_groups(requester_user_id)
 
         return 200, result
 

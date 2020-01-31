@@ -26,7 +26,6 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def setUp(self):
         hs = yield setup_test_homeserver(self.addCleanup)
-        self.db_pool = hs.get_db_pool()
 
         self.store = hs.get_datastore()
 
@@ -44,12 +43,14 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 # TODO(paul): Surely this field should be 'user_id', not 'name'
                 "name": self.user_id,
                 "password_hash": self.pwhash,
+                "admin": 0,
                 "is_guest": 0,
                 "consent_version": None,
                 "consent_server_notice_sent": None,
                 "appservice_id": None,
                 "creation_ts": 1000,
                 "user_type": None,
+                "deactivated": 0,
             },
             (yield self.store.get_user_by_id(self.user_id)),
         )

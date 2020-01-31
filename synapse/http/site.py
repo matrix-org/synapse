@@ -47,9 +47,9 @@ class SynapseRequest(Request):
         logcontext(LoggingContext) : the log context for this request
     """
 
-    def __init__(self, site, channel, *args, **kw):
+    def __init__(self, channel, *args, **kw):
         Request.__init__(self, channel, *args, **kw)
-        self.site = site
+        self.site = channel.site
         self._channel = channel  # this is used by the tests
         self.authenticated_entity = None
         self.start_time = 0
@@ -88,7 +88,7 @@ class SynapseRequest(Request):
     def get_redacted_uri(self):
         uri = self.uri
         if isinstance(uri, bytes):
-            uri = self.uri.decode("ascii")
+            uri = self.uri.decode("ascii", errors="replace")
         return redact_uri(uri)
 
     def get_method(self):
@@ -331,18 +331,6 @@ class XForwardedForRequest(SynapseRequest):
         )
 
 
-class SynapseRequestFactory(object):
-    def __init__(self, site, x_forwarded_for):
-        self.site = site
-        self.x_forwarded_for = x_forwarded_for
-
-    def __call__(self, *args, **kwargs):
-        if self.x_forwarded_for:
-            return XForwardedForRequest(self.site, *args, **kwargs)
-        else:
-            return SynapseRequest(self.site, *args, **kwargs)
-
-
 class SynapseSite(Site):
     """
     Subclass of a twisted http Site that does access logging with python's
@@ -364,7 +352,7 @@ class SynapseSite(Site):
         self.site_tag = site_tag
 
         proxied = config.get("x_forwarded", False)
-        self.requestFactory = SynapseRequestFactory(self, proxied)
+        self.requestFactory = XForwardedForRequest if proxied else SynapseRequest
         self.access_logger = logging.getLogger(logger_name)
         self.server_version_string = server_version_string.encode("ascii")
 

@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
@@ -171,8 +169,7 @@ class AuthRestServlet(RestServlet):
         else:
             raise SynapseError(404, "Unknown auth stage type")
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, stagetype):
+    async def on_POST(self, request, stagetype):
 
         session = parse_string(request, "session")
         if not session:
@@ -186,7 +183,7 @@ class AuthRestServlet(RestServlet):
 
             authdict = {"response": response, "session": session}
 
-            success = yield self.auth_handler.add_oob_auth(
+            success = await self.auth_handler.add_oob_auth(
                 LoginType.RECAPTCHA, authdict, self.hs.get_ip_from_request(request)
             )
 
@@ -209,13 +206,9 @@ class AuthRestServlet(RestServlet):
 
             return None
         elif stagetype == LoginType.TERMS:
-            if ("session" not in request.args or len(request.args["session"])) == 0:
-                raise SynapseError(400, "No session supplied")
-
-            session = request.args["session"][0]
             authdict = {"session": session}
 
-            success = yield self.auth_handler.add_oob_auth(
+            success = await self.auth_handler.add_oob_auth(
                 LoginType.TERMS, authdict, self.hs.get_ip_from_request(request)
             )
 

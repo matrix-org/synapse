@@ -21,6 +21,7 @@ from __future__ import print_function
 import email.utils
 import os
 from enum import Enum
+from typing import Optional
 
 import pkg_resources
 
@@ -36,10 +37,12 @@ class EmailConfig(Config):
 
         self.email_enable_notifs = False
 
-        email_config = config.get("email", {})
+        email_config = config.get("email")
+        if email_config is None:
+            email_config = {}
 
-        self.email_smtp_host = email_config.get("smtp_host", None)
-        self.email_smtp_port = email_config.get("smtp_port", None)
+        self.email_smtp_host = email_config.get("smtp_host", "localhost")
+        self.email_smtp_port = email_config.get("smtp_port", 25)
         self.email_smtp_user = email_config.get("smtp_user", None)
         self.email_smtp_pass = email_config.get("smtp_pass", None)
         self.require_transport_security = email_config.get(
@@ -73,9 +76,9 @@ class EmailConfig(Config):
         self.email_template_dir = os.path.abspath(template_dir)
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
-        account_validity_renewal_enabled = config.get("account_validity", {}).get(
-            "renew_at"
-        )
+
+        account_validity_config = config.get("account_validity") or {}
+        account_validity_renewal_enabled = account_validity_config.get("renew_at")
 
         self.threepid_behaviour_email = (
             # Have Synapse handle the email sending if account_threepid_delegates.email
@@ -101,7 +104,7 @@ class EmailConfig(Config):
                 # both in RegistrationConfig and here. We should factor this bit out
                 self.account_threepid_delegate_email = self.trusted_third_party_id_servers[
                     0
-                ]
+                ]  # type: Optional[str]
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
@@ -277,7 +280,9 @@ class EmailConfig(Config):
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
-            self.email_riot_base_url = email_config.get("riot_base_url", None)
+            self.email_riot_base_url = email_config.get(
+                "client_base_url", email_config.get("riot_base_url", None)
+            )
 
         if account_validity_renewal_enabled:
             self.email_expiry_template_html = email_config.get(
@@ -293,107 +298,111 @@ class EmailConfig(Config):
                     raise ConfigError("Unable to find email template file %s" % (p,))
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """
-        # Enable sending emails for password resets, notification events or
-        # account expiry notices
+        return """\
+        # Configuration for sending emails from Synapse.
         #
-        # If your SMTP server requires authentication, the optional smtp_user &
-        # smtp_pass variables should be used
-        #
-        #email:
-        #   enable_notifs: false
-        #   smtp_host: "localhost"
-        #   smtp_port: 25 # SSL: 465, STARTTLS: 587
-        #   smtp_user: "exampleusername"
-        #   smtp_pass: "examplepassword"
-        #   require_transport_security: false
-        #
-        #   # notif_from defines the "From" address to use when sending emails.
-        #   # It must be set if email sending is enabled.
-        #   #
-        #   # The placeholder '%(app)s' will be replaced by the application name,
-        #   # which is normally 'app_name' (below), but may be overridden by the
-        #   # Matrix client application.
-        #   #
-        #   # Note that the placeholder must be written '%(app)s', including the
-        #   # trailing 's'.
-        #   #
-        #   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
-        #
-        #   # app_name defines the default value for '%(app)s' in notif_from. It
-        #   # defaults to 'Matrix'.
-        #   #
-        #   #app_name: my_branded_matrix_server
-        #
-        #   # Enable email notifications by default
-        #   #
-        #   notif_for_new_users: true
-        #
-        #   # Defining a custom URL for Riot is only needed if email notifications
-        #   # should contain links to a self-hosted installation of Riot; when set
-        #   # the "app_name" setting is ignored
-        #   #
-        #   riot_base_url: "http://localhost/riot"
-        #
-        #   # Configure the time that a validation email or text message code
-        #   # will expire after sending
-        #   #
-        #   # This is currently used for password resets
-        #   #
-        #   #validation_token_lifetime: 1h
-        #
-        #   # Template directory. All template files should be stored within this
-        #   # directory. If not set, default templates from within the Synapse
-        #   # package will be used
-        #   #
-        #   # For the list of default templates, please see
-        #   # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-        #   #
-        #   #template_dir: res/templates
-        #
-        #   # Templates for email notifications
-        #   #
-        #   notif_template_html: notif_mail.html
-        #   notif_template_text: notif_mail.txt
-        #
-        #   # Templates for account expiry notices
-        #   #
-        #   expiry_template_html: notice_expiry.html
-        #   expiry_template_text: notice_expiry.txt
-        #
-        #   # Templates for password reset emails sent by the homeserver
-        #   #
-        #   #password_reset_template_html: password_reset.html
-        #   #password_reset_template_text: password_reset.txt
-        #
-        #   # Templates for registration emails sent by the homeserver
-        #   #
-        #   #registration_template_html: registration.html
-        #   #registration_template_text: registration.txt
-        #
-        #   # Templates for validation emails sent by the homeserver when adding an email to
-        #   # your user account
-        #   #
-        #   #add_threepid_template_html: add_threepid.html
-        #   #add_threepid_template_text: add_threepid.txt
-        #
-        #   # Templates for password reset success and failure pages that a user
-        #   # will see after attempting to reset their password
-        #   #
-        #   #password_reset_template_success_html: password_reset_success.html
-        #   #password_reset_template_failure_html: password_reset_failure.html
-        #
-        #   # Templates for registration success and failure pages that a user
-        #   # will see after attempting to register using an email or phone
-        #   #
-        #   #registration_template_success_html: registration_success.html
-        #   #registration_template_failure_html: registration_failure.html
-        #
-        #   # Templates for success and failure pages that a user will see after attempting
-        #   # to add an email or phone to their account
-        #   #
-        #   #add_threepid_success_html: add_threepid_success.html
-        #   #add_threepid_failure_html: add_threepid_failure.html
+        email:
+          # The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
+          #
+          #smtp_host: mail.server
+
+          # The port on the mail server for outgoing SMTP. Defaults to 25.
+          #
+          #smtp_port: 587
+
+          # Username/password for authentication to the SMTP server. By default, no
+          # authentication is attempted.
+          #
+          # smtp_user: "exampleusername"
+          # smtp_pass: "examplepassword"
+
+          # Uncomment the following to require TLS transport security for SMTP.
+          # By default, Synapse will connect over plain text, and will then switch to
+          # TLS via STARTTLS *if the SMTP server supports it*. If this option is set,
+          # Synapse will refuse to connect unless the server supports STARTTLS.
+          #
+          #require_transport_security: true
+
+          # Enable sending emails for messages that the user has missed
+          #
+          #enable_notifs: false
+
+          # notif_from defines the "From" address to use when sending emails.
+          # It must be set if email sending is enabled.
+          #
+          # The placeholder '%(app)s' will be replaced by the application name,
+          # which is normally 'app_name' (below), but may be overridden by the
+          # Matrix client application.
+          #
+          # Note that the placeholder must be written '%(app)s', including the
+          # trailing 's'.
+          #
+          #notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
+
+          # app_name defines the default value for '%(app)s' in notif_from. It
+          # defaults to 'Matrix'.
+          #
+          #app_name: my_branded_matrix_server
+
+          # Uncomment the following to disable automatic subscription to email
+          # notifications for new users. Enabled by default.
+          #
+          #notif_for_new_users: false
+
+          # Custom URL for client links within the email notifications. By default
+          # links will be based on "https://matrix.to".
+          #
+          # (This setting used to be called riot_base_url; the old name is still
+          # supported for backwards-compatibility but is now deprecated.)
+          #
+          #client_base_url: "http://localhost/riot"
+
+          # Configure the time that a validation email will expire after sending.
+          # Defaults to 1h.
+          #
+          #validation_token_lifetime: 15m
+
+          # Directory in which Synapse will try to find the template files below.
+          # If not set, default templates from within the Synapse package will be used.
+          #
+          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+          # If you *do* uncomment it, you will need to make sure that all the templates
+          # below are in the directory.
+          #
+          # Synapse will look for the following templates in this directory:
+          #
+          # * The contents of email notifications of missed events: 'notif_mail.html' and
+          #   'notif_mail.txt'.
+          #
+          # * The contents of account expiry notice emails: 'notice_expiry.html' and
+          #   'notice_expiry.txt'.
+          #
+          # * The contents of password reset emails sent by the homeserver:
+          #   'password_reset.html' and 'password_reset.txt'
+          #
+          # * HTML pages for success and failure that a user will see when they follow
+          #   the link in the password reset email: 'password_reset_success.html' and
+          #   'password_reset_failure.html'
+          #
+          # * The contents of address verification emails sent during registration:
+          #   'registration.html' and 'registration.txt'
+          #
+          # * HTML pages for success and failure that a user will see when they follow
+          #   the link in an address verification email sent during registration:
+          #   'registration_success.html' and 'registration_failure.html'
+          #
+          # * The contents of address verification emails sent when an address is added
+          #   to a Matrix account: 'add_threepid.html' and 'add_threepid.txt'
+          #
+          # * HTML pages for success and failure that a user will see when they follow
+          #   the link in an address verification email sent when an address is added
+          #   to a Matrix account: 'add_threepid_success.html' and
+          #   'add_threepid_failure.html'
+          #
+          # You can see the default templates at:
+          # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+          #
+          #template_dir: "res/templates"
         """
 
 

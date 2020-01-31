@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import logging
 from functools import wraps
 
@@ -64,12 +65,22 @@ def measure_func(name=None):
     def wrapper(func):
         block_name = func.__name__ if name is None else name
 
-        @wraps(func)
-        @defer.inlineCallbacks
-        def measured_func(self, *args, **kwargs):
-            with Measure(self.clock, block_name):
-                r = yield func(self, *args, **kwargs)
-            return r
+        if inspect.iscoroutinefunction(func):
+
+            @wraps(func)
+            async def measured_func(self, *args, **kwargs):
+                with Measure(self.clock, block_name):
+                    r = await func(self, *args, **kwargs)
+                return r
+
+        else:
+
+            @wraps(func)
+            @defer.inlineCallbacks
+            def measured_func(self, *args, **kwargs):
+                with Measure(self.clock, block_name):
+                    r = yield func(self, *args, **kwargs)
+                return r
 
         return measured_func
 
@@ -80,72 +91,48 @@ class Measure(object):
     __slots__ = [
         "clock",
         "name",
-        "start_context",
+        "_logging_context",
         "start",
-        "created_context",
-        "start_usage",
     ]
 
     def __init__(self, clock, name):
         self.clock = clock
         self.name = name
-        self.start_context = None
+        self._logging_context = None
         self.start = None
-        self.created_context = False
 
     def __enter__(self):
+        if self._logging_context:
+            raise RuntimeError("Measure() objects cannot be re-used")
+
         self.start = self.clock.time()
-        self.start_context = LoggingContext.current_context()
-        if not self.start_context:
-            self.start_context = LoggingContext("Measure")
-            self.start_context.__enter__()
-            self.created_context = True
-
-        self.start_usage = self.start_context.get_resource_usage()
-
+        parent_context = LoggingContext.current_context()
+        self._logging_context = LoggingContext(
+            "Measure[%s]" % (self.name,), parent_context
+        )
+        self._logging_context.__enter__()
         in_flight.register((self.name,), self._update_in_flight)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if isinstance(exc_type, Exception) or not self.start_context:
-            return
-
-        in_flight.unregister((self.name,), self._update_in_flight)
+        if not self._logging_context:
+            raise RuntimeError("Measure() block exited without being entered")
 
         duration = self.clock.time() - self.start
+        usage = self._logging_context.get_resource_usage()
 
-        block_counter.labels(self.name).inc()
-        block_timer.labels(self.name).inc(duration)
+        in_flight.unregister((self.name,), self._update_in_flight)
+        self._logging_context.__exit__(exc_type, exc_val, exc_tb)
 
-        context = LoggingContext.current_context()
-
-        if context != self.start_context:
-            logger.warning(
-                "Context has unexpectedly changed from '%s' to '%s'. (%r)",
-                self.start_context,
-                context,
-                self.name,
-            )
-            return
-
-        if not context:
-            logger.warning("Expected context. (%r)", self.name)
-            return
-
-        current = context.get_resource_usage()
-        usage = current - self.start_usage
         try:
+            block_counter.labels(self.name).inc()
+            block_timer.labels(self.name).inc(duration)
             block_ru_utime.labels(self.name).inc(usage.ru_utime)
             block_ru_stime.labels(self.name).inc(usage.ru_stime)
             block_db_txn_count.labels(self.name).inc(usage.db_txn_count)
             block_db_txn_duration.labels(self.name).inc(usage.db_txn_duration_sec)
             block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
         except ValueError:
-            logger.warning(
-                "Failed to save metrics! OLD: %r, NEW: %r", self.start_usage, current
-            )
-
-        if self.created_context:
-            self.start_context.__exit__(exc_type, exc_val, exc_tb)
+            logger.warning("Failed to save metrics! Usage: %s", usage)
 
     def _update_in_flight(self, metrics):
         """Gets called when processing in flight metrics

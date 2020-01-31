@@ -52,6 +52,14 @@ class MockHandlerProfileTestCase(unittest.TestCase):
             ]
         )
 
+        self.mock_handler.get_displayname.return_value = defer.succeed(Mock())
+        self.mock_handler.set_displayname.return_value = defer.succeed(Mock())
+        self.mock_handler.get_avatar_url.return_value = defer.succeed(Mock())
+        self.mock_handler.set_avatar_url.return_value = defer.succeed(Mock())
+        self.mock_handler.check_profile_query_allowed.return_value = defer.succeed(
+            Mock()
+        )
+
         hs = yield setup_test_homeserver(
             self.addCleanup,
             "test",
@@ -63,7 +71,7 @@ class MockHandlerProfileTestCase(unittest.TestCase):
         )
 
         def _get_user_by_req(request=None, allow_guest=False):
-            return synapse.types.create_requester(myid)
+            return defer.succeed(synapse.types.create_requester(myid))
 
         hs.get_auth().get_user_by_req = _get_user_by_req
 
@@ -229,6 +237,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["require_auth_for_profile_requests"] = True
+        config["limit_profile_requests_to_users_who_share_rooms"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs
@@ -301,6 +310,7 @@ class OwnProfileUnrestrictedTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
         config["require_auth_for_profile_requests"] = True
+        config["limit_profile_requests_to_users_who_share_rooms"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs

@@ -46,3 +46,6 @@ Joseph Weston <joseph at weston.cloud>
 
 Benjamin Saunders <ben.e.saunders at gmail dot com>
  * Documentation improvements
+
+Werner Sembach <werner.sembach at fau dot de>
+ * Automatically remove a group/community when it is empty

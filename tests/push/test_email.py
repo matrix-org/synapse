@@ -165,6 +165,7 @@ class EmailPusherTests(HomeserverTestCase):
         pushers = self.get_success(
             self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
         )
+        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         last_stream_ordering = pushers[0]["last_stream_ordering"]
 
@@ -175,6 +176,7 @@ class EmailPusherTests(HomeserverTestCase):
         pushers = self.get_success(
             self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
         )
+        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertEqual(last_stream_ordering, pushers[0]["last_stream_ordering"])
 
@@ -192,5 +194,6 @@ class EmailPusherTests(HomeserverTestCase):
         pushers = self.get_success(
             self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
         )
+        pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
         self.assertTrue(pushers[0]["last_stream_ordering"] > last_stream_ordering)

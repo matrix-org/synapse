@@ -66,10 +66,6 @@ therefore cannot gain access to the necessary certificate. With .well-known,
 federation servers will check for a valid TLS certificate for the delegated
 hostname (in our example: ``synapse.example.com``).
 
-.well-known support first appeared in Synapse v0.99.0. To federate with older
-servers you may need to additionally configure SRV delegation. Alternatively,
-encourage the server admin in question to upgrade :).
-
 ### DNS SRV delegation
 
 To use this delegation method, you need to have write access to your
@@ -111,29 +107,15 @@ giving it a `server_name` of `example.com`, and once [ACME](acme.md) support is 
 it would automatically generate a valid TLS certificate for you via Let's Encrypt
 and no SRV record or .well-known URI would be needed.
 
-This is the common case, although you can add an SRV record or
-`.well-known/matrix/server` URI for completeness if you wish.
-
 **However**, if your server does not listen on port 8448, or if your `server_name`
 does not point to the host that your homeserver runs on, you will need to let
 other servers know how to find it. The way to do this is via .well-known or an
 SRV record.
 
-#### I have created a .well-known URI. Do I still need an SRV record?
+#### I have created a .well-known URI. Do I also need an SRV record?
 
-As of Synapse 0.99, Synapse will first check for the existence of a .well-known
-URI and follow any delegation it suggests. It will only then check for the
-existence of an SRV record.
-
-That means that the SRV record will often be redundant. However, you should
-remember that there may still be older versions of Synapse in the federation
-which do not understand .well-known URIs, so if you removed your SRV record
-you would no longer be able to federate with them.
-
-It is therefore best to leave the SRV record in place for now. Synapse 0.34 and
-earlier will follow the SRV record (and not care about the invalid
-certificate). Synapse 0.99 and later will follow the .well-known URI, with the
-correct certificate chain.
+No. You can use either `.well-known` delegation or use an SRV record for delegation. You
+do not need to use both to delegate to the same location.
 
 #### Can I manage my own certificates rather than having Synapse renew certificates itself?
 
