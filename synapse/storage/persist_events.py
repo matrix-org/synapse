@@ -661,7 +661,7 @@ class EventsPersistenceStorage(object):
                 break
 
         if not room_version:
-            room_version = await self.main_store.get_room_version(room_id)
+            room_version = await self.main_store.get_room_version_id(room_id)
 
         logger.debug("calling resolve_state_groups from preserve_events")
         res = await self._state_resolution_handler.resolve_state_groups(

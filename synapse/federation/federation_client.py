@@ -198,7 +198,7 @@ class FederationClient(FederationBase):
 
         logger.debug("backfill transaction_data=%r", transaction_data)
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
         format_ver = room_version_to_event_format(room_version)
 
         pdus = [
@@ -336,7 +336,7 @@ class FederationClient(FederationBase):
     def get_event_auth(self, destination, room_id, event_id):
         res = yield self.transport_layer.get_event_auth(destination, room_id, event_id)
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
         format_ver = room_version_to_event_format(room_version)
 
         auth_chain = [
@@ -647,7 +647,7 @@ class FederationClient(FederationBase):
 
     @defer.inlineCallbacks
     def send_invite(self, destination, room_id, event_id, pdu):
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
 
         content = yield self._do_send_invite(destination, pdu, room_version)
 
@@ -655,7 +655,7 @@ class FederationClient(FederationBase):
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
         format_ver = room_version_to_event_format(room_version)
 
         pdu = event_from_pdu_json(pdu_dict, format_ver)
@@ -857,7 +857,7 @@ class FederationClient(FederationBase):
                 timeout=timeout,
             )
 
-            room_version = yield self.store.get_room_version(room_id)
+            room_version = yield self.store.get_room_version_id(room_id)
             format_ver = room_version_to_event_format(room_version)
 
             events = [
