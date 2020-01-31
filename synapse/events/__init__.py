@@ -257,7 +257,26 @@ class EventBase(object):
         return [e for e, _ in self.auth_events]
 
 
-class FrozenEvent(EventBase):
+class FrozenEventBase(EventBase):
+    """Base class for fully initialised events.
+    """
+
+    @property
+    def event_id(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def type(self) -> str:
+        raise NotImplementedError()
+
+    @property
+    def state_key(self) -> str:
+        """Raises if there is no state key.
+        """
+        raise NotImplementedError()
+
+
+class FrozenEvent(FrozenEventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1
 
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
@@ -305,7 +324,7 @@ class FrozenEvent(EventBase):
         )
 
 
-class FrozenEventV2(EventBase):
+class FrozenEventV2(FrozenEventBase):
     format_version = EventFormatVersions.V2  # All events of this type are V2
 
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
