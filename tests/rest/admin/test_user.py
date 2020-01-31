@@ -478,8 +478,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("foobar", channel.json_body["displayname"])
         self.assertEqual(True, channel.json_body["deactivated"])
         # the user is deactivated, the threepid will be deleted
-        # self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
-        # self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][0]["address"])
 
         # Get user
         request, channel = self.make_request(

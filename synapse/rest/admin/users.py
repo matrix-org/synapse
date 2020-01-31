@@ -174,6 +174,10 @@ class UserRestServletV2(RestServlet):
                 )
 
             if "threepids" in body:
+                # check for required parameters for each threepid
+                for threepid in body["threepids"]:
+                    assert_params_in_dict(threepid, ["medium", "address"])
+
                 # remove old threepids from user
                 threepids = await self.store.user_get_threepids(user_id)
                 for threepid in threepids:
@@ -257,6 +261,10 @@ class UserRestServletV2(RestServlet):
             )
 
             if "threepids" in body:
+                # check for required parameters for each threepid
+                for threepid in body["threepids"]:
+                    assert_params_in_dict(threepid, ["medium", "address"])
+
                 current_time = self.hs.get_clock().time_msec()
                 for threepid in body["threepids"]:
                     await self.auth_handler.add_threepid(

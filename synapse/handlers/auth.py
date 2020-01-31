@@ -816,6 +816,14 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def add_threepid(self, user_id, medium, address, validated_at):
+        # check if medium has a valid value
+        if medium not in ["email", "msisdn"]:
+            raise SynapseError(
+                code=400,
+                msg=("'%s' is not a valid value for 'medium'" % (medium)),
+                errcode=Codes.INVALID_PARAM,
+            )
+
         # 'Canonicalise' email addresses down to lower case.
         # We've now moving towards the homeserver being the entity that
         # is responsible for validating threepids used for resetting passwords
