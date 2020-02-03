@@ -2425,8 +2425,9 @@ class FederationHandler(BaseHandler):
             delta_ids=state_updates,
         )
 
-    @defer.inlineCallbacks
-    def construct_auth_difference(self, local_auth, remote_auth):
+    async def construct_auth_difference(
+        self, local_auth: Iterable[EventBase], remote_auth: Iterable[EventBase]
+    ) -> Dict:
         """ Given a local and remote auth chain, find the differences. This
         assumes that we have already processed all events in remote_auth
 
@@ -2535,7 +2536,7 @@ class FederationHandler(BaseHandler):
         reason_map = {}
 
         for e in base_remote_rejected:
-            reason = yield self.store.get_rejection_reason(e.event_id)
+            reason = await self.store.get_rejection_reason(e.event_id)
             if reason is None:
                 # TODO: e is not in the current state, so we should
                 # construct some proof of that.
