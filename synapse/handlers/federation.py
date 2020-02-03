@@ -1997,27 +1997,23 @@ class FederationHandler(BaseHandler):
 
         return context
 
-    @defer.inlineCallbacks
-    def _check_for_soft_fail(
+    async def _check_for_soft_fail(
         self, event: EventBase, state: Optional[Iterable[EventBase]], backfilled: bool
-    ):
-        """Checks if we should soft fail the event, if so marks the event as
+    ) -> None:
+        """Checks if we should soft fail the event; if so, marks the event as
         such.
 
         Args:
             event
             state: The state at the event if we don't have all the event's prev events
             backfilled: Whether the event is from backfill
-
-        Returns:
-            Deferred
         """
         # For new (non-backfilled and non-outlier) events we check if the event
         # passes auth based on the current state. If it doesn't then we
         # "soft-fail" the event.
         do_soft_fail_check = not backfilled and not event.internal_metadata.is_outlier()
         if do_soft_fail_check:
-            extrem_ids = yield self.store.get_latest_event_ids_in_room(event.room_id)
+            extrem_ids = await self.store.get_latest_event_ids_in_room(event.room_id)
 
             extrem_ids = set(extrem_ids)
             prev_event_ids = set(event.prev_event_ids())
@@ -2028,7 +2024,7 @@ class FederationHandler(BaseHandler):
                 do_soft_fail_check = False
 
         if do_soft_fail_check:
-            room_version = yield self.store.get_room_version_id(event.room_id)
+            room_version = await self.store.get_room_version_id(event.room_id)
             room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             # Calculate the "current state".
@@ -2045,19 +2041,19 @@ class FederationHandler(BaseHandler):
                 # given state at the event. This should correctly handle cases
                 # like bans, especially with state res v2.
 
-                state_sets = yield self.state_store.get_state_groups(
+                state_sets = await self.state_store.get_state_groups(
                     event.room_id, extrem_ids
                 )
                 state_sets = list(state_sets.values())
                 state_sets.append(state)
-                current_state_ids = yield self.state_handler.resolve_events(
+                current_state_ids = await self.state_handler.resolve_events(
                     room_version, state_sets, event
                 )
                 current_state_ids = {
                     k: e.event_id for k, e in iteritems(current_state_ids)
                 }
             else:
-                current_state_ids = yield self.state_handler.get_current_state_ids(
+                current_state_ids = await self.state_handler.get_current_state_ids(
                     event.room_id, latest_event_ids=extrem_ids
                 )
 
@@ -2073,7 +2069,7 @@ class FederationHandler(BaseHandler):
                 e for k, e in iteritems(current_state_ids) if k in auth_types
             ]
 
-            current_auth_events = yield self.store.get_events(current_state_ids)
+            current_auth_events = await self.store.get_events(current_state_ids)
             current_auth_events = {
                 (e.type, e.state_key): e for e in current_auth_events.values()
             }
