@@ -1557,15 +1557,20 @@ class FederationHandler(BaseHandler):
 
         return event
 
-    @defer.inlineCallbacks
-    def _make_and_verify_event(
-        self, target_hosts, room_id, user_id, membership, content={}, params=None
-    ):
+    async def _make_and_verify_event(
+        self,
+        target_hosts: Iterable[str],
+        room_id: str,
+        user_id: str,
+        membership: str,
+        content: JsonDict = {},
+        params: Optional[Dict[str, str]] = None,
+    ) -> Tuple[str, EventBase, RoomVersion]:
         (
             origin,
             event,
             room_version,
-        ) = yield self.federation_client.make_membership_event(
+        ) = await self.federation_client.make_membership_event(
             target_hosts, room_id, user_id, membership, content, params=params
         )
 
