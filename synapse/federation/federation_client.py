@@ -35,6 +35,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
+    RoomVersion,
     RoomVersions,
 )
 from synapse.events import EventBase, builder, room_version_to_event_format
@@ -404,7 +405,7 @@ class FederationClient(FederationBase):
 
         raise SynapseError(502, "Failed to %s via any server" % (description,))
 
-    def make_membership_event(
+    async def make_membership_event(
         self,
         destinations: Iterable[str],
         room_id: str,
@@ -412,7 +413,7 @@ class FederationClient(FederationBase):
         membership: str,
         content: dict,
         params: Dict[str, str],
-    ):
+    ) -> Tuple[str, EventBase, RoomVersion]:
         """
         Creates an m.room.member event, with context, without participating in the room.
 
@@ -433,19 +434,19 @@ class FederationClient(FederationBase):
             content: Any additional data to put into the content field of the
                 event.
             params: Query parameters to include in the request.
-        Return:
-            Deferred[Tuple[str, FrozenEvent, RoomVersion]]: resolves to a tuple of
+
+        Returns:
             `(origin, event, room_version)` where origin is the remote
             homeserver which generated the event, and room_version is the
             version of the room.
 
-            Fails with a `UnsupportedRoomVersionError` if remote responds with
-            a room version we don't understand.
+        Raises:
+            UnsupportedRoomVersionError: if remote responds with
+                a room version we don't understand.
 
-            Fails with a ``SynapseError`` if the chosen remote server
-            returns a 300/400 code.
+            SynapseError: if the chosen remote server returns a 300/400 code.
 
-            Fails with a ``RuntimeError`` if no servers were reachable.
+            RuntimeError: if no servers were reachable.
         """
         valid_memberships = {Membership.JOIN, Membership.LEAVE}
         if membership not in valid_memberships:
@@ -491,7 +492,7 @@ class FederationClient(FederationBase):
 
             return (destination, ev, room_version)
 
-        return self._try_destination_list(
+        return await self._try_destination_list(
             "make_" + membership, destinations, send_request
         )
 
