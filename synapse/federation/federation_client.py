@@ -17,7 +17,7 @@
 import copy
 import itertools
 import logging
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
 
@@ -211,11 +211,14 @@ class FederationClient(FederationBase):
 
         return pdus
 
-    @defer.inlineCallbacks
-    @log_function
-    def get_pdu(
-        self, destinations, event_id, room_version, outlier=False, timeout=None
-    ):
+    async def get_pdu(
+        self,
+        destinations: Iterable[str],
+        event_id: str,
+        room_version: str,
+        outlier: bool = False,
+        timeout: Optional[int] = None,
+    ) -> Optional[EventBase]:
         """Requests the PDU with given origin and ID from the remote home
         servers.
 
@@ -223,18 +226,17 @@ class FederationClient(FederationBase):
         one succeeds.
 
         Args:
-            destinations (list): Which homeservers to query
-            event_id (str): event to fetch
-            room_version (str): version of the room
-            outlier (bool): Indicates whether the PDU is an `outlier`, i.e. if
+            destinations: Which homeservers to query
+            event_id: event to fetch
+            room_version: version of the room
+            outlier: Indicates whether the PDU is an `outlier`, i.e. if
                 it's from an arbitary point in the context as opposed to part
                 of the current block of PDUs. Defaults to `False`
-            timeout (int): How long to try (in ms) each destination for before
+            timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
 
         Returns:
-            Deferred: Results in the requested PDU, or None if we were unable to find
-               it.
+            The requested PDU, or None if we were unable to find it.
         """
 
         # TODO: Rate limit the number of times we try and get the same event.
@@ -255,7 +257,7 @@ class FederationClient(FederationBase):
                 continue
 
             try:
-                transaction_data = yield self.transport_layer.get_event(
+                transaction_data = await self.transport_layer.get_event(
                     destination, event_id, timeout=timeout
                 )
 
@@ -275,7 +277,7 @@ class FederationClient(FederationBase):
                     pdu = pdu_list[0]
 
                     # Check signatures are correct.
-                    signed_pdu = yield self._check_sigs_and_hash(room_version, pdu)
+                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
 
                     break
 
