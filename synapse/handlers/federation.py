@@ -1199,13 +1199,12 @@ class FederationHandler(BaseHandler):
 
         return pdu
 
-    @defer.inlineCallbacks
-    def on_event_auth(self, event_id):
-        event = yield self.store.get_event(event_id)
-        auth = yield self.store.get_auth_chain(
+    async def on_event_auth(self, event_id: str) -> List[EventBase]:
+        event = await self.store.get_event(event_id)
+        auth = await self.store.get_auth_chain(
             [auth_id for auth_id in event.auth_event_ids()], include_given=True
         )
-        return [e for e in auth]
+        return list(auth)
 
     @log_function
     @defer.inlineCallbacks
