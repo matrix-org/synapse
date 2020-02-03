@@ -553,9 +553,8 @@ class FederationClient(FederationBase):
                     "room appears to have unsupported version %s" % (room_version,)
                 )
 
-        @defer.inlineCallbacks
-        def send_request(destination):
-            content = yield self._do_send_join(destination, pdu)
+        async def send_request(destination) -> Dict[str, Any]:
+            content = await self._do_send_join(destination, pdu)
 
             logger.debug("Got content: %s", content)
 
@@ -584,7 +583,7 @@ class FederationClient(FederationBase):
                 # invalid, and it would fail auth checks anyway.
                 raise SynapseError(400, "No create event in state")
 
-            valid_pdus = yield self._check_sigs_and_hash_and_fetch(
+            valid_pdus = await self._check_sigs_and_hash_and_fetch(
                 destination,
                 list(pdus.values()),
                 outlier=True,
