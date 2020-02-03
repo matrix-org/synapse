@@ -2121,24 +2121,23 @@ class FederationHandler(BaseHandler):
 
         return ret
 
-    @defer.inlineCallbacks
-    def on_get_missing_events(
+    async def on_get_missing_events(
         self, origin, room_id, earliest_events, latest_events, limit
     ):
-        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        in_room = await self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
         limit = min(limit, 20)
 
-        missing_events = yield self.store.get_missing_events(
+        missing_events = await self.store.get_missing_events(
             room_id=room_id,
             earliest_events=earliest_events,
             latest_events=latest_events,
             limit=limit,
         )
 
-        missing_events = yield filter_events_for_server(
+        missing_events = await filter_events_for_server(
             self.storage, origin, missing_events
         )
 
