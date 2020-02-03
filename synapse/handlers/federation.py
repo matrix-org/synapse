@@ -65,7 +65,7 @@ from synapse.replication.http.federation import (
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import StateResolutionStore, resolve_events_with_store
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
-from synapse.types import StateMap, UserID, get_domain_from_id
+from synapse.types import JsonDict, StateMap, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.distributor import user_joined_room
 from synapse.util.retryutils import NotRetryingDestination
@@ -2621,33 +2621,31 @@ class FederationHandler(BaseHandler):
                 destinations, room_id, event_dict
             )
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_exchange_third_party_invite_request(self, room_id, event_dict):
+    async def on_exchange_third_party_invite_request(
+        self, room_id: str, event_dict: JsonDict
+    ) -> None:
         """Handle an exchange_third_party_invite request from a remote server
 
         The remote server will call this when it wants to turn a 3pid invite
         into a normal m.room.member invite.
 
         Args:
-            room_id (str): The ID of the room.
+            room_id: The ID of the room.
 
             event_dict (dict[str, Any]): Dictionary containing the event body.
 
-        Returns:
-            Deferred: resolves (to None)
         """
-        room_version = yield self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
 
         # NB: event_dict has a particular specced format we might need to fudge
         # if we change event formats too much.
         builder = self.event_builder_factory.new(room_version, event_dict)
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
+        event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
 
-        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+        event_allowed = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
         if not event_allowed:
@@ -2658,16 +2656,16 @@ class FederationHandler(BaseHandler):
                 403, "This event is not allowed in this context", Codes.FORBIDDEN
             )
 
-        event, context = yield self.add_display_name_to_third_party_invite(
+        event, context = await self.add_display_name_to_third_party_invite(
             room_version, event_dict, event, context
         )
 
         try:
-            yield self.auth.check_from_context(room_version, event, context)
+            await self.auth.check_from_context(room_version, event, context)
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)
             raise e
-        yield self._check_signature(event, context)
+        await self._check_signature(event, context)
 
         # We need to tell the transaction queue to send this out, even
         # though the sender isn't a local user.
@@ -2675,7 +2673,7 @@ class FederationHandler(BaseHandler):
 
         # We retrieve the room member handler here as to not cause a cyclic dependency
         member_handler = self.hs.get_room_member_handler()
-        yield member_handler.send_membership_event(None, event, context)
+        await member_handler.send_membership_event(None, event, context)
 
     @defer.inlineCallbacks
     def add_display_name_to_third_party_invite(
