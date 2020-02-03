@@ -762,12 +762,9 @@ class FederationClient(FederationBase):
             RuntimeError if no servers were reachable.
         """
 
-        @defer.inlineCallbacks
-        def send_request(destination):
-            content = yield self._do_send_leave(destination, pdu)
-
+        async def send_request(destination: str) -> None:
+            content = await self._do_send_leave(destination, pdu)
             logger.debug("Got content: %s", content)
-            return None
 
         return await self._try_destination_list(
             "send_leave", destinations, send_request
