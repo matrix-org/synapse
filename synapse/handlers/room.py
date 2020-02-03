@@ -64,18 +64,21 @@ class RoomCreationHandler(BaseHandler):
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": True,
+            "power_level_content_override": {},
         },
         RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "shared",
             "original_invitees_have_ops": True,
             "guest_can_join": True,
+            "power_level_content_override": {},
         },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": False,
+            "power_level_content_override": {"invite": 50},
         },
     }
 
@@ -825,6 +828,8 @@ class RoomCreationHandler(BaseHandler):
                     # This will be reudundant on pre-MSC2260 rooms, since the
                     # aliases event is special-cased.
                     EventTypes.Aliases: 0,
+                    EventTypes.Tombstone: 100,
+                    EventTypes.ServerACL: 100,
                 },
                 "events_default": 0,
                 "state_default": 50,
@@ -837,6 +842,11 @@ class RoomCreationHandler(BaseHandler):
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
+
+            # Allow power levels to be defined per chat preset
+            preset_power_level_override = config.get("power_level_content_override")
+            if preset_power_level_override:
+                power_level_content.update(preset_power_level_override)
 
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
