@@ -64,21 +64,21 @@ class RoomCreationHandler(BaseHandler):
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": True,
-            "power_level_content_override": {},
+            "power_level_content_override": {"invite": 0},
         },
         RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "shared",
             "original_invitees_have_ops": True,
             "guest_can_join": True,
-            "power_level_content_override": {},
+            "power_level_content_override": {"invite": 0},
         },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": False,
-            "power_level_content_override": {"invite": 50},
+            "power_level_content_override": {},
         },
     }
 
@@ -843,10 +843,8 @@ class RoomCreationHandler(BaseHandler):
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            # Allow power levels to be defined per chat preset
-            preset_power_level_override = config.get("power_level_content_override")
-            if preset_power_level_override:
-                power_level_content.update(preset_power_level_override)
+            # Power levels overrides are defined per chat preset
+            power_level_content.update(config["power_level_content_override"])
 
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
