@@ -845,12 +845,13 @@ class SyncHandler(object):
                 # about them).
                 state_filter = StateFilter.all()
 
-                if since_token:
-                    state_at_previous_sync = await self.get_state_at(
-                        room_id, stream_position=since_token, state_filter=state_filter
-                    )
-                else:
-                    state_at_previous_sync = {}
+                # If this is an initial sync then full_state should be set, and
+                # that case is handled above. We assert here to ensure that this
+                # is indeed the case.
+                assert since_token is not None
+                state_at_previous_sync = await self.get_state_at(
+                    room_id, stream_position=since_token, state_filter=state_filter
+                )
 
                 if batch:
                     current_state_ids = await self.state_store.get_state_ids_for_event(
