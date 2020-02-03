@@ -1206,9 +1206,9 @@ class FederationHandler(BaseHandler):
         )
         return list(auth)
 
-    @log_function
-    @defer.inlineCallbacks
-    def do_invite_join(self, target_hosts, room_id, joinee, content):
+    async def do_invite_join(
+        self, target_hosts: Iterable[str], room_id: str, joinee: str, content: JsonDict
+    ) -> None:
         """ Attempts to join the `joinee` to the room `room_id` via the
         servers contained in `target_hosts`.
 
@@ -1221,17 +1221,17 @@ class FederationHandler(BaseHandler):
         have finished processing the join.
 
         Args:
-            target_hosts (Iterable[str]): List of servers to attempt to join the room with.
+            target_hosts: List of servers to attempt to join the room with.
 
-            room_id (str): The ID of the room to join.
+            room_id: The ID of the room to join.
 
-            joinee (str): The User ID of the joining user.
+            joinee: The User ID of the joining user.
 
-            content (dict): The event content to use for the join event.
+            content: The event content to use for the join event.
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event, room_version_obj = yield self._make_and_verify_event(
+        origin, event, room_version_obj = await self._make_and_verify_event(
             target_hosts,
             room_id,
             joinee,
@@ -1247,7 +1247,7 @@ class FederationHandler(BaseHandler):
 
         self.room_queues[room_id] = []
 
-        yield self._clean_room_for_join(room_id)
+        await self._clean_room_for_join(room_id)
 
         handled_events = set()
 
@@ -1261,7 +1261,7 @@ class FederationHandler(BaseHandler):
                 pass
 
             event_format_version = room_version_obj.event_format
-            ret = yield self.federation_client.send_join(
+            ret = await self.federation_client.send_join(
                 target_hosts, event, event_format_version
             )
 
@@ -1280,7 +1280,7 @@ class FederationHandler(BaseHandler):
             logger.debug("do_invite_join event: %s", event)
 
             try:
-                yield self.store.store_room(
+                await self.store.store_room(
                     room_id=room_id,
                     room_creator_user_id="",
                     is_public=False,
@@ -1290,13 +1290,13 @@ class FederationHandler(BaseHandler):
                 # FIXME
                 pass
 
-            yield self._persist_auth_tree(
+            await self._persist_auth_tree(
                 origin, auth_chain, state, event, room_version_obj
             )
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
-            predecessor = yield self.store.get_room_predecessor(room_id)
+            predecessor = await self.store.get_room_predecessor(room_id)
             if not predecessor or not isinstance(predecessor.get("room_id"), str):
                 return
             old_room_id = predecessor["room_id"]
@@ -1306,7 +1306,7 @@ class FederationHandler(BaseHandler):
 
             # We retrieve the room member handler here as to not cause a cyclic dependency
             member_handler = self.hs.get_room_member_handler()
-            yield member_handler.transfer_room_state_on_room_upgrade(
+            await member_handler.transfer_room_state_on_room_upgrade(
                 old_room_id, room_id
             )
 
@@ -1322,8 +1322,6 @@ class FederationHandler(BaseHandler):
             # have. Hence we fire off the deferred, but don't wait for it.
 
             run_in_background(self._handle_queued_pdus, room_queue)
-
-        return True
 
     async def _handle_queued_pdus(self, room_queue):
         """Process PDUs which got queued up while we were busy send_joining.
