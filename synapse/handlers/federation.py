@@ -2200,10 +2200,13 @@ class FederationHandler(BaseHandler):
 
         return context
 
-    @defer.inlineCallbacks
-    def _update_auth_events_and_context_for_auth(
-        self, origin, event, context, auth_events
-    ):
+    async def _update_auth_events_and_context_for_auth(
+        self,
+        origin: str,
+        event: EventBase,
+        context: EventContext,
+        auth_events: StateMap[EventBase],
+    ) -> EventContext:
         """Helper for do_auth. See there for docs.
 
         Checks whether a given event has the expected auth events. If it
@@ -2211,16 +2214,16 @@ class FederationHandler(BaseHandler):
         we can come to a consensus (e.g. if one server missed some valid
         state).
 
-        This attempts to resovle any potential divergence of state between
+        This attempts to resolve any potential divergence of state between
         servers, but is not essential and so failures should not block further
         processing of the event.
 
         Args:
-            origin (str):
-            event (synapse.events.EventBase):
-            context (synapse.events.snapshot.EventContext):
+            origin:
+            event:
+            context:
 
-            auth_events (dict[(str, str)->synapse.events.EventBase]):
+            auth_events:
                 Map from (event_type, state_key) to event
 
                 Normally, our calculated auth_events based on the state of the room
@@ -2231,7 +2234,7 @@ class FederationHandler(BaseHandler):
                 Also NB that this function adds entries to it.
 
         Returns:
-            defer.Deferred[EventContext]: updated context
+            updated context
         """
         event_auth_events = set(event.auth_event_ids())
 
@@ -2245,7 +2248,7 @@ class FederationHandler(BaseHandler):
         #
         # we start by checking if they are in the store, and then try calling /event_auth/.
         if missing_auth:
-            have_events = yield self.store.have_seen_events(missing_auth)
+            have_events = await self.store.have_seen_events(missing_auth)
             logger.debug("Events %s are in the store", have_events)
             missing_auth.difference_update(have_events)
 
@@ -2254,7 +2257,7 @@ class FederationHandler(BaseHandler):
             logger.info("auth_events contains unknown events: %s", missing_auth)
             try:
                 try:
-                    remote_auth_chain = yield self.federation_client.get_event_auth(
+                    remote_auth_chain = await self.federation_client.get_event_auth(
                         origin, event.room_id, event.event_id
                     )
                 except RequestSendFailed as e:
@@ -2263,7 +2266,7 @@ class FederationHandler(BaseHandler):
                     logger.info("Failed to get event auth from remote: %s", e)
                     return context
 
-                seen_remotes = yield self.store.have_seen_events(
+                seen_remotes = await self.store.have_seen_events(
                     [e.event_id for e in remote_auth_chain]
                 )
 
@@ -2286,9 +2289,7 @@ class FederationHandler(BaseHandler):
                         logger.debug(
                             "do_auth %s missing_auth: %s", event.event_id, e.event_id
                         )
-                        yield defer.ensureDeferred(
-                            self._handle_new_event(origin, e, auth_events=auth)
-                        )
+                        await self._handle_new_event(origin, e, auth_events=auth)
 
                         if e.event_id in event_auth_events:
                             auth_events[(e.type, e.state_key)] = e
@@ -2322,7 +2323,7 @@ class FederationHandler(BaseHandler):
 
         # XXX: currently this checks for redactions but I'm not convinced that is
         # necessary?
-        different_events = yield self.store.get_events_as_list(different_auth)
+        different_events = await self.store.get_events_as_list(different_auth)
 
         for d in different_events:
             if d.room_id != event.room_id:
@@ -2348,8 +2349,8 @@ class FederationHandler(BaseHandler):
         remote_auth_events.update({(d.type, d.state_key): d for d in different_events})
         remote_state = remote_auth_events.values()
 
-        room_version = yield self.store.get_room_version_id(event.room_id)
-        new_state = yield self.state_handler.resolve_events(
+        room_version = await self.store.get_room_version_id(event.room_id)
+        new_state = await self.state_handler.resolve_events(
             room_version, (local_state, remote_state), event
         )
 
@@ -2364,7 +2365,7 @@ class FederationHandler(BaseHandler):
 
         auth_events.update(new_state)
 
-        context = yield self._update_context_for_auth_events(
+        context = await self._update_context_for_auth_events(
             event, context, auth_events
         )
 
