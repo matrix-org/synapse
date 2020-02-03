@@ -820,7 +820,7 @@ class AuthHandler(BaseHandler):
         if medium not in ["email", "msisdn"]:
             raise SynapseError(
                 code=400,
-                msg=("'%s' is not a valid value for 'medium'" % (medium)),
+                msg=("'%s' is not a valid value for 'medium'" % (medium,)),
                 errcode=Codes.INVALID_PARAM,
             )
 
