@@ -583,7 +583,9 @@ class RoomCreationHandler(BaseHandler):
             requester, config, is_requester_admin=is_requester_admin
         )
         if not event_allowed:
-            raise SynapseError(403, "You are not permitted to create rooms", Codes.FORBIDDEN)
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         if not is_requester_admin and not self.spam_checker.user_may_create_room(
             user_id
