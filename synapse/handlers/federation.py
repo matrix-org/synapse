@@ -2120,15 +2120,14 @@ class FederationHandler(BaseHandler):
                 logger.warning("Soft-failing %r because %s", event, e)
                 event.internal_metadata.soft_failed = True
 
-    @defer.inlineCallbacks
-    def on_query_auth(
+    async def on_query_auth(
         self, origin, event_id, room_id, remote_auth_chain, rejects, missing
     ):
-        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        in_room = await self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
-        event = yield self.store.get_event(
+        event = await self.store.get_event(
             event_id, allow_none=False, check_room_id=room_id
         )
 
@@ -2136,19 +2135,19 @@ class FederationHandler(BaseHandler):
         # don't want to fall into the trap of `missing` being wrong.
         for e in remote_auth_chain:
             try:
-                yield self._handle_new_event(origin, e)
+                await self._handle_new_event(origin, e)
             except AuthError:
                 pass
 
         # Now get the current auth_chain for the event.
-        local_auth_chain = yield self.store.get_auth_chain(
+        local_auth_chain = await self.store.get_auth_chain(
             [auth_id for auth_id in event.auth_event_ids()], include_given=True
         )
 
         # TODO: Check if we would now reject event_id. If so we need to tell
         # everyone.
 
-        ret = yield self.construct_auth_difference(local_auth_chain, remote_auth_chain)
+        ret = await self.construct_auth_difference(local_auth_chain, remote_auth_chain)
 
         logger.debug("on_query_auth returning: %s", ret)
 
