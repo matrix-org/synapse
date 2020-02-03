@@ -1184,13 +1184,12 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(http_client.BAD_REQUEST, "Too many auth_events")
 
-    @defer.inlineCallbacks
-    def send_invite(self, target_host, event):
+    async def send_invite(self, target_host, event):
         """ Sends the invite to the remote server for signing.
 
         Invites must be signed by the invitee's server before distribution.
         """
-        pdu = yield self.federation_client.send_invite(
+        pdu = await self.federation_client.send_invite(
             destination=target_host,
             room_id=event.room_id,
             event_id=event.event_id,
