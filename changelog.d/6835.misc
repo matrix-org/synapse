@@ -1,0 +1,1 @@
+Convert `is_server_admin` from deferreds to async/await.
