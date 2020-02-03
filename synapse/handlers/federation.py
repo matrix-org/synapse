@@ -2849,13 +2849,15 @@ class FederationHandler(BaseHandler):
                 for event, _ in event_and_contexts:
                     await self._notify_persisted_event(event, max_stream_id)
 
-    def _notify_persisted_event(self, event, max_stream_id):
+    async def _notify_persisted_event(
+        self, event: EventBase, max_stream_id: int
+    ) -> None:
         """Checks to see if notifier/pushers should be notified about the
         event or not.
 
         Args:
-            event (FrozenEvent)
-            max_stream_id (int): The max_stream_id returned by persist_events
+            event:
+            max_stream_id: The max_stream_id returned by persist_events
         """
 
         extra_users = []
@@ -2879,7 +2881,7 @@ class FederationHandler(BaseHandler):
             event, event_stream_id, max_stream_id, extra_users=extra_users
         )
 
-        return self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
+        await self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
 
     def _clean_room_for_join(self, room_id):
         """Called to clean up any data in DB for a given room, ready for the
