@@ -74,7 +74,7 @@ class ThirdPartyEventRules(object):
             is_requester_admin (bool): If the requester is an admin
 
         Returns:
-            defer.Deferred
+            defer.Deferred[bool]: Whether room creation is allowed or denied.
         """
 
         if self.third_party_rules is None:

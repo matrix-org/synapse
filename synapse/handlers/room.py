@@ -582,12 +582,8 @@ class RoomCreationHandler(BaseHandler):
         event_allowed = yield self.third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
-        if type(event_allowed) is tuple:
-            event_allowed, error_message = event_allowed
-        else:
-            error_message = "You are not permitted to create rooms"
         if not event_allowed:
-            raise SynapseError(403, error_message, Codes.FORBIDDEN)
+            raise SynapseError(403, "You are not permitted to create rooms", Codes.FORBIDDEN)
 
         if not is_requester_admin and not self.spam_checker.user_may_create_room(
             user_id

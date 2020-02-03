@@ -1,1 +1,1 @@
-Function on_create_room() was not properly checked and thus ignored for third party event rules.
+Fixed third party event rules function on_create_room's return value beeing ignored.
