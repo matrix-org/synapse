@@ -1852,15 +1852,14 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
         )
 
-    @defer.inlineCallbacks
-    def _persist_auth_tree(
+    async def _persist_auth_tree(
         self,
         origin: str,
         auth_events: List[EventBase],
         state: List[EventBase],
         event: EventBase,
         room_version: RoomVersion,
-    ):
+    ) -> None:
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -1875,14 +1874,11 @@ class FederationHandler(BaseHandler):
             event
             room_version: The room version we expect this room to have, and
                 will raise if it doesn't match the version in the create event.
-
-        Returns:
-            Deferred
         """
         events_to_context = {}
         for e in itertools.chain(auth_events, state):
             e.internal_metadata.outlier = True
-            ctx = yield self.state_handler.compute_event_context(e)
+            ctx = await self.state_handler.compute_event_context(e)
             events_to_context[e.event_id] = ctx
 
         event_map = {
@@ -1914,7 +1910,7 @@ class FederationHandler(BaseHandler):
                     missing_auth_events.add(e_id)
 
         for e_id in missing_auth_events:
-            m_ev = yield self.federation_client.get_pdu(
+            m_ev = await self.federation_client.get_pdu(
                 [origin],
                 e_id,
                 room_version=room_version.identifier,
@@ -1950,18 +1946,18 @@ class FederationHandler(BaseHandler):
                     raise
                 events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
-        yield self.persist_events_and_notify(
+        await self.persist_events_and_notify(
             [
                 (e, events_to_context[e.event_id])
                 for e in itertools.chain(auth_events, state)
             ]
         )
 
-        new_event_context = yield self.state_handler.compute_event_context(
+        new_event_context = await self.state_handler.compute_event_context(
             event, old_state=state
         )
 
-        yield self.persist_events_and_notify([(event, new_event_context)])
+        await self.persist_events_and_notify([(event, new_event_context)])
 
     async def _prep_event(
         self,
