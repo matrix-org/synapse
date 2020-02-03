@@ -471,9 +471,8 @@ class FederationClient(FederationBase):
                 % (membership, ",".join(valid_memberships))
             )
 
-        @defer.inlineCallbacks
-        def send_request(destination):
-            ret = yield self.transport_layer.make_membership_event(
+        async def send_request(destination: str) -> Tuple[str, EventBase, RoomVersion]:
+            ret = await self.transport_layer.make_membership_event(
                 destination, room_id, user_id, membership, params
             )
 
@@ -506,7 +505,7 @@ class FederationClient(FederationBase):
                 event_dict=pdu_dict,
             )
 
-            return (destination, ev, room_version)
+            return destination, ev, room_version
 
         return await self._try_destination_list(
             "make_" + membership, destinations, send_request
