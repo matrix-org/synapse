@@ -2816,27 +2816,27 @@ class FederationHandler(BaseHandler):
         if "valid" not in response or not response["valid"]:
             raise AuthError(403, "Third party certificate was invalid")
 
-    @defer.inlineCallbacks
-    def persist_events_and_notify(self, event_and_contexts, backfilled=False):
+    async def persist_events_and_notify(
+        self,
+        event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
+        backfilled: bool = False,
+    ) -> None:
         """Persists events and tells the notifier/pushers about them, if
         necessary.
 
         Args:
-            event_and_contexts(list[tuple[FrozenEvent, EventContext]])
-            backfilled (bool): Whether these events are a result of
+            event_and_contexts:
+            backfilled: Whether these events are a result of
                 backfilling or not
-
-        Returns:
-            Deferred
         """
         if self.config.worker_app:
-            yield self._send_events_to_master(
+            await self._send_events_to_master(
                 store=self.store,
                 event_and_contexts=event_and_contexts,
                 backfilled=backfilled,
             )
         else:
-            max_stream_id = yield self.storage.persistence.persist_events(
+            max_stream_id = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 
@@ -2847,7 +2847,7 @@ class FederationHandler(BaseHandler):
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
-                    yield self._notify_persisted_event(event, max_stream_id)
+                    await self._notify_persisted_event(event, max_stream_id)
 
     def _notify_persisted_event(self, event, max_stream_id):
         """Checks to see if notifier/pushers should be notified about the
