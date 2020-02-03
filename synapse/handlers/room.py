@@ -22,6 +22,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
+from types import Dict
 
 from six import iteritems, string_types
 
@@ -145,15 +146,16 @@ class RoomCreationHandler(BaseHandler):
 
         return ret
 
-    @defer.inlineCallbacks
-    def _upgrade_room(self, requester, old_room_id, new_version):
+    async def _upgrade_room(
+        self, requester: Requester, old_room_id: str, new_version: RoomVersion,
+    ) -> RoomID:
         user_id = requester.user.to_string()
 
         # start by allocating a new room id
-        r = yield self.store.get_room(old_room_id)
+        r = await self.store.get_room(old_room_id)
         if r is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
-        new_room_id = yield self._generate_room_id(
+        new_room_id = await self._generate_room_id(
             creator_id=user_id, is_public=r["is_public"], room_version=new_version,
         )
 
@@ -164,7 +166,7 @@ class RoomCreationHandler(BaseHandler):
         (
             tombstone_event,
             tombstone_context,
-        ) = yield self.event_creation_handler.create_event(
+        ) = await self.event_creation_handler.create_event(
             requester,
             {
                 "type": EventTypes.Tombstone,
@@ -178,12 +180,12 @@ class RoomCreationHandler(BaseHandler):
             },
             token_id=requester.access_token_id,
         )
-        old_room_version = yield self.store.get_room_version_id(old_room_id)
-        yield self.auth.check_from_context(
+        old_room_version = await self.store.get_room_version_id(old_room_id)
+        await self.auth.check_from_context(
             old_room_version, tombstone_event, tombstone_context
         )
 
-        yield self.clone_existing_room(
+        await self.clone_existing_room(
             requester,
             old_room_id=old_room_id,
             new_room_id=new_room_id,
@@ -192,25 +194,25 @@ class RoomCreationHandler(BaseHandler):
         )
 
         # now send the tombstone
-        yield self.event_creation_handler.send_nonmember_event(
+        await self.event_creation_handler.send_nonmember_event(
             requester, tombstone_event, tombstone_context
         )
 
-        old_room_state = yield tombstone_context.get_current_state_ids()
+        old_room_state = await tombstone_context.get_current_state_ids()
 
         # update any aliases
-        yield self._move_aliases_to_new_room(
+        await self._move_aliases_to_new_room(
             requester, old_room_id, new_room_id, old_room_state
         )
 
         # Copy over user push rules, tags and migrate room directory state
-        yield self.room_member_handler.transfer_room_state_on_room_upgrade(
+        await self.room_member_handler.transfer_room_state_on_room_upgrade(
             old_room_id, new_room_id
         )
 
         # finally, shut down the PLs in the old room, and update them in the new
         # room.
-        yield self._update_upgraded_room_pls(
+        await self._update_upgraded_room_pls(
             requester, old_room_id, new_room_id, old_room_state,
         )
 
@@ -443,19 +445,22 @@ class RoomCreationHandler(BaseHandler):
         # XXX invites/joins
         # XXX 3pid invites
 
-    @defer.inlineCallbacks
-    def _move_aliases_to_new_room(
-        self, requester, old_room_id, new_room_id, old_room_state
+    async def _move_aliases_to_new_room(
+        self,
+        requester: Requester,
+        old_room_id: str,
+        new_room_id: str,
+        old_room_state: Dict[(str, str), str],
     ):
         directory_handler = self.hs.get_handlers().directory_handler
 
-        aliases = yield self.store.get_aliases_for_room(old_room_id)
+        aliases = await self.store.get_aliases_for_room(old_room_id)
 
         # check to see if we have a canonical alias.
         canonical_alias = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event_id:
-            canonical_alias_event = yield self.store.get_event(canonical_alias_event_id)
+            canonical_alias_event = await self.store.get_event(canonical_alias_event_id)
             if canonical_alias_event:
                 canonical_alias = canonical_alias_event.content.get("alias", "")
 
@@ -475,7 +480,7 @@ class RoomCreationHandler(BaseHandler):
         for alias_str in aliases:
             alias = RoomAlias.from_string(alias_str)
             try:
-                yield directory_handler.delete_association(
+                await directory_handler.delete_association(
                     requester, alias, send_event=False
                 )
                 removed_aliases.append(alias_str)
@@ -496,14 +501,14 @@ class RoomCreationHandler(BaseHandler):
             # as when you remove an alias from the directory normally - it just means that
             # the aliases event gets out of sync with the directory
             # (cf https://github.com/vector-im/riot-web/issues/2369)
-            yield directory_handler.send_room_alias_update_event(requester, old_room_id)
+            await directory_handler.send_room_alias_update_event(requester, old_room_id)
         except AuthError as e:
             logger.warning("Failed to send updated alias event on old room: %s", e)
 
         # we can now add any aliases we successfully removed to the new room.
         for alias in removed_aliases:
             try:
-                yield directory_handler.create_association(
+                await directory_handler.create_association(
                     requester,
                     RoomAlias.from_string(alias),
                     new_room_id,
@@ -519,7 +524,7 @@ class RoomCreationHandler(BaseHandler):
 
         try:
             if canonical_alias and (canonical_alias in removed_aliases):
-                yield self.event_creation_handler.create_and_send_nonmember_event(
+                await self.event_creation_handler.create_and_send_nonmember_event(
                     requester,
                     {
                         "type": EventTypes.CanonicalAlias,
@@ -531,7 +536,7 @@ class RoomCreationHandler(BaseHandler):
                     ratelimit=False,
                 )
 
-            yield directory_handler.send_room_alias_update_event(requester, new_room_id)
+            await directory_handler.send_room_alias_update_event(requester, new_room_id)
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.

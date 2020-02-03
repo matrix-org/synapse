@@ -28,7 +28,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.types import RoomAlias, UserID, get_domain_from_id
+from synapse.types import Requester, RoomAlias, UserID, get_domain_from_id
 
 from ._base import BaseHandler
 
@@ -158,22 +158,23 @@ class DirectoryHandler(BaseHandler):
                 # permission in the room; this is permitted.
                 logger.info("Skipping updating aliases event due to auth error %s", e)
 
-    @defer.inlineCallbacks
-    def delete_association(self, requester, room_alias, send_event=True):
+    async def delete_association(
+        self, requester: Requester, room_alias: RoomAlias, send_event: bool = True,
+    ) -> str:
         """Remove an alias from the directory
 
         (this is only meant for human users; AS users should call
         delete_appservice_association)
 
         Args:
-            requester (Requester):
-            room_alias (RoomAlias):
-            send_event (bool): Whether to send an updated m.room.aliases event.
-                Note that, if we delete the canonical alias, we will always attempt
-                to send an m.room.canonical_alias event
+            requester:
+            room_alias:
+            send_event: Whether to send an updated m.room.aliases event. Note
+                that, if we delete the canonical alias, we will always attempt to
+                send an m.room.canonical_alias event
 
         Returns:
-            Deferred[unicode]: room id that the alias used to point to
+            Room id that the alias used to point to
 
         Raises:
             NotFoundError: if the alias doesn't exist
@@ -186,7 +187,7 @@ class DirectoryHandler(BaseHandler):
         user_id = requester.user.to_string()
 
         try:
-            can_delete = yield self._user_can_delete_alias(room_alias, user_id)
+            can_delete = await self._user_can_delete_alias(room_alias, user_id)
         except StoreError as e:
             if e.code == 404:
                 raise NotFoundError("Unknown room alias")
@@ -195,7 +196,7 @@ class DirectoryHandler(BaseHandler):
         if not can_delete:
             raise AuthError(403, "You don't have permission to delete the alias.")
 
-        can_delete = yield self.can_modify_alias(room_alias, user_id=user_id)
+        can_delete = await self.can_modify_alias(room_alias, user_id=user_id)
         if not can_delete:
             raise SynapseError(
                 400,
@@ -203,13 +204,13 @@ class DirectoryHandler(BaseHandler):
                 errcode=Codes.EXCLUSIVE,
             )
 
-        room_id = yield self._delete_association(room_alias)
+        room_id = await self._delete_association(room_alias)
 
         try:
             if send_event:
-                yield self.send_room_alias_update_event(requester, room_id)
+                await self.send_room_alias_update_event(requester, room_id)
 
-            yield self._update_canonical_alias(
+            await self._update_canonical_alias(
                 requester, requester.user.to_string(), room_id, room_alias
             )
         except AuthError as e:
@@ -368,14 +369,13 @@ class DirectoryHandler(BaseHandler):
         # either no interested services, or no service with an exclusive lock
         return defer.succeed(True)
 
-    @defer.inlineCallbacks
-    def _user_can_delete_alias(self, alias, user_id):
-        creator = yield self.store.get_room_alias_creator(alias.to_string())
+    async def _user_can_delete_alias(self, alias: RoomAlias, user_id: str) -> bool:
+        creator = await self.store.get_room_alias_creator(alias.to_string())
 
         if creator is not None and creator == user_id:
             return True
 
-        is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
+        is_admin = await self.auth.is_server_admin(UserID.from_string(user_id))
         return is_admin
 
     @defer.inlineCallbacks
