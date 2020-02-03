@@ -984,8 +984,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         """
         fed_handler = self.federation_handler
         try:
-            ret = yield fed_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, target.to_string(), content=content,
+            ret = yield defer.ensureDeferred(
+                fed_handler.do_remotely_reject_invite(
+                    remote_room_hosts, room_id, target.to_string(), content=content,
+                )
             )
             return ret
         except Exception as e:

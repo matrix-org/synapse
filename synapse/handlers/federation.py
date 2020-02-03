@@ -1531,9 +1531,10 @@ class FederationHandler(BaseHandler):
 
         return event
 
-    @defer.inlineCallbacks
-    def do_remotely_reject_invite(self, target_hosts, room_id, user_id, content):
-        origin, event, room_version = yield self._make_and_verify_event(
+    async def do_remotely_reject_invite(
+        self, target_hosts: Iterable[str], room_id: str, user_id: str, content: JsonDict
+    ) -> EventBase:
+        origin, event, room_version = await self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
         # Mark as outlier as we don't have any state for this event; we're not
@@ -1549,10 +1550,10 @@ class FederationHandler(BaseHandler):
         except ValueError:
             pass
 
-        yield self.federation_client.send_leave(target_hosts, event)
+        await self.federation_client.send_leave(target_hosts, event)
 
-        context = yield self.state_handler.compute_event_context(event)
-        yield self.persist_events_and_notify([(event, context)])
+        context = await self.state_handler.compute_event_context(event)
+        await self.persist_events_and_notify([(event, context)])
 
         return event
 
