@@ -17,7 +17,7 @@
 import copy
 import itertools
 import logging
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
 
@@ -496,27 +496,29 @@ class FederationClient(FederationBase):
             "make_" + membership, destinations, send_request
         )
 
-    def send_join(self, destinations, pdu, event_format_version):
+    async def send_join(
+        self, destinations: Iterable[str], pdu: EventBase, event_format_version: int
+    ) -> Dict[str, Any]:
         """Sends a join event to one of a list of homeservers.
 
         Doing so will cause the remote server to add the event to the graph,
         and send the event out to the rest of the federation.
 
         Args:
-            destinations (str): Candidate homeservers which are probably
+            destinations: Candidate homeservers which are probably
                 participating in the room.
-            pdu (BaseEvent): event to be sent
-            event_format_version (int): The event format version
+            pdu: event to be sent
+            event_format_version: The event format version
 
-        Return:
-            Deferred: resolves to a dict with members ``origin`` (a string
+        Returns:
+            a dict with members ``origin`` (a string
             giving the serer the event was sent to, ``state`` (?) and
             ``auth_chain``.
 
-            Fails with a ``SynapseError`` if the chosen remote server
-            returns a 300/400 code.
+        Raises:
+            SynapseError: if the chosen remote server returns a 300/400 code.
 
-            Fails with a ``RuntimeError`` if no servers were reachable.
+            RuntimeError: if no servers were reachable.
         """
 
         def check_authchain_validity(signed_auth_chain):
@@ -603,7 +605,7 @@ class FederationClient(FederationBase):
                 "origin": destination,
             }
 
-        return self._try_destination_list("send_join", destinations, send_request)
+        return await self._try_destination_list("send_join", destinations, send_request)
 
     @defer.inlineCallbacks
     def _do_send_join(self, destination, pdu):
