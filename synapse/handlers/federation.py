@@ -2371,21 +2371,21 @@ class FederationHandler(BaseHandler):
 
         return context
 
-    @defer.inlineCallbacks
-    def _update_context_for_auth_events(self, event, context, auth_events):
+    async def _update_context_for_auth_events(
+        self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
+    ) -> EventContext:
         """Update the state_ids in an event context after auth event resolution,
         storing the changes as a new state group.
 
         Args:
-            event (Event): The event we're handling the context for
+            event: The event we're handling the context for
 
-            context (synapse.events.snapshot.EventContext): initial event context
+            context: initial event context
 
-            auth_events (dict[(str, str)->EventBase]): Events to update in the event
-                context.
+            auth_events: Events to update in the event context.
 
         Returns:
-            Deferred[EventContext]: new event context
+            new event context
         """
         # exclude the state key of the new event from the current_state in the context.
         if event.is_state():
@@ -2396,19 +2396,19 @@ class FederationHandler(BaseHandler):
             k: a.event_id for k, a in iteritems(auth_events) if k != event_key
         }
 
-        current_state_ids = yield context.get_current_state_ids()
+        current_state_ids = await context.get_current_state_ids()
         current_state_ids = dict(current_state_ids)
 
         current_state_ids.update(state_updates)
 
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
         prev_state_ids = dict(prev_state_ids)
 
         prev_state_ids.update({k: a.event_id for k, a in iteritems(auth_events)})
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
-        state_group = yield self.state_store.store_state_group(
+        state_group = await self.state_store.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=prev_group,
