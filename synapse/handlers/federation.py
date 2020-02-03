@@ -1411,9 +1411,7 @@ class FederationHandler(BaseHandler):
 
         return event
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_send_join_request(self, origin, pdu):
+    async def on_send_join_request(self, origin, pdu):
         """ We have received a join event for a room. Fully process it and
         respond with the current state and auth chains.
         """
@@ -1450,9 +1448,9 @@ class FederationHandler(BaseHandler):
         # would introduce the danger of backwards-compatibility problems.
         event.internal_metadata.send_on_behalf_of = origin
 
-        context = yield self._handle_new_event(origin, event)
+        context = await self._handle_new_event(origin, event)
 
-        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+        event_allowed = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
         if not event_allowed:
@@ -1470,14 +1468,14 @@ class FederationHandler(BaseHandler):
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.JOIN:
                 user = UserID.from_string(event.state_key)
-                yield self.user_joined_room(user, event.room_id)
+                await self.user_joined_room(user, event.room_id)
 
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
 
         state_ids = list(prev_state_ids.values())
-        auth_chain = yield self.store.get_auth_chain(state_ids)
+        auth_chain = await self.store.get_auth_chain(state_ids)
 
-        state = yield self.store.get_events(list(prev_state_ids.values()))
+        state = await self.store.get_events(list(prev_state_ids.values()))
 
         return {"state": list(state.values()), "auth_chain": auth_chain}
 
