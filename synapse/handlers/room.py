@@ -836,7 +836,7 @@ class RoomCreationHandler(BaseHandler):
                 "ban": 50,
                 "kick": 50,
                 "redact": 50,
-                "invite": 0,
+                "invite": 50,
             }
 
             if config["original_invitees_have_ops"]:
