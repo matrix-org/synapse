@@ -1479,8 +1479,7 @@ class FederationHandler(BaseHandler):
 
         return {"state": list(state.values()), "auth_chain": auth_chain}
 
-    @defer.inlineCallbacks
-    def on_invite_request(
+    async def on_invite_request(
         self, origin: str, event: EventBase, room_version: RoomVersion
     ):
         """ We've got an invite event. Process and persist it. Sign it.
@@ -1490,7 +1489,7 @@ class FederationHandler(BaseHandler):
         if event.state_key is None:
             raise SynapseError(400, "The invite event did not have a state key")
 
-        is_blocked = yield self.store.is_room_blocked(event.room_id)
+        is_blocked = await self.store.is_room_blocked(event.room_id)
         if is_blocked:
             raise SynapseError(403, "This room has been blocked on this server")
 
@@ -1533,8 +1532,8 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        context = yield self.state_handler.compute_event_context(event)
-        yield self.persist_events_and_notify([(event, context)])
+        context = await self.state_handler.compute_event_context(event)
+        await self.persist_events_and_notify([(event, context)])
 
         return event
 
