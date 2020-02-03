@@ -25,6 +25,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Tuple,
     TypeVar,
 )
@@ -828,34 +829,33 @@ class FederationClient(FederationBase):
             third_party_instance_id=third_party_instance_id,
         )
 
-    @defer.inlineCallbacks
-    def get_missing_events(
+    async def get_missing_events(
         self,
-        destination,
-        room_id,
-        earliest_events_ids,
-        latest_events,
-        limit,
-        min_depth,
-        timeout,
-    ):
+        destination: str,
+        room_id: str,
+        earliest_events_ids: Sequence[str],
+        latest_events: Iterable[EventBase],
+        limit: int,
+        min_depth: int,
+        timeout: int,
+    ) -> List[EventBase]:
         """Tries to fetch events we are missing. This is called when we receive
         an event without having received all of its ancestors.
 
         Args:
-            destination (str)
-            room_id (str)
-            earliest_events_ids (list): List of event ids. Effectively the
+            destination
+            room_id
+            earliest_events_ids: List of event ids. Effectively the
                 events we expected to receive, but haven't. `get_missing_events`
                 should only return events that didn't happen before these.
-            latest_events (list): List of events we have received that we don't
+            latest_events: List of events we have received that we don't
                 have all previous events for.
-            limit (int): Maximum number of events to return.
-            min_depth (int): Minimum depth of events tor return.
-            timeout (int): Max time to wait in ms
+            limit: Maximum number of events to return.
+            min_depth: Minimum depth of events to return.
+            timeout: Max time to wait in ms
         """
         try:
-            content = yield self.transport_layer.get_missing_events(
+            content = await self.transport_layer.get_missing_events(
                 destination=destination,
                 room_id=room_id,
                 earliest_events=earliest_events_ids,
@@ -865,14 +865,14 @@ class FederationClient(FederationBase):
                 timeout=timeout,
             )
 
-            room_version = yield self.store.get_room_version_id(room_id)
+            room_version = await self.store.get_room_version_id(room_id)
             format_ver = room_version_to_event_format(room_version)
 
             events = [
                 event_from_pdu_json(e, format_ver) for e in content.get("events", [])
             ]
 
-            signed_events = yield self._check_sigs_and_hash_and_fetch(
+            signed_events = await self._check_sigs_and_hash_and_fetch(
                 destination, events, outlier=False, room_version=room_version
             )
         except HttpResponseException as e:
