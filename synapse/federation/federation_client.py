@@ -621,12 +621,11 @@ class FederationClient(FederationBase):
 
         return await self._try_destination_list("send_join", destinations, send_request)
 
-    @defer.inlineCallbacks
-    def _do_send_join(self, destination, pdu):
+    async def _do_send_join(self, destination: str, pdu: EventBase):
         time_now = self._clock.time_msec()
 
         try:
-            content = yield self.transport_layer.send_join_v2(
+            content = await self.transport_layer.send_join_v2(
                 destination=destination,
                 room_id=pdu.room_id,
                 event_id=pdu.event_id,
@@ -648,7 +647,7 @@ class FederationClient(FederationBase):
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
 
-        resp = yield self.transport_layer.send_join_v1(
+        resp = await self.transport_layer.send_join_v1(
             destination=destination,
             room_id=pdu.room_id,
             event_id=pdu.event_id,
