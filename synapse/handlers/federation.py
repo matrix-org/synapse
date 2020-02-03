@@ -1966,54 +1966,41 @@ class FederationHandler(BaseHandler):
 
         yield self.persist_events_and_notify([(event, new_event_context)])
 
-    @defer.inlineCallbacks
-    def _prep_event(
+    async def _prep_event(
         self,
         origin: str,
         event: EventBase,
         state: Optional[Iterable[EventBase]],
         auth_events: Optional[StateMap[EventBase]],
         backfilled: bool,
-    ):
-        """
-
-        Args:
-            origin:
-            event:
-            state:
-            auth_events:
-            backfilled:
-
-        Returns:
-            Deferred, which resolves to synapse.events.snapshot.EventContext
-        """
-        context = yield self.state_handler.compute_event_context(event, old_state=state)
+    ) -> EventContext:
+        context = await self.state_handler.compute_event_context(event, old_state=state)
 
         if not auth_events:
-            prev_state_ids = yield context.get_prev_state_ids()
-            auth_events_ids = yield self.auth.compute_auth_events(
+            prev_state_ids = await context.get_prev_state_ids()
+            auth_events_ids = await self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
-            auth_events = yield self.store.get_events(auth_events_ids)
+            auth_events = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
         # This is a hack to fix some old rooms where the initial join event
         # didn't reference the create event in its auth events.
         if event.type == EventTypes.Member and not event.auth_event_ids():
             if len(event.prev_event_ids()) == 1 and event.depth < 5:
-                c = yield self.store.get_event(
+                c = await self.store.get_event(
                     event.prev_event_ids()[0], allow_none=True
                 )
                 if c and c.type == EventTypes.Create:
                     auth_events[(c.type, c.state_key)] = c
 
-        context = yield self.do_auth(origin, event, context, auth_events=auth_events)
+        context = await self.do_auth(origin, event, context, auth_events=auth_events)
 
         if not context.rejected:
-            yield self._check_for_soft_fail(event, state, backfilled)
+            await self._check_for_soft_fail(event, state, backfilled)
 
         if event.type == EventTypes.GuestAccess and not context.rejected:
-            yield self.maybe_kick_guest_users(event)
+            await self.maybe_kick_guest_users(event)
 
         return context
 
