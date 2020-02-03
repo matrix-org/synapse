@@ -499,7 +499,7 @@ class Auth(object):
         request.authenticated_entity = service.sender
         return defer.succeed(service)
 
-    def is_server_admin(self, user):
+    async def is_server_admin(self, user):
         """ Check if the given user is a local server admin.
 
         Args:
@@ -508,7 +508,7 @@ class Auth(object):
         Returns:
             bool: True if the user is an admin
         """
-        return self.store.is_server_admin(user)
+        return await self.store.is_server_admin(user)
 
     def compute_auth_events(
         self, event, current_state_ids: StateMap[str], for_verification: bool = False,

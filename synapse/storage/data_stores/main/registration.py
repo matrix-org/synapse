@@ -273,8 +273,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="delete_account_validity_for_user",
         )
 
-    @defer.inlineCallbacks
-    def is_server_admin(self, user):
+    async def is_server_admin(self, user):
         """Determines if a user is an admin of this homeserver.
 
         Args:
@@ -283,7 +282,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns (bool):
             true iff the user is a server admin, false otherwise.
         """
-        res = yield self.db.simple_select_one_onecol(
+        res = await self.db.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user.to_string()},
             retcol="admin",
@@ -291,7 +290,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="is_server_admin",
         )
 
-        return bool(res) if res else False
+        return bool(res)
 
     def set_server_admin(self, user, admin):
         """Sets whether a user is an admin of this homeserver.
