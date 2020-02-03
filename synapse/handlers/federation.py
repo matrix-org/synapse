@@ -1815,13 +1815,12 @@ class FederationHandler(BaseHandler):
 
         return context
 
-    @defer.inlineCallbacks
-    def _handle_new_events(
+    async def _handle_new_events(
         self,
         origin: str,
         event_infos: Iterable[_NewEventInfo],
         backfilled: bool = False,
-    ):
+    ) -> None:
         """Creates the appropriate contexts and persists events. The events
         should not depend on one another, e.g. this should be used to persist
         a bunch of outliers, but not a chunk of individual events that depend
@@ -1830,11 +1829,10 @@ class FederationHandler(BaseHandler):
         Notifies about the events where appropriate.
         """
 
-        @defer.inlineCallbacks
-        def prep(ev_info: _NewEventInfo):
+        async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
-                res = yield self._prep_event(
+                res = await self._prep_event(
                     origin,
                     event,
                     state=ev_info.state,
@@ -1843,14 +1841,14 @@ class FederationHandler(BaseHandler):
                 )
             return res
 
-        contexts = yield make_deferred_yieldable(
+        contexts = await make_deferred_yieldable(
             defer.gatherResults(
                 [run_in_background(prep, ev_info) for ev_info in event_infos],
                 consumeErrors=True,
             )
         )
 
-        yield self.persist_events_and_notify(
+        await self.persist_events_and_notify(
             [
                 (ev_info.event, context)
                 for ev_info, context in zip(event_infos, contexts)
