@@ -1581,20 +1581,17 @@ class FederationHandler(BaseHandler):
         assert event.room_id == room_id
         return origin, event, room_version
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_make_leave_request(self, origin, room_id, user_id):
+    async def on_make_leave_request(
+        self, origin: str, room_id: str, user_id: str
+    ) -> EventBase:
         """ We've received a /make_leave/ request, so we create a partial
         leave event for the room and return that. We do *not* persist or
         process it until the other server has signed it and sent it back.
 
         Args:
-            origin (str): The (verified) server name of the requesting server.
-            room_id (str): Room to create leave event in
-            user_id (str): The user to create the leave for
-
-        Returns:
-            Deferred[FrozenEvent]
+            origin: The (verified) server name of the requesting server.
+            room_id: Room to create leave event in
+            user_id: The user to create the leave for
         """
         if get_domain_from_id(user_id) != origin:
             logger.info(
@@ -1604,7 +1601,7 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        room_version = yield self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         builder = self.event_builder_factory.new(
             room_version,
             {
@@ -1616,11 +1613,11 @@ class FederationHandler(BaseHandler):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
+        event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
 
-        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+        event_allowed = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
         if not event_allowed:
@@ -1632,7 +1629,7 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            yield self.auth.check_from_context(
+            await self.auth.check_from_context(
                 room_version, event, context, do_sig_check=False
             )
         except AuthError as e:
