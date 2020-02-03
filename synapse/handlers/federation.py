@@ -1641,9 +1641,7 @@ class FederationHandler(BaseHandler):
 
         return event
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_send_leave_request(self, origin, pdu):
+    async def on_send_leave_request(self, origin, pdu):
         """ We have received a leave event for a room. Fully process it."""
         event = pdu
 
@@ -1663,9 +1661,9 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        context = yield self._handle_new_event(origin, event)
+        context = await self._handle_new_event(origin, event)
 
-        event_allowed = yield self.third_party_event_rules.check_event_allowed(
+        event_allowed = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
         if not event_allowed:
