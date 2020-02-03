@@ -659,23 +659,22 @@ class FederationClient(FederationBase):
         # content.
         return resp[1]
 
-    @defer.inlineCallbacks
-    def send_invite(self, destination, room_id, event_id, pdu):
-        room_version = yield self.store.get_room_version_id(room_id)
+    async def send_invite(self, destination, room_id, event_id, pdu):
+        room_version = await self.store.get_room_version_id(room_id)
 
-        content = yield self._do_send_invite(destination, pdu, room_version)
+        content = await self._do_send_invite(destination, pdu, room_version)
 
         pdu_dict = content["event"]
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 
-        room_version = yield self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         format_ver = room_version_to_event_format(room_version)
 
         pdu = event_from_pdu_json(pdu_dict, format_ver)
 
         # Check signatures are correct.
-        pdu = yield self._check_sigs_and_hash(room_version, pdu)
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
 
         # FIXME: We should handle signature failures more gracefully.
 
