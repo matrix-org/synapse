@@ -730,7 +730,7 @@ class FederationClient(FederationBase):
         )
         return content
 
-    def send_leave(self, destinations, pdu):
+    async def send_leave(self, destinations: Iterable[str], pdu: EventBase) -> None:
         """Sends a leave event to one of a list of homeservers.
 
         Doing so will cause the remote server to add the event to the graph,
@@ -739,17 +739,14 @@ class FederationClient(FederationBase):
         This is mostly useful to reject received invites.
 
         Args:
-            destinations (str): Candidate homeservers which are probably
+            destinations: Candidate homeservers which are probably
                 participating in the room.
-            pdu (BaseEvent): event to be sent
+            pdu: event to be sent
 
-        Return:
-            Deferred: resolves to None.
+        Raises:
+            SynapseError if the chosen remote server returns a 300/400 code.
 
-            Fails with a ``SynapseError`` if the chosen remote server
-            returns a 300/400 code.
-
-            Fails with a ``RuntimeError`` if no servers were reachable.
+            RuntimeError if no servers were reachable.
         """
 
         @defer.inlineCallbacks
@@ -759,7 +756,9 @@ class FederationClient(FederationBase):
             logger.debug("Got content: %s", content)
             return None
 
-        return self._try_destination_list("send_leave", destinations, send_request)
+        return await self._try_destination_list(
+            "send_leave", destinations, send_request
+        )
 
     @defer.inlineCallbacks
     def _do_send_leave(self, destination, pdu):
