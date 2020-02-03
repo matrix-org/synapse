@@ -343,7 +343,7 @@ class Database(object):
 
             top_three_counters = self._txn_perf_counters.interval(duration, limit=3)
 
-            perf_logger.info(
+            perf_logger.debug(
                 "Total database time: %.3f%% {%s}", ratio * 100, top_three_counters
             )
 
