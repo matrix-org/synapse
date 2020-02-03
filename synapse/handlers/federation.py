@@ -2895,15 +2895,15 @@ class FederationHandler(BaseHandler):
         else:
             await self.store.clean_room_for_join(room_id)
 
-    def user_joined_room(self, user, room_id):
+    async def user_joined_room(self, user: UserID, room_id: str) -> None:
         """Called when a new user has joined the room
         """
         if self.config.worker_app:
-            return self._notify_user_membership_change(
+            await self._notify_user_membership_change(
                 room_id=room_id, user_id=user.to_string(), change="joined"
             )
         else:
-            return defer.succeed(user_joined_room(self.distributor, user, room_id))
+            user_joined_room(self.distributor, user, room_id)
 
     @defer.inlineCallbacks
     def get_room_complexity(self, remote_room_hosts, room_id):
