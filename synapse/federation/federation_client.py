@@ -17,7 +17,17 @@
 import copy
 import itertools
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 from prometheus_client import Counter
 
@@ -52,6 +62,8 @@ sent_queries_counter = Counter("synapse_federation_client_sent_queries", "", ["t
 
 
 PDU_RETRY_TIME_MS = 1 * 60 * 1000
+
+T = TypeVar("T")
 
 
 class InvalidResponseError(RuntimeError):
@@ -349,17 +361,21 @@ class FederationClient(FederationBase):
 
         return signed_auth
 
-    @defer.inlineCallbacks
-    def _try_destination_list(self, description, destinations, callback):
+    async def _try_destination_list(
+        self,
+        description: str,
+        destinations: Iterable[str],
+        callback: Callable[[str], Awaitable[T]],
+    ) -> T:
         """Try an operation on a series of servers, until it succeeds
 
         Args:
-            description (unicode): description of the operation we're doing, for logging
+            description: description of the operation we're doing, for logging
 
-            destinations (Iterable[unicode]): list of server_names to try
+            destinations: list of server_names to try
 
-            callback (callable):  Function to run for each server. Passed a single
-                argument: the server_name to try. May return a deferred.
+            callback:  Function to run for each server. Passed a single
+                argument: the server_name to try.
 
                 If the callback raises a CodeMessageException with a 300/400 code,
                 attempts to perform the operation stop immediately and the exception is
@@ -370,7 +386,7 @@ class FederationClient(FederationBase):
                 suppressed if the exception is an InvalidResponseError.
 
         Returns:
-            The [Deferred] result of callback, if it succeeds
+            The result of callback, if it succeeds
 
         Raises:
             SynapseError if the chosen remote server returns a 300/400 code, or
@@ -381,7 +397,7 @@ class FederationClient(FederationBase):
                 continue
 
             try:
-                res = yield callback(destination)
+                res = await callback(destination)
                 return res
             except InvalidResponseError as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
@@ -400,7 +416,7 @@ class FederationClient(FederationBase):
                     )
             except Exception:
                 logger.warning(
-                    "Failed to %s via %s", description, destination, exc_info=1
+                    "Failed to %s via %s", description, destination, exc_info=True
                 )
 
         raise SynapseError(502, "Failed to %s via any server" % (description,))
