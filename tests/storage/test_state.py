@@ -45,7 +45,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
         self.room = RoomID.from_string("!abc123:test")
 
         yield self.store.store_room(
-            self.room.to_string(), room_creator_user_id="@creator:text", is_public=True
+            self.room.to_string(),
+            room_creator_user_id="@creator:text",
+            is_public=True,
+            room_version=RoomVersions.V1,
         )
 
     @defer.inlineCallbacks

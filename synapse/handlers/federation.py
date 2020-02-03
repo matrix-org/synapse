@@ -44,7 +44,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
@@ -57,6 +57,7 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.utils import log_function
+from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
@@ -155,6 +156,13 @@ class FederationHandler(BaseHandler):
         self._clean_room_for_join_client = ReplicationCleanRoomRestServlet.make_client(
             hs
         )
+
+        if hs.config.worker_app:
+            self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
+                hs
+            )
+        else:
+            self._device_list_updater = hs.get_device_handler().device_list_updater
 
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
@@ -380,7 +388,7 @@ class FederationHandler(BaseHandler):
                             for x in remote_state:
                                 event_map[x.event_id] = x
 
-                    room_version = await self.store.get_room_version(room_id)
+                    room_version = await self.store.get_room_version_id(room_id)
                     state_map = await resolve_events_with_store(
                         room_id,
                         room_version,
@@ -703,8 +711,20 @@ class FederationHandler(BaseHandler):
 
         if not room:
             try:
+                prev_state_ids = await context.get_prev_state_ids()
+                create_event = await self.store.get_event(
+                    prev_state_ids[(EventTypes.Create, "")]
+                )
+
+                room_version_id = create_event.content.get(
+                    "room_version", RoomVersions.V1.identifier
+                )
+
                 await self.store.store_room(
-                    room_id=room_id, room_creator_user_id="", is_public=False
+                    room_id=room_id,
+                    room_creator_user_id="",
+                    is_public=False,
+                    room_version=KNOWN_ROOM_VERSIONS[room_version_id],
                 )
             except StoreError:
                 logger.exception("Failed to store room.")
@@ -729,6 +749,32 @@ class FederationHandler(BaseHandler):
                 if newly_joined:
                     user = UserID.from_string(event.state_key)
                     await self.user_joined_room(user, room_id)
+
+        # For encrypted messages we check that we know about the sending device,
+        # if we don't then we mark the device cache for that user as stale.
+        if event.type == EventTypes.Encryption:
+            device_id = event.content.get("device_id")
+            if device_id is not None:
+                cached_devices = await self.store.get_cached_devices_for_user(
+                    event.sender
+                )
+                if device_id not in cached_devices:
+                    logger.info(
+                        "Received event from remote device not in our cache: %s %s",
+                        event.sender,
+                        device_id,
+                    )
+                    await self.store.mark_remote_user_device_cache_as_stale(
+                        event.sender
+                    )
+
+                    # Immediately attempt a resync in the background
+                    if self.config.worker_app:
+                        return run_in_background(self._user_device_resync, event.sender)
+                    else:
+                        return run_in_background(
+                            self._device_list_updater.user_device_resync, event.sender
+                        )
 
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
@@ -1064,7 +1110,7 @@ class FederationHandler(BaseHandler):
         Logs a warning if we can't find the given event.
         """
 
-        room_version = await self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
 
         event_infos = []
 
@@ -1186,7 +1232,7 @@ class FederationHandler(BaseHandler):
         """
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event, event_format_version = yield self._make_and_verify_event(
+        origin, event, room_version_obj = yield self._make_and_verify_event(
             target_hosts,
             room_id,
             joinee,
@@ -1214,6 +1260,8 @@ class FederationHandler(BaseHandler):
                 target_hosts.insert(0, origin)
             except ValueError:
                 pass
+
+            event_format_version = room_version_obj.event_format
             ret = yield self.federation_client.send_join(
                 target_hosts, event, event_format_version
             )
@@ -1234,13 +1282,18 @@ class FederationHandler(BaseHandler):
 
             try:
                 yield self.store.store_room(
-                    room_id=room_id, room_creator_user_id="", is_public=False
+                    room_id=room_id,
+                    room_creator_user_id="",
+                    is_public=False,
+                    room_version=room_version_obj,
                 )
             except Exception:
                 # FIXME
                 pass
 
-            yield self._persist_auth_tree(origin, auth_chain, state, event)
+            yield self._persist_auth_tree(
+                origin, auth_chain, state, event, room_version_obj
+            )
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
@@ -1320,7 +1373,7 @@ class FederationHandler(BaseHandler):
 
         event_content = {"membership": Membership.JOIN}
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
 
         builder = self.event_builder_factory.new(
             room_version,
@@ -1429,13 +1482,13 @@ class FederationHandler(BaseHandler):
         return {"state": list(state.values()), "auth_chain": auth_chain}
 
     @defer.inlineCallbacks
-    def on_invite_request(self, origin, pdu):
+    def on_invite_request(
+        self, origin: str, event: EventBase, room_version: RoomVersion
+    ):
         """ We've got an invite event. Process and persist it. Sign it.
 
         Respond with the now signed event.
         """
-        event = pdu
-
         if event.state_key is None:
             raise SynapseError(400, "The invite event did not have a state key")
 
@@ -1475,7 +1528,10 @@ class FederationHandler(BaseHandler):
 
         event.signatures.update(
             compute_event_signature(
-                event.get_pdu_json(), self.hs.hostname, self.hs.config.signing_key[0]
+                room_version,
+                event.get_pdu_json(),
+                self.hs.hostname,
+                self.hs.config.signing_key[0],
             )
         )
 
@@ -1486,7 +1542,7 @@ class FederationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def do_remotely_reject_invite(self, target_hosts, room_id, user_id, content):
-        origin, event, event_format_version = yield self._make_and_verify_event(
+        origin, event, room_version = yield self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
         # Mark as outlier as we don't have any state for this event; we're not
@@ -1513,7 +1569,11 @@ class FederationHandler(BaseHandler):
     def _make_and_verify_event(
         self, target_hosts, room_id, user_id, membership, content={}, params=None
     ):
-        origin, event, format_ver = yield self.federation_client.make_membership_event(
+        (
+            origin,
+            event,
+            room_version,
+        ) = yield self.federation_client.make_membership_event(
             target_hosts, room_id, user_id, membership, content, params=params
         )
 
@@ -1525,7 +1585,7 @@ class FederationHandler(BaseHandler):
         assert event.user_id == user_id
         assert event.state_key == user_id
         assert event.room_id == room_id
-        return origin, event, format_ver
+        return origin, event, room_version
 
     @defer.inlineCallbacks
     @log_function
@@ -1550,7 +1610,7 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
         builder = self.event_builder_factory.new(
             room_version,
             {
@@ -1810,7 +1870,14 @@ class FederationHandler(BaseHandler):
         )
 
     @defer.inlineCallbacks
-    def _persist_auth_tree(self, origin, auth_events, state, event):
+    def _persist_auth_tree(
+        self,
+        origin: str,
+        auth_events: List[EventBase],
+        state: List[EventBase],
+        event: EventBase,
+        room_version: RoomVersion,
+    ):
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -1819,10 +1886,12 @@ class FederationHandler(BaseHandler):
         Will attempt to fetch missing auth events.
 
         Args:
-            origin (str): Where the events came from
-            auth_events (list)
-            state (list)
-            event (Event)
+            origin: Where the events came from
+            auth_events
+            state
+            event
+            room_version: The room version we expect this room to have, and
+                will raise if it doesn't match the version in the create event.
 
         Returns:
             Deferred
@@ -1848,9 +1917,12 @@ class FederationHandler(BaseHandler):
             # invalid, and it would fail auth checks anyway.
             raise SynapseError(400, "No create event in state")
 
-        room_version = create_event.content.get(
+        room_version_id = create_event.content.get(
             "room_version", RoomVersions.V1.identifier
         )
+
+        if room_version.identifier != room_version_id:
+            raise SynapseError(400, "Room version mismatch")
 
         missing_auth_events = set()
         for e in itertools.chain(auth_events, state, [event]):
@@ -1860,7 +1932,11 @@ class FederationHandler(BaseHandler):
 
         for e_id in missing_auth_events:
             m_ev = yield self.federation_client.get_pdu(
-                [origin], e_id, room_version=room_version, outlier=True, timeout=10000
+                [origin],
+                e_id,
+                room_version=room_version.identifier,
+                outlier=True,
+                timeout=10000,
             )
             if m_ev and m_ev.event_id == e_id:
                 event_map[e_id] = m_ev
@@ -1986,7 +2062,8 @@ class FederationHandler(BaseHandler):
                 do_soft_fail_check = False
 
         if do_soft_fail_check:
-            room_version = yield self.store.get_room_version(event.room_id)
+            room_version = yield self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             # Calculate the "current state".
             if state is not None:
@@ -2036,7 +2113,9 @@ class FederationHandler(BaseHandler):
             }
 
             try:
-                event_auth.check(room_version, event, auth_events=current_auth_events)
+                event_auth.check(
+                    room_version_obj, event, auth_events=current_auth_events
+                )
             except AuthError as e:
                 logger.warning("Soft-failing %r because %s", event, e)
                 event.internal_metadata.soft_failed = True
@@ -2119,7 +2198,8 @@ class FederationHandler(BaseHandler):
         Returns:
             defer.Deferred[EventContext]: updated context object
         """
-        room_version = yield self.store.get_room_version(event.room_id)
+        room_version = yield self.store.get_room_version_id(event.room_id)
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
         try:
             context = yield self._update_auth_events_and_context_for_auth(
@@ -2137,7 +2217,7 @@ class FederationHandler(BaseHandler):
             )
 
         try:
-            event_auth.check(room_version, event, auth_events=auth_events)
+            event_auth.check(room_version_obj, event, auth_events=auth_events)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -2290,7 +2370,7 @@ class FederationHandler(BaseHandler):
         remote_auth_events.update({(d.type, d.state_key): d for d in different_events})
         remote_state = remote_auth_events.values()
 
-        room_version = yield self.store.get_room_version(event.room_id)
+        room_version = yield self.store.get_room_version_id(event.room_id)
         new_state = yield self.state_handler.resolve_events(
             room_version, (local_state, remote_state), event
         )
@@ -2514,7 +2594,7 @@ class FederationHandler(BaseHandler):
         }
 
         if (yield self.auth.check_host_in_room(room_id, self.hs.hostname)):
-            room_version = yield self.store.get_room_version(room_id)
+            room_version = yield self.store.get_room_version_id(room_id)
             builder = self.event_builder_factory.new(room_version, event_dict)
 
             EventValidator().validate_builder(builder)
@@ -2577,7 +2657,7 @@ class FederationHandler(BaseHandler):
         Returns:
             Deferred: resolves (to None)
         """
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
 
         # NB: event_dict has a particular specced format we might need to fudge
         # if we change event formats too much.

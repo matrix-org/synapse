@@ -23,6 +23,7 @@ from unpaddedbase64 import encode_base64
 
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.types import JsonDict
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -197,7 +198,7 @@ class EventBase(object):
     def is_state(self):
         return hasattr(self, "state_key") and self.state_key is not None
 
-    def get_dict(self):
+    def get_dict(self) -> JsonDict:
         d = dict(self._event_dict)
         d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
 
@@ -209,7 +210,7 @@ class EventBase(object):
     def get_internal_metadata_dict(self):
         return self.internal_metadata.get_dict()
 
-    def get_pdu_json(self, time_now=None):
+    def get_pdu_json(self, time_now=None) -> JsonDict:
         pdu_json = self.get_dict()
 
         if time_now is not None and "age_ts" in pdu_json["unsigned"]:

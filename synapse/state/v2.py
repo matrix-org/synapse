@@ -26,6 +26,7 @@ import synapse.state
 from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.types import StateMap
 
@@ -402,6 +403,7 @@ def _iterative_auth_checks(
         Deferred[StateMap[str]]: Returns the final updated state
     """
     resolved_state = base_state.copy()
+    room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
     for event_id in event_ids:
         event = event_map[event_id]
@@ -430,7 +432,7 @@ def _iterative_auth_checks(
 
         try:
             event_auth.check(
-                room_version,
+                room_version_obj,
                 event,
                 auth_events,
                 do_sig_check=False,

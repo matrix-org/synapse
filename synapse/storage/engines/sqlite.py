@@ -59,6 +59,11 @@ class Sqlite3Engine(object):
             if version < (3, 11, 0):
                 raise RuntimeError("Synapse requires sqlite 3.11 or above.")
 
+    def check_new_database(self, txn):
+        """Gets called when setting up a brand new database. This allows us to
+        apply stricter checks on new databases versus existing database.
+        """
+
     def convert_param_style(self, sql):
         return sql
 
