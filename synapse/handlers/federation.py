@@ -1782,11 +1782,10 @@ class FederationHandler(BaseHandler):
     def get_min_depth_for_context(self, context):
         return self.store.get_min_depth(context)
 
-    @defer.inlineCallbacks
-    def _handle_new_event(
+    async def _handle_new_event(
         self, origin, event, state=None, auth_events=None, backfilled=False
     ):
-        context = yield self._prep_event(
+        context = await self._prep_event(
             origin, event, state=state, auth_events=auth_events, backfilled=backfilled
         )
 
@@ -1799,11 +1798,11 @@ class FederationHandler(BaseHandler):
                 and not backfilled
                 and not context.rejected
             ):
-                yield self.action_generator.handle_push_actions_for_event(
+                await self.action_generator.handle_push_actions_for_event(
                     event, context
                 )
 
-            yield self.persist_events_and_notify(
+            await self.persist_events_and_notify(
                 [(event, context)], backfilled=backfilled
             )
             success = True
@@ -2296,7 +2295,9 @@ class FederationHandler(BaseHandler):
                         logger.debug(
                             "do_auth %s missing_auth: %s", event.event_id, e.event_id
                         )
-                        yield self._handle_new_event(origin, e, auth_events=auth)
+                        yield defer.ensureDeferred(
+                            self._handle_new_event(origin, e, auth_events=auth)
+                        )
 
                         if e.event_id in event_auth_events:
                             auth_events[(e.type, e.state_key)] = e
