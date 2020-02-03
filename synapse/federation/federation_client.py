@@ -330,19 +330,17 @@ class FederationClient(FederationBase):
 
         return state_event_ids, auth_event_ids
 
-    @defer.inlineCallbacks
-    @log_function
-    def get_event_auth(self, destination, room_id, event_id):
-        res = yield self.transport_layer.get_event_auth(destination, room_id, event_id)
+    async def get_event_auth(self, destination, room_id, event_id):
+        res = await self.transport_layer.get_event_auth(destination, room_id, event_id)
 
-        room_version = yield self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         format_ver = room_version_to_event_format(room_version)
 
         auth_chain = [
             event_from_pdu_json(p, format_ver, outlier=True) for p in res["auth_chain"]
         ]
 
-        signed_auth = yield self._check_sigs_and_hash_and_fetch(
+        signed_auth = await self._check_sigs_and_hash_and_fetch(
             destination, auth_chain, outlier=True, room_version=room_version
         )
 
