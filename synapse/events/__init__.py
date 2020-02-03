@@ -194,6 +194,10 @@ class EventBase(object):
     user_id = _event_dict_property("sender")
 
     @property
+    def event_id(self) -> str:
+        raise NotImplementedError()
+
+    @property
     def membership(self):
         return self.content["membership"]
 
@@ -259,16 +263,7 @@ class EventBase(object):
         return [e for e, _ in self.auth_events]
 
 
-class FrozenEventBase(EventBase):
-    """Base class for fully initialised events.
-    """
-
-    @property
-    def event_id(self) -> str:
-        raise NotImplementedError()
-
-
-class FrozenEvent(FrozenEventBase):
+class FrozenEvent(EventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1
 
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
@@ -317,7 +312,7 @@ class FrozenEvent(FrozenEventBase):
         )
 
 
-class FrozenEventV2(FrozenEventBase):
+class FrozenEventV2(EventBase):
     format_version = EventFormatVersions.V2  # All events of this type are V2
 
     def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
