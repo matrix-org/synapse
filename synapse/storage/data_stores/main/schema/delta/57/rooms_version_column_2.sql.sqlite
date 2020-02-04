@@ -1,4 +1,4 @@
-/* Copyright 2020 The Matrix.org Foundation C.I.C
+/* Copyright 2020 The Matrix.org Foundation C.I.C.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,4 +20,3 @@ UPDATE rooms SET room_version=(
     FROM current_state_events cse INNER JOIN event_json ej USING (event_id)
     WHERE cse.room_id=rooms.room_id AND cse.type='m.room.create' AND cse.state_key=''
 ) WHERE rooms.room_version IS NULL;
-
