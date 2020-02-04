@@ -211,7 +211,8 @@ to clean up your PR before merging. Larger changes with an organised set of
 commits may be merged as-is, if the history is judged useful.
 
 This use of squash-merging will mean PRs built on each other will be hard to 
-merge. We suggest avoiding these where possible, and if required, ensuring each PR has a tidy set of commits to ease merging.
+merge. We suggest avoiding these where possible, and if required, ensuring
+each PR has a tidy set of commits to ease merging.
 
 ## Conclusion
 
