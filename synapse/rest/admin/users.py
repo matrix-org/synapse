@@ -45,6 +45,7 @@ class UsersRestServlet(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
 
@@ -55,7 +56,7 @@ class UsersRestServlet(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Can only users a local user")
 
-        ret = await self.admin_handler.get_users()
+        ret = await self.store.get_users()
 
         return 200, ret
 
@@ -80,6 +81,7 @@ class UsersRestServletV2(RestServlet):
 
     def __init__(self, hs):
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
 
@@ -92,7 +94,7 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
-        users = await self.admin_handler.get_users_paginate(
+        users = await self.store.get_users_paginate(
             start, limit, user_id, guests, deactivated
         )
         ret = {"users": users}
@@ -103,7 +105,7 @@ class UsersRestServletV2(RestServlet):
 
 
 class UserRestServletV2(RestServlet):
-    PATTERNS = (re.compile("^/_synapse/admin/v2/users/(?P<user_id>@[^/]+)$"),)
+    PATTERNS = (re.compile("^/_synapse/admin/v2/users/(?P<user_id>[^/]+)$"),)
 
     """Get request to list user details.
     This needs user to have administrator access in Synapse.
@@ -151,7 +153,8 @@ class UserRestServletV2(RestServlet):
         return 200, ret
 
     async def on_PUT(self, request, user_id):
-        await assert_requester_is_admin(self.auth, request)
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
 
         target_user = UserID.from_string(user_id)
         body = parse_json_object_from_request(request)
@@ -162,8 +165,6 @@ class UserRestServletV2(RestServlet):
         user = await self.admin_handler.get_user(target_user)
 
         if user:  # modify user
-            requester = await self.auth.get_user_by_req(request)
-
             if "displayname" in body:
                 await self.profile_handler.set_displayname(
                     target_user, requester, body["displayname"], True
@@ -210,11 +211,8 @@ class UserRestServletV2(RestServlet):
             return 200, user
 
         else:  # create user
-            if "password" not in body:
-                raise SynapseError(
-                    400, "password must be specified", errcode=Codes.BAD_JSON
-                )
-            elif (
+            password = body.get("password")
+            if password is not None and (
                 not isinstance(body["password"], text_type)
                 or len(body["password"]) > 512
             ):
@@ -229,7 +227,7 @@ class UserRestServletV2(RestServlet):
 
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
-                password=body["password"],
+                password=password,
                 admin=bool(admin),
                 default_display_name=displayname,
                 user_type=user_type,
@@ -516,8 +514,8 @@ class SearchUsersRestServlet(RestServlet):
     PATTERNS = historical_admin_path_patterns("/search_users/(?P<target_user_id>[^/]*)")
 
     def __init__(self, hs):
-        self.store = hs.get_datastore()
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.handlers = hs.get_handlers()
 
@@ -540,7 +538,7 @@ class SearchUsersRestServlet(RestServlet):
         term = parse_string(request, "term", required=True)
         logger.info("term: %s ", term)
 
-        ret = await self.handlers.admin_handler.search_users(term)
+        ret = await self.handlers.store.search_users(term)
         return 200, ret
 
 
@@ -570,12 +568,12 @@ class UserAdminServlet(RestServlet):
                 {}
     """
 
-    PATTERNS = (re.compile("^/_synapse/admin/v1/users/(?P<user_id>@[^/]*)/admin$"),)
+    PATTERNS = (re.compile("^/_synapse/admin/v1/users/(?P<user_id>[^/]*)/admin$"),)
 
     def __init__(self, hs):
         self.hs = hs
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
 
     async def on_GET(self, request, user_id):
         await assert_requester_is_admin(self.auth, request)
@@ -585,8 +583,7 @@ class UserAdminServlet(RestServlet):
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Only local users can be admins of this homeserver")
 
-        is_admin = await self.handlers.admin_handler.get_user_server_admin(target_user)
-        is_admin = bool(is_admin)
+        is_admin = await self.store.is_server_admin(target_user)
 
         return 200, {"admin": is_admin}
 
@@ -609,8 +606,6 @@ class UserAdminServlet(RestServlet):
         if target_user == auth_user and not set_admin_to:
             raise SynapseError(400, "You may not demote yourself.")
 
-        await self.handlers.admin_handler.set_user_server_admin(
-            target_user, set_admin_to
-        )
+        await self.store.set_user_server_admin(target_user, set_admin_to)
 
         return 200, {}

@@ -23,6 +23,7 @@ from unpaddedbase64 import encode_base64
 
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.types import JsonDict
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -116,15 +117,31 @@ class _EventInternalMetadata(object):
         return getattr(self, "redacted", False)
 
 
-def _event_dict_property(key):
+_SENTINEL = object()
+
+
+def _event_dict_property(key, default=_SENTINEL):
+    """Creates a new property for the given key that delegates access to
+    `self._event_dict`.
+
+    The default is used if the key is missing from the `_event_dict`, if given,
+    otherwise an AttributeError will be raised.
+
+    Note: If a default is given then `hasattr` will always return true.
+    """
+
     # We want to be able to use hasattr with the event dict properties.
     # However, (on python3) hasattr expects AttributeError to be raised. Hence,
     # we need to transform the KeyError into an AttributeError
-    def getter(self):
+
+    def getter_raises(self):
         try:
             return self._event_dict[key]
         except KeyError:
             raise AttributeError(key)
+
+    def getter_default(self):
+        return self._event_dict.get(key, default)
 
     def setter(self, v):
         try:
@@ -138,7 +155,11 @@ def _event_dict_property(key):
         except KeyError:
             raise AttributeError(key)
 
-    return property(getter, setter, delete)
+    if default is _SENTINEL:
+        # No default given, so use the getter that raises
+        return property(getter_raises, setter, delete)
+    else:
+        return property(getter_default, setter, delete)
 
 
 class EventBase(object):
@@ -165,10 +186,16 @@ class EventBase(object):
     origin = _event_dict_property("origin")
     origin_server_ts = _event_dict_property("origin_server_ts")
     prev_events = _event_dict_property("prev_events")
-    redacts = _event_dict_property("redacts")
+    redacts = _event_dict_property("redacts", None)
     room_id = _event_dict_property("room_id")
     sender = _event_dict_property("sender")
+    state_key = _event_dict_property("state_key")
+    type = _event_dict_property("type")
     user_id = _event_dict_property("sender")
+
+    @property
+    def event_id(self) -> str:
+        raise NotImplementedError()
 
     @property
     def membership(self):
@@ -177,7 +204,7 @@ class EventBase(object):
     def is_state(self):
         return hasattr(self, "state_key") and self.state_key is not None
 
-    def get_dict(self):
+    def get_dict(self) -> JsonDict:
         d = dict(self._event_dict)
         d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
 
@@ -189,7 +216,7 @@ class EventBase(object):
     def get_internal_metadata_dict(self):
         return self.internal_metadata.get_dict()
 
-    def get_pdu_json(self, time_now=None):
+    def get_pdu_json(self, time_now=None) -> JsonDict:
         pdu_json = self.get_dict()
 
         if time_now is not None and "age_ts" in pdu_json["unsigned"]:
@@ -260,10 +287,7 @@ class FrozenEvent(EventBase):
         else:
             frozen_dict = event_dict
 
-        self.event_id = event_dict["event_id"]
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
+        self._event_id = event_dict["event_id"]
 
         super(FrozenEvent, self).__init__(
             frozen_dict,
@@ -272,6 +296,10 @@ class FrozenEvent(EventBase):
             internal_metadata_dict=internal_metadata_dict,
             rejected_reason=rejected_reason,
         )
+
+    @property
+    def event_id(self) -> str:
+        return self._event_id
 
     def __str__(self):
         return self.__repr__()
@@ -311,9 +339,6 @@ class FrozenEventV2(EventBase):
             frozen_dict = event_dict
 
         self._event_id = None
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
 
         super(FrozenEventV2, self).__init__(
             frozen_dict,

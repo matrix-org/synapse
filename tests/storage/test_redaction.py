@@ -238,8 +238,11 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             @defer.inlineCallbacks
             def build(self, prev_event_ids):
                 built_event = yield self._base_builder.build(prev_event_ids)
-                built_event.event_id = self._event_id
+
+                built_event._event_id = self._event_id
                 built_event._event_dict["event_id"] = self._event_id
+                assert built_event.event_id == self._event_id
+
                 return built_event
 
             @property
@@ -397,4 +400,39 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         # We just want to check that fetching the event doesn't raise an exception.
         self.get_success(
             self.store.get_event(first_redact_event.event_id, allow_none=True)
+        )
+
+    def test_store_redacted_redaction(self):
+        """Tests that we can store a redacted redaction.
+        """
+
+        self.get_success(
+            self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
+        )
+
+        builder = self.event_builder_factory.for_room_version(
+            RoomVersions.V1,
+            {
+                "type": EventTypes.Redaction,
+                "sender": self.u_alice.to_string(),
+                "room_id": self.room1.to_string(),
+                "content": {"reason": "foo"},
+            },
+        )
+
+        redaction_event, context = self.get_success(
+            self.event_creation_handler.create_new_client_event(builder)
+        )
+
+        self.get_success(
+            self.storage.persistence.persist_event(redaction_event, context)
+        )
+
+        # Now lets jump to the future where we have censored the redaction event
+        # in the DB.
+        self.reactor.advance(60 * 60 * 24 * 31)
+
+        # We just want to check that fetching the event doesn't raise an exception.
+        self.get_success(
+            self.store.get_event(redaction_event.event_id, allow_none=True)
         )

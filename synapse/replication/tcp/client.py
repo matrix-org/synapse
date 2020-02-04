@@ -31,6 +31,7 @@ from .commands import (
     Command,
     FederationAckCommand,
     InvalidateCacheCommand,
+    RemoteServerUpCommand,
     RemovePusherCommand,
     UserIpCommand,
     UserSyncCommand,
@@ -209,6 +210,9 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         """
         cmd = UserIpCommand(user_id, access_token, ip, user_agent, device_id, last_seen)
         self.send_command(cmd)
+
+    def send_remote_server_up(self, server: str):
+        self.send_command(RemoteServerUpCommand(server))
 
     def await_sync(self, data):
         """Returns a deferred that is resolved when we receive a SYNC command
