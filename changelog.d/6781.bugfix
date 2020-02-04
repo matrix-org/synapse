@@ -1,1 +1,1 @@
-Fixed third party event rules function on_create_room's return value beeing ignored.
+Fixed third party event rules function `on_create_room`'s return value being ignored.
