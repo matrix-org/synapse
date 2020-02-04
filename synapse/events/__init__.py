@@ -23,6 +23,7 @@ from unpaddedbase64 import encode_base64
 
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.types import JsonDict
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 
@@ -188,7 +189,13 @@ class EventBase(object):
     redacts = _event_dict_property("redacts", None)
     room_id = _event_dict_property("room_id")
     sender = _event_dict_property("sender")
+    state_key = _event_dict_property("state_key")
+    type = _event_dict_property("type")
     user_id = _event_dict_property("sender")
+
+    @property
+    def event_id(self) -> str:
+        raise NotImplementedError()
 
     @property
     def membership(self):
@@ -197,7 +204,7 @@ class EventBase(object):
     def is_state(self):
         return hasattr(self, "state_key") and self.state_key is not None
 
-    def get_dict(self):
+    def get_dict(self) -> JsonDict:
         d = dict(self._event_dict)
         d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
 
@@ -209,7 +216,7 @@ class EventBase(object):
     def get_internal_metadata_dict(self):
         return self.internal_metadata.get_dict()
 
-    def get_pdu_json(self, time_now=None):
+    def get_pdu_json(self, time_now=None) -> JsonDict:
         pdu_json = self.get_dict()
 
         if time_now is not None and "age_ts" in pdu_json["unsigned"]:
@@ -280,10 +287,7 @@ class FrozenEvent(EventBase):
         else:
             frozen_dict = event_dict
 
-        self.event_id = event_dict["event_id"]
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
+        self._event_id = event_dict["event_id"]
 
         super(FrozenEvent, self).__init__(
             frozen_dict,
@@ -292,6 +296,10 @@ class FrozenEvent(EventBase):
             internal_metadata_dict=internal_metadata_dict,
             rejected_reason=rejected_reason,
         )
+
+    @property
+    def event_id(self) -> str:
+        return self._event_id
 
     def __str__(self):
         return self.__repr__()
@@ -331,9 +339,6 @@ class FrozenEventV2(EventBase):
             frozen_dict = event_dict
 
         self._event_id = None
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
 
         super(FrozenEventV2, self).__init__(
             frozen_dict,

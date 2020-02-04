@@ -589,7 +589,9 @@ class HomeserverTestCase(TestCase):
         event_builder_factory = self.hs.get_event_builder_factory()
         event_creation_handler = self.hs.get_event_creation_handler()
 
-        room_version = self.get_success(self.hs.get_datastore().get_room_version(room))
+        room_version = self.get_success(
+            self.hs.get_datastore().get_room_version_id(room)
+        )
 
         builder = event_builder_factory.for_room_version(
             KNOWN_ROOM_VERSIONS[room_version],

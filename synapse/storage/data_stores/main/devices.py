@@ -32,7 +32,7 @@ from synapse.logging.opentracing import (
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
-from synapse.types import get_verify_key_from_cross_signing_key
+from synapse.types import Collection, get_verify_key_from_cross_signing_key
 from synapse.util.caches.descriptors import (
     Cache,
     cached,
@@ -320,6 +320,11 @@ class DeviceWorkerStore(SQLBaseStore):
                     device_display_name = device.get("device_display_name", None)
                     if device_display_name:
                         result["device_display_name"] = device_display_name
+                    if "signatures" in device:
+                        for sig_user_id, sigs in device["signatures"].items():
+                            result["keys"].setdefault("signatures", {}).setdefault(
+                                sig_user_id, {}
+                            ).update(sigs)
                 else:
                     result["deleted"] = True
 
@@ -443,8 +448,15 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         user_ids = set(user_id for user_id, _ in query_list)
         user_map = yield self.get_device_list_last_stream_id_for_remotes(list(user_ids))
-        user_ids_in_cache = set(
-            user_id for user_id, stream_id in user_map.items() if stream_id
+
+        # We go and check if any of the users need to have their device lists
+        # resynced. If they do then we remove them from the cached list.
+        users_needing_resync = yield self.get_user_ids_requiring_device_list_resync(
+            user_ids
+        )
+        user_ids_in_cache = (
+            set(user_id for user_id, stream_id in user_map.items() if stream_id)
+            - users_needing_resync
         )
         user_ids_not_in_cache = user_ids - user_ids_in_cache
 
@@ -457,7 +469,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 device = yield self._get_cached_user_device(user_id, device_id)
                 results.setdefault(user_id, {})[device_id] = device
             else:
-                results[user_id] = yield self._get_cached_devices_for_user(user_id)
+                results[user_id] = yield self.get_cached_devices_for_user(user_id)
 
         set_tag("in_cache", results)
         set_tag("not_in_cache", user_ids_not_in_cache)
@@ -475,12 +487,12 @@ class DeviceWorkerStore(SQLBaseStore):
         return db_to_json(content)
 
     @cachedInlineCallbacks()
-    def _get_cached_devices_for_user(self, user_id):
+    def get_cached_devices_for_user(self, user_id):
         devices = yield self.db.simple_select_list(
             table="device_lists_remote_cache",
             keyvalues={"user_id": user_id},
             retcols=("device_id", "content"),
-            desc="_get_cached_devices_for_user",
+            desc="get_cached_devices_for_user",
         )
         return {
             device["device_id"]: db_to_json(device["content"]) for device in devices
@@ -517,6 +529,11 @@ class DeviceWorkerStore(SQLBaseStore):
                 device_display_name = device.get("device_display_name", None)
                 if device_display_name:
                     result["device_display_name"] = device_display_name
+                if "signatures" in device:
+                    for sig_user_id, sigs in device["signatures"].items():
+                        result["keys"].setdefault("signatures", {}).setdefault(
+                            sig_user_id, {}
+                        ).update(sigs)
 
                 results.append(result)
 
@@ -640,6 +657,37 @@ class DeviceWorkerStore(SQLBaseStore):
         results.update({row["user_id"]: row["stream_id"] for row in rows})
 
         return results
+
+    @defer.inlineCallbacks
+    def get_user_ids_requiring_device_list_resync(self, user_ids: Collection[str]):
+        """Given a list of remote users return the list of users that we
+        should resync the device lists for.
+
+        Returns:
+            Deferred[Set[str]]
+        """
+
+        rows = yield self.db.simple_select_many_batch(
+            table="device_lists_remote_resync",
+            column="user_id",
+            iterable=user_ids,
+            retcols=("user_id",),
+            desc="get_user_ids_requiring_device_list_resync",
+        )
+
+        return {row["user_id"] for row in rows}
+
+    def mark_remote_user_device_cache_as_stale(self, user_id: str):
+        """Records that the server has reason to believe the cache of the devices
+        for the remote users is out of date.
+        """
+        return self.db.simple_upsert(
+            table="device_lists_remote_resync",
+            keyvalues={"user_id": user_id},
+            values={},
+            insertion_values={"added_ts": self._clock.time_msec()},
+            desc="make_remote_user_device_cache_as_stale",
+        )
 
 
 class DeviceBackgroundUpdateStore(SQLBaseStore):
@@ -887,7 +935,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             )
 
         txn.call_after(self._get_cached_user_device.invalidate, (user_id, device_id))
-        txn.call_after(self._get_cached_devices_for_user.invalidate, (user_id,))
+        txn.call_after(self.get_cached_devices_for_user.invalidate, (user_id,))
         txn.call_after(
             self.get_device_list_last_stream_id_for_remote.invalidate, (user_id,)
         )
@@ -942,7 +990,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             ],
         )
 
-        txn.call_after(self._get_cached_devices_for_user.invalidate, (user_id,))
+        txn.call_after(self.get_cached_devices_for_user.invalidate, (user_id,))
         txn.call_after(self._get_cached_user_device.invalidate_many, (user_id,))
         txn.call_after(
             self.get_device_list_last_stream_id_for_remote.invalidate, (user_id,)
@@ -956,6 +1004,13 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             # we don't need to lock, because we can assume we are the only thread
             # updating this user's extremity.
             lock=False,
+        )
+
+        # If we're replacing the remote user's device list cache presumably
+        # we've done a full resync, so we remove the entry that says we need
+        # to resync
+        self.db.simple_delete_txn(
+            txn, table="device_lists_remote_resync", keyvalues={"user_id": user_id},
         )
 
     @defer.inlineCallbacks

@@ -72,6 +72,6 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
                 destination, token
             )
 
-        self._get_cached_devices_for_user.invalidate((user_id,))
+        self.get_cached_devices_for_user.invalidate((user_id,))
         self._get_cached_user_device.invalidate_many((user_id,))
         self.get_device_list_last_stream_id_for_remote.invalidate((user_id,))

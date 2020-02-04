@@ -37,7 +37,7 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send state
         event_auth.check(
-            RoomVersions.V1.identifier,
+            RoomVersions.V1,
             _random_state_event(creator),
             auth_events,
             do_sig_check=False,
@@ -47,7 +47,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check,
-            RoomVersions.V1.identifier,
+            RoomVersions.V1,
             _random_state_event(joiner),
             auth_events,
             do_sig_check=False,
@@ -76,7 +76,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check,
-            RoomVersions.V1.identifier,
+            RoomVersions.V1,
             _random_state_event(pleb),
             auth_events,
             do_sig_check=False,
@@ -84,10 +84,7 @@ class EventAuthTestCase(unittest.TestCase):
 
         # king should be able to send state
         event_auth.check(
-            RoomVersions.V1.identifier,
-            _random_state_event(king),
-            auth_events,
-            do_sig_check=False,
+            RoomVersions.V1, _random_state_event(king), auth_events, do_sig_check=False,
         )
 
 

@@ -281,7 +281,7 @@ def _resolve_auth_events(events, auth_events):
         try:
             # The signatures have already been checked at this point
             event_auth.check(
-                RoomVersions.V1.identifier,
+                RoomVersions.V1,
                 event,
                 auth_events,
                 do_sig_check=False,
@@ -299,7 +299,7 @@ def _resolve_normal_events(events, auth_events):
         try:
             # The signatures have already been checked at this point
             event_auth.check(
-                RoomVersions.V1.identifier,
+                RoomVersions.V1,
                 event,
                 auth_events,
                 do_sig_check=False,
