@@ -752,7 +752,7 @@ class FederationHandler(BaseHandler):
 
         # For encrypted messages we check that we know about the sending device,
         # if we don't then we mark the device cache for that user as stale.
-        if event.type == EventTypes.Encryption:
+        if event.type == EventTypes.Encrypted:
             device_id = event.content.get("device_id")
             if device_id is not None:
                 cached_devices = await self.store.get_cached_devices_for_user(
