@@ -1,0 +1,1 @@
+Detect unexpected sender keys on inbound encrypted events and resync device lists.
