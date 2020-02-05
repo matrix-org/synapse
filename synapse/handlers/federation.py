@@ -754,27 +754,61 @@ class FederationHandler(BaseHandler):
         # if we don't then we mark the device cache for that user as stale.
         if event.type == EventTypes.Encrypted:
             device_id = event.content.get("device_id")
+            sender_key = event.content.get("sender_key")
+
+            cached_devices = await self.store.get_cached_devices_for_user(event.sender)
+
+            resync = False
             if device_id is not None:
-                cached_devices = await self.store.get_cached_devices_for_user(
-                    event.sender
-                )
-                if device_id not in cached_devices:
+                device = cached_devices.get(device_id)
+                if device is None:
                     logger.info(
                         "Received event from remote device not in our cache: %s %s",
                         event.sender,
                         device_id,
                     )
-                    await self.store.mark_remote_user_device_cache_as_stale(
-                        event.sender
-                    )
+                    resync = True
 
-                    # Immediately attempt a resync in the background
-                    if self.config.worker_app:
-                        return run_in_background(self._user_device_resync, event.sender)
+            # We also check if the `sender_key` matches what we expect.
+            if sender_key is not None:
+                # We pull out the expected key from the list of devices for
+                # logging purposes. Note that the key name depends on the
+                # algorithm.
+                if device_id:
+                    if event.content.get("algorithm") == "m.megolm.v1.aes-sha2":
+                        key_name = "curve25519:%s" % (device_id,)
+                        keys = device.get("keys", {}).get("keys", {})
+                        current_key = keys.get(key_name)
                     else:
-                        return run_in_background(
-                            self._device_list_updater.user_device_resync, event.sender
-                        )
+                        current_key = "<unknown algorithm>"
+                else:
+                    current_key = "<no device_id>"
+
+                # We check that one of the keys matches.
+                if sender_key not in (
+                    key
+                    for device in cached_devices
+                    for key in device.get("keys", {}).get("keys", {}).values()
+                ):
+                    logger.info(
+                        "Received event from remote device with different sender key: %s %s %s (current: %s)",
+                        event.sender,
+                        device_id,
+                        sender_key,
+                        current_key,
+                    )
+                    resync = True
+
+            if resync:
+                await self.store.mark_remote_user_device_cache_as_stale(event.sender)
+
+                # Immediately attempt a resync in the background
+                if self.config.worker_app:
+                    return run_in_background(self._user_device_resync, event.sender)
+                else:
+                    return run_in_background(
+                        self._device_list_updater.user_device_resync, event.sender
+                    )
 
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
