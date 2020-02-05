@@ -665,7 +665,7 @@ class FederationClient(FederationBase):
     async def send_invite(
         self, destination: str, room_id: str, event_id: str, pdu: EventBase,
     ) -> EventBase:
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version(room_id)
 
         content = await self._do_send_invite(destination, pdu, room_version)
 
@@ -673,20 +673,17 @@ class FederationClient(FederationBase):
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        format_ver = room_version_to_event_format(room_version)
-
-        pdu = event_from_pdu_json(pdu_dict, format_ver)
+        pdu = event_from_pdu_json(pdu_dict, room_version.event_format)
 
         # Check signatures are correct.
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
 
         # FIXME: We should handle signature failures more gracefully.
 
         return pdu
 
     async def _do_send_invite(
-        self, destination: str, pdu: EventBase, room_version: str
+        self, destination: str, pdu: EventBase, room_version: RoomVersion
     ) -> JsonDict:
         """Actually sends the invite, first trying v2 API and falling back to
         v1 API if necessary.
@@ -703,7 +700,7 @@ class FederationClient(FederationBase):
                 event_id=pdu.event_id,
                 content={
                     "event": pdu.get_pdu_json(time_now),
-                    "room_version": room_version,
+                    "room_version": room_version.identifier,
                     "invite_room_state": pdu.unsigned.get("invite_room_state", []),
                 },
             )
@@ -721,8 +718,7 @@ class FederationClient(FederationBase):
                 # Otherwise, we assume that the remote server doesn't understand
                 # the v2 invite API. That's ok provided the room uses old-style event
                 # IDs.
-                v = KNOWN_ROOM_VERSIONS.get(room_version)
-                if v.event_format != EventFormatVersions.V1:
+                if room_version.event_format != EventFormatVersions.V1:
                     raise SynapseError(
                         400,
                         "User's homeserver does not support this room version",
