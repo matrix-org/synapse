@@ -1,0 +1,2 @@
+Limit the number of events that can be requested by the backfill federation API to 100.
+

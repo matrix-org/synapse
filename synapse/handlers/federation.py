@@ -1789,6 +1789,9 @@ class FederationHandler(BaseHandler):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
+        # Synapse asks for 100 events per backfill request. Do not allow more.
+        limit = min(limit, 100)
+
         events = yield self.store.get_backfill_events(room_id, pdu_list, limit)
 
         events = yield filter_events_for_server(self.storage, origin, events)
@@ -2169,6 +2172,7 @@ class FederationHandler(BaseHandler):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
+        # Only allow up to 20 events to be retrieved per request.
         limit = min(limit, 20)
 
         missing_events = await self.store.get_missing_events(
