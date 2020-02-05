@@ -2,8 +2,8 @@ Create or modify Account
 ========================
 
 This API allows an administrator to create or modify a user account with a
-specific ``user_id``. Be aware that ``user_id`` is fully qualified. E.g. @user:server.com
-
+specific ``user_id``. Be aware that ``user_id`` is fully qualified: for example,
+``@user:server.com``.
 
 This api is::
 
