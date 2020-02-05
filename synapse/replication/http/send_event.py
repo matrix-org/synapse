@@ -17,7 +17,8 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.events import event_type_from_format_version
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -37,6 +38,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         {
             "event": { .. serialized event .. },
+            "room_version": .., // "1", "2", "3", etc: the version of the room
+                                // containing the event
+            "event_format_version": .., // 1,2,3 etc: the event format version
             "internal_metadata": { .. serialized internal_metadata .. },
             "rejected_reason": ..,   // The event.rejected_reason field
             "context": { .. serialized event context .. },
@@ -77,6 +81,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         payload = {
             "event": event.get_pdu_json(),
+            "room_version": event.room_version.identifier,
             "event_format_version": event.format_version,
             "internal_metadata": event.internal_metadata.get_dict(),
             "rejected_reason": event.rejected_reason,
@@ -93,12 +98,13 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             content = parse_json_object_from_request(request)
 
             event_dict = content["event"]
-            format_ver = content["event_format_version"]
+            room_ver = KNOWN_ROOM_VERSIONS[content["room_ver"]]
             internal_metadata = content["internal_metadata"]
             rejected_reason = content["rejected_reason"]
 
-            EventType = event_type_from_format_version(format_ver)
-            event = EventType(event_dict, internal_metadata, rejected_reason)
+            event = make_event_from_dict(
+                event_dict, room_ver, internal_metadata, rejected_reason
+            )
 
             requester = Requester.deserialize(self.store, content["requester"])
             context = EventContext.deserialize(self.storage, content["context"])
