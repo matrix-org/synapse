@@ -528,7 +528,7 @@ class FederationClient(FederationBase):
 
         Returns:
             a dict with members ``origin`` (a string
-            giving the serer the event was sent to, ``state`` (?) and
+            giving the server the event was sent to, ``state`` (?) and
             ``auth_chain``.
 
         Raises:
@@ -659,7 +659,9 @@ class FederationClient(FederationBase):
         # content.
         return resp[1]
 
-    async def send_invite(self, destination, room_id, event_id, pdu):
+    async def send_invite(
+        self, destination: str, room_id: str, event_id: str, pdu: EventBase,
+    ) -> EventBase:
         room_version = await self.store.get_room_version_id(room_id)
 
         content = await self._do_send_invite(destination, pdu, room_version)
