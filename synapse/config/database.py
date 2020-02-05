@@ -57,9 +57,9 @@ class DatabaseConfig(Config):
     section = "database"
 
     def __init__(self, *args, **kwargs):
-        self.databases = []
-
         super().__init__(*args, **kwargs)
+
+        self.databases = []
 
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
@@ -95,10 +95,14 @@ class DatabaseConfig(Config):
                 for name, db_conf in multi_database_config.items()
             ]
 
-        elif database_config:
+        if database_config:
             self.databases = [DatabaseConnectionConfig("master", database_config)]
 
-        elif database_path:
+        if database_path:
+            if self.databases and self.databases[0].name != "sqlite3":
+                logger.warn("Ignoring 'database_path' for non-sqlite3 database")
+                return
+
             database_config = {"name": "sqlite3", "args": {}}
             self.databases = [DatabaseConnectionConfig("master", database_config)]
             self.set_databasepath(database_path)
@@ -135,15 +139,15 @@ class DatabaseConfig(Config):
     def read_arguments(self, args):
         """
         Cases for the cli input:
-          - If no databases are configured and no path available raise.
-          - No databases and only path available ==> sqlite3 db.
-          - If there are multiple databases and a path raise an error.
+          - If no databases are configured and no database_path is set, raise.
+          - No databases and only database_path available ==> sqlite3 db.
+          - If there are multiple databases and a database_path raise an error.
           - If the database set in the config file is sqlite then
             overwrite with the command line argument.
         """
 
         if args.database_path is None:
-            if len(self.databases) == 0:
+            if not self.databases:
                 raise ConfigError("No database config provided")
             return
 
@@ -178,7 +182,7 @@ class DatabaseConfig(Config):
     def get_single_database(self) -> DatabaseConnectionConfig:
         """Returns the database if there is only one, useful for e.g. tests
         """
-        if len(self.databases) != 1:
+        if not self.databases:
             raise Exception("More than one database exists")
 
         return self.databases[0]
