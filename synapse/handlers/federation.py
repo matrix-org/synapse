@@ -758,7 +758,9 @@ class FederationHandler(BaseHandler):
 
             cached_devices = await self.store.get_cached_devices_for_user(event.sender)
 
-            resync = False
+            resync = False  # Whether we should resync device lists.
+
+            device = None
             if device_id is not None:
                 device = cached_devices.get(device_id)
                 if device is None:
@@ -771,31 +773,41 @@ class FederationHandler(BaseHandler):
 
             # We also check if the `sender_key` matches what we expect.
             if sender_key is not None:
-                # We pull out the expected key from the list of devices for
-                # logging purposes. Note that the key name depends on the
-                # algorithm.
-                if device_id:
-                    if event.content.get("algorithm") == "m.megolm.v1.aes-sha2":
-                        key_name = "curve25519:%s" % (device_id,)
-                        keys = device.get("keys", {}).get("keys", {})
-                        current_key = keys.get(key_name)
-                    else:
-                        current_key = "<unknown algorithm>"
-                else:
-                    current_key = "<no device_id>"
+                # Figure out what sender key we're expecting. If we know the
+                # device and recognize the algorithm then we can work out the
+                # exact key to expect. Otherwise check it matches any key we
+                # have for that device.
+                if device:
+                    keys = device.get("keys", {}).get("keys", {})
 
-                # We check that one of the keys matches.
-                if sender_key not in (
-                    key
-                    for device in cached_devices
-                    for key in device.get("keys", {}).get("keys", {}).values()
-                ):
+                    if event.content.get("algorithm") == "m.megolm.v1.aes-sha2":
+                        # For this algorithm we expect a curve25519 key.
+                        key_name = "curve25519:%s" % (device_id,)
+                        current_keys = [keys.get(key_name)]
+                    else:
+                        # We don't know understand the algorithm, so we just
+                        # check it matches a key for the device.
+                        current_keys = keys.values()
+                elif device_id:
+                    # We don't have any keys for the device ID.
+                    current_keys = []
+                else:
+                    # The event didn't include a device ID, so we just look for
+                    # keys across all devices.
+                    current_keys = (
+                        key
+                        for device in cached_devices
+                        for key in device.get("keys", {}).get("keys", {}).values()
+                    )
+
+                # We now check that the sender key matches (one of) the expected
+                # keys.
+                if sender_key not in current_keys:
                     logger.info(
-                        "Received event from remote device with different sender key: %s %s %s (current: %s)",
+                        "Received event from remote device with unexpected sender key: %s %s: %s",
                         event.sender,
-                        device_id,
+                        device_id or "<no device_id>",
                         sender_key,
-                        current_key,
                     )
                     resync = True
 
