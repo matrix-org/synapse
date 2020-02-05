@@ -53,6 +53,7 @@ from synapse.events import EventBase, builder, room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.utils import log_function
+from synapse.types import JsonDict
 from synapse.util import unwrapFirstError
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
@@ -682,23 +683,19 @@ class FederationClient(FederationBase):
 
         return pdu
 
-    @defer.inlineCallbacks
-    def _do_send_invite(self, destination, pdu, room_version):
+    async def _do_send_invite(
+        self, destination: str, pdu: EventBase, room_version: str
+    ) -> JsonDict:
         """Actually sends the invite, first trying v2 API and falling back to
         v1 API if necessary.
 
-        Args:
-            destination (str): Target server
-            pdu (FrozenEvent)
-            room_version (str)
-
         Returns:
-            dict: The event as a dict as returned by the remote server
+            The event as a dict as returned by the remote server
         """
         time_now = self._clock.time_msec()
 
         try:
-            content = yield self.transport_layer.send_invite_v2(
+            content = await self.transport_layer.send_invite_v2(
                 destination=destination,
                 room_id=pdu.room_id,
                 event_id=pdu.event_id,
@@ -737,7 +734,7 @@ class FederationClient(FederationBase):
         # Didn't work, try v1 API.
         # Note the v1 API returns a tuple of `(200, content)`
 
-        _, content = yield self.transport_layer.send_invite_v1(
+        _, content = await self.transport_layer.send_invite_v1(
             destination=destination,
             room_id=pdu.room_id,
             event_id=pdu.event_id,
