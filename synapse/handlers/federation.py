@@ -1305,9 +1305,8 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
-            event_format_version = room_version_obj.event_format
             ret = await self.federation_client.send_join(
-                target_hosts, event, event_format_version
+                target_hosts, event, room_version_obj
             )
 
             origin = ret["origin"]
