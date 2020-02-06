@@ -259,7 +259,7 @@ class RoomCreationHandler(BaseHandler):
         for v in ("invite", "events_default"):
             current = int(pl_content.get(v, 0))
             if current < restricted_level:
-                logger.info(
+                logger.debug(
                     "Setting level for %s in %s to %i (was %i)",
                     v,
                     old_room_id,
@@ -269,7 +269,7 @@ class RoomCreationHandler(BaseHandler):
                 pl_content[v] = restricted_level
                 updated = True
             else:
-                logger.info("Not setting level for %s (already %i)", v, current)
+                logger.debug("Not setting level for %s (already %i)", v, current)
 
         if updated:
             try:
@@ -296,7 +296,7 @@ class RoomCreationHandler(BaseHandler):
             EventTypes.Aliases, events_default
         )
 
-        logger.info("Setting correct PLs in new room to %s", new_pl_content)
+        logger.debug("Setting correct PLs in new room to %s", new_pl_content)
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -782,7 +782,7 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
-            logger.info("Sending %s in new room", etype)
+            logger.debug("Sending %s in new room", etype)
             yield self.event_creation_handler.create_and_send_nonmember_event(
                 creator, event, ratelimit=False
             )
@@ -796,7 +796,7 @@ class RoomCreationHandler(BaseHandler):
         creation_content.update({"creator": creator_id})
         yield send(etype=EventTypes.Create, content=creation_content)
 
-        logger.info("Sending %s in new room", EventTypes.Member)
+        logger.debug("Sending %s in new room", EventTypes.Member)
         yield self.room_member_handler.update_membership(
             creator,
             creator.user,
