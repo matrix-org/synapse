@@ -149,7 +149,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                     self.pos, room_max_stream_ordering
                 )
 
-                logger.info("Handling %d state deltas", len(deltas))
+                logger.debug("Handling %d state deltas", len(deltas))
                 yield self._handle_deltas(deltas)
 
                 self.pos = max_pos
@@ -195,7 +195,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                         room_id, self.server_name
                     )
                     if not is_in_room:
-                        logger.info("Server left room: %r", room_id)
+                        logger.debug("Server left room: %r", room_id)
                         # Fetch all the users that we marked as being in user
                         # directory due to being in the room and then check if
                         # need to remove those users or not
