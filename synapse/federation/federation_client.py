@@ -545,12 +545,12 @@ class FederationClient(FederationBase):
             logger.debug("Got content: %s", content)
 
             state = [
-                event_from_pdu_json(p, room_version, outlier=True)
+                event_from_pdu_json(p, room_version.event_format, outlier=True)
                 for p in content.get("state", [])
             ]
 
             auth_chain = [
-                event_from_pdu_json(p, room_version, outlier=True)
+                event_from_pdu_json(p, room_version.event_format, outlier=True)
                 for p in content.get("auth_chain", [])
             ]
 
