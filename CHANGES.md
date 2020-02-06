@@ -5,7 +5,7 @@ Bugfixes
 --------
 
 - Fix an issue with cross-signing where device signatures were not sent to remote servers. ([\#6844](https://github.com/matrix-org/synapse/issues/6844))
-- Fix to the unknown remote device detection which was indroduced in 1.10.rc1. ([\#6848](https://github.com/matrix-org/synapse/issues/6848))
+- Fix to the unknown remote device detection which was introduced in 1.10.rc1. ([\#6848](https://github.com/matrix-org/synapse/issues/6848))
 
 
 Internal Changes
