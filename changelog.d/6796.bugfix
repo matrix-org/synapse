@@ -1,1 +1,0 @@
-Fix bug where querying a remote user's device keys that weren't cached resulted in only returning a single device.

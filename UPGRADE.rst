@@ -76,13 +76,13 @@ for example:
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
 
-Upgrading to **<NEXT_VERSION>**
-===============================
+Upgrading to v1.10.0
+====================
 
 Synapse will now log a warning on start up if used with a PostgreSQL database
 that has a non-recommended locale set.
 
-See [docs/postgres.md](docs/postgres.md) for details.
+See `docs/postgres.md <docs/postgres.md>`_ for details.
 
 
 Upgrading to v1.8.0

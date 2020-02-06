@@ -1,1 +1,0 @@
-When a client asks for a remote user's device keys check if the local cache for that user has been marked as potentially stale.
