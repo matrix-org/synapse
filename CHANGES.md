@@ -5,13 +5,13 @@ Bugfixes
 --------
 
 - Fix an issue with cross-signing where device signatures were not sent to remote servers. ([\#6844](https://github.com/matrix-org/synapse/issues/6844))
-- Fix detecting unknown devices from remote encrypted events. ([\#6848](https://github.com/matrix-org/synapse/issues/6848))
+- Fix to the unknown remote device detection which was indroduced in 1.10.rc1. ([\#6848](https://github.com/matrix-org/synapse/issues/6848))
 
 
 Internal Changes
 ----------------
 
-- Detect unexpected sender keys on inbound encrypted events and resync device lists. ([\#6850](https://github.com/matrix-org/synapse/issues/6850))
+- Detect unexpected sender keys on remote encrypted events and resync device lists. ([\#6850](https://github.com/matrix-org/synapse/issues/6850))
 
 
 Synapse 1.10.0rc1 (2020-01-31)
