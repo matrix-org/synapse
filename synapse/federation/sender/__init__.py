@@ -151,13 +151,12 @@ class FederationSender(object):
             "process_event_queue_for_federation", self._process_event_queue_loop
         )
 
-    @defer.inlineCallbacks
-    def _process_event_queue_loop(self):
+    async def _process_event_queue_loop(self):
         try:
             self._is_processing = True
             while True:
-                last_token = yield self.store.get_federation_out_pos("events")
-                next_token, events = yield self.store.get_all_new_events_stream(
+                last_token = await self.store.get_federation_out_pos("events")
+                next_token, events = await self.store.get_all_new_events_stream(
                     last_token, self._last_poked_id, limit=100
                 )
 
@@ -166,8 +165,7 @@ class FederationSender(object):
                 if not events and next_token >= self._last_poked_id:
                     break
 
-                @defer.inlineCallbacks
-                def handle_event(event):
+                async def handle_event(event):
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
@@ -184,7 +182,7 @@ class FederationSender(object):
                         # Otherwise if the last member on a server in a room is
                         # banned then it won't receive the event because it won't
                         # be in the room after the ban.
-                        destinations = yield self.state.get_hosts_in_room_at_events(
+                        destinations = await self.state.get_hosts_in_room_at_events(
                             event.room_id, event_ids=event.prev_event_ids()
                         )
                     except Exception:
@@ -206,17 +204,16 @@ class FederationSender(object):
 
                     self._send_pdu(event, destinations)
 
-                @defer.inlineCallbacks
-                def handle_room_events(events):
+                async def handle_room_events(events):
                     with Measure(self.clock, "handle_room_events"):
                         for event in events:
-                            yield handle_event(event)
+                            await handle_event(event)
 
                 events_by_room = {}
                 for event in events:
                     events_by_room.setdefault(event.room_id, []).append(event)
 
-                yield make_deferred_yieldable(
+                await make_deferred_yieldable(
                     defer.gatherResults(
                         [
                             run_in_background(handle_room_events, evs)
@@ -226,11 +223,11 @@ class FederationSender(object):
                     )
                 )
 
-                yield self.store.update_federation_out_pos("events", next_token)
+                await self.store.update_federation_out_pos("events", next_token)
 
                 if events:
                     now = self.clock.time_msec()
-                    ts = yield self.store.get_received_ts(events[-1].event_id)
+                    ts = await self.store.get_received_ts(events[-1].event_id)
 
                     synapse.metrics.event_processing_lag.labels(
                         "federation_sender"
