@@ -177,8 +177,7 @@ class PerDestinationQueue(object):
             self._transaction_transmission_loop,
         )
 
-    @defer.inlineCallbacks
-    def _transaction_transmission_loop(self):
+    async def _transaction_transmission_loop(self):
         pending_pdus = []
         try:
             self.transmission_loop_running = True
@@ -186,14 +185,14 @@ class PerDestinationQueue(object):
             # This will throw if we wouldn't retry. We do this here so we fail
             # quickly, but we will later check this again in the http client,
             # hence why we throw the result away.
-            yield get_retry_limiter(self._destination, self._clock, self._store)
+            await get_retry_limiter(self._destination, self._clock, self._store)
 
             pending_pdus = []
             while True:
                 # We have to keep 2 free slots for presence and rr_edus
                 limit = MAX_EDUS_PER_TRANSACTION - 2
 
-                device_update_edus, dev_list_id = yield self._get_device_update_edus(
+                device_update_edus, dev_list_id = await self._get_device_update_edus(
                     limit
                 )
 
@@ -202,7 +201,7 @@ class PerDestinationQueue(object):
                 (
                     to_device_edus,
                     device_stream_id,
-                ) = yield self._get_to_device_message_edus(limit)
+                ) = await self._get_to_device_message_edus(limit)
 
                 pending_edus = device_update_edus + to_device_edus
 
@@ -269,7 +268,7 @@ class PerDestinationQueue(object):
 
                 # END CRITICAL SECTION
 
-                success = yield self._transaction_manager.send_new_transaction(
+                success = await self._transaction_manager.send_new_transaction(
                     self._destination, pending_pdus, pending_edus
                 )
                 if success:
@@ -280,7 +279,7 @@ class PerDestinationQueue(object):
                     # Remove the acknowledged device messages from the database
                     # Only bother if we actually sent some device messages
                     if to_device_edus:
-                        yield self._store.delete_device_msgs_for_remote(
+                        await self._store.delete_device_msgs_for_remote(
                             self._destination, device_stream_id
                         )
 
@@ -289,7 +288,7 @@ class PerDestinationQueue(object):
                         logger.info(
                             "Marking as sent %r %r", self._destination, dev_list_id
                         )
-                        yield self._store.mark_as_sent_devices_by_remote(
+                        await self._store.mark_as_sent_devices_by_remote(
                             self._destination, dev_list_id
                         )
 
@@ -356,12 +355,11 @@ class PerDestinationQueue(object):
         pending_edus, self._pending_edus = pending_edus[:limit], pending_edus[limit:]
         return pending_edus
 
-    @defer.inlineCallbacks
-    def _get_device_update_edus(self, limit):
+    async def _get_device_update_edus(self, limit):
         last_device_list = self._last_device_list_stream_id
 
         # Retrieve list of new device updates to send to the destination
-        now_stream_id, results = yield self._store.get_device_updates_by_remote(
+        now_stream_id, results = await self._store.get_device_updates_by_remote(
             self._destination, last_device_list, limit=limit
         )
         edus = [
@@ -378,11 +376,10 @@ class PerDestinationQueue(object):
 
         return (edus, now_stream_id)
 
-    @defer.inlineCallbacks
-    def _get_to_device_message_edus(self, limit):
+    async def _get_to_device_message_edus(self, limit):
         last_device_stream_id = self._last_device_stream_id
         to_device_stream_id = self._store.get_to_device_stream_token()
-        contents, stream_id = yield self._store.get_new_device_msgs_for_remote(
+        contents, stream_id = await self._store.get_new_device_msgs_for_remote(
             self._destination, last_device_stream_id, to_device_stream_id, limit
         )
         edus = [
