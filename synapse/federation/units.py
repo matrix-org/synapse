@@ -19,11 +19,15 @@ server protocol.
 
 import logging
 
+import attr
+
+from synapse.types import JsonDict
 from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
 
 
+@attr.s(slots=True)
 class Edu(JsonEncodedObject):
     """ An Edu represents a piece of data sent from one homeserver to another.
 
@@ -32,11 +36,24 @@ class Edu(JsonEncodedObject):
     internal ID or previous references graph.
     """
 
-    valid_keys = ["origin", "destination", "edu_type", "content"]
+    edu_type = attr.ib(type=str)
+    content = attr.ib(type=dict)
+    origin = attr.ib(type=str)
+    destination = attr.ib(type=str)
 
-    required_keys = ["edu_type"]
+    def get_dict(self) -> JsonDict:
+        return {
+            "edu_type": self.edu_type,
+            "content": self.content,
+        }
 
-    internal_keys = ["origin", "destination"]
+    def get_internal_dict(self) -> JsonDict:
+        return {
+            "edu_type": self.edu_type,
+            "content": self.content,
+            "origin": self.origin,
+            "destination": self.destination,
+        }
 
     def get_context(self):
         return getattr(self, "content", {}).get("org.matrix.opentracing_context", "{}")

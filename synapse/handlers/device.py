@@ -225,6 +225,22 @@ class DeviceWorkerHandler(BaseHandler):
 
         return result
 
+    @defer.inlineCallbacks
+    def on_federation_query_user_devices(self, user_id):
+        stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
+        master_key = yield self.store.get_e2e_cross_signing_key(user_id, "master")
+        self_signing_key = yield self.store.get_e2e_cross_signing_key(
+            user_id, "self_signing"
+        )
+
+        return {
+            "user_id": user_id,
+            "stream_id": stream_id,
+            "devices": devices,
+            "master_key": master_key,
+            "self_signing_key": self_signing_key,
+        }
+
 
 class DeviceHandler(DeviceWorkerHandler):
     def __init__(self, hs):
@@ -238,9 +254,6 @@ class DeviceHandler(DeviceWorkerHandler):
 
         federation_registry.register_edu_handler(
             "m.device_list_update", self.device_list_updater.incoming_device_list_update
-        )
-        federation_registry.register_query_handler(
-            "user_devices", self.on_federation_query_user_devices
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
@@ -457,22 +470,6 @@ class DeviceHandler(DeviceWorkerHandler):
         self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
 
     @defer.inlineCallbacks
-    def on_federation_query_user_devices(self, user_id):
-        stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
-        master_key = yield self.store.get_e2e_cross_signing_key(user_id, "master")
-        self_signing_key = yield self.store.get_e2e_cross_signing_key(
-            user_id, "self_signing"
-        )
-
-        return {
-            "user_id": user_id,
-            "stream_id": stream_id,
-            "devices": devices,
-            "master_key": master_key,
-            "self_signing_key": self_signing_key,
-        }
-
-    @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
         user_id = user.to_string()
         room_ids = yield self.store.get_rooms_for_user(user_id)
@@ -598,7 +595,13 @@ class DeviceListUpdater(object):
             # happens if we've missed updates.
             resync = yield self._need_to_do_resync(user_id, pending_updates)
 
-            logger.debug("Need to re-sync devices for %r? %r", user_id, resync)
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(
+                    "Received device list update for %s, requiring resync: %s. Devices: %s",
+                    user_id,
+                    resync,
+                    ", ".join(u[0] for u in pending_updates),
+                )
 
             if resync:
                 yield self.user_device_resync(user_id)

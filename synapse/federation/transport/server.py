@@ -158,7 +158,7 @@ class Authenticator(object):
             origin, json_request, now, "Incoming request"
         )
 
-        logger.info("Request from %s", origin)
+        logger.debug("Request from %s", origin)
         request.authenticated_entity = origin
 
         # If we get a valid signed request from the other side, its probably

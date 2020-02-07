@@ -16,13 +16,13 @@
 
 import os
 from distutils.util import strtobool
+from typing import Optional, Type
 
 import six
 
 from unpaddedbase64 import encode_base64
 
-from synapse.api.errors import UnsupportedRoomVersionError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.types import JsonDict
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
@@ -408,28 +408,7 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
-def room_version_to_event_format(room_version):
-    """Converts a room version string to the event format
-
-    Args:
-        room_version (str)
-
-    Returns:
-        int
-
-    Raises:
-        UnsupportedRoomVersionError if the room version is unknown
-    """
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-
-    if not v:
-        # this can happen if support is withdrawn for a room version
-        raise UnsupportedRoomVersionError()
-
-    return v.event_format
-
-
-def event_type_from_format_version(format_version):
+def event_type_from_format_version(format_version: int) -> Type[EventBase]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
@@ -449,3 +428,14 @@ def event_type_from_format_version(format_version):
         return FrozenEventV3
     else:
         raise Exception("No event format %r" % (format_version,))
+
+
+def make_event_from_dict(
+    event_dict: JsonDict,
+    room_version: RoomVersion = RoomVersions.V1,
+    internal_metadata_dict: JsonDict = {},
+    rejected_reason: Optional[str] = None,
+) -> EventBase:
+    """Construct an EventBase from the given event dict"""
+    event_type = event_type_from_format_version(room_version.event_format)
+    return event_type(event_dict, internal_metadata_dict, rejected_reason)
