@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict, List, Set
 
 from six import itervalues
 
@@ -23,6 +24,7 @@ from twisted.internet import defer
 
 import synapse
 import synapse.metrics
+from synapse.events import EventBase
 from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
@@ -39,6 +41,7 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.presence import UserPresenceState
 from synapse.util.metrics import Measure, measure_func
 
 logger = logging.getLogger(__name__)
@@ -68,7 +71,7 @@ class FederationSender(object):
         self._transaction_manager = TransactionManager(hs)
 
         # map from destination to PerDestinationQueue
-        self._per_destination_queues = {}  # type: dict[str, PerDestinationQueue]
+        self._per_destination_queues = {}  # type: Dict[str, PerDestinationQueue]
 
         LaterGauge(
             "synapse_federation_transaction_queue_pending_destinations",
@@ -84,7 +87,7 @@ class FederationSender(object):
         # Map of user_id -> UserPresenceState for all the pending presence
         # to be sent out by user_id. Entries here get processed and put in
         # pending_presence_by_dest
-        self.pending_presence = {}
+        self.pending_presence = {}  # type: Dict[str, UserPresenceState]
 
         LaterGauge(
             "synapse_federation_transaction_queue_pending_pdus",
@@ -116,10 +119,10 @@ class FederationSender(object):
         # and that there is a pending call to _flush_rrs_for_room in the system.
         self._queues_awaiting_rr_flush_by_room = (
             {}
-        )  # type: dict[str, set[PerDestinationQueue]]
+        )  # type: Dict[str, Set[PerDestinationQueue]]
 
         self._rr_txn_interval_per_room_ms = (
-            1000.0 / hs.get_config().federation_rr_transactions_per_room_per_second
+            1000.0 / hs.config.federation_rr_transactions_per_room_per_second
         )
 
     def _get_per_destination_queue(self, destination):
@@ -209,7 +212,7 @@ class FederationSender(object):
                         for event in events:
                             await handle_event(event)
 
-                events_by_room = {}
+                events_by_room = {}  # type: Dict[str, List[EventBase]]
                 for event in events:
                     events_by_room.setdefault(event.room_id, []).append(event)
 
