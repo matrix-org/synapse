@@ -28,7 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import UserID, get_domain_from_id, create_requester
 
 from ._base import BaseHandler
 
@@ -164,6 +164,9 @@ class BaseProfileHandler(BaseHandler):
 
         if new_displayname == "":
             new_displayname = None
+
+        if by_admin:
+            requester = create_requester(target_user.to_string())
 
         yield self.store.set_profile_displayname(target_user.localpart, new_displayname)
 
