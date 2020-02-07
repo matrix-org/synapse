@@ -16,8 +16,6 @@ import logging
 
 from canonicaljson import json
 
-from twisted.internet import defer
-
 from synapse.api.errors import HttpResponseException
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Transaction
@@ -50,8 +48,7 @@ class TransactionManager(object):
         self._next_txn_id = int(self.clock.time_msec())
 
     @measure_func("_send_new_transaction")
-    @defer.inlineCallbacks
-    def send_new_transaction(self, destination, pending_pdus, pending_edus):
+    async def send_new_transaction(self, destination, pending_pdus, pending_edus):
 
         # Make a transaction-sending opentracing span. This span follows on from
         # all the edus in that transaction. This needs to be done since there is
@@ -127,7 +124,7 @@ class TransactionManager(object):
                 return data
 
             try:
-                response = yield self._transport_layer.send_transaction(
+                response = await self._transport_layer.send_transaction(
                     transaction, json_data_cb
                 )
                 code = 200
