@@ -165,6 +165,9 @@ class BaseProfileHandler(BaseHandler):
         if new_displayname == "":
             new_displayname = None
 
+        # If the admin changes the display name of a user, the user cannot send
+        # the join event to update the displayname in the rooms.
+        # This must be done by the user himself.
         if by_admin:
             requester = create_requester(target_user.to_string())
 
