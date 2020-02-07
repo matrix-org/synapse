@@ -1,0 +1,1 @@
+Admin API to add or modify threepids of user accounts.
