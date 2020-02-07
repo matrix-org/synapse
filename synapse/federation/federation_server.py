@@ -294,7 +294,12 @@ class FederationServer(FederationBase):
         async def _process_edu(edu_dict):
             received_edus_counter.inc()
 
-            edu = Edu(**edu_dict)
+            edu = Edu(
+                origin=origin,
+                destination=self.server_name,
+                edu_type=edu_dict["edu_type"],
+                content=edu_dict["content"],
+            )
             await self.registry.on_edu(edu.edu_type, origin, edu.content)
 
         await concurrently_execute(
