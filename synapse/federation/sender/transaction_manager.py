@@ -13,12 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import List
 
 from canonicaljson import json
 
+import synapse.server
 from synapse.api.errors import HttpResponseException
+from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
-from synapse.federation.units import Transaction
+from synapse.federation.units import Edu, Transaction
 from synapse.logging.opentracing import (
     extract_text_map,
     set_tag,
@@ -37,7 +40,7 @@ class TransactionManager(object):
     shared between PerDestinationQueue objects
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "synapse.server.HomeServer"):
         self._server_name = hs.hostname
         self.clock = hs.get_clock()  # nb must be called this for @measure_func
         self._store = hs.get_datastore()
@@ -48,7 +51,9 @@ class TransactionManager(object):
         self._next_txn_id = int(self.clock.time_msec())
 
     @measure_func("_send_new_transaction")
-    async def send_new_transaction(self, destination, pending_pdus, pending_edus):
+    async def send_new_transaction(
+        self, destination: str, pending_pdus: List[EventBase], pending_edus: List[Edu]
+    ):
 
         # Make a transaction-sending opentracing span. This span follows on from
         # all the edus in that transaction. This needs to be done since there is
