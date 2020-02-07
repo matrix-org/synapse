@@ -22,13 +22,7 @@ import six
 
 from unpaddedbase64 import encode_base64
 
-from synapse.api.errors import UnsupportedRoomVersionError
-from synapse.api.room_versions import (
-    KNOWN_ROOM_VERSIONS,
-    EventFormatVersions,
-    RoomVersion,
-    RoomVersions,
-)
+from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.types import JsonDict
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
