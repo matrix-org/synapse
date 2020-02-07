@@ -28,7 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import UserID, get_domain_from_id, create_requester
+from synapse.types import UserID, create_requester, get_domain_from_id
 
 from ._base import BaseHandler
 
@@ -222,6 +222,10 @@ class BaseProfileHandler(BaseHandler):
             raise SynapseError(
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
+
+        # Same like set_displayname
+        if by_admin:
+            requester = create_requester(target_user.to_string())
 
         yield self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
 
