@@ -82,6 +82,8 @@ class FederationServer(FederationBase):
         self.handler = hs.get_handlers().federation_handler
         self.state = hs.get_state_handler()
 
+        self.device_handler = hs.get_device_handler()
+
         self._server_linearizer = Linearizer("fed_server")
         self._transaction_linearizer = Linearizer("fed_txn_handler")
 
@@ -528,8 +530,9 @@ class FederationServer(FederationBase):
     def on_query_client_keys(self, origin, content):
         return self.on_query_request("client_keys", content)
 
-    def on_query_user_devices(self, origin, user_id):
-        return self.on_query_request("user_devices", user_id)
+    async def on_query_user_devices(self, origin: str, user_id: str):
+        keys = await self.device_handler.on_federation_query_user_devices(user_id)
+        return 200, keys
 
     @trace
     async def on_claim_client_keys(self, origin, content):
