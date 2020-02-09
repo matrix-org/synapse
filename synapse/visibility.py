@@ -122,6 +122,12 @@ def filter_events_for_client(
         if not event.is_state() and event.sender in ignore_list:
             return None
 
+        # Until MSC2261 has landed we can't redact malicious aliases, so for
+        # now we temporarily filter out m.room.aliases entirely, until we bump
+        # to a room version which lets us manage them properly.
+        if event.type == EventTypes.Aliases:
+            return None
+
         # Don't try to apply the room's retention policy if the event is a state event, as
         # MSC1763 states that retention is only considered for non-state events.
         if apply_retention_policies and not event.is_state():
