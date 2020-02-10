@@ -26,6 +26,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
+    SynapseError,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.types import RoomStreamToken, get_domain_from_id
@@ -38,6 +39,8 @@ from synapse.util.retryutils import NotRetryingDestination
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
+
+MAX_DEVICE_DISPLAY_NAME_LEN = 100
 
 
 class DeviceWorkerHandler(BaseHandler):
@@ -404,9 +407,18 @@ class DeviceHandler(DeviceWorkerHandler):
             defer.Deferred:
         """
 
+        # Reject a new displayname which is too long.
+        new_display_name = content.get("display_name")
+        if new_display_name and len(new_display_name) > MAX_DEVICE_DISPLAY_NAME_LEN:
+            raise SynapseError(
+                400,
+                "Device display name is too long (max %i)"
+                % (MAX_DEVICE_DISPLAY_NAME_LEN,),
+            )
+
         try:
             yield self.store.update_device(
-                user_id, device_id, new_display_name=content.get("display_name")
+                user_id, device_id, new_display_name=new_display_name
             )
             yield self.notify_device_update(user_id, [device_id])
         except errors.StoreError as e:
