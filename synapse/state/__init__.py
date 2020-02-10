@@ -21,6 +21,7 @@ from six import iteritems, itervalues
 
 import attr
 from frozendict import frozendict
+from prometheus_client import Histogram
 
 from twisted.internet import defer
 
@@ -35,6 +36,13 @@ from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
+
+
+# Metrics for number of state groups involved in a resolution.
+state_groups_histogram = Histogram(
+    "synapse_state_number_state_groups", "",
+    buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
+)
 
 
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
@@ -363,6 +371,8 @@ class StateHandler(object):
         state_groups_ids = yield self.store.get_state_groups_ids(
             room_id, event_ids
         )
+
+        state_groups_histogram.observe(len(state_groups_ids))
 
         if len(state_groups_ids) == 0:
             defer.returnValue(_StateCacheEntry(
