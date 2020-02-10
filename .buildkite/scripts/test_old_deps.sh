@@ -13,4 +13,6 @@ python3.5 -m pip install setuptools
 
 python3.5 -m pip install tox
 
+export LANG="C.UTF-8"
+
 exec tox -e py35-old,combine
