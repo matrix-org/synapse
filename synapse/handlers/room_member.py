@@ -784,6 +784,15 @@ class RoomMemberHandler(object):
                 Codes.FORBIDDEN,
             )
 
+        can_invite = yield self.third_party_event_rules.check_threepid_can_be_invited(
+            medium, address, room_id,
+        )
+        if not can_invite:
+            raise SynapseError(
+                403, "This third-party identifier can not be invited in this room",
+                Codes.FORBIDDEN,
+            )
+
         invitee = yield self._lookup_3pid(
             id_server, medium, address
         )
