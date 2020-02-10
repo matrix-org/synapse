@@ -16,6 +16,8 @@
 
 import logging
 
+from six import raise_from
+
 from six.moves import range
 
 from signedjson.sign import sign_json
@@ -24,8 +26,9 @@ from twisted.internet import defer, reactor
 
 from synapse.api.errors import (
     AuthError,
-    CodeMessageException,
     Codes,
+    HttpResponseException,
+    RequestSendFailed,
     StoreError,
     SynapseError,
 )
@@ -174,10 +177,10 @@ class BaseProfileHandler(BaseHandler):
                     ignore_backoff=True,
                 )
                 defer.returnValue(result)
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get displayname")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
     @defer.inlineCallbacks
     def get_profile_from_cache(self, user_id):
@@ -231,10 +234,10 @@ class BaseProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get displayname")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
             defer.returnValue(result["displayname"])
 
@@ -338,10 +341,10 @@ class BaseProfileHandler(BaseHandler):
                     },
                     ignore_backoff=True,
                 )
-            except CodeMessageException as e:
-                if e.code != 404:
-                    logger.exception("Failed to get avatar_url")
-                raise
+            except RequestSendFailed as e:
+                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
 
             defer.returnValue(result["avatar_url"])
 

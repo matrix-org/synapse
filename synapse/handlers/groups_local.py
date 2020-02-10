@@ -49,9 +49,7 @@ def _create_rerouter(func_name):
             def http_response_errback(failure):
                 failure.trap(HttpResponseException)
                 e = failure.value
-                if e.code == 403:
-                    raise e.to_synapse_error()
-                return failure
+                raise e.to_synapse_error()
 
             def request_failed_errback(failure):
                 failure.trap(RequestSendFailed)
