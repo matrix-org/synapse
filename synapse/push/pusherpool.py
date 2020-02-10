@@ -60,6 +60,11 @@ class PusherPool:
     def add_pusher(self, user_id, access_token, kind, app_id,
                    app_display_name, device_display_name, pushkey, lang, data,
                    profile_tag=""):
+        """Creates a new pusher and adds it to the pool
+
+        Returns:
+            Deferred[EmailPusher|HttpPusher]
+        """
         time_now_msec = self.clock.time_msec()
 
         # we try to create the pusher just to validate the config: it
@@ -103,7 +108,9 @@ class PusherPool:
             last_stream_ordering=last_stream_ordering,
             profile_tag=profile_tag,
         )
-        yield self.start_pusher_by_id(app_id, pushkey, user_id)
+        pusher = yield self.start_pusher_by_id(app_id, pushkey, user_id)
+
+        defer.returnValue(pusher)
 
     @defer.inlineCallbacks
     def remove_pushers_by_app_id_and_pushkey_not_user(self, app_id, pushkey,
@@ -184,7 +191,11 @@ class PusherPool:
 
     @defer.inlineCallbacks
     def start_pusher_by_id(self, app_id, pushkey, user_id):
-        """Look up the details for the given pusher, and start it"""
+        """Look up the details for the given pusher, and start it
+
+        Returns:
+            Deferred[EmailPusher|HttpPusher|None]: The pusher started, if any
+        """
         if not self._should_start_pushers:
             return
 
@@ -192,13 +203,16 @@ class PusherPool:
             app_id, pushkey
         )
 
-        p = None
+        pusher_dict = None
         for r in resultlist:
             if r['user_name'] == user_id:
-                p = r
+                pusher_dict = r
 
-        if p:
-            yield self._start_pusher(p)
+        pusher = None
+        if pusher_dict:
+            pusher = yield self._start_pusher(pusher_dict)
+
+        defer.returnValue(pusher)
 
     @defer.inlineCallbacks
     def _start_pushers(self):
@@ -224,7 +238,7 @@ class PusherPool:
             pusherdict (dict):
 
         Returns:
-            None
+            Deferred[EmailPusher|HttpPusher]
         """
         try:
             p = self.pusher_factory.create_pusher(pusherdict)
@@ -269,6 +283,8 @@ class PusherPool:
             have_notifs = True
 
         p.on_started(have_notifs)
+
+        defer.returnValue(p)
 
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_id):
