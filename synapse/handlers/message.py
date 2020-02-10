@@ -34,6 +34,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import ConsentURIBuilder
 from synapse.events.validator import EventValidator
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
@@ -265,9 +266,11 @@ class EventCreationHandler(object):
             not self.config.worker_app
             and self.config.cleanup_extremities_with_dummy_events
         ):
-            # XXX: Send dummy events.
             self.clock.looping_call(
-                self._send_dummy_events_to_fill_extremities,
+                lambda: run_as_background_process(
+                    "send_dummy_events_to_fill_extremities",
+                    self._send_dummy_events_to_fill_extremities
+                ),
                 5 * 60 * 1000,
             )
 
