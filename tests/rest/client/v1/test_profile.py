@@ -230,6 +230,7 @@ class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):
 
         config = self.default_config()
         config["require_auth_for_profile_requests"] = True
+        config["limit_profile_requests_to_known_users"] = True
         self.hs = self.setup_test_homeserver(config=config)
 
         return self.hs

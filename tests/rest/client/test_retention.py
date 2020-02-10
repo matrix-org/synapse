@@ -163,6 +163,12 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         self.assertEqual(filtered_events[0].event_id, valid_event_id, filtered_events)
 
     def _test_retention_event_purged(self, room_id, increment):
+        # Get the create event to, later, check that we can still access it.
+        message_handler = self.hs.get_message_handler()
+        create_event = self.get_success(
+            message_handler.get_room_data(self.user_id, room_id, EventTypes.Create)
+        )
+
         # Send a first event to the room. This is the event we'll want to be purged at the
         # end of the test.
         resp = self.helper.send(
@@ -200,6 +206,10 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # Check that the event that hasn't been purged can still be retrieved.
         valid_event = self.get_event(room_id, valid_event_id)
         self.assertEqual(valid_event.get("content", {}).get("body"), "2", valid_event)
+
+        # Check that we can still access state events that were sent before the event that
+        # has been purged.
+        self.get_event(room_id, create_event.event_id)
 
     def get_event(self, room_id, event_id, expected_code=200):
         url = "/_matrix/client/r0/rooms/%s/event/%s" % (room_id, event_id)

@@ -63,6 +63,9 @@ class BaseProfileHandler(BaseHandler):
 
         self.http_client = hs.get_simple_http_client()
 
+        self.max_avatar_size = hs.config.max_avatar_size
+        self.allowed_avatar_mimetypes = hs.config.allowed_avatar_mimetypes
+
         if hs.config.worker_app is None:
             self.clock.looping_call(
                 self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
@@ -368,6 +371,35 @@ class BaseProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN, ),
             )
 
+        # Enforce a max avatar size if one is defined
+        if self.max_avatar_size or self.allowed_avatar_mimetypes:
+            media_id = self._validate_and_parse_media_id_from_avatar_url(new_avatar_url)
+
+            # Check that this media exists locally
+            media_info = yield self.store.get_local_media(media_id)
+            if not media_info:
+                raise SynapseError(
+                    400, "Unknown media id supplied", errcode=Codes.NOT_FOUND
+                )
+
+            # Ensure avatar does not exceed max allowed avatar size
+            media_size = media_info["media_length"]
+            if self.max_avatar_size and media_size > self.max_avatar_size:
+                raise SynapseError(
+                    400, "Avatars must be less than %s bytes in size" %
+                    (self.max_avatar_size,), errcode=Codes.TOO_LARGE,
+                )
+
+            # Ensure the avatar's file type is allowed
+            if (
+                self.allowed_avatar_mimetypes
+                and media_info["media_type"] not in self.allowed_avatar_mimetypes
+            ):
+                raise SynapseError(
+                    400, "Avatar file type '%s' not allowed" %
+                    media_info["media_type"],
+                )
+
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url, new_batchnum,
         )
@@ -382,6 +414,20 @@ class BaseProfileHandler(BaseHandler):
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)
+
+    def _validate_and_parse_media_id_from_avatar_url(self, mxc):
+        """Validate and parse a provided avatar url and return the local media id
+
+        Args:
+            mxc (str): A mxc URL
+
+        Returns:
+            str: The ID of the media
+        """
+        avatar_pieces = mxc.split("/")
+        if len(avatar_pieces) != 4 or avatar_pieces[0] != "mxc:":
+            raise SynapseError(400, "Invalid avatar URL '%s' supplied" % mxc)
+        return avatar_pieces[-1]
 
     @defer.inlineCallbacks
     def on_profile_query(self, args):
@@ -441,7 +487,7 @@ class BaseProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def check_profile_query_allowed(self, target_user, requester=None):
         """Checks whether a profile query is allowed. If the
-        'require_auth_for_profile_requests' config flag is set to True and a
+        'limit_profile_requests_to_known_users' config flag is set to True and a
         'requester' is provided, the query is only allowed if the two users
         share a room.
 
@@ -459,7 +505,7 @@ class BaseProfileHandler(BaseHandler):
         # be None when this function is called outside of a profile query, e.g.
         # when building a membership event. In this case, we must allow the
         # lookup.
-        if not self.hs.config.require_auth_for_profile_requests or not requester:
+        if not self.hs.config.limit_profile_requests_to_known_users or not requester:
             return
 
         # Always allow the user to query their own profile.

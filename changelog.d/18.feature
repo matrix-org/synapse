@@ -1,0 +1,1 @@
+Add option `limit_profile_requests_to_known_users` to prevent requirement of a user sharing a room with another user to query their profile information.

@@ -77,6 +77,13 @@ pid_file: DATADIR/homeserver.pid
 #
 #require_auth_for_profile_requests: true
 
+# Whether to require a user to share a room with another user in order
+# to retrieve their profile information. Only checked on Client-Server
+# requests. Profile requests from other servers should be checked by the
+# requesting server. Defaults to 'false'.
+#
+# limit_profile_requests_to_known_users: true
+
 # If set to 'false', requires authentication to access the server's public rooms
 # directory through the client API. Defaults to 'true'.
 #
@@ -568,6 +575,8 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for login that ratelimits login requests based on the account the
 #     client is attempting to log into, based on the amount of failed login
 #     attempts for this account.
+#   - one that ratelimits third-party invites requests based on the account
+#     that's making the requests.
 #
 # The defaults are as shown below.
 #
@@ -589,6 +598,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #  failed_attempts:
 #    per_second: 0.17
 #    burst_count: 3
+#
+#rc_third_party_invite:
+#  per_second: 0.2
+#  burst_count: 10
 
 
 # Ratelimiting settings for incoming federation
@@ -649,6 +662,30 @@ uploads_path: "DATADIR/uploads"
 # The largest allowed upload size in bytes
 #
 #max_upload_size: 10M
+
+# The largest allowed size for a user avatar. If not defined, no
+# restriction will be imposed.
+#
+# Note that this only applies when an avatar is changed globally.
+# Per-room avatar changes are not affected. See allow_per_room_profiles
+# for disabling that functionality.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's local media repo.
+#
+#max_avatar_size: 10M
+
+# Allow mimetypes for a user avatar. If not defined, no restriction will
+# be imposed.
+#
+# Note that this only applies when an avatar is changed globally.
+# Per-room avatar changes are not affected. See allow_per_room_profiles
+# for disabling that functionality.
+#
+# Note that user avatar changes will not work if this is set without
+# using Synapse's local media repo.
+#
+#allowed_avatar_mimetypes: ["image/png", "image/jpeg", "image/gif"]
 
 # Maximum number of pixels that will be thumbnailed
 #

@@ -17,7 +17,7 @@ import email.utils
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
 from synapse.config._base import ConfigError
 from synapse.types import get_domain_from_id
@@ -237,6 +237,15 @@ class RoomAccessRules(object):
         if event.type == EventTypes.JoinRules:
             return self._on_join_rule_change(event, rule)
 
+        if event.type == EventTypes.RoomAvatar:
+            return self._on_room_avatar_change(event, rule)
+
+        if event.type == EventTypes.Name:
+            return self._on_room_name_change(event, rule)
+
+        if event.type == EventTypes.Topic:
+            return self._on_room_topic_change(event, rule)
+
         return True
 
     def _on_rules_change(self, event, state_events):
@@ -265,7 +274,7 @@ class RoomAccessRules(object):
         # Make sure we don't apply "direct" if the room has more than two members.
         if new_rule == ACCESS_RULE_DIRECT:
             existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-                state_events,
+                state_events
             )
 
             if len(existing_members) > 2 or len(threepid_tokens) > 1:
@@ -327,6 +336,14 @@ class RoomAccessRules(object):
         # called before check_event_allowed.
         if event.type == EventTypes.ThirdPartyInvite:
             return True
+
+        # We only need to process "join" and "invite" memberships, in order to be backward
+        # compatible, e.g. if a user from a blacklisted server joined a restricted room
+        # before the rules started being enforced on the server, that user must be able to
+        # leave it.
+        if event.membership not in [Membership.JOIN, Membership.INVITE]:
+            return True
+
         invitee_domain = get_domain_from_id(event.state_key)
         return invitee_domain not in self.domains_forbidden_when_restricted
 
@@ -356,7 +373,7 @@ class RoomAccessRules(object):
         """
         # Get the room memberships and 3PID invite tokens from the room's state.
         existing_members, threepid_tokens = self._get_members_and_tokens_from_state(
-            state_events,
+            state_events
         )
 
         # There should never be more than one 3PID invite in the room state: if the second
@@ -365,8 +382,12 @@ class RoomAccessRules(object):
         # join the first time), Synapse will successfully look it up before attempting to
         # store an invite on the IS.
         if len(threepid_tokens) == 1 and event.type == EventTypes.ThirdPartyInvite:
-            # If we already have a 3PID invite in flight, don't accept another one.
-            return False
+            # If we already have a 3PID invite in flight, don't accept another one, unless
+            # the new one has the same invite token as its state key. This is because 3PID
+            # invite revocations must be allowed, and a revocation is basically a new 3PID
+            # invite event with an empty content and the same token as the invite it
+            # revokes.
+            return event.state_key in threepid_tokens
 
         if len(existing_members) == 2:
             # If the user was within the two initial user of the room, Synapse would have
@@ -461,6 +482,45 @@ class RoomAccessRules(object):
 
         return True
 
+    def _on_room_avatar_change(self, event, rule):
+        """Check whether a change of room avatar is allowed.
+        The current rule is to forbid such a change in direct chats but allow it
+        everywhere else.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        return rule != ACCESS_RULE_DIRECT
+
+    def _on_room_name_change(self, event, rule):
+        """Check whether a change of room name is allowed.
+        The current rule is to forbid such a change in direct chats but allow it
+        everywhere else.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        return rule != ACCESS_RULE_DIRECT
+
+    def _on_room_topic_change(self, event, rule):
+        """Check whether a change of room topic is allowed.
+        The current rule is to forbid such a change in direct chats but allow it
+        everywhere else.
+
+        Args:
+            event (synapse.events.EventBase): The event to check.
+            rule (str): The name of the rule to apply.
+        Returns:
+            bool, True if the event can be allowed, False otherwise.
+        """
+        return rule != ACCESS_RULE_DIRECT
+
     @staticmethod
     def _get_rule_from_state(state_events):
         """Extract the rule to be applied from the given set of state events.
@@ -509,11 +569,12 @@ class RoomAccessRules(object):
         """
         existing_members = []
         threepid_invite_tokens = []
-        for key, event in state_events.items():
-            if key[0] == EventTypes.Member:
-                existing_members.append(event.state_key)
-            if key[0] == EventTypes.ThirdPartyInvite:
-                threepid_invite_tokens.append(event.state_key)
+        for key, state_event in state_events.items():
+            if key[0] == EventTypes.Member and state_event.content:
+                existing_members.append(state_event.state_key)
+            if key[0] == EventTypes.ThirdPartyInvite and state_event.content:
+                # Don't include revoked invites.
+                threepid_invite_tokens.append(state_event.state_key)
 
         return existing_members, threepid_invite_tokens
 

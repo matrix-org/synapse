@@ -23,6 +23,7 @@
 # Imports required for the default HomeServer() implementation
 import abc
 import logging
+import os
 
 from twisted.enterprise import adbapi
 from twisted.mail.smtp import sendmail
@@ -165,6 +166,7 @@ class HomeServer(object):
         'event_builder_factory',
         'filtering',
         'http_client_context_factory',
+        "proxied_http_client",
         'simple_http_client',
         'media_repository',
         'media_repository_resource',
@@ -305,6 +307,13 @@ class HomeServer(object):
 
     def build_simple_http_client(self):
         return SimpleHttpClient(self)
+
+    def build_proxied_http_client(self):
+        return SimpleHttpClient(
+            self,
+            http_proxy=os.getenv("http_proxy"),
+            https_proxy=os.getenv("HTTPS_PROXY"),
+        )
 
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)

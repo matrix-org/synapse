@@ -1,0 +1,1 @@
+Hide expired users from the user directory, and optionally re-add them on renewal.

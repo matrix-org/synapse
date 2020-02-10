@@ -420,7 +420,7 @@ class AuthHandler(BaseHandler):
         # TODO: get this from the homeserver rather than creating a new one for
         # each request
         try:
-            client = self.hs.get_simple_http_client()
+            client = self.hs.get_proxied_http_client()
             resp_body = yield client.post_urlencoded_get_json(
                 self.hs.config.recaptcha_siteverify_api,
                 args={

@@ -1,0 +1,1 @@
+User displaynames now have capitalised letters after - symbols.

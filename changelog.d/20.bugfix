@@ -1,0 +1,1 @@
+Validate `client_secret` parameter against the regex provided by the C-S spec.

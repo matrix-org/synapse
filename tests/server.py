@@ -387,11 +387,24 @@ class FakeTransport(object):
             self.disconnecting = True
             if self._protocol:
                 self._protocol.connectionLost(reason)
-            self.disconnected = True
+
+            # if we still have data to write, delay until that is done
+            if self.buffer:
+                logger.info(
+                    "FakeTransport: Delaying disconnect until buffer is flushed"
+                )
+            else:
+                self.disconnected = True
 
     def abortConnection(self):
         logger.info("FakeTransport: abortConnection()")
-        self.loseConnection()
+
+        if not self.disconnecting:
+            self.disconnecting = True
+            if self._protocol:
+                self._protocol.connectionLost(None)
+
+        self.disconnected = True
 
     def pauseProducing(self):
         if not self.producer:
@@ -422,6 +435,9 @@ class FakeTransport(object):
             self._reactor.callLater(0.0, _produce)
 
     def write(self, byt):
+        if self.disconnecting:
+            raise Exception("Writing to disconnecting FakeTransport")
+
         self.buffer = self.buffer + byt
 
         # always actually do the write asynchronously. Some protocols (notably the
@@ -465,3 +481,7 @@ class FakeTransport(object):
         self.buffer = self.buffer[len(to_write) :]
         if self.buffer and self.autoflush:
             self._reactor.callLater(0.0, self.flush)
+
+        if not self.buffer and self.disconnecting:
+            logger.info("FakeTransport: Buffer now empty, completing disconnect")
+            self.disconnected = True

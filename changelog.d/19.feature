@@ -1,0 +1,1 @@
+Add `max_avatar_size` and `allowed_avatar_mimetypes` to restrict the size of user avatars and their file type respectively.

@@ -26,11 +26,10 @@ import synapse.server
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, ProxiedRequestError, SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
-
-from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -74,11 +73,7 @@ class RoomMemberHandler(object):
         self.rewrite_identity_server_urls = self.config.rewrite_identity_server_urls
         self._enable_lookup = hs.config.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
-
-        # This is only used to get at ratelimit function, and
-        # maybe_kick_guest_users. It's fine there are multiple of these as
-        # it doesn't store state.
-        self.base_handler = BaseHandler(hs)
+        self.ratelimiter = Ratelimiter()
 
     @abc.abstractmethod
     def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
@@ -773,7 +768,12 @@ class RoomMemberHandler(object):
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
-        yield self.base_handler.ratelimit(requester)
+        self.ratelimiter.ratelimit(
+            requester.user.to_string(), time_now_s=self.hs.clock.time(),
+            rate_hz=self.hs.config.rc_third_party_invite.per_second,
+            burst_count=self.hs.config.rc_third_party_invite.burst_count,
+            update=True,
+        )
 
         can_invite = yield self.third_party_event_rules.check_threepid_can_be_invited(
             medium, address, room_id,
