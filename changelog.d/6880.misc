@@ -1,1 +1,0 @@
-Fix continuous integration failures with old versions of `pip`, which were introduced by a release of the `zipp` library.
