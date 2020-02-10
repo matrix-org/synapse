@@ -94,10 +94,10 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
-        users = await self.store.get_users_paginate(
+        users, total = await self.store.get_users_paginate(
             start, limit, user_id, guests, deactivated
         )
-        ret = {"users": users}
+        ret = {"users": users, "total": total}
         if len(users) >= limit:
             ret["next_token"] = str(start + len(users))
 

@@ -70,17 +70,22 @@ It returns a JSON body like the following:
                 "is_guest": 0,
                 "admin": 0,
                 "user_type": null,
-                "deactivated": 0
+                "deactivated": 0,
+                "displayname": <User One>,
+                "avatar_url": null
             }, {
                 "name": "<user_id2>",
                 "password_hash": "<password_hash2>",
                 "is_guest": 0,
                 "admin": 1,
                 "user_type": null,
-                "deactivated": 0
+                "deactivated": 0,
+                "displayname": <User Two>,
+                "avatar_url": "https://example.com/user_id2"
             }
         ],
-        "next_token": "100"
+        "next_token": "100",
+        "total": 200
     }
 
 
