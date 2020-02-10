@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # Metrics for number of state groups involved in a resolution.
 state_groups_histogram = Histogram(
     "synapse_state_number_state_groups", "",
-    buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
+    buckets=(1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
 
 
@@ -372,8 +372,6 @@ class StateHandler(object):
             room_id, event_ids
         )
 
-        state_groups_histogram.observe(len(state_groups_ids))
-
         if len(state_groups_ids) == 0:
             defer.returnValue(_StateCacheEntry(
                 state={},
@@ -497,6 +495,8 @@ class StateResolutionHandler(object):
             logger.info(
                 "Resolving state for %s with %d groups", room_id, len(state_groups_ids)
             )
+
+            state_groups_histogram.observe(len(state_groups_ids))
 
             # start by assuming we won't have any conflicted state, and build up the new
             # state map by iterating through the state groups. If we discover a conflict,
