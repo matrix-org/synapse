@@ -39,3 +39,5 @@ Server correctly handles incoming m.device_list_update
 
 # this fails reliably with a torture level of 100 due to https://github.com/matrix-org/synapse/issues/6536
 Outbound federation requests missing prev_events and then asks for /state_ids and resolves the state
+
+Can get rooms/{roomId}/members at a given point
