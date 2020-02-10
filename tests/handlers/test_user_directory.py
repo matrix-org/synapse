@@ -147,6 +147,50 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
 
+    def test_banned_user(self):
+        """
+        A banned user will not appear in search results.
+        """
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
+        u2 = self.register_user("user2", "pass")
+        u2_token = self.login(u2, "pass")
+
+        # We do not add users to the directory until they join a room.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+        room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
+        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        # Check we have populated the database correctly.
+        shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
+
+        self.assertEqual(
+            self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
+        )
+        self.assertEqual(public_users, [])
+
+        # We get one search result when searching for user2 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 1)
+
+        # Configure a user ban. This is implemented by a separate module.
+        spam_checker = self.hs.get_spam_checker()
+
+        class SpamChecker(object):
+            def check_for_banned_user(self, userid, display_name):
+                # Ban all users.
+                return True
+
+        spam_checker.spam_checker = SpamChecker()
+
+        # User1 now gets no search results for any of the other users.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
     def _compress_shared(self, shared):
         """
         Compress a list of users who share rooms dicts to a list of tuples.

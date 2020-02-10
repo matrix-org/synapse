@@ -52,6 +52,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.is_mine_id = hs.is_mine_id
         self.update_user_directory = hs.config.update_user_directory
         self.search_all_users = hs.config.user_directory_search_all_users
+        self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream
         self.pos = None
 
@@ -65,7 +66,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             # we start populating the user directory
             self.clock.call_later(0, self.notify_new_event)
 
-    def search_users(self, user_id, search_term, limit):
+    async def search_users(self, user_id, search_term, limit):
         """Searches for users in directory
 
         Returns:
@@ -82,7 +83,20 @@ class UserDirectoryHandler(StateDeltasHandler):
                     ]
                 }
         """
-        return self.store.search_user_dir(user_id, search_term, limit)
+        results = await self.store.search_user_dir(user_id, search_term, limit)
+
+        if self.spam_checker:
+            # Remove any banned users from the results.
+            results["results"] = list(
+                filter(
+                    lambda user_info: not self.spam_checker.check_for_banned_user(
+                        user_info["user_id"], user_info["display_name"]
+                    ),
+                    results["results"],
+                )
+            )
+
+        return results
 
     def notify_new_event(self):
         """Called when there may be more deltas to process
