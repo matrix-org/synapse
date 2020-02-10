@@ -1,0 +1,1 @@
+Fix exceptions in federation reader worker caused by attempting to renew attestations, which should only happen on master worker.
