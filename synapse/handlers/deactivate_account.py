@@ -121,6 +121,10 @@ class DeactivateAccountHandler(BaseHandler):
         # parts users from rooms (if it isn't already running)
         self._start_user_parting()
 
+        # Remove all information on the user from the account_validity table.
+        if self._account_validity_enabled:
+            yield self.store.delete_account_validity_for_user(user_id)
+
         # Mark the user as deactivated.
         yield self.store.set_user_deactivated_status(user_id, True)
 
