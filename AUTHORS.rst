@@ -72,3 +72,6 @@ Jason Robinson <jasonr at matrix.org>
 
 Joseph Weston <joseph at weston.cloud>
  + Add admin API for querying HS version
+
+Benjamin Saunders <ben.e.saunders at gmail dot com>
+ * Documentation improvements
