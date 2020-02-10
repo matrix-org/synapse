@@ -412,6 +412,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 "password": "abc123",
                 "admin": True,
                 "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+                "avatar_url": None,
             }
         )
 

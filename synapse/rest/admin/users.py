@@ -196,7 +196,7 @@ class UserRestServletV2(RestServlet):
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
 
-            if "avatar_url" in body:
+            if "avatar_url" in body and type(body["avatar_url"]) == str:
                 await self.profile_handler.set_avatar_url(
                     target_user, requester, body["avatar_url"], True
                 )
@@ -271,7 +271,7 @@ class UserRestServletV2(RestServlet):
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
 
-            if "avatar_url" in body:
+            if "avatar_url" in body and type(body["avatar_url"]) == str:
                 await self.profile_handler.set_avatar_url(
                     user_id, requester, body["avatar_url"], True
                 )
