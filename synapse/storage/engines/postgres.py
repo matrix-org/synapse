@@ -45,6 +45,10 @@ class PostgresEngine(object):
         # together. For example, version 8.1.5 will be returned as 80105
         self._version = db_conn.server_version
 
+        # Are we on a supported PostgreSQL version?
+        if self._version < 90500:
+            raise RuntimeError("Synapse requires PostgreSQL 9.5+ or above.")
+
         db_conn.set_isolation_level(
             self.module.extensions.ISOLATION_LEVEL_REPEATABLE_READ
         )
@@ -64,9 +68,9 @@ class PostgresEngine(object):
     @property
     def can_native_upsert(self):
         """
-        Can we use native UPSERTs? This requires PostgreSQL 9.5+.
+        Can we use native UPSERTs?
         """
-        return self._version >= 90500
+        return True
 
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):
