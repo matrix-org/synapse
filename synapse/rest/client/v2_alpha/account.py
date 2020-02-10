@@ -69,7 +69,13 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         if self.config.email_password_reset_behaviour == "off":
-            raise SynapseError(400, "Password resets have been disabled on this server")
+            if self.config.password_resets_were_disabled_due_to_email_config:
+                logger.warn(
+                    "User password resets have been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based password resets have been disabled on this server",
+            )
 
         body = parse_json_object_from_request(request)
 
@@ -197,9 +203,6 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_POST(self, request):
-        if not self.config.email_password_reset_behaviour == "off":
-            raise SynapseError(400, "Password resets have been disabled on this server")
-
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(body, [
@@ -253,6 +256,14 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400,
                 "This medium is currently not supported for password resets",
+            )
+        if self.config.email_password_reset_behaviour == "off":
+            if self.config.password_resets_were_disabled_due_to_email_config:
+                logger.warn(
+                    "User password resets have been disabled due to lack of email config"
+                )
+            raise SynapseError(
+                400, "Email-based password resets have been disabled on this server",
             )
 
         sid = parse_string(request, "sid")

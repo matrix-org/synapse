@@ -44,7 +44,7 @@ REQUIREMENTS = [
     "canonicaljson>=1.1.3",
     "signedjson>=1.0.0",
     "pynacl>=1.2.1",
-    "idna>=2",
+    "idna>=2.5",
 
     # validating SSL certs for IP addresses requires service_identity 18.1.
     "service_identity>=18.1.0",
@@ -65,7 +65,7 @@ REQUIREMENTS = [
     "sortedcontainers>=1.4.4",
     "psutil>=2.0.0",
     "pymacaroons>=0.13.0",
-    "msgpack>=0.5.0",
+    "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
     "six>=1.12",
     # prometheus_client 0.4.0 changed the format of counter metrics

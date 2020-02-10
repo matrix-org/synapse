@@ -19,14 +19,11 @@ from __future__ import print_function
 
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
-import logging
 import os
 
 import pkg_resources
 
 from ._base import Config, ConfigError
-
-logger = logging.getLogger(__name__)
 
 
 class EmailConfig(Config):
@@ -85,10 +82,12 @@ class EmailConfig(Config):
         self.email_password_reset_behaviour = (
             "remote" if email_trust_identity_server_for_password_resets else "local"
         )
+        self.password_resets_were_disabled_due_to_email_config = False
         if self.email_password_reset_behaviour == "local" and email_config == {}:
-            logger.warn(
-                "User password resets have been disabled due to lack of email config"
-            )
+            # We cannot warn the user this has happened here
+            # Instead do so when a user attempts to reset their password
+            self.password_resets_were_disabled_due_to_email_config = True
+
             self.email_password_reset_behaviour = "off"
 
         # Get lifetime of a validation token in milliseconds
