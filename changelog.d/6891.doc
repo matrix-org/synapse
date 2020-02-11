@@ -1,0 +1,1 @@
+Spell out that the last event sent to a room won't be deleted by the purge jobs for the message retention policies support.
