@@ -42,6 +42,10 @@ purged according to its room's policy, then the receiving server will
 process and store that event until it's picked up by the next purge job,
 though it will always hide it from clients.
 
+With the current implementation of this feature, in order not to break
+rooms, Synapse will never delete the last message sent to a room, and
+will only hide it from clients.
+
 
 ## Server configuration
 
