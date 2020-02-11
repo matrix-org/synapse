@@ -4,7 +4,7 @@ Synapse 1.10.0rc4 (2020-02-11)
 Features
 --------
 
-- Filter out m.room.aliases from /sync state blocks until a full fix lands. ([\#6884](https://github.com/matrix-org/synapse/issues/6884))
+- Filter out `m.room.aliase`s from `/sync` state blocks until a full fix lands. ([\#6884](https://github.com/matrix-org/synapse/issues/6884))
 
 
 Synapse 1.10.0rc3 (2020-02-10)
@@ -13,7 +13,7 @@ Synapse 1.10.0rc3 (2020-02-10)
 Features
 --------
 
-- Filter out m.room.aliases from the CS API to mitigate abuse while a better solution is specced. ([\#6878](https://github.com/matrix-org/synapse/issues/6878))
+- Filter out `m.room.aliases` from the CS API to mitigate abuse while a better solution is specced. ([\#6878](https://github.com/matrix-org/synapse/issues/6878))
 
 
 Internal Changes
