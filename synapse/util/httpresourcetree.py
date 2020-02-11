@@ -45,7 +45,7 @@ def create_resource_tree(desired_tree, root_resource):
 
         logger.info("Attaching %s to path %s", res, full_path)
         last_resource = root_resource
-        for path_seg in full_path.split(b'/')[1:-1]:
+        for path_seg in full_path.split(b"/")[1:-1]:
             if path_seg not in last_resource.listNames():
                 # resource doesn't exist, so make a "dummy resource"
                 child_resource = NoResource()
@@ -60,7 +60,7 @@ def create_resource_tree(desired_tree, root_resource):
 
         # ===========================
         # now attach the actual desired resource
-        last_path_seg = full_path.split(b'/')[-1]
+        last_path_seg = full_path.split(b"/")[-1]
 
         # if there is already a resource here, thieve its children and
         # replace it
@@ -70,9 +70,7 @@ def create_resource_tree(desired_tree, root_resource):
             # to be replaced with the desired resource.
             existing_dummy_resource = resource_mappings[res_id]
             for child_name in existing_dummy_resource.listNames():
-                child_res_id = _resource_id(
-                    existing_dummy_resource, child_name
-                )
+                child_res_id = _resource_id(existing_dummy_resource, child_name)
                 child_resource = resource_mappings[child_res_id]
                 # steal the children
                 res.putChild(child_name, child_resource)

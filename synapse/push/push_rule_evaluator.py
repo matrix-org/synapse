@@ -26,8 +26,8 @@ from synapse.util.caches.lrucache import LruCache
 logger = logging.getLogger(__name__)
 
 
-GLOB_REGEX = re.compile(r'\\\[(\\\!|)(.*)\\\]')
-IS_GLOB = re.compile(r'[\?\*\[\]]')
+GLOB_REGEX = re.compile(r"\\\[(\\\!|)(.*)\\\]")
+IS_GLOB = re.compile(r"[\?\*\[\]]")
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
@@ -36,20 +36,20 @@ def _room_member_count(ev, condition, room_member_count):
 
 
 def _sender_notification_permission(ev, condition, sender_power_level, power_levels):
-    notif_level_key = condition.get('key')
+    notif_level_key = condition.get("key")
     if notif_level_key is None:
         return False
 
-    notif_levels = power_levels.get('notifications', {})
+    notif_levels = power_levels.get("notifications", {})
     room_notif_level = notif_levels.get(notif_level_key, 50)
 
     return sender_power_level >= room_notif_level
 
 
 def _test_ineq_condition(condition, number):
-    if 'is' not in condition:
+    if "is" not in condition:
         return False
-    m = INEQUALITY_EXPR.match(condition['is'])
+    m = INEQUALITY_EXPR.match(condition["is"])
     if not m:
         return False
     ineq = m.group(1)
@@ -58,15 +58,15 @@ def _test_ineq_condition(condition, number):
         return False
     rhs = int(rhs)
 
-    if ineq == '' or ineq == '==':
+    if ineq == "" or ineq == "==":
         return number == rhs
-    elif ineq == '<':
+    elif ineq == "<":
         return number < rhs
-    elif ineq == '>':
+    elif ineq == ">":
         return number > rhs
-    elif ineq == '>=':
+    elif ineq == ">=":
         return number >= rhs
-    elif ineq == '<=':
+    elif ineq == "<=":
         return number <= rhs
     else:
         return False
@@ -77,8 +77,8 @@ def tweaks_for_actions(actions):
     for a in actions:
         if not isinstance(a, dict):
             continue
-        if 'set_tweak' in a and 'value' in a:
-            tweaks[a['set_tweak']] = a['value']
+        if "set_tweak" in a and "value" in a:
+            tweaks[a["set_tweak"]] = a["value"]
     return tweaks
 
 
@@ -93,26 +93,24 @@ class PushRuleEvaluatorForEvent(object):
         self._value_cache = _flatten_dict(event)
 
     def matches(self, condition, user_id, display_name):
-        if condition['kind'] == 'event_match':
+        if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
-        elif condition['kind'] == 'contains_display_name':
+        elif condition["kind"] == "contains_display_name":
             return self._contains_display_name(display_name)
-        elif condition['kind'] == 'room_member_count':
-            return _room_member_count(
-                self._event, condition, self._room_member_count
-            )
-        elif condition['kind'] == 'sender_notification_permission':
+        elif condition["kind"] == "room_member_count":
+            return _room_member_count(self._event, condition, self._room_member_count)
+        elif condition["kind"] == "sender_notification_permission":
             return _sender_notification_permission(
-                self._event, condition, self._sender_power_level, self._power_levels,
+                self._event, condition, self._sender_power_level, self._power_levels
             )
         else:
             return True
 
     def _event_match(self, condition, user_id):
-        pattern = condition.get('pattern', None)
+        pattern = condition.get("pattern", None)
 
         if not pattern:
-            pattern_type = condition.get('pattern_type', None)
+            pattern_type = condition.get("pattern_type", None)
             if pattern_type == "user_id":
                 pattern = user_id
             elif pattern_type == "user_localpart":
@@ -123,14 +121,14 @@ class PushRuleEvaluatorForEvent(object):
             return False
 
         # XXX: optimisation: cache our pattern regexps
-        if condition['key'] == 'content.body':
+        if condition["key"] == "content.body":
             body = self._event.content.get("body", None)
             if not body:
                 return False
 
             return _glob_matches(pattern, body, word_boundary=True)
         else:
-            haystack = self._get_value(condition['key'])
+            haystack = self._get_value(condition["key"])
             if haystack is None:
                 return False
 
@@ -193,16 +191,13 @@ def _glob_to_re(glob, word_boundary):
     if IS_GLOB.search(glob):
         r = re.escape(glob)
 
-        r = r.replace(r'\*', '.*?')
-        r = r.replace(r'\?', '.')
+        r = r.replace(r"\*", ".*?")
+        r = r.replace(r"\?", ".")
 
         # handle [abc], [a-z] and [!a-z] style ranges.
         r = GLOB_REGEX.sub(
             lambda x: (
-                '[%s%s]' % (
-                    x.group(1) and '^' or '',
-                    x.group(2).replace(r'\\\-', '-')
-                )
+                "[%s%s]" % (x.group(1) and "^" or "", x.group(2).replace(r"\\\-", "-"))
             ),
             r,
         )

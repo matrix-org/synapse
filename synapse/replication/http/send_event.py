@@ -45,6 +45,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "extra_users": [],
         }
     """
+
     NAME = "send_event"
     PATH_ARGS = ("event_id",)
 
@@ -57,8 +58,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
     @staticmethod
     @defer.inlineCallbacks
-    def _serialize_payload(event_id, store, event, context, requester,
-                           ratelimit, extra_users):
+    def _serialize_payload(
+        event_id, store, event, context, requester, ratelimit, extra_users
+    ):
         """
         Args:
             event_id (str)
@@ -108,14 +110,11 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             request.authenticated_entity = requester.user.to_string()
 
         logger.info(
-            "Got event to send with ID: %s into room: %s",
-            event.event_id, event.room_id,
+            "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
 
         yield self.event_creation_handler.persist_and_notify_client_event(
-            requester, event, context,
-            ratelimit=ratelimit,
-            extra_users=extra_users,
+            requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
         defer.returnValue((200, {}))

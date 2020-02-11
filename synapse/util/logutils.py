@@ -44,7 +44,7 @@ def _log_debug_as_f(f, msg, msg_args):
             lineno=lineno,
             msg=msg,
             args=msg_args,
-            exc_info=None
+            exc_info=None,
         )
 
         logger.handle(record)
@@ -70,20 +70,11 @@ def log_function(f):
                     r = r[:50] + "..."
                 return r
 
-            func_args = [
-                "%s=%s" % (k, format(v)) for k, v in bound_args.items()
-            ]
+            func_args = ["%s=%s" % (k, format(v)) for k, v in bound_args.items()]
 
-            msg_args = {
-                "func_name": func_name,
-                "args": ", ".join(func_args)
-            }
+            msg_args = {"func_name": func_name, "args": ", ".join(func_args)}
 
-            _log_debug_as_f(
-                f,
-                "Invoked '%(func_name)s' with args: %(args)s",
-                msg_args
-            )
+            _log_debug_as_f(f, "Invoked '%(func_name)s' with args: %(args)s", msg_args)
 
         return f(*args, **kwargs)
 
@@ -103,19 +94,13 @@ def time_function(f):
         start = time.clock()
 
         try:
-            _log_debug_as_f(
-                f,
-                "[FUNC START] {%s-%d}",
-                (func_name, id),
-            )
+            _log_debug_as_f(f, "[FUNC START] {%s-%d}", (func_name, id))
 
             r = f(*args, **kwargs)
         finally:
             end = time.clock()
             _log_debug_as_f(
-                f,
-                "[FUNC END] {%s-%d} %.3f sec",
-                (func_name, id, end - start,),
+                f, "[FUNC END] {%s-%d} %.3f sec", (func_name, id, end - start)
             )
 
         return r
@@ -137,9 +122,8 @@ def trace_function(f):
         s = inspect.currentframe().f_back
 
         to_print = [
-            "\t%s:%s %s. Args: args=%s, kwargs=%s" % (
-                pathname, linenum, func_name, args, kwargs
-            )
+            "\t%s:%s %s. Args: args=%s, kwargs=%s"
+            % (pathname, linenum, func_name, args, kwargs)
         ]
         while s:
             if True or s.f_globals["__name__"].startswith("synapse"):
@@ -147,9 +131,7 @@ def trace_function(f):
                 args_string = inspect.formatargvalues(*inspect.getargvalues(s))
 
                 to_print.append(
-                    "\t%s:%d %s. Args: %s" % (
-                        filename, lineno, function, args_string
-                    )
+                    "\t%s:%d %s. Args: %s" % (filename, lineno, function, args_string)
                 )
 
             s = s.f_back
@@ -163,7 +145,7 @@ def trace_function(f):
             lineno=lineno,
             msg=msg,
             args=None,
-            exc_info=None
+            exc_info=None,
         )
 
         logger.handle(record)
@@ -182,13 +164,13 @@ def get_previous_frames():
             filename, lineno, function, _, _ = inspect.getframeinfo(s)
             args_string = inspect.formatargvalues(*inspect.getargvalues(s))
 
-            to_return.append("{{  %s:%d %s - Args: %s }}" % (
-                filename, lineno, function, args_string
-            ))
+            to_return.append(
+                "{{  %s:%d %s - Args: %s }}" % (filename, lineno, function, args_string)
+            )
 
         s = s.f_back
 
-    return ", ". join(to_return)
+    return ", ".join(to_return)
 
 
 def get_previous_frame(ignore=[]):
@@ -201,7 +183,10 @@ def get_previous_frame(ignore=[]):
                 args_string = inspect.formatargvalues(*inspect.getargvalues(s))
 
                 return "{{  %s:%d %s - Args: %s }}" % (
-                    filename, lineno, function, args_string
+                    filename,
+                    lineno,
+                    function,
+                    args_string,
                 )
 
         s = s.f_back

@@ -68,13 +68,10 @@ class ProfileDisplaynameRestServlet(RestServlet):
         except Exception:
             defer.returnValue((400, "Unable to parse name"))
 
-        yield self.profile_handler.set_displayname(
-            user, requester, new_name, is_admin)
+        yield self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
         if self.hs.config.shadow_server:
-            shadow_user = UserID(
-                user.localpart, self.hs.config.shadow_server.get("hs")
-            )
+            shadow_user = UserID(user.localpart, self.hs.config.shadow_server.get("hs"))
             self.shadow_displayname(shadow_user.to_string(), content)
 
         defer.returnValue((200, {}))
@@ -89,10 +86,9 @@ class ProfileDisplaynameRestServlet(RestServlet):
         as_token = self.hs.config.shadow_server.get("as_token")
 
         yield self.http_client.put_json(
-            "%s/_matrix/client/r0/profile/%s/displayname?access_token=%s&user_id=%s" % (
-                shadow_hs_url, user_id, as_token, user_id
-            ),
-            body
+            "%s/_matrix/client/r0/profile/%s/displayname?access_token=%s&user_id=%s"
+            % (shadow_hs_url, user_id, as_token, user_id),
+            body,
         )
 
 
@@ -143,9 +139,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
         )
 
         if self.hs.config.shadow_server:
-            shadow_user = UserID(
-                user.localpart, self.hs.config.shadow_server.get("hs")
-            )
+            shadow_user = UserID(user.localpart, self.hs.config.shadow_server.get("hs"))
             self.shadow_avatar_url(shadow_user.to_string(), content)
 
         defer.returnValue((200, {}))
@@ -160,10 +154,9 @@ class ProfileAvatarURLRestServlet(RestServlet):
         as_token = self.hs.config.shadow_server.get("as_token")
 
         yield self.http_client.put_json(
-            "%s/_matrix/client/r0/profile/%s/avatar_url?access_token=%s&user_id=%s" % (
-                shadow_hs_url, user_id, as_token, user_id
-            ),
-            body
+            "%s/_matrix/client/r0/profile/%s/avatar_url?access_token=%s&user_id=%s"
+            % (shadow_hs_url, user_id, as_token, user_id),
+            body,
         )
 
 

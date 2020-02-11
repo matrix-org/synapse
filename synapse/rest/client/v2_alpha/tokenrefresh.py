@@ -26,6 +26,7 @@ class TokenRefreshRestServlet(RestServlet):
     Exchanges refresh tokens for a pair of an access token and a new refresh
     token.
     """
+
     PATTERNS = client_patterns("/tokenrefresh")
 
     def __init__(self, hs):

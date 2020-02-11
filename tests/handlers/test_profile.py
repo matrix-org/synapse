@@ -71,9 +71,7 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield self.store.set_profile_displayname(
-            self.frank.localpart, "Frank", 1,
-        )
+        yield self.store.set_profile_displayname(self.frank.localpart, "Frank", 1)
 
         displayname = yield self.handler.get_displayname(self.frank)
 
@@ -127,7 +125,7 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
         yield self.store.set_profile_avatar_url(
-            self.frank.localpart, "http://my.server/me.png", 1,
+            self.frank.localpart, "http://my.server/me.png", 1
         )
 
         avatar_url = yield self.handler.get_avatar_url(self.frank)

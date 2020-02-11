@@ -206,9 +206,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
 class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
 
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-    ]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
 
@@ -219,15 +217,11 @@ class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
         config["show_users_in_user_directory"] = False
         config["replicate_user_profiles_to"] = ["fakeserver"]
 
-        mock_http_client = Mock(spec=[
-            "get_json",
-            "post_json_get_json",
-        ])
+        mock_http_client = Mock(spec=["get_json", "post_json_get_json"])
         mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
 
         self.hs = self.setup_test_homeserver(
-            config=config,
-            simple_http_client=mock_http_client,
+            config=config, simple_http_client=mock_http_client
         )
 
         return self.hs
@@ -376,14 +370,11 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         config["replicate_user_profiles_to"] = "test.is"
 
         # Mock homeserver requests to an identity server
-        mock_http_client = Mock(spec=[
-            "post_json_get_json",
-        ])
+        mock_http_client = Mock(spec=["post_json_get_json"])
         mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
 
         self.hs = self.setup_test_homeserver(
-            config=config,
-            simple_http_client=mock_http_client,
+            config=config, simple_http_client=mock_http_client
         )
 
         return self.hs
@@ -524,7 +515,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         config["email"] = {
             "enable_notifs": True,
             "template_dir": os.path.abspath(
-                pkg_resources.resource_filename('synapse', 'res/templates')
+                pkg_resources.resource_filename("synapse", "res/templates")
             ),
             "expiry_template_html": "notice_expiry.html",
             "expiry_template_text": "notice_expiry.txt",
@@ -624,19 +615,18 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         (user_id, tok) = self.create_user()
 
-        request_data = json.dumps({
-            "auth": {
-                "type": "m.login.password",
-                "user": user_id,
-                "password": "monkey",
-            },
-            "erase": False,
-        })
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": user_id,
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
         request, channel = self.make_request(
-            "POST",
-            "account/deactivate",
-            request_data,
-            access_token=tok,
+            "POST", "account/deactivate", request_data, access_token=tok
         )
         self.render(request)
         self.assertEqual(request.code, 200, channel.result)
@@ -700,9 +690,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
 class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-    ]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
         self.validity_period = 10
@@ -711,9 +699,7 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
 
         config["enable_registration"] = True
-        config["account_validity"] = {
-            "enabled": False,
-        }
+        config["account_validity"] = {"enabled": False}
 
         self.hs = self.setup_test_homeserver(config=config)
         self.hs.config.account_validity.period = self.validity_period

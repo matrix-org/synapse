@@ -56,9 +56,8 @@ class IdTokenServlet(RestServlet):
         "expires_in": 3600,
     }
     """
-    PATTERNS = client_patterns(
-        "/user/(?P<user_id>[^/]*)/openid/request_token"
-    )
+
+    PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/openid/request_token")
 
     EXPIRES_MS = 3600 * 1000
 
@@ -84,12 +83,17 @@ class IdTokenServlet(RestServlet):
 
         yield self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
 
-        defer.returnValue((200, {
-            "access_token": token,
-            "token_type": "Bearer",
-            "matrix_server_name": self.server_name,
-            "expires_in": self.EXPIRES_MS / 1000,
-        }))
+        defer.returnValue(
+            (
+                200,
+                {
+                    "access_token": token,
+                    "token_type": "Bearer",
+                    "matrix_server_name": self.server_name,
+                    "expires_in": self.EXPIRES_MS / 1000,
+                },
+            )
+        )
 
 
 def register_servlets(hs, http_server):

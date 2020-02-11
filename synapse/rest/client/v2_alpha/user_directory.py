@@ -64,15 +64,14 @@ class UserDirectorySearchRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         if not self.hs.config.user_directory_search_enabled:
-            defer.returnValue((200, {
-                "limited": False,
-                "results": [],
-            }))
+            defer.returnValue((200, {"limited": False, "results": []}))
 
         body = parse_json_object_from_request(request)
 
         if self.hs.config.user_directory_defer_to_id_server:
-            signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
+            signed_body = sign_json(
+                body, self.hs.hostname, self.hs.config.signing_key[0]
+            )
             url = "%s/_matrix/identity/api/v1/user_directory/search" % (
                 self.hs.config.user_directory_defer_to_id_server,
             )
@@ -88,7 +87,7 @@ class UserDirectorySearchRestServlet(RestServlet):
             raise SynapseError(400, "`search_term` is required field")
 
         results = yield self.user_directory_handler.search_users(
-            user_id, search_term, limit,
+            user_id, search_term, limit
         )
 
         defer.returnValue((200, results))
@@ -98,9 +97,8 @@ class UserInfoServlet(RestServlet):
     """
     GET /user/{user_id}/info HTTP/1.1
     """
-    PATTERNS = client_patterns(
-        "/user/(?P<user_id>[^/]*)/info$"
-    )
+
+    PATTERNS = client_patterns("/user/(?P<user_id>[^/]*)/info$")
 
     def __init__(self, hs):
         super(UserInfoServlet, self).__init__()
@@ -113,9 +111,7 @@ class UserInfoServlet(RestServlet):
         registry = hs.get_federation_registry()
 
         if not registry.query_handlers.get("user_info"):
-            registry.register_query_handler(
-                "user_info", self._on_federation_query
-            )
+            registry.register_query_handler("user_info", self._on_federation_query)
 
     @defer.inlineCallbacks
     def on_GET(self, request, user_id):
@@ -127,7 +123,7 @@ class UserInfoServlet(RestServlet):
             # Attempt to make a federation request to the server that owns this user
             args = {"user_id": user_id}
             res = yield self.transport_layer.make_query(
-                user.domain, "user_info", args, retry_on_dns_fail=True,
+                user.domain, "user_info", args, retry_on_dns_fail=True
             )
             defer.returnValue((200, res))
 
@@ -174,10 +170,7 @@ class UserInfoServlet(RestServlet):
             expiration_ts is not None and self.clock.time_msec() >= expiration_ts
         )
 
-        res = {
-            "expired": is_expired,
-            "deactivated": is_deactivated,
-        }
+        res = {"expired": is_expired, "deactivated": is_deactivated}
         defer.returnValue(res)
 
 

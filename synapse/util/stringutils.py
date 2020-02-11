@@ -24,9 +24,7 @@ from six.moves import range
 
 from synapse.api.errors import Codes, SynapseError
 
-_string_with_symbols = (
-    string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
-)
+_string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
 
 # random_string and random_string_with_symbols are used for a range of things,
 # some cryptographically important, some less so. We use SystemRandom to make sure
@@ -37,13 +35,11 @@ client_secret_regex = re.compile(r"^[0-9a-zA-Z.=_-]+$")
 
 
 def random_string(length):
-    return ''.join(rand.choice(string.ascii_letters) for _ in range(length))
+    return "".join(rand.choice(string.ascii_letters) for _ in range(length))
 
 
 def random_string_with_symbols(length):
-    return ''.join(
-        rand.choice(_string_with_symbols) for _ in range(length)
-    )
+    return "".join(rand.choice(_string_with_symbols) for _ in range(length))
 
 
 def is_ascii(s):
@@ -51,7 +47,7 @@ def is_ascii(s):
     if PY3:
         if isinstance(s, bytes):
             try:
-                s.decode('ascii').encode('ascii')
+                s.decode("ascii").encode("ascii")
             except UnicodeDecodeError:
                 return False
             except UnicodeEncodeError:
@@ -116,7 +112,7 @@ def exception_to_unicode(e):
 
     msg = e.args[0]
     if isinstance(msg, bytes):
-        return msg.decode('utf-8', errors='replace')
+        return msg.decode("utf-8", errors="replace")
     else:
         return msg
 

@@ -38,24 +38,18 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         self.rewritten_is_url = "int.testis"
 
         config = self.default_config()
-        config["trusted_third_party_id_servers"] = [
-            self.is_server_name,
-        ]
+        config["trusted_third_party_id_servers"] = [self.is_server_name]
         config["rewrite_identity_server_urls"] = {
-            self.is_server_name: self.rewritten_is_url,
+            self.is_server_name: self.rewritten_is_url
         }
 
-        mock_http_client = Mock(spec=[
-            "post_urlencoded_get_json",
-        ])
-        mock_http_client.post_urlencoded_get_json.return_value = defer.succeed({
-            "address": self.address,
-            "medium": "email",
-        })
+        mock_http_client = Mock(spec=["post_urlencoded_get_json"])
+        mock_http_client.post_urlencoded_get_json.return_value = defer.succeed(
+            {"address": self.address, "medium": "email"}
+        )
 
         self.hs = self.setup_test_homeserver(
-            config=config,
-            simple_http_client=mock_http_client,
+            config=config, simple_http_client=mock_http_client
         )
 
         return self.hs
@@ -74,35 +68,34 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         post_urlenc_get_json = self.hs.get_simple_http_client().post_urlencoded_get_json
         store = self.hs.get_datastore()
 
-        creds = {
-            "sid": "123",
-            "client_secret": "some_secret",
-        }
+        creds = {"sid": "123", "client_secret": "some_secret"}
 
         # Make sure processing the mocked response goes through.
-        data = self.get_success(handler.bind_threepid(
-            {
-                "id_server": self.is_server_name,
-                "client_secret": creds["client_secret"],
-                "sid": creds["sid"],
-            },
-            self.user_id,
-        ))
+        data = self.get_success(
+            handler.bind_threepid(
+                {
+                    "id_server": self.is_server_name,
+                    "client_secret": creds["client_secret"],
+                    "sid": creds["sid"],
+                },
+                self.user_id,
+            )
+        )
         self.assertEqual(data.get("address"), self.address)
 
         # Check that the request was done against the rewritten server name.
         post_urlenc_get_json.assert_called_once_with(
             "https://%s/_matrix/identity/api/v1/3pid/bind" % self.rewritten_is_url,
             {
-                'sid': creds['sid'],
-                'client_secret': creds["client_secret"],
-                'mxid': self.user_id,
-            }
+                "sid": creds["sid"],
+                "client_secret": creds["client_secret"],
+                "mxid": self.user_id,
+            },
         )
 
         # Check that the original server name is saved in the database instead of the
         # rewritten one.
-        id_servers = self.get_success(store.get_id_servers_user_bound(
-            self.user_id, "email", self.address
-        ))
+        id_servers = self.get_success(
+            store.get_id_servers_user_bound(self.user_id, "email", self.address)
+        )
         self.assertEqual(id_servers, [self.is_server_name])

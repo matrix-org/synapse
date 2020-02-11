@@ -27,14 +27,14 @@ class UserDirectoryConfig(Config):
         self.user_directory_defer_to_id_server = None
         user_directory_config = config.get("user_directory", None)
         if user_directory_config:
-            self.user_directory_search_enabled = (
-                user_directory_config.get("enabled", True)
+            self.user_directory_search_enabled = user_directory_config.get(
+                "enabled", True
             )
-            self.user_directory_search_all_users = (
-                user_directory_config.get("search_all_users", False)
+            self.user_directory_search_all_users = user_directory_config.get(
+                "search_all_users", False
             )
-            self.user_directory_defer_to_id_server = (
-                user_directory_config.get("defer_to_id_server", None)
+            self.user_directory_defer_to_id_server = user_directory_config.get(
+                "defer_to_id_server", None
             )
 
     def default_config(self, config_dir_path, server_name, **kwargs):

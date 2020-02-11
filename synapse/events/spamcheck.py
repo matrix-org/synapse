@@ -46,8 +46,15 @@ class SpamChecker(object):
 
         return self.spam_checker.check_event_for_spam(event)
 
-    def user_may_invite(self, inviter_userid, invitee_userid, third_party_invite,
-                        room_id, new_room, published_room):
+    def user_may_invite(
+        self,
+        inviter_userid,
+        invitee_userid,
+        third_party_invite,
+        room_id,
+        new_room,
+        published_room,
+    ):
         """Checks if a given user may send an invite
 
         If this method returns false, the invite will be rejected.
@@ -74,12 +81,17 @@ class SpamChecker(object):
             return True
 
         return self.spam_checker.user_may_invite(
-            inviter_userid, invitee_userid, third_party_invite, room_id, new_room,
+            inviter_userid,
+            invitee_userid,
+            third_party_invite,
+            room_id,
+            new_room,
             published_room,
         )
 
-    def user_may_create_room(self, userid, invite_list, third_party_invite_list,
-                             cloning):
+    def user_may_create_room(
+        self, userid, invite_list, third_party_invite_list, cloning
+    ):
         """Checks if a given user may create a room
 
         If this method returns false, the creation request will be rejected.
@@ -100,7 +112,7 @@ class SpamChecker(object):
             return True
 
         return self.spam_checker.user_may_create_room(
-            userid, invite_list, third_party_invite_list, cloning,
+            userid, invite_list, third_party_invite_list, cloning
         )
 
     def user_may_create_room_alias(self, userid, room_alias):

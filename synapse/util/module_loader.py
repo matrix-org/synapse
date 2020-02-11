@@ -28,15 +28,13 @@ def load_module(provider):
     """
     # We need to import the module, and then pick the class out of
     # that, so we split based on the last dot.
-    module, clz = provider['module'].rsplit(".", 1)
+    module, clz = provider["module"].rsplit(".", 1)
     module = importlib.import_module(module)
     provider_class = getattr(module, clz)
 
     try:
         provider_config = provider_class.parse_config(provider["config"])
     except Exception as e:
-        raise ConfigError(
-            "Failed to parse config for %r: %r" % (provider['module'], e)
-        )
+        raise ConfigError("Failed to parse config for %r: %r" % (provider["module"], e))
 
     return provider_class, provider_config

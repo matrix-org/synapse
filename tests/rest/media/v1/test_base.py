@@ -24,14 +24,14 @@ class GetFileNameFromHeadersTests(unittest.TestCase):
         b"inline; filename=abc.txt": u"abc.txt",
         b'inline; filename="azerty"': u"azerty",
         b'inline; filename="aze%20rty"': u"aze%20rty",
-        b'inline; filename="aze\"rty"': u'aze"rty',
+        b'inline; filename="aze"rty"': u'aze"rty',
         b'inline; filename="azer;ty"': u"azer;ty",
         b"inline; filename*=utf-8''foo%C2%A3bar": u"foo£bar",
     }
 
     def tests(self):
         for hdr, expected in self.TEST_CASES.items():
-            res = get_filename_from_headers({b'Content-Disposition': [hdr]})
+            res = get_filename_from_headers({b"Content-Disposition": [hdr]})
             self.assertEqual(
                 res,
                 expected,

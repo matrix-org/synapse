@@ -46,7 +46,7 @@ class FakeChannel(object):
     def json_body(self):
         if not self.result:
             raise Exception("No result yet.")
-        return json.loads(self.result["body"].decode('utf8'))
+        return json.loads(self.result["body"].decode("utf8"))
 
     @property
     def code(self):
@@ -151,10 +151,10 @@ def make_request(
         Tuple[synapse.http.site.SynapseRequest, channel]
     """
     if not isinstance(method, bytes):
-        method = method.encode('ascii')
+        method = method.encode("ascii")
 
     if not isinstance(path, bytes):
-        path = path.encode('ascii')
+        path = path.encode("ascii")
 
     # Decorate it to be the full path, if we're using shorthand
     if shorthand and not path.startswith(b"/_matrix"):
@@ -165,7 +165,7 @@ def make_request(
         path = b"/" + path
 
     if isinstance(content, text_type):
-        content = content.encode('utf8')
+        content = content.encode("utf8")
 
     site = FakeSite()
     channel = FakeChannel(reactor)
@@ -173,11 +173,11 @@ def make_request(
     req = request(site, channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
-    req.postpath = list(map(unquote, path[1:].split(b'/')))
+    req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
         req.requestHeaders.addRawHeader(
-            b"Authorization", b"Bearer " + access_token.encode('ascii')
+            b"Authorization", b"Bearer " + access_token.encode("ascii")
         )
 
     if federation_auth_origin is not None:
@@ -242,7 +242,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super(ThreadedMemoryReactorClock, self).__init__()
 
-    def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
+    def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
         p.startListening()
         self._udp.append(p)
@@ -371,7 +371,7 @@ class FakeTransport(object):
 
     disconnecting = False
     disconnected = False
-    buffer = attr.ib(default=b'')
+    buffer = attr.ib(default=b"")
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
 

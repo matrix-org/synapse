@@ -71,7 +71,7 @@ class BaseProfileHandler(BaseHandler):
 
         if hs.config.worker_app is None:
             self.clock.looping_call(
-                self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+                self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )
 
             if len(self.hs.config.replicate_user_profiles_to) > 0:
@@ -115,7 +115,7 @@ class BaseProfileHandler(BaseHandler):
                     yield self._replicate_host_profile_batch(repl_host, i)
             except Exception:
                 logger.exception(
-                    "Exception while replicating to %s: aborting for now", repl_host,
+                    "Exception while replicating to %s: aborting for now", repl_host
                 )
 
     @defer.inlineCallbacks
@@ -123,18 +123,16 @@ class BaseProfileHandler(BaseHandler):
         logger.info("Replicating profile batch %d to %s", batchnum, host)
         batch_rows = yield self.store.get_profile_batch(batchnum)
         batch = {
-            UserID(r["user_id"], self.hs.hostname).to_string(): ({
-                "display_name": r["displayname"],
-                "avatar_url": r["avatar_url"],
-            } if r["active"] else None) for r in batch_rows
+            UserID(r["user_id"], self.hs.hostname).to_string(): (
+                {"display_name": r["displayname"], "avatar_url": r["avatar_url"]}
+                if r["active"]
+                else None
+            )
+            for r in batch_rows
         }
 
         url = "https://%s/_matrix/identity/api/v1/replicate_profiles" % (host,)
-        body = {
-            "batchnum": batchnum,
-            "batch": batch,
-            "origin_server": self.hs.hostname,
-        }
+        body = {"batchnum": batchnum, "batch": batch, "origin_server": self.hs.hostname}
         signed_body = sign_json(body, self.hs.hostname, self.hs.config.signing_key[0])
         try:
             yield self.http_client.post_json_get_json(url, signed_body)
@@ -142,7 +140,9 @@ class BaseProfileHandler(BaseHandler):
             logger.info("Sucessfully replicated profile batch %d to %s", batchnum, host)
         except Exception:
             # This will get retried when the looping call next comes around
-            logger.exception("Failed to replicate profile batch %d to %s", batchnum, host)
+            logger.exception(
+                "Failed to replicate profile batch %d to %s", batchnum, host
+            )
             raise
 
     @defer.inlineCallbacks
@@ -162,18 +162,13 @@ class BaseProfileHandler(BaseHandler):
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
 
-            defer.returnValue({
-                "displayname": displayname,
-                "avatar_url": avatar_url,
-            })
+            defer.returnValue({"displayname": displayname, "avatar_url": avatar_url})
         else:
             try:
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
-                    args={
-                        "user_id": user_id,
-                    },
+                    args={"user_id": user_id},
                     ignore_backoff=True,
                 )
                 defer.returnValue(result)
@@ -202,10 +197,7 @@ class BaseProfileHandler(BaseHandler):
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
 
-            defer.returnValue({
-                "displayname": displayname,
-                "avatar_url": avatar_url,
-            })
+            defer.returnValue({"displayname": displayname, "avatar_url": avatar_url})
         else:
             profile = yield self.store.get_from_remote_profile_cache(user_id)
             defer.returnValue(profile or {})
@@ -228,10 +220,7 @@ class BaseProfileHandler(BaseHandler):
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
-                    args={
-                        "user_id": target_user.to_string(),
-                        "field": "displayname",
-                    },
+                    args={"user_id": target_user.to_string(), "field": "displayname"},
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
@@ -260,18 +249,22 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and self.hs.config.disable_set_displayname:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             if profile.display_name:
-                raise SynapseError(400, "Changing displayname is disabled on this server")
+                raise SynapseError(
+                    400, "Changing displayname is disabled on this server"
+                )
 
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
-                400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN, ),
+                400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
             )
 
-        if new_displayname == '':
+        if new_displayname == "":
             new_displayname = None
 
         if len(self.hs.config.replicate_user_profiles_to) > 0:
-            cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+            cur_batchnum = (
+                yield self.store.get_latest_profile_replication_batch_number()
+            )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
         else:
             new_batchnum = None
@@ -307,7 +300,9 @@ class BaseProfileHandler(BaseHandler):
         where we've already done these checks anyway.
         """
         if len(self.hs.config.replicate_user_profiles_to) > 0:
-            cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+            cur_batchnum = (
+                yield self.store.get_latest_profile_replication_batch_number()
+            )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
         else:
             new_batchnum = None
@@ -335,10 +330,7 @@ class BaseProfileHandler(BaseHandler):
                 result = yield self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
-                    args={
-                        "user_id": target_user.to_string(),
-                        "field": "avatar_url",
-                    },
+                    args={"user_id": target_user.to_string(), "field": "avatar_url"},
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
@@ -361,17 +353,21 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and self.hs.config.disable_set_avatar_url:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             if profile.avatar_url:
-                raise SynapseError(400, "Changing avatar url is disabled on this server")
+                raise SynapseError(
+                    400, "Changing avatar url is disabled on this server"
+                )
 
         if len(self.hs.config.replicate_user_profiles_to) > 0:
-            cur_batchnum = yield self.store.get_latest_profile_replication_batch_number()
+            cur_batchnum = (
+                yield self.store.get_latest_profile_replication_batch_number()
+            )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
         else:
             new_batchnum = None
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
-                400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN, ),
+                400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
         # Enforce a max avatar size if one is defined
@@ -389,8 +385,10 @@ class BaseProfileHandler(BaseHandler):
             media_size = media_info["media_length"]
             if self.max_avatar_size and media_size > self.max_avatar_size:
                 raise SynapseError(
-                    400, "Avatars must be less than %s bytes in size" %
-                    (self.max_avatar_size,), errcode=Codes.TOO_LARGE,
+                    400,
+                    "Avatars must be less than %s bytes in size"
+                    % (self.max_avatar_size,),
+                    errcode=Codes.TOO_LARGE,
                 )
 
             # Ensure the avatar's file type is allowed
@@ -399,12 +397,11 @@ class BaseProfileHandler(BaseHandler):
                 and media_info["media_type"] not in self.allowed_avatar_mimetypes
             ):
                 raise SynapseError(
-                    400, "Avatar file type '%s' not allowed" %
-                    media_info["media_type"],
+                    400, "Avatar file type '%s' not allowed" % media_info["media_type"]
                 )
 
         yield self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url, new_batchnum,
+            target_user.localpart, new_avatar_url, new_batchnum
         )
 
         if self.hs.config.user_directory_search_all_users:
@@ -465,9 +462,7 @@ class BaseProfileHandler(BaseHandler):
 
         yield self.ratelimit(requester)
 
-        room_ids = yield self.store.get_rooms_for_user(
-            target_user.to_string(),
-        )
+        room_ids = yield self.store.get_rooms_for_user(target_user.to_string())
 
         for room_id in room_ids:
             handler = self.hs.get_room_member_handler()
@@ -483,8 +478,7 @@ class BaseProfileHandler(BaseHandler):
                 )
             except Exception as e:
                 logger.warn(
-                    "Failed to update join event for room %s - %s",
-                    room_id, str(e)
+                    "Failed to update join event for room %s - %s", room_id, str(e)
                 )
 
     @defer.inlineCallbacks
@@ -516,11 +510,9 @@ class BaseProfileHandler(BaseHandler):
             return
 
         try:
-            requester_rooms = yield self.store.get_rooms_for_user(
-                requester.to_string()
-            )
+            requester_rooms = yield self.store.get_rooms_for_user(requester.to_string())
             target_user_rooms = yield self.store.get_rooms_for_user(
-                target_user.to_string(),
+                target_user.to_string()
             )
 
             # Check if the room lists have no elements in common.
@@ -544,12 +536,12 @@ class MasterProfileHandler(BaseProfileHandler):
         assert hs.config.worker_app is None
 
         self.clock.looping_call(
-            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS,
+            self._start_update_remote_profile_cache, self.PROFILE_UPDATE_MS
         )
 
     def _start_update_remote_profile_cache(self):
         return run_as_background_process(
-            "Update remote profile", self._update_remote_profile_cache,
+            "Update remote profile", self._update_remote_profile_cache
         )
 
     @defer.inlineCallbacks
@@ -563,7 +555,7 @@ class MasterProfileHandler(BaseProfileHandler):
 
         for user_id, displayname, avatar_url in entries:
             is_subscribed = yield self.store.is_subscribed_remote_profile_for_user(
-                user_id,
+                user_id
             )
             if not is_subscribed:
                 yield self.store.maybe_delete_remote_profile_cache(user_id)
@@ -573,9 +565,7 @@ class MasterProfileHandler(BaseProfileHandler):
                 profile = yield self.federation.make_query(
                     destination=get_domain_from_id(user_id),
                     query_type="profile",
-                    args={
-                        "user_id": user_id,
-                    },
+                    args={"user_id": user_id},
                     ignore_backoff=True,
                 )
             except Exception:
@@ -590,6 +580,4 @@ class MasterProfileHandler(BaseProfileHandler):
             new_avatar = profile.get("avatar_url")
 
             # We always hit update to update the last_check timestamp
-            yield self.store.update_remote_profile_cache(
-                user_id, new_name, new_avatar
-            )
+            yield self.store.update_remote_profile_cache(user_id, new_name, new_avatar)

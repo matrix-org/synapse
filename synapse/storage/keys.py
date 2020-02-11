@@ -131,7 +131,7 @@ class KeyStore(SQLBaseStore):
         def _invalidate(res):
             f = self._get_server_verify_key.invalidate
             for i in invalidations:
-                f((i, ))
+                f((i,))
             return res
 
         return self.runInteraction(

@@ -52,11 +52,11 @@ def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
 def set_timeline_upper_limit(filter_json, filter_timeline_limit):
     if filter_timeline_limit < 0:
         return  # no upper limits
-    timeline = filter_json.get('room', {}).get('timeline', {})
-    if 'limit' in timeline:
-        filter_json['room']['timeline']["limit"] = min(
-            filter_json['room']['timeline']['limit'],
-            filter_timeline_limit)
+    timeline = filter_json.get("room", {}).get("timeline", {})
+    if "limit" in timeline:
+        filter_json["room"]["timeline"]["limit"] = min(
+            filter_json["room"]["timeline"]["limit"], filter_timeline_limit
+        )
 
 
 def interactive_auth_handler(orig):
@@ -74,10 +74,12 @@ def interactive_auth_handler(orig):
         # ...
         yield self.auth_handler.check_auth
             """
+
     def wrapped(*args, **kwargs):
         res = defer.maybeDeferred(orig, *args, **kwargs)
         res.addErrback(_catch_incomplete_interactive_auth)
         return res
+
     return wrapped
 
 

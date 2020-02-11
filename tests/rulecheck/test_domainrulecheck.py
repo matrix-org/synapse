@@ -33,7 +33,7 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
                 "source_one": ["target_one", "target_two"],
                 "source_two": ["target_two"],
             },
-            "domains_prevented_from_being_invited_to_published_rooms": ["target_two"]
+            "domains_prevented_from_being_invited_to_published_rooms": ["target_two"],
         }
         check = DomainRuleChecker(config)
         self.assertTrue(
@@ -55,14 +55,14 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         # User can invite internal user to a published room
         self.assertTrue(
             check.user_may_invite(
-                "test:source_one", "test1:target_one", None, "room", False, True,
+                "test:source_one", "test1:target_one", None, "room", False, True
             )
         )
 
         # User can invite external user to a non-published room
         self.assertTrue(
             check.user_may_invite(
-                "test:source_one", "test:target_two", None, "room", False, False,
+                "test:source_one", "test:target_two", None, "room", False, False
             )
         )
 
@@ -100,7 +100,7 @@ class DomainRuleCheckerTestCase(unittest.TestCase):
         # User cannot invite external user to a published room
         self.assertTrue(
             check.user_may_invite(
-                "test:source_one", "test:target_two", None, "room", False, True,
+                "test:source_one", "test:target_two", None, "room", False, True
             )
         )
 
@@ -165,9 +165,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
-        config["trusted_third_party_id_servers"] = [
-            "localhost",
-        ]
+        config["trusted_third_party_id_servers"] = ["localhost"]
 
         config["spam_checker"] = {
             "module": "synapse.rulecheck.domain_rule_checker.DomainRuleChecker",
@@ -302,9 +300,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         )
 
         self.helper.join(
-            room_id, self.normal_user_id,
-            tok=self.normal_access_token,
-            expect_code=200,
+            room_id, self.normal_user_id, tok=self.normal_access_token, expect_code=200
         )
 
         self.helper.invite(
@@ -318,11 +314,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             "rooms/%s/invite" % (room_id),
-            {
-                "address": "foo@bar.com",
-                "medium": "email",
-                "id_server": "localhost"
-            },
+            {"address": "foo@bar.com", "medium": "email", "id_server": "localhost"},
             access_token=self.normal_access_token,
         )
         self.render(request)

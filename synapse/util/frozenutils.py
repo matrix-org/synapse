@@ -60,11 +60,10 @@ def _handle_frozendict(obj):
         # fishing the protected dict out of the object is a bit nasty,
         # but we don't really want the overhead of copying the dict.
         return obj._dict
-    raise TypeError('Object of type %s is not JSON serializable' %
-                    obj.__class__.__name__)
+    raise TypeError(
+        "Object of type %s is not JSON serializable" % obj.__class__.__name__
+    )
 
 
 # A JSONEncoder which is capable of encoding frozendics without barfing
-frozendict_json_encoder = json.JSONEncoder(
-    default=_handle_frozendict,
-)
+frozendict_json_encoder = json.JSONEncoder(default=_handle_frozendict)

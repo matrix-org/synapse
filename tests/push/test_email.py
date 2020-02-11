@@ -57,7 +57,7 @@ class EmailPusherTests(HomeserverTestCase):
         config["email"] = {
             "enable_notifs": True,
             "template_dir": os.path.abspath(
-                pkg_resources.resource_filename('synapse', 'res/templates')
+                pkg_resources.resource_filename("synapse", "res/templates")
             ),
             "expiry_template_html": "notice_expiry.html",
             "expiry_template_text": "notice_expiry.txt",
@@ -120,7 +120,7 @@ class EmailPusherTests(HomeserverTestCase):
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
-            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id,
+            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
         )
         self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
 
@@ -141,7 +141,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         for other in self.others:
             self.helper.invite(
-                room=room, src=self.user_id, tok=self.access_token, targ=other.id,
+                room=room, src=self.user_id, tok=self.access_token, targ=other.id
             )
             self.helper.join(room=room, user=other.id, tok=other.token)
 

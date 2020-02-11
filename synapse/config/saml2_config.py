@@ -28,6 +28,7 @@ class SAML2Config(Config):
         self.saml2_enabled = True
 
         import saml2.config
+
         self.saml2_sp_config = saml2.config.SPConfig()
         self.saml2_sp_config.load(self._default_saml_config_dict())
         self.saml2_sp_config.load(saml2_config.get("sp_config", {}))
@@ -41,26 +42,23 @@ class SAML2Config(Config):
 
         public_baseurl = self.public_baseurl
         if public_baseurl is None:
-            raise ConfigError(
-                "saml2_config requires a public_baseurl to be set"
-            )
+            raise ConfigError("saml2_config requires a public_baseurl to be set")
 
         metadata_url = public_baseurl + "_matrix/saml2/metadata.xml"
         response_url = public_baseurl + "_matrix/saml2/authn_response"
         return {
             "entityid": metadata_url,
-
             "service": {
                 "sp": {
                     "endpoints": {
                         "assertion_consumer_service": [
-                            (response_url, saml2.BINDING_HTTP_POST),
-                        ],
+                            (response_url, saml2.BINDING_HTTP_POST)
+                        ]
                     },
                     "required_attributes": ["uid"],
                     "optional_attributes": ["mail", "surname", "givenname"],
-                },
-            }
+                }
+            },
         }
 
     def default_config(self, config_dir_path, server_name, **kwargs):
@@ -106,4 +104,6 @@ class SAML2Config(Config):
         #  # separate pysaml2 configuration file:
         #  #
         #  config_path: "%(config_dir_path)s/sp_conf.py"
-        """ % {"config_dir_path": config_dir_path}
+        """ % {
+            "config_dir_path": config_dir_path
+        }

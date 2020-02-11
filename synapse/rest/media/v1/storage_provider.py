@@ -32,6 +32,7 @@ class StorageProvider(object):
     """A storage provider is a service that can store uploaded media and
     retrieve them.
     """
+
     def store_file(self, path, file_info):
         """Store the file described by file_info. The actual contents can be
         retrieved by reading the file in file_info.upload_path.
@@ -70,6 +71,7 @@ class StorageProviderWrapper(StorageProvider):
             uploaded, or todo the upload in the backgroud.
         store_remote (bool): Whether remote media should be uploaded
     """
+
     def __init__(self, backend, store_local, store_synchronous, store_remote):
         self.backend = backend
         self.store_local = store_local
@@ -92,6 +94,7 @@ class StorageProviderWrapper(StorageProvider):
                     return self.backend.store_file(path, file_info)
                 except Exception:
                     logger.exception("Error storing file")
+
             run_in_background(store)
             return defer.succeed(None)
 
@@ -123,8 +126,7 @@ class FileStorageProviderBackend(StorageProvider):
             os.makedirs(dirname)
 
         return logcontext.defer_to_thread(
-            self.hs.get_reactor(),
-            shutil.copyfile, primary_fname, backup_fname,
+            self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname
         )
 
     def fetch(self, path, file_info):

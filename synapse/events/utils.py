@@ -31,7 +31,7 @@ from . import EventBase
 # by a match for 'stuff'.
 # TODO: This is fast, but fails to handle "foo\\.bar" which should be treated as
 #       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
-SPLIT_FIELD_REGEX = re.compile(r'(?<!\\)\.')
+SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
 def prune_event(event):
@@ -51,6 +51,7 @@ def prune_event(event):
     pruned_event_dict = prune_event_dict(event.get_dict())
 
     from . import event_type_from_format_version
+
     return event_type_from_format_version(event.format_version)(
         pruned_event_dict, event.internal_metadata.get_dict()
     )
@@ -116,11 +117,7 @@ def prune_event_dict(event_dict):
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
 
-    allowed_fields = {
-        k: v
-        for k, v in event_dict.items()
-        if k in allowed_keys
-    }
+    allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 
     allowed_fields["content"] = new_content
 
@@ -205,7 +202,7 @@ def only_fields(dictionary, fields):
     # for each element of the output array of arrays:
     # remove escaping so we can use the right key names.
     split_fields[:] = [
-        [f.replace(r'\.', r'.') for f in field_array] for field_array in split_fields
+        [f.replace(r"\.", r".") for f in field_array] for field_array in split_fields
     ]
 
     output = {}
@@ -226,7 +223,10 @@ def format_event_for_client_v1(d):
         d["user_id"] = sender
 
     copy_keys = (
-        "age", "redacted_because", "replaces_state", "prev_content",
+        "age",
+        "redacted_because",
+        "replaces_state",
+        "prev_content",
         "invite_room_state",
     )
     for key in copy_keys:
@@ -238,8 +238,13 @@ def format_event_for_client_v1(d):
 
 def format_event_for_client_v2(d):
     drop_keys = (
-        "auth_events", "prev_events", "hashes", "signatures", "depth",
-        "origin", "prev_state",
+        "auth_events",
+        "prev_events",
+        "hashes",
+        "signatures",
+        "depth",
+        "origin",
+        "prev_state",
     )
     for key in drop_keys:
         d.pop(key, None)
@@ -252,9 +257,15 @@ def format_event_for_client_v2_without_room_id(d):
     return d
 
 
-def serialize_event(e, time_now_ms, as_client_event=True,
-                    event_format=format_event_for_client_v1,
-                    token_id=None, only_event_fields=None, is_invite=False):
+def serialize_event(
+    e,
+    time_now_ms,
+    as_client_event=True,
+    event_format=format_event_for_client_v1,
+    token_id=None,
+    only_event_fields=None,
+    is_invite=False,
+):
     """Serialize event for clients
 
     Args:
@@ -288,8 +299,7 @@ def serialize_event(e, time_now_ms, as_client_event=True,
 
     if "redacted_because" in e.unsigned:
         d["unsigned"]["redacted_because"] = serialize_event(
-            e.unsigned["redacted_because"], time_now_ms,
-            event_format=event_format
+            e.unsigned["redacted_because"], time_now_ms, event_format=event_format
         )
 
     if token_id is not None:
@@ -308,8 +318,9 @@ def serialize_event(e, time_now_ms, as_client_event=True,
         d = event_format(d)
 
     if only_event_fields:
-        if (not isinstance(only_event_fields, list) or
-                not all(isinstance(f, string_types) for f in only_event_fields)):
+        if not isinstance(only_event_fields, list) or not all(
+            isinstance(f, string_types) for f in only_event_fields
+        ):
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)
 
@@ -352,11 +363,9 @@ class EventClientSerializer(object):
         # If MSC1849 is enabled then we need to look if thre are any relations
         # we need to bundle in with the event
         if self.experimental_msc1849_support_enabled and bundle_aggregations:
-            annotations = yield self.store.get_aggregation_groups_for_event(
-                event_id,
-            )
+            annotations = yield self.store.get_aggregation_groups_for_event(event_id)
             references = yield self.store.get_relations_for_event(
-                event_id, RelationTypes.REFERENCE, direction="f",
+                event_id, RelationTypes.REFERENCE, direction="f"
             )
 
             if annotations.chunk:
@@ -383,9 +392,7 @@ class EventClientSerializer(object):
                     serialized_event["content"].pop("m.relates_to", None)
 
                 r = serialized_event["unsigned"].setdefault("m.relations", {})
-                r[RelationTypes.REPLACE] = {
-                    "event_id": edit.event_id,
-                }
+                r[RelationTypes.REPLACE] = {"event_id": edit.event_id}
 
         defer.returnValue(serialized_event)
 
@@ -401,6 +408,5 @@ class EventClientSerializer(object):
             Deferred[list[dict]]: The list of serialized events
         """
         return yieldable_gather_results(
-            self.serialize_event, events,
-            time_now=time_now, **kwargs
+            self.serialize_event, events, time_now=time_now, **kwargs
         )

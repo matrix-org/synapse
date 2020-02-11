@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 
 class AccountValidityRenewServlet(RestServlet):
     PATTERNS = client_patterns("/account_validity/renew$")
-    SUCCESS_HTML = b"<html><body>Your account has been successfully renewed.</body><html>"
+    SUCCESS_HTML = (
+        b"<html><body>Your account has been successfully renewed.</body><html>"
+    )
 
     def __init__(self, hs):
         """
@@ -86,7 +88,9 @@ class AccountValiditySendMailServlet(RestServlet):
     @defer.inlineCallbacks
     def on_POST(self, request):
         if not self.account_validity.renew_by_email_enabled:
-            raise AuthError(403, "Account renewal via email is disabled on this server.")
+            raise AuthError(
+                403, "Account renewal via email is disabled on this server."
+            )
 
         requester = yield self.auth.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()

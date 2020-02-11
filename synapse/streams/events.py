@@ -34,8 +34,7 @@ class EventSources(object):
 
     def __init__(self, hs):
         self.sources = {
-            name: cls(hs)
-            for name, cls in EventSources.SOURCE_TYPES.items()
+            name: cls(hs) for name, cls in EventSources.SOURCE_TYPES.items()
         }
         self.store = hs.get_datastore()
 
@@ -47,21 +46,11 @@ class EventSources(object):
         groups_key = self.store.get_group_stream_token()
 
         token = StreamToken(
-            room_key=(
-                yield self.sources["room"].get_current_key()
-            ),
-            presence_key=(
-                yield self.sources["presence"].get_current_key()
-            ),
-            typing_key=(
-                yield self.sources["typing"].get_current_key()
-            ),
-            receipt_key=(
-                yield self.sources["receipt"].get_current_key()
-            ),
-            account_data_key=(
-                yield self.sources["account_data"].get_current_key()
-            ),
+            room_key=(yield self.sources["room"].get_current_key()),
+            presence_key=(yield self.sources["presence"].get_current_key()),
+            typing_key=(yield self.sources["typing"].get_current_key()),
+            receipt_key=(yield self.sources["receipt"].get_current_key()),
+            account_data_key=(yield self.sources["account_data"].get_current_key()),
             push_rules_key=push_rules_key,
             to_device_key=to_device_key,
             device_list_key=device_list_key,
@@ -77,21 +66,11 @@ class EventSources(object):
         groups_key = self.store.get_group_stream_token()
 
         token = StreamToken(
-            room_key=(
-                yield self.sources["room"].get_current_key_for_room(room_id)
-            ),
-            presence_key=(
-                yield self.sources["presence"].get_current_key()
-            ),
-            typing_key=(
-                yield self.sources["typing"].get_current_key()
-            ),
-            receipt_key=(
-                yield self.sources["receipt"].get_current_key()
-            ),
-            account_data_key=(
-                yield self.sources["account_data"].get_current_key()
-            ),
+            room_key=(yield self.sources["room"].get_current_key_for_room(room_id)),
+            presence_key=(yield self.sources["presence"].get_current_key()),
+            typing_key=(yield self.sources["typing"].get_current_key()),
+            receipt_key=(yield self.sources["receipt"].get_current_key()),
+            account_data_key=(yield self.sources["account_data"].get_current_key()),
             push_rules_key=push_rules_key,
             to_device_key=to_device_key,
             device_list_key=device_list_key,

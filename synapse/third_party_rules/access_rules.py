@@ -44,9 +44,7 @@ VALID_ACCESS_RULES = (
 #  * the default power level for users (users_default) being set to anything other than 0.
 #  * a non-default power level being assigned to any user which would be forbidden from
 #     joining a restricted room.
-RULES_WITH_RESTRICTED_POWER_LEVELS = (
-    ACCESS_RULE_UNRESTRICTED,
-)
+RULES_WITH_RESTRICTED_POWER_LEVELS = (ACCESS_RULE_UNRESTRICTED,)
 
 
 class RoomAccessRules(object):
@@ -76,7 +74,7 @@ class RoomAccessRules(object):
         self.id_server = config["id_server"]
 
         self.domains_forbidden_when_restricted = config.get(
-            "domains_forbidden_when_restricted", [],
+            "domains_forbidden_when_restricted", []
         )
 
     @staticmethod
@@ -113,9 +111,8 @@ class RoomAccessRules(object):
                     raise SynapseError(400, "Invalid access rule")
 
                 # Make sure the rule is "direct" if the room is a direct chat.
-                if (
-                    (is_direct and access_rule != ACCESS_RULE_DIRECT)
-                    or (access_rule == ACCESS_RULE_DIRECT and not is_direct)
+                if (is_direct and access_rule != ACCESS_RULE_DIRECT) or (
+                    access_rule == ACCESS_RULE_DIRECT and not is_direct
                 ):
                     raise SynapseError(400, "Invalid access rule")
 
@@ -136,13 +133,13 @@ class RoomAccessRules(object):
             if not config.get("initial_state"):
                 config["initial_state"] = []
 
-            config["initial_state"].append({
-                "type": ACCESS_RULES_TYPE,
-                "state_key": "",
-                "content": {
-                    "rule": default_rule,
+            config["initial_state"].append(
+                {
+                    "type": ACCESS_RULES_TYPE,
+                    "state_key": "",
+                    "content": {"rule": default_rule},
                 }
-            })
+            )
 
             access_rule = default_rule
 
@@ -150,16 +147,13 @@ class RoomAccessRules(object):
         # rule, whether it's a user-defined one or the default one (i.e. if it involves
         # a "public" join rule, the access rule must be "restricted").
         if (
-            (
-                join_rule == JoinRules.PUBLIC
-                or preset == RoomCreationPreset.PUBLIC_CHAT
-            ) and access_rule != ACCESS_RULE_RESTRICTED
-        ):
+            join_rule == JoinRules.PUBLIC or preset == RoomCreationPreset.PUBLIC_CHAT
+        ) and access_rule != ACCESS_RULE_RESTRICTED:
             raise SynapseError(400, "Invalid access rule")
 
         # Check if the creator can override values for the power levels.
         allowed = self._is_power_level_content_allowed(
-            config.get("power_level_content_override", {}), access_rule,
+            config.get("power_level_content_override", {}), access_rule
         )
         if not allowed:
             raise SynapseError(400, "Invalid power levels content override")
@@ -202,10 +196,7 @@ class RoomAccessRules(object):
         # Get the HS this address belongs to from the identity server.
         res = yield self.http_client.get_json(
             "https://%s/_matrix/identity/api/v1/info" % (self.id_server,),
-            {
-                "medium": medium,
-                "address": address,
-            }
+            {"medium": medium, "address": address},
         )
 
         # Look for a domain that's not forbidden from being invited.
@@ -411,7 +402,7 @@ class RoomAccessRules(object):
             # user.
             target = event.state_key
             is_from_threepid_invite = self._is_invite_from_threepid(
-                event, threepid_tokens[0],
+                event, threepid_tokens[0]
             )
             if is_from_threepid_invite or target == existing_members[0]:
                 return True
@@ -438,11 +429,11 @@ class RoomAccessRules(object):
             return True
 
         # If users_default is explicitly set to a non-0 value, deny the event.
-        users_default = content.get('users_default', 0)
+        users_default = content.get("users_default", 0)
         if users_default:
             return False
 
-        users = content.get('users', {})
+        users = content.get("users", {})
         for user_id, power_level in users.items():
             server_name = get_domain_from_id(user_id)
             # Check the domain against the blacklist. If found, and the PL isn't 0, deny
@@ -477,7 +468,7 @@ class RoomAccessRules(object):
         Returns:
             bool, True if the event can be allowed, False otherwise.
         """
-        if event.content.get('join_rule') == JoinRules.PUBLIC:
+        if event.content.get("join_rule") == JoinRules.PUBLIC:
             return rule == ACCESS_RULE_RESTRICTED
 
         return True
@@ -586,8 +577,10 @@ class RoomAccessRules(object):
              invite (EventBase): The m.room.member event with "invite" membership.
              threepid_invite_token (str): The state key from the 3PID invite.
         """
-        token = invite.content.get(
-            "third_party_invite", {},
-        ).get("signed", {}).get("token", "")
+        token = (
+            invite.content.get("third_party_invite", {})
+            .get("signed", {})
+            .get("token", "")
+        )
 
         return token == threepid_invite_token

@@ -45,7 +45,7 @@ class ProfileWorkerStore(SQLBaseStore):
 
         defer.returnValue(
             ProfileInfo(
-                avatar_url=profile['avatar_url'], display_name=profile['displayname']
+                avatar_url=profile["avatar_url"], display_name=profile["displayname"]
             )
         )
 
@@ -69,17 +69,14 @@ class ProfileWorkerStore(SQLBaseStore):
         def f(txn):
             txn.execute("SELECT MAX(batch) as maxbatch FROM profiles")
             rows = self.cursor_to_dict(txn)
-            return rows[0]['maxbatch']
-        return self.runInteraction(
-            "get_latest_profile_replication_batch_number", f,
-        )
+            return rows[0]["maxbatch"]
+
+        return self.runInteraction("get_latest_profile_replication_batch_number", f)
 
     def get_profile_batch(self, batchnum):
         return self._simple_select_list(
             table="profiles",
-            keyvalues={
-                "batch": batchnum,
-            },
+            keyvalues={"batch": batchnum},
             retcols=("user_id", "displayname", "avatar_url", "active"),
             desc="get_profile_batch",
         )
@@ -95,22 +92,24 @@ class ProfileWorkerStore(SQLBaseStore):
             )
             txn.execute(sql, (BATCH_SIZE,))
             return txn.rowcount
+
         return self.runInteraction("assign_profile_batch", f)
 
     def get_replication_hosts(self):
         def f(txn):
-            txn.execute("SELECT host, last_synced_batch FROM profile_replication_status")
+            txn.execute(
+                "SELECT host, last_synced_batch FROM profile_replication_status"
+            )
             rows = self.cursor_to_dict(txn)
-            return {r['host']: r['last_synced_batch'] for r in rows}
+            return {r["host"]: r["last_synced_batch"] for r in rows}
+
         return self.runInteraction("get_replication_hosts", f)
 
     def update_replication_batch_for_host(self, host, last_synced_batch):
         return self._simple_upsert(
             table="profile_replication_status",
             keyvalues={"host": host},
-            values={
-                "last_synced_batch": last_synced_batch,
-            },
+            values={"last_synced_batch": last_synced_batch},
             desc="update_replication_batch_for_host",
         )
 
@@ -127,31 +126,22 @@ class ProfileWorkerStore(SQLBaseStore):
         return self._simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={
-                "displayname": new_displayname,
-                "batch": batchnum,
-            },
+            values={"displayname": new_displayname, "batch": batchnum},
             desc="set_profile_displayname",
-            lock=False  # we can do this because user_id has a unique index
+            lock=False,  # we can do this because user_id has a unique index
         )
 
     def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
         return self._simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            values={
-                "avatar_url": new_avatar_url,
-                "batch": batchnum,
-            },
+            values={"avatar_url": new_avatar_url, "batch": batchnum},
             desc="set_profile_avatar_url",
-            lock=False  # we can do this because user_id has a unique index
+            lock=False,  # we can do this because user_id has a unique index
         )
 
     def set_profile_active(self, user_localpart, active, hide, batchnum):
-        values = {
-            "active": int(active),
-            "batch": batchnum,
-        }
+        values = {"active": int(active), "batch": batchnum}
         if not active and not hide:
             # we are deactivating for real (not in hide mode)
             # so clear the profile.
@@ -162,7 +152,7 @@ class ProfileWorkerStore(SQLBaseStore):
             keyvalues={"user_id": user_localpart},
             values=values,
             desc="set_profile_active",
-            lock=False  # we can do this because user_id has a unique index
+            lock=False,  # we can do this because user_id has a unique index
         )
 
 

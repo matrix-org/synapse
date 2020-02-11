@@ -149,9 +149,7 @@ class DeviceWorkerStore(SQLBaseStore):
             defer.returnValue((stream_id_cutoff, []))
 
         results = yield self._get_device_update_edus_by_remote(
-            destination,
-            from_stream_id,
-            query_map,
+            destination, from_stream_id, query_map
         )
 
         defer.returnValue((now_stream_id, results))
@@ -182,9 +180,7 @@ class DeviceWorkerStore(SQLBaseStore):
         return list(txn)
 
     @defer.inlineCallbacks
-    def _get_device_update_edus_by_remote(
-        self, destination, from_stream_id, query_map,
-    ):
+    def _get_device_update_edus_by_remote(self, destination, from_stream_id, query_map):
         """Returns a list of device update EDUs as well as E2EE keys
 
         Args:
@@ -210,7 +206,7 @@ class DeviceWorkerStore(SQLBaseStore):
             # The prev_id for the first row is always the last row before
             # `from_stream_id`
             prev_id = yield self._get_last_device_update_for_remote_user(
-                destination, user_id, from_stream_id,
+                destination, user_id, from_stream_id
             )
             for device_id, device in iteritems(user_devices):
                 stream_id = query_map[(user_id, device_id)]
@@ -238,7 +234,7 @@ class DeviceWorkerStore(SQLBaseStore):
         defer.returnValue(results)
 
     def _get_last_device_update_for_remote_user(
-        self, destination, user_id, from_stream_id,
+        self, destination, user_id, from_stream_id
     ):
         def f(txn):
             prev_sent_id_sql = """

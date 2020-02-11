@@ -172,7 +172,7 @@ class AuthTestCase(unittest.TestCase):
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request)
         self.assertEquals(
-            requester.user.to_string(), masquerading_user_id.decode('utf8')
+            requester.user.to_string(), masquerading_user_id.decode("utf8")
         )
 
     def test_get_user_by_req_appservice_valid_token_bad_user_id(self):
@@ -264,7 +264,7 @@ class AuthTestCase(unittest.TestCase):
 
         # check the token works
         request = Mock(args={})
-        request.args[b"access_token"] = [token.encode('ascii')]
+        request.args[b"access_token"] = [token.encode("ascii")]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         self.assertEqual(UserID.from_string(USER_ID), requester.user)
@@ -277,7 +277,7 @@ class AuthTestCase(unittest.TestCase):
 
         # the token should *not* work now
         request = Mock(args={})
-        request.args[b"access_token"] = [guest_tok.encode('ascii')]
+        request.args[b"access_token"] = [guest_tok.encode("ascii")]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
         with self.assertRaises(AuthError) as cm:
@@ -321,11 +321,11 @@ class AuthTestCase(unittest.TestCase):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 1
         self.store.get_monthly_active_count = lambda: defer.succeed(2)
-        threepid = {'medium': 'email', 'address': 'reserved@server.com'}
-        unknown_threepid = {'medium': 'email', 'address': 'unreserved@server.com'}
+        threepid = {"medium": "email", "address": "reserved@server.com"}
+        unknown_threepid = {"medium": "email", "address": "unreserved@server.com"}
         self.hs.config.mau_limits_reserved_threepids = [threepid]
 
-        yield self.store.register(user_id='user1', token="123", password_hash=None)
+        yield self.store.register(user_id="user1", token="123", password_hash=None)
         with self.assertRaises(ResourceLimitError):
             yield self.auth.check_auth_blocking()
 

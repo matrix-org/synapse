@@ -26,7 +26,6 @@ CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
 
 
 class HttpTransactionCache(object):
-
     def __init__(self, hs):
         self.hs = hs
         self.auth = self.hs.get_auth()
@@ -53,7 +52,7 @@ class HttpTransactionCache(object):
             str: A transaction key
         """
         token = self.auth.get_access_token_from_request(request)
-        return request.path.decode('utf8') + "/" + token
+        return request.path.decode("utf8") + "/" + token
 
     def fetch_or_execute_request(self, request, fn, *args, **kwargs):
         """A helper function for fetch_or_execute which extracts

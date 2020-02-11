@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class AdminHandler(BaseHandler):
-
     def __init__(self, hs):
         super(AdminHandler, self).__init__(hs)
 
@@ -33,23 +32,17 @@ class AdminHandler(BaseHandler):
 
         sessions = yield self.store.get_user_ip_and_agents(user)
         for session in sessions:
-            connections.append({
-                "ip": session["ip"],
-                "last_seen": session["last_seen"],
-                "user_agent": session["user_agent"],
-            })
+            connections.append(
+                {
+                    "ip": session["ip"],
+                    "last_seen": session["last_seen"],
+                    "user_agent": session["user_agent"],
+                }
+            )
 
         ret = {
             "user_id": user.to_string(),
-            "devices": {
-                "": {
-                    "sessions": [
-                        {
-                            "connections": connections,
-                        }
-                    ]
-                },
-            },
+            "devices": {"": {"sessions": [{"connections": connections}]}},
         }
 
         defer.returnValue(ret)

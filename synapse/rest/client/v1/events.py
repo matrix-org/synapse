@@ -38,17 +38,14 @@ class EventStreamRestServlet(RestServlet):
 
     @defer.inlineCallbacks
     def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(
-            request,
-            allow_guest=True,
-        )
+        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
         is_guest = requester.is_guest
         room_id = None
         if is_guest:
             if b"room_id" not in request.args:
                 raise SynapseError(400, "Guest users must specify room_id param")
         if b"room_id" in request.args:
-            room_id = request.args[b"room_id"][0].decode('ascii')
+            room_id = request.args[b"room_id"][0].decode("ascii")
 
         pagin_config = PaginationConfig.from_request(request)
         timeout = EventStreamRestServlet.DEFAULT_LONGPOLL_TIME_MS

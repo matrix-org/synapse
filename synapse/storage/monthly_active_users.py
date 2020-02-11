@@ -86,11 +86,11 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             if len(self.reserved_users) > 0:
                 # questionmarks is a hack to overcome sqlite not supporting
                 # tuples in 'WHERE IN %s'
-                questionmarks = '?' * len(self.reserved_users)
+                questionmarks = "?" * len(self.reserved_users)
 
                 query_args.extend(self.reserved_users)
                 sql = base_sql + """ AND user_id NOT IN ({})""".format(
-                    ','.join(questionmarks)
+                    ",".join(questionmarks)
                 )
             else:
                 sql = base_sql
@@ -124,7 +124,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
                 if len(self.reserved_users) > 0:
                     query_args.extend(self.reserved_users)
                     sql = base_sql + """ AND user_id NOT IN ({})""".format(
-                        ','.join(questionmarks)
+                        ",".join(questionmarks)
                     )
                 else:
                     sql = base_sql
