@@ -66,11 +66,6 @@ If you already have certificates, you will need to back up or delete them
 (files `example.com.tls.crt` and `example.com.tls.key` in Synapse's root
 directory), Synapse's ACME implementation will not overwrite them.
 
-You may wish to use alternate methods such as Certbot to obtain a certificate
-from Let's Encrypt, depending on your server configuration. Of course, if you
-already have a valid certificate for your homeserver's domain, that can be
-placed in Synapse's config directory without the need for any ACME setup.
-
 ## ACME setup
 
 The main steps for enabling ACME support in short summary are:
