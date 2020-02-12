@@ -1,3 +1,14 @@
+Synapse 1.10.0 (2020-02-12)
+===========================
+
+**WARNING to client developers**: As of this release Synapse validates `client_secret` parameters in the Client-Server API as per the spec. See [\#6766](https://github.com/matrix-org/synapse/issues/6766) for details.
+
+Updates to the Docker image
+---------------------------
+
+- Update the docker images to Alpine Linux 3.11. ([\#6897](https://github.com/matrix-org/synapse/issues/6897))
+
+
 Synapse 1.10.0rc5 (2020-02-11)
 ==============================
 
@@ -44,9 +55,6 @@ Internal Changes
 
 Synapse 1.10.0rc1 (2020-01-31)
 ==============================
-
-**WARNING to client developers**: As of this release Synapse validates `client_secret` parameters in the Client-Server API as per the spec. See [\#6766](https://github.com/matrix-org/synapse/issues/6766) for details.
-
 
 Features
 --------
