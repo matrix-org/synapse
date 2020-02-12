@@ -598,7 +598,13 @@ class DeviceListUpdater(object):
             # happens if we've missed updates.
             resync = yield self._need_to_do_resync(user_id, pending_updates)
 
-            logger.debug("Need to re-sync devices for %r? %r", user_id, resync)
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(
+                    "Received device list update for %s, requiring resync: %s. Devices: %s",
+                    user_id,
+                    resync,
+                    ", ".join(u[0] for u in pending_updates),
+                )
 
             if resync:
                 yield self.user_device_resync(user_id)

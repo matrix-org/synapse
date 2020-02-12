@@ -151,7 +151,12 @@ class DirectoryHandler(BaseHandler):
 
         yield self._create_association(room_alias, room_id, servers, creator=user_id)
         if send_event:
-            yield self.send_room_alias_update_event(requester, room_id)
+            try:
+                yield self.send_room_alias_update_event(requester, room_id)
+            except AuthError as e:
+                # sending the aliases event may fail due to the user not having
+                # permission in the room; this is permitted.
+                logger.info("Skipping updating aliases event due to auth error %s", e)
 
     @defer.inlineCallbacks
     def delete_association(self, requester, room_alias, send_event=True):

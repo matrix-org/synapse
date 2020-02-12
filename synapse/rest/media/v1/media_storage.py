@@ -148,6 +148,7 @@ class MediaStorage(object):
         for provider in self.storage_providers:
             res = yield provider.fetch(path, file_info)
             if res:
+                logger.debug("Streaming %s from %s", path, provider)
                 return res
 
         return None
