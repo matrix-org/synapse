@@ -35,7 +35,9 @@ In case you can't do that and need Synapse to serve them itself, make
 sure to set the `tls_certificate_path` configuration setting to the path
 of the certificate (make sure to use the certificate containing the full
 certification chain, e.g. `fullchain.pem` if using certbot) and
-`tls_private_key_path` to the path of the matching private key.
+`tls_private_key_path` to the path of the matching private key. Note
+that in this case you will need to restart Synapse after each
+certificate renewal so that Synapse stops using the old certificate.
 
 If you still want to use Synapse's built-in ACME support, the rest of
 this document explains how to set it up. 
