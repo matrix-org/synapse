@@ -8,8 +8,8 @@ Depending on the amount of history being purged a call to the API may take
 several minutes or longer. During this period users will not be able to
 paginate further back in the room from the point being purged from.
 
-Note that, in order to not break the room, this API won't delete the last
-message sent to it.
+Note that Synapse requires at least one message in each room, so it will never
+delete the last message in a room.
 
 The API is:
 
