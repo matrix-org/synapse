@@ -372,7 +372,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server:
+        if server and server != self.hs.config.server_name:
             try:
                 data = await handler.get_remote_public_room_list(
                     server, limit=limit, since_token=since_token
@@ -383,10 +383,12 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                         400,
                         "The remote server is only allowing local users to view "
                         "its public rooms list",
-                        errcode=Codes.FORBIDDEN
+                        errcode=Codes.FORBIDDEN,
                     )
                 else:
-                    raise SynapseError(400, "Unable to retrieve remote public rooms list")
+                    raise SynapseError(
+                        400, "Unable to retrieve remote public rooms list"
+                    )
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit, since_token=since_token
@@ -423,7 +425,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server:
+        if server and server != self.hs.config.server_name:
             try:
                 data = await handler.get_remote_public_room_list(
                     server,
@@ -439,10 +441,12 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                         400,
                         "The remote server is only allowing local users to view "
                         "its public rooms list",
-                        errcode=Codes.FORBIDDEN
+                        errcode=Codes.FORBIDDEN,
                     )
                 else:
-                    raise SynapseError(400, "Unable to retrieve remote public rooms list")
+                    raise SynapseError(
+                        400, "Unable to retrieve remote public rooms list"
+                    )
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit,
