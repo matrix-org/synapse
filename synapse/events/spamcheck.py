@@ -142,7 +142,7 @@ class SpamChecker(object):
         if self.spam_checker is None:
             return False
 
-        # For backwards compatibility, if the method does not exist on the spam checker fallback to not interfering.
+        # For backwards compatibility, if the method does not exist on the spam checker, fallback to not interfering.
         if not hasattr(self.spam_checker, "check_for_banned_user"):
             return False
 
