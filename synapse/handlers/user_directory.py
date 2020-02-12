@@ -87,7 +87,8 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         # Remove any spammy users from the results.
         results["results"] = [
-            user for user in results["results"]
+            user
+            for user in results["results"]
             if not self.spam_checker.check_username_for_spam(
                 user["user_id"], user["display_name"]
             )
