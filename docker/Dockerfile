@@ -16,7 +16,7 @@ ARG PYTHON_VERSION=3.7
 ###
 ### Stage 0: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.10 as builder
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.11 as builder
 
 # install the OS build deps
 
