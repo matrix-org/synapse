@@ -21,7 +21,7 @@ from six import text_type
 from six.moves import http_client
 
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, SynapseError, NotFoundError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -153,7 +153,7 @@ class UserRestServletV2(RestServlet):
         ret = await self.admin_handler.get_user(target_user)
 
         if not ret:
-            raise SynapseError(404, "User not found", errcode=Codes.NOT_FOUND)
+            raise NotFoundError("User not found")
 
         return 200, ret
 
