@@ -1,3 +1,12 @@
+Synapse 1.10.0 (2020-02-12)
+===========================
+
+Updates to the Docker image
+---------------------------
+
+- Update the docker images to Alpine Linux 3.11. ([\#6897](https://github.com/matrix-org/synapse/issues/6897))
+
+
 Synapse 1.10.0rc5 (2020-02-11)
 ==============================
 
