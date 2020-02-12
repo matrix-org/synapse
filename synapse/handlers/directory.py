@@ -81,13 +81,7 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_association(
-        self,
-        requester,
-        room_alias,
-        room_id,
-        servers=None,
-        send_event=True,
-        check_membership=True,
+        self, requester, room_alias, room_id, servers=None, check_membership=True,
     ):
         """Attempt to create a new alias
 
@@ -97,7 +91,6 @@ class DirectoryHandler(BaseHandler):
             room_id (str)
             servers (list[str]|None): List of servers that others servers
                 should try and join via
-            send_event (bool): Whether to send an updated m.room.aliases event
             check_membership (bool): Whether to check if the user is in the room
                 before the alias can be set (if the server's config requires it).
 
@@ -150,16 +143,9 @@ class DirectoryHandler(BaseHandler):
                 )
 
         yield self._create_association(room_alias, room_id, servers, creator=user_id)
-        if send_event:
-            try:
-                yield self.send_room_alias_update_event(requester, room_id)
-            except AuthError as e:
-                # sending the aliases event may fail due to the user not having
-                # permission in the room; this is permitted.
-                logger.info("Skipping updating aliases event due to auth error %s", e)
 
     @defer.inlineCallbacks
-    def delete_association(self, requester, room_alias, send_event=True):
+    def delete_association(self, requester, room_alias):
         """Remove an alias from the directory
 
         (this is only meant for human users; AS users should call
@@ -168,9 +154,6 @@ class DirectoryHandler(BaseHandler):
         Args:
             requester (Requester):
             room_alias (RoomAlias):
-            send_event (bool): Whether to send an updated m.room.aliases event.
-                Note that, if we delete the canonical alias, we will always attempt
-                to send an m.room.canonical_alias event
 
         Returns:
             Deferred[unicode]: room id that the alias used to point to
@@ -206,9 +189,6 @@ class DirectoryHandler(BaseHandler):
         room_id = yield self._delete_association(room_alias)
 
         try:
-            if send_event:
-                yield self.send_room_alias_update_event(requester, room_id)
-
             yield self._update_canonical_alias(
                 requester, requester.user.to_string(), room_id, room_alias
             )
