@@ -143,7 +143,7 @@ class SpamChecker(object):
             return False
 
         # For backwards compatibility, if the method does not exist on the spam checker, fallback to not interfering.
-        if not hasattr(self.spam_checker, "check_username_for_spam"):
+        checker = getattr(self.spam_checker, "check_username_for_spam", None)
+        if not checker:
             return False
-
-        return self.spam_checker.check_username_for_spam(userid, display_name)
+        return checker(userid, display_name)
