@@ -152,6 +152,9 @@ class UserRestServletV2(RestServlet):
 
         ret = await self.admin_handler.get_user(target_user)
 
+        if not ret:
+            raise SynapseError(404, "User not found", errcode=Codes.NOT_FOUND)
+
         return 200, ret
 
     async def on_PUT(self, request, user_id):
