@@ -126,24 +126,24 @@ class SpamChecker(object):
 
         return self.spam_checker.user_may_publish_room(userid, room_id)
 
-    def check_for_banned_user(self, userid, display_name):
-        """Checks if a user ID and display name are considered banned by this server.
+    def check_username_for_spam(self, userid: str, display_name: str) -> bool:
+        """Checks if a user ID or display name are considered "spammy" by this server.
 
-        If the server considers a user banned, then it will not be included in
+        If the server considers a username spammy, then it will not be included in
         user directory results.
 
         Args:
-            userid (string): The ID of the user to check
-            display_name (string): The display name of the user to check
+            userid: The ID of the user to check
+            display_name: The display name of the user to check
 
         Returns:
-            bool: True if the user is banned.
+            True if the user is banned.
         """
         if self.spam_checker is None:
             return False
 
         # For backwards compatibility, if the method does not exist on the spam checker, fallback to not interfering.
-        if not hasattr(self.spam_checker, "check_for_banned_user"):
+        if not hasattr(self.spam_checker, "check_username_for_spam"):
             return False
 
-        return self.spam_checker.check_for_banned_user(userid, display_name)
+        return self.spam_checker.check_username_for_spam(userid, display_name)

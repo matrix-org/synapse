@@ -87,14 +87,12 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         if self.spam_checker:
             # Remove any banned users from the results.
-            results["results"] = list(
-                filter(
-                    lambda user_info: not self.spam_checker.check_for_banned_user(
-                        user_info["user_id"], user_info["display_name"]
-                    ),
-                    results["results"],
+            results["results"] = [
+                user for user in results["results"]
+                if not self.spam_checker.check_username_for_spam(
+                    user["user_id"], user["display_name"]
                 )
-            )
+            ]
 
         return results
 

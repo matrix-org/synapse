@@ -181,7 +181,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         spam_checker = self.hs.get_spam_checker()
 
         class AllowAll(object):
-            def check_for_banned_user(self, user_id, display_name):
+            def check_username_for_spam(self, user_id, display_name):
                 # Allow all users.
                 return False
 
@@ -194,8 +194,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Configure a spam checker that filters all users.
         class BlockAll(object):
-            def check_for_banned_user(self, user_id, display_name):
-                # Ban all users.
+            def check_username_for_spam(self, user_id, display_name):
+                # All users are spammy.
                 return True
 
         spam_checker.spam_checker = BlockAll()
@@ -230,7 +230,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(public_users, [])
 
-        # Configure a user ban. This is implemented by a separate module.
+        # Configure a spam checker.
         spam_checker = self.hs.get_spam_checker()
         # The spam checker doesn't need any methods, so create a bare object.
         spam_checker.spam_checker = object()
