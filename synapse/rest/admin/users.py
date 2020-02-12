@@ -21,7 +21,7 @@ from six import text_type
 from six.moves import http_client
 
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, SynapseError, NotFoundError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
