@@ -163,7 +163,6 @@ class FederationBase(object):
                         logger.warning(
                             "Event %s content has been tampered, redacting",
                             pdu.event_id,
-                            pdu.get_pdu_json(),
                         )
                     return redacted_event
 
