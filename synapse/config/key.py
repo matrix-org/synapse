@@ -65,7 +65,7 @@ class TrustedKeyServer(object):
 
 
 class KeyConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])

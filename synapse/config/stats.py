@@ -25,7 +25,7 @@ class StatsConfig(Config):
     Configuration for the behaviour of synapse's stats engine
     """
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.stats_enabled = True
         self.stats_bucket_size = 86400
         self.stats_retention = sys.maxsize

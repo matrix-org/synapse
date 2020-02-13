@@ -19,7 +19,7 @@ from ._base import Config
 
 
 class SpamCheckerConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.spam_checker = None
 
         provider = config.get("spam_checker", None)

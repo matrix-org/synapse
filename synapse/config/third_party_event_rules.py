@@ -19,7 +19,7 @@ from ._base import Config
 
 
 class ThirdPartyRulesConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.third_party_event_rules = None
 
         provider = config.get("third_party_event_rules", None)

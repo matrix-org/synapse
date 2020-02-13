@@ -22,7 +22,7 @@ class CasConfig(Config):
     cas_server_url: URL of CAS server
     """
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         cas_config = config.get("cas_config", None)
         if cas_config:
             self.cas_enabled = cas_config.get("enabled", True)

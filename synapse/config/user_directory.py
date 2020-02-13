@@ -21,7 +21,7 @@ class UserDirectoryConfig(Config):
     Configuration for the behaviour of the /user_directory API
     """
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.user_directory_search_enabled = True
         self.user_directory_search_all_users = False
         self.user_directory_defer_to_id_server = None

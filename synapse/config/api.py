@@ -18,7 +18,7 @@ from ._base import Config
 
 
 class ApiConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.room_invite_state_types = config.get(
             "room_invite_state_types",
             [

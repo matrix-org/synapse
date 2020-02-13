@@ -66,7 +66,7 @@ class ServerNoticesConfig(Config):
         self.server_notices_mxid_avatar_url = None
         self.server_notices_room_name = None
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         c = config.get("server_notices")
         if c is None:
             return

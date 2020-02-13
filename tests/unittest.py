@@ -342,7 +342,7 @@ class HomeserverTestCase(TestCase):
 
         # Parse the config from a config dict into a HomeServerConfig
         config_obj = HomeServerConfig()
-        config_obj.parse_config_dict(config)
+        config_obj.parse_config_dict(config, "", "")
         kwargs["config"] = config_obj
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)

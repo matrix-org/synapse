@@ -1,0 +1,1 @@
+Pass config_dir_path and data_dir_path into Config.read_config.

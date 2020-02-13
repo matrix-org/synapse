@@ -36,7 +36,7 @@ class FederationRateLimitConfig(object):
 
 
 class RatelimitConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
 
         # Load the new-style messages config if it exists. Otherwise fall back
         # to the old method.

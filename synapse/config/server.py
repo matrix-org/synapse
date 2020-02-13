@@ -40,7 +40,7 @@ DEFAULT_ROOM_VERSION = "4"
 
 
 class ServerConfig(Config):
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
 
