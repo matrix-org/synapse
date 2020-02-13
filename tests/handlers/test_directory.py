@@ -18,9 +18,10 @@ from mock import Mock
 
 from twisted.internet import defer
 
+import synapse.api.errors
 from synapse.config.room_directory import RoomDirectoryConfig
 from synapse.rest.client.v1 import directory, room
-from synapse.types import RoomAlias
+from synapse.types import RoomAlias, create_requester
 
 from tests import unittest
 
@@ -83,6 +84,38 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             args={"room_alias": "#another:remote"},
             retry_on_dns_fail=False,
             ignore_backoff=True,
+        )
+
+    def test_delete_alias_not_allowed(self):
+        room_id = "!8765qwer:test"
+        self.get_success(
+            self.store.create_room_alias_association(self.my_room, room_id, ["test"])
+        )
+
+        self.get_failure(
+            self.handler.delete_association(
+                create_requester("@user:test"), self.my_room
+            ),
+            synapse.api.errors.AuthError,
+        )
+
+    def test_delete_alias(self):
+        room_id = "!8765qwer:test"
+        user_id = "@user:test"
+        self.get_success(
+            self.store.create_room_alias_association(
+                self.my_room, room_id, ["test"], user_id
+            )
+        )
+
+        result = self.get_success(
+            self.handler.delete_association(create_requester(user_id), self.my_room)
+        )
+        self.assertEquals(room_id, result)
+
+        # The alias should not be found.
+        self.get_failure(
+            self.handler.get_association(self.my_room), synapse.api.errors.SynapseError
         )
 
     def test_incoming_fed_query(self):
