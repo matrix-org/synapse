@@ -41,7 +41,7 @@ before that date.
 
 For more info and alternative solutions, see
 https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1 
-"""
+--------------------------------------------------------------------------------"""
 
 
 class TlsConfig(Config):
