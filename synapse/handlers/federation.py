@@ -82,7 +82,7 @@ def shortstr(iterable, maxitems=5):
     items = list(itertools.islice(iterable, maxitems + 1))
     if len(items) <= maxitems:
         return str(items)
-    return u"[" + u", ".join(repr(r) for r in items[:maxitems]) + u", ...]"
+    return "[" + ", ".join(repr(r) for r in items[:maxitems]) + ", ...]"
 
 
 class FederationHandler(BaseHandler):

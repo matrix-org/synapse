@@ -389,7 +389,7 @@ class HomeserverTestCase(TestCase):
         Returns:
             The MXID of the new user (unicode).
         """
-        self.hs.config.registration_shared_secret = u"shared"
+        self.hs.config.registration_shared_secret = "shared"
 
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")

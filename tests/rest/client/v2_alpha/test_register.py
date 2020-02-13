@@ -694,7 +694,7 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.validity_period = 10
-        self.max_delta = self.validity_period * 10. / 100.
+        self.max_delta = self.validity_period * 10.0 / 100.0
 
         config = self.default_config()
 

@@ -5,8 +5,8 @@ steps:
 
   - command:
       - "python -m pip install tox"
-      - "tox -e pep8"
-    label: "\U0001F9F9 PEP-8"
+      - "tox -e check_codestyle"
+    label: "\U0001F9F9 Check Style"
     plugins:
       - docker#v3.0.1:
           image: "python:3.6"

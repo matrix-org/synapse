@@ -339,7 +339,7 @@ class Notifier(object):
                     listener = user_stream.new_listener(prev_token)
                     listener.deferred = timeout_deferred(
                         listener.deferred,
-                        (end_time - now) / 1000.,
+                        (end_time - now) / 1000.0,
                         self.hs.get_reactor(),
                     )
                     with PreserveLoggingContext():

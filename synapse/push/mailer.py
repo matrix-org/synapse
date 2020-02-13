@@ -42,7 +42,9 @@ from synapse.visibility import filter_events_for_client
 logger = logging.getLogger(__name__)
 
 
-MESSAGE_FROM_PERSON_IN_ROOM = "You have a message on %(app)s from %(person)s " "in the %(room)s room..."
+MESSAGE_FROM_PERSON_IN_ROOM = (
+    "You have a message on %(app)s from %(person)s " "in the %(room)s room..."
+)
 MESSAGE_FROM_PERSON = "You have a message on %(app)s from %(person)s..."
 MESSAGES_FROM_PERSON = "You have messages on %(app)s from %(person)s..."
 MESSAGES_IN_ROOM = "You have messages on %(app)s in the %(room)s room..."
@@ -52,7 +54,9 @@ MESSAGES_IN_ROOM_AND_OTHERS = (
 MESSAGES_FROM_PERSON_AND_OTHERS = (
     "You have messages on %(app)s from %(person)s and others..."
 )
-INVITE_FROM_PERSON_TO_ROOM = "%(person)s has invited you to join the " "%(room)s room on %(app)s..."
+INVITE_FROM_PERSON_TO_ROOM = (
+    "%(person)s has invited you to join the " "%(room)s room on %(app)s..."
+)
 INVITE_FROM_PERSON = "%(person)s has invited you to chat on %(app)s..."
 
 CONTEXT_BEFORE = 1

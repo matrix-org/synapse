@@ -35,11 +35,11 @@ def find_patterns_in_file(filepath):
         find_patterns_in_code(f.read())
 
 
-parser = argparse.ArgumentParser(description='Find url patterns.')
+parser = argparse.ArgumentParser(description="Find url patterns.")
 
 parser.add_argument(
     "directories",
-    nargs='+',
+    nargs="+",
     metavar="DIR",
     help="Directories to search for definitions",
 )

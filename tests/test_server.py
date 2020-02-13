@@ -69,8 +69,8 @@ class JsonResourceTests(unittest.TestCase):
         )
         render(request, res, self.reactor)
 
-        self.assertEqual(request.args, {b"a": [u"\N{SNOWMAN}".encode("utf8")]})
-        self.assertEqual(got_kwargs, {u"room_id": u"\N{SNOWMAN}"})
+        self.assertEqual(request.args, {b"a": ["\N{SNOWMAN}".encode("utf8")]})
+        self.assertEqual(got_kwargs, {"room_id": "\N{SNOWMAN}"})
 
     def test_callback_direct_exception(self):
         """

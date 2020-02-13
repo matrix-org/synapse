@@ -21,12 +21,12 @@ from tests import unittest
 class GetFileNameFromHeadersTests(unittest.TestCase):
     # input -> expected result
     TEST_CASES = {
-        b"inline; filename=abc.txt": u"abc.txt",
-        b'inline; filename="azerty"': u"azerty",
-        b'inline; filename="aze%20rty"': u"aze%20rty",
-        b'inline; filename="aze"rty"': u'aze"rty',
-        b'inline; filename="azer;ty"': u"azer;ty",
-        b"inline; filename*=utf-8''foo%C2%A3bar": u"foo£bar",
+        b"inline; filename=abc.txt": "abc.txt",
+        b'inline; filename="azerty"': "azerty",
+        b'inline; filename="aze%20rty"': "aze%20rty",
+        b'inline; filename="aze"rty"': 'aze"rty',
+        b'inline; filename="azer;ty"': "azer;ty",
+        b"inline; filename*=utf-8''foo%C2%A3bar": "foo£bar",
     }
 
     def tests(self):

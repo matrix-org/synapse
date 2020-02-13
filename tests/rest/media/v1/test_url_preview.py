@@ -212,7 +212,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
+        self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
 
     def test_non_ascii_preview_content_type(self):
         self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
@@ -245,7 +245,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.json_body["og:title"], u"\u0434\u043a\u0430")
+        self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
 
     def test_ipaddr(self):
         """
@@ -396,7 +396,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         non-blacklisted one, it will be rejected.
         """
         # Hardcode the URL resolving to the IP we want.
-        self.lookups[u"example.com"] = [
+        self.lookups["example.com"] = [
             (IPv4Address, "1.1.1.2"),
             (IPv4Address, "8.8.8.8"),
         ]

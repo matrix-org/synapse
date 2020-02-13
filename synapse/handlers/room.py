@@ -813,7 +813,7 @@ class RoomContextHandler(object):
         Returns:
             dict, or None if the event isn't found
         """
-        before_limit = math.floor(limit / 2.)
+        before_limit = math.floor(limit / 2.0)
         after_limit = limit - before_limit
 
         users = yield self.store.get_users_in_room(room_id)

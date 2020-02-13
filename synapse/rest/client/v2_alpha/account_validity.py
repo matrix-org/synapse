@@ -57,15 +57,15 @@ class AccountValidityRenewServlet(RestServlet):
 
         if token_valid:
             status_code = 200
-            response = self.success_html
         else:
             status_code = 404
-            response = self.failure_html
 
         request.setResponseCode(status_code)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(response),))
-        request.write(response.encode("utf8"))
+        request.setHeader(
+            b"Content-Length", b"%d" % (len(AccountValidityRenewServlet.SUCCESS_HTML),)
+        )
+        request.write(AccountValidityRenewServlet.SUCCESS_HTML)
         finish_request(request)
         defer.returnValue(None)
 

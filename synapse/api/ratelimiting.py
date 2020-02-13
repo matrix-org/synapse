@@ -44,15 +44,15 @@ class Ratelimiter(object):
         """
         self.prune_message_counts(time_now_s)
         message_count, time_start, _ignored = self.message_counts.get(
-            key, (0., time_now_s, None)
+            key, (0.0, time_now_s, None)
         )
         time_delta = time_now_s - time_start
         sent_count = message_count - time_delta * rate_hz
         if sent_count < 0:
             allowed = True
             time_start = time_now_s
-            message_count = 1.
-        elif sent_count > burst_count - 1.:
+            message_count = 1.0
+        elif sent_count > burst_count - 1.0:
             allowed = False
         else:
             allowed = True

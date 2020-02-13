@@ -489,11 +489,7 @@ class RegistrationHandler(BaseHandler):
                 threepid["address"],
             )
 
-            if not (
-                yield check_3pid_allowed(
-                    self.hs, threepid["medium"], threepid["address"]
-                )
-            ):
+            if not check_3pid_allowed(self.hs, threepid["medium"], threepid["address"]):
                 raise RegistrationError(403, "Third party identifier is not allowed")
 
     @defer.inlineCallbacks

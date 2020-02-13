@@ -96,8 +96,8 @@ class ContextResourceUsage(object):
         return ContextResourceUsage(copy_from=self)
 
     def reset(self):
-        self.ru_stime = 0.
-        self.ru_utime = 0.
+        self.ru_stime = 0.0
+        self.ru_utime = 0.0
         self.db_txn_count = 0
 
         self.db_txn_duration_sec = 0

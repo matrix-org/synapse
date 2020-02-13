@@ -11,22 +11,22 @@ try:
 except NameError:  # Python 3
     raw_input = input
 
+
 def _mkurl(template, kws):
     for key in kws:
         template = template.replace(key, kws[key])
     return template
 
+
 def main(hs, room_id, access_token, user_id_prefix, why):
     if not why:
         why = "Automated kick."
-    print("Kicking members on %s in room %s matching %s" % (hs, room_id, user_id_prefix))
+    print(
+        "Kicking members on %s in room %s matching %s" % (hs, room_id, user_id_prefix)
+    )
     room_state_url = _mkurl(
         "$HS/_matrix/client/api/v1/rooms/$ROOM/state?access_token=$TOKEN",
-        {
-            "$HS": hs,
-            "$ROOM": room_id,
-            "$TOKEN": access_token
-        }
+        {"$HS": hs, "$ROOM": room_id, "$TOKEN": access_token},
     )
     print("Getting room state => %s" % room_state_url)
     res = requests.get(room_state_url)
@@ -57,24 +57,16 @@ def main(hs, room_id, access_token, user_id_prefix, why):
     for uid in kick_list:
         print(uid)
     doit = raw_input("Continue? [Y]es\n")
-    if len(doit) > 0 and doit.lower() == 'y':
+    if len(doit) > 0 and doit.lower() == "y":
         print("Kicking members...")
         # encode them all
         kick_list = [urllib.quote(uid) for uid in kick_list]
         for uid in kick_list:
             kick_url = _mkurl(
                 "$HS/_matrix/client/api/v1/rooms/$ROOM/state/m.room.member/$UID?access_token=$TOKEN",
-                {
-                    "$HS": hs,
-                    "$UID": uid,
-                    "$ROOM": room_id,
-                    "$TOKEN": access_token
-                }
+                {"$HS": hs, "$UID": uid, "$ROOM": room_id, "$TOKEN": access_token},
             )
-            kick_body = {
-                "membership": "leave",
-                "reason": why
-            }
+            kick_body = {"membership": "leave", "reason": why}
             print("Kicking %s" % uid)
             res = requests.put(kick_url, data=json.dumps(kick_body))
             if res.status_code != 200:
@@ -83,14 +75,15 @@ def main(hs, room_id, access_token, user_id_prefix, why):
                 print("ERROR: JSON %s" % res.json())
 
 
-
 if __name__ == "__main__":
     parser = ArgumentParser("Kick members in a room matching a certain user ID prefix.")
-    parser.add_argument("-u","--user-id",help="The user ID prefix e.g. '@irc_'")
-    parser.add_argument("-t","--token",help="Your access_token")
-    parser.add_argument("-r","--room",help="The room ID to kick members in")
-    parser.add_argument("-s","--homeserver",help="The base HS url e.g. http://matrix.org")
-    parser.add_argument("-w","--why",help="Reason for the kick. Optional.")
+    parser.add_argument("-u", "--user-id", help="The user ID prefix e.g. '@irc_'")
+    parser.add_argument("-t", "--token", help="Your access_token")
+    parser.add_argument("-r", "--room", help="The room ID to kick members in")
+    parser.add_argument(
+        "-s", "--homeserver", help="The base HS url e.g. http://matrix.org"
+    )
+    parser.add_argument("-w", "--why", help="Reason for the kick. Optional.")
     args = parser.parse_args()
     if not args.room or not args.token or not args.user_id or not args.homeserver:
         parser.print_help()

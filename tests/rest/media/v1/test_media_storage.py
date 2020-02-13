@@ -204,7 +204,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         correctly decode it as the UTF-8 string, and use filename* in the
         response.
         """
-        filename = parse.quote(u"\u2603".encode("utf8")).encode("ascii")
+        filename = parse.quote("\u2603".encode("utf8")).encode("ascii")
         channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
 
         headers = channel.headers

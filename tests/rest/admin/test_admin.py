@@ -68,7 +68,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
 
         self.hs = self.setup_test_homeserver()
 
-        self.hs.config.registration_shared_secret = u"shared"
+        self.hs.config.registration_shared_secret = "shared"
 
         self.hs.get_media_repository = Mock()
         self.hs.get_deactivate_account_handler = Mock()
@@ -270,7 +270,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Invalid username", channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": u"abcd\u0000"})
+        body = json.dumps({"nonce": nonce(), "username": "abcd\u0000"})
         request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 
@@ -306,9 +306,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Invalid password", channel.json_body["error"])
 
         # Must not have null bytes
-        body = json.dumps(
-            {"nonce": nonce(), "username": "a", "password": u"abcd\u0000"}
-        )
+        body = json.dumps({"nonce": nonce(), "username": "a", "password": "abcd\u0000"})
         request, channel = self.make_request("POST", self.url, body.encode("utf8"))
         self.render(request)
 

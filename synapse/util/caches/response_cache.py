@@ -35,7 +35,7 @@ class ResponseCache(object):
         self.pending_result_cache = {}  # Requests that haven't finished yet.
 
         self.clock = hs.get_clock()
-        self.timeout_sec = timeout_ms / 1000.
+        self.timeout_sec = timeout_ms / 1000.0
 
         self._name = name
         self._metrics = register_cache("response_cache", name, self)

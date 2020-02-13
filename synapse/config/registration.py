@@ -42,7 +42,7 @@ class AccountValidityConfig(Config):
             else:
                 self.renew_email_subject = "Renew your %(app)s account"
 
-            self.startup_job_max_delta = self.period * 10. / 100.
+            self.startup_job_max_delta = self.period * 10.0 / 100.0
 
         if self.renew_by_email_enabled:
             if "public_baseurl" not in synapse_config:
