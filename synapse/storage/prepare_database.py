@@ -133,7 +133,7 @@ def _setup_new_database(cur, database_engine):
             if ver <= SCHEMA_VERSION:
                 valid_dirs.append((ver, abs_path))
         else:
-            logger.warn("Unexpected entry in 'full_schemas': %s", filename)
+            logger.debug("Ignoring entry '%s' in 'full_schemas'", filename)
 
     if not valid_dirs:
         raise PrepareDatabaseException(
