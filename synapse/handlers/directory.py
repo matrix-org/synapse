@@ -303,9 +303,27 @@ class DirectoryHandler(BaseHandler):
             room_id, EventTypes.CanonicalAlias, ""
         )
 
-        alias_str = room_alias.to_string()
-        if not alias_event or alias_event.content.get("alias", "") != alias_str:
+        # There is no canonical alias, nothing to do.
+        if not alias_event:
             return
+
+        # An updated canonical alias event must be sent if the removed alias was
+        # set as the alias on the canonical_alias event or listed in the
+        # alt_aliases field.
+        alias_str = room_alias.to_string()
+        alt_aliases = alias_event.content.get("alt_aliases", [])
+        send_update = (
+            alias_event.content.get("alias", "") == alias_str
+            or alias_str in alt_aliases
+        )
+        if not send_update:
+            return
+
+        # Include any remaining aliases in the content.
+        content = {}
+        alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
+        if alt_aliases:
+            content["alt_aliases"] = alt_aliases
 
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
@@ -314,7 +332,7 @@ class DirectoryHandler(BaseHandler):
                 "state_key": "",
                 "room_id": room_id,
                 "sender": user_id,
-                "content": {},
+                "content": content,
             },
             ratelimit=False,
         )
