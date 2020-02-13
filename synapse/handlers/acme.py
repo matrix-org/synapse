@@ -47,7 +47,7 @@ class AcmeHandler(object):
         self._issuer = acme_issuing_service.create_issuing_service(
             self.reactor,
             acme_url=self.hs.config.acme_url,
-            pem_path=self.hs.config.config_dir_path,
+            account_key_file=self.hs.config.acme_account_key_file,
             well_known_resource=well_known,
         )
 

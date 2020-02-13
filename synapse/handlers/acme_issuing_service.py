@@ -21,28 +21,34 @@ This file contains the unconditional imports on the acme and cryptography bits t
 only need (and may only have available) if we are doing ACME, so is designed to be
 imported conditionally.
 """
+import logging
 
 import attr
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from josepy import JWKRSA
 from josepy.jwa import RS256
 from txacme.challenges import HTTP01Responder
 from txacme.client import Client
-from txacme.endpoint import load_or_create_client_key
 from txacme.interfaces import ICertificateStore
 from txacme.service import AcmeIssuingService
+from txacme.util import generate_private_key
 from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.python.filepath import FilePath
 from twisted.python.url import URL
 
+logger = logging.getLogger(__name__)
 
-def create_issuing_service(reactor, acme_url, pem_path, well_known_resource):
+
+def create_issuing_service(reactor, acme_url, account_key_file, well_known_resource):
     """Create an ACME issuing service, and attach it to a web Resource
 
     Args:
         reactor: twisted reactor
         acme_url (str): URL to use to request certificates
-        pem_path (str): where to store the client key
+        account_key_file (str): where to store the account key
         well_known_resource (twisted.web.IResource): web resource for .well-known.
             we will attach a child resource for "acme-challenge".
 
@@ -61,7 +67,7 @@ def create_issuing_service(reactor, acme_url, pem_path, well_known_resource):
             lambda: Client.from_url(
                 reactor=reactor,
                 url=URL.from_text(acme_url),
-                key=load_or_create_client_key(FilePath(pem_path)),
+                key=load_or_create_client_key(account_key_file),
                 alg=RS256,
             )
         ),
@@ -82,3 +88,30 @@ class ErsatzStore(object):
     def store(self, server_name, pem_objects):
         self.certs[server_name] = [o.as_bytes() for o in pem_objects]
         return defer.succeed(None)
+
+
+def load_or_create_client_key(key_file):
+    """Load the ACME account key from a file, creating it if it does not exist.
+
+    Args:
+        key_file (str): name of the file to use as the account key
+    """
+    # this is based on txacme.endpoint.load_or_create_client_key, but doesn't
+    # hardcode the 'client.key' filename
+    acme_key_file = FilePath(key_file)
+    if acme_key_file.exists():
+        logger.info("Loading ACME account key from '%s'", acme_key_file)
+        key = serialization.load_pem_private_key(
+            acme_key_file.getContent(), password=None, backend=default_backend()
+        )
+    else:
+        logger.info("Saving new ACME account key to '%s'", acme_key_file)
+        key = generate_private_key("rsa")
+        acme_key_file.setContent(
+            key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
+    return JWKRSA(key=key)
