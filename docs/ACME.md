@@ -27,7 +27,7 @@ feature to an external automated tool such as [certbot](https://github.com/certb
 for an alternative ACME client).
 
 It's also recommended to use a reverse proxy for the server-facing
-communications (mode documentation about this can be found
+communications (more documentation about this can be found
 [here](/docs/reverse_proxy.md)) as well as the client-facing ones and
 have it serve the certificates.
 
