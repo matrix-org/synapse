@@ -76,12 +76,13 @@ class AcmeHandler(object):
         try:
             yield self._issuer._ensure_registered()
         except Exception:
-            raise ConfigError("Failed to register with the ACME provider. This is likely"
-                " happening because the install is new, and ACME v1 has been deprecated"
-                " by Let's Encrypt and is disabled for installs set up after November"
-                " 2019. At the moment, Synapse doesn't support ACME v2. For more info"
-                " and alternative solution, check out https://github.com/matrix-org"
-                "/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1"
+            raise ConfigError(
+                "Failed to register with the ACME provider. This is likely happening"
+                " because the install is new, and ACME v1 has been deprecated by Let's"
+                " Encrypt and is disabled for installs set up after November 2019. At the"
+                " moment, Synapse doesn't support ACME v2. For more info and alternative"
+                " solution, check out https://github.com/matrix-org/synapse/blob/master"
+                "/docs/ACME.md#deprecation-of-acme-v1"
             )
 
     @defer.inlineCallbacks
