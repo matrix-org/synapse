@@ -22,6 +22,7 @@ from twisted.web import server, static
 from twisted.web.resource import Resource
 
 from synapse.app import check_bind_error
+from synapse.config import ConfigError
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,18 @@ class AcmeHandler(object):
         # want it to control where we save the certificates, we have to reach in
         # and trigger the registration machinery ourselves.
         self._issuer._registered = False
-        yield self._issuer._ensure_registered()
+
+        try:
+            yield self._issuer._ensure_registered()
+        except Exception:
+            raise ConfigError("Failed to register with the ACME provider. This is likely"
+                              " happening because the install is new, and ACME v1 has"
+                              " been deprecated by Let's Encrypt and is disabled for"
+                              " installs set up after November 2019. At the moment,"
+                              " Synapse doesn't support ACME v2. For more info and"
+                              " alternative solution, check out"
+                              " https://github.com/matrix-org/synapse/blob/master/docs/"
+                              "ACME.md#deprecation-of-acme-v1")
 
     @defer.inlineCallbacks
     def provision_certificate(self):
