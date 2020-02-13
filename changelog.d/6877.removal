@@ -1,1 +1,1 @@
-Remove m.lazy_load_members from unstable features since lazy loading is in the stable Client-Server API version r0.5.0.
+Remove `m.lazy_load_members` from `unstable_features` since lazy loading is in the stable Client-Server API version r0.5.0.
