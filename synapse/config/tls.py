@@ -40,7 +40,7 @@ November 2019, and that it may stop working on June 2020 for installs set up
 before that date.
 
 For more info and alternative solutions, see
-https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1 
+https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
 --------------------------------------------------------------------------------"""
 
 
