@@ -1,0 +1,1 @@
+Fix intermittent exceptions on Apple hardware. Also fix bug that caused database activity times to be under-reported in log lines.
