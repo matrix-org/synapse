@@ -641,7 +641,6 @@ def run(hs):
         gc_thresholds=hs.config.gc_thresholds,
         pid_file=hs.config.pid_file,
         daemonize=hs.config.daemonize,
-        cpu_affinity=hs.config.cpu_affinity,
         print_pidfile=hs.config.print_pidfile,
         logger=logger,
     )

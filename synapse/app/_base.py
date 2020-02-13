@@ -19,7 +19,6 @@ import signal
 import sys
 import traceback
 
-import psutil
 from daemonize import Daemonize
 
 from twisted.internet import defer, error, reactor
@@ -68,21 +67,13 @@ def start_worker_reactor(appname, config):
         gc_thresholds=config.gc_thresholds,
         pid_file=config.worker_pid_file,
         daemonize=config.worker_daemonize,
-        cpu_affinity=config.worker_cpu_affinity,
         print_pidfile=config.print_pidfile,
         logger=logger,
     )
 
 
 def start_reactor(
-    appname,
-    soft_file_limit,
-    gc_thresholds,
-    pid_file,
-    daemonize,
-    cpu_affinity,
-    print_pidfile,
-    logger,
+    appname, soft_file_limit, gc_thresholds, pid_file, daemonize, print_pidfile, logger
 ):
     """ Run the reactor in the main process
 
@@ -95,7 +86,6 @@ def start_reactor(
         gc_thresholds:
         pid_file (str): name of pid file to write to if daemonize is True
         daemonize (bool): true to run the reactor in a background process
-        cpu_affinity (int|None): cpu affinity mask
         print_pidfile (bool): whether to print the pid file, if daemonize is True
         logger (logging.Logger): logger instance to pass to Daemonize
     """
@@ -109,20 +99,6 @@ def start_reactor(
         # between the sentinel and `run` logcontexts.
         with PreserveLoggingContext():
             logger.info("Running")
-            if cpu_affinity is not None:
-                # Turn the bitmask into bits, reverse it so we go from 0 up
-                mask_to_bits = bin(cpu_affinity)[2:][::-1]
-
-                cpus = []
-                cpu_num = 0
-
-                for i in mask_to_bits:
-                    if i == "1":
-                        cpus.append(cpu_num)
-                    cpu_num += 1
-
-                p = psutil.Process()
-                p.cpu_affinity(cpus)
 
             change_resource_limit(soft_file_limit)
             if gc_thresholds:
