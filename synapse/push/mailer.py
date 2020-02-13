@@ -256,7 +256,7 @@ class Mailer(object):
         multipart_msg.attach(text_part)
         multipart_msg.attach(html_part)
 
-        logger.info("Sending email push notification to %s" % email_address)
+        logger.info("Sending email notification to %s" % email_address)
 
         yield make_deferred_yieldable(
             self.sendmail(
