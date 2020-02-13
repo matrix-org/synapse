@@ -74,8 +74,8 @@ This section might look like:
 spam_checker:
   module: my_module.ExampleSpamChecker
   config:
-    # Foobar
-    block_invites: true
+    # Enable or disable a specific option in ExampleSpamChecker.
+    my_custom_option: true
 ```
 
 ## Examples
