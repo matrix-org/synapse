@@ -418,7 +418,9 @@ so, you will need to edit `homeserver.yaml`, as follows:
   for having Synapse automatically provision and renew federation
   certificates through ACME can be found at [ACME.md](docs/ACME.md).
   Note that, as pointed out in that document, this feature will not
-  work with installs set up after November 2020. If you are using your
+  work with installs set up after November 2020. 
+  
+  If you are using your
   own certificate, be sure to use a `.pem` file that includes the full
   certificate chain including any intermediate certificates (for
   instance, if using certbot, use `fullchain.pem` as your certificate,
