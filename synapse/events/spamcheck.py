@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import inspect
+from typing import Dict
 
 from synapse.spam_checker_api import SpamCheckerApi
 
@@ -125,3 +126,29 @@ class SpamChecker(object):
             return True
 
         return self.spam_checker.user_may_publish_room(userid, room_id)
+
+    def check_username_for_spam(self, user_profile: Dict[str, str]) -> bool:
+        """Checks if a user ID or display name are considered "spammy" by this server.
+
+        If the server considers a username spammy, then it will not be included in
+        user directory results.
+
+        Args:
+            user_profile: The user information to check, it contains the keys:
+                * user_id
+                * display_name
+                * avatar_url
+
+        Returns:
+            True if the user is spammy.
+        """
+        if self.spam_checker is None:
+            return False
+
+        # For backwards compatibility, if the method does not exist on the spam checker, fallback to not interfering.
+        checker = getattr(self.spam_checker, "check_username_for_spam", None)
+        if not checker:
+            return False
+        # Make a copy of the user profile object to ensure the spam checker
+        # cannot modify it.
+        return checker(user_profile.copy())
