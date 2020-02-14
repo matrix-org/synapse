@@ -16,6 +16,7 @@
 import logging
 
 from twisted.internet import defer
+from six import ensure_binary
 
 from synapse.api.errors import AuthError, SynapseError
 from synapse.http.server import finish_request
@@ -57,15 +58,17 @@ class AccountValidityRenewServlet(RestServlet):
 
         if token_valid:
             status_code = 200
+            response = self.success_html
         else:
             status_code = 404
+            response = self.failure_html
 
         request.setResponseCode(status_code)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
         request.setHeader(
-            b"Content-Length", b"%d" % (len(AccountValidityRenewServlet.SUCCESS_HTML),)
+            b"Content-Length", b"%d" % (len(response),)
         )
-        request.write(AccountValidityRenewServlet.SUCCESS_HTML)
+        request.write(ensure_binary(response))
         finish_request(request)
         defer.returnValue(None)
 
