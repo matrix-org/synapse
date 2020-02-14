@@ -24,7 +24,8 @@ from six import itervalues, string_types
 
 from twisted.internet import defer
 
-from synapse.util import logcontext, unwrapFirstError
+from synapse.logging.context import make_deferred_yieldable, preserve_fn
+from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.lrucache import LruCache
@@ -388,7 +389,7 @@ class CacheDescriptor(_CacheDescriptorBase):
 
             except KeyError:
                 ret = defer.maybeDeferred(
-                    logcontext.preserve_fn(self.function_to_call), obj, *args, **kwargs
+                    preserve_fn(self.function_to_call), obj, *args, **kwargs
                 )
 
                 def onErr(f):
@@ -408,7 +409,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                 observer = result_d.observe()
 
             if isinstance(observer, defer.Deferred):
-                return logcontext.make_deferred_yieldable(observer)
+                return make_deferred_yieldable(observer)
             else:
                 return observer
 
@@ -563,7 +564,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
 
                 cached_defers.append(
                     defer.maybeDeferred(
-                        logcontext.preserve_fn(self.function_to_call), **args_to_call
+                        preserve_fn(self.function_to_call), **args_to_call
                     ).addCallbacks(complete_all, errback)
                 )
 
@@ -571,7 +572,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                 d = defer.gatherResults(cached_defers, consumeErrors=True).addCallbacks(
                     lambda _: results, unwrapFirstError
                 )
-                return logcontext.make_deferred_yieldable(d)
+                return make_deferred_yieldable(d)
             else:
                 return results
 

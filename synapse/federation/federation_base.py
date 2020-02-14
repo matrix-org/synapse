@@ -27,8 +27,14 @@ from synapse.crypto.event_signing import check_event_content_hash
 from synapse.events import event_type_from_format_version
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
+from synapse.logging.context import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    preserve_fn,
+)
 from synapse.types import get_domain_from_id
-from synapse.util import logcontext, unwrapFirstError
+from synapse.util import unwrapFirstError
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +79,7 @@ class FederationBase(object):
         @defer.inlineCallbacks
         def handle_check_result(pdu, deferred):
             try:
-                res = yield logcontext.make_deferred_yieldable(deferred)
+                res = yield make_deferred_yieldable(deferred)
             except SynapseError:
                 res = None
 
@@ -102,10 +108,10 @@ class FederationBase(object):
 
             defer.returnValue(res)
 
-        handle = logcontext.preserve_fn(handle_check_result)
+        handle = preserve_fn(handle_check_result)
         deferreds2 = [handle(pdu, deferred) for pdu, deferred in zip(pdus, deferreds)]
 
-        valid_pdus = yield logcontext.make_deferred_yieldable(
+        valid_pdus = yield make_deferred_yieldable(
             defer.gatherResults(deferreds2, consumeErrors=True)
         ).addErrback(unwrapFirstError)
 
@@ -115,7 +121,7 @@ class FederationBase(object):
             defer.returnValue([p for p in valid_pdus if p])
 
     def _check_sigs_and_hash(self, room_version, pdu):
-        return logcontext.make_deferred_yieldable(
+        return make_deferred_yieldable(
             self._check_sigs_and_hashes(room_version, [pdu])[0]
         )
 
@@ -133,14 +139,14 @@ class FederationBase(object):
               * returns a redacted version of the event (if the signature
                 matched but the hash did not)
               * throws a SynapseError if the signature check failed.
-            The deferreds run their callbacks in the sentinel logcontext.
+            The deferreds run their callbacks in the sentinel
         """
         deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
 
-        ctx = logcontext.LoggingContext.current_context()
+        ctx = LoggingContext.current_context()
 
         def callback(_, pdu):
-            with logcontext.PreserveLoggingContext(ctx):
+            with PreserveLoggingContext(ctx):
                 if not check_event_content_hash(pdu):
                     # let's try to distinguish between failures because the event was
                     # redacted (which are somewhat expected) vs actual ball-tampering
@@ -178,7 +184,7 @@ class FederationBase(object):
 
         def errback(failure, pdu):
             failure.trap(SynapseError)
-            with logcontext.PreserveLoggingContext(ctx):
+            with PreserveLoggingContext(ctx):
                 logger.warn(
                     "Signature check failed for %s: %s",
                     pdu.event_id,

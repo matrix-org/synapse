@@ -30,9 +30,12 @@ from synapse.crypto.keyring import (
     ServerKeyFetcher,
     StoreKeyFetcher,
 )
+from synapse.logging.context import (
+    LoggingContext,
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+)
 from synapse.storage.keys import FetchKeyResult
-from synapse.util import logcontext
-from synapse.util.logcontext import LoggingContext
 
 from tests import unittest
 
@@ -131,7 +134,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         @defer.inlineCallbacks
         def get_perspectives(**kwargs):
             self.assertEquals(LoggingContext.current_context().request, "11")
-            with logcontext.PreserveLoggingContext():
+            with PreserveLoggingContext():
                 yield persp_deferred
             defer.returnValue(persp_resp)
 
@@ -158,7 +161,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 self.assertFalse(res_deferreds[0].called)
                 res_deferreds[0].addBoth(self.check_context, None)
 
-                yield logcontext.make_deferred_yieldable(res_deferreds[0])
+                yield make_deferred_yieldable(res_deferreds[0])
 
                 # let verify_json_objects_for_server finish its work before we kill the
                 # logcontext
@@ -184,7 +187,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                     [("server10", json1, 0, "test")]
                 )
                 res_deferreds_2[0].addBoth(self.check_context, None)
-                yield logcontext.make_deferred_yieldable(res_deferreds_2[0])
+                yield make_deferred_yieldable(res_deferreds_2[0])
 
                 # let verify_json_objects_for_server finish its work before we kill the
                 # logcontext

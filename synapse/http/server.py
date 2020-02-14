@@ -39,8 +39,8 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.logging.context import preserve_fn
 from synapse.util.caches import intern_dict
-from synapse.util.logcontext import preserve_fn
 
 logger = logging.getLogger(__name__)
 

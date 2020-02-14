@@ -22,7 +22,7 @@ from synapse.appservice.scheduler import (
     _ServiceQueuer,
     _TransactionController,
 )
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable
 
 from tests import unittest
 

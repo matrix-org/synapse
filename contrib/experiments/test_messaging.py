@@ -36,7 +36,7 @@ from synapse.util import origin_from_ucid
 
 from synapse.app.homeserver import SynapseHomeServer
 
-# from synapse.util.logutils import log_function
+# from synapse.logging.utils import log_function
 
 from twisted.internet import reactor, defer
 from twisted.python import log

@@ -24,7 +24,7 @@ from twisted.logger import STDLibLogObserver, globalLogBeginner
 
 import synapse
 from synapse.app import _base as appbase
-from synapse.util.logcontext import LoggingContextFilter
+from synapse.logging.context import LoggingContextFilter
 from synapse.util.versionstring import get_version_string
 
 from ._base import Config
@@ -40,7 +40,7 @@ formatters:
 
 filters:
     context:
-        (): synapse.util.logcontext.LoggingContextFilter
+        (): synapse.logging.context.LoggingContextFilter
         request: ""
 
 handlers:

@@ -23,7 +23,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.util.logutils import log_function
+from synapse.logging.utils import log_function
 
 logger = logging.getLogger(__name__)
 

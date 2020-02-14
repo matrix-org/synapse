@@ -36,8 +36,8 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string_from_args,
 )
+from synapse.logging.context import run_in_background
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
-from synapse.util.logcontext import run_in_background
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
 

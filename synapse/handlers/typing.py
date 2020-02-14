@@ -19,9 +19,9 @@ from collections import namedtuple
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError, SynapseError
+from synapse.logging.context import run_in_background
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-from synapse.util.logcontext import run_in_background
 from synapse.util.metrics import Measure
 from synapse.util.wheel_timer import WheelTimer
 

@@ -28,7 +28,7 @@ def do_patch():
     Patch defer.inlineCallbacks so that it checks the state of the logcontext on exit
     """
 
-    from synapse.util.logcontext import LoggingContext
+    from synapse.logging.context import LoggingContext
 
     orig_inline_callbacks = defer.inlineCallbacks
 

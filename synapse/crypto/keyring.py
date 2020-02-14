@@ -44,15 +44,16 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.storage.keys import FetchKeyResult
-from synapse.util import logcontext, unwrapFirstError
-from synapse.util.async_helpers import yieldable_gather_results
-from synapse.util.logcontext import (
+from synapse.logging.context import (
     LoggingContext,
     PreserveLoggingContext,
+    make_deferred_yieldable,
     preserve_fn,
     run_in_background,
 )
+from synapse.storage.keys import FetchKeyResult
+from synapse.util import unwrapFirstError
+from synapse.util.async_helpers import yieldable_gather_results
 from synapse.util.metrics import Measure
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -140,7 +141,7 @@ class Keyring(object):
         """
         req = VerifyJsonRequest(server_name, json_object, validity_time, request_name)
         requests = (req,)
-        return logcontext.make_deferred_yieldable(self._verify_objects(requests)[0])
+        return make_deferred_yieldable(self._verify_objects(requests)[0])
 
     def verify_json_objects_for_server(self, server_and_json):
         """Bulk verifies signatures of json objects, bulk fetching keys as
@@ -557,7 +558,7 @@ class BaseV2KeyFetcher(object):
 
         signed_key_json_bytes = encode_canonical_json(signed_key_json)
 
-        yield logcontext.make_deferred_yieldable(
+        yield make_deferred_yieldable(
             defer.gatherResults(
                 [
                     run_in_background(
@@ -612,7 +613,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
             defer.returnValue({})
 
-        results = yield logcontext.make_deferred_yieldable(
+        results = yield make_deferred_yieldable(
             defer.gatherResults(
                 [run_in_background(get_key, server) for server in self.key_servers],
                 consumeErrors=True,

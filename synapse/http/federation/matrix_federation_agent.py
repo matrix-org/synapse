@@ -30,9 +30,9 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent
 
 from synapse.http.federation.srv_resolver import SrvResolver, pick_server_from_list
+from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
 from synapse.util.caches.ttlcache import TTLCache
-from synapse.util.logcontext import make_deferred_yieldable
 from synapse.util.metrics import Measure
 
 # period to cache .well-known results for by default

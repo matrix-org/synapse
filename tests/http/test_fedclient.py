@@ -29,7 +29,7 @@ from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
 )
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import LoggingContext
 
 from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase

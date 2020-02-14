@@ -20,7 +20,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import LimitExceededError
-from synapse.util.logcontext import (
+from synapse.logging.context import (
     PreserveLoggingContext,
     make_deferred_yieldable,
     run_in_background,
