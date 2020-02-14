@@ -209,19 +209,19 @@ def main(args, environ):
         error("Unknown execution mode '%s'" % (mode,))
 
     config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
-    config_path = environ.get(
-        "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
-    )
+    config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
 
     if not os.path.exists(config_path):
         if "SYNAPSE_SERVER_NAME" in environ:
-            error("""\
+            error(
+                """\
 Config file '%s' does not exist.
 
 The synapse docker image no longer supports generating a config file on-the-fly
 based on environment variables. You can migrate to a static config file by
 running with 'migrate_config'.  See the README for more details.
-""" % (config_path, )
+"""
+                % (config_path,)
             )
 
         error(
@@ -229,7 +229,7 @@ running with 'migrate_config'.  See the README for more details.
             "config file by running with the `generate` argument (and then edit "
             "the resulting file before restarting) or specify the path to an "
             "existing config file with the SYNAPSE_CONFIG_PATH variable."
-                % (config_path,)
+            % (config_path,)
         )
 
     log("Starting synapse with config file " + config_path)
