@@ -12,3 +12,9 @@ Local device key changes get to remote servers
 
 # flaky test
 Old leaves are present in gapped incremental syncs
+
+# flaky test on workers
+Old members are included in gappy incr LL sync if they start speaking
+
+# flaky test on workers
+Presence changes to UNAVAILABLE are reported to remote room members
