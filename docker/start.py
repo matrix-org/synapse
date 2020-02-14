@@ -164,6 +164,7 @@ def run_generate_config(environ, ownership):
         "--data-directory",
         data_dir,
         "--generate-config",
+        "--open-private-ports",
     ]
     # log("running %s" % (args, ))
     os.execv("/usr/local/bin/python", args)
