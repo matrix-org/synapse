@@ -1,0 +1,1 @@
+Convert the directory handler tests to use HomeserverTestCase.
