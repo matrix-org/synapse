@@ -1,1 +1,0 @@
-Fix bug where clients could tight loop calling `/sync` for a period.

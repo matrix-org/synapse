@@ -1,1 +1,0 @@
-PostgreSQL 9.4 is no longer supported. Synapse requires Postgres 9.5+ or above for Postgres support.
