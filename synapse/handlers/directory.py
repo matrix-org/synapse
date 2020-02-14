@@ -320,14 +320,14 @@ class DirectoryHandler(BaseHandler):
             content.pop("alias", "")
 
         # Filter alt_aliases for the removed alias.
-        alt_aliases = alias_event.content.get("alt_aliases", None)
+        alt_aliases = content.pop("alt_aliases", None)
         # If the aliases are not a list (or not found) do not attempt to modify
         # the list.
         if isinstance(alt_aliases, list):
             send_update = True
-            content["alt_aliases"] = [
-                alias for alias in alt_aliases if alias != alias_str
-            ]
+            alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
+            if alt_aliases:
+                content["alt_aliases"] = alt_aliases
 
         if send_update:
             yield self.event_creation_handler.create_and_send_nonmember_event(
