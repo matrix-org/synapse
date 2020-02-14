@@ -16,8 +16,11 @@ import logging
 
 from twisted.internet import defer
 
-import synapse.server
 from synapse.storage.state import StateFilter
+
+MYPY = False
+if MYPY:
+    import synapse.server
 
 logger = logging.getLogger(__name__)
 

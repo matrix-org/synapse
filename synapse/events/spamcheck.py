@@ -17,8 +17,11 @@
 import inspect
 from typing import Dict
 
-import synapse.server
 from synapse.spam_checker_api import SpamCheckerApi
+
+MYPY = False
+if MYPY:
+    import synapse.server
 
 
 class SpamChecker(object):
