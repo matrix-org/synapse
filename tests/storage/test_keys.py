@@ -128,4 +128,3 @@ class KeyStoreTestCase(tests.unittest.HomeserverTestCase):
         res2 = res[("srv1", key_id_2)]
         self.assertEqual(res2.verify_key, new_key_2)
         self.assertEqual(res2.valid_until_ts, 300)
-

@@ -22,8 +22,8 @@ from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.logging.context import run_in_background
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import ReadWriteLock

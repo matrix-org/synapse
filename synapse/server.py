@@ -94,7 +94,7 @@ from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
-    WorkerServerNoticesSender
+    WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.streams.events import EventSources

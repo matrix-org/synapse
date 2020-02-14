@@ -16,7 +16,7 @@ from twisted.internet import defer
 
 from synapse.server_notices.consent_server_notices import ConsentServerNotices
 from synapse.server_notices.resource_limits_server_notices import (
-    ResourceLimitsServerNotices
+    ResourceLimitsServerNotices,
 )
 
 

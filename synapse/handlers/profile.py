@@ -17,7 +17,6 @@
 import logging
 
 from six import raise_from
-
 from six.moves import range
 
 from signedjson.sign import sign_json
@@ -32,9 +31,9 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID, get_domain_from_id
-from synapse.logging.context import run_in_background
 
 from ._base import BaseHandler
 

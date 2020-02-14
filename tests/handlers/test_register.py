@@ -246,8 +246,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Multibyte unicode characters
         self._check_mapping(
-            u"j\u030a\u0065an-poppy.seed@example.com",
-            u"J\u030a\u0065an-Poppy Seed [Example]",
+            "j\u030a\u0065an-poppy.seed@example.com",
+            "J\u030a\u0065an-Poppy Seed [Example]",
         )
 
     def _check_mapping(self, i, expected):
