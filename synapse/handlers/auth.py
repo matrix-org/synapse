@@ -743,7 +743,7 @@ class AuthHandler(BaseHandler):
                     result = (result, None)
                 defer.returnValue(result)
 
-        if login_type == LoginType.PASSWORD:
+        if login_type == LoginType.PASSWORD and self.hs.config.password_localdb_enabled:
             known_login_type = True
 
             canonical_user_id = yield self._check_local_password(
