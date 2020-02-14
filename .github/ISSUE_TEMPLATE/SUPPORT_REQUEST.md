@@ -4,6 +4,7 @@ about: I need support for Synapse
 
 ---
 
-# Please ask for support in [**#matrix:matrix.org**](https://matrix.to/#/#matrix:matrix.org)
+Please don't file github issues asking for support.
 
-## Don't file an issue as a support request.
+Instead, please join [`#synapse:matrix.org`](https://matrix.to/#/#synapse:matrix.org)
+(from a matrix.org account if necessary), and ask there.
