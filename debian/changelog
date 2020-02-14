@@ -1,3 +1,10 @@
+matrix-synapse-py3 (1.1.0-1) UNRELEASED; urgency=medium
+
+  [ Amber Brown ]
+  * Update logging config defaults to match API changes in Synapse.
+
+ -- Erik Johnston <erikj@rae>  Thu, 04 Jul 2019 13:59:02 +0100
+
 matrix-synapse-py3 (1.1.0) stable; urgency=medium
 
   [ Silke Hofstra ]
