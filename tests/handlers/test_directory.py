@@ -19,12 +19,10 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.config.room_directory import RoomDirectoryConfig
-from synapse.handlers.directory import DirectoryHandler
 from synapse.rest.client.v1 import directory, room
 from synapse.types import RoomAlias
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):
@@ -59,9 +57,11 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         return hs
 
     def test_get_local_association(self):
-        self.get_success(self.store.create_room_alias_association(
-            self.my_room, "!8765qwer:test", ["test"]
-        ))
+        self.get_success(
+            self.store.create_room_alias_association(
+                self.my_room, "!8765qwer:test", ["test"]
+            )
+        )
 
         result = self.get_success(self.handler.get_association(self.my_room))
 
@@ -86,13 +86,15 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
 
     def test_incoming_fed_query(self):
-        self.get_success(self.store.create_room_alias_association(
-            self.your_room, "!8765asdf:test", ["test"]
-        ))
+        self.get_success(
+            self.store.create_room_alias_association(
+                self.your_room, "!8765asdf:test", ["test"]
+            )
+        )
 
-        response = self.get_success(self.handler.on_directory_query(
-            {"room_alias": "#your-room:test"}
-        ))
+        response = self.get_success(
+            self.handler.on_directory_query({"room_alias": "#your-room:test"})
+        )
 
         self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
 
