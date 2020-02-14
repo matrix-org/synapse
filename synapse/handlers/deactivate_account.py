@@ -133,13 +133,6 @@ class DeactivateAccountHandler(BaseHandler):
         # Mark the user as deactivated.
         yield self.store.set_user_deactivated_status(user_id, True)
 
-        # Remove all information on the user from the account_validity table.
-        if self._account_validity_enabled:
-            yield self.store.delete_account_validity_for_user(user_id)
-
-        # Mark the user as deactivated.
-        yield self.store.set_user_deactivated_status(user_id, True)
-
         defer.returnValue(identity_server_supports_unbinding)
 
     @defer.inlineCallbacks
