@@ -1,0 +1,1 @@
+Logging when running GC collection on generation 0 is now at the DEBUG level, not INFO.
