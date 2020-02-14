@@ -65,8 +65,8 @@ def wrap_json_request_handler(h):
     The handler method must have a signature of "handle_foo(self, request)",
     where "request" must be a SynapseRequest.
 
-    The handler must return a deferred. If the deferred succeeds we assume that
-    a response has been sent. If the deferred fails with a SynapseError we use
+    The handler must return a deferred or a coroutine. If the deferred succeeds
+    we assume that a response has been sent. If the deferred fails with a SynapseError we use
     it to send a JSON response with the appropriate HTTP reponse code. If the
     deferred fails with any other type of error we send a 500 reponse.
     """
@@ -353,16 +353,22 @@ class DirectServeResource(resource.Resource):
         """
         Render the request, using an asynchronous render handler if it exists.
         """
-        render_callback_name = "_async_render_" + request.method.decode("ascii")
+        async_render_callback_name = "_async_render_" + request.method.decode("ascii")
 
-        if hasattr(self, render_callback_name):
-            # Call the handler
-            callback = getattr(self, render_callback_name)
-            defer.ensureDeferred(callback(request))
+        # Try and get the async renderer
+        callback = getattr(self, async_render_callback_name, None)
 
-            return NOT_DONE_YET
-        else:
-            super().render(request)
+        # No async renderer for this request method.
+        if not callback:
+            return super().render(request)
+
+        resp = callback(request)
+
+        # If it's a coroutine, turn it into a Deferred
+        if isinstance(resp, types.CoroutineType):
+            defer.ensureDeferred(resp)
+
+        return NOT_DONE_YET
 
 
 def _options_handler(request):
