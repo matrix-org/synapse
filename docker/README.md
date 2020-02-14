@@ -112,3 +112,19 @@ For backwards-compatibility only, the docker image supports creating a dynamic
 configuration file based on environment variables. This is now deprecated, but
 is enabled when the `SYNAPSE_SERVER_NAME` variable is set (and `generate` is
 not given).
+
+To migrate from a dynamic configuration file to a static one, run the docker
+container once with the environment variables set, and `migrate_config`
+commandline option. For example:
+
+```
+docker run -it --rm \
+    --mount type=volume,src=synapse-data,dst=/data \
+    -e SYNAPSE_SERVER_NAME=my.matrix.host \
+    -e SYNAPSE_REPORT_STATS=yes \
+    matrixdotorg/synapse:latest migrate_config
+```
+
+This will generate the same configuration file as the legacy mode used, but
+will store it in `/data/homeserver.yaml` instead of a temporary location. You
+can then use it as shown above at [Running synapse](#running-synapse).
