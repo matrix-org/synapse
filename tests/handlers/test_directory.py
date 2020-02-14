@@ -32,11 +32,10 @@ class DirectoryHandlers(object):
         self.directory_handler = DirectoryHandler(hs)
 
 
-class DirectoryTestCase(unittest.TestCase):
+class DirectoryTestCase(unittest.HomeserverTestCase):
     """ Tests the directory service. """
 
-    @defer.inlineCallbacks
-    def setUp(self):
+    def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()
         self.mock_registry = Mock()
 
@@ -47,8 +46,7 @@ class DirectoryTestCase(unittest.TestCase):
 
         self.mock_registry.register_query_handler = register_query_handler
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup,
+        hs = self.setup_test_homeserver(
             http_client=None,
             resource_for_federation=Mock(),
             federation_client=self.mock_federation,
@@ -64,23 +62,23 @@ class DirectoryTestCase(unittest.TestCase):
         self.your_room = RoomAlias.from_string("#your-room:test")
         self.remote_room = RoomAlias.from_string("#another:remote")
 
-    @defer.inlineCallbacks
-    def test_get_local_association(self):
-        yield self.store.create_room_alias_association(
-            self.my_room, "!8765qwer:test", ["test"]
-        )
+        return hs
 
-        result = yield self.handler.get_association(self.my_room)
+    def test_get_local_association(self):
+        self.get_success(self.store.create_room_alias_association(
+            self.my_room, "!8765qwer:test", ["test"]
+        ))
+
+        result = self.get_success(self.handler.get_association(self.my_room))
 
         self.assertEquals({"room_id": "!8765qwer:test", "servers": ["test"]}, result)
 
-    @defer.inlineCallbacks
     def test_get_remote_association(self):
         self.mock_federation.make_query.return_value = defer.succeed(
             {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}
         )
 
-        result = yield self.handler.get_association(self.remote_room)
+        result = self.get_success(self.handler.get_association(self.remote_room))
 
         self.assertEquals(
             {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}, result
@@ -93,15 +91,14 @@ class DirectoryTestCase(unittest.TestCase):
             ignore_backoff=True,
         )
 
-    @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield self.store.create_room_alias_association(
+        self.get_success(self.store.create_room_alias_association(
             self.your_room, "!8765asdf:test", ["test"]
-        )
+        ))
 
-        response = yield self.query_handlers["directory"](
+        response = self.get_success(self.handler.on_directory_query(
             {"room_alias": "#your-room:test"}
-        )
+        ))
 
         self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
 
