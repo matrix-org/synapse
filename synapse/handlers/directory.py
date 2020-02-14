@@ -310,32 +310,37 @@ class DirectoryHandler(BaseHandler):
         # An updated canonical alias event must be sent if the removed alias was
         # set as the alias on the canonical_alias event or listed in the
         # alt_aliases field.
+        content = alias_event.content.copy()
+        send_update = False
+
+        # Remove the alias property if it matches the removed alias.
         alias_str = room_alias.to_string()
-        alt_aliases = alias_event.content.get("alt_aliases", [])
-        send_update = (
-            alias_event.content.get("alias", "") == alias_str
-            or alias_str in alt_aliases
-        )
-        if not send_update:
-            return
+        if alias_event.content.get("alias", "") == alias_str:
+            send_update = True
+            content.pop("alias", "")
 
-        # Include any remaining aliases in the content.
-        content = {}
-        alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
-        if alt_aliases:
-            content["alt_aliases"] = alt_aliases
+        # Filter alt_aliases for the removed alias.
+        alt_aliases = alias_event.content.get("alt_aliases", None)
+        # If the aliases are not a list (or not found) do not attempt to modify
+        # the list.
+        if isinstance(alt_aliases, list):
+            send_update = True
+            content["alt_aliases"] = [
+                alias for alias in alt_aliases if alias != alias_str
+            ]
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.CanonicalAlias,
-                "state_key": "",
-                "room_id": room_id,
-                "sender": user_id,
-                "content": content,
-            },
-            ratelimit=False,
-        )
+        if send_update:
+            yield self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.CanonicalAlias,
+                    "state_key": "",
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "content": content,
+                },
+                ratelimit=False,
+            )
 
     @defer.inlineCallbacks
     def get_association_from_room_alias(self, room_alias):
