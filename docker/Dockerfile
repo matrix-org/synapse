@@ -66,6 +66,7 @@ RUN apk add --no-cache --virtual .runtime_deps \
         libpq \
         zlib \
         su-exec \
+        tzdata \
         xmlsec
 
 COPY --from=builder /install /usr/local
