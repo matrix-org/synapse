@@ -27,11 +27,6 @@ from tests import unittest
 from tests.utils import setup_test_homeserver
 
 
-class DirectoryHandlers(object):
-    def __init__(self, hs):
-        self.directory_handler = DirectoryHandler(hs)
-
-
 class DirectoryTestCase(unittest.HomeserverTestCase):
     """ Tests the directory service. """
 
@@ -52,7 +47,6 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             federation_client=self.mock_federation,
             federation_registry=self.mock_registry,
         )
-        hs.handlers = DirectoryHandlers(hs)
 
         self.handler = hs.get_handlers().directory_handler
 
