@@ -1,3 +1,20 @@
+Synapse 1.1.0rc2 (2019-07-03)
+=============================
+
+Bugfixes
+--------
+
+- Fix regression in 1.1rc1 where OPTIONS requests to the media repo would fail. ([\#5593](https://github.com/matrix-org/synapse/issues/5593))
+- Removed the `SYNAPSE_SMTP_*` docker container environment variables. Using these environment variables prevented the docker container from starting in Synapse v1.0, even though they didn't actually allow any functionality anyway. Users are advised to remove `SYNAPSE_SMTP_HOST`, `SYNAPSE_SMTP_PORT`, `SYNAPSE_SMTP_USER`, `SYNAPSE_SMTP_PASSWORD` and `SYNAPSE_SMTP_FROM` environment variables from their docker run commands. ([\#5596](https://github.com/matrix-org/synapse/issues/5596))
+- Fix a number of "Starting txn from sentinel context" warnings. ([\#5605](https://github.com/matrix-org/synapse/issues/5605))
+
+
+Internal Changes
+----------------
+
+- Update github templates. ([\#5552](https://github.com/matrix-org/synapse/issues/5552))
+
+
 Synapse 1.1.0rc1 (2019-07-02)
 =============================
 
