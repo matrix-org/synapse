@@ -217,7 +217,9 @@ class TlsConfig(Config):
             if sha256_fingerprint not in sha256_fingerprints:
                 self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
-    def default_config(self, config_dir_path, server_name, data_dir_path, **kwargs):
+    def generate_config_section(
+        self, config_dir_path, server_name, data_dir_path, **kwargs
+    ):
         base_key_name = os.path.join(config_dir_path, server_name)
 
         tls_certificate_path = base_key_name + ".tls.crt"

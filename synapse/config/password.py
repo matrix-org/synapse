@@ -34,7 +34,7 @@ class PasswordConfig(Config):
         self.password_policy = password_config.get("policy", {})
         self.password_policy_enabled = self.password_policy.pop("enabled", False)
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         password_config:
            # Uncomment to disable password login

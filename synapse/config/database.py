@@ -38,7 +38,7 @@ class DatabaseConfig(Config):
 
         self.set_databasepath(config.get("database_path"))
 
-    def default_config(self, data_dir_path, **kwargs):
+    def generate_config_section(self, data_dir_path, **kwargs):
         database_path = os.path.join(data_dir_path, "homeserver.db")
         return (
             """\

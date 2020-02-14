@@ -34,7 +34,7 @@ class AppServiceConfig(Config):
         self.notify_appservices = config.get("notify_appservices", True)
         self.track_appservice_user_ips = config.get("track_appservice_user_ips", False)
 
-    def default_config(cls, **kwargs):
+    def generate_config_section(cls, **kwargs):
         return """\
         # A list of application service config files to use
         #

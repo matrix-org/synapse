@@ -97,7 +97,9 @@ class ContentRepositoryConfig(Config):
 
         self.allowed_avatar_mimetypes = config.get("allowed_avatar_mimetypes", [])
 
-        self.media_store_path = self.ensure_directory(config["media_store_path"])
+        self.media_store_path = self.ensure_directory(
+            config.get("media_store_path", "media_store")
+        )
 
         backup_media_store_path = config.get("backup_media_store_path")
 
@@ -154,7 +156,7 @@ class ContentRepositoryConfig(Config):
                 (provider_class, parsed_config, wrapper_config)
             )
 
-        self.uploads_path = self.ensure_directory(config["uploads_path"])
+        self.uploads_path = self.ensure_directory(config.get("uploads_path", "uploads"))
         self.dynamic_thumbnails = config.get("dynamic_thumbnails", False)
         self.thumbnail_requirements = parse_thumbnail_requirements(
             config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES)
@@ -194,7 +196,7 @@ class ContentRepositoryConfig(Config):
 
             self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
 
-    def default_config(self, data_dir_path, **kwargs):
+    def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
         uploads_path = os.path.join(data_dir_path, "uploads")
 

@@ -46,7 +46,7 @@ class RoomDirectoryConfig(Config):
                 _RoomDirectoryRule("room_list_publication_rules", {"action": "allow"})
             ]
 
-    def default_config(self, config_dir_path, server_name, **kwargs):
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # Uncomment to disable searching the public room list. When disabled
         # blocks searching local and remote room lists for local and remote

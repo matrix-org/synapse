@@ -26,7 +26,7 @@ class SpamCheckerConfig(Config):
         if provider is not None:
             self.spam_checker = load_module(provider)
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         #spam_checker:
         #  module: "my_custom_project.SuperSpamChecker"

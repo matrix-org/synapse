@@ -40,7 +40,7 @@ class MetricsConfig(Config):
                     "sentry.dsn field is required when sentry integration is enabled"
                 )
 
-    def default_config(self, report_stats=None, **kwargs):
+    def generate_config_section(self, report_stats=None, **kwargs):
         res = """\
         ## Metrics ###
 

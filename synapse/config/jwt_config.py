@@ -41,7 +41,7 @@ class JWTConfig(Config):
             self.jwt_secret = None
             self.jwt_algorithm = None
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return """\
         # The JWT needs to contain a globally unique "sub" (subject) claim.
         #

@@ -111,5 +111,5 @@ class ConsentConfig(Config):
             "policy_name", "Privacy Policy"
         )
 
-    def default_config(self, **kwargs):
+    def generate_config_section(self, **kwargs):
         return DEFAULT_CONFIG
