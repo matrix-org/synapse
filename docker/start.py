@@ -122,17 +122,23 @@ def generate_config_from_template(environ, ownership):
     return config_path
 
 
-def run_generate_config(environ):
+def run_generate_config(environ, ownership):
     """Run synapse with a --generate-config param to generate a template config file
 
     Args:
-        environ (dict): environment dictionary
+        environ (dict): env var dict
+        ownership (str): "userid:groupid" arg for chmod
 
     Never returns.
     """
     for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS", "SYNAPSE_CONFIG_PATH"):
         if v not in environ:
             error("Environment variable '%s' is mandatory in `generate` mode." % (v,))
+
+    data_dir = environ.get("SYNAPSE_DATA_DIR", "/data")
+
+    # make sure that synapse has perms to write to the data dir.
+    subprocess.check_output(["chown", ownership, data_dir])
 
     args = [
         "python",
@@ -144,8 +150,11 @@ def run_generate_config(environ):
         environ["SYNAPSE_REPORT_STATS"],
         "--config-path",
         environ["SYNAPSE_CONFIG_PATH"],
+        "--data-directory",
+        data_dir,
         "--generate-config",
     ]
+    # log("running %s" % (args, ))
     os.execv("/usr/local/bin/python", args)
 
 
@@ -153,9 +162,9 @@ def main(args, environ):
     mode = args[1] if len(args) > 1 else None
     ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
 
-    # In generate mode, generate a configuration, missing keys, then exit
+    # In generate mode, generate a configuration and missing keys, then exit
     if mode == "generate":
-        return run_generate_config(environ)
+        return run_generate_config(environ, ownership)
 
     # In normal mode, generate missing keys if any, then run synapse
     if "SYNAPSE_CONFIG_PATH" in environ:
