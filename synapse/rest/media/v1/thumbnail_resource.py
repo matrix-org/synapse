@@ -17,10 +17,12 @@
 import logging
 
 from twisted.internet import defer
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
-from synapse.http.server import set_cors_headers, wrap_json_request_handler
+from synapse.http.server import (
+    DirectServeResource,
+    set_cors_headers,
+    wrap_json_request_handler,
+)
 from synapse.http.servlet import parse_integer, parse_string
 
 from ._base import (
@@ -34,11 +36,11 @@ from ._base import (
 logger = logging.getLogger(__name__)
 
 
-class ThumbnailResource(Resource):
+class ThumbnailResource(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
-        Resource.__init__(self)
+        super().__init__()
 
         self.store = hs.get_datastore()
         self.media_repo = media_repo
@@ -47,13 +49,8 @@ class ThumbnailResource(Resource):
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
 
-    def render_GET(self, request):
-        self._async_render_GET(request)
-        return NOT_DONE_YET
-
     @wrap_json_request_handler
-    @defer.inlineCallbacks
-    def _async_render_GET(self, request):
+    async def _async_render_GET(self, request):
         set_cors_headers(request)
         server_name, media_id, _ = parse_media_id(request)
         width = parse_integer(request, "width", required=True)
@@ -63,21 +60,21 @@ class ThumbnailResource(Resource):
 
         if server_name == self.server_name:
             if self.dynamic_thumbnails:
-                yield self._select_or_generate_local_thumbnail(
+                await self._select_or_generate_local_thumbnail(
                     request, media_id, width, height, method, m_type
                 )
             else:
-                yield self._respond_local_thumbnail(
+                await self._respond_local_thumbnail(
                     request, media_id, width, height, method, m_type
                 )
             self.media_repo.mark_recently_accessed(None, media_id)
         else:
             if self.dynamic_thumbnails:
-                yield self._select_or_generate_remote_thumbnail(
+                await self._select_or_generate_remote_thumbnail(
                     request, server_name, media_id, width, height, method, m_type
                 )
             else:
-                yield self._respond_remote_thumbnail(
+                await self._respond_remote_thumbnail(
                     request, server_name, media_id, width, height, method, m_type
                 )
             self.media_repo.mark_recently_accessed(server_name, media_id)
