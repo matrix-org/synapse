@@ -137,7 +137,7 @@ class ResponseCache(object):
 
             *args: positional parameters to pass to the callback, if it is used
 
-            **kwargs: named paramters to pass to the callback, if it is used
+            **kwargs: named parameters to pass to the callback, if it is used
 
         Returns:
             twisted.internet.defer.Deferred: yieldable result
