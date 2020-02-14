@@ -150,8 +150,9 @@ def main():
     parser.add_argument(
         "--no-daemonize",
         action="store_false",
+        dest="daemonize",
         help="Run synapse in the foreground for debugging. "
-        "Will work only if the daemonize option is not set in the config."
+        "Will work only if the daemonize option is not set in the config.",
     )
 
     options = parser.parse_args()
@@ -159,7 +160,7 @@ def main():
     if options.worker and options.all_processes:
         write('Cannot use "--worker" with "--all-processes"', stream=sys.stderr)
         sys.exit(1)
-    if options.no_daemonize and options.all_processes:
+    if not options.daemonize and options.all_processes:
         write('Cannot use "--no-daemonize" with "--all-processes"', stream=sys.stderr)
         sys.exit(1)
 
@@ -169,9 +170,8 @@ def main():
         write(
             "No config file found\n"
             "To generate a config file, run '%s -c %s --generate-config"
-            " --server-name=<server name> --report-stats=<yes/no>'\n" % (
-                " ".join(SYNAPSE), options.configfile,
-            ),
+            " --server-name=<server name> --report-stats=<yes/no>'\n"
+            % (" ".join(SYNAPSE), options.configfile),
             stream=sys.stderr,
         )
         sys.exit(1)
@@ -289,7 +289,7 @@ def main():
             # Check if synapse is already running
             if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
                 abort("synapse.app.homeserver already running")
-            start(configfile, bool(options.no_daemonize))
+            start(configfile, bool(options.daemonize))
 
         for worker in workers:
             env = os.environ.copy()
