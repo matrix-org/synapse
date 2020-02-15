@@ -281,7 +281,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             user (UserID): user ID of the user to test
 
         Returns (bool):
-            true iff the user is a server admin, false otherwise.
+            true if the user is a server admin, false otherwise.
         """
         res = yield self.db.simple_select_one_onecol(
             table="users",
@@ -298,7 +298,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         Args:
             user (UserID): user ID of the user to test
-            admin (bool): true iff the user is to be a server admin,
+            admin (bool): true if the user is to be a server admin,
                 false otherwise.
         """
         return self.db.simple_update_one(
