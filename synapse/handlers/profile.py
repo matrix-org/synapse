@@ -225,7 +225,7 @@ class BaseProfileHandler(BaseHandler):
 
         # Same like set_displayname
         if by_admin:
-            requester = create_requester(target_user.to_string())
+            requester = create_requester(target_user)
 
         yield self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
 
