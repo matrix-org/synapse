@@ -424,7 +424,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         self.hs.config.registration_shared_secret = None
 
-        # Create user as admin
+        # Create user (server admin)
         body = json.dumps(
             {
                 "password": "abc123",
@@ -463,7 +463,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, channel.json_body["is_guest"])
         self.assertEqual(0, channel.json_body["deactivated"])
 
-        # Create user 
+        # Create user
         body = json.dumps(
             {
                 "password": "abc123",
@@ -517,9 +517,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Delete old and add new threepid to user
         body = json.dumps(
-            {
-                "threepids": [{"medium": "email", "address": "bob3@bob.bob"}],
-            }
+            {"threepids": [{"medium": "email", "address": "bob3@bob.bob"}],}
         )
 
         request, channel = self.make_request(
@@ -552,12 +550,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
 
         # Modify user
-        body = json.dumps(
-            {
-                "displayname": "foobar",
-                "deactivated": True,
-            }
-        )
+        body = json.dumps({"displayname": "foobar","deactivated": True,})
 
         request, channel = self.make_request(
             "PUT",
@@ -587,11 +580,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(1, channel.json_body["deactivated"])
 
         # Set a user as an admin
-        body = json.dumps(
-            {
-                "admin": True
-            }
-        )
+        body = json.dumps({"admin": True})
 
         request, channel = self.make_request(
             "PUT",

@@ -211,9 +211,7 @@ class UserRestServletV2(RestServlet):
                     if target_user == auth_user and not set_admin_to:
                         raise SynapseError(400, "You may not demote yourself.")
 
-                    await self.store.set_server_admin(
-                        target_user, set_admin_to
-                    )
+                    await self.store.set_server_admin(target_user, set_admin_to)
 
             if "password" in body:
                 if (
