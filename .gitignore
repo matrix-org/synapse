@@ -42,3 +42,6 @@ _trial_temp*/
 /docs/build/
 /htmlcov
 /pip-wheel-metadata/
+/.settings/
+/.gitignore
+/.project

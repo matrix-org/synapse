@@ -550,7 +550,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
 
         # Modify user
-        body = json.dumps({"displayname": "foobar","deactivated": True,})
+        body = json.dumps({"displayname": "foobar", "deactivated": True,})
 
         request, channel = self.make_request(
             "PUT",
