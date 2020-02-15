@@ -401,13 +401,35 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
+    def test_user_does_not_exist(self):
+        """
+        Tests that a lookup for a user that does not exist returns a 404
+        """
+        self.hs.config.registration_shared_secret = None
+
+        request, channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v2/users/@unknown_person:test",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
+
     def test_requester_is_admin(self):
         """
         If the user is a server admin, a new user is created.
         """
         self.hs.config.registration_shared_secret = None
 
-        body = json.dumps({"password": "abc123", "admin": True})
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "admin": True,
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            }
+        )
 
         # Create user
         request, channel = self.make_request(
@@ -421,6 +443,8 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
 
         # Get user
         request, channel = self.make_request(
@@ -449,7 +473,13 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         # Modify user
-        body = json.dumps({"displayname": "foobar", "deactivated": True})
+        body = json.dumps(
+            {
+                "displayname": "foobar",
+                "deactivated": True,
+                "threepids": [{"medium": "email", "address": "bob2@bob.bob"}],
+            }
+        )
 
         request, channel = self.make_request(
             "PUT",
@@ -463,6 +493,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("foobar", channel.json_body["displayname"])
         self.assertEqual(True, channel.json_body["deactivated"])
+        # the user is deactivated, the threepid will be deleted
 
         # Get user
         request, channel = self.make_request(

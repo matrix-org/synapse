@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 from synapse.events.utils import (
     copy_power_levels_contents,
     prune_event,
@@ -30,7 +29,7 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return make_event_from_dict(kwargs)
 
 
 class PruneEventTestCase(unittest.TestCase):
@@ -38,7 +37,9 @@ class PruneEventTestCase(unittest.TestCase):
     `matchdict` when it is redacted. """
 
     def run_test(self, evdict, matchdict):
-        self.assertEquals(prune_event(FrozenEvent(evdict)).get_dict(), matchdict)
+        self.assertEquals(
+            prune_event(make_event_from_dict(evdict)).get_dict(), matchdict
+        )
 
     def test_minimal(self):
         self.run_test(

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,9 +23,13 @@ from twisted.internet.defer import DeferredList
 
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    RoomVersion,
+)
 from synapse.crypto.event_signing import check_event_content_hash
-from synapse.events import event_type_from_format_version
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
@@ -33,7 +38,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     preserve_fn,
 )
-from synapse.types import get_domain_from_id
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import unwrapFirstError
 
 logger = logging.getLogger(__name__)
@@ -342,16 +347,15 @@ def _is_invite_via_3pid(event):
     )
 
 
-def event_from_pdu_json(pdu_json, event_format_version, outlier=False):
-    """Construct a FrozenEvent from an event json received over federation
+def event_from_pdu_json(
+    pdu_json: JsonDict, room_version: RoomVersion, outlier: bool = False
+) -> EventBase:
+    """Construct an EventBase from an event json received over federation
 
     Args:
-        pdu_json (object): pdu as received over federation
-        event_format_version (int): The event format version
-        outlier (bool): True to mark this event as an outlier
-
-    Returns:
-        FrozenEvent
+        pdu_json: pdu as received over federation
+        room_version: The version of the room this event belongs to
+        outlier: True to mark this event as an outlier
 
     Raises:
         SynapseError: if the pdu is missing required fields or is otherwise
@@ -370,8 +374,7 @@ def event_from_pdu_json(pdu_json, event_format_version, outlier=False):
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
-    event = event_type_from_format_version(event_format_version)(pdu_json)
-
+    event = make_event_from_dict(pdu_json, room_version)
     event.internal_metadata.outlier = outlier
 
     return event

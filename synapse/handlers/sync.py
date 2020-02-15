@@ -932,6 +932,7 @@ class SyncHandler(object):
             for e in sync_config.filter_collection.filter_room_state(
                 list(state.values())
             )
+            if e.type != EventTypes.Aliases  # until MSC2261 or alternative solution
         }
 
     async def unread_notifs_for_room_id(
@@ -968,7 +969,7 @@ class SyncHandler(object):
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = await self.event_sources.get_current_token()
 
-        logger.info(
+        logger.debug(
             "Calculating sync response for %r between %s and %s",
             sync_config.user,
             since_token,
@@ -1498,7 +1499,7 @@ class SyncHandler(object):
         room_entries = []
         invited = []
         for room_id, events in iteritems(mem_change_events_by_room_id):
-            logger.info(
+            logger.debug(
                 "Membership changes in %s: [%s]",
                 room_id,
                 ", ".join(("%s (%s)" % (e.event_id, e.membership) for e in events)),
@@ -1892,7 +1893,7 @@ class SyncHandler(object):
 
             if batch.limited and since_token:
                 user_id = sync_result_builder.sync_config.user.to_string()
-                logger.info(
+                logger.debug(
                     "Incremental gappy sync of %s for user %s with %d state events"
                     % (room_id, user_id, len(state))
                 )

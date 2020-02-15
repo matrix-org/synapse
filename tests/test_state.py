@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.api.auth import Auth
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.state import StateHandler, StateResolutionHandler
 
@@ -66,7 +66,7 @@ def create_event(
 
     d.update(kwargs)
 
-    event = FrozenEvent(d)
+    event = make_event_from_dict(d)
 
     return event
 

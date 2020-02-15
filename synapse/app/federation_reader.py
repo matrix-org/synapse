@@ -33,8 +33,10 @@ from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
+from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.replication.slave.storage.events import SlavedEventStore
+from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
@@ -66,6 +68,8 @@ class FederationReaderSlavedStore(
     SlavedEventStore,
     SlavedKeyStore,
     SlavedRegistrationStore,
+    SlavedGroupServerStore,
+    SlavedDeviceStore,
     RoomStore,
     DirectoryStore,
     SlavedTransactionStore,

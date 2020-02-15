@@ -271,31 +271,6 @@ class StatsStore(StateDeltasStore):
 
         return slice_list
 
-    def get_room_stats_state(self, room_id):
-        """
-        Returns the current room_stats_state for a room.
-
-        Args:
-            room_id (str): The ID of the room to return state for.
-
-        Returns (dict):
-            Dictionary containing these keys:
-                "name", "topic", "canonical_alias", "avatar", "join_rules",
-                "history_visibility"
-        """
-        return self.db.simple_select_one(
-            "room_stats_state",
-            {"room_id": room_id},
-            retcols=(
-                "name",
-                "topic",
-                "canonical_alias",
-                "avatar",
-                "join_rules",
-                "history_visibility",
-            ),
-        )
-
     @cached()
     def get_earliest_token_for_stats(self, stats_type, id):
         """
@@ -744,7 +719,7 @@ class StatsStore(StateDeltasStore):
                     EventTypes.Create,
                     EventTypes.JoinRules,
                     EventTypes.RoomHistoryVisibility,
-                    EventTypes.Encryption,
+                    EventTypes.RoomEncryption,
                     EventTypes.Name,
                     EventTypes.Topic,
                     EventTypes.RoomAvatar,
@@ -816,7 +791,7 @@ class StatsStore(StateDeltasStore):
                 room_state["history_visibility"] = event.content.get(
                     "history_visibility"
                 )
-            elif event.type == EventTypes.Encryption:
+            elif event.type == EventTypes.RoomEncryption:
                 room_state["encryption"] = event.content.get("algorithm")
             elif event.type == EventTypes.Name:
                 room_state["name"] = event.content.get("name")

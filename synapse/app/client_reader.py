@@ -57,6 +57,7 @@ from synapse.rest.client.v1.room import (
     RoomStateRestServlet,
 )
 from synapse.rest.client.v1.voip import VoipRestServlet
+from synapse.rest.client.v2_alpha import groups
 from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
@@ -123,6 +124,8 @@ class ClientReaderServer(HomeServer):
                     VoipRestServlet(self).register(resource)
                     PushRuleRestServlet(self).register(resource)
                     VersionsRestServlet(self).register(resource)
+
+                    groups.register_servlets(self, resource)
 
                     resources.update({"/_matrix/client": resource})
 

@@ -2,7 +2,8 @@ Create or modify Account
 ========================
 
 This API allows an administrator to create or modify a user account with a
-specific ``user_id``.
+specific ``user_id``. Be aware that ``user_id`` is fully qualified: for example,
+``@user:server.com``.
 
 This api is::
 
@@ -15,6 +16,16 @@ with a body of:
     {
         "password": "user_password",
         "displayname": "User",
+        "threepids": [
+            {
+                "medium": "email",
+                "address": "<user_mail_1>"
+            },
+            {
+                "medium": "email",
+                "address": "<user_mail_2>"
+            }
+        ],
         "avatar_url": "<avatar_url>",
         "admin": false,
         "deactivated": false
@@ -23,6 +34,7 @@ with a body of:
 including an ``access_token`` of a server admin.
 
 The parameter ``displayname`` is optional and defaults to ``user_id``.
+The parameter ``threepids`` is optional.
 The parameter ``avatar_url`` is optional.
 The parameter ``admin`` is optional and defaults to 'false'.
 The parameter ``deactivated`` is optional and defaults to 'false'.

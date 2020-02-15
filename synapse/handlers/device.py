@@ -26,6 +26,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
     RequestSendFailed,
+    SynapseError,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.types import RoomStreamToken, get_domain_from_id
@@ -38,6 +39,8 @@ from synapse.util.retryutils import NotRetryingDestination
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
+
+MAX_DEVICE_DISPLAY_NAME_LEN = 100
 
 
 class DeviceWorkerHandler(BaseHandler):
@@ -225,6 +228,22 @@ class DeviceWorkerHandler(BaseHandler):
 
         return result
 
+    @defer.inlineCallbacks
+    def on_federation_query_user_devices(self, user_id):
+        stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
+        master_key = yield self.store.get_e2e_cross_signing_key(user_id, "master")
+        self_signing_key = yield self.store.get_e2e_cross_signing_key(
+            user_id, "self_signing"
+        )
+
+        return {
+            "user_id": user_id,
+            "stream_id": stream_id,
+            "devices": devices,
+            "master_key": master_key,
+            "self_signing_key": self_signing_key,
+        }
+
 
 class DeviceHandler(DeviceWorkerHandler):
     def __init__(self, hs):
@@ -238,9 +257,6 @@ class DeviceHandler(DeviceWorkerHandler):
 
         federation_registry.register_edu_handler(
             "m.device_list_update", self.device_list_updater.incoming_device_list_update
-        )
-        federation_registry.register_query_handler(
-            "user_devices", self.on_federation_query_user_devices
         )
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
@@ -391,9 +407,18 @@ class DeviceHandler(DeviceWorkerHandler):
             defer.Deferred:
         """
 
+        # Reject a new displayname which is too long.
+        new_display_name = content.get("display_name")
+        if new_display_name and len(new_display_name) > MAX_DEVICE_DISPLAY_NAME_LEN:
+            raise SynapseError(
+                400,
+                "Device display name is too long (max %i)"
+                % (MAX_DEVICE_DISPLAY_NAME_LEN,),
+            )
+
         try:
             yield self.store.update_device(
-                user_id, device_id, new_display_name=content.get("display_name")
+                user_id, device_id, new_display_name=new_display_name
             )
             yield self.notify_device_update(user_id, [device_id])
         except errors.StoreError as e:
@@ -455,22 +480,6 @@ class DeviceHandler(DeviceWorkerHandler):
         )
 
         self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
-
-    @defer.inlineCallbacks
-    def on_federation_query_user_devices(self, user_id):
-        stream_id, devices = yield self.store.get_devices_with_keys_by_user(user_id)
-        master_key = yield self.store.get_e2e_cross_signing_key(user_id, "master")
-        self_signing_key = yield self.store.get_e2e_cross_signing_key(
-            user_id, "self_signing"
-        )
-
-        return {
-            "user_id": user_id,
-            "stream_id": stream_id,
-            "devices": devices,
-            "master_key": master_key,
-            "self_signing_key": self_signing_key,
-        }
 
     @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
@@ -598,7 +607,13 @@ class DeviceListUpdater(object):
             # happens if we've missed updates.
             resync = yield self._need_to_do_resync(user_id, pending_updates)
 
-            logger.debug("Need to re-sync devices for %r? %r", user_id, resync)
+            if logger.isEnabledFor(logging.INFO):
+                logger.info(
+                    "Received device list update for %s, requiring resync: %s. Devices: %s",
+                    user_id,
+                    resync,
+                    ", ".join(u[0] for u in pending_updates),
+                )
 
             if resync:
                 yield self.user_device_resync(user_id)

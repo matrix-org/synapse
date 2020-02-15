@@ -1,0 +1,1 @@
+Databases created using the compose file in contrib/docker will now always have correct encoding and locale settings. Contributed by Fridtjof Mund.

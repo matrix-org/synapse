@@ -752,29 +752,75 @@ class FederationHandler(BaseHandler):
 
         # For encrypted messages we check that we know about the sending device,
         # if we don't then we mark the device cache for that user as stale.
-        if event.type == EventTypes.Encryption:
+        if event.type == EventTypes.Encrypted:
             device_id = event.content.get("device_id")
+            sender_key = event.content.get("sender_key")
+
+            cached_devices = await self.store.get_cached_devices_for_user(event.sender)
+
+            resync = False  # Whether we should resync device lists.
+
+            device = None
             if device_id is not None:
-                cached_devices = await self.store.get_cached_devices_for_user(
-                    event.sender
-                )
-                if device_id not in cached_devices:
+                device = cached_devices.get(device_id)
+                if device is None:
                     logger.info(
                         "Received event from remote device not in our cache: %s %s",
                         event.sender,
                         device_id,
                     )
-                    await self.store.mark_remote_user_device_cache_as_stale(
-                        event.sender
+                    resync = True
+
+            # We also check if the `sender_key` matches what we expect.
+            if sender_key is not None:
+                # Figure out what sender key we're expecting. If we know the
+                # device and recognize the algorithm then we can work out the
+                # exact key to expect. Otherwise check it matches any key we
+                # have for that device.
+                if device:
+                    keys = device.get("keys", {}).get("keys", {})
+
+                    if event.content.get("algorithm") == "m.megolm.v1.aes-sha2":
+                        # For this algorithm we expect a curve25519 key.
+                        key_name = "curve25519:%s" % (device_id,)
+                        current_keys = [keys.get(key_name)]
+                    else:
+                        # We don't know understand the algorithm, so we just
+                        # check it matches a key for the device.
+                        current_keys = keys.values()
+                elif device_id:
+                    # We don't have any keys for the device ID.
+                    current_keys = []
+                else:
+                    # The event didn't include a device ID, so we just look for
+                    # keys across all devices.
+                    current_keys = (
+                        key
+                        for device in cached_devices
+                        for key in device.get("keys", {}).get("keys", {}).values()
                     )
 
-                    # Immediately attempt a resync in the background
-                    if self.config.worker_app:
-                        return run_in_background(self._user_device_resync, event.sender)
-                    else:
-                        return run_in_background(
-                            self._device_list_updater.user_device_resync, event.sender
-                        )
+                # We now check that the sender key matches (one of) the expected
+                # keys.
+                if sender_key not in current_keys:
+                    logger.info(
+                        "Received event from remote device with unexpected sender key: %s %s: %s",
+                        event.sender,
+                        device_id or "<no device_id>",
+                        sender_key,
+                    )
+                    resync = True
+
+            if resync:
+                await self.store.mark_remote_user_device_cache_as_stale(event.sender)
+
+                # Immediately attempt a resync in the background
+                if self.config.worker_app:
+                    return run_in_background(self._user_device_resync, event.sender)
+                else:
+                    return run_in_background(
+                        self._device_list_updater.user_device_resync, event.sender
+                    )
 
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
@@ -1110,7 +1156,7 @@ class FederationHandler(BaseHandler):
         Logs a warning if we can't find the given event.
         """
 
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version(room_id)
 
         event_infos = []
 
@@ -1259,9 +1305,8 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
-            event_format_version = room_version_obj.event_format
             ret = await self.federation_client.send_join(
-                target_hosts, event, event_format_version
+                target_hosts, event, room_version_obj
             )
 
             origin = ret["origin"]
@@ -1743,6 +1788,9 @@ class FederationHandler(BaseHandler):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
+        # Synapse asks for 100 events per backfill request. Do not allow more.
+        limit = min(limit, 100)
+
         events = yield self.store.get_backfill_events(room_id, pdu_list, limit)
 
         events = yield filter_events_for_server(self.storage, origin, events)
@@ -1916,11 +1964,7 @@ class FederationHandler(BaseHandler):
 
         for e_id in missing_auth_events:
             m_ev = await self.federation_client.get_pdu(
-                [origin],
-                e_id,
-                room_version=room_version.identifier,
-                outlier=True,
-                timeout=10000,
+                [origin], e_id, room_version=room_version, outlier=True, timeout=10000,
             )
             if m_ev and m_ev.event_id == e_id:
                 event_map[e_id] = m_ev
@@ -2127,6 +2171,7 @@ class FederationHandler(BaseHandler):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
+        # Only allow up to 20 events to be retrieved per request.
         limit = min(limit, 20)
 
         missing_events = await self.store.get_missing_events(
