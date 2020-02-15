@@ -1,3 +1,42 @@
+Synapse 1.10.0 (2020-02-12)
+===========================
+
+**WARNING to client developers**: As of this release Synapse validates `client_secret` parameters in the Client-Server API as per the spec. See [\#6766](https://github.com/matrix-org/synapse/issues/6766) for details.
+
+Updates to the Docker image
+---------------------------
+
+- Update the docker images to Alpine Linux 3.11. ([\#6897](https://github.com/matrix-org/synapse/issues/6897))
+
+
+Synapse 1.10.0rc5 (2020-02-11)
+==============================
+
+Bugfixes
+--------
+
+- Fix the filtering introduced in 1.10.0rc3 to also apply to the state blocks returned by `/sync`. ([\#6884](https://github.com/matrix-org/synapse/issues/6884))
+
+Synapse 1.10.0rc4 (2020-02-11)
+==============================
+
+This release candidate was built incorrectly and is superceded by 1.10.0rc5.
+
+Synapse 1.10.0rc3 (2020-02-10)
+==============================
+
+Features
+--------
+
+- Filter out `m.room.aliases` from the CS API to mitigate abuse while a better solution is specced. ([\#6878](https://github.com/matrix-org/synapse/issues/6878))
+
+
+Internal Changes
+----------------
+
+- Fix continuous integration failures with old versions of `pip`, which were introduced by a release of the `zipp` library. ([\#6880](https://github.com/matrix-org/synapse/issues/6880))
+
+
 Synapse 1.10.0rc2 (2020-02-06)
 ==============================
 
@@ -16,9 +55,6 @@ Internal Changes
 
 Synapse 1.10.0rc1 (2020-01-31)
 ==============================
-
-**WARNING to client developers**: As of this release Synapse validates `client_secret` parameters in the Client-Server API as per the spec. See [\#6766](https://github.com/matrix-org/synapse/issues/6766) for details.
-
 
 Features
 --------
