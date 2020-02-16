@@ -306,7 +306,9 @@ class RegistrationWorkerStore(SQLBaseStore):
             self.db.simple_update_one_txn(
                 txn, "users", {"name": user.to_string()}, {"admin": 1 if admin else 0}
             )
-            self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user.to_string(),))
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user.to_string(),)
+            )
 
         return self.db.runInteraction("set_server_admin", set_server_admin_txn)
 
