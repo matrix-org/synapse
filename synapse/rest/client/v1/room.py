@@ -24,7 +24,12 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    SynapseError,
+)
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
@@ -307,7 +312,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
 
         try:
             yield self.auth.get_user_by_req(request, allow_guest=True)
-        except AuthError as e:
+        except InvalidClientCredentialsError as e:
             # Option to allow servers to require auth when accessing
             # /publicRooms via CS API. This is especially helpful in private
             # federations.

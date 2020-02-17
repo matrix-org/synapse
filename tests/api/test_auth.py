@@ -21,7 +21,14 @@ from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
-from synapse.api.errors import AuthError, Codes, ResourceLimitError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    InvalidClientTokenError,
+    MissingClientTokenError,
+    ResourceLimitError,
+)
 from synapse.types import UserID
 
 from tests import unittest
@@ -70,7 +77,9 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, InvalidClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
     def test_get_user_by_req_user_missing_token(self):
         user_info = {"name": self.test_user, "token_id": "ditto"}
@@ -79,7 +88,9 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, MissingClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_MISSING_TOKEN")
 
     @defer.inlineCallbacks
     def test_get_user_by_req_appservice_valid_token(self):
@@ -133,7 +144,9 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, InvalidClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
     def test_get_user_by_req_appservice_bad_token(self):
         self.store.get_app_service_by_token = Mock(return_value=None)
@@ -143,7 +156,9 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, InvalidClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_UNKNOWN_TOKEN")
 
     def test_get_user_by_req_appservice_missing_token(self):
         app_service = Mock(token="foobar", url="a_url", sender=self.test_user)
@@ -153,7 +168,9 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
         d = self.auth.get_user_by_req(request)
-        self.failureResultOf(d, AuthError)
+        f = self.failureResultOf(d, MissingClientTokenError).value
+        self.assertEqual(f.code, 401)
+        self.assertEqual(f.errcode, "M_MISSING_TOKEN")
 
     @defer.inlineCallbacks
     def test_get_user_by_req_appservice_valid_token_valid_user_id(self):
@@ -280,7 +297,7 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [guest_tok.encode("ascii")]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
-        with self.assertRaises(AuthError) as cm:
+        with self.assertRaises(InvalidClientCredentialsError) as cm:
             yield self.auth.get_user_by_req(request, allow_guest=True)
 
         self.assertEqual(401, cm.exception.code)
