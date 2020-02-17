@@ -578,8 +578,10 @@ class AuthHandler(BaseHandler):
             StoreError if there was a problem storing the token.
         """
         logger.info("Logging in user %s on device %s", user_id, device_id)
-        access_token = yield self.issue_access_token(user_id, device_id)
         yield self.auth.check_auth_blocking(user_id)
+
+        access_token = self.macaroon_gen.generate_access_token(user_id)
+        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -830,12 +832,6 @@ class AuthHandler(BaseHandler):
             logger.warn("Failed password login for user %s", user_id)
             defer.returnValue(None)
         defer.returnValue(user_id)
-
-    @defer.inlineCallbacks
-    def issue_access_token(self, user_id, device_id=None):
-        access_token = self.macaroon_gen.generate_access_token(user_id)
-        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
-        defer.returnValue(access_token)
 
     @defer.inlineCallbacks
     def validate_short_term_login_token_and_get_user_id(self, login_token):
