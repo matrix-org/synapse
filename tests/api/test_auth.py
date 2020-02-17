@@ -262,9 +262,11 @@ class AuthTestCase(unittest.TestCase):
         self.store.add_access_token_to_user = Mock()
 
         token = yield self.hs.handlers.auth_handler.get_access_token_for_user_id(
-            USER_ID, "DEVICE"
+            USER_ID, "DEVICE", valid_until_ms=None
         )
-        self.store.add_access_token_to_user.assert_called_with(USER_ID, token, "DEVICE")
+        self.store.add_access_token_to_user.assert_called_with(
+            USER_ID, token, "DEVICE", None
+        )
 
         def get_user(tok):
             if token != tok:

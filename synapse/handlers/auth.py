@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import time
 import unicodedata
 
 import attr
@@ -558,7 +559,7 @@ class AuthHandler(BaseHandler):
         return self.sessions[session_id]
 
     @defer.inlineCallbacks
-    def get_access_token_for_user_id(self, user_id, device_id=None):
+    def get_access_token_for_user_id(self, user_id, device_id, valid_until_ms):
         """
         Creates a new access token for the user with the given user ID.
 
@@ -572,16 +573,26 @@ class AuthHandler(BaseHandler):
             device_id (str|None): the device ID to associate with the tokens.
                None to leave the tokens unassociated with a device (deprecated:
                we should always have a device ID)
+            valid_until_ms (int|None): when the token is valid until. None for
+                no expiry.
         Returns:
               The access token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
         """
-        logger.info("Logging in user %s on device %s", user_id, device_id)
+        fmt_expiry = ""
+        if valid_until_ms is not None:
+            fmt_expiry = time.strftime(
+                " until %Y-%m-%d %H:%M:%S", time.localtime(valid_until_ms / 1000.0)
+            )
+        logger.info("Logging in user %s on device %s%s", user_id, device_id, fmt_expiry)
+
         yield self.auth.check_auth_blocking(user_id)
 
         access_token = self.macaroon_gen.generate_access_token(user_id)
-        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
+        yield self.store.add_access_token_to_user(
+            user_id, access_token, device_id, valid_until_ms
+        )
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
