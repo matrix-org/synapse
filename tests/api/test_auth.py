@@ -325,7 +325,7 @@ class AuthTestCase(unittest.TestCase):
         unknown_threepid = {"medium": "email", "address": "unreserved@server.com"}
         self.hs.config.mau_limits_reserved_threepids = [threepid]
 
-        yield self.store.register(user_id="user1", token="123", password_hash=None)
+        yield self.store.register_user(user_id="user1", password_hash=None)
         with self.assertRaises(ResourceLimitError):
             yield self.auth.check_auth_blocking()
 

@@ -185,9 +185,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 50
         user_id = "@user:server"
-        self.get_success(
-            self.store.register(user_id=user_id, token="123", password_hash=None)
-        )
+        self.get_success(self.store.register_user(user_id=user_id, password_hash=None))
 
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)

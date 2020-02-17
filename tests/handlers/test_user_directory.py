@@ -47,11 +47,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def test_handle_local_profile_change_with_support_user(self):
         support_user_id = "@support:test"
         self.get_success(
-            self.store.register(
-                user_id=support_user_id,
-                token="123",
-                password_hash=None,
-                user_type=UserTypes.SUPPORT,
+            self.store.register_user(
+                user_id=support_user_id, password_hash=None, user_type=UserTypes.SUPPORT
             )
         )
 
@@ -73,11 +70,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def test_handle_user_deactivated_support_user(self):
         s_user_id = "@support:test"
         self.get_success(
-            self.store.register(
-                user_id=s_user_id,
-                token="123",
-                password_hash=None,
-                user_type=UserTypes.SUPPORT,
+            self.store.register_user(
+                user_id=s_user_id, password_hash=None, user_type=UserTypes.SUPPORT
             )
         )
 
@@ -90,7 +84,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def test_handle_user_deactivated_regular_user(self):
         r_user_id = "@regular:test"
         self.get_success(
-            self.store.register(user_id=r_user_id, token="123", password_hash=None)
+            self.store.register_user(user_id=r_user_id, password_hash=None)
         )
         self.store.remove_from_user_dir = Mock()
         self.get_success(self.handler.handle_user_deactivated(r_user_id))
