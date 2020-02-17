@@ -21,13 +21,9 @@ import attr
 
 from twisted.internet import defer, task
 
-from synapse.logging import context, formatter
+from synapse.logging import context
 
 logger = logging.getLogger(__name__)
-
-# Compatibility alias, for existing logconfigs.
-logcontext = context
-logformatter = formatter
 
 
 def unwrapFirstError(failure):
