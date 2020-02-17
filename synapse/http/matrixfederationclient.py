@@ -36,6 +36,7 @@ from twisted.internet.task import _EPSILON, Cooperator
 from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
 
+import synapse.logging.opentracing as opentracing
 import synapse.metrics
 import synapse.util.retryutils
 from synapse.api.errors import (
@@ -339,9 +340,25 @@ class MatrixFederationHttpClient(object):
         else:
             query_bytes = b""
 
-        headers_dict = {b"User-Agent": [self.version_string_bytes]}
+        # Retreive current span
+        scope = opentracing.start_active_span(
+            "outgoing-federation-request",
+            tags={
+                opentracing.tags.SPAN_KIND: opentracing.tags.SPAN_KIND_RPC_CLIENT,
+                opentracing.tags.PEER_ADDRESS: request.destination,
+                opentracing.tags.HTTP_METHOD: request.method,
+                opentracing.tags.HTTP_URL: request.path,
+            },
+            finish_on_close=True,
+        )
 
-        with limiter:
+        # Inject the span into the headers
+        headers_dict = {}
+        opentracing.inject_active_span_byte_dict(headers_dict, request.destination)
+
+        headers_dict[b"User-Agent"] = [self.version_string_bytes]
+
+        with limiter, scope:
             # XXX: Would be much nicer to retry only at the transaction-layer
             # (once we have reliable transactions in place)
             if long_retries:
@@ -417,6 +434,10 @@ class MatrixFederationHttpClient(object):
                         request.destination,
                         response.code,
                         response.phrase.decode("ascii", errors="replace"),
+                    )
+
+                    opentracing.set_tag(
+                        opentracing.tags.HTTP_STATUS_CODE, response.code
                     )
 
                     if 200 <= response.code < 300:
@@ -499,8 +520,7 @@ class MatrixFederationHttpClient(object):
                         _flatten_response_never_received(e),
                     )
                     raise
-
-            defer.returnValue(response)
+        defer.returnValue(response)
 
     def build_auth_headers(
         self, destination, method, url_bytes, content=None, destination_is=None
