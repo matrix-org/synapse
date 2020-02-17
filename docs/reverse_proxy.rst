@@ -48,6 +48,8 @@ Let's assume that we expect clients to connect to our server at
               proxy_set_header X-Forwarded-For $remote_addr;
           }
       }
+      
+  Do not add a `/` after the port in `proxy_pass`, otherwise nginx will canonicalise/normalise the URI.
 
 * Caddy::
 
