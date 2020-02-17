@@ -14,8 +14,7 @@
 # limitations under the License.
 
 import os
-from collections import defaultdict
-from typing import DefaultDict
+from typing import Dict
 
 from ._base import Config, ConfigError
 
