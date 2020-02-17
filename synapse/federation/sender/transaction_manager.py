@@ -63,8 +63,6 @@ class TransactionManager(object):
             len(edus),
         )
 
-        logger.debug("TX [%s] Persisting transaction...", destination)
-
         transaction = Transaction.create_new(
             origin_server_ts=int(self.clock.time_msec()),
             transaction_id=txn_id,
@@ -76,9 +74,6 @@ class TransactionManager(object):
 
         self._next_txn_id += 1
 
-        yield self._transaction_actions.prepare_to_send(transaction)
-
-        logger.debug("TX [%s] Persisted transaction", destination)
         logger.info(
             "TX [%s] {%s} Sending transaction [%s]," " (PDUs: %d, EDUs: %d)",
             destination,
@@ -117,10 +112,6 @@ class TransactionManager(object):
                 raise e
 
         logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
-
-        yield self._transaction_actions.delivered(transaction, code, response)
-
-        logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
 
         if code == 200:
             for e_id, r in response.get("pdus", {}).items():
