@@ -69,7 +69,8 @@ class DatabaseConfig(Config):
             if database_path is not None:
                 self.database_config["args"]["database"] = database_path
 
-    def add_arguments(self, parser):
+    @staticmethod
+    def add_arguments(parser):
         db_group = parser.add_argument_group("database")
         db_group.add_argument(
             "-d",

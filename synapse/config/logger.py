@@ -103,7 +103,8 @@ class LoggingConfig(Config):
         if args.log_file is not None:
             self.log_file = args.log_file
 
-    def add_arguments(cls, parser):
+    @staticmethod
+    def add_arguments(parser):
         logging_group = parser.add_argument_group("logging")
         logging_group.add_argument(
             "-v",
