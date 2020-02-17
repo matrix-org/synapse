@@ -141,11 +141,10 @@ class RegistrationHandler(BaseHandler):
                 )
 
     @defer.inlineCallbacks
-    def register(
+    def register_user(
         self,
         localpart=None,
         password=None,
-        generate_token=True,
         guest_access_token=None,
         make_guest=False,
         admin=False,
@@ -163,11 +162,6 @@ class RegistrationHandler(BaseHandler):
             password (unicode) : The password to assign to this user so they can
               login again. This can be None which means they cannot login again
               via a password (e.g. the user is an application service user).
-            generate_token (bool): Whether a new access token should be
-              generated. Having this be True should be considered deprecated,
-              since it offers no means of associating a device_id with the
-              access_token. Instead you should call auth_handler.issue_access_token
-              after registration.
             user_type (str|None): type of user. One of the values from
               api.constants.UserTypes, or None for a normal user.
             default_display_name (unicode|None): if set, the new user's displayname
@@ -175,7 +169,7 @@ class RegistrationHandler(BaseHandler):
             address (str|None): the IP address used to perform the registration.
             bind_emails (List[str]): list of emails to bind to this account.
         Returns:
-            A tuple of (user_id, access_token).
+            Deferred[str]: user_id
         Raises:
             RegistrationError if there was a problem registering.
         """
@@ -209,12 +203,8 @@ class RegistrationHandler(BaseHandler):
             elif default_display_name is None:
                 default_display_name = localpart
 
-            token = None
-            if generate_token:
-                token = self.macaroon_gen.generate_access_token(user_id)
             yield self.register_with_store(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -238,21 +228,17 @@ class RegistrationHandler(BaseHandler):
         else:
             # autogen a sequential user ID
             attempts = 0
-            token = None
             user = None
             while not user:
                 localpart = yield self._generate_user_id(attempts > 0)
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 yield self.check_user_id_not_appservice_exclusive(user_id)
-                if generate_token:
-                    token = self.macaroon_gen.generate_access_token(user_id)
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
                     yield self.register_with_store(
                         user_id=user_id,
-                        token=token,
                         password_hash=password_hash,
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
@@ -267,7 +253,6 @@ class RegistrationHandler(BaseHandler):
                     # if user id is taken, just generate another
                     user = None
                     user_id = None
-                    token = None
                     attempts += 1
 
         if not self.hs.config.user_consent_at_registration:
@@ -299,7 +284,7 @@ class RegistrationHandler(BaseHandler):
             )
             yield self.profile_handler.set_active(user, False, True)
 
-        defer.returnValue((user_id, token))
+        defer.returnValue(user_id)
 
     @defer.inlineCallbacks
     def _auto_join_rooms(self, user_id):
@@ -695,7 +680,6 @@ class RegistrationHandler(BaseHandler):
     def register_with_store(
         self,
         user_id,
-        token=None,
         password_hash=None,
         was_guest=False,
         make_guest=False,
@@ -709,9 +693,6 @@ class RegistrationHandler(BaseHandler):
 
         Args:
             user_id (str): The desired user ID to register.
-            token (str): The desired access token to use for this user. If this
-                is not None, the given access token is associated with the user
-                id.
             password_hash (str|None): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
@@ -747,7 +728,6 @@ class RegistrationHandler(BaseHandler):
         if self.hs.config.worker_app:
             return self._register_client(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,
@@ -760,7 +740,6 @@ class RegistrationHandler(BaseHandler):
         else:
             return self.store.register(
                 user_id=user_id,
-                token=token,
                 password_hash=password_hash,
                 was_guest=was_guest,
                 make_guest=make_guest,

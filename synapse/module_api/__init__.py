@@ -103,7 +103,6 @@ class ModuleApi(object):
         _, access_token = yield self.register_device(user_id)
         defer.returnValue((user_id, access_token))
 
-    @defer.inlineCallbacks
     def register_user(self, localpart, displayname=None, emails=[]):
         """Registers a new user with given localpart and optional displayname, emails.
 
@@ -115,14 +114,9 @@ class ModuleApi(object):
         Returns:
             Deferred[str]: user_id
         """
-        user_id, _ = yield self.hs.get_registration_handler().register(
-            localpart=localpart,
-            default_display_name=displayname,
-            bind_emails=emails,
-            generate_token=False,
+        return self.hs.get_registration_handler().register_user(
+            localpart=localpart, default_display_name=displayname, bind_emails=emails
         )
-
-        defer.returnValue(user_id)
 
     def register_device(self, user_id, device_id=None, initial_display_name=None):
         """Register a device for a user and generate an access token.
