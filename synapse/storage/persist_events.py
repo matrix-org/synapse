@@ -390,7 +390,7 @@ class EventsPersistenceStorage(object):
                                     state_delta_reuse_delta_counter.inc()
                                     break
 
-                        logger.info("Calculating state delta for room %s", room_id)
+                        logger.debug("Calculating state delta for room %s", room_id)
                         with Measure(
                             self._clock, "persist_events.get_new_state_after_events"
                         ):

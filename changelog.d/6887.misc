@@ -1,0 +1,1 @@
+Fix the use of sed in the linting scripts when using BSD sed.

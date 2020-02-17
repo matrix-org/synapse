@@ -262,7 +262,7 @@ class RoomCreationHandler(BaseHandler):
         for v in ("invite", "events_default"):
             current = int(pl_content.get(v, 0))
             if current < restricted_level:
-                logger.info(
+                logger.debug(
                     "Setting level for %s in %s to %i (was %i)",
                     v,
                     old_room_id,
@@ -272,7 +272,7 @@ class RoomCreationHandler(BaseHandler):
                 pl_content[v] = restricted_level
                 updated = True
             else:
-                logger.info("Not setting level for %s (already %i)", v, current)
+                logger.debug("Not setting level for %s (already %i)", v, current)
 
         if updated:
             try:
@@ -299,7 +299,7 @@ class RoomCreationHandler(BaseHandler):
             EventTypes.Aliases, events_default
         )
 
-        logger.info("Setting correct PLs in new room to %s", new_pl_content)
+        logger.debug("Setting correct PLs in new room to %s", new_pl_content)
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -363,7 +363,7 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.RoomHistoryVisibility, ""),
             (EventTypes.GuestAccess, ""),
             (EventTypes.RoomAvatar, ""),
-            (EventTypes.Encryption, ""),
+            (EventTypes.RoomEncryption, ""),
             (EventTypes.ServerACL, ""),
             (EventTypes.RelatedGroups, ""),
             (EventTypes.PowerLevels, ""),
@@ -582,9 +582,13 @@ class RoomCreationHandler(BaseHandler):
 
         # Check whether the third party rules allows/changes the room create
         # request.
-        yield self.third_party_event_rules.on_create_room(
+        event_allowed = yield self.third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
+        if not event_allowed:
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         if not is_requester_admin and not self.spam_checker.user_may_create_room(
             user_id
@@ -785,7 +789,7 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
-            logger.info("Sending %s in new room", etype)
+            logger.debug("Sending %s in new room", etype)
             yield self.event_creation_handler.create_and_send_nonmember_event(
                 creator, event, ratelimit=False
             )
@@ -799,7 +803,7 @@ class RoomCreationHandler(BaseHandler):
         creation_content.update({"creator": creator_id})
         yield send(etype=EventTypes.Create, content=creation_content)
 
-        logger.info("Sending %s in new room", EventTypes.Member)
+        logger.debug("Sending %s in new room", EventTypes.Member)
         yield self.room_member_handler.update_membership(
             creator,
             creator.user,

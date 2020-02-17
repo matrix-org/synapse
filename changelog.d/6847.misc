@@ -1,0 +1,1 @@
+Populate `rooms.room_version` database column at startup, rather than in a background update.

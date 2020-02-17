@@ -21,7 +21,7 @@ from six import text_type
 from six.moves import http_client
 
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -136,6 +136,8 @@ class UserRestServletV2(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.admin_handler = hs.get_handlers().admin_handler
+        self.store = hs.get_datastore()
+        self.auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.set_password_handler = hs.get_set_password_handler()
         self.deactivate_account_handler = hs.get_deactivate_account_handler()
@@ -150,6 +152,9 @@ class UserRestServletV2(RestServlet):
 
         ret = await self.admin_handler.get_user(target_user)
 
+        if not ret:
+            raise NotFoundError("User not found")
+
         return 200, ret
 
     async def on_PUT(self, request, user_id):
@@ -163,12 +168,36 @@ class UserRestServletV2(RestServlet):
             raise SynapseError(400, "This endpoint can only be used with local users")
 
         user = await self.admin_handler.get_user(target_user)
+        user_id = target_user.to_string()
 
         if user:  # modify user
             if "displayname" in body:
                 await self.profile_handler.set_displayname(
                     target_user, requester, body["displayname"], True
                 )
+
+            if "threepids" in body:
+                # check for required parameters for each threepid
+                for threepid in body["threepids"]:
+                    assert_params_in_dict(threepid, ["medium", "address"])
+
+                # remove old threepids from user
+                threepids = await self.store.user_get_threepids(user_id)
+                for threepid in threepids:
+                    try:
+                        await self.auth_handler.delete_threepid(
+                            user_id, threepid["medium"], threepid["address"], None
+                        )
+                    except Exception:
+                        logger.exception("Failed to remove threepids")
+                        raise SynapseError(500, "Failed to remove threepids")
+
+                # add new threepids to user
+                current_time = self.hs.get_clock().time_msec()
+                for threepid in body["threepids"]:
+                    await self.auth_handler.add_threepid(
+                        user_id, threepid["medium"], threepid["address"], current_time
+                    )
 
             if "avatar_url" in body:
                 await self.profile_handler.set_avatar_url(
@@ -221,6 +250,7 @@ class UserRestServletV2(RestServlet):
             admin = body.get("admin", None)
             user_type = body.get("user_type", None)
             displayname = body.get("displayname", None)
+            threepids = body.get("threepids", None)
 
             if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
                 raise SynapseError(400, "Invalid user type")
@@ -232,6 +262,18 @@ class UserRestServletV2(RestServlet):
                 default_display_name=displayname,
                 user_type=user_type,
             )
+
+            if "threepids" in body:
+                # check for required parameters for each threepid
+                for threepid in body["threepids"]:
+                    assert_params_in_dict(threepid, ["medium", "address"])
+
+                current_time = self.hs.get_clock().time_msec()
+                for threepid in body["threepids"]:
+                    await self.auth_handler.add_threepid(
+                        user_id, threepid["medium"], threepid["address"], current_time
+                    )
+
             if "avatar_url" in body:
                 await self.profile_handler.set_avatar_url(
                     user_id, requester, body["avatar_url"], True

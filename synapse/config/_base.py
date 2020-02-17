@@ -53,6 +53,18 @@ Missing mandatory `server_name` config option.
 """
 
 
+CONFIG_FILE_HEADER = """\
+# Configuration file for Synapse.
+#
+# This is a YAML file: see [1] for a quick introduction. Note in particular
+# that *indentation is important*: all the elements of a list or dictionary
+# should have the same indentation.
+#
+# [1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
+
+"""
+
+
 def path_exists(file_path):
     """Check if a file exists
 
@@ -344,7 +356,7 @@ class RootConfig(object):
             str: the yaml config file
         """
 
-        return "\n\n".join(
+        return CONFIG_FILE_HEADER + "\n\n".join(
             dedent(conf)
             for conf in self.invoke_all(
                 "generate_config_section",
@@ -574,8 +586,8 @@ class RootConfig(object):
                 if not path_exists(config_dir_path):
                     os.makedirs(config_dir_path)
                 with open(config_path, "w") as config_file:
-                    config_file.write("# vim:ft=yaml\n\n")
                     config_file.write(config_str)
+                    config_file.write("\n\n# vim:ft=yaml")
 
                 config_dict = yaml.safe_load(config_str)
                 obj.generate_missing_files(config_dict, config_dir_path)

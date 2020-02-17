@@ -176,8 +176,14 @@ endpoints matching the following regular expressions:
     ^/_matrix/federation/v1/query_auth/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
+    ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/send/
+    ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
+
+Additionally, the following REST endpoints can be handled for GET requests:
+
+    ^/_matrix/federation/v1/groups/
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
@@ -254,10 +260,13 @@ following regular expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
+    ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/get_groups_publicised$
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/groups/.*$
 
 Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance:

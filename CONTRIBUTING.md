@@ -200,6 +200,20 @@ Git allows you to add this signoff automatically when using the `-s`
 flag to `git commit`, which uses the name and email set in your
 `user.name` and `user.email` git configs.
 
+## Merge Strategy
+
+We use the commit history of develop/master extensively to identify
+when regressions were introduced and what changes have been made.
+
+We aim to have a clean merge history, which means we normally squash-merge
+changes into develop. For small changes this means there is no need to rebase
+to clean up your PR before merging. Larger changes with an organised set of
+commits may be merged as-is, if the history is judged to be useful.
+
+This use of squash-merging will mean PRs built on each other will be hard to 
+merge. We suggest avoiding these where possible, and if required, ensuring
+each PR has a tidy set of commits to ease merging.
+
 ## Conclusion
 
 That's it! Matrix is a very open and collaborative project as you might expect

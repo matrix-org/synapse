@@ -58,8 +58,10 @@ class AdminHandler(BaseHandler):
         ret = await self.store.get_user_by_id(user.to_string())
         if ret:
             profile = await self.store.get_profileinfo(user.localpart)
+            threepids = await self.store.user_get_threepids(user.to_string())
             ret["displayname"] = profile.display_name
             ret["avatar_url"] = profile.avatar_url
+            ret["threepids"] = threepids
         return ret
 
     async def export_user_data(self, user_id, writer):
