@@ -575,6 +575,26 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         count = yield self.runInteraction("did_forget_membership", f)
         defer.returnValue(count == 0)
 
+    @defer.inlineCallbacks
+    def get_rooms_user_has_been_in(self, user_id):
+        """Get all rooms that the user has ever been in.
+
+        Args:
+            user_id (str)
+
+        Returns:
+            Deferred[set[str]]: Set of room IDs.
+        """
+
+        room_ids = yield self._simple_select_onecol(
+            table="room_memberships",
+            keyvalues={"membership": Membership.JOIN, "user_id": user_id},
+            retcol="room_id",
+            desc="get_rooms_user_has_been_in",
+        )
+
+        return set(room_ids)
+
 
 class RoomMemberStore(RoomMemberWorkerStore):
     def __init__(self, db_conn, hs):
