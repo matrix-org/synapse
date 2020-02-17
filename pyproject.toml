@@ -15,6 +15,11 @@
         showcontent = true
 
     [[tool.towncrier.type]]
+        directory = "docker"
+        name = "Updates to the Docker image"
+        showcontent = true
+
+    [[tool.towncrier.type]]
         directory = "doc"
         name = "Improved Documentation"
         showcontent = true
