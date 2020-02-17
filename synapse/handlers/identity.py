@@ -136,7 +136,7 @@ class IdentityHandler(BaseHandler):
             id_server_host = id_server
 
         try:
-            data = yield self.http_client.post_urlencoded_get_json(
+            data = yield self.http_client.post_json_get_json(
                 "https://%s%s" % (id_server_host, "/_matrix/identity/api/v1/3pid/bind"),
                 {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid},
             )

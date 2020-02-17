@@ -43,8 +43,8 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
             self.is_server_name: self.rewritten_is_url
         }
 
-        mock_http_client = Mock(spec=["post_urlencoded_get_json"])
-        mock_http_client.post_urlencoded_get_json.return_value = defer.succeed(
+        mock_http_client = Mock(spec=["post_json_get_json"])
+        mock_http_client.post_json_get_json.return_value = defer.succeed(
             {"address": self.address, "medium": "email"}
         )
 
@@ -65,7 +65,7 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         * the original, non-rewritten, server name is stored in the database
         """
         handler = self.hs.get_handlers().identity_handler
-        post_urlenc_get_json = self.hs.get_simple_http_client().post_urlencoded_get_json
+        post_json_get_json = self.hs.get_simple_http_client().post_json_get_json
         store = self.hs.get_datastore()
 
         creds = {"sid": "123", "client_secret": "some_secret"}
@@ -84,7 +84,7 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         self.assertEqual(data.get("address"), self.address)
 
         # Check that the request was done against the rewritten server name.
-        post_urlenc_get_json.assert_called_once_with(
+        post_json_get_json.assert_called_once_with(
             "https://%s/_matrix/identity/api/v1/3pid/bind" % self.rewritten_is_url,
             {
                 "sid": creds["sid"],
