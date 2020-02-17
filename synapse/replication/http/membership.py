@@ -156,70 +156,6 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         defer.returnValue((200, ret))
 
 
-class ReplicationRegister3PIDGuestRestServlet(ReplicationEndpoint):
-    """Gets/creates a guest account for given 3PID.
-
-    Request format:
-
-        POST /_synapse/replication/get_or_register_3pid_guest/
-
-        {
-            "requester": ...,
-            "medium": ...,
-            "address": ...,
-            "inviter_user_id": ...
-        }
-    """
-
-    NAME = "get_or_register_3pid_guest"
-    PATH_ARGS = ()
-
-    def __init__(self, hs):
-        super(ReplicationRegister3PIDGuestRestServlet, self).__init__(hs)
-
-        self.registeration_handler = hs.get_registration_handler()
-        self.store = hs.get_datastore()
-        self.clock = hs.get_clock()
-
-    @staticmethod
-    def _serialize_payload(requester, medium, address, inviter_user_id):
-        """
-        Args:
-            requester(Requester)
-            medium (str)
-            address (str)
-            inviter_user_id (str): The user ID who is trying to invite the
-                3PID
-        """
-        return {
-            "requester": requester.serialize(),
-            "medium": medium,
-            "address": address,
-            "inviter_user_id": inviter_user_id,
-        }
-
-    @defer.inlineCallbacks
-    def _handle_request(self, request):
-        content = parse_json_object_from_request(request)
-
-        medium = content["medium"]
-        address = content["address"]
-        inviter_user_id = content["inviter_user_id"]
-
-        requester = Requester.deserialize(self.store, content["requester"])
-
-        if requester.user:
-            request.authenticated_entity = requester.user.to_string()
-
-        logger.info("get_or_register_3pid_guest: %r", content)
-
-        ret = yield self.registeration_handler.get_or_register_3pid_guest(
-            medium, address, inviter_user_id
-        )
-
-        defer.returnValue((200, ret))
-
-
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
     """Notifies that a user has joined or left the room
 
@@ -272,5 +208,4 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
 def register_servlets(hs, http_server):
     ReplicationRemoteJoinRestServlet(hs).register(http_server)
     ReplicationRemoteRejectInviteRestServlet(hs).register(http_server)
-    ReplicationRegister3PIDGuestRestServlet(hs).register(http_server)
     ReplicationUserJoinedLeftRoomRestServlet(hs).register(http_server)
