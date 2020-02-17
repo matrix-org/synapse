@@ -21,7 +21,6 @@ import string
 from mock import Mock
 
 from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -62,7 +61,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             address_domain = args["address"].split("@")[1]
             return defer.succeed({"hs": address_domain})
 
-        def post_urlencoded_get_json(uri, args={}, headers=None):
+        def post_json_get_json(uri, post_json, args={}, headers=None):
             token = "".join(random.choice(string.ascii_letters) for _ in range(10))
             return defer.succeed(
                 {
@@ -84,11 +83,13 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["send_invite"])
         mock_federation_client.send_invite.side_effect = send_invite
 
-        mock_http_client = Mock(spec=["get_json", "post_urlencoded_get_json"])
+        mock_http_client = Mock(
+            spec=["get_json", "post_json_get_json"],
+        )
         # Mocking the response for /info on the IS API.
         mock_http_client.get_json.side_effect = get_json
         # Mocking the response for /store-invite on the IS API.
-        mock_http_client.post_urlencoded_get_json.side_effect = post_urlencoded_get_json
+        mock_http_client.post_json_get_json.side_effect = post_json_get_json
         self.hs = self.setup_test_homeserver(
             config=config,
             federation_client=mock_federation_client,
