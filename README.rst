@@ -272,7 +272,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python3 env
     source env/bin/activate
-    python -m pip install --no-pep-517 -e .[all]
+    python -m pip install --no-use-pep517 -e .[all]
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
