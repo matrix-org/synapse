@@ -35,6 +35,7 @@ from synapse.api.errors import (
     LoginError,
     StoreError,
     SynapseError,
+    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import defer_to_thread
@@ -623,6 +624,7 @@ class AuthHandler(BaseHandler):
         Raises:
             LimitExceededError if the ratelimiter's login requests count for this
                 user is too high too proceed.
+            UserDeactivatedError if a user is found but is deactivated.
         """
         self.ratelimit_login_per_account(user_id)
         res = yield self._find_user_id_and_pwd_hash(user_id)
@@ -838,6 +840,13 @@ class AuthHandler(BaseHandler):
         if not lookupres:
             defer.returnValue(None)
         (user_id, password_hash) = lookupres
+
+        # If the password hash is None, the account has likely been deactivated
+        if not password_hash:
+            deactivated = yield self.store.get_user_deactivated_status(user_id)
+            if deactivated:
+                raise UserDeactivatedError("This account has been deactivated")
+
         result = yield self.validate_hash(password, password_hash)
         if not result:
             logger.warn("Failed password login for user %s", user_id)
