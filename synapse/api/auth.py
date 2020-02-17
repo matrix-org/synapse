@@ -33,6 +33,7 @@ from synapse.api.errors import (
     MissingClientTokenError,
     ResourceLimitError,
 )
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import is_threepid_reserved
 from synapse.types import StateMap, UserID
 from synapse.util.caches import register_cache
@@ -77,15 +78,17 @@ class Auth(object):
         self._account_validity = hs.config.account_validity
 
     @defer.inlineCallbacks
-    def check_from_context(self, room_version, event, context, do_sig_check=True):
+    def check_from_context(self, room_version: str, event, context, do_sig_check=True):
         prev_state_ids = yield context.get_prev_state_ids()
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
+
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
         event_auth.check(
-            room_version, event, auth_events=auth_events, do_sig_check=do_sig_check
+            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
         )
 
     @defer.inlineCallbacks

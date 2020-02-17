@@ -81,6 +81,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ]
         )
 
+        # the tests assume that we are starting at unix time 1000
+        reactor.pump((1000,))
+
         hs = self.setup_test_homeserver(
             notifier=Mock(), http_client=mock_federation_client, keyring=mock_keyring
         )
@@ -90,9 +93,6 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
-        # the tests assume that we are starting at unix time 1000
-        reactor.pump((1000,))
-
         mock_notifier = hs.get_notifier()
         self.on_new_event = mock_notifier.on_new_event
 
@@ -111,7 +111,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             retry_timings_res
         )
 
-        self.datastore.get_device_updates_by_remote.return_value = (0, [])
+        self.datastore.get_device_updates_by_remote.return_value = defer.succeed(
+            (0, [])
+        )
 
         def get_received_txn_response(*args):
             return defer.succeed(None)
@@ -144,7 +146,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_current_state_deltas.return_value = (0, None)
 
         self.datastore.get_to_device_stream_token = lambda: 0
-        self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: ([], 0)
+        self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: defer.succeed(
+            ([], 0)
+        )
         self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: None
         self.datastore.set_received_txn_response = lambda *args, **kwargs: defer.succeed(
             None

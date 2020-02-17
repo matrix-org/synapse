@@ -19,24 +19,16 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.config.room_directory import RoomDirectoryConfig
-from synapse.handlers.directory import DirectoryHandler
 from synapse.rest.client.v1 import directory, room
 from synapse.types import RoomAlias
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
 
 
-class DirectoryHandlers(object):
-    def __init__(self, hs):
-        self.directory_handler = DirectoryHandler(hs)
-
-
-class DirectoryTestCase(unittest.TestCase):
+class DirectoryTestCase(unittest.HomeserverTestCase):
     """ Tests the directory service. """
 
-    @defer.inlineCallbacks
-    def setUp(self):
+    def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()
         self.mock_registry = Mock()
 
@@ -47,14 +39,12 @@ class DirectoryTestCase(unittest.TestCase):
 
         self.mock_registry.register_query_handler = register_query_handler
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup,
+        hs = self.setup_test_homeserver(
             http_client=None,
             resource_for_federation=Mock(),
             federation_client=self.mock_federation,
             federation_registry=self.mock_registry,
         )
-        hs.handlers = DirectoryHandlers(hs)
 
         self.handler = hs.get_handlers().directory_handler
 
@@ -64,23 +54,25 @@ class DirectoryTestCase(unittest.TestCase):
         self.your_room = RoomAlias.from_string("#your-room:test")
         self.remote_room = RoomAlias.from_string("#another:remote")
 
-    @defer.inlineCallbacks
+        return hs
+
     def test_get_local_association(self):
-        yield self.store.create_room_alias_association(
-            self.my_room, "!8765qwer:test", ["test"]
+        self.get_success(
+            self.store.create_room_alias_association(
+                self.my_room, "!8765qwer:test", ["test"]
+            )
         )
 
-        result = yield self.handler.get_association(self.my_room)
+        result = self.get_success(self.handler.get_association(self.my_room))
 
         self.assertEquals({"room_id": "!8765qwer:test", "servers": ["test"]}, result)
 
-    @defer.inlineCallbacks
     def test_get_remote_association(self):
         self.mock_federation.make_query.return_value = defer.succeed(
             {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}
         )
 
-        result = yield self.handler.get_association(self.remote_room)
+        result = self.get_success(self.handler.get_association(self.remote_room))
 
         self.assertEquals(
             {"room_id": "!8765qwer:test", "servers": ["test", "remote"]}, result
@@ -93,14 +85,15 @@ class DirectoryTestCase(unittest.TestCase):
             ignore_backoff=True,
         )
 
-    @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield self.store.create_room_alias_association(
-            self.your_room, "!8765asdf:test", ["test"]
+        self.get_success(
+            self.store.create_room_alias_association(
+                self.your_room, "!8765asdf:test", ["test"]
+            )
         )
 
-        response = yield self.query_handlers["directory"](
-            {"room_alias": "#your-room:test"}
+        response = self.get_success(
+            self.handler.on_directory_query({"room_alias": "#your-room:test"})
         )
 
         self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict, Set
 
 from canonicaljson import encode_canonical_json, json
 from signedjson.sign import sign_json
@@ -103,7 +104,7 @@ class RemoteKey(DirectServeResource):
     async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
             (server,) = request.postpath
-            query = {server.decode("ascii"): {}}
+            query = {server.decode("ascii"): {}}  # type: dict
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
             minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
@@ -148,7 +149,7 @@ class RemoteKey(DirectServeResource):
 
         time_now_ms = self.clock.time_msec()
 
-        cache_misses = dict()
+        cache_misses = dict()  # type: Dict[str, Set[str]]
         for (server_name, key_id, from_server), results in cached.items():
             results = [(result["ts_added_ms"], result) for result in results]
 

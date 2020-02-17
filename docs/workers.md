@@ -176,14 +176,33 @@ endpoints matching the following regular expressions:
     ^/_matrix/federation/v1/query_auth/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
+    ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/send/
+    ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
+
+Additionally, the following REST endpoints can be handled for GET requests:
+
+    ^/_matrix/federation/v1/groups/
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
 
 The `^/_matrix/federation/v1/send/` endpoint must only be handled by a single
 instance.
+
+Note that `federation` must be added to the listener resources in the worker config:
+
+```yaml
+worker_app: synapse.app.federation_reader
+...
+worker_listeners:
+ - type: http
+   port: <port>
+   resources:
+     - names:
+       - federation
+```
 
 ### `synapse.app.federation_sender`
 
@@ -241,10 +260,13 @@ following regular expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
+    ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/get_groups_publicised$
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/groups/.*$
 
 Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance:
@@ -264,6 +286,10 @@ Handles searches in the user directory. It can handle REST endpoints matching
 the following regular expressions:
 
     ^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$
+
+When using this worker you must also set `update_user_directory: False` in the 
+shared configuration file to stop the main synapse running background 
+jobs related to updating the user directory.
 
 ### `synapse.app.frontend_proxy`
 

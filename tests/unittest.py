@@ -463,7 +463,7 @@ class HomeserverTestCase(TestCase):
         # Create the user
         request, channel = self.make_request("GET", "/_matrix/client/r0/admin/register")
         self.render(request)
-        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.code, 200, msg=channel.result)
         nonce = channel.json_body["nonce"]
 
         want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
@@ -589,7 +589,9 @@ class HomeserverTestCase(TestCase):
         event_builder_factory = self.hs.get_event_builder_factory()
         event_creation_handler = self.hs.get_event_creation_handler()
 
-        room_version = self.get_success(self.hs.get_datastore().get_room_version(room))
+        room_version = self.get_success(
+            self.hs.get_datastore().get_room_version_id(room)
+        )
 
         builder = event_builder_factory.for_room_version(
             KNOWN_ROOM_VERSIONS[room_version],

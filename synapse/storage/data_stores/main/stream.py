@@ -525,8 +525,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return rows, token
 
-    def get_room_event_after_stream_ordering(self, room_id, stream_ordering):
-        """Gets details of the first event in a room at or after a stream ordering
+    def get_room_event_before_stream_ordering(self, room_id, stream_ordering):
+        """Gets details of the first event in a room at or before a stream ordering
 
         Args:
             room_id (str):
@@ -541,15 +541,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             sql = (
                 "SELECT stream_ordering, topological_ordering, event_id"
                 " FROM events"
-                " WHERE room_id = ? AND stream_ordering >= ?"
+                " WHERE room_id = ? AND stream_ordering <= ?"
                 " AND NOT outlier"
-                " ORDER BY stream_ordering"
+                " ORDER BY stream_ordering DESC"
                 " LIMIT 1"
             )
             txn.execute(sql, (room_id, stream_ordering))
             return txn.fetchone()
 
-        return self.db.runInteraction("get_room_event_after_stream_ordering", _f)
+        return self.db.runInteraction("get_room_event_before_stream_ordering", _f)
 
     @defer.inlineCallbacks
     def get_room_events_max_id(self, room_id=None):

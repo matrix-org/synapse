@@ -40,6 +40,21 @@ def historical_admin_path_patterns(path_regex):
     )
 
 
+def admin_patterns(path_regex: str):
+    """Returns the list of patterns for an admin endpoint
+
+    Args:
+        path_regex: The regex string to match. This should NOT have a ^
+            as this will be prefixed.
+
+    Returns:
+        A list of regex patterns.
+    """
+    admin_prefix = "^/_synapse/admin/v1"
+    patterns = [re.compile(admin_prefix + path_regex)]
+    return patterns
+
+
 async def assert_requester_is_admin(auth, request):
     """Verify that the requester is an admin user
 

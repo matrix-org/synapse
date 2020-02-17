@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from typing import Any, Dict
 
 from six.moves import urllib
 
@@ -352,7 +353,9 @@ class TransportLayerClient(object):
         else:
             path = _create_v1_path("/publicRooms")
 
-            args = {"include_all_networks": "true" if include_all_networks else "false"}
+            args = {
+                "include_all_networks": "true" if include_all_networks else "false"
+            }  # type: Dict[str, Any]
             if third_party_instance_id:
                 args["third_party_instance_id"] = (third_party_instance_id,)
             if limit:

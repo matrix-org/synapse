@@ -18,6 +18,7 @@
 import functools
 import logging
 import re
+from typing import Optional, Tuple, Type
 
 from twisted.internet.defer import maybeDeferred
 
@@ -44,6 +45,7 @@ from synapse.logging.opentracing import (
     tags,
     whitelisted_homeserver,
 )
+from synapse.server import HomeServer
 from synapse.types import ThirdPartyInstanceID, get_domain_from_id
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.versionstring import get_version_string
@@ -101,12 +103,17 @@ class NoAuthenticationError(AuthenticationError):
 
 
 class Authenticator(object):
-    def __init__(self, hs):
+    def __init__(self, hs: HomeServer):
         self._clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.notifer = hs.get_notifier()
+
+        self.replication_client = None
+        if hs.config.worker.worker_app:
+            self.replication_client = hs.get_tcp_replication()
 
     # A method just so we can pass 'self' as the authenticator to the Servlets
     async def authenticate_request(self, request, content):
@@ -151,7 +158,7 @@ class Authenticator(object):
             origin, json_request, now, "Incoming request"
         )
 
-        logger.info("Request from %s", origin)
+        logger.debug("Request from %s", origin)
         request.authenticated_entity = origin
 
         # If we get a valid signed request from the other side, its probably
@@ -166,6 +173,17 @@ class Authenticator(object):
         try:
             logger.info("Marking origin %r as up", origin)
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
+
+            # Inform the relevant places that the remote server is back up.
+            self.notifer.notify_remote_server_up(origin)
+            if self.replication_client:
+                # If we're on a worker we try and inform master about this. The
+                # replication client doesn't hook into the notifier to avoid
+                # infinite loops where we send a `REMOTE_SERVER_UP` command to
+                # master, which then echoes it back to us which in turn pokes
+                # the notifier.
+                self.replication_client.send_remote_server_up(origin)
+
         except Exception:
             logger.exception("Error resetting retry timings on %s", origin)
 
@@ -250,6 +268,8 @@ class BaseFederationServlet(object):
                 returned.
     """
 
+    PATH = ""  # Overridden in subclasses, the regex to match against the path.
+
     REQUIRE_AUTH = True
 
     PREFIX = FEDERATION_V1_PREFIX  # Allows specifying the API version
@@ -329,9 +349,6 @@ class BaseFederationServlet(object):
                     )
 
             return response
-
-        # Extra logic that functools.wraps() doesn't finish
-        new_func.__self__ = func.__self__
 
         return new_func
 
@@ -562,7 +579,7 @@ class FederationV1InviteServlet(BaseFederationServlet):
         # state resolution algorithm, and we don't use that for processing
         # invites
         content = await self.handler.on_invite_request(
-            origin, content, room_version=RoomVersions.V1.identifier
+            origin, content, room_version_id=RoomVersions.V1.identifier
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
@@ -589,7 +606,7 @@ class FederationV2InviteServlet(BaseFederationServlet):
         event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
 
         content = await self.handler.on_invite_request(
-            origin, event, room_version=room_version
+            origin, event, room_version_id=room_version
         )
         return 200, content
 
@@ -807,7 +824,7 @@ class PublicRoomList(BaseFederationServlet):
         if not self.allow_access:
             raise FederationDeniedError(origin)
 
-        limit = int(content.get("limit", 100))
+        limit = int(content.get("limit", 100))  # type: Optional[int]
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
@@ -954,7 +971,7 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
-        result = await self.groups_handler.update_room_in_group(
+        result = await self.handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
 
@@ -1405,11 +1422,13 @@ FEDERATION_SERVLET_CLASSES = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-OPENID_SERVLET_CLASSES = (OpenIdUserInfo,)
+OPENID_SERVLET_CLASSES = (
+    OpenIdUserInfo,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
-ROOM_LIST_CLASSES = (PublicRoomList,)
+ROOM_LIST_CLASSES = (PublicRoomList,)  # type: Tuple[Type[PublicRoomList], ...]
 
 GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsProfileServlet,
@@ -1430,17 +1449,19 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
     FederationGroupsSettingJoinPolicyServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
 GROUP_LOCAL_SERVLET_CLASSES = (
     FederationGroupsLocalInviteServlet,
     FederationGroupsRemoveLocalUserServlet,
     FederationGroupsBulkPublicisedServlet,
-)
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 
-GROUP_ATTESTATION_SERVLET_CLASSES = (FederationGroupsRenewAttestaionServlet,)
+GROUP_ATTESTATION_SERVLET_CLASSES = (
+    FederationGroupsRenewAttestaionServlet,
+)  # type: Tuple[Type[BaseFederationServlet], ...]
 
 DEFAULT_SERVLET_GROUPS = (
     "federation",

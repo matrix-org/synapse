@@ -392,7 +392,7 @@ class StateHandler(object):
                 delta_ids=delta_ids,
             )
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
 
         result = yield self._state_resolution_handler.resolve_state_groups(
             room_id,

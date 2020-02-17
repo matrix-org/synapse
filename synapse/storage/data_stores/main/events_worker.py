@@ -37,8 +37,8 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.types import get_domain_from_id
-from synapse.util import batch_iter
 from synapse.util.caches.descriptors import Cache
+from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -287,7 +287,7 @@ class EventsWorkerStore(SQLBaseStore):
             # we have to recheck auth now.
 
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
-                if not hasattr(entry.event, "redacts"):
+                if entry.event.redacts is None:
                     # A redacted redaction doesn't have a `redacts` key, in
                     # which case lets just withhold the event.
                     #

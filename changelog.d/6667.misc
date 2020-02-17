@@ -1,1 +1,0 @@
-Fixup `synapse.replication` to pass mypy checks.

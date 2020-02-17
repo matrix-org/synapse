@@ -17,8 +17,8 @@ from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.presence import UserPresenceState
-from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.iterutils import batch_iter
 
 
 class PresenceStore(SQLBaseStore):

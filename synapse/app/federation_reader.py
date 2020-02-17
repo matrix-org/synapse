@@ -33,8 +33,10 @@ from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
+from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.directory import DirectoryStore
 from synapse.replication.slave.storage.events import SlavedEventStore
+from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
 from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
@@ -46,6 +48,9 @@ from synapse.replication.slave.storage.transactions import SlavedTransactionStor
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.monthly_active_users import (
+    MonthlyActiveUsersWorkerStore,
+)
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
@@ -63,9 +68,12 @@ class FederationReaderSlavedStore(
     SlavedEventStore,
     SlavedKeyStore,
     SlavedRegistrationStore,
+    SlavedGroupServerStore,
+    SlavedDeviceStore,
     RoomStore,
     DirectoryStore,
     SlavedTransactionStore,
+    MonthlyActiveUsersWorkerStore,
     BaseSlavedStore,
 ):
     pass

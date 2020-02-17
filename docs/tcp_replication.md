@@ -209,7 +209,7 @@ Where `<token>` may be either:
  * a numeric stream_id to stream updates since (exclusive)
  * `NOW` to stream all subsequent updates.
 
-The `<stream_name>` is the name of a replication stream to subscribe 
+The `<stream_name>` is the name of a replication stream to subscribe
 to (see [here](../synapse/replication/tcp/streams/_base.py) for a list
 of streams). It can also be `ALL` to subscribe to all known streams,
 in which case the `<token>` must be set to `NOW`.
@@ -234,6 +234,10 @@ in which case the `<token>` must be set to `NOW`.
 
    Used exclusively in tests
 
+### REMOTE_SERVER_UP (S, C)
+
+   Inform other processes that a remote server may have come back online.
+
 See `synapse/replication/tcp/commands.py` for a detailed description and
 the format of each command.
 
@@ -249,6 +253,11 @@ replication, which includes the cache name (the name of the function)
 and they key to invalidate. For example:
 
     > RDATA caches 550953771 ["get_user_by_id", ["@bob:example.com"], 1550574873251]
+
+Alternatively, an entire cache can be invalidated by sending down a `null`
+instead of the key. For example:
+
+    > RDATA caches 550953772 ["get_user_by_id", null, 1550574873252]
 
 However, there are times when a number of caches need to be invalidated
 at the same time with the same key. To reduce traffic we batch those

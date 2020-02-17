@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -105,7 +105,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
 
 def _create_acl_event(content):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": "!a:b",
             "event_id": "$a:b",

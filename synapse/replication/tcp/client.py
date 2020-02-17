@@ -31,6 +31,7 @@ from .commands import (
     Command,
     FederationAckCommand,
     InvalidateCacheCommand,
+    RemoteServerUpCommand,
     RemovePusherCommand,
     UserIpCommand,
     UserSyncCommand,
@@ -143,6 +144,9 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         if d:
             d.callback(data)
 
+    def on_remote_server_up(self, server: str):
+        """Called when get a new REMOTE_SERVER_UP command."""
+
     def get_streams_to_replicate(self) -> Dict[str, int]:
         """Called when a new connection has been established and we need to
         subscribe to streams.
@@ -206,6 +210,9 @@ class ReplicationClientHandler(AbstractReplicationClientHandler):
         """
         cmd = UserIpCommand(user_id, access_token, ip, user_agent, device_id, last_seen)
         self.send_command(cmd)
+
+    def send_remote_server_up(self, server: str):
+        self.send_command(RemoteServerUpCommand(server))
 
     def await_sync(self, data):
         """Returns a deferred that is resolved when we receive a SYNC command

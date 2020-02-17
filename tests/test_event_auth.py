@@ -18,7 +18,7 @@ import unittest
 from synapse import event_auth
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 
 
 class EventAuthTestCase(unittest.TestCase):
@@ -37,7 +37,7 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send state
         event_auth.check(
-            RoomVersions.V1.identifier,
+            RoomVersions.V1,
             _random_state_event(creator),
             auth_events,
             do_sig_check=False,
@@ -47,7 +47,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check,
-            RoomVersions.V1.identifier,
+            RoomVersions.V1,
             _random_state_event(joiner),
             auth_events,
             do_sig_check=False,
@@ -76,7 +76,7 @@ class EventAuthTestCase(unittest.TestCase):
         self.assertRaises(
             AuthError,
             event_auth.check,
-            RoomVersions.V1.identifier,
+            RoomVersions.V1,
             _random_state_event(pleb),
             auth_events,
             do_sig_check=False,
@@ -84,10 +84,7 @@ class EventAuthTestCase(unittest.TestCase):
 
         # king should be able to send state
         event_auth.check(
-            RoomVersions.V1.identifier,
-            _random_state_event(king),
-            auth_events,
-            do_sig_check=False,
+            RoomVersions.V1, _random_state_event(king), auth_events, do_sig_check=False,
         )
 
 
@@ -97,7 +94,7 @@ TEST_ROOM_ID = "!test:room"
 
 
 def _create_event(user_id):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -109,7 +106,7 @@ def _create_event(user_id):
 
 
 def _join_event(user_id):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -122,7 +119,7 @@ def _join_event(user_id):
 
 
 def _power_levels_event(sender, content):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -135,7 +132,7 @@ def _power_levels_event(sender, content):
 
 
 def _random_state_event(sender):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),

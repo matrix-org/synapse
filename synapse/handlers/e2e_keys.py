@@ -208,8 +208,9 @@ class E2eKeysHandler(object):
                         )
 
                     user_devices = user_devices["devices"]
+                    user_results = results.setdefault(user_id, {})
                     for device in user_devices:
-                        results[user_id] = {device["device_id"]: device["keys"]}
+                        user_results[device["device_id"]] = device["keys"]
                     user_ids_updated.append(user_id)
                 except Exception as e:
                     failures[destination] = _exception_to_failure(e)

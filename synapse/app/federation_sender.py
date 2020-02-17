@@ -38,7 +38,11 @@ from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
-from synapse.replication.tcp.streams._base import ReceiptsStream
+from synapse.replication.tcp.streams._base import (
+    DeviceListsStream,
+    ReceiptsStream,
+    ToDeviceStream,
+)
 from synapse.server import HomeServer
 from synapse.storage.database import Database
 from synapse.types import ReadReceipt
@@ -158,6 +162,13 @@ class FederationSenderReplicationHandler(ReplicationClientHandler):
         args.update(self.send_handler.stream_positions())
         return args
 
+    def on_remote_server_up(self, server: str):
+        """Called when get a new REMOTE_SERVER_UP command."""
+
+        # Let's wake up the transaction queue for the server in case we have
+        # pending stuff to send to it.
+        self.send_handler.wake_destination(server)
+
 
 def start(config_options):
     try:
@@ -205,7 +216,7 @@ class FederationSenderHandler(object):
     to the federation sender.
     """
 
-    def __init__(self, hs, replication_client):
+    def __init__(self, hs: FederationSenderServer, replication_client):
         self.store = hs.get_datastore()
         self._is_mine_id = hs.is_mine_id
         self.federation_sender = hs.get_federation_sender()
@@ -226,6 +237,9 @@ class FederationSenderHandler(object):
             self.store.get_room_max_stream_ordering()
         )
 
+    def wake_destination(self, server: str):
+        self.federation_sender.wake_destination(server)
+
     def stream_positions(self):
         return {"federation": self.federation_position}
 
@@ -245,6 +259,20 @@ class FederationSenderHandler(object):
             run_as_background_process(
                 "process_receipts_for_federation", self._on_new_receipts, rows
             )
+
+        # ... as well as device updates and messages
+        elif stream_name == DeviceListsStream.NAME:
+            hosts = set(row.destination for row in rows)
+            for host in hosts:
+                self.federation_sender.send_device_messages(host)
+
+        elif stream_name == ToDeviceStream.NAME:
+            # The to_device stream includes stuff to be pushed to both local
+            # clients and remote servers, so we ignore entities that start with
+            # '@' (since they'll be local users rather than destinations).
+            hosts = set(row.entity for row in rows if not row.entity.startswith("@"))
+            for host in hosts:
+                self.federation_sender.send_device_messages(host)
 
     @defer.inlineCallbacks
     def _on_new_receipts(self, rows):
