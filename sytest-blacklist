@@ -36,3 +36,6 @@ Inbound federation of state requires event_id as a mandatory paramater
 
 # Blacklisted until https://github.com/matrix-org/synapse/pull/6486 lands
 Can upload self-signing keys
+
+# Blacklist due to https://github.com/matrix-org/synapse/issues/6932
+Local and remote users' homeservers remove a room from their public directory on upgrade
