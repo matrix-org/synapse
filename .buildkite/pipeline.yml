@@ -166,7 +166,26 @@ steps:
         - exit_status: 2
           limit: 2
 
-  - label: "SyTest - :python: 3 / :postgres: 9.6 / Monolith"
+
+  - label: "SyTest - :python: 3.5 / SQLite / Monolith"
+    agents:
+      queue: "medium"
+    command:
+      - "bash .buildkite/merge_base_branch.sh"
+      - "bash /synapse_sytest.sh"
+    plugins:
+      - docker#v3.0.1:
+          image: "matrixdotorg/sytest-synapse:py35"
+          propagate-environment: true
+          always-pull: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
+
+  - label: "SyTest - :python: 3.5 / :postgres: 9.6 / Monolith"
     agents:
       queue: "xlarge"
     env:
@@ -179,17 +198,12 @@ steps:
           image: "matrixdotorg/sytest-synapse:dinsic-py3"
           propagate-environment: true
           always-pull: true
-          workdir: "/src"
-          entrypoint: "/bin/sh"
-          init: false
-          shell: ["-x", "-c"]
-          mount-buildkite-agent: false
-          volumes: ["./logs:/logs"]
-      - artifacts#v1.2.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
-      - matrix-org/annotate:
-          path: "logs/annotate.md"
-          style: "error"
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
 
   - label: "SyTest - :python: 3 / :postgres: 9.6 / Workers"
     agents:
@@ -205,15 +219,10 @@ steps:
           image: "matrixdotorg/sytest-synapse:dinsic-py3"
           propagate-environment: true
           always-pull: true
-          workdir: "/src"
-          entrypoint: "/bin/sh"
-          init: false
-          shell: ["-x", "-c"]
-          mount-buildkite-agent: false
-          volumes: ["./logs:/logs"]
-      - artifacts#v1.2.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
-      - matrix-org/annotate:
-          path: "logs/annotate.md"
-          style: "error"
-
+    soft_fail: true
+    retry:
+      automatic:
+        - exit_status: -1
+          limit: 2
+        - exit_status: 2
+          limit: 2
