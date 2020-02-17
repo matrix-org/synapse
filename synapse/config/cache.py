@@ -39,20 +39,35 @@ _DEFAULT_CONFIG = """\
 #
 """
 
+# Callback to ensure that all caches are the correct size, registered when the
+# configuration has been loaded.
+_ENSURE_CORRECT_CACHE_SIZING = None
+
 
 def add_resizable_cache(cache_name, cache_resize_callback):
     _CACHES[cache_name.lower()] = cache_resize_callback
-    cache_resize_callback(DEFAULT_CACHE_SIZE_FACTOR)
+    if _ENSURE_CORRECT_CACHE_SIZING:
+        _ENSURE_CORRECT_CACHE_SIZING()
 
 
 class CacheConfig(Config):
     section = "caches"
     _environ = os.environ
 
+    @staticmethod
+    def _reset():
+        global DEFAULT_CACHE_SIZE_FACTOR
+        global _ENSURE_CORRECT_CACHE_SIZING
+
+        DEFAULT_CACHE_SIZE_FACTOR = float(os.environ.get(_CACHE_PREFIX, 0.5))
+        _ENSURE_CORRECT_CACHE_SIZING = None
+        _CACHES.clear()
+
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 
         global DEFAULT_CACHE_SIZE_FACTOR
+        global _ENSURE_CORRECT_CACHE_SIZING
 
         cache_config = config.get("caches", {})
 
@@ -79,9 +94,7 @@ class CacheConfig(Config):
 
         individual_factors.update(individual_factors_config)
 
-        self.cache_factors = defaultdict(
-            lambda: self.global_factor
-        )  # type: DefaultDict[str, float]
+        self.cache_factors = dict()  # type: Dict[str, float]
 
         for cache, factor in individual_factors.items():
             if not isinstance(factor, (int, float)):
@@ -89,3 +102,12 @@ class CacheConfig(Config):
                     "caches.per_cache_factors.%s must be a number" % (cache.lower(),)
                 )
             self.cache_factors[cache.lower()] = factor
+
+        # Register the global callback so that the individual cache sizes get set.
+        def ensure_cache_sizes():
+            for cache_name, callback in _CACHES.items():
+                new_factor = self.cache_factors.get(cache_name, self.global_factor)
+                callback(new_factor)
+
+        _ENSURE_CORRECT_CACHE_SIZING = ensure_cache_sizes
+        _ENSURE_CORRECT_CACHE_SIZING()
