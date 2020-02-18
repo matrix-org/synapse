@@ -271,31 +271,6 @@ class StatsStore(StateDeltasStore):
 
         return slice_list
 
-    def get_room_stats_state(self, room_id):
-        """
-        Returns the current room_stats_state for a room.
-
-        Args:
-            room_id (str): The ID of the room to return state for.
-
-        Returns (dict):
-            Dictionary containing these keys:
-                "name", "topic", "canonical_alias", "avatar", "join_rules",
-                "history_visibility"
-        """
-        return self.db.simple_select_one(
-            "room_stats_state",
-            {"room_id": room_id},
-            retcols=(
-                "name",
-                "topic",
-                "canonical_alias",
-                "avatar",
-                "join_rules",
-                "history_visibility",
-            ),
-        )
-
     @cached()
     def get_earliest_token_for_stats(self, stats_type, id):
         """

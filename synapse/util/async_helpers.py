@@ -73,6 +73,10 @@ class ObservableDeferred(object):
         def errback(f):
             object.__setattr__(self, "_result", (False, f))
             while self._observers:
+                # This is a little bit of magic to correctly propagate stack
+                # traces when we `await` on one of the observer deferreds.
+                f.value.__failure__ = f
+
                 try:
                     # TODO: Handle errors here.
                     self._observers.pop().errback(f)

@@ -1612,7 +1612,9 @@ class ContextTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.user_id = self.register_user("user", "password")
         self.tok = self.login("user", "password")
-        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+        self.room_id = self.helper.create_room_as(
+            self.user_id, tok=self.tok, is_public=False
+        )
 
         self.other_user_id = self.register_user("user2", "password")
         self.other_tok = self.login("user2", "password")

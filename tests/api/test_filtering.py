@@ -25,7 +25,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 
 from tests import unittest
 from tests.utils import DeferredMockCallable, MockHttpResource, setup_test_homeserver
@@ -38,7 +38,7 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return make_event_from_dict(kwargs)
 
 
 class FilteringTestCase(unittest.TestCase):

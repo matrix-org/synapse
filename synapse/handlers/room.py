@@ -64,18 +64,21 @@ class RoomCreationHandler(BaseHandler):
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": True,
+            "power_level_content_override": {"invite": 0},
         },
         RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
             "join_rules": JoinRules.INVITE,
             "history_visibility": "shared",
             "original_invitees_have_ops": True,
             "guest_can_join": True,
+            "power_level_content_override": {"invite": 0},
         },
         RoomCreationPreset.PUBLIC_CHAT: {
             "join_rules": JoinRules.PUBLIC,
             "history_visibility": "shared",
             "original_invitees_have_ops": False,
             "guest_can_join": False,
+            "power_level_content_override": {},
         },
     }
 
@@ -259,7 +262,7 @@ class RoomCreationHandler(BaseHandler):
         for v in ("invite", "events_default"):
             current = int(pl_content.get(v, 0))
             if current < restricted_level:
-                logger.info(
+                logger.debug(
                     "Setting level for %s in %s to %i (was %i)",
                     v,
                     old_room_id,
@@ -269,7 +272,7 @@ class RoomCreationHandler(BaseHandler):
                 pl_content[v] = restricted_level
                 updated = True
             else:
-                logger.info("Not setting level for %s (already %i)", v, current)
+                logger.debug("Not setting level for %s (already %i)", v, current)
 
         if updated:
             try:
@@ -296,7 +299,7 @@ class RoomCreationHandler(BaseHandler):
             EventTypes.Aliases, events_default
         )
 
-        logger.info("Setting correct PLs in new room to %s", new_pl_content)
+        logger.debug("Setting correct PLs in new room to %s", new_pl_content)
         yield self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
@@ -475,9 +478,7 @@ class RoomCreationHandler(BaseHandler):
         for alias_str in aliases:
             alias = RoomAlias.from_string(alias_str)
             try:
-                yield directory_handler.delete_association(
-                    requester, alias, send_event=False
-                )
+                yield directory_handler.delete_association(requester, alias)
                 removed_aliases.append(alias_str)
             except SynapseError as e:
                 logger.warning("Unable to remove alias %s from old room: %s", alias, e)
@@ -508,7 +509,6 @@ class RoomCreationHandler(BaseHandler):
                     RoomAlias.from_string(alias),
                     new_room_id,
                     servers=(self.hs.hostname,),
-                    send_event=False,
                     check_membership=False,
                 )
                 logger.info("Moved alias %s to new room", alias)
@@ -579,9 +579,13 @@ class RoomCreationHandler(BaseHandler):
 
         # Check whether the third party rules allows/changes the room create
         # request.
-        yield self.third_party_event_rules.on_create_room(
+        event_allowed = yield self.third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
+        if not event_allowed:
+            raise SynapseError(
+                403, "You are not permitted to create rooms", Codes.FORBIDDEN
+            )
 
         if not is_requester_admin and not self.spam_checker.user_may_create_room(
             user_id
@@ -657,7 +661,6 @@ class RoomCreationHandler(BaseHandler):
                 room_id=room_id,
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
-                send_event=False,
                 check_membership=False,
             )
 
@@ -782,7 +785,7 @@ class RoomCreationHandler(BaseHandler):
         @defer.inlineCallbacks
         def send(etype, content, **kwargs):
             event = create(etype, content, **kwargs)
-            logger.info("Sending %s in new room", etype)
+            logger.debug("Sending %s in new room", etype)
             yield self.event_creation_handler.create_and_send_nonmember_event(
                 creator, event, ratelimit=False
             )
@@ -796,7 +799,7 @@ class RoomCreationHandler(BaseHandler):
         creation_content.update({"creator": creator_id})
         yield send(etype=EventTypes.Create, content=creation_content)
 
-        logger.info("Sending %s in new room", EventTypes.Member)
+        logger.debug("Sending %s in new room", EventTypes.Member)
         yield self.room_member_handler.update_membership(
             creator,
             creator.user,
@@ -825,18 +828,23 @@ class RoomCreationHandler(BaseHandler):
                     # This will be reudundant on pre-MSC2260 rooms, since the
                     # aliases event is special-cased.
                     EventTypes.Aliases: 0,
+                    EventTypes.Tombstone: 100,
+                    EventTypes.ServerACL: 100,
                 },
                 "events_default": 0,
                 "state_default": 50,
                 "ban": 50,
                 "kick": 50,
                 "redact": 50,
-                "invite": 0,
+                "invite": 50,
             }
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
+
+            # Power levels overrides are defined per chat preset
+            power_level_content.update(config["power_level_content_override"])
 
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)

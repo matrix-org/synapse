@@ -225,7 +225,7 @@ class SynapseRequest(Request):
             self.start_time, name=servlet_name, method=self.get_method()
         )
 
-        self.site.access_logger.info(
+        self.site.access_logger.debug(
             "%s - %s - Received request: %s %s",
             self.getClientIP(),
             self.site.site_tag,
