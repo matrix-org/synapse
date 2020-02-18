@@ -461,6 +461,13 @@ class RoomCreationHandler(BaseHandler):
             canonical_alias_event = yield self.store.get_event(canonical_alias_event_id)
             if canonical_alias_event:
                 canonical_alias = canonical_alias_event.content.get("alias", "")
+                canonical_alt_aliases = canonical_alias_event.content.get(
+                    "alt_aliases", []
+                )
+                # If alt_aliases is not a list, overwrite it as whatever is there
+                # cannot be handled.
+                if not isinstance(canonical_alt_aliases, list):
+                    canonical_alt_aliases = []
 
         # first we try to remove the aliases from the old room (we suppress sending
         # the room_aliases event until the end).
@@ -504,8 +511,19 @@ class RoomCreationHandler(BaseHandler):
                 # checking module decides it shouldn't, or similar.
                 logger.error("Error adding alias %s to new room: %s", alias, e)
 
+        # The canonical alias and alternative aliases can only be propagated to
+        # the new room if they were removed from the old room.
+        content = {}
+        if canonical_alias and (canonical_alias in removed_aliases):
+            content["alias"] = canonical_alias
+        canonical_alt_aliases = [
+            alias for alias in canonical_alt_aliases if alias in removed_aliases
+        ]
+        if canonical_alt_aliases:
+            content["alt_aliases"] = canonical_alt_aliases
+
         try:
-            if canonical_alias and (canonical_alias in removed_aliases):
+            if content:
                 yield self.event_creation_handler.create_and_send_nonmember_event(
                     requester,
                     {
@@ -513,8 +531,7 @@ class RoomCreationHandler(BaseHandler):
                         "state_key": "",
                         "room_id": new_room_id,
                         "sender": requester.user.to_string(),
-                        # TODO Update with alt_aliases?
-                        "content": {"alias": canonical_alias},
+                        "content": content,
                     },
                     ratelimit=False,
                 )
