@@ -219,7 +219,7 @@ Config file '%s' does not exist.
 
 The synapse docker image no longer supports generating a config file on-the-fly
 based on environment variables. You can migrate to a static config file by
-running with 'migrate_config'.  See the README for more details.
+running with 'migrate_config'. See the README for more details.
 """
                 % (config_path,)
             )
