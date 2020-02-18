@@ -1,14 +1,13 @@
 # Delegation
 
-For a more flexible configuration, you can have `server_name`
-resources (eg: `@user:example.com`) served by a different host and
-port (eg: `synapse.example.com:443`).
+Without configuring delegation, homeservers will expect the server
+responsible for resources using e.g. `example.com` as their `server_name`
+(e.g. `@user:example.com`) to be served at `example.com:8448`.
 
-Without configuring delegation, the matrix federation will
-expect to find your server via `example.com:8448`. The following methods
-allow you retain a `server_name` of `example.com` so that your user IDs, room
-aliases, etc continue to look like `*:example.com`, whilst having your
-federation traffic routed to a different server (e.g. `synapse.example.com`).
+Delegation is a Matrix feature allowing a homeserver admin to retain a
+`server_name` of `example.com` so that your user IDs, room aliases, etc
+continue to look like `*:example.com`, whilst having your federation
+traffic routed to a different server and/or port (e.g. `synapse.example.com:443`).
 
 ## .well-known delegation
 
@@ -38,11 +37,8 @@ should return:
 Note, specifying a port is optional. If no port is specified, then it defaults
 to 8448.
 
-Most installations will not need to configure .well-known. However, it can be
-useful in cases where the admin is hosting on behalf of someone else and
-therefore cannot gain access to the necessary certificate. With .well-known,
-federation servers will check for a valid TLS certificate for the delegated
-hostname (in our example: `synapse.example.com`).
+With .well-known, federation servers will check for a valid TLS certificate
+for the delegated hostname (in our example: `synapse.example.com`).
 
 ## SRV DNS record delegation
 
