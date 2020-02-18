@@ -748,7 +748,8 @@ class EventsPersistenceStorage(object):
 
         # None of the changes to state are joins, so we fall back to checking
         # the current state of the room to see if any of our users are joined
-        # (ingnoring users that have changed state.)
+        # None of the new state events are joins, so now we check the current
+        # room state to see if there are any other users in the room.
         users_to_ignore = [
             state_key
             for _, state_key in itertools.chain(delta.to_insert, delta.to_delete)
