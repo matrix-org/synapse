@@ -18,7 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -274,9 +274,10 @@ class InitialSyncHandler(BaseHandler):
 
         user_id = requester.user.to_string()
 
-        membership, member_event_id = await self._check_in_room_or_world_readable(
-            room_id, user_id
-        )
+        (
+            membership,
+            member_event_id,
+        ) = await self.auth.check_user_in_room_or_world_readable(room_id, user_id)
         is_peeking = member_event_id is None
 
         if membership == Membership.JOIN:
@@ -433,25 +434,3 @@ class InitialSyncHandler(BaseHandler):
             ret["membership"] = membership
 
         return ret
-
-    async def _check_in_room_or_world_readable(self, room_id, user_id):
-        try:
-            # check_user_was_in_room will return the most recent membership
-            # event for the user if:
-            #  * The user is a non-guest user, and was ever in the room
-            #  * The user is a guest user, and has joined the room
-            # else it will throw.
-            member_event = await self.auth.check_user_was_in_room(room_id, user_id)
-            return member_event.membership, member_event.event_id
-        except AuthError:
-            visibility = await self.state_handler.get_current_state(
-                room_id, EventTypes.RoomHistoryVisibility, ""
-            )
-            if (
-                visibility
-                and visibility.content["history_visibility"] == "world_readable"
-            ):
-                return Membership.JOIN, None
-            raise AuthError(
-                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
-            )
