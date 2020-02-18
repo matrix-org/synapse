@@ -28,8 +28,9 @@ from twisted.internet import defer
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
-from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import account
+from synapse.types import JsonDict, RoomAlias
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -1726,3 +1727,70 @@ class ContextTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(events_after), 2, events_after)
         self.assertDictEqual(events_after[0].get("content"), {}, events_after[0])
         self.assertEqual(events_after[1].get("content"), {}, events_after[1])
+
+
+class DirectoryTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+        self.room_id = self.helper.create_room_as(
+            self.room_owner, tok=self.room_owner_tok
+        )
+
+    def test_no_aliases(self):
+        res = self._get_aliases(self.room_owner_tok)
+        self.assertEqual(res["aliases"], [])
+
+    def test_not_in_room(self):
+        self.register_user("user", "test")
+        user_tok = self.login("user", "test")
+        res = self._get_aliases(user_tok, expected_code=403)
+        self.assertEqual(res["errcode"], "M_FORBIDDEN")
+
+    def test_with_aliases(self):
+        alias1 = self._random_alias()
+        alias2 = self._random_alias()
+
+        self._set_alias_via_directory(alias1)
+        self._set_alias_via_directory(alias2)
+
+        res = self._get_aliases(self.room_owner_tok)
+        self.assertEqual(set(res["aliases"]), {alias1, alias2})
+
+    def _get_aliases(self, access_token: str, expected_code: int = 200) -> JsonDict:
+        """Calls the endpoint under test. returns the json response object."""
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/aliases" % (self.room_id,),
+            access_token=access_token,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+        res = channel.json_body
+        self.assertIsInstance(res, dict)
+        if expected_code == 200:
+            self.assertIsInstance(res["aliases"], list)
+        return res
+
+    def _random_alias(self) -> str:
+        return RoomAlias(random_string(5), self.hs.hostname).to_string()
+
+    def _set_alias_via_directory(self, alias: str, expected_code: int = 200):
+        url = "/_matrix/client/r0/directory/room/" + alias
+        data = {"room_id": self.room_id}
+        request_data = json.dumps(data)
+
+        request, channel = self.make_request(
+            "PUT", url, request_data, access_token=self.room_owner_tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)

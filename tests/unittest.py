@@ -21,6 +21,7 @@ import hmac
 import inspect
 import logging
 import time
+from typing import Optional, Tuple, TypeVar, Union
 
 from mock import Mock
 
@@ -42,7 +43,13 @@ from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-from tests.server import get_clock, make_request, render, setup_test_homeserver
+from tests.server import (
+    FakeChannel,
+    get_clock,
+    make_request,
+    render,
+    setup_test_homeserver,
+)
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -334,14 +341,13 @@ class HomeserverTestCase(TestCase):
 
     def make_request(
         self,
-        method,
-        path,
-        content=b"",
-        access_token=None,
-        request=SynapseRequest,
-        shorthand=True,
-        federation_auth_origin=None,
-    ):
+        method: Union[bytes, str],
+        path: Union[bytes, str],
+        content: Union[bytes, dict] = b"",
+        access_token: Optional[str] = None,
+        shorthand: bool = True,
+        federation_auth_origin: str = None,
+    ) -> Tuple[SynapseRequest, FakeChannel]:
         """
         Create a SynapseRequest at the path using the method and containing the
         given content.
@@ -369,9 +375,8 @@ class HomeserverTestCase(TestCase):
             path,
             content,
             access_token,
-            request,
-            shorthand,
-            federation_auth_origin,
+            shorthand=shorthand,
+            federation_auth_origin=federation_auth_origin,
         )
 
     def render(self, request):
