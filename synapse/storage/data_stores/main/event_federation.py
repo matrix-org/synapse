@@ -63,7 +63,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
     def _get_auth_chain_ids_txn(self, txn, event_ids, include_given):
         if isinstance(self.database_engine, PostgresEngine):
-            # For efficieny we make the database do this if we can.
+            # For efficiency we make the database do this if we can.
             sql = """
                 WITH RECURSIVE auth_chain(event_id) AS (
                     SELECT auth_id FROM event_auth WHERE event_id = ANY(?)
