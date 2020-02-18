@@ -839,7 +839,6 @@ class RoomCreationHandler(BaseHandler):
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
             yield send(
                 etype=EventTypes.CanonicalAlias,
-                # TODO Alt alias?
                 content={"alias": room_alias.to_string()},
             )
 
