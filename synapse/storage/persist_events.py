@@ -736,8 +736,10 @@ class EventsPersistenceStorage(object):
                 if event_id == event.event_id:
                     if event.membership == Membership.JOIN:
                         return True
-                else:
-                    events_to_check.append(event_id)
+            else:
+                # The event is not in `ev_ctx_rm`, so we need to pull it out of
+                # the DB.
+                events_to_check.append(event_id)
 
         # Check if any of the changes that we don't have events for are joins.
         if events_to_check:
