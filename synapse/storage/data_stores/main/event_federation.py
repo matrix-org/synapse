@@ -62,32 +62,37 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     def _get_auth_chain_ids_txn(self, txn, event_ids, include_given):
+        if include_given:
+            results = set(event_ids)
+        else:
+            results = set()
+
         if isinstance(self.database_engine, PostgresEngine):
             # For efficiency we make the database do this if we can.
-            sql = """
-                WITH RECURSIVE auth_chain(event_id) AS (
-                    SELECT auth_id FROM event_auth WHERE event_id = ANY(?)
-                    UNION
-                    SELECT auth_id FROM event_auth
-                    INNER JOIN auth_chain USING (event_id)
-                )
-                SELECT event_id FROM auth_chain
-            """
-            txn.execute(sql, (list(event_ids),))
 
-            results = set(event_id for event_id, in txn)
+            # We need to be a little careful with querying large amounts at
+            # once, for some reason postgres really doesn't like it. We do this
+            # by only asking for auth chain of 500 events at a time.
+            event_ids = list(event_ids)
+            chunks = [event_ids[x : x + 500] for x in range(0, len(event_ids), 500)]
+            for chunk in chunks:
+                sql = """
+                    WITH RECURSIVE auth_chain(event_id) AS (
+                        SELECT auth_id FROM event_auth WHERE event_id = ANY(?)
+                        UNION
+                        SELECT auth_id FROM event_auth
+                        INNER JOIN auth_chain USING (event_id)
+                    )
+                    SELECT event_id FROM auth_chain
+                """
+                txn.execute(sql, (chunk,))
 
-            if include_given:
-                results.update(event_ids)
+                results.update(event_id for event_id, in txn)
 
             return list(results)
 
         # Database doesn't necessarily support recursive CTE, so we fall
         # back to do doing it manually.
-        if include_given:
-            results = set(event_ids)
-        else:
-            results = set()
 
         base_sql = "SELECT auth_id FROM event_auth WHERE "
 
