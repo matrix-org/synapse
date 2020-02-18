@@ -261,7 +261,7 @@ following regular expressions:
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
-    ^/_matrix/client/(api/v1|r0|unstable)/get_groups_publicised$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
