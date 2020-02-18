@@ -871,8 +871,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     async def is_local_host_in_room_ignoring_users(
         self, room_id: str, ignore_users: Collection[str]
     ) -> bool:
-        """Checks if the local server is in the room, ignoring membership of
-        the given users.
+        """Check if there are any local users, excluding those in the given
+        list, in the room.
         """
 
         clause, args = make_in_list_sql_clause(
