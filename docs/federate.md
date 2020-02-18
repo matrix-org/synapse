@@ -13,7 +13,7 @@ server (via port 8448). This is easy to set up and will work provided
 you set the `server_name` to match your machine's public DNS hostname.
 
 You will also need a valid TLS certificate for this `server_name` served
-on port 8448 - the preferred way to do that is by using a reverse proxy,
+on port 8448. The preferred way to do that is by using a reverse proxy,
 see [reverse_proxy.md](<reverse_proxy.md>) for instructions on how to
 correctly set one up.
 
