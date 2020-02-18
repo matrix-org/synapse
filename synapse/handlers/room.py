@@ -478,9 +478,7 @@ class RoomCreationHandler(BaseHandler):
         for alias_str in aliases:
             alias = RoomAlias.from_string(alias_str)
             try:
-                yield directory_handler.delete_association(
-                    requester, alias, send_event=False
-                )
+                yield directory_handler.delete_association(requester, alias)
                 removed_aliases.append(alias_str)
             except SynapseError as e:
                 logger.warning("Unable to remove alias %s from old room: %s", alias, e)
@@ -511,7 +509,6 @@ class RoomCreationHandler(BaseHandler):
                     RoomAlias.from_string(alias),
                     new_room_id,
                     servers=(self.hs.hostname,),
-                    send_event=False,
                     check_membership=False,
                 )
                 logger.info("Moved alias %s to new room", alias)
@@ -664,7 +661,6 @@ class RoomCreationHandler(BaseHandler):
                 room_id=room_id,
                 room_alias=room_alias,
                 servers=[self.hs.hostname],
-                send_event=False,
                 check_membership=False,
             )
 
