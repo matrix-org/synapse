@@ -45,6 +45,10 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
 
+MYPY = False
+if MYPY:
+    import synapse.server
+
 logger = logging.getLogger(__name__)
 
 
@@ -843,6 +847,24 @@ class RoomTypingRestServlet(RestServlet):
         return 200, {}
 
 
+class RoomAliasListServlet(RestServlet):
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/aliases", unstable=False)
+
+    def __init__(self, hs: "synapse.server.HomeServer"):
+        super().__init__()
+        self.auth = hs.get_auth()
+        self.directory_handler = hs.get_handlers().directory_handler
+
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+
+        alias_list = await self.directory_handler.get_aliases_for_room(
+            requester, room_id
+        )
+
+        return 200, {"aliases": alias_list}
+
+
 class SearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/search$", v1=True)
 
@@ -931,6 +953,7 @@ def register_servlets(hs, http_server):
     JoinedRoomsRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
+    RoomAliasListServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):

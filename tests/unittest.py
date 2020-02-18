@@ -21,6 +21,7 @@ import hmac
 import inspect
 import logging
 import time
+from typing import Optional, Tuple, Type, TypeVar, Union
 
 from mock import Mock
 
@@ -42,7 +43,13 @@ from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
 
-from tests.server import get_clock, make_request, render, setup_test_homeserver
+from tests.server import (
+    FakeChannel,
+    get_clock,
+    make_request,
+    render,
+    setup_test_homeserver,
+)
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -69,6 +76,9 @@ def around(target):
         setattr(target, name, new)
 
     return _around
+
+
+T = TypeVar("T")
 
 
 class TestCase(unittest.TestCase):
@@ -334,14 +344,14 @@ class HomeserverTestCase(TestCase):
 
     def make_request(
         self,
-        method,
-        path,
-        content=b"",
-        access_token=None,
-        request=SynapseRequest,
-        shorthand=True,
-        federation_auth_origin=None,
-    ):
+        method: Union[bytes, str],
+        path: Union[bytes, str],
+        content: Union[bytes, dict] = b"",
+        access_token: Optional[str] = None,
+        request: Type[T] = SynapseRequest,
+        shorthand: bool = True,
+        federation_auth_origin: str = None,
+    ) -> Tuple[T, FakeChannel]:
         """
         Create a SynapseRequest at the path using the method and containing the
         given content.
