@@ -261,6 +261,7 @@ following regular expressions:
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
 
 Additionally, the following REST endpoints can be handled for GET requests:
@@ -287,8 +288,8 @@ the following regular expressions:
 
     ^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$
 
-When using this worker you must also set `update_user_directory: False` in the 
-shared configuration file to stop the main synapse running background 
+When using this worker you must also set `update_user_directory: False` in the
+shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.
 
 ### `synapse.app.frontend_proxy`
