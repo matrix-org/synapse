@@ -1,3 +1,12 @@
+Synapse 1.10.1 (2020-02-17)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in Synapse 1.10.0 which would cause room state to be cleared in the database if Synapse was upgraded direct from 1.2.1 or earlier to 1.10.0. ([\#6924](https://github.com/matrix-org/synapse/issues/6924))
+
+
 Synapse 1.10.0 (2020-02-12)
 ===========================
 
