@@ -488,19 +488,6 @@ class RoomCreationHandler(BaseHandler):
         if not removed_aliases:
             return
 
-        try:
-            # this can fail if, for some reason, our user doesn't have perms to send
-            # m.room.aliases events in the old room (note that we've already checked that
-            # they have perms to send a tombstone event, so that's not terribly likely).
-            #
-            # If that happens, it's regrettable, but we should carry on: it's the same
-            # as when you remove an alias from the directory normally - it just means that
-            # the aliases event gets out of sync with the directory
-            # (cf https://github.com/vector-im/riot-web/issues/2369)
-            yield directory_handler.send_room_alias_update_event(requester, old_room_id)
-        except AuthError as e:
-            logger.warning("Failed to send updated alias event on old room: %s", e)
-
         # we can now add any aliases we successfully removed to the new room.
         for alias in removed_aliases:
             try:
@@ -526,12 +513,11 @@ class RoomCreationHandler(BaseHandler):
                         "state_key": "",
                         "room_id": new_room_id,
                         "sender": requester.user.to_string(),
+                        # TODO Update with alt_aliases?
                         "content": {"alias": canonical_alias},
                     },
                     ratelimit=False,
                 )
-
-            yield directory_handler.send_room_alias_update_event(requester, new_room_id)
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.
@@ -757,7 +743,6 @@ class RoomCreationHandler(BaseHandler):
 
         if room_alias:
             result["room_alias"] = room_alias.to_string()
-            yield directory_handler.send_room_alias_update_event(requester, room_id)
 
         return result
 
@@ -854,6 +839,7 @@ class RoomCreationHandler(BaseHandler):
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
             yield send(
                 etype=EventTypes.CanonicalAlias,
+                # TODO Alt alias?
                 content={"alias": room_alias.to_string()},
             )
 

@@ -283,22 +283,6 @@ class DirectoryHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def send_room_alias_update_event(self, requester, room_id):
-        aliases = yield self.store.get_aliases_for_room(room_id)
-
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.Aliases,
-                "state_key": self.hs.hostname,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "content": {"aliases": aliases},
-            },
-            ratelimit=False,
-        )
-
-    @defer.inlineCallbacks
     def _update_canonical_alias(self, requester, user_id, room_id, room_alias):
         """
         Send an updated canonical alias event if the removed alias was set as
