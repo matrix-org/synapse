@@ -21,7 +21,7 @@ import hmac
 import inspect
 import logging
 import time
-from typing import Optional, Tuple, TypeVar, Union
+from typing import Optional, Tuple, Type, TypeVar, Union
 
 from mock import Mock
 
@@ -76,6 +76,9 @@ def around(target):
         setattr(target, name, new)
 
     return _around
+
+
+T = TypeVar("T")
 
 
 class TestCase(unittest.TestCase):
@@ -345,9 +348,10 @@ class HomeserverTestCase(TestCase):
         path: Union[bytes, str],
         content: Union[bytes, dict] = b"",
         access_token: Optional[str] = None,
+        request: Type[T] = SynapseRequest,
         shorthand: bool = True,
         federation_auth_origin: str = None,
-    ) -> Tuple[SynapseRequest, FakeChannel]:
+    ) -> Tuple[T, FakeChannel]:
         """
         Create a SynapseRequest at the path using the method and containing the
         given content.
@@ -375,8 +379,9 @@ class HomeserverTestCase(TestCase):
             path,
             content,
             access_token,
-            shorthand=shorthand,
-            federation_auth_origin=federation_auth_origin,
+            request,
+            shorthand,
+            federation_auth_origin,
         )
 
     def render(self, request):
