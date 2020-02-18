@@ -10,7 +10,7 @@ The `server_name` configured in the Synapse configuration file (often
 identified (eg: `@user:example.com`, `#room:example.com`). By default,
 it is also the domain that other servers will use to try to reach your
 server (via port 8448). This is easy to set up and will work provided
-you set the `server_name` to match your machine's public DNS hostname. 
+you set the `server_name` to match your machine's public DNS hostname.
 
 You will also need a valid TLS certificate for this `server_name` served
 on port 8448 - the preferred way to do that is by using a reverse proxy,
@@ -23,7 +23,7 @@ to use port than 8448 (e.g. you want to use `example.com` as your `server_name`
 but want Synapse to be reachable on `synapse.example.com:443`). This can
 be done using delegation, which allows an admin to dictate where federation
 traffic should be sent, see [delegate.md](<delegate.md>) for instructions on
-how to set this up. 
+how to set this up.
 
 Once federation has been configured, you should be able to join a room over
 federation. A good place to start is `#synapse:matrix.org` - a room for
