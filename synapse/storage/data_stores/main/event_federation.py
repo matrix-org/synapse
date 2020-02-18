@@ -82,7 +82,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             return list(results)
 
-        # Database doesn't necessarily support recursive CTE, so we falll
+        # Database doesn't necessarily support recursive CTE, so we fall
         # back to do doing it manually.
         if include_given:
             results = set(event_ids)
