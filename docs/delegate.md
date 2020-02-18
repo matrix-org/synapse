@@ -44,6 +44,16 @@ therefore cannot gain access to the necessary certificate. With .well-known,
 federation servers will check for a valid TLS certificate for the delegated
 hostname (in our example: `synapse.example.com`).
 
+## SRV DNS record delegation
+
+It is also possible to do delegation using a SRV DNS record. However, that is
+considered an advanced topic since it's a bit complex to set up, and `.well-known`
+delegation is already enough in most cases.
+
+However, if you really need it, you can find some documentation on how such a
+record should look like and how Synapse will use it in [the Matrix
+specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names).
+
 ## Delegation FAQ
 
 ### When do I need delegation?
