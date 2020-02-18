@@ -868,6 +868,37 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             desc="get_membership_from_event_ids",
         )
 
+    async def is_local_host_in_room_ignoring_users(
+        self, room_id: str, ignore_users: Collection[str]
+    ) -> bool:
+        """Checks if the local server is in the room, ignoring membership of
+        the given users.
+        """
+
+        clause, args = make_in_list_sql_clause(
+            self.database_engine, "user_id", ignore_users
+        )
+
+        sql = """
+            SELECT 1 FROM local_current_membership
+            WHERE
+                room_id = ? AND membership = ?
+                AND NOT (%s)
+                LIMIT 1
+        """ % (
+            clause,
+        )
+
+        def _is_local_host_in_room_ignoring_users_txn(txn):
+            txn.execute(sql, (room_id, Membership.JOIN, *args))
+
+            return bool(txn.fetchone())
+
+        return await self.db.runInteraction(
+            "is_local_host_in_room_ignoring_users",
+            _is_local_host_in_room_ignoring_users_txn,
+        )
+
 
 class RoomMemberBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: Database, db_conn, hs):
