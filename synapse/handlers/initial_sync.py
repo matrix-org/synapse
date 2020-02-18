@@ -277,7 +277,9 @@ class InitialSyncHandler(BaseHandler):
         (
             membership,
             member_event_id,
-        ) = await self.auth.check_user_in_room_or_world_readable(room_id, user_id)
+        ) = await self.auth.check_user_in_room_or_world_readable(
+            room_id, user_id, allow_departed_users=True,
+        )
         is_peeking = member_event_id is None
 
         if membership == Membership.JOIN:

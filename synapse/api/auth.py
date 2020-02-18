@@ -625,9 +625,17 @@ class Auth(object):
             return query_params[0].decode("ascii")
 
     @defer.inlineCallbacks
-    def check_in_room_or_world_readable(self, room_id, user_id):
+    def check_user_in_room_or_world_readable(
+        self, room_id: str, user_id: str, allow_departed_users: bool = False
+    ):
         """Checks that the user is or was in the room or the room is world
         readable. If it isn't then an exception is raised.
+
+        Args:
+            room_id: room to check
+            user_id: user to check
+            allow_departed_users: if True, accept users that were previously
+                members but have now departed
 
         Returns:
             Deferred[tuple[str, str|None]]: Resolves to the current membership of
@@ -643,7 +651,7 @@ class Auth(object):
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             member_event = yield self.check_user_in_room(
-                room_id, user_id, allow_departed_users=True
+                room_id, user_id, allow_departed_users=allow_departed_users
             )
             return member_event.membership, member_event.event_id
         except AuthError:
@@ -656,7 +664,9 @@ class Auth(object):
             ):
                 return Membership.JOIN, None
             raise AuthError(
-                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+                403,
+                "User %s not in room %s, and room previews are disabled"
+                % (user_id, room_id),
             )
 
     @defer.inlineCallbacks
