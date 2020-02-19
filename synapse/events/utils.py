@@ -360,7 +360,7 @@ class EventClientSerializer(object):
         """
         # To handle the case of presence events and the like
         if not isinstance(event, EventBase):
-            defer.returnValue(event)
+            return event
 
         event_id = event.event_id
         serialized_event = serialize_event(event, time_now, **kwargs)
@@ -406,7 +406,7 @@ class EventClientSerializer(object):
                     "sender": edit.sender,
                 }
 
-        defer.returnValue(serialized_event)
+        return serialized_event
 
     def serialize_events(self, events, time_now, **kwargs):
         """Serializes multiple events.

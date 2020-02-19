@@ -374,7 +374,7 @@ class PerDestinationQueue(object):
 
         assert len(edus) <= limit, "get_devices_by_remote returned too many EDUs"
 
-        defer.returnValue((edus, now_stream_id))
+        return (edus, now_stream_id)
 
     @defer.inlineCallbacks
     def _get_to_device_message_edus(self, limit):
@@ -393,4 +393,4 @@ class PerDestinationQueue(object):
             for content in contents
         ]
 
-        defer.returnValue((edus, stream_id))
+        return (edus, stream_id)

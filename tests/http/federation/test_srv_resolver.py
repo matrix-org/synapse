@@ -61,7 +61,7 @@ class SrvResolverTestCase(unittest.TestCase):
                 # should have restored our context
                 self.assertIs(LoggingContext.current_context(), ctx)
 
-                defer.returnValue(result)
+                return result
 
         test_d = do_lookup()
         self.assertNoResult(test_d)

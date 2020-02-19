@@ -56,7 +56,7 @@ class EventSources(object):
             device_list_key=device_list_key,
             groups_key=groups_key,
         )
-        defer.returnValue(token)
+        return token
 
     @defer.inlineCallbacks
     def get_current_token_for_pagination(self):
@@ -80,4 +80,4 @@ class EventSources(object):
             device_list_key=0,
             groups_key=0,
         )
-        defer.returnValue(token)
+        return token

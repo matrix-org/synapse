@@ -92,7 +92,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 user_id, last_deleted_stream_id
             )
             if not has_changed:
-                defer.returnValue(0)
+                return 0
 
         def delete_messages_for_device_txn(txn):
             sql = (
@@ -115,7 +115,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             last_deleted_stream_id, up_to_stream_id
         )
 
-        defer.returnValue(count)
+        return count
 
     def get_new_device_msgs_for_remote(
         self, destination, last_stream_id, current_stream_id, limit
@@ -263,7 +263,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
                     destination, stream_id
                 )
 
-        defer.returnValue(self._device_inbox_id_gen.get_current_token())
+        return self._device_inbox_id_gen.get_current_token()
 
     @defer.inlineCallbacks
     def add_messages_from_remote_to_device_inbox(
@@ -312,7 +312,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
             for user_id in local_messages_by_user_then_device.keys():
                 self._device_inbox_stream_cache.entity_has_changed(user_id, stream_id)
 
-        defer.returnValue(stream_id)
+        return stream_id
 
     def _add_messages_to_local_device_inbox_txn(
         self, txn, stream_id, messages_by_user_then_device
@@ -426,4 +426,4 @@ class DeviceInboxStore(DeviceInboxWorkerStore, BackgroundUpdateStore):
 
         yield self._end_background_update(self.DEVICE_INBOX_STREAM_ID)
 
-        defer.returnValue(1)
+        return 1

@@ -86,7 +86,7 @@ class StatsHandler(StateDeltasHandler):
 
         # If still None then the initial background update hasn't happened yet
         if self.pos is None:
-            defer.returnValue(None)
+            return None
 
         # Loop round handling deltas until we're up to date
         while True:
@@ -328,6 +328,6 @@ class StatsHandler(StateDeltasHandler):
                 == "world_readable"
             )
         ):
-            defer.returnValue(True)
+            return True
         else:
-            defer.returnValue(False)
+            return False

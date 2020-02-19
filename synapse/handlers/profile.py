@@ -161,7 +161,7 @@ class BaseProfileHandler(BaseHandler):
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
 
-            defer.returnValue({"displayname": displayname, "avatar_url": avatar_url})
+            return {"displayname": displayname, "avatar_url": avatar_url}
         else:
             try:
                 result = yield self.federation.make_query(
@@ -170,7 +170,7 @@ class BaseProfileHandler(BaseHandler):
                     args={"user_id": user_id},
                     ignore_backoff=True,
                 )
-                defer.returnValue(result)
+                return result
             except RequestSendFailed as e:
                 raise_from(SynapseError(502, "Failed to fetch profile"), e)
             except HttpResponseException as e:
@@ -196,10 +196,10 @@ class BaseProfileHandler(BaseHandler):
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
 
-            defer.returnValue({"displayname": displayname, "avatar_url": avatar_url})
+            return {"displayname": displayname, "avatar_url": avatar_url}
         else:
             profile = yield self.store.get_from_remote_profile_cache(user_id)
-            defer.returnValue(profile or {})
+            return profile or {}
 
     @defer.inlineCallbacks
     def get_displayname(self, target_user):
@@ -213,7 +213,7 @@ class BaseProfileHandler(BaseHandler):
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
 
-            defer.returnValue(displayname)
+            return displayname
         else:
             try:
                 result = yield self.federation.make_query(
@@ -227,7 +227,7 @@ class BaseProfileHandler(BaseHandler):
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-            defer.returnValue(result["displayname"])
+            return result["displayname"]
 
     @defer.inlineCallbacks
     def set_displayname(self, target_user, requester, new_displayname, by_admin=False):
@@ -323,7 +323,7 @@ class BaseProfileHandler(BaseHandler):
                 if e.code == 404:
                     raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
                 raise
-            defer.returnValue(avatar_url)
+            return avatar_url
         else:
             try:
                 result = yield self.federation.make_query(
@@ -337,7 +337,7 @@ class BaseProfileHandler(BaseHandler):
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-            defer.returnValue(result["avatar_url"])
+            return result["avatar_url"]
 
     @defer.inlineCallbacks
     def set_avatar_url(self, target_user, requester, new_avatar_url, by_admin=False):
@@ -452,7 +452,7 @@ class BaseProfileHandler(BaseHandler):
                 raise SynapseError(404, "Profile was not found", Codes.NOT_FOUND)
             raise
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     def _update_join_states(self, requester, target_user):

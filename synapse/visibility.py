@@ -238,7 +238,7 @@ def filter_events_for_client(
     filtered_events = filter(operator.truth, filtered_events)
 
     # we turn it into a list before returning it.
-    defer.returnValue(list(filtered_events))
+    return list(filtered_events)
 
 
 @defer.inlineCallbacks
@@ -347,11 +347,11 @@ def filter_events_for_server(
                 elif redact:
                     to_return.append(prune_event(e))
 
-            defer.returnValue(to_return)
+            return to_return
 
         # If there are no erased users then we can just return the given list
         # of events without having to copy it.
-        defer.returnValue(events)
+        return events
 
     # Ok, so we're dealing with events that have non-trivial visibility
     # rules, so we need to also get the memberships of the room.
@@ -414,4 +414,4 @@ def filter_events_for_server(
         elif redact:
             to_return.append(prune_event(e))
 
-    defer.returnValue(to_return)
+    return to_return

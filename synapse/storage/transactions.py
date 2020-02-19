@@ -147,7 +147,7 @@ class TransactionStore(SQLBaseStore):
 
         result = self._destination_retry_cache.get(destination, SENTINEL)
         if result is not SENTINEL:
-            defer.returnValue(result)
+            return result
 
         result = yield self.runInteraction(
             "get_destination_retry_timings",
@@ -158,7 +158,7 @@ class TransactionStore(SQLBaseStore):
         # We don't hugely care about race conditions between getting and
         # invalidating the cache, since we time out fairly quickly anyway.
         self._destination_retry_cache[destination] = result
-        defer.returnValue(result)
+        return result
 
     def _get_destination_retry_timings(self, txn, destination):
         result = self._simple_select_one_txn(

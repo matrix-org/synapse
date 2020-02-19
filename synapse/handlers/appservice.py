@@ -167,8 +167,8 @@ class ApplicationServicesHandler(object):
         for user_service in user_query_services:
             is_known_user = yield self.appservice_api.query_user(user_service, user_id)
             if is_known_user:
-                defer.returnValue(True)
-        defer.returnValue(False)
+                return True
+        return False
 
     @defer.inlineCallbacks
     def query_room_alias_exists(self, room_alias):
@@ -192,7 +192,7 @@ class ApplicationServicesHandler(object):
             if is_known_alias:
                 # the alias exists now so don't query more ASes.
                 result = yield self.store.get_association_from_room_alias(room_alias)
-                defer.returnValue(result)
+                return result
 
     @defer.inlineCallbacks
     def query_3pe(self, kind, protocol, fields):
@@ -215,7 +215,7 @@ class ApplicationServicesHandler(object):
             if success:
                 ret.extend(result)
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_3pe_protocols(self, only_protocol=None):
@@ -254,7 +254,7 @@ class ApplicationServicesHandler(object):
         for p in protocols.keys():
             protocols[p] = _merge_instances(protocols[p])
 
-        defer.returnValue(protocols)
+        return protocols
 
     @defer.inlineCallbacks
     def _get_services_for_event(self, event):
@@ -276,7 +276,7 @@ class ApplicationServicesHandler(object):
             if (yield s.is_interested(event, self.store)):
                 interested_list.append(s)
 
-        defer.returnValue(interested_list)
+        return interested_list
 
     def _get_services_for_user(self, user_id):
         services = self.store.get_app_services()
@@ -293,23 +293,23 @@ class ApplicationServicesHandler(object):
         if not self.is_mine_id(user_id):
             # we don't know if they are unknown or not since it isn't one of our
             # users. We can't poke ASes.
-            defer.returnValue(False)
+            return False
             return
 
         user_info = yield self.store.get_user_by_id(user_id)
         if user_info:
-            defer.returnValue(False)
+            return False
             return
 
         # user not found; could be the AS though, so check.
         services = self.store.get_app_services()
         service_list = [s for s in services if s.sender == user_id]
-        defer.returnValue(len(service_list) == 0)
+        return len(service_list) == 0
 
     @defer.inlineCallbacks
     def _check_user_exists(self, user_id):
         unknown_user = yield self._is_unknown_user(user_id)
         if unknown_user:
             exists = yield self.query_user_exists(user_id)
-            defer.returnValue(exists)
-        defer.returnValue(True)
+            return exists
+        return True

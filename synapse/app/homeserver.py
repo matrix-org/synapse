@@ -406,7 +406,7 @@ def setup(config_options):
         if provision:
             yield acme.provision_certificate()
 
-        defer.returnValue(provision)
+        return provision
 
     @defer.inlineCallbacks
     def reprovision_acme():

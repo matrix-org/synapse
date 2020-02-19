@@ -61,7 +61,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
         row["session_data"] = json.loads(row["session_data"])
 
-        defer.returnValue(row)
+        return row
 
     @defer.inlineCallbacks
     def set_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
@@ -118,7 +118,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         try:
             version = int(version)
         except ValueError:
-            defer.returnValue({"rooms": {}})
+            return {"rooms": {}}
 
         keyvalues = {"user_id": user_id, "version": version}
         if room_id:
@@ -151,7 +151,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "session_data": json.loads(row["session_data"]),
             }
 
-        defer.returnValue(sessions)
+        return sessions
 
     @defer.inlineCallbacks
     def delete_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):

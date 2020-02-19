@@ -159,7 +159,7 @@ class DescriptorTestCase(unittest.TestCase):
                 def inner_fn():
                     with PreserveLoggingContext():
                         yield complete_lookup
-                    defer.returnValue(1)
+                    return 1
 
                 return inner_fn()
 
@@ -169,7 +169,7 @@ class DescriptorTestCase(unittest.TestCase):
                 c1.name = "c1"
                 r = yield obj.fn(1)
                 self.assertEqual(LoggingContext.current_context(), c1)
-            defer.returnValue(r)
+            return r
 
         def check_result(r):
             self.assertEqual(r, 1)
@@ -286,7 +286,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
                 # we want this to behave like an asynchronous function
                 yield run_on_reactor()
                 assert LoggingContext.current_context().request == "c1"
-                defer.returnValue(self.mock(args1, arg2))
+                return self.mock(args1, arg2)
 
         with LoggingContext() as c1:
             c1.request = "c1"
@@ -334,7 +334,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def list_fn(self, args1, arg2):
                 # we want this to behave like an asynchronous function
                 yield run_on_reactor()
-                defer.returnValue(self.mock(args1, arg2))
+                return self.mock(args1, arg2)
 
         obj = Cls()
         invalidate0 = mock.Mock()

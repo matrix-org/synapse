@@ -89,7 +89,7 @@ the function becomes the operation name for the span.
        # We start
        yield we_wait
        # we finish
-       defer.returnValue(something_usual_and_useful)
+       return something_usual_and_useful
 
 Operation names can be explicitly set for functions by using
 ``trace_using_operation_name`` and
@@ -113,7 +113,7 @@ Operation names can be explicitly set for functions by using
        # We start
        yield we_wait
        # we finish
-       defer.returnValue(something_usual_and_useful)
+       return something_usual_and_useful
 
 Contexts and carriers
 ---------------------
@@ -694,7 +694,7 @@ def trace_servlet(servlet_name, func):
             },
         ):
             result = yield defer.maybeDeferred(func, request, *args, **kwargs)
-            defer.returnValue(result)
+            return result
 
     return _trace_servlet_inner
 

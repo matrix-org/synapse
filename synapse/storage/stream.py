@@ -300,7 +300,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         if not room_ids:
-            defer.returnValue({})
+            return {}
 
         results = {}
         room_ids = list(room_ids)
@@ -323,7 +323,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             )
             results.update(dict(zip(rm_ids, res)))
 
-        defer.returnValue(results)
+        return results
 
     def get_rooms_that_changed(self, room_ids, from_key):
         """Given a list of rooms and a token, return rooms where there may have
@@ -364,7 +364,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             the chunk of events returned.
         """
         if from_key == to_key:
-            defer.returnValue(([], from_key))
+            return ([], from_key)
 
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
         to_id = RoomStreamToken.parse_stream_token(to_key).stream
@@ -374,7 +374,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         if not has_changed:
-            defer.returnValue(([], from_key))
+            return ([], from_key)
 
         def f(txn):
             sql = (
@@ -407,7 +407,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             # get.
             key = from_key
 
-        defer.returnValue((ret, key))
+        return (ret, key)
 
     @defer.inlineCallbacks
     def get_membership_changes_for_user(self, user_id, from_key, to_key):
@@ -415,14 +415,14 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         to_id = RoomStreamToken.parse_stream_token(to_key).stream
 
         if from_key == to_key:
-            defer.returnValue([])
+            return []
 
         if from_id:
             has_changed = self._membership_stream_cache.has_entity_changed(
                 user_id, int(from_id)
             )
             if not has_changed:
-                defer.returnValue([])
+                return []
 
         def f(txn):
             sql = (
@@ -447,7 +447,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         self._set_before_and_after(ret, rows, topo_order=False)
 
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def get_recent_events_for_room(self, room_id, limit, end_token):
@@ -477,7 +477,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         self._set_before_and_after(events, rows)
 
-        defer.returnValue((events, token))
+        return (events, token)
 
     @defer.inlineCallbacks
     def get_recent_event_ids_for_room(self, room_id, limit, end_token):
@@ -496,7 +496,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         # Allow a zero limit here, and no-op.
         if limit == 0:
-            defer.returnValue(([], end_token))
+            return ([], end_token)
 
         end_token = RoomStreamToken.parse(end_token)
 
@@ -511,7 +511,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         # We want to return the results in ascending order.
         rows.reverse()
 
-        defer.returnValue((rows, token))
+        return (rows, token)
 
     def get_room_event_after_stream_ordering(self, room_id, stream_ordering):
         """Gets details of the first event in a room at or after a stream ordering
@@ -549,12 +549,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         """
         token = yield self.get_room_max_stream_ordering()
         if room_id is None:
-            defer.returnValue("s%d" % (token,))
+            return "s%d" % (token,)
         else:
             topo = yield self.runInteraction(
                 "_get_max_topological_txn", self._get_max_topological_txn, room_id
             )
-            defer.returnValue("t%d-%d" % (topo, token))
+            return "t%d-%d" % (topo, token)
 
     def get_stream_token_for_event(self, event_id):
         """The stream token for an event
@@ -674,14 +674,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             [e for e in results["after"]["event_ids"]], get_prev_content=True
         )
 
-        defer.returnValue(
-            {
-                "events_before": events_before,
-                "events_after": events_after,
-                "start": results["before"]["token"],
-                "end": results["after"]["token"],
-            }
-        )
+        return {
+            "events_before": events_before,
+            "events_after": events_after,
+            "start": results["before"]["token"],
+            "end": results["after"]["token"],
+        }
 
     def _get_events_around_txn(
         self, txn, room_id, event_id, before_limit, after_limit, event_filter
@@ -785,7 +783,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         events = yield self.get_events_as_list(event_ids)
 
-        defer.returnValue((upper_bound, events))
+        return (upper_bound, events)
 
     def get_federation_out_pos(self, typ):
         return self._simple_select_one_onecol(
@@ -939,7 +937,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         self._set_before_and_after(events, rows)
 
-        defer.returnValue((events, token))
+        return (events, token)
 
 
 class StreamStore(StreamWorkerStore):

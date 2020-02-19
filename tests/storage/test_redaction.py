@@ -69,7 +69,7 @@ class RedactionTestCase(unittest.TestCase):
 
         yield self.store.persist_event(event, context)
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def inject_message(self, room, user, body):
@@ -92,7 +92,7 @@ class RedactionTestCase(unittest.TestCase):
 
         yield self.store.persist_event(event, context)
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def inject_redaction(self, room, event_id, user, reason):

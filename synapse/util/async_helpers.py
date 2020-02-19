@@ -366,7 +366,7 @@ class ReadWriteLock(object):
                 new_defer.callback(None)
                 self.key_to_current_readers.get(key, set()).discard(new_defer)
 
-        defer.returnValue(_ctx_manager())
+        return _ctx_manager()
 
     @defer.inlineCallbacks
     def write(self, key):
@@ -396,7 +396,7 @@ class ReadWriteLock(object):
                 if self.key_to_current_writer[key] == new_defer:
                     self.key_to_current_writer.pop(key)
 
-        defer.returnValue(_ctx_manager())
+        return _ctx_manager()
 
 
 def _cancelled_to_timed_out_error(value, timeout):

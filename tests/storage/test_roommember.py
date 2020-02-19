@@ -67,7 +67,7 @@ class RoomMemberStoreTestCase(unittest.TestCase):
 
         yield self.store.persist_event(event, context)
 
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def test_one_member(self):

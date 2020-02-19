@@ -84,7 +84,7 @@ class ReceiptsHandler(BaseHandler):
 
         if min_batch_id is None:
             # no new receipts
-            defer.returnValue(False)
+            return False
 
         affected_room_ids = list(set([r.room_id for r in receipts]))
 
@@ -94,7 +94,7 @@ class ReceiptsHandler(BaseHandler):
             min_batch_id, max_batch_id, affected_room_ids
         )
 
-        defer.returnValue(True)
+        return True
 
     @defer.inlineCallbacks
     def received_client_receipt(self, room_id, receipt_type, user_id, event_id):
@@ -124,9 +124,9 @@ class ReceiptsHandler(BaseHandler):
         )
 
         if not result:
-            defer.returnValue([])
+            return []
 
-        defer.returnValue(result)
+        return result
 
 
 class ReceiptEventSource(object):
@@ -139,13 +139,13 @@ class ReceiptEventSource(object):
         to_key = yield self.get_current_key()
 
         if from_key == to_key:
-            defer.returnValue(([], to_key))
+            return ([], to_key)
 
         events = yield self.store.get_linearized_receipts_for_rooms(
             room_ids, from_key=from_key, to_key=to_key
         )
 
-        defer.returnValue((events, to_key))
+        return (events, to_key)
 
     def get_current_key(self, direction="f"):
         return self.store.get_max_receipt_stream_id()
@@ -164,4 +164,4 @@ class ReceiptEventSource(object):
             room_ids, from_key=from_key, to_key=to_key
         )
 
-        defer.returnValue((events, to_key))
+        return (events, to_key)

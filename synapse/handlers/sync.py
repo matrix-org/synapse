@@ -263,7 +263,7 @@ class SyncHandler(object):
             timeout,
             full_state,
         )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def _wait_for_sync_for_user(self, sync_config, since_token, timeout, full_state):
@@ -303,7 +303,7 @@ class SyncHandler(object):
                 lazy_loaded = "false"
             non_empty_sync_counter.labels(sync_type, lazy_loaded).inc()
 
-        defer.returnValue(result)
+        return result
 
     def current_sync_for_user(self, sync_config, since_token=None, full_state=False):
         """Get the sync for client needed to match what the server has now.
@@ -317,7 +317,7 @@ class SyncHandler(object):
         user_id = user.to_string()
         rules = yield self.store.get_push_rules_for_user(user_id)
         rules = format_push_rules_for_user(user, rules)
-        defer.returnValue(rules)
+        return rules
 
     @defer.inlineCallbacks
     def ephemeral_by_room(self, sync_result_builder, now_token, since_token=None):
@@ -378,7 +378,7 @@ class SyncHandler(object):
                 event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
-        defer.returnValue((now_token, ephemeral_by_room))
+        return (now_token, ephemeral_by_room)
 
     @defer.inlineCallbacks
     def _load_filtered_recents(
@@ -426,8 +426,8 @@ class SyncHandler(object):
                 recents = []
 
             if not limited or block_all_timeline:
-                defer.returnValue(
-                    TimelineBatch(events=recents, prev_batch=now_token, limited=False)
+                return TimelineBatch(
+                    events=recents, prev_batch=now_token, limited=False
                 )
 
             filtering_factor = 2
@@ -490,12 +490,10 @@ class SyncHandler(object):
 
             prev_batch_token = now_token.copy_and_replace("room_key", room_key)
 
-        defer.returnValue(
-            TimelineBatch(
-                events=recents,
-                prev_batch=prev_batch_token,
-                limited=limited or newly_joined_room,
-            )
+        return TimelineBatch(
+            events=recents,
+            prev_batch=prev_batch_token,
+            limited=limited or newly_joined_room,
         )
 
     @defer.inlineCallbacks
@@ -517,7 +515,7 @@ class SyncHandler(object):
         if event.is_state():
             state_ids = state_ids.copy()
             state_ids[(event.type, event.state_key)] = event.event_id
-        defer.returnValue(state_ids)
+        return state_ids
 
     @defer.inlineCallbacks
     def get_state_at(self, room_id, stream_position, state_filter=StateFilter.all()):
@@ -549,7 +547,7 @@ class SyncHandler(object):
         else:
             # no events in this room - so presumably no state
             state = {}
-        defer.returnValue(state)
+        return state
 
     @defer.inlineCallbacks
     def compute_summary(self, room_id, sync_config, batch, state, now_token):
@@ -579,7 +577,7 @@ class SyncHandler(object):
         )
 
         if not last_events:
-            defer.returnValue(None)
+            return None
             return
 
         last_event = last_events[-1]
@@ -611,14 +609,14 @@ class SyncHandler(object):
         if name_id:
             name = yield self.store.get_event(name_id, allow_none=True)
             if name and name.content.get("name"):
-                defer.returnValue(summary)
+                return summary
 
         if canonical_alias_id:
             canonical_alias = yield self.store.get_event(
                 canonical_alias_id, allow_none=True
             )
             if canonical_alias and canonical_alias.content.get("alias"):
-                defer.returnValue(summary)
+                return summary
 
         me = sync_config.user.to_string()
 
@@ -652,7 +650,7 @@ class SyncHandler(object):
             summary["m.heroes"] = sorted([user_id for user_id in gone_user_ids])[0:5]
 
         if not sync_config.filter_collection.lazy_load_members():
-            defer.returnValue(summary)
+            return summary
 
         # ensure we send membership events for heroes if needed
         cache_key = (sync_config.user.to_string(), sync_config.device_id)
@@ -686,7 +684,7 @@ class SyncHandler(object):
             cache.set(s.state_key, s.event_id)
             state[(EventTypes.Member, s.state_key)] = s
 
-        defer.returnValue(summary)
+        return summary
 
     def get_lazy_loaded_members_cache(self, cache_key):
         cache = self.lazy_loaded_members_cache.get(cache_key)
@@ -871,14 +869,12 @@ class SyncHandler(object):
         if state_ids:
             state = yield self.store.get_events(list(state_ids.values()))
 
-        defer.returnValue(
-            {
-                (e.type, e.state_key): e
-                for e in sync_config.filter_collection.filter_room_state(
-                    list(state.values())
-                )
-            }
-        )
+        return {
+            (e.type, e.state_key): e
+            for e in sync_config.filter_collection.filter_room_state(
+                list(state.values())
+            )
+        }
 
     @defer.inlineCallbacks
     def unread_notifs_for_room_id(self, room_id, sync_config):
@@ -894,11 +890,11 @@ class SyncHandler(object):
                 notifs = yield self.store.get_unread_event_push_actions_by_room_for_user(
                     room_id, sync_config.user.to_string(), last_unread_event_id
                 )
-                defer.returnValue(notifs)
+                return notifs
 
         # There is no new information in this period, so your notification
         # count is whatever it was last time.
-        defer.returnValue(None)
+        return None
 
     @defer.inlineCallbacks
     def generate_sync_result(self, sync_config, since_token=None, full_state=False):
@@ -989,19 +985,17 @@ class SyncHandler(object):
                     "Sync result for newly joined room %s: %r", room_id, joined_room
                 )
 
-        defer.returnValue(
-            SyncResult(
-                presence=sync_result_builder.presence,
-                account_data=sync_result_builder.account_data,
-                joined=sync_result_builder.joined,
-                invited=sync_result_builder.invited,
-                archived=sync_result_builder.archived,
-                to_device=sync_result_builder.to_device,
-                device_lists=device_lists,
-                groups=sync_result_builder.groups,
-                device_one_time_keys_count=one_time_key_counts,
-                next_batch=sync_result_builder.now_token,
-            )
+        return SyncResult(
+            presence=sync_result_builder.presence,
+            account_data=sync_result_builder.account_data,
+            joined=sync_result_builder.joined,
+            invited=sync_result_builder.invited,
+            archived=sync_result_builder.archived,
+            to_device=sync_result_builder.to_device,
+            device_lists=device_lists,
+            groups=sync_result_builder.groups,
+            device_one_time_keys_count=one_time_key_counts,
+            next_batch=sync_result_builder.now_token,
         )
 
     @measure_func("_generate_sync_entry_for_groups")
@@ -1124,11 +1118,9 @@ class SyncHandler(object):
             # Remove any users that we still share a room with.
             newly_left_users -= users_who_share_room
 
-            defer.returnValue(
-                DeviceLists(changed=users_that_have_changed, left=newly_left_users)
-            )
+            return DeviceLists(changed=users_that_have_changed, left=newly_left_users)
         else:
-            defer.returnValue(DeviceLists(changed=[], left=[]))
+            return DeviceLists(changed=[], left=[])
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_to_device(self, sync_result_builder):
@@ -1225,7 +1217,7 @@ class SyncHandler(object):
 
         sync_result_builder.account_data = account_data_for_user
 
-        defer.returnValue(account_data_by_room)
+        return account_data_by_room
 
     @defer.inlineCallbacks
     def _generate_sync_entry_for_presence(
@@ -1325,7 +1317,7 @@ class SyncHandler(object):
                     )
                     if not tags_by_room:
                         logger.debug("no-oping sync")
-                        defer.returnValue(([], [], [], []))
+                        return ([], [], [], [])
 
         ignored_account_data = yield self.store.get_global_account_data_by_type_for_user(
             "m.ignored_user_list", user_id=user_id
@@ -1388,13 +1380,11 @@ class SyncHandler(object):
 
         newly_left_users -= newly_joined_or_invited_users
 
-        defer.returnValue(
-            (
-                newly_joined_rooms,
-                newly_joined_or_invited_users,
-                newly_left_rooms,
-                newly_left_users,
-            )
+        return (
+            newly_joined_rooms,
+            newly_joined_or_invited_users,
+            newly_left_rooms,
+            newly_left_users,
         )
 
     @defer.inlineCallbacks
@@ -1414,13 +1404,13 @@ class SyncHandler(object):
         )
 
         if rooms_changed:
-            defer.returnValue(True)
+            return True
 
         stream_id = RoomStreamToken.parse_stream_token(since_token.room_key).stream
         for room_id in sync_result_builder.joined_room_ids:
             if self.store.has_room_changed_since(room_id, stream_id):
-                defer.returnValue(True)
-        defer.returnValue(False)
+                return True
+        return False
 
     @defer.inlineCallbacks
     def _get_rooms_changed(self, sync_result_builder, ignored_users):
@@ -1637,7 +1627,7 @@ class SyncHandler(object):
                 )
             room_entries.append(entry)
 
-        defer.returnValue((room_entries, invited, newly_joined_rooms, newly_left_rooms))
+        return (room_entries, invited, newly_joined_rooms, newly_left_rooms)
 
     @defer.inlineCallbacks
     def _get_all_rooms(self, sync_result_builder, ignored_users):
@@ -1711,7 +1701,7 @@ class SyncHandler(object):
                     )
                 )
 
-        defer.returnValue((room_entries, invited, []))
+        return (room_entries, invited, [])
 
     @defer.inlineCallbacks
     def _generate_room_entry(
@@ -1912,7 +1902,7 @@ class SyncHandler(object):
                 joined_room_ids.add(room_id)
 
         joined_room_ids = frozenset(joined_room_ids)
-        defer.returnValue(joined_room_ids)
+        return joined_room_ids
 
 
 def _action_has_highlight(actions):

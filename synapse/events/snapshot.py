@@ -133,19 +133,17 @@ class EventContext(object):
         else:
             prev_state_id = None
 
-        defer.returnValue(
-            {
-                "prev_state_id": prev_state_id,
-                "event_type": event.type,
-                "event_state_key": event.state_key if event.is_state() else None,
-                "state_group": self.state_group,
-                "rejected": self.rejected,
-                "prev_group": self.prev_group,
-                "delta_ids": _encode_state_dict(self.delta_ids),
-                "prev_state_events": self.prev_state_events,
-                "app_service_id": self.app_service.id if self.app_service else None,
-            }
-        )
+        return {
+            "prev_state_id": prev_state_id,
+            "event_type": event.type,
+            "event_state_key": event.state_key if event.is_state() else None,
+            "state_group": self.state_group,
+            "rejected": self.rejected,
+            "prev_group": self.prev_group,
+            "delta_ids": _encode_state_dict(self.delta_ids),
+            "prev_state_events": self.prev_state_events,
+            "app_service_id": self.app_service.id if self.app_service else None,
+        }
 
     @staticmethod
     def deserialize(store, input):
@@ -202,7 +200,7 @@ class EventContext(object):
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self._current_state_ids)
+        return self._current_state_ids
 
     @defer.inlineCallbacks
     def get_prev_state_ids(self, store):
@@ -222,7 +220,7 @@ class EventContext(object):
 
         yield make_deferred_yieldable(self._fetching_state_deferred)
 
-        defer.returnValue(self._prev_state_ids)
+        return self._prev_state_ids
 
     def get_cached_current_state_ids(self):
         """Gets the current state IDs if we have them already cached.

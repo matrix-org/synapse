@@ -157,7 +157,7 @@ class GroupAttestionRenewer(object):
 
         yield self.store.update_remote_attestion(group_id, user_id, attestation)
 
-        defer.returnValue({})
+        return {}
 
     def _start_renew_attestations(self):
         return run_as_background_process("renew_attestations", self._renew_attestations)

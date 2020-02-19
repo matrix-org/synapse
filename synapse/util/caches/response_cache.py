@@ -121,7 +121,7 @@ class ResponseCache(object):
             @defer.inlineCallbacks
             def handle_request(request):
                 # etc
-                defer.returnValue(result)
+                return result
 
             result = yield response_cache.wrap(
                 key,

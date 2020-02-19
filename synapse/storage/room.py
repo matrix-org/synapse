@@ -214,14 +214,12 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
         if row:
-            defer.returnValue(
-                RatelimitOverride(
-                    messages_per_second=row["messages_per_second"],
-                    burst_count=row["burst_count"],
-                )
+            return RatelimitOverride(
+                messages_per_second=row["messages_per_second"],
+                burst_count=row["burst_count"],
             )
         else:
-            defer.returnValue(None)
+            return None
 
     @cachedInlineCallbacks()
     def get_retention_policy_for_room(self, room_id):

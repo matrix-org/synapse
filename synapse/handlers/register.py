@@ -286,7 +286,7 @@ class RegistrationHandler(BaseHandler):
             )
             yield self.profile_handler.set_active(user, False, True)
 
-        defer.returnValue(user_id)
+        return user_id
 
     @defer.inlineCallbacks
     def _auto_join_rooms(self, user_id):
@@ -400,7 +400,7 @@ class RegistrationHandler(BaseHandler):
                 user_id, profile
             )
 
-        defer.returnValue(user_id)
+        return user_id
 
     @defer.inlineCallbacks
     def check_recaptcha(self, ip, private_key, challenge, response):
@@ -566,7 +566,7 @@ class RegistrationHandler(BaseHandler):
 
         id = self._next_generated_user_id
         self._next_generated_user_id += 1
-        defer.returnValue(str(id))
+        return str(id)
 
     @defer.inlineCallbacks
     def _validate_captcha(self, ip_addr, private_key, challenge, response):
@@ -586,7 +586,7 @@ class RegistrationHandler(BaseHandler):
             "error_url": "http://www.recaptcha.net/recaptcha/api/challenge?"
             + "error=%s" % lines[1],
         }
-        defer.returnValue(json)
+        return json
 
     @defer.inlineCallbacks
     def _submit_captcha(self, ip_addr, private_key, challenge, response):
@@ -602,7 +602,7 @@ class RegistrationHandler(BaseHandler):
                 "response": response,
             },
         )
-        defer.returnValue(data)
+        return data
 
     @defer.inlineCallbacks
     def get_or_create_user(self, requester, localpart, displayname, password_hash=None):
@@ -776,7 +776,7 @@ class RegistrationHandler(BaseHandler):
                 initial_display_name=initial_display_name,
                 is_guest=is_guest,
             )
-            defer.returnValue((r["device_id"], r["access_token"]))
+            return (r["device_id"], r["access_token"])
 
         valid_until_ms = None
         if self.session_lifetime is not None:
@@ -799,7 +799,7 @@ class RegistrationHandler(BaseHandler):
                 user_id, device_id=device_id, valid_until_ms=valid_until_ms
             )
 
-        defer.returnValue((device_id, access_token))
+        return (device_id, access_token)
 
     @defer.inlineCallbacks
     def post_registration_actions(
@@ -952,7 +952,7 @@ class RegistrationHandler(BaseHandler):
             if ex.errcode == Codes.MISSING_PARAM:
                 # This will only happen if the ID server returns a malformed response
                 logger.info("Can't add incomplete 3pid")
-                defer.returnValue(None)
+                return None
             raise
 
         yield self._auth_handler.add_threepid(

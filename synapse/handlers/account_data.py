@@ -51,8 +51,8 @@ class AccountDataEventSource(object):
                     {"type": account_data_type, "content": content, "room_id": room_id}
                 )
 
-        defer.returnValue((results, current_stream_id))
+        return (results, current_stream_id)
 
     @defer.inlineCallbacks
     def get_pagination_rows(self, user, config, key):
-        defer.returnValue(([], config.to_id))
+        return ([], config.to_id)

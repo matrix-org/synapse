@@ -48,7 +48,7 @@ class StateDeltasHandler(object):
 
         if not event and not prev_event:
             logger.debug("Neither event exists: %r %r", prev_event_id, event_id)
-            defer.returnValue(None)
+            return None
 
         prev_value = None
         value = None
@@ -62,8 +62,8 @@ class StateDeltasHandler(object):
         logger.debug("prev_value: %r -> value: %r", prev_value, value)
 
         if value == public_value and prev_value != public_value:
-            defer.returnValue(True)
+            return True
         elif value != public_value and prev_value == public_value:
-            defer.returnValue(False)
+            return False
         else:
-            defer.returnValue(None)
+            return None

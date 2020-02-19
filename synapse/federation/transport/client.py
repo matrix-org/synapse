@@ -183,7 +183,7 @@ class TransportLayerClient(object):
             try_trailing_slash_on_400=True,
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -201,7 +201,7 @@ class TransportLayerClient(object):
             ignore_backoff=ignore_backoff,
         )
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -259,7 +259,7 @@ class TransportLayerClient(object):
             ignore_backoff=ignore_backoff,
         )
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -270,7 +270,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -288,7 +288,7 @@ class TransportLayerClient(object):
             ignore_backoff=True,
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -299,7 +299,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -310,7 +310,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -339,7 +339,7 @@ class TransportLayerClient(object):
             destination=remote_server, path=path, args=args, ignore_backoff=True
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -350,7 +350,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=event_dict
         )
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     @log_function
@@ -359,7 +359,7 @@ class TransportLayerClient(object):
 
         content = yield self.client.get_json(destination=destination, path=path)
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -370,7 +370,7 @@ class TransportLayerClient(object):
             destination=destination, path=path, data=content
         )
 
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -402,7 +402,7 @@ class TransportLayerClient(object):
         content = yield self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -426,7 +426,7 @@ class TransportLayerClient(object):
         content = yield self.client.get_json(
             destination=destination, path=path, timeout=timeout
         )
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -460,7 +460,7 @@ class TransportLayerClient(object):
         content = yield self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
-        defer.returnValue(content)
+        return content
 
     @defer.inlineCallbacks
     @log_function
@@ -488,7 +488,7 @@ class TransportLayerClient(object):
             timeout=timeout,
         )
 
-        defer.returnValue(content)
+        return content
 
     @log_function
     def get_group_profile(self, destination, group_id, requester_user_id):

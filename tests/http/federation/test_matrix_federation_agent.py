@@ -150,7 +150,7 @@ class MatrixFederationAgentTests(TestCase):
 
             try:
                 fetch_res = yield fetch_d
-                defer.returnValue(fetch_res)
+                return fetch_res
             except Exception as e:
                 logger.info("Fetch of %s failed: %s", uri.decode("ascii"), e)
                 raise
@@ -941,7 +941,7 @@ class MatrixFederationAgentTests(TestCase):
         except Exception as e:
             logger.warning("Error fetching well-known: %s", e)
             raise
-        defer.returnValue(result)
+        return result
 
     def test_well_known_cache(self):
         self.reactor.lookups["testserv"] = "1.2.3.4"

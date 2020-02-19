@@ -111,9 +111,9 @@ class AccountDataWorkerStore(SQLBaseStore):
         )
 
         if result:
-            defer.returnValue(json.loads(result))
+            return json.loads(result)
         else:
-            defer.returnValue(None)
+            return None
 
     @cached(num_args=2)
     def get_account_data_for_room(self, user_id, room_id):
@@ -264,11 +264,9 @@ class AccountDataWorkerStore(SQLBaseStore):
             on_invalidate=cache_context.invalidate,
         )
         if not ignored_account_data:
-            defer.returnValue(False)
+            return False
 
-        defer.returnValue(
-            ignored_user_id in ignored_account_data.get("ignored_users", {})
-        )
+        return ignored_user_id in ignored_account_data.get("ignored_users", {})
 
 
 class AccountDataStore(AccountDataWorkerStore):
@@ -332,7 +330,7 @@ class AccountDataStore(AccountDataWorkerStore):
             )
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def add_account_data_for_user(self, user_id, account_data_type, content):
@@ -373,7 +371,7 @@ class AccountDataStore(AccountDataWorkerStore):
             )
 
         result = self._account_data_id_gen.get_current_token()
-        defer.returnValue(result)
+        return result
 
     def _update_max_stream_id(self, next_id):
         """Update the max stream_id

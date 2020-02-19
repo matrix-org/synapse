@@ -158,7 +158,7 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         response.code,
         response.phrase.decode("ascii", errors="replace"),
     )
-    defer.returnValue(body)
+    return body
 
 
 class MatrixFederationHttpClient(object):
@@ -256,7 +256,7 @@ class MatrixFederationHttpClient(object):
 
             response = yield self._send_request(request, **send_request_args)
 
-        defer.returnValue(response)
+        return response
 
     @defer.inlineCallbacks
     def _send_request(
@@ -520,7 +520,7 @@ class MatrixFederationHttpClient(object):
                         _flatten_response_never_received(e),
                     )
                     raise
-        defer.returnValue(response)
+        return response
 
     def build_auth_headers(
         self, destination, method, url_bytes, content=None, destination_is=None
@@ -644,7 +644,7 @@ class MatrixFederationHttpClient(object):
             self.reactor, self.default_timeout, request, response
         )
 
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def post_json(
@@ -713,7 +713,7 @@ class MatrixFederationHttpClient(object):
         body = yield _handle_json_response(
             self.reactor, _sec_timeout, request, response
         )
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def get_json(
@@ -778,7 +778,7 @@ class MatrixFederationHttpClient(object):
             self.reactor, self.default_timeout, request, response
         )
 
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def delete_json(
@@ -836,7 +836,7 @@ class MatrixFederationHttpClient(object):
         body = yield _handle_json_response(
             self.reactor, self.default_timeout, request, response
         )
-        defer.returnValue(body)
+        return body
 
     @defer.inlineCallbacks
     def get_file(
@@ -902,7 +902,7 @@ class MatrixFederationHttpClient(object):
             response.phrase.decode("ascii", errors="replace"),
             length,
         )
-        defer.returnValue((length, headers))
+        return (length, headers)
 
 
 class _ReadBodyToFileProtocol(protocol.Protocol):

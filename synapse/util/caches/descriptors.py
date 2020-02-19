@@ -289,7 +289,7 @@ class CacheDescriptor(_CacheDescriptorBase):
         def foo(self, key, cache_context):
             r1 = yield self.bar1(key, on_invalidate=cache_context.invalidate)
             r2 = yield self.bar2(key, on_invalidate=cache_context.invalidate)
-            defer.returnValue(r1 + r2)
+            return r1 + r2
 
     Args:
         num_args (int): number of positional arguments (excluding ``self`` and

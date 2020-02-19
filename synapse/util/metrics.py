@@ -67,7 +67,7 @@ def measure_func(name):
         def measured_func(self, *args, **kwargs):
             with Measure(self.clock, name):
                 r = yield func(self, *args, **kwargs)
-            defer.returnValue(r)
+            return r
 
         return measured_func
 

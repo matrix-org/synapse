@@ -51,7 +51,7 @@ class ThirdPartyEventRules(object):
             defer.Deferred[bool]: True if the event should be allowed, False if not.
         """
         if self.third_party_rules is None:
-            defer.returnValue(True)
+            return True
 
         prev_state_ids = yield context.get_prev_state_ids(self.store)
 
@@ -61,7 +61,7 @@ class ThirdPartyEventRules(object):
             state_events[key] = yield self.store.get_event(event_id, allow_none=True)
 
         ret = yield self.third_party_rules.check_event_allowed(event, state_events)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def on_create_room(self, requester, config, is_requester_admin):
@@ -98,7 +98,7 @@ class ThirdPartyEventRules(object):
         """
 
         if self.third_party_rules is None:
-            defer.returnValue(True)
+            return True
 
         state_ids = yield self.store.get_filtered_current_state_ids(room_id)
         room_state_events = yield self.store.get_events(state_ids.values())
@@ -110,4 +110,4 @@ class ThirdPartyEventRules(object):
         ret = yield self.third_party_rules.check_threepid_can_be_invited(
             medium, address, state_events
         )
-        defer.returnValue(ret)
+        return ret

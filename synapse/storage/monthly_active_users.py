@@ -173,7 +173,7 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             )
             if user_id:
                 count = count + 1
-        defer.returnValue(count)
+        return count
 
     @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):

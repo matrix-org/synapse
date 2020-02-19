@@ -210,7 +210,7 @@ class DirectoryHandler(BaseHandler):
         except AuthError as e:
             logger.info("Failed to update alias events: %s", e)
 
-        defer.returnValue(room_id)
+        return room_id
 
     @defer.inlineCallbacks
     def delete_appservice_association(self, service, room_alias):
@@ -229,7 +229,7 @@ class DirectoryHandler(BaseHandler):
 
         room_id = yield self.store.delete_room_alias(room_alias)
 
-        defer.returnValue(room_id)
+        return room_id
 
     @defer.inlineCallbacks
     def get_association(self, room_alias):
@@ -277,7 +277,7 @@ class DirectoryHandler(BaseHandler):
         else:
             servers = list(servers)
 
-        defer.returnValue({"room_id": room_id, "servers": servers})
+        return {"room_id": room_id, "servers": servers}
         return
 
     @defer.inlineCallbacks
@@ -289,7 +289,7 @@ class DirectoryHandler(BaseHandler):
         result = yield self.get_association_from_room_alias(room_alias)
 
         if result is not None:
-            defer.returnValue({"room_id": result.room_id, "servers": result.servers})
+            return {"room_id": result.room_id, "servers": result.servers}
         else:
             raise SynapseError(
                 404,
@@ -342,7 +342,7 @@ class DirectoryHandler(BaseHandler):
             # Query AS to see if it exists
             as_handler = self.appservice_handler
             result = yield as_handler.query_room_alias_exists(room_alias)
-        defer.returnValue(result)
+        return result
 
     def can_modify_alias(self, alias, user_id=None):
         # Any application service "interested" in an alias they are regexing on
@@ -369,10 +369,10 @@ class DirectoryHandler(BaseHandler):
         creator = yield self.store.get_room_alias_creator(alias.to_string())
 
         if creator is not None and creator == user_id:
-            defer.returnValue(True)
+            return True
 
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
-        defer.returnValue(is_admin)
+        return is_admin
 
     @defer.inlineCallbacks
     def edit_published_room_list(self, requester, room_id, visibility):

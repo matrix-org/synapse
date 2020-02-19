@@ -39,7 +39,7 @@ def get_badge_count(store, user_id):
             # return one badge count per conversation, as count per
             # message is so noisy as to be almost useless
             badge += 1 if notifs["notify_count"] else 0
-    defer.returnValue(badge)
+    return badge
 
 
 @defer.inlineCallbacks
@@ -61,4 +61,4 @@ def get_context_for_event(store, state_handler, ev, user_id):
     sender_state_event = yield store.get_event(sender_state_event_id)
     ctx["sender_display_name"] = name_from_member_event(sender_state_event)
 
-    defer.returnValue(ctx)
+    return ctx

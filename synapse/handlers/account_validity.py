@@ -198,7 +198,7 @@ class AccountValidityHandler(object):
             if threepid["medium"] == "email":
                 addresses.append(threepid["address"])
 
-        defer.returnValue(addresses)
+        return addresses
 
     @defer.inlineCallbacks
     def _get_renewal_token(self, user_id):
@@ -219,7 +219,7 @@ class AccountValidityHandler(object):
             try:
                 renewal_token = stringutils.random_string(32)
                 yield self.store.set_renewal_token_for_user(user_id, renewal_token)
-                defer.returnValue(renewal_token)
+                return renewal_token
             except StoreError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a unique string as refresh string.")
@@ -274,7 +274,7 @@ class AccountValidityHandler(object):
                 UserID.from_string(user_id), True, True
             )
 
-        defer.returnValue(expiration_ts)
+        return expiration_ts
 
     @defer.inlineCallbacks
     def _mark_expired_users_as_inactive(self):

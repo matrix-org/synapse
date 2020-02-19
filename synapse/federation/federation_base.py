@@ -106,7 +106,7 @@ class FederationBase(object):
                     "Failed to find copy of %s with valid signature", pdu.event_id
                 )
 
-            defer.returnValue(res)
+            return res
 
         handle = preserve_fn(handle_check_result)
         deferreds2 = [handle(pdu, deferred) for pdu, deferred in zip(pdus, deferreds)]
@@ -116,9 +116,9 @@ class FederationBase(object):
         ).addErrback(unwrapFirstError)
 
         if include_none:
-            defer.returnValue(valid_pdus)
+            return valid_pdus
         else:
-            defer.returnValue([p for p in valid_pdus if p])
+            return [p for p in valid_pdus if p]
 
     def _check_sigs_and_hash(self, room_version, pdu):
         return make_deferred_yieldable(

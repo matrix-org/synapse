@@ -132,7 +132,7 @@ class Filtering(object):
     @defer.inlineCallbacks
     def get_user_filter(self, user_localpart, filter_id):
         result = yield self.store.get_user_filter(user_localpart, filter_id)
-        defer.returnValue(FilterCollection(result))
+        return FilterCollection(result)
 
     def add_user_filter(self, user_localpart, user_filter):
         self.check_valid_filter(user_filter)

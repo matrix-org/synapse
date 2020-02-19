@@ -49,7 +49,7 @@ class LogoutRestServlet(RestServlet):
                 requester.user.to_string(), requester.device_id
             )
 
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 class LogoutAllRestServlet(RestServlet):
@@ -75,7 +75,7 @@ class LogoutAllRestServlet(RestServlet):
         # .. and then delete any access tokens which weren't associated with
         # devices.
         yield self._auth_handler.delete_access_tokens_for_user(user_id)
-        defer.returnValue((200, {}))
+        return (200, {})
 
 
 def register_servlets(hs, http_server):

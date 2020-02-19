@@ -139,7 +139,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             builder
         )
         yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def inject_room_member(self, user_id, membership="join", extra_content={}):
@@ -161,7 +161,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         )
 
         yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
@@ -182,7 +182,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         )
 
         yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        return event
 
     @defer.inlineCallbacks
     def test_large_room(self):

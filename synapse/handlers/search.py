@@ -69,7 +69,7 @@ class SearchHandler(BaseHandler):
             # Scan through the old room for further predecessors
             room_id = predecessor["room_id"]
 
-        defer.returnValue(historical_room_ids)
+        return historical_room_ids
 
     @defer.inlineCallbacks
     def search(self, user, content, batch=None):
@@ -186,13 +186,11 @@ class SearchHandler(BaseHandler):
             room_ids.intersection_update({batch_group_key})
 
         if not room_ids:
-            defer.returnValue(
-                {
-                    "search_categories": {
-                        "room_events": {"results": [], "count": 0, "highlights": []}
-                    }
+            return {
+                "search_categories": {
+                    "room_events": {"results": [], "count": 0, "highlights": []}
                 }
-            )
+            }
 
         rank_map = {}  # event_id -> rank of event
         allowed_events = []
@@ -455,4 +453,4 @@ class SearchHandler(BaseHandler):
         if global_next_batch:
             rooms_cat_res["next_batch"] = global_next_batch
 
-        defer.returnValue({"search_categories": {"room_events": rooms_cat_res}})
+        return {"search_categories": {"room_events": rooms_cat_res}}

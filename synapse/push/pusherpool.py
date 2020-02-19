@@ -123,7 +123,7 @@ class PusherPool:
         )
         pusher = yield self.start_pusher_by_id(app_id, pushkey, user_id)
 
-        defer.returnValue(pusher)
+        return pusher
 
     @defer.inlineCallbacks
     def remove_pushers_by_app_id_and_pushkey_not_user(
@@ -224,7 +224,7 @@ class PusherPool:
         if pusher_dict:
             pusher = yield self._start_pusher(pusher_dict)
 
-        defer.returnValue(pusher)
+        return pusher
 
     @defer.inlineCallbacks
     def _start_pushers(self):
@@ -293,7 +293,7 @@ class PusherPool:
 
         p.on_started(have_notifs)
 
-        defer.returnValue(p)
+        return p
 
     @defer.inlineCallbacks
     def remove_pusher(self, app_id, pushkey, user_id):

@@ -510,7 +510,7 @@ class SQLBaseStore(object):
                 after_callback(*after_args, **after_kwargs)
             raise
 
-        defer.returnValue(result)
+        return result
 
     @defer.inlineCallbacks
     def runWithConnection(self, func, *args, **kwargs):
@@ -550,7 +550,7 @@ class SQLBaseStore(object):
         with PreserveLoggingContext():
             result = yield self._db_pool.runWithConnection(inner_func, *args, **kwargs)
 
-        defer.returnValue(result)
+        return result
 
     @staticmethod
     def cursor_to_dict(cursor):
@@ -612,8 +612,8 @@ class SQLBaseStore(object):
             # a cursor after we receive an error from the db.
             if not or_ignore:
                 raise
-            defer.returnValue(False)
-        defer.returnValue(True)
+            return False
+        return True
 
     @staticmethod
     def _simple_insert_txn(txn, table, values):
@@ -705,7 +705,7 @@ class SQLBaseStore(object):
                     insertion_values,
                     lock=lock,
                 )
-                defer.returnValue(result)
+                return result
             except self.database_engine.module.IntegrityError as e:
                 attempts += 1
                 if attempts >= 5:
@@ -1118,7 +1118,7 @@ class SQLBaseStore(object):
         results = []
 
         if not iterable:
-            defer.returnValue(results)
+            return results
 
         # iterables can not be sliced, so convert it to a list first
         it_list = list(iterable)
@@ -1139,7 +1139,7 @@ class SQLBaseStore(object):
 
             results.extend(rows)
 
-        defer.returnValue(results)
+        return results
 
     @classmethod
     def _simple_select_many_txn(cls, txn, table, column, iterable, keyvalues, retcols):

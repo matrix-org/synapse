@@ -207,7 +207,7 @@ class AuthRestServlet(RestServlet):
             request.write(html_bytes)
             finish_request(request)
 
-            defer.returnValue(None)
+            return None
         elif stagetype == LoginType.TERMS:
             if ("session" not in request.args or len(request.args["session"])) == 0:
                 raise SynapseError(400, "No session supplied")
@@ -239,7 +239,7 @@ class AuthRestServlet(RestServlet):
 
             request.write(html_bytes)
             finish_request(request)
-            defer.returnValue(None)
+            return None
         else:
             raise SynapseError(404, "Unknown auth stage type")
 

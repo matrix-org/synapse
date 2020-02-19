@@ -148,7 +148,7 @@ call any other functions.
         d = more_stuff()
         result = yield d            # also fine, of course
 
-        defer.returnValue(result)
+        return result
 
     def nonInlineCallbacksFun():
         logger.debug("just a wrapper really")

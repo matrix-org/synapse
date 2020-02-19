@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import operator
 
-from twisted.internet import defer
+import operator
 
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
@@ -67,7 +66,7 @@ class UserErasureWorkerStore(SQLBaseStore):
 
         erased_users = yield self.runInteraction("are_users_erased", _get_erased_users)
         res = dict((u, u in erased_users) for u in user_ids)
-        defer.returnValue(res)
+        return res
 
 
 class UserErasureStore(UserErasureWorkerStore):

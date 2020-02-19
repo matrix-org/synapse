@@ -185,7 +185,7 @@ class ReplicationEndpoint(object):
             except RequestSendFailed as e:
                 raise_from(SynapseError(502, "Failed to talk to master"), e)
 
-            defer.returnValue(result)
+            return result
 
         return send_request
 

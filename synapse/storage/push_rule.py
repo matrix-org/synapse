@@ -120,7 +120,7 @@ class PushRulesWorkerStore(
 
         rules = _load_rules(rows, enabled_map)
 
-        defer.returnValue(rules)
+        return rules
 
     @cachedInlineCallbacks(max_entries=5000)
     def get_push_rules_enabled_for_user(self, user_id):
@@ -130,9 +130,7 @@ class PushRulesWorkerStore(
             retcols=("user_name", "rule_id", "enabled"),
             desc="get_push_rules_enabled_for_user",
         )
-        defer.returnValue(
-            {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
-        )
+        return {r["rule_id"]: False if r["enabled"] == 0 else True for r in results}
 
     def have_push_rules_changed_for_user(self, user_id, last_id):
         if not self.push_rules_stream_cache.has_entity_changed(user_id, last_id):
@@ -160,7 +158,7 @@ class PushRulesWorkerStore(
     )
     def bulk_get_push_rules(self, user_ids):
         if not user_ids:
-            defer.returnValue({})
+            return {}
 
         results = {user_id: [] for user_id in user_ids}
 
@@ -182,7 +180,7 @@ class PushRulesWorkerStore(
         for user_id, rules in results.items():
             results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
 
-        defer.returnValue(results)
+        return results
 
     @defer.inlineCallbacks
     def move_push_rule_from_room_to_room(self, new_room_id, user_id, rule):
@@ -253,7 +251,7 @@ class PushRulesWorkerStore(
         result = yield self._bulk_get_push_rules_for_room(
             event.room_id, state_group, current_state_ids, event=event
         )
-        defer.returnValue(result)
+        return result
 
     @cachedInlineCallbacks(num_args=2, cache_context=True)
     def _bulk_get_push_rules_for_room(
@@ -312,7 +310,7 @@ class PushRulesWorkerStore(
 
         rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
 
-        defer.returnValue(rules_by_user)
+        return rules_by_user
 
     @cachedList(
         cached_method_name="get_push_rules_enabled_for_user",
@@ -322,7 +320,7 @@ class PushRulesWorkerStore(
     )
     def bulk_get_push_rules_enabled(self, user_ids):
         if not user_ids:
-            defer.returnValue({})
+            return {}
 
         results = {user_id: {} for user_id in user_ids}
 
@@ -336,7 +334,7 @@ class PushRulesWorkerStore(
         for row in rows:
             enabled = bool(row["enabled"])
             results.setdefault(row["user_name"], {})[row["rule_id"]] = enabled
-        defer.returnValue(results)
+        return results
 
 
 class PushRuleStore(PushRulesWorkerStore):

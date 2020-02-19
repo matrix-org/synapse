@@ -83,16 +83,14 @@ class IdTokenServlet(RestServlet):
 
         yield self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
 
-        defer.returnValue(
-            (
-                200,
-                {
-                    "access_token": token,
-                    "token_type": "Bearer",
-                    "matrix_server_name": self.server_name,
-                    "expires_in": self.EXPIRES_MS / 1000,
-                },
-            )
+        return (
+            200,
+            {
+                "access_token": token,
+                "token_type": "Bearer",
+                "matrix_server_name": self.server_name,
+                "expires_in": self.EXPIRES_MS / 1000,
+            },
         )
 
 
