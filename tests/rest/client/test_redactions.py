@@ -157,3 +157,23 @@ class RedactionsTestCase(HomeserverTestCase):
         self.assertEqual(timeline[-2]["event_id"], msg_id)
         self.assertEqual(timeline[-2]["unsigned"]["redacted_by"], redaction_id)
         self.assertEqual(timeline[-2]["content"], {})
+
+    def test_redact_create_event(self):
+        # control case: an existing event
+        b = self.helper.send(room_id=self.room_id, tok=self.mod_access_token)
+        msg_id = b["event_id"]
+        self._redact_event(self.mod_access_token, self.room_id, msg_id)
+
+        # sync the room, to get the id of the create event
+        timeline = self._sync_room_timeline(self.other_access_token, self.room_id)
+        create_event_id = timeline[0]["event_id"]
+
+        # room moderators cannot send redactions for create events
+        self._redact_event(
+            self.mod_access_token, self.room_id, create_event_id, expect_code=403
+        )
+
+        # and nor can normals
+        self._redact_event(
+            self.other_access_token, self.room_id, create_event_id, expect_code=403
+        )
