@@ -271,6 +271,14 @@ class EventsWorkerStore(SQLBaseStore):
                     )
                     continue
 
+                if original_event.room_id != entry.event.room_id:
+                    logger.info(
+                        "Withholding redaction %s of event %s from a different room",
+                        event_id,
+                        redacted_event_id,
+                    )
+                    continue
+
                 if entry.event.internal_metadata.need_to_check_redaction():
                     original_domain = get_domain_from_id(original_event.sender)
                     redaction_domain = get_domain_from_id(entry.event.sender)
@@ -639,9 +647,21 @@ class EventsWorkerStore(SQLBaseStore):
             if not redaction_entry:
                 # we don't have the redaction event, or the redaction event was not
                 # authorized.
+                logger.debug(
+                    "%s was redacted by %s but redaction not found/authed",
+                    original_ev.event_id,
+                    redaction_id,
+                )
                 continue
 
             redaction_event = redaction_entry.event
+            if redaction_event.room_id != original_ev.room_id:
+                logger.debug(
+                    "%s was redacted by %s but redaction was in a different room!",
+                    original_ev.event_id,
+                    redaction_id,
+                )
+                continue
 
             # Starting in room version v3, some redactions need to be
             # rechecked if we didn't have the redacted event at the
@@ -653,7 +673,14 @@ class EventsWorkerStore(SQLBaseStore):
                     redaction_event.internal_metadata.recheck_redaction = False
                 else:
                     # Senders don't match, so the event isn't actually redacted
+                    logger.debug(
+                        "%s was redacted by %s but the senders don't match",
+                        original_ev.event_id,
+                        redaction_id,
+                    )
                     continue
+
+            logger.debug("Redacting %s due to %s", original_ev.event_id, redaction_id)
 
             # we found a good redaction event. Redact!
             redacted_event = prune_event(original_ev)
