@@ -1,13 +1,14 @@
 # Delegation
 
-Without configuring delegation, homeservers will expect the server
-responsible for resources using e.g. `example.com` as their `server_name`
-(e.g. `@user:example.com`) to be served at `example.com:8448`.
+By default, other homeservers will expect to be able to reach yours via
+your `server_name`, on port 8448. For example, if you set your `server_name`
+to `example.com` (so that your user names look like `@user:example.com`),
+other servers will try to connect to yours at `https://example.com:8448/`.
 
 Delegation is a Matrix feature allowing a homeserver admin to retain a
-`server_name` of `example.com` so that your user IDs, room aliases, etc
-continue to look like `*:example.com`, whilst having your federation
-traffic routed to a different server and/or port (e.g. `synapse.example.com:443`).
+`server_name` of `example.com` so that user IDs, room aliases, etc continue
+to look like `*:example.com`, whilst having federation traffic routed
+to a different server and/or port (e.g. `synapse.example.com:443`).
 
 ## .well-known delegation
 
@@ -37,8 +38,8 @@ should return:
 Note, specifying a port is optional. If no port is specified, then it defaults
 to 8448.
 
-With .well-known, federation servers will check for a valid TLS certificate
-for the delegated hostname (in our example: `synapse.example.com`).
+With .well-known delegation, federating servers will check for a valid TLS
+certificate for the delegated hostname (in our example: `synapse.example.com`).
 
 ## SRV DNS record delegation
 

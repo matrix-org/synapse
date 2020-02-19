@@ -12,10 +12,10 @@ it is also the domain that other servers will use to try to reach your
 server (via port 8448). This is easy to set up and will work provided
 you set the `server_name` to match your machine's public DNS hostname.
 
-You will also need a valid TLS certificate for this `server_name` served
-on port 8448. The preferred way to do that is by using a reverse proxy,
-see [reverse_proxy.md](<reverse_proxy.md>) for instructions on how to
-correctly set one up.
+For this default configuration to work, you will need to listen for TLS
+connections on port 8448. The preferred way to do that is by using a
+reverse proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions
+on how to correctly set one up.
 
 In some cases you might not want to run Synapse on the machine that has
 the `server_name` as its public DNS hostname, or you might want federation
