@@ -1,1 +1,1 @@
-Fix bogus log in the purge jobs related to the message retention policies support.
+Fix errors from logging in the purge jobs related to the message retention policies support.
