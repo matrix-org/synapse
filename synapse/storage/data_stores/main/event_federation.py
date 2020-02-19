@@ -72,13 +72,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         while front:
             new_front = set()
             front_list = list(front)
-            chunks = [front_list[x : x + 100] for x in range(0, len(front), 100)]
+            chunks = (front_list[x : x + 100] for x in range(0, len(front), 100))
             for chunk in chunks:
                 clause, args = make_in_list_sql_clause(
                     txn.database_engine, "event_id", chunk
                 )
-                txn.execute(base_sql + clause, list(args))
-                new_front.update([r[0] for r in txn])
+                txn.execute(base_sql + clause, args)
+                new_front.update(r[0] for r in txn)
 
             new_front -= results
 
