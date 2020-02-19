@@ -16,7 +16,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Set
 
 from six import iteritems, itervalues
 
@@ -662,7 +662,7 @@ class StateResolutionStore(object):
             allow_rejected=allow_rejected,
         )
 
-    def get_auth_chain(self, event_ids):
+    def get_auth_chain(self, event_ids: List[str], ignore_events: Set[str]):
         """Gets the full auth chain for a set of events (including rejected
         events).
 
@@ -674,11 +674,16 @@ class StateResolutionStore(object):
                presence of rejected events
 
         Args:
-            event_ids (list): The event IDs of the events to fetch the auth
-                chain for. Must be state events.
+            event_ids: The event IDs of the events to fetch the auth chain for.
+                Must be state events.
+            ignore_events: Set of events to exclude from the returned auth
+                chain.
+
 
         Returns:
             Deferred[list[str]]: List of event IDs of the auth chain.
         """
 
-        return self.store.get_auth_chain_ids(event_ids, include_given=True)
+        return self.store.get_auth_chain_ids(
+            event_ids, include_given=True, ignore_events=ignore_events,
+        )
