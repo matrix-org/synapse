@@ -353,7 +353,7 @@ class RoomCreationHandler(BaseHandler):
             # If so, mark the new room as non-federatable as well
             creation_content["m.federate"] = False
 
-        initial_state = dict()
+        initial_state = {}
 
         # Replicate relevant room events
         types_to_copy = (

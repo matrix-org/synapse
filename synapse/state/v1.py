@@ -69,9 +69,9 @@ def resolve_events_with_store(
 
     unconflicted_state, conflicted_state = _seperate(state_sets)
 
-    needed_events = set(
+    needed_events = {
         event_id for event_ids in itervalues(conflicted_state) for event_id in event_ids
-    )
+    }
     needed_event_count = len(needed_events)
     if event_map is not None:
         needed_events -= set(iterkeys(event_map))
@@ -261,11 +261,11 @@ def _resolve_state_events(conflicted_state, auth_events):
 
 
 def _resolve_auth_events(events, auth_events):
-    reverse = [i for i in reversed(_ordered_events(events))]
+    reverse = list(reversed(_ordered_events(events)))
 
-    auth_keys = set(
+    auth_keys = {
         key for event in events for key in event_auth.auth_types_for_event(event)
-    )
+    }
 
     new_auth_events = {}
     for key in auth_keys:
