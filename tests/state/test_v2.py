@@ -603,7 +603,7 @@ class TestStateResolutionStore(object):
 
         return {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
 
-    def get_auth_chain(self, event_ids):
+    def get_auth_chain(self, event_ids, ignore_events):
         """Gets the full auth chain for a set of events (including rejected
         events).
 
@@ -617,6 +617,8 @@ class TestStateResolutionStore(object):
         Args:
             event_ids (list): The event IDs of the events to fetch the auth
                 chain for. Must be state events.
+            ignore_events: Set of events to exclude from the returned auth
+                chain.
 
         Returns:
             Deferred[list[str]]: List of event IDs of the auth chain.
@@ -627,7 +629,7 @@ class TestStateResolutionStore(object):
         stack = list(event_ids)
         while stack:
             event_id = stack.pop()
-            if event_id in result:
+            if event_id in result or event_id in ignore_events:
                 continue
 
             result.add(event_id)

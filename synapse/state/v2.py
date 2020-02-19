@@ -248,7 +248,7 @@ def _get_auth_chain_difference(state_sets, event_map, state_res_store):
             and eid not in common
         )
 
-        auth_chain = yield state_res_store.get_auth_chain(auth_ids)
+        auth_chain = yield state_res_store.get_auth_chain(auth_ids, common)
         auth_ids.update(auth_chain)
 
         auth_sets.append(auth_ids)
