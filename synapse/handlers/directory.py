@@ -310,7 +310,7 @@ class DirectoryHandler(BaseHandler):
         alt_aliases = content.pop("alt_aliases", None)
         # If the aliases are not a list (or not found) do not attempt to modify
         # the list.
-        if isinstance(alt_aliases, list):
+        if isinstance(alt_aliases, (list, tuple)):
             send_update = True
             alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
             if alt_aliases:

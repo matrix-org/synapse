@@ -456,6 +456,7 @@ class RoomCreationHandler(BaseHandler):
 
         # check to see if we have a canonical alias.
         canonical_alias = None
+        canonical_alt_aliases = []
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event_id:
             canonical_alias_event = yield self.store.get_event(canonical_alias_event_id)
@@ -466,7 +467,7 @@ class RoomCreationHandler(BaseHandler):
                 )
                 # If alt_aliases is not a list, overwrite it as whatever is there
                 # cannot be handled.
-                if not isinstance(canonical_alt_aliases, list):
+                if not isinstance(canonical_alt_aliases, (list, tuple)):
                     canonical_alt_aliases = []
 
         # first we try to remove the aliases from the old room (we suppress sending
