@@ -510,14 +510,18 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             event ID.
         """
 
+        where_clause, where_args = state_filter.make_sql_filter_clause()
+
+        if not where_clause:
+            # We delegate to the cached version
+            return self.get_current_state_ids(room_id)
+
         def _get_filtered_current_state_ids_txn(txn):
             results = {}
             sql = """
                 SELECT type, state_key, event_id FROM current_state_events
                 WHERE room_id = ?
             """
-
-            where_clause, where_args = state_filter.make_sql_filter_clause()
 
             if where_clause:
                 sql += " AND (%s)" % (where_clause,)
