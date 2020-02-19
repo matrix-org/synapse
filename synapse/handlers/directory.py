@@ -463,7 +463,9 @@ class DirectoryHandler(BaseHandler):
         # allow access to server admins and current members of the room
         is_admin = await self.auth.is_server_admin(requester.user)
         if not is_admin:
-            await self.auth.check_joined_room(room_id, requester.user.to_string())
+            await self.auth.check_user_in_room_or_world_readable(
+                room_id, requester.user.to_string()
+            )
 
         aliases = await self.store.get_aliases_for_room(room_id)
         return aliases
