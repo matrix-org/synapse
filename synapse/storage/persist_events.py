@@ -727,6 +727,7 @@ class EventsPersistenceStorage(object):
 
         # Check if any of the given events are a local join that appear in the
         # current state
+        events_to_check = []  # Event IDs that aren't an event we're persisting
         for (typ, state_key), event_id in delta.to_insert.items():
             if typ != EventTypes.Member or not self.is_mine_id(state_key):
                 continue
@@ -736,8 +737,33 @@ class EventsPersistenceStorage(object):
                     if event.membership == Membership.JOIN:
                         return True
 
-        # There's been a change of membership but we don't have a local join
-        # event in the new events, so we need to check the full state.
+            # The event is not in `ev_ctx_rm`, so we need to pull it out of
+            # the DB.
+            events_to_check.append(event_id)
+
+        # Check if any of the changes that we don't have events for are joins.
+        if events_to_check:
+            rows = await self.main_store.get_membership_from_event_ids(events_to_check)
+            is_still_joined = any(row["membership"] == Membership.JOIN for row in rows)
+            if is_still_joined:
+                return True
+
+        # None of the new state events are local joins, so we check the database
+        # to see if there are any other local users in the room. We ignore users
+        # whose state has changed as we've already their new state above.
+        users_to_ignore = [
+            state_key
+            for _, state_key in itertools.chain(delta.to_insert, delta.to_delete)
+            if self.is_mine_id(state_key)
+        ]
+
+        if await self.main_store.is_local_host_in_room_ignoring_users(
+            room_id, users_to_ignore
+        ):
+            return True
+
+        # The server will leave the room, so we go and find out which remote
+        # users will still be joined when we leave.
         if current_state is None:
             current_state = await self.main_store.get_current_state_ids(room_id)
             current_state = dict(current_state)
@@ -746,19 +772,6 @@ class EventsPersistenceStorage(object):
 
             current_state.update(delta.to_insert)
 
-        event_ids = [
-            event_id
-            for (typ, state_key,), event_id in current_state.items()
-            if typ == EventTypes.Member and self.is_mine_id(state_key)
-        ]
-
-        rows = await self.main_store.get_membership_from_event_ids(event_ids)
-        is_still_joined = any(row["membership"] == Membership.JOIN for row in rows)
-        if is_still_joined:
-            return True
-
-        # The server will leave the room, so we go and find out which remote
-        # users will still be joined when we leave.
         remote_event_ids = [
             event_id
             for (typ, state_key,), event_id in current_state.items()

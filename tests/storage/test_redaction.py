@@ -240,7 +240,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 built_event = yield self._base_builder.build(prev_event_ids)
 
                 built_event._event_id = self._event_id
-                built_event._event_dict["event_id"] = self._event_id
+                built_event._dict["event_id"] = self._event_id
                 assert built_event.event_id == self._event_id
 
                 return built_event
