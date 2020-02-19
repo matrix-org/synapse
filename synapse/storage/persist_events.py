@@ -602,14 +602,14 @@ class EventsPersistenceStorage(object):
             event_id_to_state_group.update(event_to_groups)
 
         # State groups of old_latest_event_ids
-        old_state_groups = set(
+        old_state_groups = {
             event_id_to_state_group[evid] for evid in old_latest_event_ids
-        )
+        }
 
         # State groups of new_latest_event_ids
-        new_state_groups = set(
+        new_state_groups = {
             event_id_to_state_group[evid] for evid in new_latest_event_ids
-        )
+        }
 
         # If they old and new groups are the same then we don't need to do
         # anything.

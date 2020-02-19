@@ -145,7 +145,7 @@ class EventsStore(
             return txn.fetchall()
 
         res = yield self.db.runInteraction("read_forward_extremities", fetch)
-        self._current_forward_extremities_amount = c_counter(list(x[0] for x in res))
+        self._current_forward_extremities_amount = c_counter([x[0] for x in res])
 
     @_retry_on_integrity_error
     @defer.inlineCallbacks
@@ -598,11 +598,11 @@ class EventsStore(
             # We find out which membership events we may have deleted
             # and which we have added, then we invlidate the caches for all
             # those users.
-            members_changed = set(
+            members_changed = {
                 state_key
                 for ev_type, state_key in itertools.chain(to_delete, to_insert)
                 if ev_type == EventTypes.Member
-            )
+            }
 
             for member in members_changed:
                 txn.call_after(
@@ -1615,7 +1615,7 @@ class EventsStore(
         """
         )
 
-        referenced_state_groups = set(sg for sg, in txn)
+        referenced_state_groups = {sg for sg, in txn}
         logger.info(
             "[purge] found %i referenced state groups", len(referenced_state_groups)
         )
