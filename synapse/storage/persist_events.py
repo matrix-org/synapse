@@ -735,11 +735,11 @@ class EventsPersistenceStorage(object):
             for event, _ in ev_ctx_rm:
                 if event_id == event.event_id:
                     if event.membership == Membership.JOIN:
-                        return True
-            else:
-                # The event is not in `ev_ctx_rm`, so we need to pull it out of
-                # the DB.
-                events_to_check.append(event_id)
+                        return
+
+            # The event is not in `ev_ctx_rm`, so we need to pull it out of
+            # the DB.
+            events_to_check.append(event_id)
 
         # Check if any of the changes that we don't have events for are joins.
         if events_to_check:
@@ -748,10 +748,9 @@ class EventsPersistenceStorage(object):
             if is_still_joined:
                 return True
 
-        # None of the changes to state are joins, so we fall back to checking
-        # the current state of the room to see if any of our users are joined
-        # None of the new state events are joins, so now we check the current
-        # room state to see if there are any other users in the room.
+        # None of the new state events are local joins, so we check the database
+        # to see if there are any other local users in the room. We ignore users
+        # whose state has changed as we've already their new state above.
         users_to_ignore = [
             state_key
             for _, state_key in itertools.chain(delta.to_insert, delta.to_delete)
