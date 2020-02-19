@@ -1775,6 +1775,23 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         res = self._get_aliases(self.room_owner_tok)
         self.assertEqual(set(res["aliases"]), {alias1, alias2})
 
+    def test_peekable_room(self):
+        alias1 = self._random_alias()
+        self._set_alias_via_directory(alias1)
+
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": "world_readable"},
+            tok=self.room_owner_tok,
+        )
+
+        self.register_user("user", "test")
+        user_tok = self.login("user", "test")
+
+        res = self._get_aliases(user_tok)
+        self.assertEqual(res["aliases"], [alias1])
+
     def _get_aliases(self, access_token: str, expected_code: int = 200) -> JsonDict:
         """Calls the endpoint under test. returns the json response object."""
         request, channel = self.make_request(

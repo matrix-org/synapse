@@ -142,8 +142,8 @@ class RelationPaginationServlet(RestServlet):
     ):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        await self.auth.check_in_room_or_world_readable(
-            room_id, requester.user.to_string()
+        await self.auth.check_user_in_room_or_world_readable(
+            room_id, requester.user.to_string(), allow_departed_users=True
         )
 
         # This gets the original event and checks that a) the event exists and
@@ -235,8 +235,8 @@ class RelationAggregationPaginationServlet(RestServlet):
     ):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        await self.auth.check_in_room_or_world_readable(
-            room_id, requester.user.to_string()
+        await self.auth.check_user_in_room_or_world_readable(
+            room_id, requester.user.to_string(), allow_departed_users=True,
         )
 
         # This checks that a) the event exists and b) the user is allowed to
@@ -313,8 +313,8 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
     async def on_GET(self, request, room_id, parent_id, relation_type, event_type, key):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        await self.auth.check_in_room_or_world_readable(
-            room_id, requester.user.to_string()
+        await self.auth.check_user_in_room_or_world_readable(
+            room_id, requester.user.to_string(), allow_departed_users=True,
         )
 
         # This checks that a) the event exists and b) the user is allowed to
