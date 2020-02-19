@@ -335,7 +335,9 @@ class PaginationHandler(object):
             (
                 membership,
                 member_event_id,
-            ) = await self.auth.check_in_room_or_world_readable(room_id, user_id)
+            ) = await self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
+            )
 
             if source_config.direction == "b":
                 # if we're going backwards, we might need to backfill. This
