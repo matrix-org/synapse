@@ -279,6 +279,15 @@ def start(hs, listeners=None):
 
         setup_sentry(hs)
         setup_sdnotify(hs)
+
+        # We now freeze all allocated objects in the hopes that (almost)
+        # everything currently allocated are things that will be used for the
+        # rest of time. Doing so means less work each GC (hopefully).
+        #
+        # This only works on Python 3.7
+        if sys.version_info >= (3, 7):
+            gc.collect()
+            gc.freeze()
     except Exception:
         traceback.print_exc(file=sys.stderr)
         reactor = hs.get_reactor()

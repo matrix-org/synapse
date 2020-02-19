@@ -1,1 +1,0 @@
-Return a 404 instead of 200 for querying information of a non-existant user through the admin API.
