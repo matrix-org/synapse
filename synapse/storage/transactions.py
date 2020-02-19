@@ -196,6 +196,26 @@ class TransactionStore(SQLBaseStore):
     def _set_destination_retry_timings(
         self, txn, destination, retry_last_ts, retry_interval
     ):
+
+        if self.database_engine.can_native_upsert:
+            # Upsert retry time interval if retry_interval is zero (i.e. we're
+            # resetting it) or greater than the existing retry interval.
+
+            sql = """
+                INSERT INTO destinations (destination, retry_last_ts, retry_interval)
+                    VALUES (?, ?, ?)
+                ON CONFLICT (destination) DO UPDATE SET
+                        retry_last_ts = EXCLUDED.retry_last_ts,
+                        retry_interval = EXCLUDED.retry_interval
+                    WHERE
+                        EXCLUDED.retry_interval = 0
+                        OR destinations.retry_interval < EXCLUDED.retry_interval
+            """
+
+            txn.execute(sql, (destination, retry_last_ts, retry_interval))
+
+            return
+
         self.database_engine.lock_table(txn, "destinations")
 
         # We need to be careful here as the data may have changed from under us
