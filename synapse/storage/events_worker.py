@@ -236,38 +236,47 @@ class EventsWorkerStore(SQLBaseStore):
                     "allow_rejected=False"
                 )
 
-            # Starting in room version v3, some redactions need to be rechecked if we
-            # didn't have the redacted event at the time, so we recheck on read
-            # instead.
+            # We may not have had the original event when we received a redaction, so
+            # we have to recheck auth now.
+
             if not allow_rejected and entry.event.type == EventTypes.Redaction:
-                orig_event_info = yield self._simple_select_one(
-                    table="events",
-                    keyvalues={"event_id": entry.event.redacts},
-                    retcols=["sender", "room_id", "type"],
-                    allow_none=True,
-                )
-
-                if not orig_event_info:
-                    # We don't have the event that is being redacted, so we
-                    # assume that the event isn't authorized for now. (If we
-                    # later receive the event, then we will always redact
-                    # it anyway, since we have this redaction)
+                redacted_event_id = entry.event.redacts
+                event_map = yield self._get_events_from_cache_or_db([redacted_event_id])
+                original_event_entry = event_map.get(redacted_event_id)
+                if not original_event_entry:
+                    # we don't have the redacted event (or it was rejected).
+                    #
+                    # We assume that the redaction isn't authorized for now; if the
+                    # redacted event later turns up, the redaction will be re-checked,
+                    # and if it is found valid, the original will get redacted before it
+                    # is served to the client.
+                    logger.debug(
+                        "Withholding redaction event %s since we don't (yet) have the "
+                        "original %s",
+                        event_id,
+                        redacted_event_id,
+                    )
                     continue
 
-                if orig_event_info["room_id"] != entry.event.room_id:
-                    # Don't process redactions if the redacted event doesn't belong to the
-                    # redaction's room.
-                    logger.info("Ignoring redation in another room.")
-                    continue
+                original_event = original_event_entry.event
 
                 if entry.event.internal_metadata.need_to_check_redaction():
-                    # XXX: we should probably use _get_events_from_cache_or_db here,
-                    # so that we can benefit from caching.
-                    expected_domain = get_domain_from_id(entry.event.sender)
-                    if get_domain_from_id(orig_event_info["sender"]) == expected_domain:
-                        # This redaction event is allowed. Mark as not needing a
-                        # recheck.
-                        entry.event.internal_metadata.recheck_redaction = False
+                    original_domain = get_domain_from_id(original_event.sender)
+                    redaction_domain = get_domain_from_id(entry.event.sender)
+                    if original_domain != redaction_domain:
+                        # the senders don't match, so this is forbidden
+                        logger.info(
+                            "Withholding redaction %s whose sender domain %s doesn't "
+                            "match that of redacted event %s %s",
+                            event_id,
+                            redaction_domain,
+                            redacted_event_id,
+                            original_domain,
+                        )
+                        continue
+
+                    # Update the cache to save doing the checks again.
+                    entry.event.internal_metadata.recheck_redaction = False
 
             if check_redacted and entry.redacted_event:
                 event = entry.redacted_event
@@ -630,15 +639,6 @@ class EventsWorkerStore(SQLBaseStore):
                 else:
                     # Senders don't match, so the event isn't actually redacted
                     continue
-
-                if redaction_event.room_id != original_ev.room_id:
-                    continue
-
-            else:
-                # The lack of a redaction likely means that the redaction is invalid
-                # and therefore not returned by get_event, so it should be safe to
-                # just ignore it here.
-                continue
 
             # we found a good redaction event. Redact!
             redacted_event = prune_event(original_ev)
