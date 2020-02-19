@@ -1,1 +1,0 @@
-Fix bug in #5626 that prevented the original_event field from actually having the contents of the original event in a call to `/relations`.

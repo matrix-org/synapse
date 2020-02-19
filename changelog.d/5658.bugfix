@@ -1,1 +1,0 @@
-Fix 3PID bind requests being sent to identity servers as `application/x-form-www-urlencoded` data, which is deprecated.

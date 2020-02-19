@@ -1,1 +1,0 @@
-Move logging code out of `synapse.util` and into `synapse.logging`.
