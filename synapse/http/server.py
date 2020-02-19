@@ -245,7 +245,9 @@ class JsonResource(HttpServer, resource.Resource):
 
     isLeaf = True
 
-    _PathEntry = collections.namedtuple("_PathEntry", ["pattern", "callback"])
+    _PathEntry = collections.namedtuple(
+        "_PathEntry", ["pattern", "callback", "servlet_classname"]
+    )
 
     def __init__(self, hs, canonical_json=True):
         resource.Resource.__init__(self)
@@ -255,12 +257,28 @@ class JsonResource(HttpServer, resource.Resource):
         self.path_regexs = {}
         self.hs = hs
 
-    def register_paths(self, method, path_patterns, callback):
+    def register_paths(self, method, path_patterns, callback, servlet_classname):
+        """
+        Registers a request handler against a regular expression. Later request URLs are
+        checked against these regular expressions in order to identify an appropriate
+        handler for that request.
+
+        Args:
+            method (str): GET, POST etc
+
+            path_patterns (Iterable[str]): A list of regular expressions to which
+                the request URLs are compared.
+
+            callback (function): The handler for the request. Usually a Servlet
+
+            servlet_classname (str): The name of the handler to be used in prometheus
+                and opentracing logs.
+        """
         method = method.encode("utf-8")  # method is bytes on py3
         for path_pattern in path_patterns:
             logger.debug("Registering for %s %s", method, path_pattern.pattern)
             self.path_regexs.setdefault(method, []).append(
-                self._PathEntry(path_pattern, callback)
+                self._PathEntry(path_pattern, callback, servlet_classname)
             )
 
     def render(self, request):
@@ -275,13 +293,9 @@ class JsonResource(HttpServer, resource.Resource):
             This checks if anyone has registered a callback for that method and
             path.
         """
-        callback, group_dict = self._get_handler_for_request(request)
+        callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
-        servlet_instance = getattr(callback, "__self__", None)
-        if servlet_instance is not None:
-            servlet_classname = servlet_instance.__class__.__name__
-        else:
-            servlet_classname = "%r" % callback
+        # Make sure we have a name for this handler in prometheus.
         request.request_metrics.name = servlet_classname
 
         # Now trigger the callback. If it returns a response, we send it
@@ -311,7 +325,8 @@ class JsonResource(HttpServer, resource.Resource):
             request (twisted.web.http.Request):
 
         Returns:
-            Tuple[Callable, dict[unicode, unicode]]: callback method, and the
+            Tuple[Callable, str, dict[unicode, unicode]]: callback method, the
+                label to use for that method in prometheus metrics, and the
                 dict mapping keys to path components as specified in the
                 handler's path match regexp.
 
@@ -320,7 +335,7 @@ class JsonResource(HttpServer, resource.Resource):
                 None, or a tuple of (http code, response body).
         """
         if request.method == b"OPTIONS":
-            return _options_handler, {}
+            return _options_handler, "options_request_handler", {}
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
@@ -328,10 +343,10 @@ class JsonResource(HttpServer, resource.Resource):
             m = path_entry.pattern.match(request.path.decode("ascii"))
             if m:
                 # We found a match!
-                return path_entry.callback, m.groupdict()
+                return path_entry.callback, path_entry.servlet_classname, m.groupdict()
 
         # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        return _unrecognised_request_handler, {}
+        return _unrecognised_request_handler, "unrecognised_request_handler", {}
 
     def _send_response(
         self, request, code, response_json_object, response_code_message=None
