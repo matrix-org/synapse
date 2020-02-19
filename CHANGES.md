@@ -65,7 +65,7 @@ Internal Changes
 - Unblacklist some user_directory sytests. ([\#5637](https://github.com/matrix-org/synapse/issues/5637))
 - Factor out some redundant code in the login implementation. ([\#5639](https://github.com/matrix-org/synapse/issues/5639))
 - Update ModuleApi to avoid register(generate_token=True). ([\#5640](https://github.com/matrix-org/synapse/issues/5640))
-- Remove access-token support from RegistrationHandler.register, and rename it. ([\#5641](https://github.com/matrix-org/synapse/issues/5641))
+- Remove access-token support from `RegistrationHandler.register`, and rename it. ([\#5641](https://github.com/matrix-org/synapse/issues/5641))
 - Remove access-token support from `RegistrationStore.register`, and rename it. ([\#5642](https://github.com/matrix-org/synapse/issues/5642))
 - Improve logging for auto-join when a new user is created. ([\#5643](https://github.com/matrix-org/synapse/issues/5643))
 - Remove unused and unnecessary check for FederationDeniedError in _exception_to_failure. ([\#5645](https://github.com/matrix-org/synapse/issues/5645))
