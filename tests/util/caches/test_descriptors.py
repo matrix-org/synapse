@@ -27,6 +27,7 @@ from synapse.logging.context import (
     make_deferred_yieldable,
 )
 from synapse.util.caches import descriptors
+from synapse.util.caches.descriptors import cached
 
 from tests import unittest
 
@@ -55,12 +56,15 @@ class CacheTestCase(unittest.TestCase):
         d2 = defer.Deferred()
         cache.set("key2", d2, partial(record_callback, 1))
 
-        # lookup should return the deferreds
-        self.assertIs(cache.get("key1"), d1)
-        self.assertIs(cache.get("key2"), d2)
+        # lookup should return observable deferreds
+        self.assertFalse(cache.get("key1").has_called())
+        self.assertFalse(cache.get("key2").has_called())
 
         # let one of the lookups complete
         d2.callback("result2")
+
+        # for now at least, the cache will return real results rather than an
+        # observabledeferred
         self.assertEqual(cache.get("key2"), "result2")
 
         # now do the invalidation
@@ -146,6 +150,28 @@ class DescriptorTestCase(unittest.TestCase):
         self.assertEqual(r, "chips")
         obj.mock.assert_not_called()
 
+    def test_cache_with_sync_exception(self):
+        """If the wrapped function throws synchronously, things should continue to work
+        """
+
+        class Cls(object):
+            @cached()
+            def fn(self, arg1):
+                raise SynapseError(100, "mai spoon iz too big!!1")
+
+        obj = Cls()
+
+        # this should fail immediately
+        d = obj.fn(1)
+        self.failureResultOf(d, SynapseError)
+
+        # ... leaving the cache empty
+        self.assertEqual(len(obj.fn.cache.cache), 0)
+
+        # and a second call should result in a second exception
+        d = obj.fn(1)
+        self.failureResultOf(d, SynapseError)
+
     def test_cache_logcontexts(self):
         """Check that logcontexts are set and restored correctly when
         using the cache."""
@@ -222,6 +248,9 @@ class DescriptorTestCase(unittest.TestCase):
 
                 self.assertEqual(LoggingContext.current_context(), c1)
 
+            # the cache should now be empty
+            self.assertEqual(len(obj.fn.cache.cache), 0)
+
         obj = Cls()
 
         # set off a deferred which will do a cache lookup
@@ -267,6 +296,61 @@ class DescriptorTestCase(unittest.TestCase):
         r = yield obj.fn(2, 3)
         self.assertEqual(r, "chips")
         obj.mock.assert_not_called()
+
+    def test_cache_iterable(self):
+        class Cls(object):
+            def __init__(self):
+                self.mock = mock.Mock()
+
+            @descriptors.cached(iterable=True)
+            def fn(self, arg1, arg2):
+                return self.mock(arg1, arg2)
+
+        obj = Cls()
+
+        obj.mock.return_value = ["spam", "eggs"]
+        r = obj.fn(1, 2)
+        self.assertEqual(r, ["spam", "eggs"])
+        obj.mock.assert_called_once_with(1, 2)
+        obj.mock.reset_mock()
+
+        # a call with different params should call the mock again
+        obj.mock.return_value = ["chips"]
+        r = obj.fn(1, 3)
+        self.assertEqual(r, ["chips"])
+        obj.mock.assert_called_once_with(1, 3)
+        obj.mock.reset_mock()
+
+        # the two values should now be cached
+        self.assertEqual(len(obj.fn.cache.cache), 3)
+
+        r = obj.fn(1, 2)
+        self.assertEqual(r, ["spam", "eggs"])
+        r = obj.fn(1, 3)
+        self.assertEqual(r, ["chips"])
+        obj.mock.assert_not_called()
+
+    def test_cache_iterable_with_sync_exception(self):
+        """If the wrapped function throws synchronously, things should continue to work
+        """
+
+        class Cls(object):
+            @descriptors.cached(iterable=True)
+            def fn(self, arg1):
+                raise SynapseError(100, "mai spoon iz too big!!1")
+
+        obj = Cls()
+
+        # this should fail immediately
+        d = obj.fn(1)
+        self.failureResultOf(d, SynapseError)
+
+        # ... leaving the cache empty
+        self.assertEqual(len(obj.fn.cache.cache), 0)
+
+        # and a second call should result in a second exception
+        d = obj.fn(1)
+        self.failureResultOf(d, SynapseError)
 
 
 class CachedListDescriptorTestCase(unittest.TestCase):
