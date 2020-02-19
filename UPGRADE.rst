@@ -49,6 +49,13 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v1.2.0
+===================
+
+Some counter metrics have been renamed, with the old names deprecated. See
+`the metrics documentation <docs/metrics-howto.rst#renaming-of-metrics--deprecation-of-old-names-in-12>`_
+for details.
+
 Upgrading to v1.1.0
 ===================
 

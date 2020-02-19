@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from prometheus_client.exposition import generate_latest
-
-from synapse.metrics import REGISTRY
+from synapse.metrics import REGISTRY, generate_latest
 from synapse.types import Requester, UserID
 
 from tests.unittest import HomeserverTestCase
