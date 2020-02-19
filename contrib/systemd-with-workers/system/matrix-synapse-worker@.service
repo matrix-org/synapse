@@ -4,7 +4,8 @@ After=matrix-synapse.service
 BindsTo=matrix-synapse.service
 
 [Service]
-Type=simple
+Type=notify
+NotifyAccess=main
 User=matrix-synapse
 WorkingDirectory=/var/lib/matrix-synapse
 EnvironmentFile=/etc/default/matrix-synapse

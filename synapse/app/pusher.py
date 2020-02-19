@@ -216,7 +216,7 @@ def start(config_options):
         _base.start(ps, config.worker_listeners)
         ps.get_pusherpool().start()
 
-    reactor.callWhenRunning(start)
+    reactor.addSystemEventTrigger("before", "startup", start)
 
     _base.start_worker_reactor("synapse-pusher", config)
 
