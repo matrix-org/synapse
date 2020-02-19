@@ -34,9 +34,7 @@ class LogContextScopeManager(ScopeManager):
     """
 
     def __init__(self, config):
-        # Set the whitelists
-        logger.info(config.tracer_config)
-        self._homeserver_whitelist = config.tracer_config["homeserver_whitelist"]
+        pass
 
     @property
     def active(self):

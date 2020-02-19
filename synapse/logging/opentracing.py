@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2019 The Matrix.org Foundation C.I.C.d
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,15 @@
 # this move the methods have work very similarly to opentracing's and it should only
 # be a matter of few regexes to move over to opentracing's access patterns proper.
 
+import contextlib
+import logging
+import re
+from functools import wraps
+
+from twisted.internet import defer
+
+from synapse.config import ConfigError
+
 try:
     import opentracing
 except ImportError:
@@ -35,12 +44,6 @@ except ImportError:
     JaegerConfig = None
     LogContextScopeManager = None
 
-import contextlib
-import logging
-import re
-from functools import wraps
-
-from twisted.internet import defer
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +94,8 @@ def only_if_tracing(func):
     return _only_if_tracing_inner
 
 
-# Block everything by default
+# A regex which matches the server_names to expose traces for.
+# None means 'block everything'.
 _homeserver_whitelist = None
 
 tags = _DumTagNames
@@ -101,31 +105,24 @@ def init_tracer(config):
     """Set the whitelists and initialise the JaegerClient tracer
 
     Args:
-        config (Config)
-        The config used by the homeserver. Here it's used to set the service
-        name to the homeserver's.
+        config (HomeserverConfig): The config used by the homeserver
     """
     global opentracing
-    if not config.tracer_config.get("tracer_enabled", False):
+    if not config.opentracer_enabled:
         # We don't have a tracer
         opentracing = None
         return
 
-    if not opentracing:
-        logger.error(
-            "The server has been configure to use opentracing but opentracing is not installed."
-        )
-        raise ModuleNotFoundError("opentracing")
-
-    if not JaegerConfig:
-        logger.error(
-            "The server has been configure to use opentracing but opentracing is not installed."
+    if not opentracing or not JaegerConfig:
+        raise ConfigError(
+            "The server has been configured to use opentracing but opentracing is not "
+            "installed."
         )
 
     # Include the worker name
     name = config.worker_name if config.worker_name else "master"
 
-    set_homeserver_whitelist(config.tracer_config["homeserver_whitelist"])
+    set_homeserver_whitelist(config.opentracer_whitelist)
     jaeger_config = JaegerConfig(
         config={"sampler": {"type": "const", "param": 1}, "logging": True},
         service_name="{} {}".format(config.server_name, name),
@@ -232,7 +229,6 @@ def whitelisted_homeserver(destination):
     """Checks if a destination matches the whitelist
     Args:
         destination (String)"""
-    global _homeserver_whitelist
     if _homeserver_whitelist:
         return _homeserver_whitelist.match(destination)
     return False
