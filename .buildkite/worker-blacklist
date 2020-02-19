@@ -1,0 +1,28 @@
+# This file serves as a blacklist for SyTest tests that we expect will fail in
+# Synapse when run under worker mode. For more details, see sytest-blacklist.
+
+Message history can be paginated
+
+m.room.history_visibility == "world_readable" allows/forbids appropriately for Guest users
+
+m.room.history_visibility == "world_readable" allows/forbids appropriately for Real users
+
+Can re-join room if re-invited
+
+/upgrade creates a new room
+
+The only membership state included in an initial sync is for all the senders in the timeline
+
+Local device key changes get to remote servers
+
+If remote user leaves room we no longer receive device updates
+
+Forgotten room messages cannot be paginated
+
+Inbound federation can get public room list
+
+Members from the gap are included in gappy incr LL sync
+
+Leaves are present in non-gapped incremental syncs
+
+Old leaves are present in gapped incremental syncs
