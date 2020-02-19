@@ -735,7 +735,7 @@ class EventsPersistenceStorage(object):
             for event, _ in ev_ctx_rm:
                 if event_id == event.event_id:
                     if event.membership == Membership.JOIN:
-                        return
+                        return True
 
             # The event is not in `ev_ctx_rm`, so we need to pull it out of
             # the DB.
