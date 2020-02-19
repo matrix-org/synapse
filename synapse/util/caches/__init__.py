@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,7 +52,19 @@ response_cache_evicted = Gauge(
 response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
 
 
-def register_cache(cache_type, cache_name, cache):
+def register_cache(cache_type, cache_name, cache, collect_callback=None):
+    """Register a cache object for metric collection.
+
+    Args:
+        cache_type (str):
+        cache_name (str): name of the cache
+        cache (object): cache itself
+        collect_callback (callable|None): if not None, a function which is called during
+            metric collection to update additional metrics.
+
+    Returns:
+        CacheMetric: an object which provides inc_{hits,misses,evictions} methods
+    """
 
     # Check if the metric is already registered. Unregister it, if so.
     # This usually happens during tests, as at runtime these caches are
@@ -90,6 +103,8 @@ def register_cache(cache_type, cache_name, cache):
                     cache_hits.labels(cache_name).set(self.hits)
                     cache_evicted.labels(cache_name).set(self.evicted_size)
                     cache_total.labels(cache_name).set(self.hits + self.misses)
+                if collect_callback:
+                    collect_callback()
             except Exception as e:
                 logger.warn("Error calculating metrics for %s: %s", cache_name, e)
                 raise
