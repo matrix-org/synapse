@@ -1,0 +1,1 @@
+Fix database index so that different backup versions can have the same sessions.
