@@ -36,7 +36,7 @@ class CacheTestCase(unittest.TestCase):
         self.assertTrue("one" in self.cache)
         self.assertEqual(self.cache.get("one"), "1")
         self.assertEqual(self.cache["one"], "1")
-        self.assertEqual(self.cache.get_with_expiry("one"), ("1", 110))
+        self.assertEqual(self.cache.get_with_expiry("one"), ("1", 110, 10))
         self.assertEqual(self.cache._metrics.hits, 3)
         self.assertEqual(self.cache._metrics.misses, 0)
 
@@ -77,7 +77,7 @@ class CacheTestCase(unittest.TestCase):
         self.assertEqual(self.cache["two"], "2")
         self.assertEqual(self.cache["three"], "3")
 
-        self.assertEqual(self.cache.get_with_expiry("two"), ("2", 120))
+        self.assertEqual(self.cache.get_with_expiry("two"), ("2", 120, 20))
 
         self.assertEqual(self.cache._metrics.hits, 5)
         self.assertEqual(self.cache._metrics.misses, 0)
