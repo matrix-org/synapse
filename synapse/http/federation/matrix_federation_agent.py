@@ -64,10 +64,6 @@ class MatrixFederationAgent(object):
         tls_client_options_factory (ClientTLSOptionsFactory|None):
             factory to use for fetching client tls options, or none to disable TLS.
 
-        _well_known_tls_policy (IPolicyForHTTPS|None):
-            TLS policy to use for fetching .well-known files. None to use a default
-            (browser-like) implementation.
-
         _srv_resolver (SrvResolver|None):
             SRVResolver impl to use for looking up SRV records. None to use a default
             implementation.
@@ -81,7 +77,6 @@ class MatrixFederationAgent(object):
         self,
         reactor,
         tls_client_options_factory,
-        _well_known_tls_policy=None,
         _srv_resolver=None,
         _well_known_cache=well_known_cache,
     ):
@@ -98,13 +93,12 @@ class MatrixFederationAgent(object):
         self._pool.maxPersistentPerHost = 5
         self._pool.cachedConnectionTimeout = 2 * 60
 
-        agent_args = {}
-        if _well_known_tls_policy is not None:
-            # the param is called 'contextFactory', but actually passing a
-            # contextfactory is deprecated, and it expects an IPolicyForHTTPS.
-            agent_args["contextFactory"] = _well_known_tls_policy
         _well_known_agent = RedirectAgent(
-            Agent(self._reactor, pool=self._pool, **agent_args)
+            Agent(
+                self._reactor,
+                pool=self._pool,
+                contextFactory=tls_client_options_factory,
+            )
         )
         self._well_known_agent = _well_known_agent
 
