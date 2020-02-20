@@ -1,3 +1,13 @@
+Synapse 1.3.0 (2019-08-15)
+==========================
+
+Bugfixes
+--------
+
+- Fix 500 Internal Server Error on `publicRooms` when the public room list was
+  cached. ([\#5851](https://github.com/matrix-org/synapse/issues/5851))
+
+
 Synapse 1.3.0rc1 (2019-08-13)
 ==========================
 
