@@ -860,7 +860,7 @@ class AuthHandler(BaseHandler):
         try:
             macaroon = pymacaroons.Macaroon.deserialize(login_token)
             user_id = auth_api.get_user_id_from_macaroon(macaroon)
-            auth_api.validate_macaroon(macaroon, "login", True, user_id)
+            auth_api.validate_macaroon(macaroon, "login", user_id)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
         self.ratelimit_login_per_account(user_id)

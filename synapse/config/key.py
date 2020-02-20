@@ -116,8 +116,6 @@ class KeyConfig(Config):
             seed = bytes(self.signing_key[0])
             self.macaroon_secret_key = hashlib.sha256(seed).digest()
 
-        self.expire_access_token = config.get("expire_access_token", False)
-
         # a secret which is used to calculate HMACs for form values, to stop
         # falsification of values
         self.form_secret = config.get("form_secret", None)
@@ -143,10 +141,6 @@ class KeyConfig(Config):
         # a secret key is derived from the signing key.
         #
         %(macaroon_secret_key)s
-
-        # Used to enable access token expiration.
-        #
-        #expire_access_token: False
 
         # a secret which is used to calculate HMACs for form values, to stop
         # falsification of values. Must be specified for the User Consent
