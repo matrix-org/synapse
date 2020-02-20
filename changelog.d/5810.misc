@@ -1,0 +1,1 @@
+Return 502 not 500 when failing to reach any remote server.
