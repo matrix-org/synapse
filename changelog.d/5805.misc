@@ -1,0 +1,1 @@
+Deny sending well known state types as non-state events.
