@@ -1,6 +1,7 @@
 # filename patterns
 *~
 .*.swp
+.vim
 .#*
 *.deb
 *.egg

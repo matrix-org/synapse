@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- CODING: UTF-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -486,18 +486,21 @@ class PreviewUrlResource(DirectServeResource):
 def decode_and_calc_og(body, media_uri, request_encoding=None):
     from lxml import etree
 
+    parser = etree.HTMLParser(recover=True, encoding=request_encoding)
     try:
-        parser = etree.HTMLParser(recover=True, encoding=request_encoding)
         tree = etree.fromstring(body, parser)
-        og = _calc_og(tree, media_uri)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
-        parser = etree.HTMLParser(recover=True, encoding=request_encoding)
         tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
-        og = _calc_og(tree, media_uri)
 
-    return og
+    if tree is None:
+        msg = 'etree returned None for body: \'%s\', please report to ' \
+            'https://github.com/matrix-org/synapse/issues/6745'.format(body)
+        logger.warn(msg)
+        raise RuntimeError(msg)
+
+    return _calc_og(tree, media_uri)
 
 
 def _calc_og(tree, media_uri):
