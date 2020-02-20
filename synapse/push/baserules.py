@@ -245,7 +245,13 @@ BASE_APPEND_OVERRIDE_RULES = [
                 "key": "type",
                 "pattern": "m.room.tombstone",
                 "_id": "_tombstone",
-            }
+            },
+            {
+                "kind": "event_match",
+                "key": "state_key",
+                "pattern": "",
+                "_id": "_tombstone_statekey",
+            },
         ],
         "actions": ["notify", {"set_tweak": "highlight", "value": True}],
     },
