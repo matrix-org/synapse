@@ -22,6 +22,7 @@ from netaddr import IPAddress
 
 from twisted.internet import defer
 
+import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
 from synapse.api.constants import EventTypes, JoinRules, Membership
@@ -178,6 +179,7 @@ class Auth(object):
     def get_public_keys(self, invite_event):
         return event_auth.get_public_keys(invite_event)
 
+    @opentracing.trace
     @defer.inlineCallbacks
     def get_user_by_req(
         self, request, allow_guest=False, rights="access", allow_expired=False
@@ -210,6 +212,7 @@ class Auth(object):
 
             if user_id:
                 request.authenticated_entity = user_id
+                opentracing.set_tag("authenticated_entity", user_id)
 
                 if ip_addr and self.hs.config.track_appservice_user_ips:
                     yield self.store.insert_client_ip(
@@ -260,6 +263,7 @@ class Auth(object):
                 )
 
             request.authenticated_entity = user.to_string()
+            opentracing.set_tag("authenticated_entity", user.to_string())
 
             return synapse.types.create_requester(
                 user, token_id, is_guest, device_id, app_service=app_service
