@@ -993,3 +993,39 @@ class FederationClient(FederationBase):
                 )
 
         raise RuntimeError("Failed to send to any server.")
+
+    @defer.inlineCallbacks
+    def get_room_complexity(self, destination, room_id):
+        """
+        Fetch the complexity of a remote room from another server.
+
+        Args:
+            destination (str): The remote server
+            room_id (str): The room ID to ask about.
+
+        Returns:
+            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            metric versions, while None means we could not fetch the complexity.
+        """
+        try:
+            complexity = yield self.transport_layer.get_room_complexity(
+                destination=destination, room_id=room_id
+            )
+            defer.returnValue(complexity)
+        except CodeMessageException as e:
+            # We didn't manage to get it -- probably a 404. We are okay if other
+            # servers don't give it to us.
+            logger.debug(
+                "Failed to fetch room complexity via %s for %s, got a %d",
+                destination,
+                room_id,
+                e.code,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to fetch room complexity via %s for %s", destination, room_id
+            )
+
+        # If we don't manage to find it, return None. It's not an error if a
+        # server doesn't give it to us.
+        defer.returnValue(None)
