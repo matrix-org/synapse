@@ -67,9 +67,9 @@ class AccountValidityRenewServlet(RestServlet):
         request.setResponseCode(status_code)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
         request.setHeader(b"Content-Length", b"%d" % (len(response),))
-        request.write(ensure_binary(response))
+        request.write(response.encode("utf8"))
         finish_request(request)
-        return None
+        defer.returnValue(None)
 
 
 class AccountValiditySendMailServlet(RestServlet):
@@ -98,7 +98,7 @@ class AccountValiditySendMailServlet(RestServlet):
         user_id = requester.user.to_string()
         yield self.account_activity_handler.send_renewal_email_to_user(user_id)
 
-        return (200, {})
+        defer.returnValue((200, {}))
 
 
 def register_servlets(hs, http_server):
