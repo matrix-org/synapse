@@ -149,7 +149,9 @@ class RoomCreationHandler(BaseHandler):
         return ret
 
     @defer.inlineCallbacks
-    def _upgrade_room(self, requester, old_room_id, new_version):
+    def _upgrade_room(
+        self, requester: Requester, old_room_id: str, new_version: RoomVersion
+    ):
         user_id = requester.user.to_string()
 
         # start by allocating a new room id
@@ -448,7 +450,11 @@ class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _move_aliases_to_new_room(
-        self, requester, old_room_id, new_room_id, old_room_state
+        self,
+        requester: Requester,
+        old_room_id: str,
+        new_room_id: str,
+        old_room_state: StateMap[str],
     ):
         directory_handler = self.hs.get_handlers().directory_handler
 
