@@ -1,0 +1,1 @@
+Fix bug where user `/sync` stream could get wedged in rare circumstances.

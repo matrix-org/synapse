@@ -781,9 +781,17 @@ class SyncHandler(object):
                     lazy_load_members=lazy_load_members,
                 )
             elif batch.limited:
-                state_at_timeline_start = yield self.store.get_state_ids_for_event(
-                    batch.events[0].event_id, state_filter=state_filter
-                )
+                if batch:
+                    state_at_timeline_start = yield self.store.get_state_ids_for_event(
+                        batch.events[0].event_id, state_filter=state_filter
+                    )
+                else:
+                    # Its not clear how we get here, but empirically we do
+                    # (#5407). Logging has been added elsewhere to try and
+                    # figure out where this state comes from.
+                    state_at_timeline_start = yield self.get_state_at(
+                        room_id, stream_position=now_token, state_filter=state_filter
+                    )
 
                 # for now, we disable LL for gappy syncs - see
                 # https://github.com/vector-im/riot-web/issues/7211#issuecomment-419976346
@@ -803,9 +811,17 @@ class SyncHandler(object):
                     room_id, stream_position=since_token, state_filter=state_filter
                 )
 
-                current_state_ids = yield self.store.get_state_ids_for_event(
-                    batch.events[-1].event_id, state_filter=state_filter
-                )
+                if batch:
+                    current_state_ids = yield self.store.get_state_ids_for_event(
+                        batch.events[-1].event_id, state_filter=state_filter
+                    )
+                else:
+                    # Its not clear how we get here, but empirically we do
+                    # (#5407). Logging has been added elsewhere to try and
+                    # figure out where this state comes from.
+                    current_state_ids = yield self.get_state_at(
+                        room_id, stream_position=now_token, state_filter=state_filter
+                    )
 
                 state_ids = _calculate_state(
                     timeline_contains=timeline_state,
@@ -1754,6 +1770,21 @@ class SyncHandler(object):
             recents=events,
             newly_joined_room=newly_joined,
         )
+
+        if not batch and batch.limited:
+            # This resulted in #5407, which is weird, so lets log! We do it
+            # here as we have the maximum amount of information.
+            user_id = sync_result_builder.sync_config.user.to_string()
+            logger.info(
+                "Issue #5407: Found limited batch with no events. user %s, room %s,"
+                " sync_config %s, newly_joined %s, events %s, batch %s.",
+                user_id,
+                room_id,
+                sync_config,
+                newly_joined,
+                events,
+                batch,
+            )
 
         if newly_joined:
             # debug for https://github.com/matrix-org/synapse/issues/4422
