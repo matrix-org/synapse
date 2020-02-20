@@ -25,6 +25,7 @@ from twisted.internet import defer
 from synapse.api.errors import CodeMessageException, SynapseError
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID, get_domain_from_id
+from synapse.util import unwrapFirstError
 from synapse.util.retryutils import NotRetryingDestination
 
 logger = logging.getLogger(__name__)
@@ -161,9 +162,7 @@ class E2eKeysHandler(object):
                         results[user_id] = {device["device_id"]: device["keys"]}
                     user_ids_updated.append(user_id)
                 except Exception as e:
-                    failures[destination] = failures.get(destination, []).append(
-                        _exception_to_failure(e)
-                    )
+                    failures[destination] = _exception_to_failure(e)
 
             if len(destination_query) == len(user_ids_updated):
                 # We've updated all the users in the query and we do not need to
@@ -194,7 +193,7 @@ class E2eKeysHandler(object):
                     for destination in remote_queries_not_in_cache
                 ],
                 consumeErrors=True,
-            )
+            ).addErrback(unwrapFirstError)
         )
 
         return {"device_keys": results, "failures": failures}
