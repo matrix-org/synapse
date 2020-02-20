@@ -1,7 +1,18 @@
+matrix-synapse-py3 (1.3.1) stable; urgency=medium
+
+  * New synapse release 1.3.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Sat, 17 Aug 2019 09:15:49 +0100
+
 matrix-synapse-py3 (1.3.0) stable; urgency=medium
 
   [ Andrew Morgan ]
   * Remove libsqlite3-dev from required build dependencies.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.3.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 15 Aug 2019 12:04:23 +0100
 
 matrix-synapse-py3 (1.2.0) stable; urgency=medium
 
@@ -13,9 +24,8 @@ matrix-synapse-py3 (1.2.0) stable; urgency=medium
 
   [ Synapse Packaging team ]
   * New synapse release 1.2.0.
-  * New synapse release 1.3.0.
 
- -- Synapse Packaging team <packages@matrix.org>  Thu, 15 Aug 2019 12:04:23 +0100
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Jul 2019 14:10:07 +0100
 
 matrix-synapse-py3 (1.1.0) stable; urgency=medium
 
