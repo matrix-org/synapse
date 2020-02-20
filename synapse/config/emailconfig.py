@@ -27,6 +27,12 @@ import pkg_resources
 
 from ._base import Config, ConfigError
 
+MISSING_PASSWORD_RESET_CONFIG_ERROR = """\
+Password reset emails are enabled on this homeserver due to a partial
+'email' block. However, the following required keys are missing:
+    %s
+"""
+
 
 class EmailConfig(Config):
     section = "email"
@@ -153,10 +159,7 @@ class EmailConfig(Config):
 
             if missing:
                 raise ConfigError(
-                    "Password resets emails are configured to be sent from "
-                    "this homeserver due to a partial 'email' block. "
-                    "However, the following required keys are missing: %s"
-                    % (", ".join(missing),)
+                    MISSING_PASSWORD_RESET_CONFIG_ERROR % (", ".join(missing),)
                 )
 
             # These email templates have placeholders in them, and thus must be
@@ -313,10 +316,6 @@ class EmailConfig(Config):
           #
           #require_transport_security: true
 
-          # Enable sending emails for messages that the user has missed
-          #
-          #enable_notifs: false
-
           # notif_from defines the "From" address to use when sending emails.
           # It must be set if email sending is enabled.
           #
@@ -333,6 +332,11 @@ class EmailConfig(Config):
           # defaults to 'Matrix'.
           #
           #app_name: my_branded_matrix_server
+
+          # Uncomment the following to enable sending emails for messages that the user
+          # has missed. Disabled by default.
+          #
+          #enable_notifs: true
 
           # Uncomment the following to disable automatic subscription to email
           # notifications for new users. Enabled by default.
