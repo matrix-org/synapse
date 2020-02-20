@@ -419,12 +419,11 @@ If Synapse is not configured with an SMTP server, password reset via email will
 
 ## Registering a user
 
-You will need at least one user on your server in order to use a Matrix
-client. Users can be registered either via a Matrix client, or via a
-commandline script.
+The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
 
-To get started, it is easiest to use the command line to register new
-users. This can be done as follows:
+Alternatively you can do so from the command line if you have installed via pip. 
+
+This can be done as follows:
 
 ```
 $ source ~/synapse/env/bin/activate
