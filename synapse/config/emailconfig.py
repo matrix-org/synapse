@@ -261,9 +261,9 @@ class EmailConfig(Config):
             self.email_notif_template_html = email_config.get(
                 "notif_template_html", "notif_mail.html"
             )
-            self.email_notif_template_text = email_config[
+            self.email_notif_template_text = email_config.get(
                 "notif_template_text", "notif_mail.txt"
-            ]
+            )
 
             for f in self.email_notif_template_text, self.email_notif_template_html:
                 p = os.path.join(self.email_template_dir, f)
