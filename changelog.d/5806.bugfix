@@ -1,0 +1,1 @@
+Fix error when trying to login as a deactivated user when using a worker to handle login.
