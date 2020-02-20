@@ -795,13 +795,15 @@ class EventCreationHandler(object):
                 get_prev_content=False,
                 allow_rejected=False,
                 allow_none=True,
-                check_room_id=event.room_id,
             )
 
             # we can make some additional checks now if we have the original event.
             if original_event:
                 if original_event.type == EventTypes.Create:
                     raise AuthError(403, "Redacting create events is not permitted")
+
+                if original_event.room_id != event.room_id:
+                    raise SynapseError(400, "Cannot redact event from a different room")
 
             prev_state_ids = yield context.get_prev_state_ids(self.store)
             auth_events_ids = yield self.auth.compute_auth_events(
