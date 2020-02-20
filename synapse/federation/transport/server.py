@@ -19,6 +19,8 @@ import functools
 import logging
 import re
 
+from twisted.internet.defer import maybeDeferred
+
 import synapse
 import synapse.logging.opentracing as opentracing
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
@@ -745,8 +747,12 @@ class PublicRoomList(BaseFederationServlet):
         else:
             network_tuple = ThirdPartyInstanceID(None, None)
 
-        data = await self.handler.get_local_public_room_list(
-            limit, since_token, network_tuple=network_tuple, from_federation=True
+        data = await maybeDeferred(
+            self.handler.get_local_public_room_list,
+            limit,
+            since_token,
+            network_tuple=network_tuple,
+            from_federation=True,
         )
         return 200, data
 
