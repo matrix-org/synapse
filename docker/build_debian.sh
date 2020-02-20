@@ -4,7 +4,8 @@
 
 set -ex
 
-DIST=`lsb_release -c -s`
+# Get the codename from distro env
+DIST=`cut -d ':' -f2 <<< $distro`
 
 # we get a read-only copy of the source: make a writeable copy
 cp -aT /synapse/source /synapse/build
