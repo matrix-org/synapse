@@ -149,7 +149,9 @@ class RoomCreationHandler(BaseHandler):
         return ret
 
     @defer.inlineCallbacks
-    def _upgrade_room(self, requester, old_room_id, new_version):
+    def _upgrade_room(
+        self, requester: Requester, old_room_id: str, new_version: RoomVersion
+    ):
         user_id = requester.user.to_string()
 
         # start by allocating a new room id
@@ -448,19 +450,21 @@ class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _move_aliases_to_new_room(
-        self, requester, old_room_id, new_room_id, old_room_state
+        self,
+        requester: Requester,
+        old_room_id: str,
+        new_room_id: str,
+        old_room_state: StateMap[str],
     ):
         directory_handler = self.hs.get_handlers().directory_handler
 
         aliases = yield self.store.get_aliases_for_room(old_room_id)
 
         # check to see if we have a canonical alias.
-        canonical_alias = None
+        canonical_alias_event = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event_id:
             canonical_alias_event = yield self.store.get_event(canonical_alias_event_id)
-            if canonical_alias_event:
-                canonical_alias = canonical_alias_event.content.get("alias", "")
 
         # first we try to remove the aliases from the old room (we suppress sending
         # the room_aliases event until the end).
@@ -488,19 +492,6 @@ class RoomCreationHandler(BaseHandler):
         if not removed_aliases:
             return
 
-        try:
-            # this can fail if, for some reason, our user doesn't have perms to send
-            # m.room.aliases events in the old room (note that we've already checked that
-            # they have perms to send a tombstone event, so that's not terribly likely).
-            #
-            # If that happens, it's regrettable, but we should carry on: it's the same
-            # as when you remove an alias from the directory normally - it just means that
-            # the aliases event gets out of sync with the directory
-            # (cf https://github.com/vector-im/riot-web/issues/2369)
-            yield directory_handler.send_room_alias_update_event(requester, old_room_id)
-        except AuthError as e:
-            logger.warning("Failed to send updated alias event on old room: %s", e)
-
         # we can now add any aliases we successfully removed to the new room.
         for alias in removed_aliases:
             try:
@@ -517,8 +508,10 @@ class RoomCreationHandler(BaseHandler):
                 # checking module decides it shouldn't, or similar.
                 logger.error("Error adding alias %s to new room: %s", alias, e)
 
+        # If a canonical alias event existed for the old room, fire a canonical
+        # alias event for the new room with a copy of the information.
         try:
-            if canonical_alias and (canonical_alias in removed_aliases):
+            if canonical_alias_event:
                 yield self.event_creation_handler.create_and_send_nonmember_event(
                     requester,
                     {
@@ -526,12 +519,10 @@ class RoomCreationHandler(BaseHandler):
                         "state_key": "",
                         "room_id": new_room_id,
                         "sender": requester.user.to_string(),
-                        "content": {"alias": canonical_alias},
+                        "content": canonical_alias_event.content,
                     },
                     ratelimit=False,
                 )
-
-            yield directory_handler.send_room_alias_update_event(requester, new_room_id)
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.
@@ -757,7 +748,6 @@ class RoomCreationHandler(BaseHandler):
 
         if room_alias:
             result["room_alias"] = room_alias.to_string()
-            yield directory_handler.send_room_alias_update_event(requester, room_id)
 
         return result
 
