@@ -142,20 +142,17 @@ class EmailConfig(Config):
             bleach
 
         if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            required = ["smtp_host", "smtp_port", "notif_from"]
-
             missing = []
-            for k in required:
-                if k not in email_config:
-                    missing.append("email." + k)
+            if not self.email_notif_from:
+                missing.append("email.notif_from")
 
             # public_baseurl is required to build password reset and validation links that
             # will be emailed to users
             if config.get("public_baseurl") is None:
                 missing.append("public_baseurl")
 
-            if len(missing) > 0:
-                raise RuntimeError(
+            if missing:
+                raise ConfigError(
                     "Password resets emails are configured to be sent from "
                     "this homeserver due to a partial 'email' block. "
                     "However, the following required keys are missing: %s"
@@ -245,32 +242,25 @@ class EmailConfig(Config):
             )
 
         if self.email_enable_notifs:
-            required = [
-                "smtp_host",
-                "smtp_port",
-                "notif_from",
-                "notif_template_html",
-                "notif_template_text",
-            ]
-
             missing = []
-            for k in required:
-                if k not in email_config:
-                    missing.append(k)
-
-            if len(missing) > 0:
-                raise RuntimeError(
-                    "email.enable_notifs is True but required keys are missing: %s"
-                    % (", ".join(["email." + k for k in missing]),)
-                )
+            if not self.email_notif_from:
+                missing.append("email.notif_from")
 
             if config.get("public_baseurl") is None:
-                raise RuntimeError(
-                    "email.enable_notifs is True but no public_baseurl is set"
+                missing.append("public_baseurl")
+
+            if missing:
+                raise ConfigError(
+                    "email.enable_notifs is True but required keys are missing: %s"
+                    % (", ".join(missing),)
                 )
 
-            self.email_notif_template_html = email_config["notif_template_html"]
-            self.email_notif_template_text = email_config["notif_template_text"]
+            self.email_notif_template_html = email_config.get(
+                "notif_template_html", "notif_mail.html"
+            )
+            self.email_notif_template_text = email_config[
+                "notif_template_text", "notif_mail.txt"
+            ]
 
             for f in self.email_notif_template_text, self.email_notif_template_html:
                 p = os.path.join(self.email_template_dir, f)
