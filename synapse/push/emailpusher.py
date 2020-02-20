@@ -234,13 +234,19 @@ class EmailPusher(object):
             return
 
         self.last_stream_ordering = last_stream_ordering
-        yield self.store.update_pusher_last_stream_ordering_and_success(
-            self.app_id,
-            self.email,
-            self.user_id,
-            last_stream_ordering,
-            self.clock.time_msec(),
+        pusher_still_exists = (
+            yield self.store.update_pusher_last_stream_ordering_and_success(
+                self.app_id,
+                self.email,
+                self.user_id,
+                last_stream_ordering,
+                self.clock.time_msec(),
+            )
         )
+        if not pusher_still_exists:
+            # The pusher has been deleted while we were processing, so
+            # lets just stop and return.
+            self.on_stop()
 
     def seconds_until(self, ts_msec):
         secs = (ts_msec - self.clock.time_msec()) / 1000
