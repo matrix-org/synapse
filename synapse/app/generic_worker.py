@@ -307,6 +307,7 @@ class GenericWorkerServer(HomeServer):
                 root_resource,
                 self.version_string,
             ),
+            reactor=self.get_reactor(),
         )
 
         logger.info("Synapse worker now listening on port %d", port)
