@@ -1,1 +1,0 @@
-Don't allow clients to send tombstone events that reference the room it's sent in.
