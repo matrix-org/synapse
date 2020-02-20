@@ -62,6 +62,7 @@ class Codes(object):
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
     WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
     EXPIRED_ACCOUNT = "ORG_MATRIX_EXPIRED_ACCOUNT"
+    USER_DEACTIVATED = "M_USER_DEACTIVATED"
     PASSWORD_TOO_SHORT = "M_PASSWORD_TOO_SHORT"
     PASSWORD_NO_DIGIT = "M_PASSWORD_NO_DIGIT"
     PASSWORD_NO_UPPERCASE = "M_PASSWORD_NO_UPPERCASE"
@@ -159,7 +160,7 @@ class UserDeactivatedError(SynapseError):
             msg (str): The human-readable error message
         """
         super(UserDeactivatedError, self).__init__(
-            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.UNKNOWN
+            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.USER_DEACTIVATED
         )
 
 
