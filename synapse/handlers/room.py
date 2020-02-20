@@ -455,20 +455,10 @@ class RoomCreationHandler(BaseHandler):
         aliases = yield self.store.get_aliases_for_room(old_room_id)
 
         # check to see if we have a canonical alias.
-        canonical_alias = None
-        canonical_alt_aliases = []
+        canonical_alias_event = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event_id:
             canonical_alias_event = yield self.store.get_event(canonical_alias_event_id)
-            if canonical_alias_event:
-                canonical_alias = canonical_alias_event.content.get("alias", "")
-                canonical_alt_aliases = canonical_alias_event.content.get(
-                    "alt_aliases", []
-                )
-                # If alt_aliases is not a list, overwrite it as whatever is there
-                # cannot be handled.
-                if not isinstance(canonical_alt_aliases, (list, tuple)):
-                    canonical_alt_aliases = []
 
         # first we try to remove the aliases from the old room (we suppress sending
         # the room_aliases event until the end).
@@ -512,19 +502,10 @@ class RoomCreationHandler(BaseHandler):
                 # checking module decides it shouldn't, or similar.
                 logger.error("Error adding alias %s to new room: %s", alias, e)
 
-        # The canonical alias and alternative aliases can only be propagated to
-        # the new room if they were removed from the old room.
-        content = {}
-        if canonical_alias and (canonical_alias in removed_aliases):
-            content["alias"] = canonical_alias
-        canonical_alt_aliases = [
-            alias for alias in canonical_alt_aliases if alias in removed_aliases
-        ]
-        if canonical_alt_aliases:
-            content["alt_aliases"] = canonical_alt_aliases
-
+        # If a canonical alias event existed for the old room, fire a canonical
+        # alias event for the new room with a copy of the information.
         try:
-            if content:
+            if canonical_alias_event:
                 yield self.event_creation_handler.create_and_send_nonmember_event(
                     requester,
                     {
@@ -532,7 +513,7 @@ class RoomCreationHandler(BaseHandler):
                         "state_key": "",
                         "room_id": new_room_id,
                         "sender": requester.user.to_string(),
-                        "content": content,
+                        "content": canonical_alias_event.content,
                     },
                     ratelimit=False,
                 )
