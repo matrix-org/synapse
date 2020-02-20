@@ -76,16 +76,6 @@ def calculate_room_name(
     # for an event type, so rearrange the data structure
     room_state_bytype_ids = _state_as_two_level_dict(room_state_ids)
 
-    # right then, any aliases at all?
-    if EventTypes.Aliases in room_state_bytype_ids:
-        m_room_aliases = room_state_bytype_ids[EventTypes.Aliases]
-        for alias_id in m_room_aliases.values():
-            alias_event = yield store.get_event(alias_id, allow_none=True)
-            if alias_event and alias_event.content.get("aliases"):
-                the_aliases = alias_event.content["aliases"]
-                if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
-                    return the_aliases[0]
-
     if not fallback_to_members:
         return None
 
