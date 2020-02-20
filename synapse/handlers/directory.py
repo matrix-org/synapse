@@ -14,6 +14,7 @@
 # limitations under the License.
 
 
+import collections
 import logging
 import string
 from typing import List
@@ -310,7 +311,7 @@ class DirectoryHandler(BaseHandler):
         alt_aliases = content.pop("alt_aliases", None)
         # If the aliases are not a list (or not found) do not attempt to modify
         # the list.
-        if isinstance(alt_aliases, (list, tuple)):
+        if isinstance(alt_aliases, collections.Sequence):
             send_update = True
             alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
             if alt_aliases:
