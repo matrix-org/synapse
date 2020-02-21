@@ -495,7 +495,7 @@ def decode_and_calc_og(body, media_uri, request_encoding=None):
         tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
 
     if tree is None:
-        msg = "null tree for body: '%s', please report to https://github.com/matrix-org/synapse/issues/6745".format(
+        msg = "null tree for body: '{}', please report to https://github.com/matrix-org/synapse/issues/6745".format(
             body
         )
         logger.warn(msg)
