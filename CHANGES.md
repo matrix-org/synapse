@@ -1,3 +1,12 @@
+Synapse 1.11.0 (2020-02-21)
+===========================
+
+Improved Documentation
+----------------------
+
+- Small grammatical fixes to the ACME v1 deprecation notice. ([\#6944](https://github.com/matrix-org/synapse/issues/6944))
+
+
 Synapse 1.11.0rc1 (2020-02-19)
 ==============================
 
