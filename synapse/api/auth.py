@@ -538,13 +538,13 @@ class Auth(object):
         return defer.succeed(auth_ids)
 
     @defer.inlineCallbacks
-    def check_can_change_room_list(self, room_id, user):
+    def check_can_change_room_list(self, room_id: str, user: UserID):
         """Check if the user is allowed to edit the room's entry in the
         published room list.
 
         Args:
-            room_id (str)
-            user (UserID)
+            room_id
+            user
         """
 
         is_admin = yield self.is_server_admin(user)
@@ -556,7 +556,7 @@ class Auth(object):
 
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
-        # m.room.aliases events
+        # m.room.canonical_alias events
         power_level_event = yield self.state.get_current_state(
             room_id, EventTypes.PowerLevels, ""
         )
@@ -566,7 +566,7 @@ class Auth(object):
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
         send_level = event_auth.get_send_level(
-            EventTypes.Aliases, "", power_level_event
+            EventTypes.CanonicalAlias, "", power_level_event
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
