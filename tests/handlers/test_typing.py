@@ -129,12 +129,12 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         hs.get_auth().check_user_in_room = check_user_in_room
 
         def get_joined_hosts_for_room(room_id):
-            return set(member.domain for member in self.room_members)
+            return {member.domain for member in self.room_members}
 
         self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
         def get_current_users_in_room(room_id):
-            return set(str(u) for u in self.room_members)
+            return {str(u) for u in self.room_members}
 
         hs.get_state_handler().get_current_users_in_room = get_current_users_in_room
 
@@ -257,7 +257,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         member = RoomMember(ROOM_ID, U_APPLE.to_string())
         self.handler._member_typing_until[member] = 1002000
-        self.handler._room_typing[ROOM_ID] = set([U_APPLE.to_string()])
+        self.handler._room_typing[ROOM_ID] = {U_APPLE.to_string()}
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 

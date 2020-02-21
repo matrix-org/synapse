@@ -191,7 +191,7 @@ class PusherPool:
                 min_stream_id - 1, max_stream_id
             )
             # This returns a tuple, user_id is at index 3
-            users_affected = set([r[3] for r in updated_receipts])
+            users_affected = {r[3] for r in updated_receipts}
 
             for u in users_affected:
                 if u in self.pushers:

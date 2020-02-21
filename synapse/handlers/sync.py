@@ -682,11 +682,9 @@ class SyncHandler(object):
 
         # FIXME: order by stream ordering rather than as returned by SQL
         if joined_user_ids or invited_user_ids:
-            summary["m.heroes"] = sorted(
-                [user_id for user_id in (joined_user_ids + invited_user_ids)]
-            )[0:5]
+            summary["m.heroes"] = sorted(joined_user_ids + invited_user_ids)[0:5]
         else:
-            summary["m.heroes"] = sorted([user_id for user_id in gone_user_ids])[0:5]
+            summary["m.heroes"] = sorted(gone_user_ids)[0:5]
 
         if not sync_config.filter_collection.lazy_load_members():
             return summary
@@ -697,9 +695,9 @@ class SyncHandler(object):
 
         # track which members the client should already know about via LL:
         # Ones which are already in state...
-        existing_members = set(
+        existing_members = {
             user_id for (typ, user_id) in state.keys() if typ == EventTypes.Member
-        )
+        }
 
         # ...or ones which are in the timeline...
         for ev in batch.events:
@@ -773,10 +771,10 @@ class SyncHandler(object):
                 # We only request state for the members needed to display the
                 # timeline:
 
-                members_to_fetch = set(
+                members_to_fetch = {
                     event.sender  # FIXME: we also care about invite targets etc.
                     for event in batch.events
-                )
+                }
 
                 if full_state:
                     # always make sure we LL ourselves so we know we're in the room
@@ -1993,10 +1991,10 @@ def _calculate_state(
         )
     }
 
-    c_ids = set(e for e in itervalues(current))
-    ts_ids = set(e for e in itervalues(timeline_start))
-    p_ids = set(e for e in itervalues(previous))
-    tc_ids = set(e for e in itervalues(timeline_contains))
+    c_ids = set(itervalues(current))
+    ts_ids = set(itervalues(timeline_start))
+    p_ids = set(itervalues(previous))
+    tc_ids = set(itervalues(timeline_contains))
 
     # If we are lazyloading room members, we explicitly add the membership events
     # for the senders in the timeline into the state block returned by /sync,

@@ -198,7 +198,7 @@ class TypingHandler(object):
                 now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
             )
 
-            for domain in set(get_domain_from_id(u) for u in users):
+            for domain in {get_domain_from_id(u) for u in users}:
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
                     self.federation.build_and_send_edu(
@@ -231,7 +231,7 @@ class TypingHandler(object):
             return
 
         users = yield self.state.get_current_users_in_room(room_id)
-        domains = set(get_domain_from_id(u) for u in users)
+        domains = {get_domain_from_id(u) for u in users}
 
         if self.server_name in domains:
             logger.info("Got typing update from %s: %r", user_id, content)

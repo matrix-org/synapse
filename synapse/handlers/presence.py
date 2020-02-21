@@ -313,7 +313,7 @@ class PresenceHandler(object):
                 notified_presence_counter.inc(len(to_notify))
                 yield self._persist_and_notify(list(to_notify.values()))
 
-            self.unpersisted_users_changes |= set(s.user_id for s in new_states)
+            self.unpersisted_users_changes |= {s.user_id for s in new_states}
             self.unpersisted_users_changes -= set(to_notify.keys())
 
             to_federation_ping = {
@@ -698,7 +698,7 @@ class PresenceHandler(object):
         updates = yield self.current_state_for_users(target_user_ids)
         updates = list(updates.values())
 
-        for user_id in set(target_user_ids) - set(u.user_id for u in updates):
+        for user_id in set(target_user_ids) - {u.user_id for u in updates}:
             updates.append(UserPresenceState.default(user_id))
 
         now = self.clock.time_msec()
@@ -886,7 +886,7 @@ class PresenceHandler(object):
             hosts = yield self.state.get_current_hosts_in_room(room_id)
 
             # Filter out ourselves.
-            hosts = set(host for host in hosts if host != self.server_name)
+            hosts = {host for host in hosts if host != self.server_name}
 
             self.federation.send_presence_to_destinations(
                 states=[state], destinations=hosts

@@ -63,9 +63,9 @@ class UserErasureWorkerStore(SQLBaseStore):
             retcols=("user_id",),
             desc="are_users_erased",
         )
-        erased_users = set(row["user_id"] for row in rows)
+        erased_users = {row["user_id"] for row in rows}
 
-        res = dict((u, u in erased_users) for u in user_ids)
+        res = {u: u in erased_users for u in user_ids}
         return res
 
 

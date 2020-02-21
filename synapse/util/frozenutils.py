@@ -30,7 +30,7 @@ def freeze(o):
         return o
 
     try:
-        return tuple([freeze(i) for i in o])
+        return tuple(freeze(i) for i in o)
     except TypeError:
         pass
 
