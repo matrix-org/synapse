@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.config.server import is_threepid_reserved
+import yaml
+
+from synapse.config.server import ServerConfig, is_threepid_reserved
 
 from tests import unittest
 
@@ -29,3 +31,100 @@ class ServerConfigTestCase(unittest.TestCase):
         self.assertTrue(is_threepid_reserved(config, user1))
         self.assertFalse(is_threepid_reserved(config, user3))
         self.assertFalse(is_threepid_reserved(config, user1_msisdn))
+
+    def test_unsecure_listener_no_listeners_open_private_ports_false(self):
+        conf = yaml.safe_load(
+            ServerConfig().generate_config_section(
+                "che.org", "/data_dir_path", False, None
+            )
+        )
+
+        expected_listeners = [
+            {
+                "port": 8008,
+                "tls": False,
+                "type": "http",
+                "x_forwarded": True,
+                "bind_addresses": ["::1", "127.0.0.1"],
+                "resources": [{"names": ["client", "federation"], "compress": False}],
+            }
+        ]
+
+        self.assertEqual(conf["listeners"], expected_listeners)
+
+    def test_unsecure_listener_no_listeners_open_private_ports_true(self):
+        conf = yaml.safe_load(
+            ServerConfig().generate_config_section(
+                "che.org", "/data_dir_path", True, None
+            )
+        )
+
+        expected_listeners = [
+            {
+                "port": 8008,
+                "tls": False,
+                "type": "http",
+                "x_forwarded": True,
+                "resources": [{"names": ["client", "federation"], "compress": False}],
+            }
+        ]
+
+        self.assertEqual(conf["listeners"], expected_listeners)
+
+    def test_listeners_set_correctly_open_private_ports_false(self):
+        listeners = [
+            {
+                "port": 8448,
+                "resources": [{"names": ["federation"]}],
+                "tls": True,
+                "type": "http",
+            },
+            {
+                "port": 443,
+                "resources": [{"names": ["client"]}],
+                "tls": False,
+                "type": "http",
+            },
+        ]
+
+        conf = yaml.safe_load(
+            ServerConfig().generate_config_section(
+                "this.one.listens", "/data_dir_path", True, listeners
+            )
+        )
+
+        self.assertEqual(conf["listeners"], listeners)
+
+    def test_listeners_set_correctly_open_private_ports_true(self):
+        listeners = [
+            {
+                "port": 8448,
+                "resources": [{"names": ["federation"]}],
+                "tls": True,
+                "type": "http",
+            },
+            {
+                "port": 443,
+                "resources": [{"names": ["client"]}],
+                "tls": False,
+                "type": "http",
+            },
+            {
+                "port": 1243,
+                "resources": [{"names": ["client"]}],
+                "tls": False,
+                "type": "http",
+                "bind_addresses": ["this_one_is_bound"],
+            },
+        ]
+
+        expected_listeners = listeners.copy()
+        expected_listeners[1]["bind_addresses"] = ["::1", "127.0.0.1"]
+
+        conf = yaml.safe_load(
+            ServerConfig().generate_config_section(
+                "this.one.listens", "/data_dir_path", True, listeners
+            )
+        )
+
+        self.assertEqual(conf["listeners"], expected_listeners)
