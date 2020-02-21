@@ -381,11 +381,6 @@ class GenericWorkerTyping(object):
             self._room_typing[row.room_id] = row.user_ids
 
 
-class GenericWorkerApplicationService(object):
-    def notify_interested_services(self, event):
-        pass
-
-
 class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
@@ -551,9 +546,6 @@ class GenericWorkerServer(HomeServer):
 
     def build_typing_handler(self):
         return GenericWorkerTyping(self)
-
-    def build_application_service_handler(self):
-        return GenericWorkerApplicationService()
 
 
 class GenericWorkerReplicationHandler(ReplicationClientHandler):
