@@ -538,6 +538,9 @@ class GenericWorkerServer(HomeServer):
 
         self.get_tcp_replication().start_replication(self)
 
+    def remove_pusher(self, app_id, push_key, user_id):
+        self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
+
     def build_tcp_replication(self):
         return GenericWorkerReplicationHandler(self)
 
@@ -557,6 +560,9 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
         # NB this is a SynchrotronPresence, not a normal PresenceHandler
         self.presence_handler = hs.get_presence_handler()
         self.notifier = hs.get_notifier()
+
+        self.notify_pushers = hs.config.start_pushers
+        self.pusher_pool = hs.get_pusherpool()
 
     async def on_rdata(self, stream_name, token, rows):
         await super(GenericWorkerReplicationHandler, self).on_rdata(
@@ -595,6 +601,8 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
                     self.notifier.on_new_room_event(
                         event, token, max_token, extra_users
                     )
+
+                await self.pusher_pool.on_new_notifications(token, token)
             elif stream_name == "push_rules":
                 self.notifier.on_new_event(
                     "push_rules_key", token, users=[row.user_id for row in rows]
@@ -606,6 +614,9 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
             elif stream_name == "receipts":
                 self.notifier.on_new_event(
                     "receipt_key", token, rooms=[row.room_id for row in rows]
+                )
+                await self.pusher_pool.on_new_receipts(
+                    token, token, {row.room_id for row in rows}
                 )
             elif stream_name == "typing":
                 self.typing_handler.process_replication_rows(token, rows)
@@ -628,8 +639,34 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
                 self.notifier.on_new_event(
                     "groups_key", token, users=[row.user_id for row in rows]
                 )
+            elif stream_name == "pushers":
+                for row in rows:
+                    if row.deleted:
+                        self.stop_pusher(row.user_id, row.app_id, row.pushkey)
+                    else:
+                        await self.start_pusher(row.user_id, row.app_id, row.pushkey)
         except Exception:
             logger.exception("Error processing replication")
+
+    def stop_pusher(self, user_id, app_id, pushkey):
+        if not self.notify_pushers:
+            return
+
+        key = "%s:%s" % (app_id, pushkey)
+        pushers_for_user = self.pusher_pool.pushers.get(user_id, {})
+        pusher = pushers_for_user.pop(key, None)
+        if pusher is None:
+            return
+        logger.info("Stopping pusher %r / %r", user_id, key)
+        pusher.on_stop()
+
+    async def start_pusher(self, user_id, app_id, pushkey):
+        if not self.notify_pushers:
+            return
+
+        key = "%s:%s" % (app_id, pushkey)
+        logger.info("Starting pusher %r / %r", user_id, key)
+        return await self.pusher_pool.start_pusher_by_id(app_id, pushkey, user_id)
 
 
 def start(config_options):
@@ -648,6 +685,7 @@ def start(config_options):
         "synapse.app.frontend_proxy",
         "synapse.app.generic_worker",
         "synapse.app.media_repository",
+        "synapse.app.pusher",
         "synapse.app.synchrotron",
     )
 
@@ -663,6 +701,19 @@ def start(config_options):
 
         # Force the appservice to start since they will be disabled in the main config
         config.notify_appservices = True
+
+    if config.worker_app == "synapse.app.pusher":
+        if config.start_pushers:
+            sys.stderr.write(
+                "\nThe pushers must be disabled in the main synapse process"
+                "\nbefore they can be run in a separate worker."
+                "\nPlease add ``start_pushers: false`` to the main config"
+                "\n"
+            )
+            sys.exit(1)
+
+        # Force the pushers to start since they will be disabled in the main config
+        config.start_pushers = True
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
