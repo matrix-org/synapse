@@ -1,0 +1,1 @@
+Fix `duplicate key` error which was logged when rejoining a room over federation.
