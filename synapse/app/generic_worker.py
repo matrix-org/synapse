@@ -641,6 +641,7 @@ def start(config_options):
 
     # For backwards compatibility let any of the old app names.
     assert config.worker_app in (
+        "synapse.app.appservice",
         "synapse.app.client_reader",
         "synapse.app.event_creator",
         "synapse.app.federation_reader",
@@ -649,6 +650,19 @@ def start(config_options):
         "synapse.app.media_repository",
         "synapse.app.synchrotron",
     )
+
+    if config.worker_app == "synapse.app.appservice":
+        if config.notify_appservices:
+            sys.stderr.write(
+                "\nThe appservices must be disabled in the main synapse process"
+                "\nbefore they can be run in a separate worker."
+                "\nPlease add ``notify_appservices: false`` to the main config"
+                "\n"
+            )
+            sys.exit(1)
+
+        # Force the appservice to start since they will be disabled in the main config
+        config.notify_appservices = True
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
