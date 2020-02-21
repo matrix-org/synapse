@@ -338,7 +338,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set([user_id]), now=now
+            state, is_mine=True, syncing_user_ids={user_id}, now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -579,7 +579,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=set(("server2", "server3")), states=[expected_state]
+            destinations={"server2", "server3"}, states=[expected_state]
         )
 
     def _add_new_user(self, room_id, user_id):

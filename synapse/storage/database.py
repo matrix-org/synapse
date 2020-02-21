@@ -554,8 +554,8 @@ class Database(object):
         Returns:
             A list of dicts where the key is the column header.
         """
-        col_headers = list(intern(str(column[0])) for column in cursor.description)
-        results = list(dict(zip(col_headers, row)) for row in cursor)
+        col_headers = [intern(str(column[0])) for column in cursor.description]
+        results = [dict(zip(col_headers, row)) for row in cursor]
         return results
 
     def execute(self, desc, decoder, query, *args):
@@ -1504,7 +1504,7 @@ class Database(object):
 
 def make_in_list_sql_clause(
     database_engine, column: str, iterable: Iterable
-) -> Tuple[str, Iterable]:
+) -> Tuple[str, list]:
     """Returns an SQL clause that checks the given column is in the iterable.
 
     On SQLite this expands to `column IN (?, ?, ...)`, whereas on Postgres

@@ -346,11 +346,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             from_key (str): The room_key portion of a StreamToken
         """
         from_key = RoomStreamToken.parse_stream_token(from_key).stream
-        return set(
+        return {
             room_id
             for room_id in room_ids
             if self._events_stream_cache.has_entity_changed(room_id, from_key)
-        )
+        }
 
     @defer.inlineCallbacks
     def get_room_events_stream_for_room(
@@ -679,11 +679,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         events_before = yield self.get_events_as_list(
-            [e for e in results["before"]["event_ids"]], get_prev_content=True
+            list(results["before"]["event_ids"]), get_prev_content=True
         )
 
         events_after = yield self.get_events_as_list(
-            [e for e in results["after"]["event_ids"]], get_prev_content=True
+            list(results["after"]["event_ids"]), get_prev_content=True
         )
 
         return {

@@ -158,7 +158,7 @@ class PusherReplicationHandler(ReplicationClientHandler):
                 yield self.pusher_pool.on_new_notifications(token, token)
             elif stream_name == "receipts":
                 yield self.pusher_pool.on_new_receipts(
-                    token, token, set(row.room_id for row in rows)
+                    token, token, {row.room_id for row in rows}
                 )
         except Exception:
             logger.exception("Error poking pushers")

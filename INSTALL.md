@@ -388,15 +388,17 @@ Once you have installed synapse as above, you will need to configure it.
 
 ## TLS certificates
 
-The default configuration exposes a single HTTP port: http://localhost:8008. It
-is suitable for local testing, but for any practical use, you will either need
-to enable a reverse proxy, or configure Synapse to expose an HTTPS port.
+The default configuration exposes a single HTTP port on the local
+interface: `http://localhost:8008`. It is suitable for local testing,
+but for any practical use, you will need Synapse's APIs to be served
+over HTTPS.
 
-For information on using a reverse proxy, see
+The recommended way to do so is to set up a reverse proxy on port
+`8448`. You can find documentation on doing so in
 [docs/reverse_proxy.md](docs/reverse_proxy.md).
 
-To configure Synapse to expose an HTTPS port, you will need to edit
-`homeserver.yaml`, as follows:
+Alternatively, you can configure Synapse to expose an HTTPS port. To do
+so, you will need to edit `homeserver.yaml`, as follows:
 
 * First, under the `listeners` section, uncomment the configuration for the
   TLS-enabled listener. (Remove the hash sign (`#`) at the start of
@@ -414,10 +416,13 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   point these settings at an existing certificate and key, or you can
   enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
   for having Synapse automatically provision and renew federation
-  certificates through ACME can be found at [ACME.md](docs/ACME.md). If you
-  are using your own certificate, be sure to use a `.pem` file that includes
-  the full certificate chain including any intermediate certificates (for
-  instance, if using certbot, use `fullchain.pem` as your certificate, not
+  certificates through ACME can be found at [ACME.md](docs/ACME.md).
+  Note that, as pointed out in that document, this feature will not
+  work with installs set up after November 2020. 
+  
+  If you are using your own certificate, be sure to use a `.pem` file that
+  includes the full certificate chain including any intermediate certificates
+  (for instance, if using certbot, use `fullchain.pem` as your certificate, not
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see

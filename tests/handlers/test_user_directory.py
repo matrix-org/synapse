@@ -114,7 +114,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         self.assertEqual(
-            self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
         )
         self.assertEqual(public_users, [])
 
@@ -169,7 +169,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         self.assertEqual(
-            self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
         )
         self.assertEqual(public_users, [])
 
@@ -226,7 +226,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         self.assertEqual(
-            self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
         )
         self.assertEqual(public_users, [])
 
@@ -358,12 +358,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         # User 1 and User 2 are in the same public room
-        self.assertEqual(set(public_users), set([(u1, room), (u2, room)]))
+        self.assertEqual(set(public_users), {(u1, room), (u2, room)})
 
         # User 1 and User 3 share private rooms
         self.assertEqual(
             self._compress_shared(shares_private),
-            set([(u1, u3, private_room), (u3, u1, private_room)]),
+            {(u1, u3, private_room), (u3, u1, private_room)},
         )
 
     def test_initial_share_all_users(self):
@@ -398,7 +398,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # No users share rooms
         self.assertEqual(public_users, [])
-        self.assertEqual(self._compress_shared(shares_private), set([]))
+        self.assertEqual(self._compress_shared(shares_private), set())
 
         # Despite not sharing a room, search_all_users means we get a search
         # result.
