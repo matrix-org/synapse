@@ -20,7 +20,6 @@ from synapse.federation.federation_server import server_matches_acl_event
 from tests import unittest
 
 
-@unittest.DEBUG
 class ServerACLsTestCase(unittest.TestCase):
     def test_blacklisted_server(self):
         e = _create_acl_event({"allow": ["*"], "deny": ["evil.com"]})
