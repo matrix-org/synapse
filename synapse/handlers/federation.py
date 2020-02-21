@@ -707,28 +707,6 @@ class FederationHandler(BaseHandler):
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
-        room = await self.store.get_room(room_id)
-
-        if not room:
-            try:
-                prev_state_ids = await context.get_prev_state_ids()
-                create_event = await self.store.get_event(
-                    prev_state_ids[(EventTypes.Create, "")]
-                )
-
-                room_version_id = create_event.content.get(
-                    "room_version", RoomVersions.V1.identifier
-                )
-
-                await self.store.store_room(
-                    room_id=room_id,
-                    room_creator_user_id="",
-                    is_public=False,
-                    room_version=KNOWN_ROOM_VERSIONS[room_version_id],
-                )
-            except StoreError:
-                logger.exception("Failed to store room.")
-
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
                 # Only fire user_joined_room if the user has acutally
