@@ -43,6 +43,7 @@ from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
 from synapse.http.endpoint import parse_server_name
 from synapse.logging.context import nested_logging_context
+from synapse.logging.opentracing import log_kv, trace
 from synapse.logging.utils import log_function
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
@@ -507,6 +508,7 @@ class FederationServer(FederationBase):
     def on_query_user_devices(self, origin, user_id):
         return self.on_query_request("user_devices", user_id)
 
+    @trace
     @defer.inlineCallbacks
     @log_function
     def on_claim_client_keys(self, origin, content):
@@ -515,6 +517,7 @@ class FederationServer(FederationBase):
             for device_id, algorithm in device_keys.items():
                 query.append((user_id, device_id, algorithm))
 
+        log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = yield self.store.claim_e2e_one_time_keys(query)
 
         json_result = {}
