@@ -16,6 +16,7 @@
 import hashlib
 import hmac
 import json
+import urllib.parse
 
 from mock import Mock
 
@@ -371,14 +372,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
-        self.url_user_1 = "/_synapse/admin/v2/users/@bob:test"
-        self.url_user_2 = "/_synapse/admin/v2/users/@bob2:test"
-
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
         self.other_user = self.register_user("user", "pass")
         self.other_user_token = self.login("user", "pass")
+        self.url_other_user = "/_synapse/admin/v2/users/%s" % urllib.parse.quote(
+            self.other_user
+        )
 
     def test_requester_is_no_admin(self):
         """
@@ -418,24 +419,26 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
 
-    def test_requester_is_admin(self):
+    def test_create_server_admin(self):
         """
-        If the user is a server admin, a new user is created.
+        If the user is a server admin, a new admin is created.
         """
         self.hs.config.registration_shared_secret = None
+        url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user (server admin)
         body = json.dumps(
             {
                 "password": "abc123",
                 "admin": True,
+                "displayname": "Bob's name",
                 "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
             }
         )
 
         request, channel = self.make_request(
             "PUT",
-            self.url_user_1,
+            url,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
@@ -443,77 +446,128 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("bob", channel.json_body["displayname"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertEqual(True, channel.json_body["admin"])
 
         # Get user
         request, channel = self.make_request(
-            "GET", self.url_user_1, access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("bob", channel.json_body["displayname"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
-        self.assertEqual(1, channel.json_body["admin"])
-        self.assertEqual(0, channel.json_body["is_guest"])
-        self.assertEqual(0, channel.json_body["deactivated"])
+        self.assertEqual(True, channel.json_body["admin"])
+        self.assertEqual(False, channel.json_body["is_guest"])
+        self.assertEqual(False, channel.json_body["deactivated"])
+
+    def test_create_user(self):
+        """
+        If the user is a server admin, a new user is created.
+        """
+        self.hs.config.registration_shared_secret = None
+        url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
         body = json.dumps(
             {
                 "password": "abc123",
                 "admin": False,
-                "threepids": [{"medium": "email", "address": "bob2@bob.bob"}],
+                "displayname": "Bob's name",
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
             }
         )
 
         request, channel = self.make_request(
             "PUT",
-            self.url_user_2,
+            url,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
         self.render(request)
 
         self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob2:test", channel.json_body["name"])
-        self.assertEqual("bob2", channel.json_body["displayname"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
-        self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][0]["address"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertEqual(False, channel.json_body["admin"])
 
         # Get user
         request, channel = self.make_request(
-            "GET", self.url_user_2, access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob2:test", channel.json_body["name"])
-        self.assertEqual("bob2", channel.json_body["displayname"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
-        self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][0]["address"])
-        self.assertEqual(0, channel.json_body["admin"])
-        self.assertEqual(0, channel.json_body["is_guest"])
-        self.assertEqual(0, channel.json_body["deactivated"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+        self.assertEqual(False, channel.json_body["admin"])
+        self.assertEqual(False, channel.json_body["is_guest"])
+        self.assertEqual(False, channel.json_body["deactivated"])
+
+    def test_set_password(self):
+        """
+        If the user is a server admin, set a new password of an other user.
+        """
+        self.hs.config.registration_shared_secret = None
 
         # Change password
         body = json.dumps({"password": "hahaha"})
 
         request, channel = self.make_request(
             "PUT",
-            self.url_user_1,
+            self.url_other_user,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    def test_set_displayname(self):
+        """
+        If the user is a server admin, set displayname of an other user.
+        """
+        self.hs.config.registration_shared_secret = None
+
+        # Modify user
+        body = json.dumps({"displayname": "foobar"})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual("foobar", channel.json_body["displayname"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual("foobar", channel.json_body["displayname"])
+
+    def test_set_threepid(self):
+        """
+        If the user is a server admin, set threepid of an other user.
+        """
+        self.hs.config.registration_shared_secret = None
 
         # Delete old and add new threepid to user
         body = json.dumps(
@@ -522,89 +576,86 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request(
             "PUT",
-            self.url_user_1,
+            self.url_other_user,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual(False, channel.json_body["deactivated"])
-        self.assertEqual(True, channel.json_body["admin"])
+        self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
 
         # Get user
         request, channel = self.make_request(
-            "GET", self.url_user_1, access_token=self.admin_user_tok,
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual(1, channel.json_body["admin"])
-        self.assertEqual(0, channel.json_body["is_guest"])
-        self.assertEqual(0, channel.json_body["deactivated"])
+        self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
 
-        # Modify user
-        body = json.dumps({"displayname": "foobar", "deactivated": True})
+    def test_deactivate_user(self):
+        """
+        If the user is a server admin, deactivate an other user.
+        """
+
+        # Deactivate user
+        body = json.dumps({"deactivated": True})
 
         request, channel = self.make_request(
             "PUT",
-            self.url_user_1,
+            self.url_other_user,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("foobar", channel.json_body["displayname"])
+        self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         # the user is deactivated, the threepid will be deleted
 
         # Get user
         request, channel = self.make_request(
-            "GET", self.url_user_1, access_token=self.admin_user_tok,
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("foobar", channel.json_body["displayname"])
-        self.assertEqual(1, channel.json_body["admin"])
-        self.assertEqual(0, channel.json_body["is_guest"])
-        self.assertEqual(1, channel.json_body["deactivated"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["deactivated"])
+
+    def test_set_user_as_admin(self):
+        """
+        If the user is a server admin, set a user as an admin.
+        """
+        self.hs.config.registration_shared_secret = None
 
         # Set a user as an admin
         body = json.dumps({"admin": True})
 
         request, channel = self.make_request(
             "PUT",
-            self.url_user_2,
+            self.url_other_user,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob2:test", channel.json_body["name"])
-        self.assertEqual("bob2", channel.json_body["displayname"])
-        self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["admin"])
 
         # Get user
         request, channel = self.make_request(
-            "GET", self.url_user_2, access_token=self.admin_user_tok,
+            "GET", self.url_other_user, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob2:test", channel.json_body["name"])
-        self.assertEqual("bob2", channel.json_body["displayname"])
-        self.assertEqual(1, channel.json_body["admin"])
-        self.assertEqual(0, channel.json_body["is_guest"])
-        self.assertEqual(0, channel.json_body["deactivated"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["admin"])
