@@ -94,6 +94,15 @@ class AdminHandler(BaseHandler):
 
         return ret
 
+    def get_user_server_admin(self, user):
+        """
+        Get the admin bit on a user.
+
+        Args:
+            user_id (UserID): the (necessarily local) user to manipulate
+        """
+        return self.store.is_server_admin(user)
+
     def set_user_server_admin(self, user, admin):
         """
         Set the admin bit on a user.
