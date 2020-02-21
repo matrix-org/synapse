@@ -386,9 +386,10 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         If the user is not a server admin, an error is returned.
         """
         self.hs.config.registration_shared_secret = None
+        url = "/_synapse/admin/v2/users/@bob:test"
 
         request, channel = self.make_request(
-            "GET", self.url_user_1, access_token=self.other_user_token,
+            "GET", url, access_token=self.other_user_token,
         )
         self.render(request)
 
@@ -396,7 +397,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
         request, channel = self.make_request(
-            "PUT", self.url_user_1, access_token=self.other_user_token, content=b"{}",
+            "PUT", url, access_token=self.other_user_token, content=b"{}",
         )
         self.render(request)
 
