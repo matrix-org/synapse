@@ -87,7 +87,7 @@ from synapse.rest.client.v1.room import (
     RoomStateRestServlet,
 )
 from synapse.rest.client.v1.voip import VoipRestServlet
-from synapse.rest.client.v2_alpha import groups, sync
+from synapse.rest.client.v2_alpha import groups, sync, user_directory
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
@@ -453,6 +453,8 @@ class GenericWorkerServer(HomeServer):
                     InitialSyncRestServlet(self).register(resource)
                     RoomInitialSyncRestServlet(self).register(resource)
 
+                    user_directory.register_servlets(self, resource)
+
                     # If presence is disabled, use the stub servlet that does
                     # not allow sending presence
                     if not self.config.use_presence:
@@ -687,6 +689,7 @@ def start(config_options):
         "synapse.app.media_repository",
         "synapse.app.pusher",
         "synapse.app.synchrotron",
+        "synapse.app.user_dir",
     )
 
     if config.worker_app == "synapse.app.appservice":
@@ -714,6 +717,19 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.start_pushers = True
+
+    if config.worker_app == "synapse.app.user_dir":
+        if config.update_user_directory:
+            sys.stderr.write(
+                "\nThe update_user_directory must be disabled in the main synapse process"
+                "\nbefore they can be run in a separate worker."
+                "\nPlease add ``update_user_directory: false`` to the main config"
+                "\n"
+            )
+            sys.exit(1)
+
+        # Force the pushers to start since they will be disabled in the main config
+        config.update_user_directory = True
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
