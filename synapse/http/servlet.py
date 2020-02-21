@@ -300,7 +300,7 @@ class RestServlet(object):
                     http_server.register_paths(
                         method,
                         patterns,
-                        trace_servlet(servlet_classname, method_handler),
+                        trace_servlet(servlet_classname)(method_handler),
                         servlet_classname,
                     )
 
