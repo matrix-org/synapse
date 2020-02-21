@@ -20,6 +20,7 @@ _trial_temp*/
 /*.signing.key
 /env/
 /homeserver*.yaml
+/logs
 /media_store/
 /uploads
 
@@ -29,8 +30,9 @@ _trial_temp*/
 /.vscode/
 
 # build products
-/.coverage*
 !/.coveragerc
+/.coverage*
+/.mypy_cache/
 /.tox
 /build/
 /coverage.*
@@ -38,4 +40,3 @@ _trial_temp*/
 /docs/build/
 /htmlcov
 /pip-wheel-metadata/
-

@@ -175,8 +175,6 @@ def start(config_options):
 
     assert config.worker_replication_http_port is not None
 
-    setup_logging(config, use_worker_options=True)
-
     # This should only be done on the user directory worker or the master
     config.update_user_directory = False
 
@@ -191,6 +189,8 @@ def start(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    setup_logging(ss, config, use_worker_options=True)
 
     ss.setup()
     reactor.addSystemEventTrigger(

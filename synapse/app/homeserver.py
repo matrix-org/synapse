@@ -341,8 +341,6 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    synapse.config.logger.setup_logging(config, use_worker_options=False)
-
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -355,6 +353,8 @@ def setup(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    synapse.config.logger.setup_logging(hs, config, use_worker_options=False)
 
     logger.info("Preparing database: %s...", config.database_config["name"])
 

@@ -227,8 +227,6 @@ def start(config_options):
     config.start_pushers = False
     config.send_federation = False
 
-    setup_logging(config, use_worker_options=True)
-
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     database_engine = create_engine(config.database_config)
@@ -240,6 +238,8 @@ def start(config_options):
         version_string="Synapse/" + get_version_string(synapse),
         database_engine=database_engine,
     )
+
+    setup_logging(ss, config, use_worker_options=True)
 
     ss.setup()
 
