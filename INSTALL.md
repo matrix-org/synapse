@@ -127,9 +127,8 @@ sudo pacman -S base-devel python python-pip \
 Installing prerequisites on CentOS 8 or Fedora>26:
 
 ```
-sudo dnf config-manager --set-enabled PowerTools  # lcms2-devel is in PowerTools repository
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
-                 lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
+                 libwebp-devel tk-devel redhat-rpm-config \
                  python3-virtualenv libffi-devel openssl-devel
 sudo dnf groupinstall "Development Tools"
 ```
