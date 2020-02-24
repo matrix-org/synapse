@@ -915,8 +915,7 @@ class EventCreationHandler(object):
             # Check that alt_aliases is the proper form.
             alt_aliases = event.content.get("alt_aliases", [])
             if not isinstance(alt_aliases, (list, tuple)):
-                # TODO Error message?
-                raise SynapseError(400, "Alt aliases must be a list.")
+                raise SynapseError(400, "The alt_aliases property must be a list.")
 
             # If the old version of alt_aliases is of an unknown form,
             # completely replace it.
