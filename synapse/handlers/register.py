@@ -24,13 +24,11 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
-    InvalidCaptchaError,
     LimitExceededError,
     RegistrationError,
     SynapseError,
 )
 from synapse.config.server import is_threepid_reserved
-from synapse.http.client import CaptchaServerHttpClient
 from synapse.http.servlet import assert_params_in_dict
 from synapse.replication.http.login import RegisterDeviceReplicationServlet
 from synapse.replication.http.register import (
@@ -39,7 +37,6 @@ from synapse.replication.http.register import (
 )
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
-from synapse.util.threepids import check_3pid_allowed
 
 from ._base import BaseHandler
 
@@ -59,7 +56,6 @@ class RegistrationHandler(BaseHandler):
         self._auth_handler = hs.get_auth_handler()
         self.profile_handler = hs.get_profile_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
-        self.captcha_client = CaptchaServerHttpClient(hs)
         self.http_client = hs.get_simple_http_client()
         self.identity_handler = self.hs.get_handlers().identity_handler
         self.ratelimiter = hs.get_registration_ratelimiter()
@@ -402,102 +398,6 @@ class RegistrationHandler(BaseHandler):
 
         return user_id
 
-    @defer.inlineCallbacks
-    def check_recaptcha(self, ip, private_key, challenge, response):
-        """
-        Checks a recaptcha is correct.
-
-        Used only by c/s api v1
-        """
-
-        captcha_response = yield self._validate_captcha(
-            ip, private_key, challenge, response
-        )
-        if not captcha_response["valid"]:
-            logger.info(
-                "Invalid captcha entered from %s. Error: %s",
-                ip,
-                captcha_response["error_url"],
-            )
-            raise InvalidCaptchaError(error_url=captcha_response["error_url"])
-        else:
-            logger.info("Valid captcha entered from %s", ip)
-
-    @defer.inlineCallbacks
-    def register_saml2(self, localpart):
-        """
-        Registers email_id as SAML2 Based Auth.
-        """
-        if types.contains_invalid_mxid_characters(localpart):
-            raise SynapseError(
-                400, "User ID can only contain characters a-z, 0-9, or '=_-./'"
-            )
-        yield self.auth.check_auth_blocking()
-        user = UserID(localpart, self.hs.hostname)
-        user_id = user.to_string()
-
-        yield self.check_user_id_not_appservice_exclusive(user_id)
-        token = self.macaroon_gen.generate_access_token(user_id)
-        try:
-            yield self.register_with_store(
-                user_id=user_id,
-                token=token,
-                password_hash=None,
-                create_profile_with_displayname=user.localpart,
-            )
-
-            yield self.profile_handler.set_displayname(
-                user, None, user.localpart, by_admin=True
-            )
-        except Exception as e:
-            yield self.store.add_access_token_to_user(user_id, token)
-            # Ignore Registration errors
-            logger.exception(e)
-        defer.returnValue((user_id, token))
-
-    @defer.inlineCallbacks
-    def register_email(self, threepidCreds):
-        """
-        Registers emails with an identity server.
-
-        Used only by c/s api v1
-        """
-
-        for c in threepidCreds:
-            logger.info(
-                "validating threepidcred sid %s on id server %s",
-                c["sid"],
-                c["idServer"],
-            )
-            try:
-                threepid = yield self.identity_handler.threepid_from_creds(c)
-            except Exception:
-                logger.exception("Couldn't validate 3pid")
-                raise RegistrationError(400, "Couldn't validate 3pid")
-
-            if not threepid:
-                raise RegistrationError(400, "Couldn't validate 3pid")
-            logger.info(
-                "got threepid with medium '%s' and address '%s'",
-                threepid["medium"],
-                threepid["address"],
-            )
-
-            if not check_3pid_allowed(self.hs, threepid["medium"], threepid["address"]):
-                raise RegistrationError(403, "Third party identifier is not allowed")
-
-    @defer.inlineCallbacks
-    def bind_emails(self, user_id, threepidCreds):
-        """Links emails with a user ID and informs an identity server.
-
-        Used only by c/s api v1
-        """
-
-        # Now we have a matrix ID, bind it to the threepids we were given
-        for c in threepidCreds:
-            # XXX: This should be a deferred list, shouldn't it?
-            yield self.identity_handler.bind_threepid(c, user_id)
-
     def check_user_id_not_appservice_exclusive(self, user_id, allowed_appservice=None):
         # don't allow people to register the server notices mxid
         if self._server_notices_mxid is not None:
@@ -567,91 +467,6 @@ class RegistrationHandler(BaseHandler):
         id = self._next_generated_user_id
         self._next_generated_user_id += 1
         return str(id)
-
-    @defer.inlineCallbacks
-    def _validate_captcha(self, ip_addr, private_key, challenge, response):
-        """Validates the captcha provided.
-
-        Used only by c/s api v1
-
-        Returns:
-            dict: Containing 'valid'(bool) and 'error_url'(str) if invalid.
-
-        """
-        response = yield self._submit_captcha(ip_addr, private_key, challenge, response)
-        # parse Google's response. Lovely format..
-        lines = response.split("\n")
-        json = {
-            "valid": lines[0] == "true",
-            "error_url": "http://www.recaptcha.net/recaptcha/api/challenge?"
-            + "error=%s" % lines[1],
-        }
-        return json
-
-    @defer.inlineCallbacks
-    def _submit_captcha(self, ip_addr, private_key, challenge, response):
-        """
-        Used only by c/s api v1
-        """
-        data = yield self.captcha_client.post_urlencoded_get_raw(
-            "http://www.recaptcha.net:80/recaptcha/api/verify",
-            args={
-                "privatekey": private_key,
-                "remoteip": ip_addr,
-                "challenge": challenge,
-                "response": response,
-            },
-        )
-        return data
-
-    @defer.inlineCallbacks
-    def get_or_create_user(self, requester, localpart, displayname, password_hash=None):
-        """Creates a new user if the user does not exist,
-        else revokes all previous access tokens and generates a new one.
-
-        Args:
-            localpart : The local part of the user ID to register. If None,
-              one will be randomly generated.
-        Returns:
-            A tuple of (user_id, access_token).
-        Raises:
-            RegistrationError if there was a problem registering.
-
-        NB this is only used in tests. TODO: move it to the test package!
-        """
-        if localpart is None:
-            raise SynapseError(400, "Request must include user id")
-        yield self.auth.check_auth_blocking()
-        need_register = True
-
-        try:
-            yield self.check_username(localpart)
-        except SynapseError as e:
-            if e.errcode == Codes.USER_IN_USE:
-                need_register = False
-            else:
-                raise
-
-        user = UserID(localpart, self.hs.hostname)
-        user_id = user.to_string()
-        token = self.macaroon_gen.generate_access_token(user_id)
-
-        if need_register:
-            yield self.register_with_store(
-                user_id=user_id,
-                token=token,
-                password_hash=password_hash,
-                create_profile_with_displayname=displayname or user.localpart,
-            )
-            if displayname is not None:
-                yield self.profile_handler.set_displayname(
-                    user, None, displayname or user.localpart, by_admin=True
-                )
-        else:
-            yield self._auth_handler.delete_access_tokens_for_user(user_id)
-            yield self.store.add_access_token_to_user(user_id=user_id, token=token)
-
-        defer.returnValue((user_id, token))
 
     @defer.inlineCallbacks
     def _join_user_to_room(self, requester, room_identifier):
