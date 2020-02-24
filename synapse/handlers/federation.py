@@ -61,6 +61,7 @@ from synapse.replication.http.devices import ReplicationUserDevicesResyncRestSer
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
+    ReplicationStoreRoomOnInviteRestServlet,
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import StateResolutionStore, resolve_events_with_store
@@ -161,8 +162,12 @@ class FederationHandler(BaseHandler):
             self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
                 hs
             )
+            self._maybe_store_room_on_invite = ReplicationStoreRoomOnInviteRestServlet.make_client(
+                hs
+            )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
+            self._maybe_store_room_on_invite = self.store.maybe_store_room_on_invite
 
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
@@ -1559,6 +1564,11 @@ class FederationHandler(BaseHandler):
         # block any attempts to invite the server notices mxid
         if event.state_key == self._server_notices_mxid:
             raise SynapseError(http_client.FORBIDDEN, "Cannot invite this user")
+
+        # keep a record of the room version, if we don't yet know it.
+        # (this may get overwritten if we later get a different room version in a
+        # join dance).
+        await self._maybe_store_room_on_invite(event.room_id, room_version)
 
         event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
