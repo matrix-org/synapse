@@ -912,15 +912,18 @@ class EventCreationHandler(object):
                         "Room alias %s does not point to the room" % (room_alias_str,),
                     )
 
-            # Check that alt_aliases is the proper form (and that each alias is
-            # currently valid).
+            # Check that alt_aliases is the proper form.
             alt_aliases = event.content.get("alt_aliases", [])
             if not isinstance(alt_aliases, (list, tuple)):
-                # TODO Invalid data.
+                # TODO Error message?
                 raise SynapseError(400, "Alt aliases must be a list.")
 
-            # TODO Validate original_alt_aliases?
+            # If the old version of alt_aliases is of an unknown form,
+            # completely replace it.
+            if not isinstance(original_alt_aliases, (list, tuple)):
+                original_alt_aliases = []
 
+            # Check that each alias is currently valid.
             new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
             if new_alt_aliases:
                 for alias_str in new_alt_aliases:
