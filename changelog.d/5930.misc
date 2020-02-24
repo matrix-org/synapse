@@ -1,1 +1,0 @@
-Add temporary flag to /versions in unstable_features to indicate this Synapse supports receiving id_access_token parameters on calls to identity server-proxying endpoints.
