@@ -20,7 +20,6 @@ from mock import Mock
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.errors import HttpResponseException
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account
 
@@ -110,15 +109,8 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         config["enable_3pid_lookup"] = True
         config["trusted_third_party_id_servers"] = ["testis"]
 
-        def get_json(uri, args={}, headers=None):
-            # TODO: Mock v2 hash_details endpoints and don't just run the v1 code
-            if "/hash_details" in uri:
-                raise HttpResponseException(404, "I am a happy v1 server", b"{}")
-
-            return defer.succeed((200, "{}"))
-
         mock_http_client = Mock(spec=["get_json", "post_json_get_json"])
-        mock_http_client.get_json.side_effect = get_json
+        mock_http_client.get_json.return_value = defer.succeed((200, "{}"))
         mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
 
         self.hs = self.setup_test_homeserver(
@@ -151,10 +143,8 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
 
-        # There will be a call to hash_details, which will 404
-        # then /lookup. Thus we don't use `assert_called_with_once` here
         get_json = self.hs.get_simple_http_client().get_json
-        get_json.assert_called_with(
+        get_json.assert_called_once_with(
             "https://testis/_matrix/identity/api/v1/lookup",
             {"address": "test@example.com", "medium": "email"},
         )
@@ -167,10 +157,8 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request("GET", url, access_token=self.tok)
         self.render(request)
 
-        # There will be a call to hash_details, which will 404
-        # then /lookup. Thus we don't use `assert_called_with_once` here
         get_json = self.hs.get_simple_http_client().get_json
-        get_json.assert_called_with(
+        get_json.assert_called_once_with(
             "https://testis/_matrix/identity/api/v1/lookup",
             {"address": "foo@bar.baz", "medium": "email"},
         )

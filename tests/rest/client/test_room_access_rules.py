@@ -22,7 +22,6 @@ from mock import Mock
 
 from twisted.internet import defer
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
-from synapse.api.errors import HttpResponseException
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.third_party_rules.access_rules import (
@@ -59,10 +58,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             return defer.succeed(pdu)
 
         def get_json(uri, args={}, headers=None):
-            # TODO: Mock v2 hash_details endpoints and don't just run the v1 code
-            if "/hash_details" in uri:
-                raise HttpResponseException(404, "I am a happy v1 server", b"{}")
-
             address_domain = args["address"].split("@")[1]
             return defer.succeed({"hs": address_domain})
 
@@ -337,7 +332,6 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.hs.config.rc_third_party_invite.burst_count = 10
         self.hs.config.rc_third_party_invite.per_second = 0.1
 
-        # Note: These calls trigger the mocked get_json method above
         # We can't send a 3PID invite to a room that already has two members.
         self.send_threepid_invite(
             address="test@allowed_domain",
