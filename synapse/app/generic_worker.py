@@ -231,7 +231,7 @@ class GenericWorkerPresence(object):
         self.users_going_offline = {}
 
         self._send_stop_syncing_loop = self.clock.looping_call(
-            self.send_stop_syncing, 10 * 1000
+            self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
 
         self.process_id = random_string(16)
@@ -272,7 +272,7 @@ class GenericWorkerPresence(object):
         """
         now = self.clock.time_msec()
         for user_id, last_sync_ms in list(self.users_going_offline.items()):
-            if now - last_sync_ms > 10 * 1000:
+            if now - last_sync_ms > UPDATE_SYNCING_USERS_MS:
                 self.users_going_offline.pop(user_id, None)
                 self.send_user_sync(user_id, False, last_sync_ms)
 
