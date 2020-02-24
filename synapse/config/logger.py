@@ -89,7 +89,8 @@ class LoggingConfig(Config):
             """\
         ## Logging ##
 
-        # A yaml python logging config file
+        # A yaml python logging config file as described by
+        # https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
         #
         log_config: "%(log_config)s"
         """
