@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import event_type_from_format_version
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import parse_json_object_from_request
@@ -261,7 +261,7 @@ class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
         self.store = hs.get_datastore()
 
     @staticmethod
-    def _serialize_payload(room_id: str, room_version: RoomVersion):
+    def _serialize_payload(room_id, room_version):
         return {"room_version": room_version.identifier}
 
     async def _handle_request(self, request, room_id):
