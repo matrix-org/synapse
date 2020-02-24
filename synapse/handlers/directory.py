@@ -147,15 +147,15 @@ class DirectoryHandler(BaseHandler):
         yield self._create_association(room_alias, room_id, servers, creator=user_id)
 
     @defer.inlineCallbacks
-    def delete_association(self, requester, room_alias):
+    def delete_association(self, requester: Requester, room_alias: RoomAlias):
         """Remove an alias from the directory
 
         (this is only meant for human users; AS users should call
         delete_appservice_association)
 
         Args:
-            requester (Requester):
-            room_alias (RoomAlias):
+            requester
+            room_alias
 
         Returns:
             Deferred[unicode]: room id that the alias used to point to
@@ -192,7 +192,7 @@ class DirectoryHandler(BaseHandler):
 
         try:
             yield self._update_canonical_alias(
-                requester, requester.user.to_string(), room_id, room_alias
+                requester, user_id, room_id, room_alias
             )
         except AuthError as e:
             logger.info("Failed to update alias events: %s", e)
@@ -210,7 +210,7 @@ class DirectoryHandler(BaseHandler):
         yield self._delete_association(room_alias)
 
     @defer.inlineCallbacks
-    def _delete_association(self, room_alias):
+    def _delete_association(self, room_alias: RoomAlias):
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
@@ -284,7 +284,9 @@ class DirectoryHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def _update_canonical_alias(self, requester, user_id, room_id, room_alias):
+    def _update_canonical_alias(
+        self, requester: Requester, user_id: str, room_id: str, room_alias: RoomAlias
+    ):
         """
         Send an updated canonical alias event if the removed alias was set as
         the canonical alias or listed in the alt_aliases field.
@@ -339,7 +341,7 @@ class DirectoryHandler(BaseHandler):
             result = yield as_handler.query_room_alias_exists(room_alias)
         return result
 
-    def can_modify_alias(self, alias, user_id=None):
+    def can_modify_alias(self, alias: RoomAlias, user_id: str = None):
         # Any application service "interested" in an alias they are regexing on
         # can modify the alias.
         # Users can only modify the alias if ALL the interested services have
@@ -360,7 +362,7 @@ class DirectoryHandler(BaseHandler):
         return defer.succeed(True)
 
     @defer.inlineCallbacks
-    def _user_can_delete_alias(self, alias, user_id):
+    def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
         creator = yield self.store.get_room_alias_creator(alias.to_string())
 
         if creator is not None and creator == user_id:
