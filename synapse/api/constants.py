@@ -125,7 +125,8 @@ class UserTypes(object):
     """
 
     SUPPORT = "support"
-    ALL_USER_TYPES = (SUPPORT,)
+    BOT = "bot"
+    ALL_USER_TYPES = (SUPPORT, BOT)
 
 
 class RelationTypes(object):
