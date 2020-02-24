@@ -526,7 +526,7 @@ class MediaRepository(object):
             try:
                 file_info = FileInfo(
                     server_name=server_name,
-                    file_id=media_id,
+                    file_id=file_id,
                     thumbnail=True,
                     thumbnail_width=t_width,
                     thumbnail_height=t_height,
