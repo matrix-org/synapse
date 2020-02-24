@@ -36,7 +36,7 @@ that your email address is probably `user@example.com` rather than
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, 3.7, or 2.7
+- Python 3.5, 3.6, or 3.7
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -421,7 +421,7 @@ If Synapse is not configured with an SMTP server, password reset via email will
 
 The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
 
-Alternatively you can do so from the command line if you have installed via pip. 
+Alternatively you can do so from the command line if you have installed via pip.
 
 This can be done as follows:
 
