@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import collections
 import logging
 from typing import Optional
 
@@ -916,11 +915,11 @@ class EventCreationHandler(object):
             # Check that alt_aliases is the proper form (and that each alias is
             # currently valid).
             alt_aliases = event.content.get("alt_aliases", [])
-            if alt_aliases and not isinstance(alt_aliases, collections.Sequence):
+            if not isinstance(alt_aliases, (list, tuple)):
                 # TODO Invalid data.
                 raise SynapseError(400, "Alt aliases must be a list.")
 
-            # TODO Valid original_alt_aliases?
+            # TODO Validate original_alt_aliases?
 
             new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
             if new_alt_aliases:

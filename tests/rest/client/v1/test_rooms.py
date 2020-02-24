@@ -1966,3 +1966,18 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         self.assertEqual(
             res, {"alias": self.alias, "alt_aliases": [self.alias, second_alias]}
         )
+
+    def test_bad_data(self):
+        """Invalid data for alt_aliases should cause errors."""
+        self._set_canonical_alias({"alt_aliases": "@bad:test"}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": None}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": 0}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": 1}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": False}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": True}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": {}}, expected_code=400)
+
+    def test_bad_alias(self):
+        """An alias which does not point to the room raises a SynapseError."""
+        self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
