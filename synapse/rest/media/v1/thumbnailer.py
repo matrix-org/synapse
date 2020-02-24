@@ -78,9 +78,9 @@ class Thumbnailer(object):
         """
 
         if max_width * self.height < max_height * self.width:
-            return (max_width, (max_width * self.height) // self.width)
+            return max_width, (max_width * self.height) // self.width
         else:
-            return ((max_height * self.width) // self.height, max_height)
+            return (max_height * self.width) // self.height, max_height
 
     def scale(self, width, height, output_type):
         """Rescales the image to the given dimensions.

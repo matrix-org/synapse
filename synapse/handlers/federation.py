@@ -1435,7 +1435,7 @@ class FederationHandler(BaseHandler):
         assert event.user_id == user_id
         assert event.state_key == user_id
         assert event.room_id == room_id
-        return (origin, event, format_ver)
+        return origin, event, format_ver
 
     @defer.inlineCallbacks
     @log_function

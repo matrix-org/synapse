@@ -60,7 +60,7 @@ class VoipRestServlet(RestServlet):
             password = turnPassword
 
         else:
-            return (200, {})
+            return 200, {}
 
         return (
             200,
@@ -73,7 +73,7 @@ class VoipRestServlet(RestServlet):
         )
 
     def on_OPTIONS(self, request):
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

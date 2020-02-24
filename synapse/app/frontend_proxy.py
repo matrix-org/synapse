@@ -70,12 +70,12 @@ class PresenceStatusStubServlet(RestServlet):
         except HttpResponseException as e:
             raise e.to_synapse_error()
 
-        return (200, result)
+        return 200, result
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
         yield self.auth.get_user_by_req(request)
-        return (200, {})
+        return 200, {}
 
 
 class KeyUploadServlet(RestServlet):
@@ -126,11 +126,11 @@ class KeyUploadServlet(RestServlet):
                 self.main_uri + request.uri.decode("ascii"), body, headers=headers
             )
 
-            return (200, result)
+            return 200, result
         else:
             # Just interested in counts.
             result = yield self.store.count_e2e_one_time_keys(user_id, device_id)
-            return (200, {"one_time_key_counts": result})
+            return 200, {"one_time_key_counts": result}
 
 
 class FrontendProxySlavedStore(

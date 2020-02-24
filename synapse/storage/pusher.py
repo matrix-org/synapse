@@ -133,7 +133,7 @@ class PusherWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id, limit))
             deleted = txn.fetchall()
 
-            return (updated, deleted)
+            return updated, deleted
 
         return self.runInteraction(
             "get_all_updated_pushers", get_all_updated_pushers_txn

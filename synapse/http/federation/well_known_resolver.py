@@ -207,7 +207,7 @@ class WellKnownResolver(object):
             cache_period + WELL_KNOWN_REMEMBER_DOMAIN_HAD_VALID,
         )
 
-        return (result, cache_period)
+        return result, cache_period
 
     @defer.inlineCallbacks
     def _make_well_known_request(self, server_name, retry):

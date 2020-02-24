@@ -40,7 +40,7 @@ class ThirdPartyProtocolsServlet(RestServlet):
         yield self.auth.get_user_by_req(request, allow_guest=True)
 
         protocols = yield self.appservice_handler.get_3pe_protocols()
-        return (200, protocols)
+        return 200, protocols
 
 
 class ThirdPartyProtocolServlet(RestServlet):
@@ -60,9 +60,9 @@ class ThirdPartyProtocolServlet(RestServlet):
             only_protocol=protocol
         )
         if protocol in protocols:
-            return (200, protocols[protocol])
+            return 200, protocols[protocol]
         else:
-            return (404, {"error": "Unknown protocol"})
+            return 404, {"error": "Unknown protocol"}
 
 
 class ThirdPartyUserServlet(RestServlet):
@@ -85,7 +85,7 @@ class ThirdPartyUserServlet(RestServlet):
             ThirdPartyEntityKind.USER, protocol, fields
         )
 
-        return (200, results)
+        return 200, results
 
 
 class ThirdPartyLocationServlet(RestServlet):
@@ -108,7 +108,7 @@ class ThirdPartyLocationServlet(RestServlet):
             ThirdPartyEntityKind.LOCATION, protocol, fields
         )
 
-        return (200, results)
+        return 200, results
 
 
 def register_servlets(hs, http_server):

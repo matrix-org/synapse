@@ -464,7 +464,7 @@ class MockHttpResource(HttpServer):
                     args = [urlparse.unquote(u) for u in matcher.groups()]
 
                     (code, response) = yield func(mock_request, *args)
-                    return (code, response)
+                    return code, response
                 except CodeMessageException as e:
                     return (e.code, cs_error(e.msg, code=e.errcode))
 

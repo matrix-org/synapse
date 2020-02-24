@@ -121,7 +121,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             # Wrap the session id in a JSON object
             ret = {"sid": sid}
 
-        return (200, ret)
+        return 200, ret
 
     @defer.inlineCallbacks
     def send_password_reset(self, email, client_secret, send_attempt, next_link=None):
@@ -227,7 +227,7 @@ class MsisdnPasswordRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "MSISDN not found", Codes.THREEPID_NOT_FOUND)
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class PasswordResetSubmitTokenServlet(RestServlet):
@@ -341,7 +341,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         )
         response_code = 200 if valid else 400
 
-        return (response_code, {"success": valid})
+        return response_code, {"success": valid}
 
 
 class PasswordRestServlet(RestServlet):
@@ -421,7 +421,7 @@ class PasswordRestServlet(RestServlet):
             )
             self.shadow_password(params, shadow_user.to_string())
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, _):
         return 200, {}
@@ -468,7 +468,7 @@ class DeactivateAccountRestServlet(RestServlet):
             yield self._deactivate_account_handler.deactivate_account(
                 requester.user.to_string(), erase
             )
-            return (200, {})
+            return 200, {}
 
         yield self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request)
@@ -481,7 +481,7 @@ class DeactivateAccountRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        return (200, {"id_server_unbind_result": id_server_unbind_result})
+        return 200, {"id_server_unbind_result": id_server_unbind_result}
 
 
 class EmailThreepidRequestTokenRestServlet(RestServlet):
@@ -517,7 +517,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestEmailToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class MsisdnThreepidRequestTokenRestServlet(RestServlet):
@@ -554,7 +554,7 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         ret = yield self.identity_handler.requestMsisdnToken(**body)
-        return (200, ret)
+        return 200, ret
 
 
 class ThreepidRestServlet(RestServlet):
@@ -575,7 +575,7 @@ class ThreepidRestServlet(RestServlet):
 
         threepids = yield self.datastore.user_get_threepids(requester.user.to_string())
 
-        return (200, {"threepids": threepids})
+        return 200, {"threepids": threepids}
 
     @defer.inlineCallbacks
     def on_POST(self, request):
@@ -626,7 +626,7 @@ class ThreepidRestServlet(RestServlet):
             )
             self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
 
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def shadow_3pid(self, body, user_id):
@@ -684,7 +684,7 @@ class ThreepidDeleteRestServlet(RestServlet):
         else:
             id_server_unbind_result = "no-support"
 
-        return (200, {"id_server_unbind_result": id_server_unbind_result})
+        return 200, {"id_server_unbind_result": id_server_unbind_result}
 
     @defer.inlineCallbacks
     def shadow_3pid_delete(self, body, user_id):
@@ -769,7 +769,7 @@ class WhoamiRestServlet(RestServlet):
     def on_GET(self, request):
         requester = yield self.auth.get_user_by_req(request)
 
-        return (200, {"user_id": requester.user.to_string()})
+        return 200, {"user_id": requester.user.to_string()}
 
 
 def register_servlets(hs, http_server):

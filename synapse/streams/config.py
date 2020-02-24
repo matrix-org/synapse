@@ -37,7 +37,7 @@ class SourcePaginationConfig(object):
         self.limit = min(int(limit), MAX_LIMIT) if limit is not None else None
 
     def __repr__(self):
-        return ("StreamConfig(from_key=%r, to_key=%r, direction=%r, limit=%r)") % (
+        return "StreamConfig(from_key=%r, to_key=%r, direction=%r, limit=%r)" % (
             self.from_key,
             self.to_key,
             self.direction,

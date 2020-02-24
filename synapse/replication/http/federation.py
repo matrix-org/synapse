@@ -113,7 +113,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
             event_and_contexts, backfilled
         )
 
-        return (200, {})
+        return 200, {}
 
 
 class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
@@ -156,7 +156,7 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
 
         result = yield self.registry.on_edu(edu_type, origin, edu_content)
 
-        return (200, result)
+        return 200, result
 
 
 class ReplicationGetQueryRestServlet(ReplicationEndpoint):
@@ -204,7 +204,7 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
 
         result = yield self.registry.on_query(query_type, args)
 
-        return (200, result)
+        return 200, result
 
 
 class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
@@ -238,7 +238,7 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
     def _handle_request(self, request, room_id):
         yield self.store.clean_room_for_join(room_id)
 
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

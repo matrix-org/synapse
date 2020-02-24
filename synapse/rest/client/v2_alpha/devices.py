@@ -48,7 +48,7 @@ class DevicesRestServlet(RestServlet):
         devices = yield self.device_handler.get_devices_by_user(
             requester.user.to_string()
         )
-        return (200, {"devices": devices})
+        return 200, {"devices": devices}
 
 
 class DeleteDevicesRestServlet(RestServlet):
@@ -91,7 +91,7 @@ class DeleteDevicesRestServlet(RestServlet):
         yield self.device_handler.delete_devices(
             requester.user.to_string(), body["devices"]
         )
-        return (200, {})
+        return 200, {}
 
 
 class DeviceRestServlet(RestServlet):
@@ -114,7 +114,7 @@ class DeviceRestServlet(RestServlet):
         device = yield self.device_handler.get_device(
             requester.user.to_string(), device_id
         )
-        return (200, device)
+        return 200, device
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -137,7 +137,7 @@ class DeviceRestServlet(RestServlet):
         )
 
         yield self.device_handler.delete_device(requester.user.to_string(), device_id)
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def on_PUT(self, request, device_id):
@@ -147,7 +147,7 @@ class DeviceRestServlet(RestServlet):
         yield self.device_handler.update_device(
             requester.user.to_string(), device_id, body
         )
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

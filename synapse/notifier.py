@@ -472,11 +472,11 @@ class Notifier(object):
         joined_room_ids = yield self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
-                return ([explicit_room_id], True)
+                return [explicit_room_id], True
             if (yield self._is_world_readable(explicit_room_id)):
-                return ([explicit_room_id], False)
+                return [explicit_room_id], False
             raise AuthError(403, "Non-joined access not allowed")
-        return (joined_room_ids, True)
+        return joined_room_ids, True
 
     @defer.inlineCallbacks
     def _is_world_readable(self, room_id):

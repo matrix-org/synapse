@@ -83,7 +83,7 @@ def compute_content_hash(event_dict, hash_algorithm):
     event_json_bytes = encode_canonical_json(event_dict)
 
     hashed = hash_algorithm(event_json_bytes)
-    return (hashed.name, hashed.digest())
+    return hashed.name, hashed.digest()
 
 
 def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
@@ -106,7 +106,7 @@ def compute_event_reference_hash(event, hash_algorithm=hashlib.sha256):
     event_dict.pop("unsigned", None)
     event_json_bytes = encode_canonical_json(event_dict)
     hashed = hash_algorithm(event_json_bytes)
-    return (hashed.name, hashed.digest())
+    return hashed.name, hashed.digest()
 
 
 def compute_event_signature(event_dict, signature_name, signing_key):

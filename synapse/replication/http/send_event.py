@@ -117,7 +117,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

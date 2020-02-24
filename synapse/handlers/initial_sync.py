@@ -449,7 +449,7 @@ class InitialSyncHandler(BaseHandler):
             #  * The user is a guest user, and has joined the room
             # else it will throw.
             member_event = yield self.auth.check_user_was_in_room(room_id, user_id)
-            return (member_event.membership, member_event.event_id)
+            return member_event.membership, member_event.event_id
             return
         except AuthError:
             visibility = yield self.state_handler.get_current_state(
@@ -459,7 +459,7 @@ class InitialSyncHandler(BaseHandler):
                 visibility
                 and visibility.content["history_visibility"] == "world_readable"
             ):
-                return (Membership.JOIN, None)
+                return Membership.JOIN, None
                 return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN

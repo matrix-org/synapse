@@ -49,7 +49,7 @@ class QuarantineMediaInRoom(RestServlet):
             room_id, requester.user.to_string()
         )
 
-        return (200, {"num_quarantined": num_quarantined})
+        return 200, {"num_quarantined": num_quarantined}
 
 
 class ListMediaInRoom(RestServlet):
@@ -70,7 +70,7 @@ class ListMediaInRoom(RestServlet):
 
         local_mxcs, remote_mxcs = yield self.store.get_media_mxcs_in_room(room_id)
 
-        return (200, {"local": local_mxcs, "remote": remote_mxcs})
+        return 200, {"local": local_mxcs, "remote": remote_mxcs}
 
 
 class PurgeMediaCacheRestServlet(RestServlet):
@@ -89,7 +89,7 @@ class PurgeMediaCacheRestServlet(RestServlet):
 
         ret = yield self.media_repository.delete_old_remote_media(before_ts)
 
-        return (200, ret)
+        return 200, ret
 
 
 def register_servlets_for_media_repo(hs, http_server):

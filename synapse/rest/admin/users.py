@@ -71,7 +71,7 @@ class UserAdminServlet(RestServlet):
         is_admin = yield self.handlers.admin_handler.get_user_server_admin(target_user)
         is_admin = bool(is_admin)
 
-        return (200, {"admin": is_admin})
+        return 200, {"admin": is_admin}
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -97,4 +97,4 @@ class UserAdminServlet(RestServlet):
             target_user, set_admin_to
         )
 
-        return (200, {})
+        return 200, {}

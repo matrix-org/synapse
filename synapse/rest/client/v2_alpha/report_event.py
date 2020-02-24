@@ -72,7 +72,7 @@ class ReportEventRestServlet(RestServlet):
             received_ts=self.clock.time_msec(),
         )
 
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

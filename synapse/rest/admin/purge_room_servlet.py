@@ -54,4 +54,4 @@ class PurgeRoomServlet(RestServlet):
 
         await self.pagination_handler.purge_room(body["room_id"])
 
-        return (200, {})
+        return 200, {}

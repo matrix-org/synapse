@@ -52,7 +52,7 @@ class ReceiptRestServlet(RestServlet):
             room_id, receipt_type, user_id=requester.user.to_string(), event_id=event_id
         )
 
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

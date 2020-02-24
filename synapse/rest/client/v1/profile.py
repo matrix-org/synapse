@@ -53,7 +53,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
         if displayname is not None:
             ret["displayname"] = displayname
 
-        return (200, ret)
+        return 200, ret
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -66,7 +66,7 @@ class ProfileDisplaynameRestServlet(RestServlet):
         try:
             new_name = content["displayname"]
         except Exception:
-            return (400, "Unable to parse name")
+            return 400, "Unable to parse name"
 
         yield self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
@@ -74,10 +74,10 @@ class ProfileDisplaynameRestServlet(RestServlet):
             shadow_user = UserID(user.localpart, self.hs.config.shadow_server.get("hs"))
             self.shadow_displayname(shadow_user.to_string(), content)
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, request, user_id):
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def shadow_displayname(self, user_id, body):
@@ -120,7 +120,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        return (200, ret)
+        return 200, ret
 
     @defer.inlineCallbacks
     def on_PUT(self, request, user_id):
@@ -132,7 +132,7 @@ class ProfileAvatarURLRestServlet(RestServlet):
         try:
             new_avatar_url = content["avatar_url"]
         except Exception:
-            return (400, "Unable to parse name")
+            return 400, "Unable to parse name"
 
         yield self.profile_handler.set_avatar_url(
             user, requester, new_avatar_url, is_admin
@@ -142,10 +142,10 @@ class ProfileAvatarURLRestServlet(RestServlet):
             shadow_user = UserID(user.localpart, self.hs.config.shadow_server.get("hs"))
             self.shadow_avatar_url(shadow_user.to_string(), content)
 
-        return (200, {})
+        return 200, {}
 
     def on_OPTIONS(self, request, user_id):
-        return (200, {})
+        return 200, {}
 
     @defer.inlineCallbacks
     def shadow_avatar_url(self, user_id, body):
@@ -190,7 +190,7 @@ class ProfileRestServlet(RestServlet):
         if avatar_url is not None:
             ret["avatar_url"] = avatar_url
 
-        return (200, ret)
+        return 200, ret
 
 
 def register_servlets(hs, http_server):

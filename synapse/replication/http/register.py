@@ -90,7 +90,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             address=content["address"],
         )
 
-        return (200, {})
+        return 200, {}
 
 
 class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
@@ -143,7 +143,7 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
             bind_msisdn=bind_msisdn,
         )
 
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):
