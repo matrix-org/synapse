@@ -41,7 +41,6 @@ from synapse.api.errors import (
     FederationDeniedError,
     FederationError,
     RequestSendFailed,
-    StoreError,
     SynapseError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
