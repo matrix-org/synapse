@@ -15,6 +15,8 @@
 
 
 import json
+from mock import Mock
+from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.config._base import ConfigError
@@ -287,6 +289,9 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
     def test_cannot_3pid_invite(self):
         """Test that unbound 3pid invites get rejected.
         """
+        self.hs.get_room_member_handler().lookup_3pid = Mock()
+        self.hs.get_room_member_handler().lookup_3pid.return_value = defer.succeed(None)
+
         channel = self._create_room(self.admin_access_token)
         assert channel.result["code"] == b"200", channel.result
 
