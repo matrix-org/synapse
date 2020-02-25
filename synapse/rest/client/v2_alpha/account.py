@@ -569,7 +569,8 @@ class ThreepidRestServlet(RestServlet):
             requester = yield self.auth.get_user_by_req(request)
             user_id = requester.user.to_string()
 
-            threepid = yield self.identity_handler.threepid_from_creds(threepid_creds)
+            # Specify None as the identity server to retrieve it from the request body instead
+            threepid = yield self.identity_handler.threepid_from_creds(None, threepid_creds)
 
             if not threepid:
                 raise SynapseError(
