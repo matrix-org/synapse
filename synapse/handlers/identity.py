@@ -18,6 +18,7 @@
 """Utilities for interacting with Identity Servers"""
 
 import logging
+import urllib
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
@@ -367,6 +368,15 @@ class IdentityHandler(BaseHandler):
             # An non-validated session does not exist yet.
             # Generate a session id
             session_id = random_string(16)
+
+        if next_link:
+            # Manipulate the next_link to add the sid, because the caller won't get
+            # it until we send a response, by which time we've sent the mail.
+            if "?" in next_link:
+                next_link += "&"
+            else:
+                next_link += "?"
+            next_link += "sid=" + urllib.parse.quote(session_id)
 
         # Generate a new validation token
         token = random_string(32)
