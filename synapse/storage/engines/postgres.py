@@ -53,7 +53,7 @@ class PostgresEngine(object):
             if rows and rows[0][0] != "UTF8":
                 raise IncorrectDatabaseSetup(
                     "Database has incorrect encoding: '%s' instead of 'UTF8'\n"
-                    "See docs/postgres.rst for more information." % (rows[0][0],)
+                    "See docs/postgres.md for more information." % (rows[0][0],)
                 )
 
             txn.execute(
@@ -62,12 +62,16 @@ class PostgresEngine(object):
             collation, ctype = txn.fetchone()
             if collation != "C":
                 logger.warning(
-                    "Database has incorrect collation of %r. Should be 'C'", collation
+                    "Database has incorrect collation of %r. Should be 'C'\n"
+                    "See docs/postgres.md for more information.",
+                    collation,
                 )
 
             if ctype != "C":
                 logger.warning(
-                    "Database has incorrect ctype of %r. Should be 'C'", ctype
+                    "Database has incorrect ctype of %r. Should be 'C'\n"
+                    "See docs/postgres.md for more information.",
+                    ctype,
                 )
 
     def check_new_database(self, txn):
