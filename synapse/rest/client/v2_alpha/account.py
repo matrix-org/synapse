@@ -573,10 +573,6 @@ class ThreepidRestServlet(RestServlet):
             user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
         )
 
-        if not requester.app_service and ("bind" in body and body["bind"]):
-            logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
-
         if self.hs.config.shadow_server:
             shadow_user = UserID(
                 requester.user.localpart, self.hs.config.shadow_server.get("hs")
