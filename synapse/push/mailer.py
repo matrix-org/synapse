@@ -136,10 +136,11 @@ class Mailer(object):
                 group together multiple email sending attempts
             sid (str): The generated session ID
         """
+        params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
             self.hs.config.public_baseurl
-            + "_matrix/client/unstable/password_reset/email/submit_token"
-            "?token=%s&client_secret=%s&sid=%s" % (token, client_secret, sid)
+            + "_matrix/client/unstable/password_reset/email/submit_token?%s"
+            % urllib.parse.urlencode(params)
         )
 
         template_vars = {"link": link}
@@ -163,10 +164,11 @@ class Mailer(object):
                 group together multiple email sending attempts
             sid (str): The generated session ID
         """
+        params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
             self.hs.config.public_baseurl
-            + "_matrix/client/unstable/registration/email/submit_token"
-            "?token=%s&client_secret=%s&sid=%s" % (token, client_secret, sid)
+            + "_matrix/client/unstable/registration/email/submit_token?%s"
+            % urllib.parse.urlencode(params)
         )
 
         template_vars = {"link": link}
