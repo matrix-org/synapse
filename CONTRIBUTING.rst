@@ -56,7 +56,7 @@ Code style
 
 All Matrix projects have a well-defined code-style - and sometimes we've even
 got as far as documenting it... For instance, synapse's code style doc lives
-at https://github.com/matrix-org/synapse/tree/master/docs/code_style.rst.
+at https://github.com/matrix-org/synapse/tree/master/docs/code_style.md.
 
 Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
