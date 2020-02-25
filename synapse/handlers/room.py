@@ -879,7 +879,6 @@ class RoomContextHandler(object):
         )
         if not event:
             return None
-            return
 
         filtered = yield (filter_evts([event]))
         if not filtered:

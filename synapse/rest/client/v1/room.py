@@ -704,7 +704,6 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 new_room=False,
             )
             return 200, {}
-            return
 
         target = requester.user
         if membership_action in ["invite", "ban", "unban", "kick"]:

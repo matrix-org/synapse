@@ -107,7 +107,6 @@ class ApplicationServiceApi(SimpleHttpClient):
         except CodeMessageException as e:
             if e.code == 404:
                 return False
-                return
             logger.warning("query_user to %s received %s", uri, e.code)
         except Exception as ex:
             logger.warning("query_user to %s threw exception %s", uri, ex)
@@ -127,7 +126,6 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("query_alias to %s received %s", uri, e.code)
             if e.code == 404:
                 return False
-                return
         except Exception as ex:
             logger.warning("query_alias to %s threw exception %s", uri, ex)
         return False
@@ -230,7 +228,6 @@ class ApplicationServiceApi(SimpleHttpClient):
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))
             return True
-            return
         except CodeMessageException as e:
             logger.warning("push_bulk to %s received %s", uri, e.code)
         except Exception as ex:

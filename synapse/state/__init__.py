@@ -136,7 +136,6 @@ class StateHandler(object):
             if event_id:
                 event = yield self.store.get_event(event_id, allow_none=True)
             return event
-            return
 
         state_map = yield self.store.get_events(
             list(state.values()), get_prev_content=False

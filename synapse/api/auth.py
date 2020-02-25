@@ -709,7 +709,6 @@ class Auth(object):
                 and visibility.content["history_visibility"] == "world_readable"
             ):
                 return Membership.JOIN, None
-                return
             raise AuthError(
                 403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
             )

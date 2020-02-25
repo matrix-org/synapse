@@ -165,7 +165,6 @@ class ApplicationServiceTransactionWorkerStore(
         )
         if result:
             return result.get("state")
-            return
         return None
 
     def set_appservice_state(self, service, state):

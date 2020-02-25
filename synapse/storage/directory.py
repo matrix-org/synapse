@@ -47,7 +47,6 @@ class DirectoryWorkerStore(SQLBaseStore):
 
         if not room_id:
             return None
-            return
 
         servers = yield self._simple_select_onecol(
             "room_alias_servers",
@@ -58,7 +57,6 @@ class DirectoryWorkerStore(SQLBaseStore):
 
         if not servers:
             return None
-            return
 
         return RoomAliasMapping(room_id, room_alias.to_string(), servers)
 

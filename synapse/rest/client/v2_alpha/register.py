@@ -238,7 +238,6 @@ class RegisterRestServlet(RestServlet):
         if kind == b"guest":
             ret = yield self._do_guest_registration(body, address=client_addr)
             return ret
-            return
         elif kind != b"user":
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind,)
@@ -297,7 +296,6 @@ class RegisterRestServlet(RestServlet):
                     body,
                 )
             return 200, result  # we throw for non 200 responses
-            return
 
         # for regular registration, downcase the provided username before
         # attempting to register it. This should mean

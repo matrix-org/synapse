@@ -39,7 +39,6 @@ class ProfileWorkerStore(SQLBaseStore):
             if e.code == 404:
                 # no match
                 return ProfileInfo(None, None)
-                return
             else:
                 raise
 
