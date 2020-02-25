@@ -34,12 +34,14 @@ from synapse.api.errors import (
     ThreepidValidationError,
     UnrecognizedRequestError,
 )
+from synapse.config import ConfigError
 from synapse.config.captcha import CaptchaConfig
 from synapse.config.consent_config import ConsentConfig
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
+from synapse.handlers.auth import AuthHandler
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -381,7 +383,9 @@ class RegisterRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
 
-        self._registration_flows = _calculate_registration_flows(hs.config)
+        self._registration_flows = _calculate_registration_flows(
+            hs.config, self.auth_handler
+        )
 
     @interactive_auth_handler
     @defer.inlineCallbacks
@@ -843,11 +847,13 @@ def _map_email_to_displayname(address):
 def _calculate_registration_flows(
     # technically `config` has to provide *all* of these interfaces, not just one
     config: Union[RegistrationConfig, ConsentConfig, CaptchaConfig],
+    auth_handler: AuthHandler,
 ) -> List[List[str]]:
     """Get a suitable flows list for registration
 
     Args:
         config: server configuration
+        auth_handler: authorization handler
 
     Returns: a list of supported flows
     """
@@ -857,9 +863,28 @@ def _calculate_registration_flows(
     require_msisdn = "msisdn" in config.registrations_require_3pid
 
     show_msisdn = True
+    show_email = True
+
     if config.disable_msisdn_registration:
         show_msisdn = False
         require_msisdn = False
+
+    enabled_auth_types = auth_handler.get_enabled_auth_types()
+    if LoginType.EMAIL_IDENTITY not in enabled_auth_types:
+        show_email = False
+        if require_email:
+            raise ConfigError(
+                "Configuration requires email address at registration, but email "
+                "validation is not configured"
+            )
+
+    if LoginType.MSISDN not in enabled_auth_types:
+        show_msisdn = False
+        if require_msisdn:
+            raise ConfigError(
+                "Configuration requires msisdn at registration, but msisdn "
+                "validation is not configured"
+            )
 
     flows = []
 
@@ -872,14 +897,15 @@ def _calculate_registration_flows(
         flows.append([LoginType.DUMMY])
 
     # only support the email-only flow if we don't require MSISDN 3PIDs
-    if not require_msisdn:
+    if show_email and not require_msisdn:
         flows.append([LoginType.EMAIL_IDENTITY])
 
     # only support the MSISDN-only flow if we don't require email 3PIDs
     if show_msisdn and not require_email:
         flows.append([LoginType.MSISDN])
 
-    if show_msisdn:
+    if show_email and show_msisdn:
+        # always let users provide both MSISDN & email
         flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
 
     # Prepend m.login.terms to all flows if we're requiring consent

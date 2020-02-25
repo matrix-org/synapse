@@ -61,7 +61,8 @@ class AuthHandler(BaseHandler):
         self.checkers = {}  # type: dict[str, UserInteractiveAuthChecker]
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
-            self.checkers[inst.AUTH_TYPE] = inst
+            if inst.is_enabled():
+                self.checkers[inst.AUTH_TYPE] = inst
 
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
@@ -155,6 +156,14 @@ class AuthHandler(BaseHandler):
             raise AuthError(403, "Invalid auth")
 
         return params
+
+    def get_enabled_auth_types(self):
+        """Return the enabled user-interactive authentication types
+
+        Returns the UI-Auth types which are supported by the homeserver's current
+        config.
+        """
+        return self.checkers.keys()
 
     @defer.inlineCallbacks
     def check_auth(self, flows, clientdict, clientip):

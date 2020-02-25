@@ -32,6 +32,13 @@ class UserInteractiveAuthChecker:
     def __init__(self, hs):
         pass
 
+    def is_enabled(self):
+        """Check if the configuration of the homeserver allows this checker to work
+
+        Returns:
+            bool: True if this login type is enabled.
+        """
+
     def check_auth(self, authdict, clientip):
         """Given the authentication dict from the client, attempt to check this step
 
@@ -51,12 +58,18 @@ class UserInteractiveAuthChecker:
 class DummyAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.DUMMY
 
+    def is_enabled(self):
+        return True
+
     def check_auth(self, authdict, clientip):
         return defer.succeed(True)
 
 
 class TermsAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.TERMS
+
+    def is_enabled(self):
+        return True
 
     def check_auth(self, authdict, clientip):
         return defer.succeed(True)
@@ -67,9 +80,13 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 
     def __init__(self, hs):
         super().__init__(hs)
+        self._enabled = bool(hs.config.recaptcha_private_key)
         self._http_client = hs.get_simple_http_client()
         self._url = hs.config.recaptcha_siteverify_api
         self._secret = hs.config.recaptcha_private_key
+
+    def is_enabled(self):
+        return self._enabled
 
     @defer.inlineCallbacks
     def check_auth(self, authdict, clientip):
@@ -191,6 +208,12 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         UserInteractiveAuthChecker.__init__(self, hs)
         _BaseThreepidAuthChecker.__init__(self, hs)
 
+    def is_enabled(self):
+        return self.hs.config.threepid_behaviour_email in (
+            ThreepidBehaviour.REMOTE,
+            ThreepidBehaviour.LOCAL,
+        )
+
     def check_auth(self, authdict, clientip):
         return self._check_threepid("email", authdict)
 
@@ -201,6 +224,9 @@ class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
     def __init__(self, hs):
         UserInteractiveAuthChecker.__init__(self, hs)
         _BaseThreepidAuthChecker.__init__(self, hs)
+
+    def is_enabled(self):
+        return bool(self.hs.config.account_threepid_delegate_msisdn)
 
     def check_auth(self, authdict, clientip):
         return self._check_threepid("msisdn", authdict)
