@@ -542,7 +542,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, channel.json_body["deactivated"])
 
         # Change password (and use a str for deactivate instead of a bool)
-        body = json.dumps({"password": "abc123", "deactivated": "false",})  # oops!
+        body = json.dumps({"password": "abc123", "deactivated": "false"})  # oops!
 
         request, channel = self.make_request(
             "PUT",
