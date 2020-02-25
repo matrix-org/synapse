@@ -635,7 +635,6 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertEqual(u1stats["joined_rooms"], 1)
 
-    @unittest.DEBUG
     def test_incomplete_stats(self):
         """
         This tests that we track incomplete statistics.

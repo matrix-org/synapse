@@ -52,7 +52,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
-    @unittest.DEBUG
     def test_POST_appservice_registration_valid(self):
         user_id = "@as_user_kermit:test"
         as_token = "i_am_an_app_service"
