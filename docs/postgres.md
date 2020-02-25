@@ -105,19 +105,41 @@ of free memory the database host has available.
 When you are ready to start using PostgreSQL, edit the `database`
 section in your config file to match the following lines:
 
-    database:
-        name: psycopg2
-        args:
-            user: <user>
-            password: <pass>
-            database: <db>
-            host: <host>
-            cp_min: 5
-            cp_max: 10
+```yaml
+database:
+  name: psycopg2
+  args:
+    user: <user>
+    password: <pass>
+    database: <db>
+    host: <host>
+    cp_min: 5
+    cp_max: 10
+```
 
 All key, values in `args` are passed to the `psycopg2.connect(..)`
 function, except keys beginning with `cp_`, which are consumed by the
-twisted adbapi connection pool.
+twisted adbapi connection pool. See the [libpq
+documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
+for a list of options which can be passed.
+
+You should consider tuning the `keepalives_*` options if there is any danger of
+the connection between your homeserver and database dropping, otherwise Synapse
+may block for an extended period while it waits for a response from the
+database server. Example values might be:
+
+```yaml
+# seconds of inactivity after which TCP should send a keepalive message to the server
+keepalives_idle: 10
+
+# the number of seconds after which a TCP keepalive message that is not
+# acknowledged by the server should be retransmitted
+keepalives_interval: 10
+
+# the number of TCP keepalives that can be lost before the client's connection
+# to the server is considered dead
+keepalives_count: 3
+```
 
 ## Porting from SQLite
 
