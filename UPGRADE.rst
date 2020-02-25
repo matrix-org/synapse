@@ -49,6 +49,56 @@ returned by the Client-Server API:
     # configured on port 443.
     curl -kv https://<host.name>/_matrix/client/versions 2>&1 | grep "Server:"
 
+Upgrading to v1.4.0
+===================
+
+Config options
+--------------
+
+**Note: Registration by email address or phone number will not work in this release unless
+some config options are changed from their defaults.**
+
+This is due to Synapse v1.4.0 now defaulting to sending registration and password reset tokens
+itself. This is for security reasons as well as putting less reliance on identity servers.
+However, currently Synapse only supports sending emails, and does not have support for
+phone-based password reset or account registration. If Synapse is configured to handle these on
+its own, phone-based password resets and registration will be disabled. For Synapse to send
+emails, the ``email`` block of the config must be filled out. If not, then password resets and
+registration via email will be disabled entirely.
+
+This release also deprecates the ``email.trust_identity_server_for_password_resets`` option and
+replaces it with the ``account_threepid_delegates`` dictionary. This option defines whether the
+homeserver should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
+registration messages via email and SMS.
+
+If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
+``account_threepid_delegates.email`` is not set, then the first entry in
+``trusted_third_party_id_servers`` will be used as the account threepid delegate for email.
+This is to ensure compatibility with existing Synapse installs that set up external server
+handling for these tasks before v1.4.0. If ``email.trust_identity_server_for_password_resets``
+is ``true`` and no trusted identity server domains are configured, Synapse will throw an error.
+
+If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent and a threepid
+type in ``account_threepid_delegates`` is not set to a domain, then Synapse will attempt to
+send password reset and registration messages for that type.
+
+Email templates
+---------------
+
+If you have configured a custom template directory with the ``email.template_dir`` option, be
+aware that there are new templates regarding registration. ``registration.html`` and
+``registration.txt`` have been added and contain the content that is sent to a client upon
+registering via an email address.
+
+``registration_success.html`` and ``registration_failure.html`` are also new HTML templates
+that will be shown to the user when they click the link in their registration emai , either
+showing them a success or failure page (assuming a redirect URL is not configured).
+
+Synapse will expect these files to exist inside the configured template directory. To view the
+default templates, see `synapse/res/templates
+<https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
 Upgrading to v1.2.0
 ===================
 
@@ -131,6 +181,19 @@ server for password resets, set ``trust_identity_server_for_password_resets`` to
 
 See the `sample configuration file <docs/sample_config.yaml>`_
 for more details on these settings.
+
+New email templates
+---------------
+Some new templates have been added to the default template directory for the purpose of the
+homeserver sending its own password reset emails. If you have configured a custom
+``template_dir`` in your Synapse config, these files will need to be added.
+
+``password_reset.html`` and ``password_reset.txt`` are HTML and plain text templates
+respectively that contain the contents of what will be emailed to the user upon attempting to
+reset their password via email. ``password_reset_success.html`` and
+``password_reset_failure.html`` are HTML files that the content of which (assuming no redirect
+URL is set) will be shown to the user after they attempt to click the link in the email sent
+to them.
 
 Upgrading to v0.99.0
 ====================

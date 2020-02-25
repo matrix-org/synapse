@@ -37,6 +37,8 @@ from signedjson.sign import verify_signed_json, SignatureVerifyException
 
 CONFIG_JSON = "cmdclient_config.json"
 
+# TODO: The concept of trusted identity servers has been deprecated. This option and checks
+#  should be removed
 TRUSTED_ID_SERVERS = ["localhost:8001"]
 
 

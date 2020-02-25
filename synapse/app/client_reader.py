@@ -119,7 +119,7 @@ class ClientReaderServer(HomeServer):
                     KeyChangesServlet(self).register(resource)
                     VoipRestServlet(self).register(resource)
                     PushRuleRestServlet(self).register(resource)
-                    VersionsRestServlet().register(resource)
+                    VersionsRestServlet(self).register(resource)
 
                     resources.update({"/_matrix/client": resource})
 
