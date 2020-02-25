@@ -86,25 +86,6 @@ class IdentityHandler(BaseHandler):
         id_access_token = creds.get("id_access_token")
         return client_secret, id_server, id_access_token
 
-    def create_id_access_token_header(self, id_access_token):
-        """Create an Authorization header for passing to SimpleHttpClient as the header value
-        of an HTTP request.
-
-        Args:
-            id_access_token (str): An identity server access token.
-
-        Returns:
-            list[str]: The ascii-encoded bearer token encased in a list.
-        """
-        # Prefix with Bearer
-        bearer_token = "Bearer %s" % id_access_token
-
-        # Encode headers to standard ascii
-        bearer_token.encode("ascii")
-
-        # Return as a list as that's how SimpleHttpClient takes header values
-        return [bearer_token]
-
     @defer.inlineCallbacks
     def threepid_from_creds(self, id_server, creds):
         """
@@ -524,6 +505,10 @@ class IdentityHandler(BaseHandler):
             logger.info("Proxied requestToken failed: %r", e)
             raise e.to_synapse_error()
 
+    # TODO: The following methods are used for proxying IS requests using
+    # the CS API. They should be consolidated with those in RoomMemberHandler
+    # https://github.com/matrix-org/synapse-dinsic/issues/25
+
     @defer.inlineCallbacks
     def lookup_3pid(self, id_server, medium, address):
         """Looks up a 3pid in the passed identity server.
@@ -630,3 +615,36 @@ class IdentityHandler(BaseHandler):
             return
 
         raise AuthError(401, "No signature from server %s" % (server_hostname,))
+
+
+def create_id_access_token_header(id_access_token):
+    """Create an Authorization header for passing to SimpleHttpClient as the header value
+    of an HTTP request.
+
+    Args:
+        id_access_token (str): An identity server access token.
+
+    Returns:
+        list[str]: The ascii-encoded bearer token encased in a list.
+    """
+    # Prefix with Bearer
+    bearer_token = "Bearer %s" % id_access_token
+
+    # Encode headers to standard ascii
+    bearer_token.encode("ascii")
+
+    # Return as a list as that's how SimpleHttpClient takes header values
+    return [bearer_token]
+
+
+class LookupAlgorithm:
+    """
+    Supported hashing algorithms when performing a 3PID lookup.
+
+    SHA256 - Hashing an (address, medium, pepper) combo with sha256, then url-safe base64
+        encoding
+    NONE - Not performing any hashing. Simply sending an (address, medium) combo in plaintext
+    """
+
+    SHA256 = "sha256"
+    NONE = "none"

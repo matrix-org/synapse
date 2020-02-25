@@ -702,6 +702,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 requester,
                 txn_id,
                 new_room=False,
+                id_access_token=content.get("id_access_token"),
             )
             return 200, {}
 
