@@ -28,7 +28,11 @@ from synapse.api.errors import (
     RequestSendFailed,
     SynapseError,
 )
-from synapse.logging.opentracing import inject_active_span_byte_dict, trace_servlet
+from synapse.logging.opentracing import (
+    inject_active_span_byte_dict,
+    trace,
+    trace_servlet,
+)
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
@@ -129,6 +133,7 @@ class ReplicationEndpoint(object):
 
         client = hs.get_simple_http_client()
 
+        @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
         def send_request(**kwargs):
             data = yield cls._serialize_payload(**kwargs)

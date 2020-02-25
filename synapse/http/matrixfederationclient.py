@@ -345,7 +345,6 @@ class MatrixFederationHttpClient(object):
         else:
             query_bytes = b""
 
-        # Retreive current span
         scope = start_active_span(
             "outgoing-federation-request",
             tags={
