@@ -255,7 +255,7 @@ class PresenceHandler(object):
         self.unpersisted_users_changes = set()
 
         if unpersisted:
-            logger.info("Persisting %d upersisted presence updates", len(unpersisted))
+            logger.info("Persisting %d unpersisted presence updates", len(unpersisted))
             yield self.store.update_presence(
                 [self.user_to_current_state[user_id] for user_id in unpersisted]
             )
