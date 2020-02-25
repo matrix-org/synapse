@@ -228,7 +228,12 @@ class UserRestServletV2(RestServlet):
                     )
 
             if "deactivated" in body:
-                deactivate = bool(body["deactivated"])
+                deactivate = body["deactivated"]
+                if not isinstance(deactivate, bool):
+                    raise SynapseError(
+                        400, "'deactivated' parameter is not of type boolean"
+                    )
+
                 if deactivate and not user["deactivated"]:
                     result = await self.deactivate_account_handler.deactivate_account(
                         target_user.to_string(), False
