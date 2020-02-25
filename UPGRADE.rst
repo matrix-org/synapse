@@ -78,52 +78,160 @@ for example:
 Upgrading to v1.4.0
 ===================
 
-Config options
---------------
+New custom templates
+--------------------
 
-**Note: Registration by email address or phone number will not work in this release unless
-some config options are changed from their defaults.**
+If you have configured a custom template directory with the
+``email.template_dir`` option, be aware that there are new templates regarding
+registration and threepid management (see below) that must be included.
 
-This is due to Synapse v1.4.0 now defaulting to sending registration and password reset tokens
-itself. This is for security reasons as well as putting less reliance on identity servers.
-However, currently Synapse only supports sending emails, and does not have support for
-phone-based password reset or account registration. If Synapse is configured to handle these on
-its own, phone-based password resets and registration will be disabled. For Synapse to send
-emails, the ``email`` block of the config must be filled out. If not, then password resets and
-registration via email will be disabled entirely.
+* ``registration.html`` and ``registration.txt``
+* ``registration_success.html`` and ``registration_failure.html``
+* ``add_threepid.html`` and  ``add_threepid.txt``
+* ``add_threepid_failure.html`` and ``add_threepid_success.html``
 
-This release also deprecates the ``email.trust_identity_server_for_password_resets`` option and
-replaces it with the ``account_threepid_delegates`` dictionary. This option defines whether the
-homeserver should delegate an external server (typically an `identity server
-<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending password reset or
-registration messages via email and SMS.
-
-If ``email.trust_identity_server_for_password_resets`` is set to ``true``, and
-``account_threepid_delegates.email`` is not set, then the first entry in
-``trusted_third_party_id_servers`` will be used as the account threepid delegate for email.
-This is to ensure compatibility with existing Synapse installs that set up external server
-handling for these tasks before v1.4.0. If ``email.trust_identity_server_for_password_resets``
-is ``true`` and no trusted identity server domains are configured, Synapse will throw an error.
-
-If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent and a threepid
-type in ``account_threepid_delegates`` is not set to a domain, then Synapse will attempt to
-send password reset and registration messages for that type.
-
-Email templates
----------------
-
-If you have configured a custom template directory with the ``email.template_dir`` option, be
-aware that there are new templates regarding registration. ``registration.html`` and
-``registration.txt`` have been added and contain the content that is sent to a client upon
-registering via an email address.
-
-``registration_success.html`` and ``registration_failure.html`` are also new HTML templates
-that will be shown to the user when they click the link in their registration emai , either
-showing them a success or failure page (assuming a redirect URL is not configured).
-
-Synapse will expect these files to exist inside the configured template directory. To view the
-default templates, see `synapse/res/templates
+Synapse will expect these files to exist inside the configured template
+directory, and **will fail to start** if they are absent.
+To view the default templates, see `synapse/res/templates
 <https://github.com/matrix-org/synapse/tree/master/synapse/res/templates>`_.
+
+3pid verification changes
+-------------------------
+
+**Note: As of this release, users will be unable to add phone numbers or email
+addresses to their accounts, without changes to the Synapse configuration. This
+includes adding an email address during registration.**
+
+It is possible for a user to associate an email address or phone number
+with their account, for a number of reasons:
+
+* for use when logging in, as an alternative to the user id.
+* in the case of email, as an alternative contact to help with account recovery.
+* in the case of email, to receive notifications of missed messages.
+
+Before an email address or phone number can be added to a user's account,
+or before such an address is used to carry out a password-reset, Synapse must
+confirm the operation with the owner of the email address or phone number.
+It does this by sending an email or text giving the user a link or token to confirm
+receipt. This process is known as '3pid verification'. ('3pid', or 'threepid',
+stands for third-party identifier, and we use it to refer to external
+identifiers such as email addresses and phone numbers.)
+
+Previous versions of Synapse delegated the task of 3pid verification to an
+identity server by default. In most cases this server is ``vector.im`` or
+``matrix.org``.
+
+In Synapse 1.4.0, for security and privacy reasons, the homeserver will no
+longer delegate this task to an identity server by default. Instead,
+the server administrator will need to explicitly decide how they would like the
+verification messages to be sent.
+
+In the medium term, the ``vector.im`` and ``matrix.org`` identity servers will
+disable support for delegated 3pid verification entirely. However, in order to
+ease the transition, they will retain the capability for a limited
+period. Delegated email verification will be disabled on Monday 2nd December
+2019 (giving roughly 2 months notice). Disabling delegated SMS verification
+will follow some time after that once SMS verification support lands in
+Synapse.
+
+Once delegated 3pid verification support has been disabled in the ``vector.im`` and
+``matrix.org`` identity servers, all Synapse versions that depend on those
+instances will be unable to verify email and phone numbers through them. There
+are no imminent plans to remove delegated 3pid verification from Sydent
+generally. (Sydent is the identity server project that backs the ``vector.im`` and
+``matrix.org`` instances).
+
+Email
+~~~~~
+Following upgrade, to continue verifying email (e.g. as part of the
+registration process), admins can either:-
+
+* Configure Synapse to use an email server.
+* Run or choose an identity server which allows delegated email verification
+  and delegate to it.
+
+Configure SMTP in Synapse
++++++++++++++++++++++++++
+
+To configure an SMTP server for Synapse, modify the configuration section
+headed ``email``, and be sure to have at least the ``smtp_host, smtp_port``
+and ``notif_from`` fields filled out.
+
+You may also need to set ``smtp_user``, ``smtp_pass``, and
+``require_transport_security``.
+
+See the `sample configuration file <docs/sample_config.yaml>`_ for more details
+on these settings.
+
+Delegate email to an identity server
+++++++++++++++++++++++++++++++++++++
+
+Some admins will wish to continue using email verification as part of the
+registration process, but will not immediately have an appropriate SMTP server
+at hand.
+
+To this end, we will continue to support email verification delegation via the
+``vector.im`` and ``matrix.org`` identity servers for two months. Support for
+delegated email verification will be disabled on Monday 2nd December.
+
+The ``account_threepid_delegates`` dictionary defines whether the homeserver
+should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
+confirmation messages via email and SMS.
+
+So to delegate email verification, in ``homeserver.yaml``, set
+``account_threepid_delegates.email`` to the base URL of an identity server. For
+example:
+
+.. code:: yaml
+
+   account_threepid_delegates:
+       email: https://example.com     # Delegate email sending to example.com
+
+Note that ``account_threepid_delegates.email`` replaces the deprecated
+``email.trust_identity_server_for_password_resets``: if
+``email.trust_identity_server_for_password_resets`` is set to ``true``, and
+``account_threepid_delegates.email`` is not set, then the first entry in
+``trusted_third_party_id_servers`` will be used as the
+``account_threepid_delegate`` for email. This is to ensure compatibility with
+existing Synapse installs that set up external server handling for these tasks
+before v1.4.0. If ``email.trust_identity_server_for_password_resets`` is
+``true`` and no trusted identity server domains are configured, Synapse will
+report an error and refuse to start.
+
+If ``email.trust_identity_server_for_password_resets`` is ``false`` or absent
+and no ``email`` delegate is configured in ``account_threepid_delegates``,
+then Synapse will send email verification messages itself, using the configured
+SMTP server (see above).
+that type.
+
+Phone numbers
+~~~~~~~~~~~~~
+
+Synapse does not support phone-number verification itself, so the only way to
+maintain the ability for users to add phone numbers to their accounts will be
+by continuing to delegate phone number verification to the ``matrix.org`` and
+``vector.im`` identity servers (or another identity server that supports SMS
+sending).
+
+The ``account_threepid_delegates`` dictionary defines whether the homeserver
+should delegate an external server (typically an `identity server
+<https://matrix.org/docs/spec/identity_service/r0.2.1>`_) to handle sending
+confirmation messages via email and SMS.
+
+So to delegate phone number verification, in ``homeserver.yaml``, set
+``account_threepid_delegates.msisdn`` to the base URL of an identity
+server. For example:
+
+.. code:: yaml
+
+   account_threepid_delegates:
+       msisdn: https://example.com     # Delegate sms sending to example.com
+
+The ``matrix.org`` and ``vector.im`` identity servers will continue to support
+delegated phone number verification via SMS until such time as it is possible
+for admins to configure their servers to perform phone number verification
+directly. More details will follow in a future release.
 
 Rolling back to v1.3.1
 ----------------------
@@ -140,7 +248,8 @@ v1.3.1, subject to the following:
   The room statistics are essentially unused in v1.3.1 (in future versions of
   Synapse, they will be used to populate the room directory), so there should
   be no loss of functionality. However, the statistics engine will write errors
-  to the logs, which can be avoided by setting the following in `homeserver.yaml`:
+  to the logs, which can be avoided by setting the following in
+  `homeserver.yaml`:
 
   .. code:: yaml
 
