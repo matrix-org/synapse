@@ -91,6 +91,7 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
                 "client_secret": creds["client_secret"],
                 "mxid": self.user_id,
             },
+            headers={},
         )
 
         # Check that the original server name is saved in the database instead of the

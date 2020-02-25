@@ -50,7 +50,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
         )
 
         d = self.handler.on_exchange_third_party_invite_request(
-            origin="example.com",
             room_id=room_id,
             event_dict={
                 "type": EventTypes.Member,
