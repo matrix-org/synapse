@@ -21,6 +21,7 @@ from twisted.internet import defer
 
 import synapse.handlers.auth
 from synapse.api.auth import Auth
+from synapse.api.constants import UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -334,6 +335,23 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(small_number_of_users)
         )
         yield self.auth.check_auth_blocking()
+
+    @defer.inlineCallbacks
+    def test_blocking_mau__depending_on_user_type(self):
+        self.hs.config.max_mau_value = 50
+        self.hs.config.limit_usage_by_mau = True
+
+        self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
+        # Support users allowed
+        yield self.auth.check_auth_blocking(user_type=UserTypes.SUPPORT)
+        self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
+        # Bots not allowed
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking(user_type=UserTypes.BOT)
+        self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
+        # Real users not allowed
+        with self.assertRaises(ResourceLimitError):
+            yield self.auth.check_auth_blocking()
 
     @defer.inlineCallbacks
     def test_reserved_threepid(self):
