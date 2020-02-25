@@ -29,6 +29,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -506,6 +507,19 @@ class SSOAuthHandler(object):
             registered_user_id = yield self._registration_handler.register_user(
                 localpart=localpart, default_display_name=user_display_name
             )
+
+        self.complete_sso_login(registered_user_id, request, client_redirect_url)
+
+    def complete_sso_login(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Having figured out a mxid for this user, complete the HTTP request
+
+        Args:
+            registered_user_id:
+            request:
+            client_redirect_url:
+        """
 
         login_token = self._macaroon_gen.generate_short_term_login_token(
             registered_user_id
