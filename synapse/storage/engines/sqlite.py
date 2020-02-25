@@ -16,12 +16,14 @@
 import struct
 import threading
 
+from synapse.storage.engines import BaseDatabaseEngine
 
-class Sqlite3Engine(object):
+
+class Sqlite3Engine(BaseDatabaseEngine):
     single_threaded = True
 
     def __init__(self, database_module, database_config):
-        self.module = database_module
+        super().__init__(database_module, database_config)
 
         database = database_config.get("args", {}).get("database")
         self._is_in_memory = database in (None, ":memory:",)
