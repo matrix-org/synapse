@@ -637,11 +637,11 @@ def auth_types_for_event(event):
     if event.type == EventTypes.Create:
         return []
 
-    auth_types = []
-
-    auth_types.append((EventTypes.PowerLevels, ""))
-    auth_types.append((EventTypes.Member, event.sender))
-    auth_types.append((EventTypes.Create, ""))
+    auth_types = [
+        (EventTypes.PowerLevels, ""),
+        (EventTypes.Member, event.sender),
+        (EventTypes.Create, ""),
+    ]
 
     if event.type == EventTypes.Member:
         membership = event.content["membership"]
