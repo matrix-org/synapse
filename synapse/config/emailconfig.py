@@ -169,11 +169,21 @@ class EmailConfig(Config):
             self.email_registration_template_text = email_config.get(
                 "registration_template_text", "registration.txt"
             )
+            self.email_add_threepid_template_html = email_config.get(
+                "add_threepid_template_html", "add_threepid.html"
+            )
+            self.email_add_threepid_template_text = email_config.get(
+                "add_threepid_template_text", "add_threepid.txt"
+            )
+
             self.email_password_reset_template_failure_html = email_config.get(
                 "password_reset_template_failure_html", "password_reset_failure.html"
             )
             self.email_registration_template_failure_html = email_config.get(
                 "registration_template_failure_html", "registration_failure.html"
+            )
+            self.email_add_threepid_template_failure_html = email_config.get(
+                "add_threepid_template_failure_html", "add_threepid_failure.html"
             )
 
             # These templates do not support any placeholder variables, so we
@@ -184,6 +194,9 @@ class EmailConfig(Config):
             email_registration_template_success_html = email_config.get(
                 "registration_template_success_html", "registration_success.html"
             )
+            email_add_threepid_template_success_html = email_config.get(
+                "add_threepid_template_success_html", "add_threepid_success.html"
+            )
 
             # Check templates exist
             for f in [
@@ -191,9 +204,14 @@ class EmailConfig(Config):
                 self.email_password_reset_template_text,
                 self.email_registration_template_html,
                 self.email_registration_template_text,
+                self.email_add_threepid_template_html,
+                self.email_add_threepid_template_text,
                 self.email_password_reset_template_failure_html,
+                self.email_registration_template_failure_html,
+                self.email_add_threepid_template_failure_html,
                 email_password_reset_template_success_html,
                 email_registration_template_success_html,
+                email_add_threepid_template_success_html,
             ]:
                 p = os.path.join(self.email_template_dir, f)
                 if not os.path.isfile(p):
@@ -211,6 +229,12 @@ class EmailConfig(Config):
             )
             self.email_registration_template_success_html_content = self.read_file(
                 filepath, "email.registration_template_success_html"
+            )
+            filepath = os.path.join(
+                self.email_template_dir, email_add_threepid_template_success_html
+            )
+            self.email_add_threepid_template_success_html_content = self.read_file(
+                filepath, "email.add_threepid_template_success_html"
             )
 
         if self.email_enable_notifs:
@@ -328,6 +352,12 @@ class EmailConfig(Config):
         #   #registration_template_html: registration.html
         #   #registration_template_text: registration.txt
         #
+        #   # Templates for validation emails sent by the homeserver when adding an email to
+        #   # your user account
+        #   #
+        #   #add_threepid_template_html: add_threepid.html
+        #   #add_threepid_template_text: add_threepid.txt
+        #
         #   # Templates for password reset success and failure pages that a user
         #   # will see after attempting to reset their password
         #   #
@@ -339,6 +369,12 @@ class EmailConfig(Config):
         #   #
         #   #registration_template_success_html: registration_success.html
         #   #registration_template_failure_html: registration_failure.html
+        #
+        #   # Templates for success and failure pages that a user will see after attempting
+        #   # to add an email or phone to their account
+        #   #
+        #   #add_threepid_success_html: add_threepid_success.html
+        #   #add_threepid_failure_html: add_threepid_failure.html
         """
 
 
