@@ -1,0 +1,1 @@
+Fix the logged number of updated items for the users_set_deactivated_flag background update.
