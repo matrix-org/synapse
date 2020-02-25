@@ -1,0 +1,1 @@
+Fix bug where login error was shown incorrectly on SSO fallback login.
