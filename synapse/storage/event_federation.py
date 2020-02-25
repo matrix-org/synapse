@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import logging
 import random
 
@@ -190,12 +191,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             room_id,
         )
 
-    def get_rooms_with_many_extremities(self, min_count, limit):
+    def get_rooms_with_many_extremities(self, min_count, limit, room_id_filter):
         """Get the top rooms with at least N extremities.
 
         Args:
             min_count (int): The minimum number of extremities
             limit (int): The maximum number of rooms to return.
+            room_id_filter (iterable[str]): room_ids to exclude from the results
 
         Returns:
             Deferred[list]: At most `limit` room IDs that have at least
@@ -203,15 +205,25 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         """
 
         def _get_rooms_with_many_extremities_txn(txn):
+            where_clause = "1=1"
+            if room_id_filter:
+                where_clause = "room_id NOT IN (%s)" % (
+                    ",".join("?" for _ in room_id_filter),
+                )
+
             sql = """
                 SELECT room_id FROM event_forward_extremities
+                WHERE %s
                 GROUP BY room_id
                 HAVING count(*) > ?
                 ORDER BY count(*) DESC
                 LIMIT ?
-            """
+            """ % (
+                where_clause,
+            )
 
-            txn.execute(sql, (min_count, limit))
+            query_args = list(itertools.chain(room_id_filter, [min_count, limit]))
+            txn.execute(sql, query_args)
             return [room_id for room_id, in txn]
 
         return self.runInteraction(

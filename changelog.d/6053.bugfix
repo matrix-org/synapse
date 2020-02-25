@@ -1,0 +1,1 @@
+Prevent exceptions being logged when extremity-cleanup events fail due to lack of user consent to the terms of service.
