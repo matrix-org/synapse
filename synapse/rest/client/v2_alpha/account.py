@@ -589,12 +589,14 @@ class ThreepidRestServlet(RestServlet):
 
         # skip validation if this is a shadow 3PID from an AS
         if not requester.app_service:
-            threePidCreds = body.get("threePidCreds")
-            threePidCreds = body.get("three_pid_creds", threePidCreds)
-            if threePidCreds is None:
+            threepid_creds = body.get("threePidCreds") or body.get("three_pid_creds")
+            if threepid_creds is None:
                 raise SynapseError(400, "Missing param", Codes.MISSING_PARAM)
 
-            threepid = yield self.identity_handler.threepid_from_creds(threePidCreds)
+            requester = yield self.auth.get_user_by_req(request)
+            user_id = requester.user.to_string()
+
+            threepid = yield self.identity_handler.threepid_from_creds(threepid_creds)
 
             if not threepid:
                 raise SynapseError(
@@ -618,7 +620,7 @@ class ThreepidRestServlet(RestServlet):
 
         if not requester.app_service and ("bind" in body and body["bind"]):
             logger.debug("Binding threepid %s to %s", threepid, user_id)
-            yield self.identity_handler.bind_threepid(threePidCreds, user_id)
+            yield self.identity_handler.bind_threepid(threepid_creds, user_id)
 
         if self.hs.config.shadow_server:
             shadow_user = UserID(
