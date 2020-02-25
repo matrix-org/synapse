@@ -18,9 +18,20 @@ from twisted.internet.defer import succeed
 
 import synapse.rest.admin
 from synapse.api.constants import LoginType
+from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.rest.client.v2_alpha import auth, register
 
 from tests import unittest
+
+
+class DummyRecaptchaChecker(UserInteractiveAuthChecker):
+    def __init__(self, hs):
+        super().__init__(hs)
+        self.recaptcha_attempts = []
+
+    def check_auth(self, authdict, clientip):
+        self.recaptcha_attempts.append((authdict, clientip))
+        return succeed(True)
 
 
 class FallbackAuthTests(unittest.HomeserverTestCase):
@@ -44,15 +55,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
+        self.recaptcha_checker = DummyRecaptchaChecker(hs)
         auth_handler = hs.get_auth_handler()
-
-        self.recaptcha_attempts = []
-
-        def _recaptcha(authdict, clientip):
-            self.recaptcha_attempts.append((authdict, clientip))
-            return succeed(True)
-
-        auth_handler.checkers[LoginType.RECAPTCHA] = _recaptcha
+        auth_handler.checkers[LoginType.RECAPTCHA] = self.recaptcha_checker
 
     @unittest.INFO
     def test_fallback_captcha(self):
@@ -89,8 +94,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(request.code, 200)
 
         # The recaptcha handler is called with the response given
-        self.assertEqual(len(self.recaptcha_attempts), 1)
-        self.assertEqual(self.recaptcha_attempts[0][0]["response"], "a")
+        attempts = self.recaptcha_checker.recaptcha_attempts
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(attempts[0][0]["response"], "a")
 
         # also complete the dummy auth
         request, channel = self.make_request(
