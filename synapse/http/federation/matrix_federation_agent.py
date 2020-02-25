@@ -217,7 +217,7 @@ class MatrixHostnameEndpoint(object):
             self._tls_options = None
         else:
             self._tls_options = tls_client_options_factory.get_options(
-                self._parsed_uri.host.decode("ascii")
+                self._parsed_uri.host
             )
 
         self._srv_resolver = srv_resolver
