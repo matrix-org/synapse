@@ -1,1 +1,1 @@
-The docker-compose file in contrib/docker would not start correctly after PR #6921.
+Fix `POSTGRES_INITDB_ARGS` in the `contrib/docker/docker-compose.yml` example docker-compose configuration.
