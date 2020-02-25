@@ -223,8 +223,8 @@ try:
     from jaeger_client import Config as JaegerConfig
     from synapse.logging.scopecontextmanager import LogContextScopeManager
 except ImportError:
-    JaegerConfig = None
-    LogContextScopeManager = None
+    JaegerConfig = None  # type: ignore
+    LogContextScopeManager = None  # type: ignore
 
 
 logger = logging.getLogger(__name__)

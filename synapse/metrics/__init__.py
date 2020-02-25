@@ -20,6 +20,7 @@ import os
 import platform
 import threading
 import time
+from typing import Dict, Union
 
 import six
 
@@ -42,9 +43,7 @@ logger = logging.getLogger(__name__)
 METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
-all_metrics = []
-all_collectors = []
-all_gauges = {}
+all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge, BucketCollector]]
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 

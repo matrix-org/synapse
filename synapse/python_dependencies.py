@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from typing import Set
 
 from pkg_resources import (
     DistributionNotFound,
@@ -97,7 +98,7 @@ CONDITIONAL_REQUIREMENTS = {
     "jwt": ["pyjwt>=1.6.4"],
 }
 
-ALL_OPTIONAL_REQUIREMENTS = set()
+ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
@@ -174,8 +175,8 @@ def check_requirements(for_feature=None):
                 pass
 
     if deps_needed:
-        for e in errors:
-            logging.error(e)
+        for err in errors:
+            logging.error(err)
 
         raise DependencyException(deps_needed)
 

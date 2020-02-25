@@ -23,10 +23,10 @@ from synapse.logging._structured import setup_structured_logging
 from tests.server import connect_client
 from tests.unittest import HomeserverTestCase
 
-from .test_structured import FakeBeginner
+from .test_structured import FakeBeginner, StructuredLoggingTestBase
 
 
-class TerseJSONTCPTestCase(HomeserverTestCase):
+class TerseJSONTCPTestCase(StructuredLoggingTestBase, HomeserverTestCase):
     def test_log_output(self):
         """
         The Terse JSON outputter delivers simplified structured logs over TCP.
