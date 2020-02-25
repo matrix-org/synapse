@@ -16,7 +16,6 @@
 # limitations under the License.
 import logging
 import time
-# on python 3, use time.monotonic, since time.clock can go backwards
 from time import monotonic as monotonic_time
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple
 
