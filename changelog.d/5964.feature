@@ -1,1 +1,0 @@
-Remove `bind_email` and `bind_msisdn` parameters from /register ala MSC2140.

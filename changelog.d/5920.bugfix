@@ -1,1 +1,0 @@
-Fix a cache-invalidation bug for worker-based deployments.

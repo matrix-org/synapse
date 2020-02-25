@@ -1,1 +1,0 @@
-Return a M_MISSING_PARAM if `sid` is not provided to `/account/3pid`.
