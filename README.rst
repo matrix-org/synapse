@@ -381,3 +381,16 @@ indicate that your server is also issuing far more outgoing federation
 requests than can be accounted for by your users' activity, this is a
 likely cause. The misbehavior can be worked around by setting
 ``use_presence: false`` in the Synapse config file.
+
+People can't accept room invitations from me
+--------------------------------------------
+
+The typical failure mode here is that you send an invitation to someone 
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of "Invalid signature"). They might see
+something like the following in their logs::
+
+    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
+
+This is normally caused by a misconfiguration in your reverse-proxy. See
+`<docs/reverse_proxy.rst>`_ and double-check that your settings are correct.
