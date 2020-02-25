@@ -1,0 +1,1 @@
+Only count real users when checking for auto-creation of auto-join room.
