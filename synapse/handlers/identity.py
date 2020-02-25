@@ -167,6 +167,12 @@ class IdentityHandler(BaseHandler):
             creds
         )
 
+        sid = creds.get("sid")
+        if not sid:
+            raise SynapseError(
+                400, "No sid in three_pid_creds", errcode=Codes.MISSING_PARAM
+            )
+
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
             use_v2 = False
@@ -180,7 +186,7 @@ class IdentityHandler(BaseHandler):
             id_server_host = id_server
 
         # Decide which API endpoint URLs to use
-        bind_data = {"sid": creds["sid"], "client_secret": client_secret, "mxid": mxid}
+        bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         if use_v2:
             bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server_host,)
             bind_data["id_access_token"] = id_access_token
