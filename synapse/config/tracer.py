@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.python_dependencies import DependencyException, check_requirements
+
 from ._base import Config, ConfigError
 
 
@@ -31,6 +33,11 @@ class TracerConfig(Config):
 
         if not self.opentracer_enabled:
             return
+
+        try:
+            check_requirements("opentracing")
+        except DependencyException as e:
+            raise ConfigError(e.message)
 
         # The tracer is enabled so sanitize the config
 
