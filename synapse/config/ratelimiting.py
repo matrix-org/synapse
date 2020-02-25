@@ -83,6 +83,12 @@ class RatelimitConfig(Config):
             "federation_rr_transactions_per_room_per_second", 50
         )
 
+        rc_admin_redaction = config.get("rc_admin_redaction")
+        if rc_admin_redaction:
+            self.rc_admin_redaction = RateLimitConfig(rc_admin_redaction)
+        else:
+            self.rc_admin_redaction = None
+
     def generate_config_section(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -107,6 +113,9 @@ class RatelimitConfig(Config):
         #     attempts for this account.
         #   - one that ratelimits third-party invites requests based on the account
         #     that's making the requests.
+        #   - one for ratelimiting redactions by room admins. If this is not explicitly
+        #     set then it uses the same ratelimiting as per rc_message. This is useful
+        #     to allow room admins to deal with abuse quickly.
         #
         # The defaults are as shown below.
         #
@@ -132,6 +141,10 @@ class RatelimitConfig(Config):
         #rc_third_party_invite:
         #  per_second: 0.2
         #  burst_count: 10
+        #
+        #rc_admin_redaction:
+        #  per_second: 1
+        #  burst_count: 50
 
 
         # Ratelimiting settings for incoming federation
