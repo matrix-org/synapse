@@ -21,6 +21,7 @@ from typing import List
 
 from twisted.internet import defer
 
+from synapse import event_auth
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
@@ -191,9 +192,7 @@ class DirectoryHandler(BaseHandler):
         room_id = yield self._delete_association(room_alias)
 
         try:
-            yield self._update_canonical_alias(
-                requester, user_id, room_id, room_alias
-            )
+            yield self._update_canonical_alias(requester, user_id, room_id, room_alias)
         except AuthError as e:
             logger.info("Failed to update alias events: %s", e)
 
@@ -363,13 +362,47 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
+        """Determine with a user can delete an alias.
+
+        One of the following must be true:
+
+        1. The user created the alias.
+        2. The user is a server administrator.
+        3. The user has a power-level sufficient to send a canonical alias event
+           for the current room.
+
+        """
         creator = yield self.store.get_room_alias_creator(alias.to_string())
 
         if creator is not None and creator == user_id:
             return True
 
         is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
-        return is_admin
+        if is_admin:
+            return True
+
+        # Resolve the alias to the corresponding room.
+        room_mapping = yield self.get_association(alias)
+        room_id = room_mapping["room_id"]
+        if not room_id:
+            return False
+
+        # Check if the user has sufficient power-level to send a canonical alias
+        # event.
+        power_level_event = yield self.state.get_current_state(
+            room_id, EventTypes.PowerLevels, ""
+        )
+
+        auth_events = {}
+        if power_level_event:
+            auth_events[(EventTypes.PowerLevels, "")] = power_level_event
+
+        send_level = event_auth.get_send_level(
+            EventTypes.CanonicalAlias, "", power_level_event
+        )
+        user_level = event_auth.get_user_power_level(user_id, auth_events)
+
+        return user_level >= send_level
 
     @defer.inlineCallbacks
     def edit_published_room_list(self, requester, room_id, visibility):
