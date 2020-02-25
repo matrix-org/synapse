@@ -73,12 +73,11 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         # Make sure processing the mocked response goes through.
         data = self.get_success(
             handler.bind_threepid(
-                {
-                    "id_server": self.is_server_name,
-                    "client_secret": creds["client_secret"],
-                    "sid": creds["sid"],
-                },
-                self.user_id,
+                client_secret=creds["client_secret"],
+                sid=creds["sid"],
+                mxid=self.user_id,
+                id_server=self.is_server_name,
+                use_v2=False,
             )
         )
         self.assertEqual(data.get("address"), self.address)
