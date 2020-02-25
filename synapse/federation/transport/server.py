@@ -165,7 +165,7 @@ class Authenticator(object):
     async def _reset_retry_timings(self, origin):
         try:
             logger.info("Marking origin %r as up", origin)
-            await self.store.set_destination_retry_timings(origin, 0, 0)
+            await self.store.set_destination_retry_timings(origin, None, 0, 0)
         except Exception:
             logger.exception("Error resetting retry timings on %s", origin)
 
