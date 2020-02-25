@@ -25,7 +25,6 @@ from synapse.logging.opentracing import (
     log_kv,
     set_tag,
     start_active_span,
-    whitelisted_homeserver,
 )
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.stringutils import random_string
@@ -121,9 +120,7 @@ class DeviceMessageHandler(object):
                     "sender": sender_user_id,
                     "type": message_type,
                     "message_id": message_id,
-                    "org.matrix.opentracing_context": json.dumps(context)
-                    if whitelisted_homeserver(destination)
-                    else None,
+                    "org.matrix.opentracing_context": json.dumps(context),
                 }
 
         log_kv({"local_messages": local_messages})

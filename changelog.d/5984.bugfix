@@ -1,0 +1,1 @@
+Fix sending of EDUs when opentracing is enabled with an empty whitelist.
