@@ -21,8 +21,12 @@ from tests import unittest
 
 # The expected number of state events in a fresh public room.
 EXPT_NUM_STATE_EVTS_IN_FRESH_PUBLIC_ROOM = 5
+
 # The expected number of state events in a fresh private room.
-EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM = 6
+#
+# Note: we increase this by 1 on the dinsic branch as we send
+# a "im.vector.room.access_rules" state event into new private rooms
+EXPT_NUM_STATE_EVTS_IN_FRESH_PRIVATE_ROOM = 7
 
 
 class StatsRoomTests(unittest.HomeserverTestCase):
@@ -631,6 +635,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertEqual(u1stats["joined_rooms"], 1)
 
+    @unittest.DEBUG
     def test_incomplete_stats(self):
         """
         This tests that we track incomplete statistics.
