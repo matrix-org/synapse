@@ -493,6 +493,11 @@ def inject_active_span_twisted_headers(headers, destination, check_destination=T
 
     Args:
         headers (twisted.web.http_headers.Headers)
+        destination (str): address of entity receiving the span context. If check_destination
+            is true the context will only be injected if the destination matches the
+            opentracing whitelist
+        check_destination (bool): If false, destination will be ignored and the context
+            will always be injected.
         span (opentracing.Span)
 
     Returns:
@@ -525,6 +530,11 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
 
     Args:
         headers (dict)
+        destination (str): address of entity receiving the span context. If check_destination
+            is true the context will only be injected if the destination matches the
+            opentracing whitelist
+        check_destination (bool): If false, destination will be ignored and the context
+            will always be injected.
         span (opentracing.Span)
 
     Returns:
@@ -537,7 +547,7 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
         here:
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
-    if not whitelisted_homeserver(destination):
+    if check_destination and not whitelisted_homeserver(destination):
         return
 
     span = opentracing.tracer.active_span
@@ -556,9 +566,11 @@ def inject_active_span_text_map(carrier, destination, check_destination=True):
 
     Args:
         carrier (dict)
-        destination (str): the name of the remote server. The span context
-        will only be injected if the destination matches the homeserver_whitelist
-        or destination is None.
+        destination (str): address of entity receiving the span context. If check_destination
+            is true the context will only be injected if the destination matches the
+            opentracing whitelist
+        check_destination (bool): If false, destination will be ignored and the context
+            will always be injected.
 
     Returns:
         In-place modification of carrier
