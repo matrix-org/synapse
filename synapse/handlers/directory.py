@@ -17,7 +17,7 @@
 import collections
 import logging
 import string
-from typing import List
+from typing import Iterable, List, Optional
 
 from twisted.internet import defer
 
@@ -31,6 +31,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
+from synapse.appservice import ApplicationService
 from synapse.types import Requester, RoomAlias, UserID, get_domain_from_id
 
 from ._base import BaseHandler
@@ -58,7 +59,13 @@ class DirectoryHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
 
     @defer.inlineCallbacks
-    def _create_association(self, room_alias, room_id, servers=None, creator=None):
+    def _create_association(
+        self,
+        room_alias: RoomAlias,
+        room_id: str,
+        servers: Optional[Iterable[str]] = None,
+        creator: Optional[str] = None,
+    ):
         # general association creation for both human users and app services
 
         for wchar in string.whitespace:
@@ -84,17 +91,21 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def create_association(
-        self, requester, room_alias, room_id, servers=None, check_membership=True,
+        self,
+        requester: Requester,
+        room_alias: RoomAlias,
+        room_id: str,
+        servers: Optional[List[str]] = None,
+        check_membership: bool = True,
     ):
         """Attempt to create a new alias
 
         Args:
-            requester (Requester)
-            room_alias (RoomAlias)
-            room_id (str)
-            servers (list[str]|None): List of servers that others servers
-                should try and join via
-            check_membership (bool): Whether to check if the user is in the room
+            requester
+            room_alias
+            room_id
+            servers: Iterable of servers that others servers should try and join via
+            check_membership: Whether to check if the user is in the room
                 before the alias can be set (if the server's config requires it).
 
         Returns:
@@ -199,7 +210,9 @@ class DirectoryHandler(BaseHandler):
         return room_id
 
     @defer.inlineCallbacks
-    def delete_appservice_association(self, service, room_alias):
+    def delete_appservice_association(
+        self, service: ApplicationService, room_alias: RoomAlias
+    ):
         if not service.is_interested_in_alias(room_alias.to_string()):
             raise SynapseError(
                 400,
@@ -218,7 +231,7 @@ class DirectoryHandler(BaseHandler):
         return room_id
 
     @defer.inlineCallbacks
-    def get_association(self, room_alias):
+    def get_association(self, room_alias: RoomAlias):
         room_id = None
         if self.hs.is_mine(room_alias):
             result = yield self.get_association_from_room_alias(room_alias)
@@ -332,7 +345,7 @@ class DirectoryHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def get_association_from_room_alias(self, room_alias):
+    def get_association_from_room_alias(self, room_alias: RoomAlias):
         result = yield self.store.get_association_from_room_alias(room_alias)
         if not result:
             # Query AS to see if it exists
@@ -340,7 +353,7 @@ class DirectoryHandler(BaseHandler):
             result = yield as_handler.query_room_alias_exists(room_alias)
         return result
 
-    def can_modify_alias(self, alias: RoomAlias, user_id: str = None):
+    def can_modify_alias(self, alias: RoomAlias, user_id: Optional[str] = None):
         # Any application service "interested" in an alias they are regexing on
         # can modify the alias.
         # Users can only modify the alias if ALL the interested services have
@@ -405,12 +418,14 @@ class DirectoryHandler(BaseHandler):
         return user_level >= send_level
 
     @defer.inlineCallbacks
-    def edit_published_room_list(self, requester, room_id, visibility):
+    def edit_published_room_list(
+        self, requester: Requester, room_id: str, visibility: str
+    ):
         """Edit the entry of the room in the published room list.
 
         requester
-        room_id (str)
-        visibility (str): "public" or "private"
+        room_id
+        visibility: "public" or "private"
         """
         user_id = requester.user.to_string()
 
@@ -456,16 +471,16 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def edit_published_appservice_room_list(
-        self, appservice_id, network_id, room_id, visibility
+        self, appservice_id: str, network_id: str, room_id: str, visibility: str
     ):
         """Add or remove a room from the appservice/network specific public
         room list.
 
         Args:
-            appservice_id (str): ID of the appservice that owns the list
-            network_id (str): The ID of the network the list is associated with
-            room_id (str)
-            visibility (str): either "public" or "private"
+            appservice_id: ID of the appservice that owns the list
+            network_id: The ID of the network the list is associated with
+            room_id
+            visibility: either "public" or "private"
         """
         if visibility not in ["public", "private"]:
             raise SynapseError(400, "Invalid visibility setting")
