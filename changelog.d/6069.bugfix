@@ -1,0 +1,1 @@
+Fix a bug which caused SAML attribute maps to be overridden by defaults.

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +13,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.util.module_loader import load_python_module
 
 from ._base import Config, ConfigError
+
+
+def _dict_merge(merge_dict, into_dict):
+    """Do a deep merge of two dicts
+
+    Recursively merges `merge_dict` into `into_dict`:
+      * For keys where both `merge_dict` and `into_dict` have a dict value, the values
+        are recursively merged
+      * For all other keys, the values in `into_dict` (if any) are overwritten with
+        the value from `merge_dict`.
+
+    Args:
+        merge_dict (dict): dict to merge
+        into_dict (dict): target dict
+    """
+    for k, v in merge_dict.items():
+        if k not in into_dict:
+            into_dict[k] = v
+            continue
+
+        current_val = into_dict[k]
+
+        if isinstance(v, dict) and isinstance(current_val, dict):
+            _dict_merge(v, current_val)
+            continue
+
+        # otherwise we just overwrite
+        into_dict[k] = v
 
 
 class SAML2Config(Config):
@@ -36,15 +67,20 @@ class SAML2Config(Config):
 
         self.saml2_enabled = True
 
-        import saml2.config
-
-        self.saml2_sp_config = saml2.config.SPConfig()
-        self.saml2_sp_config.load(self._default_saml_config_dict())
-        self.saml2_sp_config.load(saml2_config.get("sp_config", {}))
+        saml2_config_dict = self._default_saml_config_dict()
+        _dict_merge(
+            merge_dict=saml2_config.get("sp_config", {}), into_dict=saml2_config_dict
+        )
 
         config_path = saml2_config.get("config_path", None)
         if config_path is not None:
-            self.saml2_sp_config.load_file(config_path)
+            mod = load_python_module(config_path)
+            _dict_merge(merge_dict=mod.CONFIG, into_dict=saml2_config_dict)
+
+        import saml2.config
+
+        self.saml2_sp_config = saml2.config.SPConfig()
+        self.saml2_sp_config.load(saml2_config_dict)
 
         # session lifetime: in milliseconds
         self.saml2_session_lifetime = self.parse_duration(
