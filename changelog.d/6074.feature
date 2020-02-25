@@ -1,0 +1,1 @@
+Prevent password reset's submit_token endpoint from accepting trailing slashes.
