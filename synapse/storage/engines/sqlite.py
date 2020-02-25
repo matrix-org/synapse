@@ -12,16 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import sqlite3
 import struct
 import threading
 
 from synapse.storage.engines import BaseDatabaseEngine
 
 
-class Sqlite3Engine(BaseDatabaseEngine):
-    single_threaded = True
-
+class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
     def __init__(self, database_module, database_config):
         super().__init__(database_module, database_config)
 
@@ -32,6 +30,10 @@ class Sqlite3Engine(BaseDatabaseEngine):
         # in the DB yet.
         self._current_state_group_id = None
         self._current_state_group_id_lock = threading.Lock()
+
+    @property
+    def single_threaded(self) -> bool:
+        return True
 
     @property
     def can_native_upsert(self):
@@ -70,7 +72,6 @@ class Sqlite3Engine(BaseDatabaseEngine):
         return sql
 
     def on_new_connection(self, db_conn):
-
         # We need to import here to avoid an import loop.
         from synapse.storage.prepare_database import prepare_database
 

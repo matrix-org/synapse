@@ -13,39 +13,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import abc
+from typing import Generic, TypeVar
+
+from synapse.storage.types import Connection
 
 
 class IncorrectDatabaseSetup(RuntimeError):
     pass
 
 
-class BaseDatabaseEngine(metaclass=abc.ABCMeta):
+ConnectionType = TypeVar("ConnectionType", bound=Connection)
+
+
+class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
     def __init__(self, module, database_config: dict):
         self.module = module
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def single_threaded(self) -> bool:
         ...
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def can_native_upsert(self) -> bool:
         """
         Do we support native UPSERTs?
         """
         ...
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def supports_tuple_comparison(self) -> bool:
         """
         Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
         """
         ...
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def supports_using_any_list(self) -> bool:
         """
         Do we support using `a = ANY(?)` and passing a list
@@ -53,7 +59,9 @@ class BaseDatabaseEngine(metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def check_database(self, db_conn, allow_outdated_version: bool = False) -> None:
+    def check_database(
+        self, db_conn: ConnectionType, allow_outdated_version: bool = False
+    ) -> None:
         ...
 
     @abc.abstractmethod
@@ -68,7 +76,7 @@ class BaseDatabaseEngine(metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def on_new_connection(self, db_conn) -> None:
+    def on_new_connection(self, db_conn: ConnectionType) -> None:
         ...
 
     @abc.abstractmethod
@@ -76,7 +84,7 @@ class BaseDatabaseEngine(metaclass=abc.ABCMeta):
         ...
 
     @abc.abstractmethod
-    def is_connection_closed(self, conn) -> bool:
+    def is_connection_closed(self, conn: ConnectionType) -> bool:
         ...
 
     @abc.abstractmethod
@@ -89,8 +97,8 @@ class BaseDatabaseEngine(metaclass=abc.ABCMeta):
         """
         ...
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def server_version(self) -> str:
         """Gets a string giving the server version. For example: '3.22.0'
         """
