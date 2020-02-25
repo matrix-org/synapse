@@ -1,0 +1,1 @@
+Change mailer logging to reflect Synapse doesn't just do chat notifications by email now.
