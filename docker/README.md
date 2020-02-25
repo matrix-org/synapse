@@ -89,6 +89,8 @@ The following environment variables are supported in run mode:
   `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the config file. Defaults to
   `<SYNAPSE_CONFIG_DIR>/homeserver.yaml`.
+* `SYNAPSE_WORKER`: module to execute, used when running synapse with workers.
+   Defaults to `synapse.app.homeserver`, which is suitable for non-worker mode.
 * `UID`, `GID`: the user and group id to run Synapse as. Defaults to `991`, `991`.
 * `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
 

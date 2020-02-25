@@ -182,6 +182,7 @@ def main(args, environ):
     mode = args[1] if len(args) > 1 else None
     desired_uid = int(environ.get("UID", "991"))
     desired_gid = int(environ.get("GID", "991"))
+    synapse_worker = environ.get("SYNAPSE_WORKER", "synapse.app.homeserver")
     if (desired_uid == os.getuid()) and (desired_gid == os.getgid()):
         ownership = None
     else:
@@ -245,7 +246,7 @@ def main(args, environ):
 
     log("Starting synapse with config file " + config_path)
 
-    args = ["python", "-m", "synapse.app.homeserver", "--config-path", config_path]
+    args = ["python", "-m", synapse_worker, "--config-path", config_path]
     if ownership is not None:
         args = ["su-exec", ownership] + args
         os.execv("/sbin/su-exec", args)
