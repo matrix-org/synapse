@@ -29,11 +29,13 @@ from prometheus_client.core import REGISTRY, GaugeMetricFamily, HistogramMetricF
 
 from twisted.internet import reactor
 
+import synapse
 from synapse.metrics._exposition import (
     MetricsResource,
     generate_latest,
     start_http_server,
 )
+from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
 
@@ -384,6 +386,16 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # between the last processed event's received_ts and the time it was
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
+
+# Build info of the running server.
+build_info = Gauge(
+    "synapse_build_info", "Build information", ["pythonversion", "version", "osversion"]
+)
+build_info.labels(
+    " ".join([platform.python_implementation(), platform.python_version()]),
+    get_version_string(synapse),
+    " ".join([platform.system(), platform.release()]),
+).set(1)
 
 last_ticked = time.time()
 
