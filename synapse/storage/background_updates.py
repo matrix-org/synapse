@@ -140,13 +140,33 @@ class BackgroundUpdateStore(SQLBaseStore):
             "background_updates",
             keyvalues=None,
             retcol="1",
-            desc="check_background_updates",
+            desc="has_completed_background_updates",
         )
         if not updates:
             self._all_done = True
             return True
 
         return False
+
+    async def has_completed_background_update(self, update_name) -> bool:
+        """Check if the given background update has finished running.
+        """
+
+        if self._all_done:
+            return True
+
+        if update_name in self._background_update_queue:
+            return False
+
+        update_exists = await self._simple_select_one_onecol(
+            "background_updates",
+            keyvalues={"update_name": update_name},
+            retcol="1",
+            desc="has_completed_background_update",
+            allow_none=True,
+        )
+
+        return not update_exists
 
     @defer.inlineCallbacks
     def do_next_background_update(self, desired_duration_ms):

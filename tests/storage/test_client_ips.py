@@ -279,6 +279,77 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             r,
         )
 
+    def test_old_user_ips_pruned(self):
+        # First make sure we have completed all updates.
+        while not self.get_success(self.store.has_completed_background_updates()):
+            self.get_success(self.store.do_next_background_update(100), by=0.1)
+
+        # Insert a user IP
+        user_id = "@user:id"
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", "device_id"
+            )
+        )
+
+        # Force persisting to disk
+        self.reactor.advance(200)
+
+        # We should see that in the DB
+        result = self.get_success(
+            self.store._simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": user_id},
+                retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "device_id": "device_id",
+                    "last_seen": 0,
+                }
+            ],
+        )
+
+        # Now advance by a couple of months
+        self.reactor.advance(60 * 24 * 60 * 60)
+
+        # We should get no results.
+        result = self.get_success(
+            self.store._simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": user_id},
+                retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
+
+        self.assertEqual(result, [])
+
+        # But we should still get the correct values for the device
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, "device_id")
+        )
+
+        r = result[(user_id, "device_id")]
+        self.assertDictContainsSubset(
+            {
+                "user_id": user_id,
+                "device_id": "device_id",
+                "ip": "ip",
+                "user_agent": "user_agent",
+                "last_seen": 0,
+            },
+            r,
+        )
+
 
 class ClientIpAuthTestCase(unittest.HomeserverTestCase):
 
