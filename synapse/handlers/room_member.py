@@ -37,6 +37,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.handlers.identity import LookupAlgorithm, create_id_access_token_header
+from synapse.http.client import SimpleHttpClient
 from synapse.types import RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -66,7 +67,11 @@ class RoomMemberHandler(object):
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
-        self.simple_http_client = hs.get_simple_http_client()
+        # We create a blacklisting instance of SimpleHttpClient for contacting identity
+        # servers specified by clients
+        self.simple_http_client = SimpleHttpClient(
+            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
+        )
 
         self.federation_handler = hs.get_handlers().federation_handler
         self.directory_handler = hs.get_handlers().directory_handler

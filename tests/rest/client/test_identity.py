@@ -131,6 +131,14 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
+        # Replace the blacklisting SimpleHttpClient with our mock
+        self.hs.get_room_member_handler().simple_http_client = Mock(
+            spec=["get_json", "post_json_get_json"]
+        )
+        self.hs.get_room_member_handler().simple_http_client.get_json.return_value = (
+            defer.succeed((200, "{}"))
+        )
+
         params = {
             "id_server": "testis",
             "medium": "email",
@@ -143,7 +151,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
 
-        get_json = self.hs.get_simple_http_client().get_json
+        get_json = self.hs.get_room_member_handler().simple_http_client.get_json
         get_json.assert_called_once_with(
             "https://testis/_matrix/identity/api/v1/lookup",
             {"address": "test@example.com", "medium": "email"},

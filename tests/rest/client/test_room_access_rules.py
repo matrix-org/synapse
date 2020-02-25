@@ -96,6 +96,11 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             simple_http_client=mock_http_client,
         )
 
+        # TODO: This class does not use a singleton to get it's http client
+        # This should be fixed for easier testing
+        # https://github.com/matrix-org/synapse-dinsic/issues/26
+        self.hs.get_room_member_handler().simple_http_client = mock_http_client
+
         return self.hs
 
     def prepare(self, reactor, clock, homeserver):

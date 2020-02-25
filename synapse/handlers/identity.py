@@ -36,6 +36,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.http.client import SimpleHttpClient
 from synapse.util.stringutils import random_string
 
 from ._base import BaseHandler
@@ -49,6 +50,11 @@ class IdentityHandler(BaseHandler):
 
         self.hs = hs
         self.http_client = hs.get_simple_http_client()
+        # We create a blacklisting instance of SimpleHttpClient for contacting identity
+        # servers specified by clients
+        self.blacklisting_http_client = SimpleHttpClient(
+            hs, ip_blacklist=hs.config.federation_ip_range_blacklist
+        )
         self.federation_http_client = hs.get_http_client()
 
         self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
@@ -173,7 +179,9 @@ class IdentityHandler(BaseHandler):
             bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server_host,)
 
         try:
-            data = yield self.http_client.post_json_get_json(
+            # Use the blacklisting http client as this call is only to identity servers
+            # provided by a client
+            data = yield self.blacklisting_http_client.post_json_get_json(
                 bind_url, bind_data, headers=headers
             )
 
@@ -286,7 +294,11 @@ class IdentityHandler(BaseHandler):
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
 
         try:
-            yield self.http_client.post_json_get_json(url, content, headers)
+            # Use the blacklisting http client as this call is only to identity servers
+            # provided by a client
+            yield self.blacklisting_http_client.post_json_get_json(
+                url, content, headers
+            )
             changed = True
         except HttpResponseException as e:
             changed = False

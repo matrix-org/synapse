@@ -43,13 +43,27 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
             self.is_server_name: self.rewritten_is_url
         }
 
-        mock_http_client = Mock(spec=["post_json_get_json"])
+        mock_http_client = Mock(spec=["get_json", "post_json_get_json"])
+        mock_http_client.get_json.side_effect = defer.succeed({})
         mock_http_client.post_json_get_json.return_value = defer.succeed(
             {"address": self.address, "medium": "email"}
         )
 
         self.hs = self.setup_test_homeserver(
             config=config, simple_http_client=mock_http_client
+        )
+
+        mock_blacklisting_http_client = Mock(spec=["get_json", "post_json_get_json"])
+        mock_blacklisting_http_client.get_json.side_effect = defer.succeed({})
+        mock_blacklisting_http_client.post_json_get_json.return_value = defer.succeed(
+            {"address": self.address, "medium": "email"}
+        )
+
+        # TODO: This class does not use a singleton to get it's http client
+        # This should be fixed for easier testing
+        # https://github.com/matrix-org/synapse-dinsic/issues/26
+        self.hs.get_handlers().identity_handler.blacklisting_http_client = (
+            mock_blacklisting_http_client
         )
 
         return self.hs
@@ -65,7 +79,7 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
         * the original, non-rewritten, server name is stored in the database
         """
         handler = self.hs.get_handlers().identity_handler
-        post_json_get_json = self.hs.get_simple_http_client().post_json_get_json
+        post_json_get_json = handler.blacklisting_http_client.post_json_get_json
         store = self.hs.get_datastore()
 
         creds = {"sid": "123", "client_secret": "some_secret"}
