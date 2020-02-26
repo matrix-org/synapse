@@ -56,15 +56,15 @@ class UserErasureWorkerStore(SQLBaseStore):
         # iterate it multiple times, and (b) avoiding duplicates.
         user_ids = tuple(set(user_ids))
 
-        def _get_erased_users(txn):
-            txn.execute(
-                "SELECT user_id FROM erased_users WHERE user_id IN (%s)"
-                % (",".join("?" * len(user_ids))),
-                user_ids,
-            )
-            return set(r[0] for r in txn)
+        rows = yield self._simple_select_many_batch(
+            table="erased_users",
+            column="user_id",
+            iterable=user_ids,
+            retcols=("user_id",),
+            desc="are_users_erased",
+        )
+        erased_users = set(row["user_id"] for row in rows)
 
-        erased_users = yield self.runInteraction("are_users_erased", _get_erased_users)
         res = dict((u, u in erased_users) for u in user_ids)
         return res
 
