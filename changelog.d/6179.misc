@@ -1,0 +1,1 @@
+Remove unused `timeout` parameter from `_get_public_room_list`.
