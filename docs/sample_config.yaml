@@ -1409,10 +1409,6 @@ email:
   #
   #require_transport_security: true
 
-  # Enable sending emails for messages that the user has missed
-  #
-  #enable_notifs: false
-
   # notif_from defines the "From" address to use when sending emails.
   # It must be set if email sending is enabled.
   #
@@ -1429,6 +1425,11 @@ email:
   # defaults to 'Matrix'.
   #
   #app_name: my_branded_matrix_server
+
+  # Uncomment the following to enable sending emails for messages that the user
+  # has missed. Disabled by default.
+  #
+  #enable_notifs: true
 
   # Uncomment the following to disable automatic subscription to email
   # notifications for new users. Enabled by default.

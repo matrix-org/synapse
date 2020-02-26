@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.app.frontend_proxy import FrontendProxyServer
+from synapse.app.generic_worker import GenericWorkerServer
 
 from tests.unittest import HomeserverTestCase
 
@@ -22,7 +22,7 @@ class FrontendProxyTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=FrontendProxyServer
+            http_client=None, homeserverToUse=GenericWorkerServer
         )
 
         return hs
@@ -46,9 +46,7 @@ class FrontendProxyTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
-        self.resource = (
-            site.resource.children[b"_matrix"].children[b"client"].children[b"r0"]
-        )
+        self.resource = site.resource.children[b"_matrix"].children[b"client"]
 
         request, channel = self.make_request("PUT", "presence/a/status")
         self.render(request)
@@ -76,9 +74,7 @@ class FrontendProxyTests(HomeserverTestCase):
         # Grab the resource from the site that was told to listen
         self.assertEqual(len(self.reactor.tcpServers), 1)
         site = self.reactor.tcpServers[0][1]
-        self.resource = (
-            site.resource.children[b"_matrix"].children[b"client"].children[b"r0"]
-        )
+        self.resource = site.resource.children[b"_matrix"].children[b"client"]
 
         request, channel = self.make_request("PUT", "presence/a/status")
         self.render(request)
