@@ -36,7 +36,6 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.crypto.event_signing import compute_event_signature
 from synapse.events import room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
@@ -321,18 +320,6 @@ class FederationServer(FederationBase):
     def _on_context_state_request_compute(self, room_id, event_id):
         pdus = yield self.handler.get_state_for_pdu(room_id, event_id)
         auth_chain = yield self.store.get_auth_chain([pdu.event_id for pdu in pdus])
-
-        for event in auth_chain:
-            # We sign these again because there was a bug where we
-            # incorrectly signed things the first time round
-            if self.hs.is_mine_id(event.event_id):
-                event.signatures.update(
-                    compute_event_signature(
-                        event.get_pdu_json(),
-                        self.hs.hostname,
-                        self.hs.config.signing_key[0],
-                    )
-                )
 
         return {
             "pdus": [pdu.get_pdu_json() for pdu in pdus],
