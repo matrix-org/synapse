@@ -1,0 +1,1 @@
+Properly handle the result of FederationClient.get_pdu as a coroutine.
