@@ -470,57 +470,6 @@ class FederationServer(FederationBase):
             res = {"auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus]}
         return 200, res
 
-    async def on_query_auth_request(self, origin, content, room_id, event_id):
-        """
-        Content is a dict with keys::
-            auth_chain (list): A list of events that give the auth chain.
-            missing (list): A list of event_ids indicating what the other
-              side (`origin`) think we're missing.
-            rejects (dict): A mapping from event_id to a 2-tuple of reason
-              string and a proof (or None) of why the event was rejected.
-              The keys of this dict give the list of events the `origin` has
-              rejected.
-
-        Args:
-            origin (str)
-            content (dict)
-            event_id (str)
-
-        Returns:
-            Deferred: Results in `dict` with the same format as `content`
-        """
-        with (await self._server_linearizer.queue((origin, room_id))):
-            origin_host, _ = parse_server_name(origin)
-            await self.check_server_matches_acl(origin_host, room_id)
-
-            room_version = await self.store.get_room_version(room_id)
-
-            auth_chain = [
-                event_from_pdu_json(e, room_version) for e in content["auth_chain"]
-            ]
-
-            signed_auth = await self._check_sigs_and_hash_and_fetch(
-                origin, auth_chain, outlier=True, room_version=room_version.identifier
-            )
-
-            ret = await self.handler.on_query_auth(
-                origin,
-                event_id,
-                room_id,
-                signed_auth,
-                content.get("rejects", []),
-                content.get("missing", []),
-            )
-
-            time_now = self._clock.time_msec()
-            send_content = {
-                "auth_chain": [e.get_pdu_json(time_now) for e in ret["auth_chain"]],
-                "rejects": ret.get("rejects", []),
-                "missing": ret.get("missing", []),
-            }
-
-        return 200, send_content
-
     @log_function
     def on_query_client_keys(self, origin, content):
         return self.on_query_request("client_keys", content)
