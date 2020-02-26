@@ -1,0 +1,1 @@
+Make `version` optional in body of `PUT /room_keys/version/{version}`, since it's redundant.
