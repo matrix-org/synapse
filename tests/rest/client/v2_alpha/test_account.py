@@ -248,28 +248,14 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver()
-        return hs
+        self.hs = self.setup_test_homeserver()
+        return self.hs
 
     def test_deactivate_account(self):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
-        request_data = json.dumps(
-            {
-                "auth": {
-                    "type": "m.login.password",
-                    "user": user_id,
-                    "password": "test",
-                },
-                "erase": False,
-            }
-        )
-        request, channel = self.make_request(
-            "POST", "account/deactivate", request_data, access_token=tok
-        )
-        self.render(request)
-        self.assertEqual(request.code, 200)
+        self.deactivate(user_id, tok)
 
         store = self.hs.get_datastore()
 
