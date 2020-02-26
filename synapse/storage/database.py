@@ -99,11 +99,12 @@ def make_conn(
     return db_conn
 
 
-# the type of entry which goes on our after_callbacks ane exception_callbacks lists
-_CallbackType = Tuple[Callable[..., None], Iterable[Any], Dict[str, Any]]
+# the type of entry which goes on our after_callbacks and exception_callbacks lists
+# use of a string here because python 3.5.2 doesn't support Callable([...]).
+_CallbackListEntry = Tuple["Callable[..., None]", Iterable[Any], Dict[str, Any]]
 
 
-class LoggingTransaction(Cursor):
+class LoggingTransaction:
     """An object that almost-transparently proxies for the 'txn' object
     passed to the constructor. Adds logging and metrics to the .execute()
     method.
@@ -135,8 +136,8 @@ class LoggingTransaction(Cursor):
         txn: Cursor,
         name: str,
         database_engine: BaseDatabaseEngine,
-        after_callbacks: Optional[List[_CallbackType]] = None,
-        exception_callbacks: Optional[List[_CallbackType]] = None,
+        after_callbacks: Optional[List[_CallbackListEntry]] = None,
+        exception_callbacks: Optional[List[_CallbackListEntry]] = None,
     ):
         self.txn = txn
         self.name = name
@@ -144,7 +145,7 @@ class LoggingTransaction(Cursor):
         self.after_callbacks = after_callbacks
         self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback: Callable[..., None], *args, **kwargs):
+    def call_after(self, callback: "Callable[..., None]", *args, **kwargs):
         """Call the given callback on the main twisted thread after the
         transaction has finished. Used to invalidate the caches on the
         correct thread.
@@ -152,7 +153,7 @@ class LoggingTransaction(Cursor):
         assert self.after_callbacks is not None
         self.after_callbacks.append((callback, args, kwargs))
 
-    def call_on_exception(self, callback: Callable[..., None], *args, **kwargs):
+    def call_on_exception(self, callback: "Callable[..., None]", *args, **kwargs):
         assert self.exception_callbacks is not None
         self.exception_callbacks.append((callback, args, kwargs))
 
@@ -217,6 +218,9 @@ class LoggingTransaction(Cursor):
             secs = time.time() - start
             sql_logger.debug("[SQL time] {%s} %f sec", self.name, secs)
             sql_query_timer.labels(sql.split()[0]).observe(secs)
+
+    def close(self):
+        self.txn.close()
 
 
 class PerformanceCounters(object):
@@ -491,8 +495,8 @@ class Database(object):
         Returns:
             Deferred: The result of func
         """
-        after_callbacks = []  # type: List[_CallbackType]
-        exception_callbacks = []  # type: List[_CallbackType]
+        after_callbacks = []  # type: List[_CallbackListEntry]
+        exception_callbacks = []  # type: List[_CallbackListEntry]
 
         if LoggingContext.current_context() == LoggingContext.sentinel:
             logger.warning("Starting db txn '%s' from sentinel context", desc)
