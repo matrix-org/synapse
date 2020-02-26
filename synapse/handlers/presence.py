@@ -29,6 +29,7 @@ from typing import Dict, List, Set
 from six import iteritems, itervalues
 
 from prometheus_client import Counter
+from typing_extensions import ContextManager
 
 from twisted.internet import defer
 
@@ -325,7 +326,7 @@ class PresenceHandler(object):
 
                 self._push_to_remotes(to_federation_ping.values())
 
-    def _handle_timeouts(self):
+    async def _handle_timeouts(self):
         """Checks the presence of users that have timed out and updates as
         appropriate.
         """
@@ -367,7 +368,7 @@ class PresenceHandler(object):
             now=now,
         )
 
-        return self._update_states(changes)
+        return await self._update_states(changes)
 
     async def bump_presence_active_time(self, user):
         """We've seen the user do something that indicates they're interacting
@@ -389,7 +390,9 @@ class PresenceHandler(object):
 
         await self._update_states([prev_state.copy_and_replace(**new_fields)])
 
-    async def user_syncing(self, user_id, affect_presence=True):
+    async def user_syncing(
+        self, user_id: str, affect_presence: bool = True
+    ) -> ContextManager[None]:
         """Returns a context manager that should surround any stream requests
         from the user.
 
@@ -1063,8 +1066,8 @@ class PresenceEventSource(object):
     def get_current_key(self):
         return self.store.get_current_presence_token()
 
-    def get_pagination_rows(self, user, pagination_config, key):
-        return self.get_new_events(user, from_key=None, include_offline=False)
+    async def get_pagination_rows(self, user, pagination_config, key):
+        return await self.get_new_events(user, from_key=None, include_offline=False)
 
     @cached(num_args=2, cache_context=True)
     async def _get_interested_in(self, user, explicit_room_id, cache_context):
