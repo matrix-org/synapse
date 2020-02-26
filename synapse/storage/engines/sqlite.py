@@ -38,6 +38,14 @@ class Sqlite3Engine(object):
         """
         return self.module.sqlite_version_info >= (3, 24, 0)
 
+    @property
+    def supports_tuple_comparison(self):
+        """
+        Do we support comparing tuples, i.e. `(a, b) > (c, d)`? This requires
+        SQLite 3.15+.
+        """
+        return self.module.sqlite_version_info >= (3, 15, 0)
+
     def check_database(self, txn):
         pass
 
