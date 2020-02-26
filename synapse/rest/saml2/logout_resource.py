@@ -25,7 +25,7 @@ class SAML2LogoutResource(DirectServeResource):
             request.redirect(logout_url)
             finish_request(request)
         elif b"SAMLResponse" in request.args:
-            self._saml_handler.handle_logout_response(request)
+            await self._saml_handler.handle_logout_response(request)
             respond_with_json(request, 200, {}, send_cors=True)
         else:
             request.setResponseCode(400)

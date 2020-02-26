@@ -20,6 +20,7 @@ import attr
 import saml2
 import saml2.response
 from saml2 import BINDING_HTTP_POST, BINDING_HTTP_REDIRECT
+from saml2.cache import TooOld
 from saml2.client import Saml2Client
 from saml2.ident import decode
 from saml2.s_utils import status_message_factory, success_status_factory
@@ -104,18 +105,30 @@ class SamlHandler:
         # this shouldn't happen!
         raise Exception("prepare_for_authenticate didn't return a Location header")
 
-    # User should have only one local session to only one entity
-    # But in case of crash we may have multiple sessions stored in the
-    # local cache. In that case we select the last session and remove
-    # other ones.
     def _find_session_from_user(self, username):
+        """Find the user local session in the SAML local cache.
+
+        A user should be logged into only one IdP/source; therefore only one session
+        should exist into the local cache. However in case of a code exception we may
+        have multiple sessions stored in the local cache. In that case we select the last
+        session and remove other ones.
+
+        Args:
+            username (bytes): the mxid localpart
+
+        Returns:
+            dict: last SAML session info of the username
+        """
         subjects = self._saml_client.users.subjects()
         sessions = []
         # Find all sessions for a specific subject
         for name_id in subjects:
             # We should always have one source only
             for source in self._saml_client.users.sources(name_id):
-                info = self._saml_client.users.get_info_from(name_id, source)
+                try:
+                    info = self._saml_client.users.get_info_from(name_id, source)
+                except TooOld:
+                    continue
                 # If the username is found, append the session info
                 if (
                     "ava" in info
@@ -137,12 +150,21 @@ class SamlHandler:
             return None
 
     def _find_mxid_from_name_id(self, name_id):
+        """Find a mxid for a SAML NameID.
+
+        Args:
+            name_id (NameID): a SAML Name ID instance
+
+        Returns:
+            bytes: a mxid localpart
+        """
         try:
             attributes = self._saml_client.users.get_identity(name_id)
+            mxid_attr = self._user_mapping_provider._mxid_source_attribute
             for attribute in attributes:
-                if self._mxid_source_attribute in attribute:
+                if mxid_attr in attribute:
                     return "@%s:%s" % (
-                        attribute[self._mxid_source_attribute][0],
+                        attribute[mxid_attr][0],
                         self._auth_handler.hs.hostname,
                     )
         except Exception:
@@ -150,6 +172,14 @@ class SamlHandler:
         return None
 
     async def _logout(self, mxid):
+        """Logout a user and all its device from the homeserver
+
+        Args:
+            mxid (bytes): the user mxid
+
+        Returns:
+            bytes: URL to redirect to
+        """
         # first delete all of the user's devices
         await self._device_handler.delete_all_devices_for_user(mxid)
 
@@ -157,44 +187,48 @@ class SamlHandler:
         # devices.
         await self._auth_handler.delete_access_tokens_for_user(mxid)
 
-    # Example: https://github.com/IdentityPython/pysaml2/blob/master/example/sp-wsgi/sp.py
     def create_logout_request(self, user, access_token):
         """Create a SAML logout request using HTTP redirect binding
 
+        Implements step 1 of the 'Single Logout Profile' specification: this
+        method will create the HTTP response to a call to /logout. The response is
+        an HTTP redirect to the IdP with a query string parameter called 'SAMLRequest'
+        containing a SAML logout request. This way of communicating between the IdP and
+        the client is called HTTP redirect binding.
+
+        Inspired by: https://github.com/IdentityPython/pysaml2/blob/master/example/sp-wsgi/sp.py
+
         Returns:
-            bytes: URL to redirect to
+            bytes: URL of the IdP to redirect to with a SAMLRequest parameter
         """
         logger.info("Creating SAML logout request for %s", user)
         try:
             localpart = UserID.from_string(user).localpart
-            logger.debug("User localpart is %s", localpart)
 
             session = self._find_session_from_user(localpart)
             # The user probally logged in via m.login.password
             if session is None:
                 return False
-            logger.debug("User session is %s", session)
+            logger.debug("Found a user session for %s: %s", localpart, session)
 
-            # Creating a logout request through redirect
-            response = self._saml_client.do_logout(
+            # Creating a logout request through http redirect
+            responses = self._saml_client.do_logout(
                 session["name_id"],
                 [session["entity"]],
                 reason="/_matrix/client/r0/logout requested",
                 expire=None,
                 expected_binding=BINDING_HTTP_REDIRECT,
             )
-
-            # Logging out from multiple entities is not supported
-            binding, http_info = next(iter(response.values()))
+            # We are using the first response from do_logout() because logging out
+            # from multiple IdP/sources is not supported
+            binding, http_info = next(iter(responses.values()))
             logger.debug("SAML binding %s, http_info %s", binding, http_info)
 
-            redirect_url = next(
-                header[1] for header in http_info["headers"] if header[0] == "Location"
-            )
-            if not redirect_url:
-                raise RuntimeError("missing Location header")
+            for key, value in http_info["headers"]:
+                if key == "Location":
+                    return value
 
-            return redirect_url
+            raise RuntimeError("missing Location header")
 
         except Exception as e:
             raise SynapseError(
@@ -204,11 +238,17 @@ class SamlHandler:
     async def handle_logout_request(self, request):
         """Handle an incoming LogoutRequest to /_matrix/saml2/logout
 
+        Implements steps 3 and 4 of the 'Single Logout Profile' specification:
+        in case a client is logging out through another application (called a
+        'Session Participant'), the IdP will issue a LogoutRequest to all other
+        'Session Participants' including the homeserver. In that case we need to
+        logout the user and respond to the IdP.
+
         Args:
-            request (bytes): a SAML LogoutRequest
+            request (bytes): a SAML LogoutRequest from an IdP
 
         Returns:
-            bytes: URL to redirect to
+            bytes: URL to redirect the client in case of success
         """
         saml_req_encoded = parse_string(request, "SAMLRequest", required=True)
         relay_state = parse_string(request, "RelayState")
@@ -220,17 +260,15 @@ class SamlHandler:
             saml_req_encoded, BINDING_HTTP_REDIRECT
         )
         name_id = saml_req.message.name_id
+        # Retrieve the mxid before logging out from the local SAML cache
         mxid = self._find_mxid_from_name_id(name_id)
-
-        # Logout from matrix
-        if mxid:
-            await self._logout(mxid)
-
         # Logout from the local SAML cache
         try:
-
             if self._saml_client.local_logout(name_id):
                 status = success_status_factory()
+                # Logout from matrix
+                if mxid:
+                    await self._logout(mxid)
             else:
                 status = status_message_factory("Server error", STATUS_REQUEST_DENIED)
         except KeyError:
@@ -256,28 +294,51 @@ class SamlHandler:
         # this shouldn't happen!
         raise Exception("create_logout_response didn't return a Location header")
 
-    def handle_logout_response(self, request):
-        """
-            Handle an incoming LogoutResponse to /_matrix/saml2/logout
+    async def handle_logout_response(self, request):
+        """Handle an incoming LogoutResponse to /_matrix/saml2/logout
+
+        Implements step 5 of the 'Single Logout Profile' specification: when
+        an IdP has finished the logout process it will send a response to all session
+        participants (e.g. the homeserver), through an HTTP redirect (i.e. the browser
+        send the response in behalf of the IdP).
+
+        We need to parse the response and in case of success, proceed with a logout:
+        1. on our local saml cache through the use of pysaml2.local_logout().
+        2. on matrix through the use of self._logout()
+
+        Args:
+            request: the incoming request from the browser, containg the IdP response
+                to the logout process.
+        Returns:
+            bytes: None in case of success, a SynapseError otherwise.
+
         """
         resp_bytes = parse_string(request, "SAMLResponse", required=True)
         try:
             resp_saml = self._saml_client.parse_logout_request_response(
                 resp_bytes, BINDING_HTTP_REDIRECT
             )
-            logger.info("Received SAML logout response %s", resp_saml)
-            if resp_saml.response.status.status_code.value == STATUS_SUCCESS:
-                # Remove user from local SAML cache
-                status = self._saml_client.state[resp_saml.in_response_to]
-                logger.debug("Status of the SAML cached logout request %s", status)
-                self._saml_client.local_logout(decode(status["name_id"]))
-                return
-            raise SynapseError(
-                500,
-                "Could not logout from SAML: %s" % (resp_saml.response.status.message,),
-            )
         except Exception as e:
             raise SynapseError(400, "Unable to parse SAML2 response: %s" % (e,))
+
+        logger.info("Received SAML logout response %s", resp_saml)
+        if STATUS_SUCCESS == resp_saml.response.status.status_code.value:
+            logout_request = self._saml_client.state[resp_saml.in_response_to]
+            logger.debug("Status of the SAML cached logout request %s", logout_request)
+            name_id = decode(logout_request["name_id"])
+            # Retrieve the mxid before logging out from the local SAML cache
+            mxid = self._find_mxid_from_name_id(name_id)
+            # Logout from the local SAML cache
+            self._saml_client.local_logout(name_id)
+            # Logout from matrix
+            if mxid:
+                await self._logout(mxid)
+            return
+
+        raise SynapseError(
+            500,
+            "Could not logout from SAML: %s" % (resp_saml.response.status.message,),
+        )
 
     async def handle_saml_response(self, request):
         """Handle an incoming request to /_matrix/saml2/authn_response

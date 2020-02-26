@@ -85,8 +85,6 @@ class SAMLLogoutServlet(LogoutRestServlet):
 
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request)
-        # Logout from the synapse server
-        await self._logout(requester, request)
         # Try to use the SAML logout endpoint.
         # It may fail if the user logged in via m.login.password
         # TODO: find a way to know is the user logged in via
@@ -102,6 +100,10 @@ class SAMLLogoutServlet(LogoutRestServlet):
             # We've already sent the response, so return None to stop
             # JsonResource sending another.
             return None
+        else:
+            # The user probally logged in via m.login.password
+            # Use the standard LogoutRestServlet._logout().
+            await self._logout(requester, request)
 
         return 200, {}
 
