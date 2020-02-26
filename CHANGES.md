@@ -1,3 +1,12 @@
+Synapse 1.4.0 (2019-10-03)
+==========================
+
+Bugfixes
+--------
+
+- Redact `client_secret` in server logs. ([\#6158](https://github.com/matrix-org/synapse/issues/6158))
+
+
 Synapse 1.4.0rc2 (2019-10-02)
 =============================
 
