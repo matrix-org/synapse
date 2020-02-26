@@ -125,7 +125,7 @@ class InFlightGauge(object):
         )
 
         # Counts number of in flight blocks for a given set of label values
-        self._registrations = {}
+        self._registrations = {}  # type: Dict
 
         # Protects access to _registrations
         self._lock = threading.Lock()
@@ -226,7 +226,7 @@ class BucketCollector(object):
         # Fetch the data -- this must be synchronous!
         data = self.data_collector()
 
-        buckets = {}
+        buckets = {}  # type: Dict[float, int]
 
         res = []
         for x in data.keys():

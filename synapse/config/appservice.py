@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict
 
 from six import string_types
 from six.moves.urllib import parse as urlparse
@@ -56,8 +57,8 @@ def load_appservices(hostname, config_files):
         return []
 
     # Dicts of value -> filename
-    seen_as_tokens = {}
-    seen_ids = {}
+    seen_as_tokens = {}  # type: Dict[str, str]
+    seen_ids = {}  # type: Dict[str, str]
 
     appservices = []
 
