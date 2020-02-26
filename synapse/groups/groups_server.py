@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Michael Telatynski <7t3chguy@gmail.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,16 +21,16 @@ from six import string_types
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: Allow users to "knock" or simpkly join depending on rules
+# TODO: Allow users to "knock" or simply join depending on rules
 # TODO: Federation admin APIs
-# TODO: is_priveged flag to users and is_public to users and rooms
+# TODO: is_privileged flag to users and is_public to users and rooms
 # TODO: Audit log for admins (profile updates, membership changes, users who tried
 #       to join but were rejected, etc)
 # TODO: Flairs
@@ -590,7 +591,18 @@ class GroupsServerHandler(object):
         )
 
         # TODO: Check if user knocked
-        # TODO: Check if user is already invited
+
+        invited_users = yield self.store.get_invited_users_in_group(group_id)
+        if user_id in invited_users:
+            raise SynapseError(
+                400, "User already invited to group", errcode=Codes.BAD_STATE
+            )
+
+        user_results = yield self.store.get_users_in_group(
+            group_id, include_private=True
+        )
+        if user_id in [user_result["user_id"] for user_result in user_results]:
+            raise SynapseError(400, "User already in group")
 
         content = {
             "profile": {"name": group["name"], "avatar_url": group["avatar_url"]},
