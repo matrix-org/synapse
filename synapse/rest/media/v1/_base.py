@@ -195,7 +195,7 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
         respond_404(request)
         return
 
-    logger.debug("Responding to media request with responder %s")
+    logger.debug("Responding to media request with responder %s", responder)
     add_file_headers(request, media_type, file_size, upload_name)
     try:
         with responder:
