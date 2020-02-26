@@ -96,13 +96,15 @@ class FederationBase(object):
 
             if not res and pdu.origin != origin:
                 try:
-                    res = yield defer.ensureDeferred(self.get_pdu(
-                        destinations=[pdu.origin],
-                        event_id=pdu.event_id,
-                        room_version=room_version,
-                        outlier=outlier,
-                        timeout=10000,
-                    ))
+                    res = yield defer.ensureDeferred(
+                        self.get_pdu(
+                            destinations=[pdu.origin],
+                            event_id=pdu.event_id,
+                            room_version=room_version,
+                            outlier=outlier,
+                            timeout=10000,
+                        )
+                    )
                 except SynapseError:
                     pass
 
