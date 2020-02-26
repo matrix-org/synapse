@@ -19,6 +19,8 @@ from ._base import Config, ConfigError
 
 
 class RoomDirectoryConfig(Config):
+    section = "roomdirectory"
+
     def read_config(self, config, **kwargs):
         self.enable_room_list_search = config.get("enable_room_list_search", True)
 

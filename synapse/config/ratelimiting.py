@@ -36,6 +36,8 @@ class FederationRateLimitConfig(object):
 
 
 class RatelimitConfig(Config):
+    section = "ratelimiting"
+
     def read_config(self, config, **kwargs):
 
         # Load the new-style messages config if it exists. Otherwise fall back

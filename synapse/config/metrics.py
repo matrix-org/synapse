@@ -34,6 +34,8 @@ class MetricsFlags(object):
 
 
 class MetricsConfig(Config):
+    section = "metrics"
+
     def read_config(self, config, **kwargs):
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)

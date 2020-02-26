@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 
 class AppServiceConfig(Config):
+    section = "appservice"
+
     def read_config(self, config, **kwargs):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)

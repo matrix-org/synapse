@@ -55,6 +55,8 @@ def _dict_merge(merge_dict, into_dict):
 
 
 class SAML2Config(Config):
+    section = "saml2"
+
     def read_config(self, config, **kwargs):
         self.saml2_enabled = False
 
