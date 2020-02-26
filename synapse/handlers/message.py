@@ -901,9 +901,9 @@ class EventCreationHandler(object):
 
             # Check the alias is currently valid (if it has changed).
             room_alias_str = event.content.get("alias", None)
+            directory_handler = self.hs.get_handlers().directory_handler
             if room_alias_str and room_alias_str != original_alias:
                 room_alias = RoomAlias.from_string(room_alias_str)
-                directory_handler = self.hs.get_handlers().directory_handler
                 mapping = yield directory_handler.get_association(room_alias)
 
                 if mapping["room_id"] != event.room_id:
@@ -927,7 +927,6 @@ class EventCreationHandler(object):
             if new_alt_aliases:
                 for alias_str in new_alt_aliases:
                     room_alias = RoomAlias.from_string(alias_str)
-                    directory_handler = self.hs.get_handlers().directory_handler
                     mapping = yield directory_handler.get_association(room_alias)
 
                     if mapping["room_id"] != event.room_id:
