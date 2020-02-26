@@ -890,14 +890,16 @@ class EventCreationHandler(object):
         if event.type == EventTypes.CanonicalAlias:
             # Validate a newly added alias or newly added alt_aliases.
 
-            original_event = yield self.state.get_current_state(
-                event.room_id, EventTypes.CanonicalAlias, ""
-            )
             original_alias = None
             original_alt_aliases = set()
-            if original_event:
-                original_alias = original_event.content.get("alias", None)
-                original_alt_aliases = original_event.content.get("alt_aliases", [])
+
+            original_event_id = event.unsigned.get("replaces_state")
+            if original_event_id:
+                original_event = yield self.store.get_event(original_event_id)
+
+                if original_event:
+                    original_alias = original_event.content.get("alias", None)
+                    original_alt_aliases = original_event.content.get("alt_aliases", [])
 
             # Check the alias is currently valid (if it has changed).
             room_alias_str = event.content.get("alias", None)
