@@ -62,7 +62,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.device_handler.check_device_registered = Mock(return_value="FAKE")
 
         self.datastore = Mock(return_value=Mock())
-        self.datastore.get_current_state_deltas = Mock(return_value=[])
+        self.datastore.get_current_state_deltas = Mock(return_value=(0, []))
 
         self.secrets = Mock()
 

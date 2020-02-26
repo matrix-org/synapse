@@ -139,7 +139,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             defer.succeed(1)
         )
 
-        self.datastore.get_current_state_deltas.return_value = None
+        self.datastore.get_current_state_deltas.return_value = (0, None)
 
         self.datastore.get_to_device_stream_token = lambda: 0
         self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: ([], 0)
