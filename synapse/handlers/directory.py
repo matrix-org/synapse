@@ -375,7 +375,7 @@ class DirectoryHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
-        """Determine with a user can delete an alias.
+        """Determine whether a user can delete an alias.
 
         One of the following must be true:
 
