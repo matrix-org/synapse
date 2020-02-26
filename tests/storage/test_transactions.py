@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.util.retryutils import MAX_RETRY_INTERVAL
+
 from tests.unittest import HomeserverTestCase
 
 
@@ -44,4 +46,13 @@ class TransactionStoreTestCase(HomeserverTestCase):
         was a bug around invalidating the cache that broke this)
         """
         d = self.store.set_destination_retry_timings("example.com", 1000, 50, 100)
+        self.get_success(d)
+
+    def test_large_destination_retry(self):
+        d = self.store.set_destination_retry_timings(
+            "example.com", MAX_RETRY_INTERVAL, MAX_RETRY_INTERVAL, MAX_RETRY_INTERVAL
+        )
+        self.get_success(d)
+
+        d = self.store.get_destination_retry_timings("example.com")
         self.get_success(d)
