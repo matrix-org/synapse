@@ -28,6 +28,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
 from synapse.util import stringutils
@@ -573,7 +574,8 @@ class RoomCreationHandler(BaseHandler):
 
         for i in invite_list:
             try:
-                UserID.from_string(i)
+                uid = UserID.from_string(i)
+                parse_and_validate_server_name(uid.domain)
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
