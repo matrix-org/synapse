@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 from collections import namedtuple
-from typing import Collection, List
+from typing import Iterable, List
 
 import six
 
@@ -226,7 +226,7 @@ class PduToCheckSig(
 
 
 def _check_sigs_on_pdus(
-    keyring: Keyring, room_version: str, pdus: Collection[EventBase]
+    keyring: Keyring, room_version: str, pdus: Iterable[EventBase]
 ) -> List[Deferred]:
     """Check that the given events are correctly signed
 
