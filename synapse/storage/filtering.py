@@ -51,7 +51,7 @@ class FilteringStore(SQLBaseStore):
                 "SELECT filter_id FROM user_filters "
                 "WHERE user_id = ? AND filter_json = ?"
             )
-            txn.execute(sql, (user_localpart, def_json))
+            txn.execute(sql, (user_localpart, bytearray(def_json)))
             filter_id_response = txn.fetchone()
             if filter_id_response is not None:
                 return filter_id_response[0]
@@ -68,7 +68,7 @@ class FilteringStore(SQLBaseStore):
                 "INSERT INTO user_filters (user_id, filter_id, filter_json)"
                 "VALUES(?, ?, ?)"
             )
-            txn.execute(sql, (user_localpart, filter_id, def_json))
+            txn.execute(sql, (user_localpart, filter_id, bytearray(def_json)))
 
             return filter_id
 

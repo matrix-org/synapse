@@ -15,12 +15,11 @@
 
 
 -- There was a bug where we may have updated censored redactions as bytes,
--- which can (somehow) cause json to be inserted hex encoded. This goes and
--- undoes any such hex encoded JSON.
-UPDATE event_json SET json = convert_from(json::bytea, 'utf8')
-WHERE event_id IN (
-  SELECT event_json.event_id
-  FROM event_json
-  INNER JOIN redactions ON (event_json.event_id = redacts)
-  WHERE have_censored AND json NOT LIKE '{%'
-);
+-- which can (somehow) cause json to be inserted hex encoded. These updates go
+-- and undoes any such hex encoded JSON.
+
+INSERT into background_updates (update_name, progress_json)
+  VALUES ('event_fix_redactions_bytes_create_index', '{}');
+
+INSERT into background_updates (update_name, progress_json, depends_on)
+  VALUES ('event_fix_redactions_bytes', '{}', 'event_fix_redactions_bytes_create_index');
