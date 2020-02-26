@@ -36,7 +36,7 @@ SearchEntry = namedtuple(
 )
 
 
-class SearchStore(BackgroundUpdateStore):
+class SearchBackgroundUpdateStore(BackgroundUpdateStore):
 
     EVENT_SEARCH_UPDATE_NAME = "event_search"
     EVENT_SEARCH_ORDER_UPDATE_NAME = "event_search_order"
@@ -44,7 +44,7 @@ class SearchStore(BackgroundUpdateStore):
     EVENT_SEARCH_USE_GIN_POSTGRES_NAME = "event_search_postgres_gin"
 
     def __init__(self, db_conn, hs):
-        super(SearchStore, self).__init__(db_conn, hs)
+        super(SearchBackgroundUpdateStore, self).__init__(db_conn, hs)
 
         if not hs.config.enable_search:
             return
@@ -289,29 +289,6 @@ class SearchStore(BackgroundUpdateStore):
 
         return num_rows
 
-    def store_event_search_txn(self, txn, event, key, value):
-        """Add event to the search table
-
-        Args:
-            txn (cursor):
-            event (EventBase):
-            key (str):
-            value (str):
-        """
-        self.store_search_entries_txn(
-            txn,
-            (
-                SearchEntry(
-                    key=key,
-                    value=value,
-                    event_id=event.event_id,
-                    room_id=event.room_id,
-                    stream_ordering=event.internal_metadata.stream_ordering,
-                    origin_server_ts=event.origin_server_ts,
-                ),
-            ),
-        )
-
     def store_search_entries_txn(self, txn, entries):
         """Add entries to the search table
 
@@ -357,6 +334,34 @@ class SearchStore(BackgroundUpdateStore):
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
+
+
+class SearchStore(SearchBackgroundUpdateStore):
+    def __init__(self, db_conn, hs):
+        super(SearchStore, self).__init__(db_conn, hs)
+
+    def store_event_search_txn(self, txn, event, key, value):
+        """Add event to the search table
+
+        Args:
+            txn (cursor):
+            event (EventBase):
+            key (str):
+            value (str):
+        """
+        self.store_search_entries_txn(
+            txn,
+            (
+                SearchEntry(
+                    key=key,
+                    value=value,
+                    event_id=event.event_id,
+                    room_id=event.room_id,
+                    stream_ordering=event.internal_metadata.stream_ordering,
+                    origin_server_ts=event.origin_server_ts,
+                ),
+            ),
+        )
 
     @defer.inlineCallbacks
     def search_msgs(self, room_ids, search_term, keys):
