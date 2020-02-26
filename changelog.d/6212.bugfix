@@ -1,0 +1,1 @@
+Fix bug where presence would not get timed out correctly if a synchrotron worker is used and restarted.
