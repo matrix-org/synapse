@@ -235,11 +235,9 @@ class UserRestServletV2(RestServlet):
                     )
 
                 if deactivate and not user["deactivated"]:
-                    result = await self.deactivate_account_handler.deactivate_account(
+                    await self.deactivate_account_handler.deactivate_account(
                         target_user.to_string(), False
                     )
-                    if not result:
-                        raise SynapseError(500, "Could not deactivate user")
 
             user = await self.admin_handler.get_user(target_user)
             return 200, user
