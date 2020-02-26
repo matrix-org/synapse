@@ -316,7 +316,7 @@ class DirectoryHandler(BaseHandler):
                 if alt_aliases:
                     content["alt_aliases"] = alt_aliases
                 else:
-                    content.pop("alt_aliases")
+                    del content["alt_aliases"]
         except KeyError:
             # The alt_aliases property was not found.
             pass
