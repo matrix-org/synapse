@@ -33,7 +33,7 @@ from synapse.state import v1, v2
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.expiringcache import ExpiringCache
-from synapse.util.metrics import Measure
+from synapse.util.metrics import Measure, measure_func
 
 logger = logging.getLogger(__name__)
 
@@ -191,11 +191,22 @@ class StateHandler(object):
         return joined_users
 
     @defer.inlineCallbacks
-    def get_current_hosts_in_room(self, room_id, latest_event_ids=None):
-        if not latest_event_ids:
-            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
-        logger.debug("calling resolve_state_groups from get_current_hosts_in_room")
-        entry = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
+    def get_current_hosts_in_room(self, room_id):
+        event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+        return (yield self.get_hosts_in_room_at_events(room_id, event_ids))
+
+    @defer.inlineCallbacks
+    def get_hosts_in_room_at_events(self, room_id, event_ids):
+        """Get the hosts that were in a room at the given event ids
+
+        Args:
+            room_id (str):
+            event_ids (list[str]):
+
+        Returns:
+            Deferred[list[str]]: the hosts in the room at the given events
+        """
+        entry = yield self.resolve_state_groups_for_events(room_id, event_ids)
         joined_hosts = yield self.store.get_joined_hosts(room_id, entry)
         return joined_hosts
 
@@ -344,6 +355,7 @@ class StateHandler(object):
 
         return context
 
+    @measure_func()
     @defer.inlineCallbacks
     def resolve_state_groups_for_events(self, room_id, event_ids):
         """ Given a list of event_ids this method fetches the state at each

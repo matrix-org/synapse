@@ -33,6 +33,7 @@ from synapse.types import get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.metrics import Measure
 from synapse.util.stringutils import to_ascii
 
 logger = logging.getLogger(__name__)
@@ -483,6 +484,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
         return result
 
+    @defer.inlineCallbacks
     def get_joined_users_from_state(self, room_id, state_entry):
         state_group = state_entry.state_group
         if not state_group:
@@ -492,9 +494,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
-        return self._get_joined_users_from_context(
-            room_id, state_group, state_entry.state, context=state_entry
-        )
+        with Measure(self._clock, "get_joined_users_from_state"):
+            return (
+                yield self._get_joined_users_from_context(
+                    room_id, state_group, state_entry.state, context=state_entry
+                )
+            )
 
     @cachedInlineCallbacks(
         num_args=2, cache_context=True, iterable=True, max_entries=100000
@@ -669,6 +674,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return True
 
+    @defer.inlineCallbacks
     def get_joined_hosts(self, room_id, state_entry):
         state_group = state_entry.state_group
         if not state_group:
@@ -678,9 +684,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
-        return self._get_joined_hosts(
-            room_id, state_group, state_entry.state, state_entry=state_entry
-        )
+        with Measure(self._clock, "get_joined_hosts"):
+            return (
+                yield self._get_joined_hosts(
+                    room_id, state_group, state_entry.state, state_entry=state_entry
+                )
+            )
 
     @cachedInlineCallbacks(num_args=2, max_entries=10000, iterable=True)
     # @defer.inlineCallbacks
