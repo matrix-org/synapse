@@ -163,7 +163,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         self.test_alias = "#test:test"
         self.room_alias = self._add_alias(self.test_alias)
 
-    def _add_alias(self, alias):
+    def _add_alias(self, alias: str) -> RoomAlias:
         """Add an alias to the test room."""
         room_alias = RoomAlias.from_string(alias)
 
