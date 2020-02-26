@@ -293,6 +293,7 @@ class StatsHandler(StateDeltasHandler):
                 room_state["guest_access"] = event_content.get("guest_access")
 
         for room_id, state in room_to_state_updates.items():
+            logger.info("Updating room_stats_state for %s: %s", room_id, state)
             yield self.store.update_room_state(room_id, state)
 
         return room_to_stats_deltas, user_to_stats_deltas

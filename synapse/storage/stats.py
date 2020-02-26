@@ -332,6 +332,9 @@ class StatsStore(StateDeltasStore):
         def _bulk_update_stats_delta_txn(txn):
             for stats_type, stats_updates in updates.items():
                 for stats_id, fields in stats_updates.items():
+                    logger.info(
+                        "Updating %s stats for %s: %s", stats_type, stats_id, fields
+                    )
                     self._update_stats_delta_txn(
                         txn,
                         ts=ts,
