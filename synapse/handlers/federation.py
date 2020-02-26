@@ -1568,7 +1568,9 @@ class FederationHandler(BaseHandler):
         # keep a record of the room version, if we don't yet know it.
         # (this may get overwritten if we later get a different room version in a
         # join dance).
-        await self._maybe_store_room_on_invite(event.room_id, room_version)
+        await self._maybe_store_room_on_invite(
+            room_id=event.room_id, room_version=room_version
+        )
 
         event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
