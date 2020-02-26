@@ -42,11 +42,13 @@ def cancelled_to_request_timed_out_error(value, timeout):
 
 
 ACCESS_TOKEN_RE = re.compile(r"(\?.*access(_|%5[Ff])token=)[^&]*(.*)$")
+CLIENT_SECRET_RE = re.compile(r"(\?.*client(_|%5[Ff])secret=)[^&]*(.*)$")
 
 
 def redact_uri(uri):
-    """Strips access tokens from the uri replaces with <redacted>"""
-    return ACCESS_TOKEN_RE.sub(r"\1<redacted>\3", uri)
+    """Strips sensitive information from the uri replaces with <redacted>"""
+    uri = ACCESS_TOKEN_RE.sub(r"\1<redacted>\3", uri)
+    return CLIENT_SECRET_RE.sub(r"\1<redacted>\3", uri)
 
 
 class QuieterFileBodyProducer(FileBodyProducer):
