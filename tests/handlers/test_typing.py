@@ -74,6 +74,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 "set_received_txn_response",
                 "get_destination_retry_timings",
                 "get_devices_by_remote",
+                "maybe_store_room_on_invite",
                 # Bits that user_directory needs
                 "get_user_directory_stream_pos",
                 "get_current_state_deltas",

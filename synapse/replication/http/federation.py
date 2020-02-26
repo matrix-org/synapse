@@ -17,6 +17,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import event_type_from_format_version
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import parse_json_object_from_request
@@ -211,7 +212,7 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
 
     Request format:
 
-        POST /_synapse/replication/fed_query/:fed_cleanup_room/:txn_id
+        POST /_synapse/replication/fed_cleanup_room/:room_id/:txn_id
 
         {}
     """
@@ -238,8 +239,41 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
         return 200, {}
 
 
+class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
+    """Called to clean up any data in DB for a given room, ready for the
+    server to join the room.
+
+    Request format:
+
+        POST /_synapse/replication/store_room_on_invite/:room_id/:txn_id
+
+        {
+            "room_version": "1",
+        }
+    """
+
+    NAME = "store_room_on_invite"
+    PATH_ARGS = ("room_id",)
+
+    def __init__(self, hs):
+        super().__init__(hs)
+
+        self.store = hs.get_datastore()
+
+    @staticmethod
+    def _serialize_payload(room_id, room_version):
+        return {"room_version": room_version.identifier}
+
+    async def _handle_request(self, request, room_id):
+        content = parse_json_object_from_request(request)
+        room_version = KNOWN_ROOM_VERSIONS[content["room_version"]]
+        await self.store.maybe_store_room_on_invite(room_id, room_version)
+        return 200, {}
+
+
 def register_servlets(hs, http_server):
     ReplicationFederationSendEventsRestServlet(hs).register(http_server)
     ReplicationFederationSendEduRestServlet(hs).register(http_server)
     ReplicationGetQueryRestServlet(hs).register(http_server)
     ReplicationCleanRoomRestServlet(hs).register(http_server)
+    ReplicationStoreRoomOnInviteRestServlet(hs).register(http_server)

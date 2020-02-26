@@ -44,7 +44,7 @@ class ReplicationEndpoint(object):
     """Helper base class for defining new replication HTTP endpoints.
 
     This creates an endpoint under `/_synapse/replication/:NAME/:PATH_ARGS..`
-    (with an `/:txn_id` prefix for cached requests.), where NAME is a name,
+    (with a `/:txn_id` suffix for cached requests), where NAME is a name,
     PATH_ARGS are a tuple of parameters to be encoded in the URL.
 
     For example, if `NAME` is "send_event" and `PATH_ARGS` is `("event_id",)`,
