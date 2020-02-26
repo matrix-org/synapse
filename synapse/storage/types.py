@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Iterable, Iterator, List
+from typing import Any, Iterable, Iterator, List, Tuple
 
 from typing_extensions import Protocol
 
@@ -23,11 +23,6 @@ Some very basic protocol definitions for the DB-API2 classes specified in PEP-24
 """
 
 
-class Row(Protocol):
-    # todo: make this stronger
-    pass
-
-
 class Cursor(Protocol):
     def execute(self, sql: str, parameters: Iterable[Any] = ...) -> Any:
         ...
@@ -35,10 +30,10 @@ class Cursor(Protocol):
     def executemany(self, sql: str, parameters: Iterable[Iterable[Any]]) -> Any:
         ...
 
-    def fetchall(self) -> List[Row]:
+    def fetchall(self) -> List[Tuple]:
         ...
 
-    def fetchone(self) -> Row:
+    def fetchone(self) -> Tuple:
         ...
 
     @property
@@ -49,7 +44,7 @@ class Cursor(Protocol):
     def rowcount(self) -> int:
         return 0
 
-    def __iter__(self) -> Iterator[Row]:
+    def __iter__(self) -> Iterator[Tuple]:
         ...
 
     def close(self) -> None:

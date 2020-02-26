@@ -33,7 +33,7 @@ from synapse.logging.context import LoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
-from synapse.storage.types import Connection, Cursor, Row
+from synapse.storage.types import Connection, Cursor
 from synapse.util.stringutils import exception_to_unicode
 
 logger = logging.getLogger(__name__)
@@ -99,8 +99,10 @@ def make_conn(
     return db_conn
 
 
-# the type of entry which goes on our after_callbacks and exception_callbacks lists
-# use of a string here because python 3.5.2 doesn't support Callable([...]).
+# The type of entry which goes on our after_callbacks and exception_callbacks lists.
+#
+# Python 3.5.2 doesn't support Callable with an ellipsis, so we wrap it in quotes so
+# that mypy sees the type but the runtime python doesn't.
 _CallbackListEntry = Tuple["Callable[..., None]", Iterable[Any], Dict[str, Any]]
 
 
@@ -150,20 +152,26 @@ class LoggingTransaction:
         transaction has finished. Used to invalidate the caches on the
         correct thread.
         """
+        # if self.after_callbacks is None, that means that whatever constructed the
+        # LoggingTransaction isn't expecting there to be any callbacks; assert that
+        # is not the case.
         assert self.after_callbacks is not None
         self.after_callbacks.append((callback, args, kwargs))
 
     def call_on_exception(self, callback: "Callable[..., None]", *args, **kwargs):
+        # if self.exception_callbacks is None, that means that whatever constructed the
+        # LoggingTransaction isn't expecting there to be any callbacks; assert that
+        # is not the case.
         assert self.exception_callbacks is not None
         self.exception_callbacks.append((callback, args, kwargs))
 
-    def fetchall(self) -> List[Row]:
+    def fetchall(self) -> List[Tuple]:
         return self.txn.fetchall()
 
-    def fetchone(self) -> Row:
+    def fetchone(self) -> Tuple:
         return self.txn.fetchone()
 
-    def __iter__(self) -> Iterator[Row]:
+    def __iter__(self) -> Iterator[Tuple]:
         return self.txn.__iter__()
 
     @property
