@@ -17,7 +17,7 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.api.errors import AuthError, Codes, StoreError, SynapseError
+from synapse.api.errors import AuthError, NotFoundError, StoreError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.types import UserID
 
@@ -52,13 +52,15 @@ class GetFilterRestServlet(RestServlet):
             raise SynapseError(400, "Invalid filter_id")
 
         try:
-            filter = yield self.filtering.get_user_filter(
+            filter_collection = yield self.filtering.get_user_filter(
                 user_localpart=target_user.localpart, filter_id=filter_id
             )
+        except StoreError as e:
+            if e.code != 404:
+                raise
+            raise NotFoundError("No such filter")
 
-            return 200, filter.get_filter_json()
-        except (KeyError, StoreError):
-            raise SynapseError(400, "No such filter", errcode=Codes.NOT_FOUND)
+        return 200, filter_collection.get_filter_json()
 
 
 class CreateFilterRestServlet(RestServlet):
