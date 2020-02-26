@@ -1,0 +1,1 @@
+Fix tracing of non-JSON APIs, /media, /key etc.
