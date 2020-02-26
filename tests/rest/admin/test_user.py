@@ -667,13 +667,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         for the deactivated body parameter
         """
         self.hs.config.registration_shared_secret = None
+        url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
         body = json.dumps({"password": "abc123"})
 
         request, channel = self.make_request(
             "PUT",
-            self.url,
+            url,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
@@ -685,7 +686,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         request, channel = self.make_request(
-            "GET", self.url, access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -699,7 +700,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         request, channel = self.make_request(
             "PUT",
-            self.url,
+            url,
             access_token=self.admin_user_tok,
             content=body.encode(encoding="utf_8"),
         )
@@ -709,7 +710,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Check user is not deactivated
         request, channel = self.make_request(
-            "GET", self.url, access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
