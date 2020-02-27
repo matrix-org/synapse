@@ -123,7 +123,7 @@ twisted adbapi connection pool. See the [libpq
 documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
 for a list of options which can be passed.
 
-You should consider tuning the `keepalives_*` options if there is any danger of
+You should consider tuning the `args.keepalives_*` options if there is any danger of
 the connection between your homeserver and database dropping, otherwise Synapse
 may block for an extended period while it waits for a response from the
 database server. Example values might be:
