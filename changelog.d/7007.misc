@@ -1,0 +1,1 @@
+Expose the `SSOAuthHandler`'s `complete_sso_login` to the module API.
