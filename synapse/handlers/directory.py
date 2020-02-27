@@ -307,19 +307,15 @@ class DirectoryHandler(BaseHandler):
 
         # Filter the alt_aliases property for the removed alias. Note that the
         # value is not modified if alt_aliases is of an unexpected form.
-        try:
-            alt_aliases = content["alt_aliases"]
-            if isinstance(alt_aliases, (list, tuple)) and alias_str in alt_aliases:
-                send_update = True
-                alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
+        alt_aliases = content.get("alt_aliases")
+        if isinstance(alt_aliases, (list, tuple)) and alias_str in alt_aliases:
+            send_update = True
+            alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
 
-                if alt_aliases:
-                    content["alt_aliases"] = alt_aliases
-                else:
-                    del content["alt_aliases"]
-        except KeyError:
-            # The alt_aliases property was not found.
-            pass
+            if alt_aliases:
+                content["alt_aliases"] = alt_aliases
+            else:
+                del content["alt_aliases"]
 
         if send_update:
             yield self.event_creation_handler.create_and_send_nonmember_event(
