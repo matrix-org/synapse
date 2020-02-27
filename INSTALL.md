@@ -420,11 +420,10 @@ so, you will need to edit `homeserver.yaml`, as follows:
   Note that, as pointed out in that document, this feature will not
   work with installs set up after November 2020. 
   
-  If you are using your
-  own certificate, be sure to use a `.pem` file that includes the full
-  certificate chain including any intermediate certificates (for
-  instance, if using certbot, use `fullchain.pem` as your certificate,
-  not `cert.pem`).
+  If you are using your own certificate, be sure to use a `.pem` file that
+  includes the full certificate chain including any intermediate certificates
+  (for instance, if using certbot, use `fullchain.pem` as your certificate, not
+  `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
 [federate.md](docs/federate.md)

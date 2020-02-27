@@ -14,6 +14,7 @@
 # limitations under the License.
 
 
+import collections
 import logging
 import string
 from typing import List
@@ -71,7 +72,7 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Check if there is a current association.
         if not servers:
             users = yield self.state.get_current_users_in_room(room_id)
-            servers = set(get_domain_from_id(u) for u in users)
+            servers = {get_domain_from_id(u) for u in users}
 
         if not servers:
             raise SynapseError(400, "Failed to get server list")
@@ -254,7 +255,7 @@ class DirectoryHandler(BaseHandler):
             )
 
         users = yield self.state.get_current_users_in_room(room_id)
-        extra_servers = set(get_domain_from_id(u) for u in users)
+        extra_servers = {get_domain_from_id(u) for u in users}
         servers = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
@@ -281,22 +282,6 @@ class DirectoryHandler(BaseHandler):
                 "Room alias %r not found" % (room_alias.to_string(),),
                 Codes.NOT_FOUND,
             )
-
-    @defer.inlineCallbacks
-    def send_room_alias_update_event(self, requester, room_id):
-        aliases = yield self.store.get_aliases_for_room(room_id)
-
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.Aliases,
-                "state_key": self.hs.hostname,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "content": {"aliases": aliases},
-            },
-            ratelimit=False,
-        )
 
     @defer.inlineCallbacks
     def _update_canonical_alias(self, requester, user_id, room_id, room_alias):
@@ -326,7 +311,7 @@ class DirectoryHandler(BaseHandler):
         alt_aliases = content.pop("alt_aliases", None)
         # If the aliases are not a list (or not found) do not attempt to modify
         # the list.
-        if isinstance(alt_aliases, list):
+        if isinstance(alt_aliases, collections.Sequence):
             send_update = True
             alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
             if alt_aliases:

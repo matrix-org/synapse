@@ -608,7 +608,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         user_results = yield self.store.get_users_in_group(
             group_id, include_private=True
         )
-        if user_id in [user_result["user_id"] for user_result in user_results]:
+        if user_id in (user_result["user_id"] for user_result in user_results):
             raise SynapseError(400, "User already in group")
 
         content = {

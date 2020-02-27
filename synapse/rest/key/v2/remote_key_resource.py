@@ -149,7 +149,7 @@ class RemoteKey(DirectServeResource):
 
         time_now_ms = self.clock.time_msec()
 
-        cache_misses = dict()  # type: Dict[str, Set[str]]
+        cache_misses = {}  # type: Dict[str, Set[str]]
         for (server_name, key_id, from_server), results in cached.items():
             results = [(result["ts_added_ms"], result) for result in results]
 

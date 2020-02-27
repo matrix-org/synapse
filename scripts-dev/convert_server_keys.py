@@ -103,7 +103,7 @@ def main():
 
     yaml.safe_dump(result, sys.stdout, default_flow_style=False)
 
-    rows = list(row for server, json in result.items() for row in rows_v2(server, json))
+    rows = [row for server, json in result.items() for row in rows_v2(server, json)]
 
     cursor = connection.cursor()
     cursor.executemany(

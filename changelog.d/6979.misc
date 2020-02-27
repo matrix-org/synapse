@@ -1,0 +1,1 @@
+Remove redundant `store_room` call from `FederationHandler._process_received_pdu`.

@@ -680,11 +680,6 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 'user_signing' for a user-signing key
             key (dict): the key data
         """
-        # the cross-signing keys need to occupy the same namespace as devices,
-        # since signatures are identified by device ID.  So add an entry to the
-        # device table to make sure that we don't have a collision with device
-        # IDs
-
         # the 'key' dict will look something like:
         # {
         #   "user_id": "@alice:example.com",
@@ -701,16 +696,24 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         # The "keys" property must only have one entry, which will be the public
         # key, so we just grab the first value in there
         pubkey = next(iter(key["keys"].values()))
-        self.db.simple_insert_txn(
-            txn,
-            "devices",
-            values={
-                "user_id": user_id,
-                "device_id": pubkey,
-                "display_name": key_type + " signing key",
-                "hidden": True,
-            },
-        )
+
+        # The cross-signing keys need to occupy the same namespace as devices,
+        # since signatures are identified by device ID.  So add an entry to the
+        # device table to make sure that we don't have a collision with device
+        # IDs.
+        # We only need to do this for local users, since remote servers should be
+        # responsible for checking this for their own users.
+        if self.hs.is_mine_id(user_id):
+            self.db.simple_insert_txn(
+                txn,
+                "devices",
+                values={
+                    "user_id": user_id,
+                    "device_id": pubkey,
+                    "display_name": key_type + " signing key",
+                    "hidden": True,
+                },
+            )
 
         # and finally, store the key itself
         with self._cross_signing_id_gen.get_next() as stream_id:
