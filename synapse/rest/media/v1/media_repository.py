@@ -51,6 +51,7 @@ from .config_resource import MediaConfigResource
 from .download_resource import DownloadResource
 from .filepath import MediaFilePaths
 from .media_storage import MediaStorage
+from .mime_type import MimeType
 from .preview_url_resource import PreviewUrlResource
 from .storage_provider import StorageProviderWrapper
 from .thumbnail_resource import ThumbnailResource
@@ -399,7 +400,7 @@ class MediaRepository(object):
 
             yield finish()
 
-        media_type = headers[b"Content-Type"][0].decode("ascii")
+        media_type = str(MimeType(headers[b"Content-Type"][0].decode("ascii")))
         upload_name = get_filename_from_headers(headers)
         time_now_ms = self.clock.time_msec()
 
