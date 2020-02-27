@@ -21,7 +21,6 @@ from typing import Iterable, List, Optional
 
 from twisted.internet import defer
 
-from synapse import event_auth
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
@@ -390,32 +389,16 @@ class DirectoryHandler(BaseHandler):
         if creator is not None and creator == user_id:
             return True
 
-        is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
-        if is_admin:
-            return True
-
         # Resolve the alias to the corresponding room.
         room_mapping = yield self.get_association(alias)
         room_id = room_mapping["room_id"]
         if not room_id:
             return False
 
-        # Check if the user has sufficient power-level to send a canonical alias
-        # event.
-        power_level_event = yield self.state.get_current_state(
-            room_id, EventTypes.PowerLevels, ""
+        res = yield self.auth.check_can_change_room_list(
+            room_id, UserID.from_string(user_id)
         )
-
-        auth_events = {}
-        if power_level_event:
-            auth_events[(EventTypes.PowerLevels, "")] = power_level_event
-
-        send_level = event_auth.get_send_level(
-            EventTypes.CanonicalAlias, "", power_level_event
-        )
-        user_level = event_auth.get_user_power_level(user_id, auth_events)
-
-        return user_level >= send_level
+        return res
 
     @defer.inlineCallbacks
     def edit_published_room_list(
@@ -450,7 +433,15 @@ class DirectoryHandler(BaseHandler):
         if room is None:
             raise SynapseError(400, "Unknown room")
 
-        yield self.auth.check_can_change_room_list(room_id, requester.user)
+        can_change_room_list = yield self.auth.check_can_change_room_list(
+            room_id, requester.user
+        )
+        if not can_change_room_list:
+            raise AuthError(
+                403,
+                "This server requires you to be a moderator in the room to"
+                " edit its room list entry",
+            )
 
         making_public = visibility == "public"
         if making_public:
