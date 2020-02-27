@@ -494,20 +494,26 @@ class GenericWorkerServer(HomeServer):
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":
-                    media_repo = self.get_media_repository_resource()
+                    if self.config.can_load_media_repo:
+                        media_repo = self.get_media_repository_resource()
 
-                    # We need to serve the admin servlets for media on the
-                    # worker.
-                    admin_resource = JsonResource(self, canonical_json=False)
-                    register_servlets_for_media_repo(self, admin_resource)
+                        # We need to serve the admin servlets for media on the
+                        # worker.
+                        admin_resource = JsonResource(self, canonical_json=False)
+                        register_servlets_for_media_repo(self, admin_resource)
 
-                    resources.update(
-                        {
-                            MEDIA_PREFIX: media_repo,
-                            LEGACY_MEDIA_PREFIX: media_repo,
-                            "/_synapse/admin": admin_resource,
-                        }
-                    )
+                        resources.update(
+                            {
+                                MEDIA_PREFIX: media_repo,
+                                LEGACY_MEDIA_PREFIX: media_repo,
+                                "/_synapse/admin": admin_resource,
+                            }
+                        )
+                    else:
+                        logger.warning(
+                            "A 'media' listener is configured but the media"
+                            " repository is disabled. Ignoring."
+                        )
 
                 if name == "openid" and "federation" not in res["names"]:
                     # Only load the openid resource separately if federation resource
