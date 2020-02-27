@@ -378,9 +378,6 @@ class CacheDescriptor(_CacheDescriptorBase):
         self.iterable = iterable
 
     def __get__(self, obj, owner):
-        if isinstance(self.max_entries, str):
-            self.max_entries = getattr(obj.hs.config.caches, self.max_entries)
-
         cache = Cache(
             name=self.orig.__name__,
             max_entries=self.max_entries,

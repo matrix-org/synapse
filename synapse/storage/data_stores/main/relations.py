@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class RelationsWorkerStore(SQLBaseStore):
-    @cached(tree=True, max_entries="event_cache_size")
+    @cached(tree=True)
     def get_relations_for_event(
         self,
         event_id,
@@ -133,7 +133,7 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_recent_references_for_event", _get_recent_references_for_event_txn
         )
 
-    @cached(tree=True, max_entries="event_cache_size")
+    @cached(tree=True)
     def get_aggregation_groups_for_event(
         self,
         event_id,
