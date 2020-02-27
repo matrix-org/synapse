@@ -1,0 +1,1 @@
+Normalize MIME types of uploaded media files. Ensures that even images with incorrect but occasionally observed MIME types have thumbnails generated.
