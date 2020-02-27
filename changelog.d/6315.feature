@@ -1,1 +1,1 @@
-Exposed synctl, hash_password and generate_config via the snap run interface.
+Expose the `synctl`, `hash_password` and `generate_config` commands in the snapcraft package. Contributed by @devec0.
