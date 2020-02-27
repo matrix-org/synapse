@@ -912,12 +912,15 @@ class EventCreationHandler(object):
                     raise SynapseError(
                         400,
                         "Room alias %s does not point to the room" % (room_alias_str,),
+                        Codes.NOT_FOUND,
                     )
 
             # Check that alt_aliases is the proper form.
             alt_aliases = event.content.get("alt_aliases", [])
             if not isinstance(alt_aliases, (list, tuple)):
-                raise SynapseError(400, "The alt_aliases property must be a list.")
+                raise SynapseError(
+                    400, "The alt_aliases property must be a list.", Codes.INVALID_PARAM
+                )
 
             # If the old version of alt_aliases is of an unknown form,
             # completely replace it.
@@ -936,6 +939,7 @@ class EventCreationHandler(object):
                             400,
                             "Room alias %s does not point to the room"
                             % (room_alias_str,),
+                            Codes.NOT_FOUND,
                         )
 
         federation_handler = self.hs.get_handlers().federation_handler
