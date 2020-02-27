@@ -104,8 +104,10 @@ class FederationBase(object):
 
             if not res and pdu.origin != origin:
                 try:
+                    # This should not exist in the base implementation, until
+                    # this is fixed, ignore it for typing. See issue #6997.
                     res = yield defer.ensureDeferred(
-                        self.get_pdu(
+                        self.get_pdu(  # type: ignore
                             destinations=[pdu.origin],
                             event_id=pdu.event_id,
                             room_version=room_version,
