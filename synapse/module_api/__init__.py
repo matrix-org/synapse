@@ -18,6 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.rest.client.v1.login import SSOAuthHandler
 from synapse.types import UserID
 
 """
@@ -41,6 +42,9 @@ class ModuleApi(object):
         self._store = hs.get_datastore()
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
+        self._sso_handler = SSOAuthHandler(hs)
+
+        self.complete_sso_login = self._sso_handler.complete_sso_login
 
     def get_user_by_req(self, req, allow_guest=False):
         """Check the access_token provided for a request
