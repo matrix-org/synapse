@@ -390,6 +390,9 @@ class GenericWorkerTyping(object):
             self._room_serials[row.room_id] = token
             self._room_typing[row.room_id] = row.user_ids
 
+    def get_current_token(self) -> int:
+        return self._latest_room_serial
+
 
 class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
