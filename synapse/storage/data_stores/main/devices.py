@@ -574,7 +574,7 @@ class DeviceWorkerStore(SQLBaseStore):
         else:
             return set()
 
-    def get_all_device_list_changes_for_remotes(self, from_key, to_key):
+    def get_all_device_list_changes_for_remotes(self, from_key, to_key, limit):
         """Return a list of `(stream_id, user_id, destination)` which is the
         combined list of changes to devices, and which destinations need to be
         poked. `destination` may be None if no destinations need to be poked.
@@ -589,10 +589,16 @@ class DeviceWorkerStore(SQLBaseStore):
                 SELECT stream_id, destination AS entity FROM device_lists_outbound_pokes
             ) AS e
             WHERE ? < stream_id AND stream_id <= ?
+            LIMIT ?
         """
 
         return self.db.execute(
-            "get_all_device_list_changes_for_remotes", None, sql, from_key, to_key
+            "get_all_device_list_changes_for_remotes",
+            None,
+            sql,
+            from_key,
+            to_key,
+            limit,
         )
 
     @cached(max_entries=10000)

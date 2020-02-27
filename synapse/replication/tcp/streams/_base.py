@@ -358,7 +358,6 @@ class DeviceListsStream(Stream):
     """
 
     NAME = "device_lists"
-    _LIMITED = False
     ROW_TYPE = DeviceListsStreamRow
 
     def __init__(self, hs):
