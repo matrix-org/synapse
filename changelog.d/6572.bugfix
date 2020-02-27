@@ -1,0 +1,1 @@
+When a user's profile is updated via the admin API, also generate a displayname/avatar update for that user in each room.

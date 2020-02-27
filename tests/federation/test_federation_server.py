@@ -83,7 +83,7 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
             )
         )
 
-        self.assertEqual(members, set(["@user:other.example.com", u1]))
+        self.assertEqual(members, {"@user:other.example.com", u1})
         self.assertEqual(len(channel.json_body["pdus"]), 6)
 
     def test_needs_to_be_in_room(self):

@@ -494,9 +494,9 @@ class EventsWorkerStore(SQLBaseStore):
         """
         with Measure(self._clock, "_fetch_event_list"):
             try:
-                events_to_fetch = set(
+                events_to_fetch = {
                     event_id for events, _ in event_list for event_id in events
-                )
+                }
 
                 row_dict = self.db.new_transaction(
                     conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
@@ -804,7 +804,7 @@ class EventsWorkerStore(SQLBaseStore):
             desc="have_events_in_timeline",
         )
 
-        return set(r["event_id"] for r in rows)
+        return {r["event_id"] for r in rows}
 
     @defer.inlineCallbacks
     def have_seen_events(self, event_ids):

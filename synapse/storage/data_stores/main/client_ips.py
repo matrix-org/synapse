@@ -529,7 +529,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
             for row in rows
         )
-        return list(
+        return [
             {
                 "access_token": access_token,
                 "ip": ip,
@@ -537,7 +537,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 "last_seen": last_seen,
             }
             for (access_token, ip), (user_agent, last_seen) in iteritems(results)
-        )
+        ]
 
     @wrap_as_background_process("prune_old_user_ips")
     async def _prune_old_user_ips(self):

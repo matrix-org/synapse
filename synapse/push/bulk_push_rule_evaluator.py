@@ -402,11 +402,11 @@ class RulesForRoom(object):
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Found members %r: %r", self.room_id, members.values())
 
-        interested_in_user_ids = set(
+        interested_in_user_ids = {
             user_id
             for user_id, membership in itervalues(members)
             if membership == Membership.JOIN
-        )
+        }
 
         logger.debug("Joined: %r", interested_in_user_ids)
 
@@ -414,9 +414,9 @@ class RulesForRoom(object):
             interested_in_user_ids, on_invalidate=self.invalidate_all_cb
         )
 
-        user_ids = set(
+        user_ids = {
             uid for uid, have_pusher in iteritems(if_users_with_pushers) if have_pusher
-        )
+        }
 
         logger.debug("With pushers: %r", user_ids)
 

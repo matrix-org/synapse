@@ -56,7 +56,7 @@ class SQLBaseStore(metaclass=ABCMeta):
             members_changed (iterable[str]): The user_ids of members that have
                 changed
         """
-        for host in set(get_domain_from_id(u) for u in members_changed):
+        for host in {get_domain_from_id(u) for u in members_changed}:
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
             self._attempt_to_invalidate_cache("was_host_joined", (room_id, host))
 

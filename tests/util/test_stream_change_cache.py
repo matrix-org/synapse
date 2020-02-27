@@ -64,7 +64,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         # If we update an existing entity, it keeps the two existing entities
         cache.entity_has_changed("bar@baz.net", 5)
         self.assertEqual(
-            set(["bar@baz.net", "user@elsewhere.org"]), set(cache._entity_to_key)
+            {"bar@baz.net", "user@elsewhere.org"}, set(cache._entity_to_key)
         )
 
     def test_get_all_entities_changed(self):
@@ -134,7 +134,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
             cache.get_entities_changed(
                 ["user@foo.com", "bar@baz.net", "user@elsewhere.org"], stream_pos=2
             ),
-            set(["bar@baz.net", "user@elsewhere.org"]),
+            {"bar@baz.net", "user@elsewhere.org"},
         )
 
         # Query all the entries mid-way through the stream, but include one
@@ -150,7 +150,7 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
                 ],
                 stream_pos=2,
             ),
-            set(["bar@baz.net", "user@elsewhere.org"]),
+            {"bar@baz.net", "user@elsewhere.org"},
         )
 
         # Query all the entries, but before the first known point. We will get
@@ -165,21 +165,13 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
                 ],
                 stream_pos=0,
             ),
-            set(
-                [
-                    "user@foo.com",
-                    "bar@baz.net",
-                    "user@elsewhere.org",
-                    "not@here.website",
-                ]
-            ),
+            {"user@foo.com", "bar@baz.net", "user@elsewhere.org", "not@here.website"},
         )
 
         # Query a subset of the entries mid-way through the stream. We should
         # only get back the subset.
         self.assertEqual(
-            cache.get_entities_changed(["bar@baz.net"], stream_pos=2),
-            set(["bar@baz.net"]),
+            cache.get_entities_changed(["bar@baz.net"], stream_pos=2), {"bar@baz.net"},
         )
 
     def test_max_pos(self):

@@ -189,7 +189,7 @@ class BackgroundUpdater(object):
                 keyvalues=None,
                 retcols=("update_name", "depends_on"),
             )
-            in_flight = set(update["update_name"] for update in updates)
+            in_flight = {update["update_name"] for update in updates}
             for update in updates:
                 if update["depends_on"] not in in_flight:
                     self._background_update_queue.append(update["update_name"])

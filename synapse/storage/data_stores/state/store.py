@@ -518,11 +518,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             retcols=("state_group",),
         )
 
-        remaining_state_groups = set(
+        remaining_state_groups = {
             row["state_group"]
             for row in rows
             if row["state_group"] not in state_groups_to_delete
-        )
+        }
 
         logger.info(
             "[purge] de-delta-ing %i remaining state groups",

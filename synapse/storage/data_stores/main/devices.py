@@ -137,7 +137,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # get the cross-signing keys of the users in the list, so that we can
         # determine which of the device changes were cross-signing keys
-        users = set(r[0] for r in updates)
+        users = {r[0] for r in updates}
         master_key_by_user = {}
         self_signing_key_by_user = {}
         for user in users:
@@ -446,7 +446,7 @@ class DeviceWorkerStore(SQLBaseStore):
             a set of user_ids and results_map is a mapping of
             user_id -> device_id -> device_info
         """
-        user_ids = set(user_id for user_id, _ in query_list)
+        user_ids = {user_id for user_id, _ in query_list}
         user_map = yield self.get_device_list_last_stream_id_for_remotes(list(user_ids))
 
         # We go and check if any of the users need to have their device lists
@@ -454,10 +454,9 @@ class DeviceWorkerStore(SQLBaseStore):
         users_needing_resync = yield self.get_user_ids_requiring_device_list_resync(
             user_ids
         )
-        user_ids_in_cache = (
-            set(user_id for user_id, stream_id in user_map.items() if stream_id)
-            - users_needing_resync
-        )
+        user_ids_in_cache = {
+            user_id for user_id, stream_id in user_map.items() if stream_id
+        } - users_needing_resync
         user_ids_not_in_cache = user_ids - user_ids_in_cache
 
         results = {}
@@ -604,7 +603,7 @@ class DeviceWorkerStore(SQLBaseStore):
             rows = yield self.db.execute(
                 "get_users_whose_signatures_changed", None, sql, user_id, from_key
             )
-            return set(user for row in rows for user in json.loads(row[0]))
+            return {user for row in rows for user in json.loads(row[0])}
         else:
             return set()
 

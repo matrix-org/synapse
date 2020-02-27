@@ -99,7 +99,9 @@ class MessageHandler(object):
         (
             membership,
             membership_event_id,
-        ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
+        ) = yield self.auth.check_user_in_room_or_world_readable(
+            room_id, user_id, allow_departed_users=True
+        )
 
         if membership == Membership.JOIN:
             data = yield self.state.get_current_state(room_id, event_type, state_key)
@@ -177,7 +179,9 @@ class MessageHandler(object):
             (
                 membership,
                 membership_event_id,
-            ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
+            ) = yield self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
+            )
 
             if membership == Membership.JOIN:
                 state_ids = yield self.store.get_filtered_current_state_ids(
@@ -216,8 +220,8 @@ class MessageHandler(object):
         if not requester.app_service:
             # We check AS auth after fetching the room membership, as it
             # requires us to pull out all joined members anyway.
-            membership, _ = yield self.auth.check_in_room_or_world_readable(
-                room_id, user_id
+            membership, _ = yield self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
             )
             if membership != Membership.JOIN:
                 raise NotImplementedError(
@@ -1012,11 +1016,10 @@ class EventCreationHandler(object):
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
 
-    @defer.inlineCallbacks
-    def _bump_active_time(self, user):
+    async def _bump_active_time(self, user):
         try:
             presence = self.hs.get_presence_handler()
-            yield presence.bump_presence_active_time(user)
+            await presence.bump_presence_active_time(user)
         except Exception:
             logger.exception("Error bumping presence active time")
 

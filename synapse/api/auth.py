@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
 from six import itervalues
 
@@ -35,6 +36,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.server import is_threepid_reserved
+from synapse.events import EventBase
 from synapse.types import StateMap, UserID
 from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -92,20 +94,34 @@ class Auth(object):
         )
 
     @defer.inlineCallbacks
-    def check_joined_room(self, room_id, user_id, current_state=None):
-        """Check if the user is currently joined in the room
+    def check_user_in_room(
+        self,
+        room_id: str,
+        user_id: str,
+        current_state: Optional[StateMap[EventBase]] = None,
+        allow_departed_users: bool = False,
+    ):
+        """Check if the user is in the room, or was at some point.
         Args:
-            room_id(str): The room to check.
-            user_id(str): The user to check.
-            current_state(dict): Optional map of the current state of the room.
+            room_id: The room to check.
+
+            user_id: The user to check.
+
+            current_state: Optional map of the current state of the room.
                 If provided then that map is used to check whether they are a
                 member of the room. Otherwise the current membership is
                 loaded from the database.
+
+            allow_departed_users: if True, accept users that were previously
+                members but have now departed.
+
         Raises:
-            AuthError if the user is not in the room.
+            AuthError if the user is/was not in the room.
         Returns:
-            A deferred membership event for the user if the user is in
-            the room.
+            Deferred[Optional[EventBase]]:
+                Membership event for the user if the user was in the
+                room. This will be the join event if they are currently joined to
+                the room. This will be the leave event if they have left the room.
         """
         if current_state:
             member = current_state.get((EventTypes.Member, user_id), None)
@@ -113,49 +129,25 @@ class Auth(object):
             member = yield self.state.get_current_state(
                 room_id=room_id, event_type=EventTypes.Member, state_key=user_id
             )
-
-        self._check_joined_room(member, user_id, room_id)
-        return member
-
-    @defer.inlineCallbacks
-    def check_user_was_in_room(self, room_id, user_id):
-        """Check if the user was in the room at some point.
-        Args:
-            room_id(str): The room to check.
-            user_id(str): The user to check.
-        Raises:
-            AuthError if the user was never in the room.
-        Returns:
-            A deferred membership event for the user if the user was in the
-            room. This will be the join event if they are currently joined to
-            the room. This will be the leave event if they have left the room.
-        """
-        member = yield self.state.get_current_state(
-            room_id=room_id, event_type=EventTypes.Member, state_key=user_id
-        )
         membership = member.membership if member else None
 
-        if membership not in (Membership.JOIN, Membership.LEAVE):
-            raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+        if membership == Membership.JOIN:
+            return member
 
-        if membership == Membership.LEAVE:
+        # XXX this looks totally bogus. Why do we not allow users who have been banned,
+        # or those who were members previously and have been re-invited?
+        if allow_departed_users and membership == Membership.LEAVE:
             forgot = yield self.store.did_forget(user_id, room_id)
-            if forgot:
-                raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+            if not forgot:
+                return member
 
-        return member
+        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
         with Measure(self.clock, "check_host_in_room"):
             latest_event_ids = yield self.store.is_host_joined(room_id, host)
             return latest_event_ids
-
-    def _check_joined_room(self, member, user_id, room_id):
-        if not member or member.membership != Membership.JOIN:
-            raise AuthError(
-                403, "User %s not in room %s (%s)" % (user_id, room_id, repr(member))
-            )
 
     def can_federate(self, event, auth_events):
         creation_event = auth_events.get((EventTypes.Create, ""))
@@ -546,13 +538,13 @@ class Auth(object):
         return defer.succeed(auth_ids)
 
     @defer.inlineCallbacks
-    def check_can_change_room_list(self, room_id, user):
+    def check_can_change_room_list(self, room_id: str, user: UserID):
         """Check if the user is allowed to edit the room's entry in the
         published room list.
 
         Args:
-            room_id (str)
-            user (UserID)
+            room_id
+            user
         """
 
         is_admin = yield self.is_server_admin(user)
@@ -560,11 +552,11 @@ class Auth(object):
             return True
 
         user_id = user.to_string()
-        yield self.check_joined_room(room_id, user_id)
+        yield self.check_user_in_room(room_id, user_id)
 
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
-        # m.room.aliases events
+        # m.room.canonical_alias events
         power_level_event = yield self.state.get_current_state(
             room_id, EventTypes.PowerLevels, ""
         )
@@ -574,7 +566,7 @@ class Auth(object):
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
         send_level = event_auth.get_send_level(
-            EventTypes.Aliases, "", power_level_event
+            EventTypes.CanonicalAlias, "", power_level_event
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
@@ -633,9 +625,17 @@ class Auth(object):
             return query_params[0].decode("ascii")
 
     @defer.inlineCallbacks
-    def check_in_room_or_world_readable(self, room_id, user_id):
+    def check_user_in_room_or_world_readable(
+        self, room_id: str, user_id: str, allow_departed_users: bool = False
+    ):
         """Checks that the user is or was in the room or the room is world
         readable. If it isn't then an exception is raised.
+
+        Args:
+            room_id: room to check
+            user_id: user to check
+            allow_departed_users: if True, accept users that were previously
+                members but have now departed
 
         Returns:
             Deferred[tuple[str, str|None]]: Resolves to the current membership of
@@ -645,12 +645,14 @@ class Auth(object):
         """
 
         try:
-            # check_user_was_in_room will return the most recent membership
+            # check_user_in_room will return the most recent membership
             # event for the user if:
             #  * The user is a non-guest user, and was ever in the room
             #  * The user is a guest user, and has joined the room
             # else it will throw.
-            member_event = yield self.check_user_was_in_room(room_id, user_id)
+            member_event = yield self.check_user_in_room(
+                room_id, user_id, allow_departed_users=allow_departed_users
+            )
             return member_event.membership, member_event.event_id
         except AuthError:
             visibility = yield self.state.get_current_state(
@@ -662,7 +664,9 @@ class Auth(object):
             ):
                 return Membership.JOIN, None
             raise AuthError(
-                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
+                403,
+                "User %s not in room %s, and room previews are disabled"
+                % (user_id, room_id),
             )
 
     @defer.inlineCallbacks
