@@ -16,7 +16,6 @@
 import threading
 from functools import wraps
 
-from synapse.config import cache as cache_config
 from synapse.util.caches.treecache import TreeCache
 
 
@@ -79,7 +78,7 @@ class LruCache(object):
 
         # Save the original max size, and apply the default size factor.
         self._original_max_size = max_size
-        self.max_size = int(max_size * cache_config.DEFAULT_CACHE_SIZE_FACTOR)
+        self.max_size = int(max_size)
 
         list_root = _Node(None, None, None, None)
         list_root.next_node = list_root

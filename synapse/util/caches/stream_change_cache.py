@@ -20,7 +20,6 @@ from six import integer_types
 
 from sortedcontainers import SortedDict
 
-from synapse.config import cache as cache_config
 from synapse.util import caches
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ class StreamChangeCache(object):
 
     def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache=None):
         self._original_max_size = max_size
-        self.max_size = math.floor(max_size * cache_config.DEFAULT_CACHE_SIZE_FACTOR)
+        self.max_size = math.floor(max_size)
         self._entity_to_key = {}
         self._cache = SortedDict()
         self._earliest_known_stream_pos = current_stream_pos
