@@ -187,7 +187,7 @@ class FederationClient(FederationBase):
 
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Iterable[str]
-    ) -> List[EventBase]:
+    ) -> Optional[List[EventBase]]:
         """Requests some more historic PDUs for the given room from the
         given destination server.
 
@@ -199,9 +199,9 @@ class FederationClient(FederationBase):
         """
         logger.debug("backfill extrem=%s", extremities)
 
-        # If there are no extremeties then we've (probably) reached the start.
+        # If there are no extremities then we've (probably) reached the start.
         if not extremities:
-            return
+            return None
 
         transaction_data = await self.transport_layer.backfill(
             dest, room_id, extremities, limit
@@ -284,7 +284,7 @@ class FederationClient(FederationBase):
                 pdu_list = [
                     event_from_pdu_json(p, room_version, outlier=outlier)
                     for p in transaction_data["pdus"]
-                ]
+                ]  # type: List[EventBase]
 
                 if pdu_list and pdu_list[0]:
                     pdu = pdu_list[0]
@@ -615,7 +615,7 @@ class FederationClient(FederationBase):
             ]
             if auth_chain_create_events != [create_event.event_id]:
                 raise InvalidResponseError(
-                    "Unexpected create event(s) in auth chain"
+                    "Unexpected create event(s) in auth chain: %s"
                     % (auth_chain_create_events,)
                 )
 
