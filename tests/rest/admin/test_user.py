@@ -422,7 +422,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def test_create_server_admin(self):
         """
-        If the user is a server admin, a new admin is created.
+        Check that a new admin user is created successfully.
         """
         self.hs.config.registration_shared_secret = None
         url = "/_synapse/admin/v2/users/@bob:test"
@@ -469,7 +469,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def test_create_user(self):
         """
-        If the user is a server admin, a new user is created.
+        Check that a new regular user is created successfully.
         """
         self.hs.config.registration_shared_secret = None
         url = "/_synapse/admin/v2/users/@bob:test"
@@ -516,7 +516,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def test_set_password(self):
         """
-        If the user is a server admin, set a new password of an other user.
+        Test setting a new password for another user.
         """
         self.hs.config.registration_shared_secret = None
 
@@ -535,7 +535,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def test_set_displayname(self):
         """
-        If the user is a server admin, set displayname of an other user.
+        Test setting the displayname of another user.
         """
         self.hs.config.registration_shared_secret = None
 
@@ -566,7 +566,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def test_set_threepid(self):
         """
-        If the user is a server admin, set threepid of an other user.
+        Test setting threepid for an other user.
         """
         self.hs.config.registration_shared_secret = None
 
@@ -601,7 +601,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def test_deactivate_user(self):
         """
-        If the user is a server admin, deactivate an other user.
+        Test deactivating another user.
         """
 
         # Deactivate user
@@ -632,7 +632,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def test_set_user_as_admin(self):
         """
-        If the user is a server admin, set a user as an admin.
+        Test setting the admin flag on a user.
         """
         self.hs.config.registration_shared_secret = None
 
