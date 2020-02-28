@@ -612,15 +612,18 @@ class DeviceWorkerStore(SQLBaseStore):
         combined list of changes to devices, and which destinations need to be
         poked. `destination` may be None if no destinations need to be poked.
         """
-        # We do a group by here as there can be a large number of duplicate
-        # entries, since we throw away device IDs.
+
+        # This query Does The Right Thing where it'll correctly apply the
+        # bounds to the inner queries.
         sql = """
-            SELECT MAX(stream_id) AS stream_id, user_id, destination
-            FROM device_lists_stream
-            LEFT JOIN device_lists_outbound_pokes USING (stream_id, user_id, device_id)
+            SELECT stream_id, entity FROM (
+                SELECT stream_id, user_id AS entity FROM device_lists_stream
+                UNION ALL
+                SELECT stream_id, destination AS entity FROM device_lists_outbound_pokes
+            ) AS e
             WHERE ? < stream_id AND stream_id <= ?
-            GROUP BY user_id, destination
         """
+
         return self.db.execute(
             "get_all_device_list_changes_for_remotes", None, sql, from_key, to_key
         )
