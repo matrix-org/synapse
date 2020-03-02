@@ -556,6 +556,9 @@ class SSOAuthHandler(object):
 
         self._server_name = hs.config.server_name
 
+        # cast to tuple for use with str.startswith
+        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
+
     async def on_successful_auth(
         self, username, request, client_redirect_url, user_display_name=None
     ):
@@ -605,11 +608,6 @@ class SSOAuthHandler(object):
             registered_user_id
         )
 
-        # Remove the query parameters from the redirect URL to get a shorter version of
-        # it. This is only to display a human-readable URL in the template, but not the
-        # URL we redirect users to.
-        redirect_url_no_params = client_redirect_url.split("?")[0]
-
         # Append the login token to the original redirect URL (i.e. with its query
         # parameters kept intact) to build the URL to which the template needs to
         # redirect the users once they have clicked on the confirmation link.
@@ -617,17 +615,29 @@ class SSOAuthHandler(object):
             client_redirect_url, "loginToken", login_token
         )
 
-        # Serve the redirect confirmation page
+        # if the client is whitelisted, we can redirect straight to it
+        if client_redirect_url.startswith(self._whitelisted_sso_clients):
+            request.redirect(redirect_url)
+            finish_request(request)
+            return
+
+        # Otherwise, serve the redirect confirmation page.
+
+        # Remove the query parameters from the redirect URL to get a shorter version of
+        # it. This is only to display a human-readable URL in the template, but not the
+        # URL we redirect users to.
+        redirect_url_no_params = client_redirect_url.split("?")[0]
+
         html = self._template.render(
             display_url=redirect_url_no_params,
             redirect_url=redirect_url,
             server_name=self._server_name,
-        )
+        ).encode("utf-8")
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
         request.setHeader(b"Content-Length", b"%d" % (len(html),))
-        request.write(html.encode("utf8"))
+        request.write(html)
         finish_request(request)
 
     @staticmethod

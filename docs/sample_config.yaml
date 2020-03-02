@@ -1363,6 +1363,22 @@ saml2_config:
 # Additional settings to use with single-sign on systems such as SAML2 and CAS.
 #
 sso:
+    # A list of client URLs which are whitelisted so that the user does not
+    # have to confirm giving access to their account to the URL. Any client
+    # whose URL starts with an entry in the following list will not be subject
+    # to an additional confirmation step after the SSO login is completed.
+    #
+    # WARNING: An entry such as "https://my.client" is insecure, because it
+    # will also match "https://my.client.evil.site", exposing your users to
+    # phishing attacks from evil.site. To avoid this, include a slash after the
+    # hostname: "https://my.client/".
+    #
+    # By default, this list is empty.
+    #
+    #client_whitelist:
+    #  - https://riot.im/develop
+    #  - https://my.custom.client/
+
     # Directory in which Synapse will try to find the template files below.
     # If not set, default templates from within the Synapse package will be used.
     #
@@ -1372,8 +1388,8 @@ sso:
     #
     # Synapse will look for the following templates in this directory:
     #
-    # * HTML page for confirmation of redirect during authentication:
-    #   'sso_redirect_confirm.html'.
+    # * HTML page for a confirmation step before redirecting back to the client
+    #   with the login token: 'sso_redirect_confirm.html'.
     #
     #   When rendering, this template is given three variables:
     #     * redirect_url: the URL the user is about to be redirected to. Needs
@@ -1381,7 +1397,7 @@ sso:
     #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
     #
     #     * display_url: the same as `redirect_url`, but with the query
-    #                    parameters stripped. The intention is to have a 
+    #                    parameters stripped. The intention is to have a
     #                    human-readable URL to show to users, not to use it as
     #                    the final address to redirect to. Needs manual escaping
     #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
