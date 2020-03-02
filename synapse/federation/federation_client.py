@@ -346,15 +346,14 @@ class FederationClient(FederationBase):
 
         return state_event_ids, auth_event_ids
 
-    @defer.inlineCallbacks
-    def _check_sigs_and_hash_and_fetch(
+    async def _check_sigs_and_hash_and_fetch(
         self,
         origin: str,
         pdus: List[EventBase],
         room_version: str,
         outlier: bool = False,
         include_none: bool = False,
-    ):
+    ) -> List[EventBase]:
         """Takes a list of PDUs and checks the signatures and hashs of each
         one. If a PDU fails its signature check then we check if we have it in
         the database and if not then request if from the originating server of
@@ -415,7 +414,7 @@ class FederationClient(FederationBase):
         handle = preserve_fn(handle_check_result)
         deferreds2 = [handle(pdu, deferred) for pdu, deferred in zip(pdus, deferreds)]
 
-        valid_pdus = yield make_deferred_yieldable(
+        valid_pdus = await make_deferred_yieldable(
             defer.gatherResults(deferreds2, consumeErrors=True)
         ).addErrback(unwrapFirstError)
 
