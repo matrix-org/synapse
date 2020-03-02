@@ -268,13 +268,11 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
         self.redirect_path = "_synapse/client/login/sso/redirect/confirm"
 
         config = self.default_config()
-        config["enable_registration"] = True
         config["cas_config"] = {
             "enabled": True,
             "server_url": "https://fake.test",
             "service_url": "https://matrix.goodserver.com:8448",
         }
-        config["public_baseurl"] = self.base_url
 
         async def get_raw(uri, args):
             """Return an example response payload from a call to the `/proxyValidate`
@@ -310,7 +308,7 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
         """Tests that the SSO login flow serves a confirmation page before redirecting a
         user to the redirect URL.
         """
-        base_url = "/login/cas/ticket?redirectUrl"
+        base_url = "/_matrix/client/r0/login/cas/ticket?redirectUrl"
         redirect_url = "https://dodgy-site.com/"
 
         url_parts = list(urllib.parse.urlparse(base_url))
@@ -325,6 +323,7 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         # Test that the response is HTML.
+        self.assertEqual(channel.code, 200)
         content_type_header_value = ""
         for header in channel.result.get("headers", []):
             if header[0] == b"Content-Type":
@@ -337,3 +336,30 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
 
         # And that it contains our redirect link
         self.assertIn(redirect_url, channel.result["body"].decode("UTF-8"))
+
+    @override_config(
+        {
+            "sso": {
+                "client_whitelist": [
+                    "https://legit-site.com/",
+                    "https://other-site.com/",
+                ]
+            }
+        }
+    )
+    def test_cas_redirect_whitelisted(self):
+        """Tests that the SSO login flow serves a redirect to a whitelisted url
+        """
+        redirect_url = "https://legit-site.com/"
+        cas_ticket_url = (
+            "/_matrix/client/r0/login/cas/ticket?redirectUrl=%s&ticket=ticket"
+            % (urllib.parse.quote(redirect_url))
+        )
+
+        # Get Synapse to call the fake CAS and serve the template.
+        request, channel = self.make_request("GET", cas_ticket_url)
+        self.render(request)
+
+        self.assertEqual(channel.code, 302)
+        location_headers = channel.headers.getRawHeaders("Location")
+        self.assertEqual(location_headers[0][: len(redirect_url)], redirect_url)

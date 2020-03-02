@@ -37,11 +37,29 @@ class SSOConfig(Config):
 
         self.sso_redirect_confirm_template_dir = template_dir
 
+        self.sso_client_whitelist = sso_config.get("client_whitelist") or []
+
     def generate_config_section(self, **kwargs):
         return """\
         # Additional settings to use with single-sign on systems such as SAML2 and CAS.
         #
         sso:
+            # A list of client URLs which are whitelisted so that the user does not
+            # have to confirm giving access to their account to the URL. Any client
+            # whose URL starts with an entry in the following list will not be subject
+            # to an additional confirmation step after the SSO login is completed.
+            #
+            # WARNING: An entry such as "https://my.client" is insecure, because it
+            # will also match "https://my.client.evil.site", exposing your users to
+            # phishing attacks from evil.site. To avoid this, include a slash after the
+            # hostname: "https://my.client/".
+            #
+            # By default, this list is empty.
+            #
+            #client_whitelist:
+            #  - https://riot.im/develop
+            #  - https://my.custom.client/
+
             # Directory in which Synapse will try to find the template files below.
             # If not set, default templates from within the Synapse package will be used.
             #
