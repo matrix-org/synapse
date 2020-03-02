@@ -29,6 +29,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.http.site import SynapseRequest
+from synapse.push.mailer import load_jinja2_templates
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -548,6 +549,13 @@ class SSOAuthHandler(object):
         self._registration_handler = hs.get_registration_handler()
         self._macaroon_gen = hs.get_macaroon_generator()
 
+        # Load the redirect page HTML template
+        self._template = load_jinja2_templates(
+            hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
+        )[0]
+
+        self._server_name = hs.config.server_name
+
     async def on_successful_auth(
         self, username, request, client_redirect_url, user_display_name=None
     ):
@@ -592,21 +600,41 @@ class SSOAuthHandler(object):
             request:
             client_redirect_url:
         """
-
+        # Create a login token
         login_token = self._macaroon_gen.generate_short_term_login_token(
             registered_user_id
         )
-        redirect_url = self._add_login_token_to_redirect_url(
-            client_redirect_url, login_token
+
+        # Remove the query parameters from the redirect URL to get a shorter version of
+        # it. This is only to display a human-readable URL in the template, but not the
+        # URL we redirect users to.
+        redirect_url_no_params = client_redirect_url.split("?")[0]
+
+        # Append the login token to the original redirect URL (i.e. with its query
+        # parameters kept intact) to build the URL to which the template needs to
+        # redirect the users once they have clicked on the confirmation link.
+        redirect_url = self._add_query_param_to_url(
+            client_redirect_url, "loginToken", login_token
         )
-        request.redirect(redirect_url)
+
+        # Serve the redirect confirmation page
+        html = self._template.render(
+            display_url=redirect_url_no_params,
+            redirect_url=redirect_url,
+            server_name=self._server_name,
+        )
+
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html),))
+        request.write(html.encode("utf8"))
         finish_request(request)
 
     @staticmethod
-    def _add_login_token_to_redirect_url(url, token):
+    def _add_query_param_to_url(url, param_name, param):
         url_parts = list(urllib.parse.urlparse(url))
         query = dict(urllib.parse.parse_qsl(url_parts[4]))
-        query.update({"loginToken": token})
+        query.update({param_name: param})
         url_parts[4] = urllib.parse.urlencode(query)
         return urllib.parse.urlunparse(url_parts)
 

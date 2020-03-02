@@ -1360,6 +1360,40 @@ saml2_config:
 #   #    name: value
 
 
+# Additional settings to use with single-sign on systems such as SAML2 and CAS.
+#
+sso:
+    # Directory in which Synapse will try to find the template files below.
+    # If not set, default templates from within the Synapse package will be used.
+    #
+    # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+    # If you *do* uncomment it, you will need to make sure that all the templates
+    # below are in the directory.
+    #
+    # Synapse will look for the following templates in this directory:
+    #
+    # * HTML page for confirmation of redirect during authentication:
+    #   'sso_redirect_confirm.html'.
+    #
+    #   When rendering, this template is given three variables:
+    #     * redirect_url: the URL the user is about to be redirected to. Needs
+    #                     manual escaping (see
+    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #
+    #     * display_url: the same as `redirect_url`, but with the query
+    #                    parameters stripped. The intention is to have a 
+    #                    human-readable URL to show to users, not to use it as
+    #                    the final address to redirect to. Needs manual escaping
+    #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #
+    #     * server_name: the homeserver's name.
+    #
+    # You can see the default templates at:
+    # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+    #
+    #template_dir: "res/templates"
+
+
 # The JWT needs to contain a globally unique "sub" (subject) claim.
 #
 #jwt_config:
