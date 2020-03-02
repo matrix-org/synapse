@@ -49,6 +49,7 @@ def check_3pid_allowed(hs, medium, address):
 
     return False
 
+
 def check_3pid_valid_format(medium, address):
     """Checks whether 3pid has a valid format
 
@@ -61,7 +62,7 @@ def check_3pid_valid_format(medium, address):
 
     if medium == "email":
         regex = "(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
-        if re.search(regex,email):
+        if re.search(regex, email):
             return True
         else:
             return False
