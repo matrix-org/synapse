@@ -912,7 +912,7 @@ class EventCreationHandler(object):
                     raise SynapseError(
                         400,
                         "Room alias %s does not point to the room" % (room_alias_str,),
-                        Codes.NOT_FOUND,
+                        Codes.BAD_ALIAS,
                     )
 
             # Check that alt_aliases is the proper form.
@@ -939,7 +939,7 @@ class EventCreationHandler(object):
                             400,
                             "Room alias %s does not point to the room"
                             % (room_alias_str,),
-                            Codes.NOT_FOUND,
+                            Codes.BAD_ALIAS,
                         )
 
         federation_handler = self.hs.get_handlers().federation_handler
