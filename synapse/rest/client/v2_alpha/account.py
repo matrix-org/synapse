@@ -31,7 +31,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret
-from synapse.util.threepids import check_3pid_allowed
+from synapse.util.threepids import check_3pid_allowed, check_3pid_valid_format
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -87,6 +87,13 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         email = body["email"]
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
+
+        if not check_3pid_valid_format("email", email):
+            raise SynapseError(
+                400,
+                "Third party identifier has not a valid format",
+                Codes.INVALID_THREEPID,
+            )
 
         if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
@@ -363,6 +370,13 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
+        if not check_3pid_valid_format("email", email):
+            raise SynapseError(
+                400,
+                "Third party identifier has not a valid format",
+                Codes.INVALID_THREEPID,
+            )
+
         if not check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
@@ -427,6 +441,13 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         next_link = body.get("next_link")  # Optional param
 
         msisdn = phone_number_to_msisdn(country, phone_number)
+
+        if not check_3pid_valid_format("msisdn", msisdn):
+            raise SynapseError(
+                400,
+                "Third party identifier has not a valid format",
+                Codes.INVALID_THREEPID,
+            )
 
         if not check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(

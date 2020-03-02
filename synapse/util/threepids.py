@@ -48,3 +48,24 @@ def check_3pid_allowed(hs, medium, address):
         return True
 
     return False
+
+def check_3pid_valid_format(medium, address):
+    """Checks whether 3pid has a valid format
+
+    Args:
+        medium (str): 3pid medium - e.g. email, msisdn
+        address (str): 3pid address to check (e.g. "wotan@matrix.org")
+    Returns:
+        bool: whether the email address has a valid format
+    """
+
+    if medium = "email"
+        regex = "(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+        if re.search(regex,email):
+            return True
+        else:
+            return False
+    elif medium = "address"
+        return True
+    else
+        return False
