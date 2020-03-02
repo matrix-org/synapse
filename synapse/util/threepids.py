@@ -59,13 +59,13 @@ def check_3pid_valid_format(medium, address):
         bool: whether the email address has a valid format
     """
 
-    if medium == "email"
+    if medium == "email":
         regex = "(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
         if re.search(regex,email):
             return True
         else:
             return False
-    elif medium == "msisdn"
+    elif medium == "msisdn":
         return True
-    else
+    else:
         return False
