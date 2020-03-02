@@ -119,7 +119,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        email = body["email"]
+        # For emails, transform the address to lowercase.
+        # We store all email addreses as lowercase in the DB.
+        # (See add_threepid in synapse/handlers/auth.py)
+        email = body["email"].lower()
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -131,7 +134,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
-            "email", body["email"]
+            "email", email
         )
 
         if existing_user_id is not None:
@@ -552,7 +555,10 @@ class RegisterRestServlet(RestServlet):
                 for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
                     if login_type in auth_result:
                         medium = auth_result[login_type]["medium"]
-                        address = auth_result[login_type]["address"]
+                        # For emails, transform the address to lowercase.
+                        # We store all email addreses as lowercase in the DB.
+                        # (See add_threepid in synapse/handlers/auth.py)
+                        address = auth_result[login_type]["address"].lower()
 
                         existing_user_id = await self.store.get_user_id_by_threepid(
                             medium, address
