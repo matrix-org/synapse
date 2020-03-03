@@ -16,7 +16,7 @@ from typing import Any, Dict
 
 import pkg_resources
 
-from ._base import Config, ConfigError
+from ._base import Config
 
 
 class SSOConfig(Config):

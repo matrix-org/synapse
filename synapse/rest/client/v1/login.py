@@ -28,7 +28,6 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.http.site import SynapseRequest
 from synapse.push.mailer import load_jinja2_templates
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
@@ -591,62 +590,9 @@ class SSOAuthHandler(object):
                 localpart=localpart, default_display_name=user_display_name
             )
 
-        self.complete_sso_login(registered_user_id, request, client_redirect_url)
-
-    def complete_sso_login(
-        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
-    ):
-        """Having figured out a mxid for this user, complete the HTTP request
-
-        Args:
-            registered_user_id:
-            request:
-            client_redirect_url:
-        """
-        # Create a login token
-        login_token = self._macaroon_gen.generate_short_term_login_token(
-            registered_user_id
+        self._auth_handler.complete_sso_login(
+            registered_user_id, request, client_redirect_url
         )
-
-        # Append the login token to the original redirect URL (i.e. with its query
-        # parameters kept intact) to build the URL to which the template needs to
-        # redirect the users once they have clicked on the confirmation link.
-        redirect_url = self._add_query_param_to_url(
-            client_redirect_url, "loginToken", login_token
-        )
-
-        # if the client is whitelisted, we can redirect straight to it
-        if client_redirect_url.startswith(self._whitelisted_sso_clients):
-            request.redirect(redirect_url)
-            finish_request(request)
-            return
-
-        # Otherwise, serve the redirect confirmation page.
-
-        # Remove the query parameters from the redirect URL to get a shorter version of
-        # it. This is only to display a human-readable URL in the template, but not the
-        # URL we redirect users to.
-        redirect_url_no_params = client_redirect_url.split("?")[0]
-
-        html = self._template.render(
-            display_url=redirect_url_no_params,
-            redirect_url=redirect_url,
-            server_name=self._server_name,
-        ).encode("utf-8")
-
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html),))
-        request.write(html)
-        finish_request(request)
-
-    @staticmethod
-    def _add_query_param_to_url(url, param_name, param):
-        url_parts = list(urllib.parse.urlparse(url))
-        query = dict(urllib.parse.parse_qsl(url_parts[4]))
-        query.update({param_name: param})
-        url_parts[4] = urllib.parse.urlencode(query)
-        return urllib.parse.urlunparse(url_parts)
 
 
 def register_servlets(hs, http_server):
