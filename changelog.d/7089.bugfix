@@ -1,0 +1,1 @@
+Fix typing issue in federation client found with mypy.
