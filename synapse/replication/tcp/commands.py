@@ -183,35 +183,22 @@ class ReplicateCommand(Command):
 
     Format::
 
-        REPLICATE <stream_name> <token>
+        REPLICATE <stream_name>
 
-    Where <token> may be either:
-        * a numeric stream_id to stream updates from
-        * "NOW" to stream all subsequent updates.
-
-    The <stream_name> can be "ALL" to subscribe to all known streams, in which
-    case the <token> must be set to "NOW", i.e.::
-
-        REPLICATE ALL NOW
+    The <stream_name> can be "ALL" to subscribe to all known streams
     """
 
     NAME = "REPLICATE"
 
-    def __init__(self, stream_name, token):
+    def __init__(self, stream_name):
         self.stream_name = stream_name
-        self.token = token
 
     @classmethod
     def from_line(cls, line):
-        stream_name, token = line.split(" ", 1)
-        if token in ("NOW", "now"):
-            token = "NOW"
-        else:
-            token = int(token)
-        return cls(stream_name, token)
+        return cls(line)
 
     def to_line(self):
-        return " ".join((self.stream_name, str(self.token)))
+        return self.stream_name
 
     def get_logcontext_id(self):
         return "REPLICATE-" + self.stream_name

@@ -71,7 +71,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
     def replicate_stream(self, stream, token="NOW"):
         """Make the client end a REPLICATE command to set up a subscription to a stream"""
-        self.client.send_command(ReplicateCommand(stream, token))
+        self.client.send_command(ReplicateCommand(stream))
 
 
 class TestReplicationClientHandler(object):
