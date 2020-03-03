@@ -36,6 +36,7 @@ from synapse.rest.admin._base import (
     historical_admin_path_patterns,
 )
 from synapse.types import UserID
+from synapse.util.threepids import check_3pid_allowed, check_3pid_valid_format
 
 logger = logging.getLogger(__name__)
 
@@ -195,8 +196,35 @@ class UserRestServletV2(RestServlet):
                 # add new threepids to user
                 current_time = self.hs.get_clock().time_msec()
                 for threepid in body["threepids"]:
+                    # For emails, transform the address to lowercase.
+                    # We store all email addreses as lowercase in the DB.
+                    # (See add_threepid in synapse/handlers/auth.py)
+                    address = threepid["address"].lower()
+                    if not check_3pid_valid_format(threepid["medium"], address):
+                        raise SynapseError(
+                            400,
+                            "Third party identifier has not a valid format",
+                            Codes.INVALID_THREEPID,
+                        )
+
+                    if not check_3pid_allowed(self.hs, threepid["medium"], address):
+                        raise SynapseError(
+                            403,
+                            "Your email domain or account phone number is not authorized on this server",
+                            Codes.THREEPID_DENIED,
+                        )
+
+                    existing_user_id = await self.store.get_user_id_by_threepid(
+                        threepid["medium"], address
+                    )
+
+                    if existing_user_id is not None:
+                        raise SynapseError(
+                            400, "Threepid is already in use", Codes.THREEPID_IN_USE
+                        )
+
                     await self.auth_handler.add_threepid(
-                        user_id, threepid["medium"], threepid["address"], current_time
+                        user_id, threepid["medium"], address, current_time
                     )
 
             if "avatar_url" in body:
@@ -271,8 +299,35 @@ class UserRestServletV2(RestServlet):
 
                 current_time = self.hs.get_clock().time_msec()
                 for threepid in body["threepids"]:
+                    # For emails, transform the address to lowercase.
+                    # We store all email addreses as lowercase in the DB.
+                    # (See add_threepid in synapse/handlers/auth.py)
+                    address = threepid["address"].lower()
+                    if not check_3pid_valid_format(threepid["medium"], address):
+                        raise SynapseError(
+                            400,
+                            "Third party identifier has not a valid format",
+                            Codes.INVALID_THREEPID,
+                        )
+
+                    if not check_3pid_allowed(self.hs, threepid["medium"], address):
+                        raise SynapseError(
+                            403,
+                            "Your email domain or account phone number is not authorized on this server",
+                            Codes.THREEPID_DENIED,
+                        )
+
+                    existing_user_id = await self.store.get_user_id_by_threepid(
+                        threepid["medium"], address
+                    )
+
+                    if existing_user_id is not None:
+                        raise SynapseError(
+                            400, "Threepid is already in use", Codes.THREEPID_IN_USE
+                        )
+
                     await self.auth_handler.add_threepid(
-                        user_id, threepid["medium"], threepid["address"], current_time
+                        user_id, threepid["medium"], address, current_time
                     )
 
             if "avatar_url" in body:

@@ -599,6 +599,83 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
 
+    def test_set_duplicate_threepid(self):
+        """
+        Test setting duplicate threepid for different user.
+        """
+        self.hs.config.registration_shared_secret = None
+
+        # Add duplicate threepid with different notations
+        body = json.dumps(
+            {
+                "threepids": [
+                    {"medium": "email", "address": "bob3@bob.bob"},
+                    {"medium": "email", "address": "BOB3@bob.BOB"},
+                ]
+            }
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("Threepid is already in use", channel.json_body["error"])
+
+    def test_set_invalid_threepid(self):
+        """
+        Test setting invalid threepid for an other user.
+        """
+        self.hs.config.registration_shared_secret = None
+
+        # Add threepid to user
+        body = json.dumps({"threepids": [{"medium": "email", "address": "bob3@bob"}]})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            "Third party identifier has not a valid format", channel.json_body["error"]
+        )
+
+    def test_set_not_allowed_threepid(self):
+        """
+        Test setting not allowed threepid for an other user.
+        """
+        self.hs.config.registration_shared_secret = None
+        self.hs.config.allowed_local_3pids = [
+            {"medium": "email", "pattern": r".*@matrix\.org"}
+        ]
+
+        # Add threepid to user
+        body = json.dumps(
+            {"threepids": [{"medium": "email", "address": "bob3@bob.bob"}]}
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            "Your email domain or account phone number is not authorized on this server",
+            channel.json_body["error"],
+        )
+
     def test_deactivate_user(self):
         """
         Test deactivating another user.
@@ -693,7 +770,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
-        self.assertEqual(0, channel.json_body["deactivated"])
+        self.assertEqual(False, channel.json_body["deactivated"])
 
         # Change password (and use a str for deactivate instead of a bool)
         body = json.dumps({"password": "abc123", "deactivated": "false"})  # oops!
@@ -719,4 +796,4 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("bob", channel.json_body["displayname"])
 
         # Ensure they're still alive
-        self.assertEqual(0, channel.json_body["deactivated"])
+        self.assertEqual(False, channel.json_body["deactivated"])

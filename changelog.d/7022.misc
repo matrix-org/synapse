@@ -1,1 +1,1 @@
-Add validation of format for 3pid.
+Add validation of 3pid in admin api ``PUT /_synapse/admin/v2/users/<user_id>``.
