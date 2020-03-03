@@ -27,7 +27,8 @@ Each stream is defined by the following information:
 
 from typing import Dict, Type
 
-from . import _base, events, federation
+from synapse.replication.tcp.streams import _base, events, federation
+from synapse.replication.tcp.streams._base import Stream
 
 STREAMS_MAP = {
     stream.NAME: stream
@@ -50,3 +51,6 @@ STREAMS_MAP = {
         _base.UserSignatureStream,
     )
 }  # type: Dict[str, Type[_base.Stream]]
+
+
+__all__ = ["Stream", "STREAMS_MAP"]
