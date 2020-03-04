@@ -17,7 +17,7 @@
 
 import logging
 import random
-from typing import Any, Dict, List
+from typing import Dict
 
 from six import itervalues
 
@@ -25,9 +25,8 @@ from prometheus_client import Counter
 
 from twisted.internet.protocol import Factory
 
-from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util.metrics import Measure, measure_func
+from synapse.util.metrics import Measure
 
 from .protocol import ServerReplicationStreamProtocol
 from .streams import STREAMS_MAP, Stream
@@ -36,13 +35,6 @@ from .streams.federation import FederationStream
 stream_updates_counter = Counter(
     "synapse_replication_tcp_resource_stream_updates", "", ["stream_name"]
 )
-user_sync_counter = Counter("synapse_replication_tcp_resource_user_sync", "")
-federation_ack_counter = Counter("synapse_replication_tcp_resource_federation_ack", "")
-remove_pusher_counter = Counter("synapse_replication_tcp_resource_remove_pusher", "")
-invalidate_cache_counter = Counter(
-    "synapse_replication_tcp_resource_invalidate_cache", ""
-)
-user_ip_cache_counter = Counter("synapse_replication_tcp_resource_user_ip_cache", "")
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +44,18 @@ class ReplicationStreamProtocolFactory(Factory):
     """
 
     def __init__(self, hs):
-        self.streamer = hs.get_replication_streamer()
+        self.handler = hs.get_tcp_replication()
         self.clock = hs.get_clock()
         self.server_name = hs.config.server_name
+        self.hs = hs
+
+        # Ensure the replication streamer is started if we register a
+        # replication server endpoint.
+        hs.get_replication_streamer()
 
     def buildProtocol(self, addr):
         return ServerReplicationStreamProtocol(
-            self.server_name, self.clock, self.streamer
+            self.hs, self.server_name, self.clock, self.handler
         )
 
 
@@ -78,16 +75,6 @@ class ReplicationStreamer(object):
 
         self._replication_torture_level = hs.config.replication_torture_level
 
-        # Current connections.
-        self.connections = []  # type: List[ServerReplicationStreamProtocol]
-
-        LaterGauge(
-            "synapse_replication_tcp_resource_total_connections",
-            "",
-            [],
-            lambda: len(self.connections),
-        )
-
         # List of streams that clients can subscribe to.
         # We only support federation stream if federation sending hase been
         # disabled on the master.
@@ -99,39 +86,17 @@ class ReplicationStreamer(object):
 
         self.streams_by_name = {stream.NAME: stream for stream in self.streams}
 
-        LaterGauge(
-            "synapse_replication_tcp_resource_connections_per_stream",
-            "",
-            ["stream_name"],
-            lambda: {
-                (stream_name,): len(
-                    [
-                        conn
-                        for conn in self.connections
-                        if stream_name in conn.replication_streams
-                    ]
-                )
-                for stream_name in self.streams_by_name
-            },
-        )
-
         self.federation_sender = None
         if not hs.config.send_federation:
             self.federation_sender = hs.get_federation_sender()
 
         self.notifier.add_replication_callback(self.on_notifier_poke)
-        self.notifier.add_remote_server_up_callback(self.send_remote_server_up)
 
         # Keeps track of whether we are currently checking for updates
         self.is_looping = False
         self.pending_updates = False
 
-        hs.get_reactor().addSystemEventTrigger("before", "shutdown", self.on_shutdown)
-
-    def on_shutdown(self):
-        # close all connections on shutdown
-        for conn in self.connections:
-            conn.send_error("server shutting down")
+        self.client = hs.get_tcp_replication()
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a mapp from stream name to stream instance.
@@ -145,7 +110,7 @@ class ReplicationStreamer(object):
         This should get called each time new data is available, even if it
         is currently being executed, so that nothing gets missed
         """
-        if not self.connections:
+        if not self.client.connected():
             # Don't bother if nothing is listening. We still need to advance
             # the stream tokens otherwise they'll fall beihind forever
             for stream in self.streams:
@@ -202,9 +167,7 @@ class ReplicationStreamer(object):
                             raise
 
                         logger.debug(
-                            "Sending %d updates to %d connections",
-                            len(updates),
-                            len(self.connections),
+                            "Sending %d updates", len(updates),
                         )
 
                         if updates:
@@ -220,111 +183,16 @@ class ReplicationStreamer(object):
                         # token. See RdataCommand for more details.
                         batched_updates = _batch_updates(updates)
 
-                        for conn in self.connections:
-                            for token, row in batched_updates:
-                                try:
-                                    conn.stream_update(stream.NAME, token, row)
-                                except Exception:
-                                    logger.exception("Failed to replicate")
+                        for token, row in batched_updates:
+                            try:
+                                self.client.stream_update(stream.NAME, token, row)
+                            except Exception:
+                                logger.exception("Failed to replicate")
 
             logger.debug("No more pending updates, breaking poke loop")
         finally:
             self.pending_updates = False
             self.is_looping = False
-
-    def get_stream_token(self, stream_name):
-        """For a given stream get all updates since token. This is called when
-        a client first subscribes to a stream.
-        """
-        stream = self.streams_by_name.get(stream_name, None)
-        if not stream:
-            raise Exception("unknown stream %s", stream_name)
-
-        return stream.current_token()
-
-    @measure_func("repl.federation_ack")
-    def federation_ack(self, token):
-        """We've received an ack for federation stream from a client.
-        """
-        federation_ack_counter.inc()
-        if self.federation_sender:
-            self.federation_sender.federation_ack(token)
-
-    @measure_func("repl.on_user_sync")
-    async def on_user_sync(self, instance_id, user_id, is_syncing, last_sync_ms):
-        """A client has started/stopped syncing on a worker.
-        """
-        user_sync_counter.inc()
-        await self.presence_handler.update_external_syncs_row(
-            instance_id, user_id, is_syncing, last_sync_ms
-        )
-
-    async def on_clear_user_syncs(self, instance_id):
-        """A replication client wants us to drop all their UserSync data.
-        """
-        await self.presence_handler.update_external_syncs_clear(instance_id)
-
-    @measure_func("repl.on_remove_pusher")
-    async def on_remove_pusher(self, app_id, push_key, user_id):
-        """A client has asked us to remove a pusher
-        """
-        remove_pusher_counter.inc()
-        await self.store.delete_pusher_by_app_id_pushkey_user_id(
-            app_id=app_id, pushkey=push_key, user_id=user_id
-        )
-
-        self.notifier.on_new_replication_data()
-
-    @measure_func("repl.on_invalidate_cache")
-    async def on_invalidate_cache(self, cache_func: str, keys: List[Any]):
-        """The client has asked us to invalidate a cache
-        """
-        invalidate_cache_counter.inc()
-
-        # We invalidate the cache locally, but then also stream that to other
-        # workers.
-        await self.store.invalidate_cache_and_stream(cache_func, tuple(keys))
-
-    @measure_func("repl.on_user_ip")
-    async def on_user_ip(
-        self, user_id, access_token, ip, user_agent, device_id, last_seen
-    ):
-        """The client saw a user request
-        """
-        user_ip_cache_counter.inc()
-        await self.store.insert_client_ip(
-            user_id, access_token, ip, user_agent, device_id, last_seen
-        )
-        await self._server_notices_sender.on_user_ip(user_id)
-
-    @measure_func("repl.on_remote_server_up")
-    def on_remote_server_up(self, server: str):
-        self.notifier.notify_remote_server_up(server)
-
-    def send_remote_server_up(self, server: str):
-        for conn in self.connections:
-            conn.send_remote_server_up(server)
-
-    def send_sync_to_all_connections(self, data):
-        """Sends a SYNC command to all clients.
-
-        Used in tests.
-        """
-        for conn in self.connections:
-            conn.send_sync(data)
-
-    def new_connection(self, connection):
-        """A new client connection has been established
-        """
-        self.connections.append(connection)
-
-    def lost_connection(self, connection):
-        """A client connection has been lost
-        """
-        try:
-            self.connections.remove(connection)
-        except ValueError:
-            pass
 
 
 def _batch_updates(updates):
