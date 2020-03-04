@@ -24,6 +24,7 @@ from synapse.config import (
     server,
     server_notices_config,
     spam_checker,
+    sso,
     stats,
     third_party_event_rules,
     tls,
@@ -57,6 +58,7 @@ class RootConfig:
     key: key.KeyConfig
     saml2: saml2_config.SAML2Config
     cas: cas.CasConfig
+    sso: sso.SSOConfig
     jwt: jwt_config.JWTConfig
     password: password.PasswordConfig
     email: emailconfig.EmailConfig
