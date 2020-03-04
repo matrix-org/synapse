@@ -888,18 +888,59 @@ class EventCreationHandler(object):
         yield self.base_handler.maybe_kick_guest_users(event, context)
 
         if event.type == EventTypes.CanonicalAlias:
-            # Check the alias is acually valid (at this time at least)
+            # Validate a newly added alias or newly added alt_aliases.
+
+            original_alias = None
+            original_alt_aliases = set()
+
+            original_event_id = event.unsigned.get("replaces_state")
+            if original_event_id:
+                original_event = yield self.store.get_event(original_event_id)
+
+                if original_event:
+                    original_alias = original_event.content.get("alias", None)
+                    original_alt_aliases = original_event.content.get("alt_aliases", [])
+
+            # Check the alias is currently valid (if it has changed).
             room_alias_str = event.content.get("alias", None)
-            if room_alias_str:
+            directory_handler = self.hs.get_handlers().directory_handler
+            if room_alias_str and room_alias_str != original_alias:
                 room_alias = RoomAlias.from_string(room_alias_str)
-                directory_handler = self.hs.get_handlers().directory_handler
                 mapping = yield directory_handler.get_association(room_alias)
 
                 if mapping["room_id"] != event.room_id:
                     raise SynapseError(
                         400,
                         "Room alias %s does not point to the room" % (room_alias_str,),
+                        Codes.BAD_ALIAS,
                     )
+
+            # Check that alt_aliases is the proper form.
+            alt_aliases = event.content.get("alt_aliases", [])
+            if not isinstance(alt_aliases, (list, tuple)):
+                raise SynapseError(
+                    400, "The alt_aliases property must be a list.", Codes.INVALID_PARAM
+                )
+
+            # If the old version of alt_aliases is of an unknown form,
+            # completely replace it.
+            if not isinstance(original_alt_aliases, (list, tuple)):
+                original_alt_aliases = []
+
+            # Check that each alias is currently valid.
+            new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
+            if new_alt_aliases:
+                for alias_str in new_alt_aliases:
+                    room_alias = RoomAlias.from_string(alias_str)
+                    mapping = yield directory_handler.get_association(room_alias)
+
+                    if mapping["room_id"] != event.room_id:
+                        raise SynapseError(
+                            400,
+                            "Room alias %s does not point to the room"
+                            % (room_alias_str,),
+                            Codes.BAD_ALIAS,
+                        )
 
         federation_handler = self.hs.get_handlers().federation_handler
 
