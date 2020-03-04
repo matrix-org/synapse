@@ -43,12 +43,38 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
         def _count_users(txn):
             sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
-
             txn.execute(sql)
             (count,) = txn.fetchone()
             return count
 
         return self.db.runInteraction("count_users", _count_users)
+
+    @cached(num_args=0)
+    def get_monthly_active_count_by_service(self):
+        """Generates current count of monthly active users broken down by service.
+        Since the `monthly_active_users` table is populated from the `user_ips` table
+        `config.track_appservice_user_ips` must be set to `true` for this
+        method to return anything meaningful.
+
+        Returns:
+            Deferred[dict]: dict that includes a mapping between app_service_id
+                and the number of occurrences.
+
+        """
+
+        def _count_users_by_service(txn):
+            sql = """
+                SELECT COALESCE(appservice_id, 'native'), COALESCE(count(*),0)
+                FROM monthly_active_users
+                LEFT JOIN users ON monthly_active_users.user_id=users.name
+                GROUP BY appservice_id;
+            """
+
+            txn.execute(sql)
+            result = txn.fetchall()
+            return dict(result)
+
+        return self.db.runInteraction("count_users_by_service", _count_users_by_service)
 
     @defer.inlineCallbacks
     def get_registered_reserved_users(self):
@@ -291,6 +317,9 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         )
 
         self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
+        self._invalidate_cache_and_stream(
+            txn, self.get_monthly_active_count_by_service, ()
+        )
         self._invalidate_cache_and_stream(
             txn, self.user_last_seen_monthly_active, (user_id,)
         )
