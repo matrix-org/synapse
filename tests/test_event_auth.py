@@ -91,7 +91,7 @@ class EventAuthTestCase(unittest.TestCase):
     def test_alias_event(self):
         """Alias events have special behavior up through room version 6."""
         creator = "@creator:example.com"
-        other = "@joiner:example.com"  # note the different domain name
+        other = "@other:example.com"
         auth_events = {
             ("m.room.create", ""): _create_event(creator),
             ("m.room.member", creator): _join_event(creator),
@@ -128,7 +128,7 @@ class EventAuthTestCase(unittest.TestCase):
     def test_msc2432_alias_event(self):
         """After MSC2432, alias events have no special behavior."""
         creator = "@creator:example.com"
-        other = "@joiner:example.com"  # note the different domain name
+        other = "@other:example.com"
         auth_events = {
             ("m.room.create", ""): _create_event(creator),
             ("m.room.member", creator): _join_event(creator),
