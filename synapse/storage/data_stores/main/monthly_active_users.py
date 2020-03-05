@@ -65,7 +65,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
         def _count_users_by_service(txn):
             sql = """
-                SELECT COALESCE(appservice_id, 'native'), COALESCE(count(*),0)
+                SELECT COALESCE(appservice_id, 'native'), COALESCE(count(*), 0)
                 FROM monthly_active_users
                 LEFT JOIN users ON monthly_active_users.user_id=users.name
                 GROUP BY appservice_id;
