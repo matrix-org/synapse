@@ -52,9 +52,10 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
     @cached(num_args=0)
     def get_monthly_active_count_by_service(self):
         """Generates current count of monthly active users broken down by service.
+        A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
         `config.track_appservice_user_ips` must be set to `true` for this
-        method to return anything meaningful.
+        method to return anything other than native matrix users.
 
         Returns:
             Deferred[dict]: dict that includes a mapping between app_service_id
