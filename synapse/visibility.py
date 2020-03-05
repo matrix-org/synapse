@@ -119,6 +119,9 @@ def filter_events_for_client(
 
                the original event if they can see it as normal.
         """
+        if event.type == "org.matrix.dummy_event":
+            return None
+
         if not event.is_state() and event.sender in ignore_list:
             return None
 

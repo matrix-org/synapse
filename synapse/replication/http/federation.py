@@ -18,7 +18,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.events import event_type_from_format_version
+from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -38,6 +38,9 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         {
             "events": [{
                 "event": { .. serialized event .. },
+                "room_version": .., // "1", "2", "3", etc: the version of the room
+                                    // containing the event
+                "event_format_version": .., // 1,2,3 etc: the event format version
                 "internal_metadata": { .. serialized internal_metadata .. },
                 "rejected_reason": ..,   // The event.rejected_reason field
                 "context": { .. serialized event context .. },
@@ -73,6 +76,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
             event_payloads.append(
                 {
                     "event": event.get_pdu_json(),
+                    "room_version": event.room_version.identifier,
                     "event_format_version": event.format_version,
                     "internal_metadata": event.internal_metadata.get_dict(),
                     "rejected_reason": event.rejected_reason,
@@ -95,12 +99,13 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
             event_and_contexts = []
             for event_payload in event_payloads:
                 event_dict = event_payload["event"]
-                format_ver = event_payload["event_format_version"]
+                room_ver = KNOWN_ROOM_VERSIONS[event_payload["room_version"]]
                 internal_metadata = event_payload["internal_metadata"]
                 rejected_reason = event_payload["rejected_reason"]
 
-                EventType = event_type_from_format_version(format_ver)
-                event = EventType(event_dict, internal_metadata, rejected_reason)
+                event = make_event_from_dict(
+                    event_dict, room_ver, internal_metadata, rejected_reason
+                )
 
                 context = EventContext.deserialize(
                     self.storage, event_payload["context"]

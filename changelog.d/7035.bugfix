@@ -1,0 +1,1 @@
+Fix a bug causing `org.matrix.dummy_event` to be included in responses from `/sync`.
