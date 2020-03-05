@@ -470,7 +470,7 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
-def event_type_from_format_version(format_version: int) -> Type[EventBase]:
+def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
@@ -499,5 +499,5 @@ def make_event_from_dict(
     rejected_reason: Optional[str] = None,
 ) -> EventBase:
     """Construct an EventBase from the given event dict"""
-    event_type = event_type_from_format_version(room_version.event_format)
+    event_type = _event_type_from_format_version(room_version.event_format)
     return event_type(event_dict, room_version, internal_metadata_dict, rejected_reason)
