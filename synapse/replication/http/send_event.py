@@ -98,7 +98,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             content = parse_json_object_from_request(request)
 
             event_dict = content["event"]
-            room_ver = KNOWN_ROOM_VERSIONS[content["room_ver"]]
+            room_ver = KNOWN_ROOM_VERSIONS[content["room_version"]]
             internal_metadata = content["internal_metadata"]
             rejected_reason = content["rejected_reason"]
 
