@@ -396,7 +396,7 @@ class FederationClient(FederationBase):
                         self.get_pdu(
                             destinations=[pdu.origin],
                             event_id=pdu.event_id,
-                            room_version=room_version,
+                            room_version=room_version,  # type: ignore
                             outlier=outlier,
                             timeout=10000,
                         )
