@@ -209,8 +209,9 @@ class E2eRoomKeysHandler(object):
                 for session_id, room_key in iteritems(room["sessions"]):
                     if not isinstance(room_key["is_verified"], bool):
                         msg = (
-                            "is_verified must be a boolean in keys for room %s"
-                            % room_id
+                            "is_verified must be a boolean in keys for session %s in"
+                            "room %s"
+                            % (session_id, room_id)
                         )
                         raise SynapseError(400, msg, Codes.INVALID_PARAM)
 
