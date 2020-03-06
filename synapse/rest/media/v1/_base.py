@@ -30,6 +30,20 @@ from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
 
+TEXT_CONTENT_TYPES = [
+    "text/css",
+    "text/csv",
+    "text/html",
+    "text/calendar",
+    "text/plain",
+    "text/javascript",
+    "application/json",
+    "application/ld+json",
+    "application/rtf",
+    "image/svg+xml",
+    "text/xml",
+]
+
 
 def parse_media_id(request):
     try:
@@ -96,7 +110,13 @@ def add_file_headers(request, media_type, file_size, upload_name):
     def _quote(x):
         return urllib.parse.quote(x.encode("utf-8"))
 
-    request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
+    content_type = (
+        media_type + "; charset=utf-8"
+        if media_type in TEXT_CONTENT_TYPES
+        else media_type
+    )
+
+    request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
