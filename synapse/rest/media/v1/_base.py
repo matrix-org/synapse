@@ -30,6 +30,9 @@ from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
 
+# list all text content types that will
+# have the charset default to UTF-8 when
+# none is given
 TEXT_CONTENT_TYPES = [
     "text/css",
     "text/csv",
