@@ -117,7 +117,7 @@ def add_file_headers(request, media_type, file_size, upload_name):
     # 'text/css' but not 'text/css; charset=UTF-16'
     content_type = (
         media_type + "; charset=UTF-8"
-        if media_type in TEXT_CONTENT_TYPES
+        if media_type.lower() in TEXT_CONTENT_TYPES
         else media_type
     )
 
