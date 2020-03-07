@@ -173,9 +173,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
         # Validate if user is member of room
         request, channel = self.make_request(
-            "GET",
-            "/_matrix/client/r0/joined_rooms",
-            access_token=self.second_tok,
+            "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
         self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
