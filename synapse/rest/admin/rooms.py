@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import List, Optional
 
 from synapse.api.constants import Membership
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -274,7 +275,7 @@ class JoinRoomAliasServlet(RestServlet):
             try:
                 remote_room_hosts = [
                     x.decode("ascii") for x in request.args[b"server_name"]
-                ]
+                ]  # type: Optional[List[str]]
             except Exception:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
