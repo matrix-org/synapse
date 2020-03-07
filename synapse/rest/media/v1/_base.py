@@ -116,11 +116,10 @@ def add_file_headers(request, media_type, file_size, upload_name):
     # 
     # This will only fire if no charset (or any other parameter) is given: ie, it will match
     # 'text/css' but not 'text/css; charset=UTF-16'
-    content_type = (
-        media_type + "; charset=UTF-8"
-        if media_type.lower() in TEXT_CONTENT_TYPES
-        else media_type
-    )
+    if media_type.lower() in TEXT_CONTENT_TYPES:
+        content_type = media_type + "; charset=UTF-8"
+    else:
+        content_type = media_type
 
     request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
     if upload_name:
