@@ -110,7 +110,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("This endpoint can only be used with local users", channel.json_body["error"])
+        self.assertEqual(
+            "This endpoint can only be used with local users",
+            channel.json_body["error"],
+        )
 
     def test_room_does_not_exist(self):
         """
@@ -146,7 +149,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("invalidroom was not legal room ID or room alias", channel.json_body["error"])
+        self.assertEqual(
+            "invalidroom was not legal room ID or room alias",
+            channel.json_body["error"],
+        )
 
     def test_join_room(self):
         """
@@ -169,7 +175,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "GET",
             "/rooms/%s/members?membership=join" % self.room_id,
-            access_token=self.second_tok
+            access_token=self.second_tok,
         )
         self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
