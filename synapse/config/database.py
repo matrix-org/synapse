@@ -22,6 +22,11 @@ from synapse.config._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
+NON_SQLITE_DATABASE_PATH_WARNING = """\
+Ignoring 'database_path' setting: not using a sqlite3 database.
+--------------------------------------------------------------------------------
+"""
+
 
 class DatabaseConnectionConfig:
     """Contains the connection config for a particular database.
@@ -100,7 +105,7 @@ class DatabaseConfig(Config):
 
         if database_path:
             if self.databases and self.databases[0].name != "sqlite3":
-                logger.warn("Ignoring 'database_path' for non-sqlite3 database")
+                logger.warning(NON_SQLITE_DATABASE_PATH_WARNING)
                 return
 
             database_config = {"name": "sqlite3", "args": {}}
@@ -160,7 +165,7 @@ class DatabaseConfig(Config):
         if self.get_single_database().name == "sqlite3":
             self.set_databasepath(args.database_path)
         else:
-            logger.warn("Ignoring 'database_path' for non-sqlite3 database")
+            logger.warning(NON_SQLITE_DATABASE_PATH_WARNING)
 
     def set_databasepath(self, database_path):
 
