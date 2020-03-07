@@ -15,7 +15,7 @@
 import logging
 
 from synapse.api.constants import Membership
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -29,7 +29,7 @@ from synapse.rest.admin._base import (
     historical_admin_path_patterns,
 )
 from synapse.storage.data_stores.main.room import RoomSortOrder
-from synapse.types import create_requester
+from synapse.types import RoomAlias, RoomID, UserID, create_requester
 from synapse.util.async_helpers import maybe_awaitable
 
 logger = logging.getLogger(__name__)
@@ -237,3 +237,64 @@ class ListRoomRestServlet(RestServlet):
                 response["prev_batch"] = 0
 
         return 200, response
+
+
+class JoinRoomAliasServlet(RestServlet):
+
+    PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.room_member_handler = hs.get_room_member_handler()
+        self.admin_handler = hs.get_handlers().admin_handler
+
+    async def on_POST(self, request, room_identifier):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        try:
+            content = parse_json_object_from_request(request)
+        except Exception:
+            # Turns out we used to ignore the body entirely, and some clients
+            # cheekily send invalid bodies.
+            content = {}
+
+        assert_params_in_dict(content, ["user_id"])
+        target_user = UserID.from_string(content["user_id"])
+
+        if not self.hs.is_mine(target_user):
+            raise SynapseError(400, "This endpoint can only be used with local users")
+
+        if not await self.admin_handler.get_user(target_user):
+            raise NotFoundError("User not found")
+
+        if RoomID.is_valid(room_identifier):
+            room_id = room_identifier
+            try:
+                remote_room_hosts = [
+                    x.decode("ascii") for x in request.args[b"server_name"]
+                ]  # type: Optional[List[str]]
+            except Exception:
+                remote_room_hosts = None
+        elif RoomAlias.is_valid(room_identifier):
+            handler = self.room_member_handler
+            room_alias = RoomAlias.from_string(room_identifier)
+            room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
+            room_id = room_id.to_string()
+        else:
+            raise SynapseError(
+                400, "%s was not legal room ID or room alias" % (room_identifier,)
+            )
+
+        fake_requester = create_requester(target_user)
+        await self.room_member_handler.update_membership(
+            requester=fake_requester,
+            target=fake_requester.user,
+            room_id=room_id,
+            action="join",
+            remote_room_hosts=remote_room_hosts,
+            ratelimit=False,
+        )
+
+        return 200, {"room_id": room_id}

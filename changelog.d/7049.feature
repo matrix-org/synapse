@@ -1,0 +1,1 @@
+Admin API `POST /_synapse/admin/v1/join/<roomIdOrAlias>` to join users to a room. Similar to `auto_join_rooms` for creation of users.
