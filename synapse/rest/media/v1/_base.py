@@ -113,9 +113,7 @@ def add_file_headers(request, media_type, file_size, upload_name):
         return urllib.parse.quote(x.encode("utf-8"))
 
     # Default to a UTF-8 charset for text content types.
-    # 
-    # This will only fire if no charset (or any other parameter) is given: ie, it will match
-    # 'text/css' but not 'text/css; charset=UTF-16'
+    # ex, uses UTF-8 for 'text/css' but not 'text/css; charset=UTF-16'
     if media_type.lower() in TEXT_CONTENT_TYPES:
         content_type = media_type + "; charset=UTF-8"
     else:
