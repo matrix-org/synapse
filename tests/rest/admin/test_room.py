@@ -171,12 +171,12 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(self.room_id, channel.json_body["room_id"])
 
-        # Validate status in room
+        # Validate if user is member of room
         request, channel = self.make_request(
             "GET",
-            "/rooms/%s/members?membership=join" % self.room_id,
+            "/_matrix/client/r0/joined_rooms",
             access_token=self.second_tok,
         )
         self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(self.second_user_id, channel.json_body["chunk"][1]["user_id"])
+        self.assertEqual(self.room_id, channel.json_body["joined_rooms"][0])
