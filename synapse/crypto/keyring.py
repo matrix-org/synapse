@@ -326,9 +326,7 @@ class Keyring(object):
             verify_requests (list[VerifyJsonRequest]): list of verify requests
         """
 
-        remaining_requests = set(
-            (rq for rq in verify_requests if not rq.key_ready.called)
-        )
+        remaining_requests = {rq for rq in verify_requests if not rq.key_ready.called}
 
         @defer.inlineCallbacks
         def do_iterations():
@@ -396,7 +394,7 @@ class Keyring(object):
 
         results = yield fetcher.get_keys(missing_keys)
 
-        completed = list()
+        completed = []
         for verify_request in remaining_requests:
             server_name = verify_request.server_name
 

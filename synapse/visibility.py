@@ -75,7 +75,7 @@ def filter_events_for_client(
     """
     # Filter out events that have been soft failed so that we don't relay them
     # to clients.
-    events = list(e for e in events if not e.internal_metadata.is_soft_failed())
+    events = [e for e in events if not e.internal_metadata.is_soft_failed()]
 
     types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
     event_id_to_state = yield storage.state.get_state_for_events(
@@ -97,7 +97,7 @@ def filter_events_for_client(
     erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
 
     if apply_retention_policies:
-        room_ids = set(e.room_id for e in events)
+        room_ids = {e.room_id for e in events}
         retention_policies = {}
 
         for room_id in room_ids:
@@ -119,7 +119,17 @@ def filter_events_for_client(
 
                the original event if they can see it as normal.
         """
+        if event.type == "org.matrix.dummy_event":
+            return None
+
         if not event.is_state() and event.sender in ignore_list:
+            return None
+
+        # Until MSC2261 has landed we can't redact malicious alias events, so for
+        # now we temporarily filter out m.room.aliases entirely to mitigate
+        # abuse, while we spec a better solution to advertising aliases
+        # on rooms.
+        if event.type == EventTypes.Aliases:
             return None
 
         # Don't try to apply the room's retention policy if the event is a state event, as

@@ -954,6 +954,23 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         self.config = hs.config
 
+    async def upsert_room_on_join(self, room_id: str, room_version: RoomVersion):
+        """Ensure that the room is stored in the table
+
+        Called when we join a room over federation, and overwrites any room version
+        currently in the table.
+        """
+        await self.db.simple_upsert(
+            desc="upsert_room_on_join",
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            values={"room_version": room_version.identifier},
+            insertion_values={"is_public": False, "creator": ""},
+            # rooms has a unique constraint on room_id, so no need to lock when doing an
+            # emulated upsert.
+            lock=False,
+        )
+
     @defer.inlineCallbacks
     def store_room(
         self,
@@ -1002,6 +1019,26 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
+
+    async def maybe_store_room_on_invite(self, room_id: str, room_version: RoomVersion):
+        """
+        When we receive an invite over federation, store the version of the room if we
+        don't already know the room version.
+        """
+        await self.db.simple_upsert(
+            desc="maybe_store_room_on_invite",
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            values={},
+            insertion_values={
+                "room_version": room_version.identifier,
+                "is_public": False,
+                "creator": "",
+            },
+            # rooms has a unique constraint on room_id, so no need to lock when doing an
+            # emulated upsert.
+            lock=False,
+        )
 
     @defer.inlineCallbacks
     def set_room_is_public(self, room_id, is_public):

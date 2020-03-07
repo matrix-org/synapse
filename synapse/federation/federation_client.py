@@ -49,7 +49,7 @@ from synapse.api.room_versions import (
     RoomVersion,
     RoomVersions,
 )
-from synapse.events import EventBase, builder, room_version_to_event_format
+from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.utils import log_function
@@ -187,7 +187,7 @@ class FederationClient(FederationBase):
 
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: Iterable[str]
-    ) -> List[EventBase]:
+    ) -> Optional[List[EventBase]]:
         """Requests some more historic PDUs for the given room from the
         given destination server.
 
@@ -199,9 +199,9 @@ class FederationClient(FederationBase):
         """
         logger.debug("backfill extrem=%s", extremities)
 
-        # If there are no extremeties then we've (probably) reached the start.
+        # If there are no extremities then we've (probably) reached the start.
         if not extremities:
-            return
+            return None
 
         transaction_data = await self.transport_layer.backfill(
             dest, room_id, extremities, limit
@@ -209,18 +209,18 @@ class FederationClient(FederationBase):
 
         logger.debug("backfill transaction_data=%r", transaction_data)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        format_ver = room_version_to_event_format(room_version)
+        room_version = await self.store.get_room_version(room_id)
 
         pdus = [
-            event_from_pdu_json(p, format_ver, outlier=False)
+            event_from_pdu_json(p, room_version, outlier=False)
             for p in transaction_data["pdus"]
         ]
 
         # FIXME: We should handle signature failures more gracefully.
         pdus[:] = await make_deferred_yieldable(
             defer.gatherResults(
-                self._check_sigs_and_hashes(room_version, pdus), consumeErrors=True
+                self._check_sigs_and_hashes(room_version.identifier, pdus),
+                consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )
 
@@ -230,7 +230,7 @@ class FederationClient(FederationBase):
         self,
         destinations: Iterable[str],
         event_id: str,
-        room_version: str,
+        room_version: RoomVersion,
         outlier: bool = False,
         timeout: Optional[int] = None,
     ) -> Optional[EventBase]:
@@ -262,8 +262,6 @@ class FederationClient(FederationBase):
 
         pdu_attempts = self.pdu_destination_tried.setdefault(event_id, {})
 
-        format_ver = room_version_to_event_format(room_version)
-
         signed_pdu = None
         for destination in destinations:
             now = self._clock.time_msec()
@@ -284,15 +282,17 @@ class FederationClient(FederationBase):
                 )
 
                 pdu_list = [
-                    event_from_pdu_json(p, format_ver, outlier=outlier)
+                    event_from_pdu_json(p, room_version, outlier=outlier)
                     for p in transaction_data["pdus"]
-                ]
+                ]  # type: List[EventBase]
 
                 if pdu_list and pdu_list[0]:
                     pdu = pdu_list[0]
 
                     # Check signatures are correct.
-                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
+                    signed_pdu = await self._check_sigs_and_hash(
+                        room_version.identifier, pdu
+                    )
 
                     break
 
@@ -348,15 +348,15 @@ class FederationClient(FederationBase):
     async def get_event_auth(self, destination, room_id, event_id):
         res = await self.transport_layer.get_event_auth(destination, room_id, event_id)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        format_ver = room_version_to_event_format(room_version)
+        room_version = await self.store.get_room_version(room_id)
 
         auth_chain = [
-            event_from_pdu_json(p, format_ver, outlier=True) for p in res["auth_chain"]
+            event_from_pdu_json(p, room_version, outlier=True)
+            for p in res["auth_chain"]
         ]
 
         signed_auth = await self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True, room_version=room_version
+            destination, auth_chain, outlier=True, room_version=room_version.identifier
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -514,7 +514,7 @@ class FederationClient(FederationBase):
         )
 
     async def send_join(
-        self, destinations: Iterable[str], pdu: EventBase, event_format_version: int
+        self, destinations: Iterable[str], pdu: EventBase, room_version: RoomVersion
     ) -> Dict[str, Any]:
         """Sends a join event to one of a list of homeservers.
 
@@ -525,7 +525,8 @@ class FederationClient(FederationBase):
             destinations: Candidate homeservers which are probably
                 participating in the room.
             pdu: event to be sent
-            event_format_version: The event format version
+            room_version: the version of the room (according to the server that
+                did the make_join)
 
         Returns:
             a dict with members ``origin`` (a string
@@ -538,58 +539,51 @@ class FederationClient(FederationBase):
             RuntimeError: if no servers were reachable.
         """
 
-        def check_authchain_validity(signed_auth_chain):
-            for e in signed_auth_chain:
-                if e.type == EventTypes.Create:
-                    create_event = e
-                    break
-            else:
-                raise InvalidResponseError("no %s in auth chain" % (EventTypes.Create,))
-
-            # the room version should be sane.
-            room_version = create_event.content.get("room_version", "1")
-            if room_version not in KNOWN_ROOM_VERSIONS:
-                # This shouldn't be possible, because the remote server should have
-                # rejected the join attempt during make_join.
-                raise InvalidResponseError(
-                    "room appears to have unsupported version %s" % (room_version,)
-                )
-
         async def send_request(destination) -> Dict[str, Any]:
             content = await self._do_send_join(destination, pdu)
 
             logger.debug("Got content: %s", content)
 
             state = [
-                event_from_pdu_json(p, event_format_version, outlier=True)
+                event_from_pdu_json(p, room_version, outlier=True)
                 for p in content.get("state", [])
             ]
 
             auth_chain = [
-                event_from_pdu_json(p, event_format_version, outlier=True)
+                event_from_pdu_json(p, room_version, outlier=True)
                 for p in content.get("auth_chain", [])
             ]
 
             pdus = {p.event_id: p for p in itertools.chain(state, auth_chain)}
 
-            room_version = None
+            create_event = None
             for e in state:
                 if (e.type, e.state_key) == (EventTypes.Create, ""):
-                    room_version = e.content.get(
-                        "room_version", RoomVersions.V1.identifier
-                    )
+                    create_event = e
                     break
 
-            if room_version is None:
+            if create_event is None:
                 # If the state doesn't have a create event then the room is
                 # invalid, and it would fail auth checks anyway.
                 raise SynapseError(400, "No create event in state")
+
+            # the room version should be sane.
+            create_room_version = create_event.content.get(
+                "room_version", RoomVersions.V1.identifier
+            )
+            if create_room_version != room_version.identifier:
+                # either the server that fulfilled the make_join, or the server that is
+                # handling the send_join, is lying.
+                raise InvalidResponseError(
+                    "Unexpected room version %s in create event"
+                    % (create_room_version,)
+                )
 
             valid_pdus = await self._check_sigs_and_hash_and_fetch(
                 destination,
                 list(pdus.values()),
                 outlier=True,
-                room_version=room_version,
+                room_version=room_version.identifier,
             )
 
             valid_pdus_map = {p.event_id: p for p in valid_pdus}
@@ -613,7 +607,17 @@ class FederationClient(FederationBase):
             for s in signed_state:
                 s.internal_metadata = copy.deepcopy(s.internal_metadata)
 
-            check_authchain_validity(signed_auth)
+            # double-check that the same create event has ended up in the auth chain
+            auth_chain_create_events = [
+                e.event_id
+                for e in signed_auth
+                if (e.type, e.state_key) == (EventTypes.Create, "")
+            ]
+            if auth_chain_create_events != [create_event.event_id]:
+                raise InvalidResponseError(
+                    "Unexpected create event(s) in auth chain: %s"
+                    % (auth_chain_create_events,)
+                )
 
             return {
                 "state": signed_state,
@@ -663,7 +667,7 @@ class FederationClient(FederationBase):
     async def send_invite(
         self, destination: str, room_id: str, event_id: str, pdu: EventBase,
     ) -> EventBase:
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version(room_id)
 
         content = await self._do_send_invite(destination, pdu, room_version)
 
@@ -671,20 +675,17 @@ class FederationClient(FederationBase):
 
         logger.debug("Got response to send_invite: %s", pdu_dict)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        format_ver = room_version_to_event_format(room_version)
-
-        pdu = event_from_pdu_json(pdu_dict, format_ver)
+        pdu = event_from_pdu_json(pdu_dict, room_version)
 
         # Check signatures are correct.
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
 
         # FIXME: We should handle signature failures more gracefully.
 
         return pdu
 
     async def _do_send_invite(
-        self, destination: str, pdu: EventBase, room_version: str
+        self, destination: str, pdu: EventBase, room_version: RoomVersion
     ) -> JsonDict:
         """Actually sends the invite, first trying v2 API and falling back to
         v1 API if necessary.
@@ -701,7 +702,7 @@ class FederationClient(FederationBase):
                 event_id=pdu.event_id,
                 content={
                     "event": pdu.get_pdu_json(time_now),
-                    "room_version": room_version,
+                    "room_version": room_version.identifier,
                     "invite_room_state": pdu.unsigned.get("invite_room_state", []),
                 },
             )
@@ -719,8 +720,7 @@ class FederationClient(FederationBase):
                 # Otherwise, we assume that the remote server doesn't understand
                 # the v2 invite API. That's ok provided the room uses old-style event
                 # IDs.
-                v = KNOWN_ROOM_VERSIONS.get(room_version)
-                if v.event_format != EventFormatVersions.V1:
+                if room_version.event_format != EventFormatVersions.V1:
                     raise SynapseError(
                         400,
                         "User's homeserver does not support this room version",
@@ -863,15 +863,14 @@ class FederationClient(FederationBase):
                 timeout=timeout,
             )
 
-            room_version = await self.store.get_room_version_id(room_id)
-            format_ver = room_version_to_event_format(room_version)
+            room_version = await self.store.get_room_version(room_id)
 
             events = [
-                event_from_pdu_json(e, format_ver) for e in content.get("events", [])
+                event_from_pdu_json(e, room_version) for e in content.get("events", [])
             ]
 
             signed_events = await self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False, room_version=room_version
+                destination, events, outlier=False, room_version=room_version.identifier
             )
         except HttpResponseException as e:
             if not e.code == 400:

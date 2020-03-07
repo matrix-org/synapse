@@ -35,26 +35,20 @@ from . import EventBase
 SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
-def prune_event(event):
+def prune_event(event: EventBase) -> EventBase:
     """ Returns a pruned version of the given event, which removes all keys we
     don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
-
-    Args:
-        event (FrozenEvent)
-
-    Returns:
-        FrozenEvent
     """
     pruned_event_dict = prune_event_dict(event.get_dict())
 
-    from . import event_type_from_format_version
+    from . import make_event_from_dict
 
-    pruned_event = event_type_from_format_version(event.format_version)(
-        pruned_event_dict, event.internal_metadata.get_dict()
+    pruned_event = make_event_from_dict(
+        pruned_event_dict, event.room_version, event.internal_metadata.get_dict()
     )
 
     # Mark the event as redacted

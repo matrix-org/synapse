@@ -22,7 +22,7 @@ import attr
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.event_auth import auth_types_for_event
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 from synapse.state.v2 import lexicographical_topological_sort, resolve_events_with_store
 from synapse.types import EventID
 
@@ -89,7 +89,7 @@ class FakeEvent(object):
         if self.state_key is not None:
             event_dict["state_key"] = self.state_key
 
-        return FrozenEvent(event_dict)
+        return make_event_from_dict(event_dict)
 
 
 # All graphs start with this set of events
@@ -603,7 +603,7 @@ class TestStateResolutionStore(object):
 
         return {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
 
-    def get_auth_chain(self, event_ids):
+    def get_auth_chain(self, event_ids, ignore_events):
         """Gets the full auth chain for a set of events (including rejected
         events).
 
@@ -617,6 +617,8 @@ class TestStateResolutionStore(object):
         Args:
             event_ids (list): The event IDs of the events to fetch the auth
                 chain for. Must be state events.
+            ignore_events: Set of events to exclude from the returned auth
+                chain.
 
         Returns:
             Deferred[list[str]]: List of event IDs of the auth chain.
@@ -627,7 +629,7 @@ class TestStateResolutionStore(object):
         stack = list(event_ids)
         while stack:
             event_id = stack.pop()
-            if event_id in result:
+            if event_id in result or event_id in ignore_events:
                 continue
 
             result.add(event_id)

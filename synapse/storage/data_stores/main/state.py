@@ -321,7 +321,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             desc="get_referenced_state_groups",
         )
 
-        return set(row["state_group"] for row in rows)
+        return {row["state_group"] for row in rows}
 
 
 class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
@@ -367,7 +367,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             """
 
             txn.execute(sql, (last_room_id, batch_size))
-            room_ids = list(row[0] for row in txn)
+            room_ids = [row[0] for row in txn]
             if not room_ids:
                 return True, set()
 
@@ -384,7 +384,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
             txn.execute(sql, (last_room_id, room_ids[-1], "%:" + self.server_name))
 
-            joined_room_ids = set(row[0] for row in txn)
+            joined_room_ids = {row[0] for row in txn}
 
             left_rooms = set(room_ids) - joined_room_ids
 
@@ -404,7 +404,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 retcols=("state_key",),
             )
 
-            potentially_left_users = set(row["state_key"] for row in rows)
+            potentially_left_users = {row["state_key"] for row in rows}
 
             # Now lets actually delete the rooms from the DB.
             self.db.simple_delete_many_txn(

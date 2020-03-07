@@ -28,11 +28,7 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.events import (
-    EventBase,
-    _EventInternalMetadata,
-    event_type_from_format_version,
-)
+from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
 from synapse.types import EventID, JsonDict
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
@@ -256,8 +252,8 @@ def create_local_event_from_event_dict(
     event_dict.setdefault("signatures", {})
 
     add_hashes_and_signatures(room_version, event_dict, hostname, signing_key)
-    return event_type_from_format_version(format_version)(
-        event_dict, internal_metadata_dict=internal_metadata_dict
+    return make_event_from_dict(
+        event_dict, room_version, internal_metadata_dict=internal_metadata_dict
     )
 
 

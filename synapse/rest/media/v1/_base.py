@@ -135,27 +135,25 @@ def add_file_headers(request, media_type, file_size, upload_name):
 
 # separators as defined in RFC2616. SP and HT are handled separately.
 # see _can_encode_filename_as_token.
-_FILENAME_SEPARATOR_CHARS = set(
-    (
-        "(",
-        ")",
-        "<",
-        ">",
-        "@",
-        ",",
-        ";",
-        ":",
-        "\\",
-        '"',
-        "/",
-        "[",
-        "]",
-        "?",
-        "=",
-        "{",
-        "}",
-    )
-)
+_FILENAME_SEPARATOR_CHARS = {
+    "(",
+    ")",
+    "<",
+    ">",
+    "@",
+    ",",
+    ";",
+    ":",
+    "\\",
+    '"',
+    "/",
+    "[",
+    "]",
+    "?",
+    "=",
+    "{",
+    "}",
+}
 
 
 def _can_encode_filename_as_token(x):

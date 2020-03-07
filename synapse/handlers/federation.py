@@ -41,7 +41,6 @@ from synapse.api.errors import (
     FederationDeniedError,
     FederationError,
     RequestSendFailed,
-    StoreError,
     SynapseError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
@@ -61,6 +60,7 @@ from synapse.replication.http.devices import ReplicationUserDevicesResyncRestSer
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationFederationSendEventsRestServlet,
+    ReplicationStoreRoomOnInviteRestServlet,
 )
 from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRestServlet
 from synapse.state import StateResolutionStore, resolve_events_with_store
@@ -161,8 +161,12 @@ class FederationHandler(BaseHandler):
             self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
                 hs
             )
+            self._maybe_store_room_on_invite = ReplicationStoreRoomOnInviteRestServlet.make_client(
+                hs
+            )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
+            self._maybe_store_room_on_invite = self.store.maybe_store_room_on_invite
 
         # When joining a room we need to queue any events for that room up
         self.room_queues = {}
@@ -659,11 +663,11 @@ class FederationHandler(BaseHandler):
         # this can happen if a remote server claims that the state or
         # auth_events at an event in room A are actually events in room B
 
-        bad_events = list(
+        bad_events = [
             (event_id, event.room_id)
             for event_id, event in fetched_events.items()
             if event.room_id != room_id
-        )
+        ]
 
         for bad_event_id, bad_room_id in bad_events:
             # This is a bogus situation, but since we may only discover it a long time
@@ -707,28 +711,6 @@ class FederationHandler(BaseHandler):
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
-        room = await self.store.get_room(room_id)
-
-        if not room:
-            try:
-                prev_state_ids = await context.get_prev_state_ids()
-                create_event = await self.store.get_event(
-                    prev_state_ids[(EventTypes.Create, "")]
-                )
-
-                room_version_id = create_event.content.get(
-                    "room_version", RoomVersions.V1.identifier
-                )
-
-                await self.store.store_room(
-                    room_id=room_id,
-                    room_creator_user_id="",
-                    is_public=False,
-                    room_version=KNOWN_ROOM_VERSIONS[room_version_id],
-                )
-            except StoreError:
-                logger.exception("Failed to store room.")
-
         if event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
                 # Only fire user_joined_room if the user has acutally
@@ -752,29 +734,75 @@ class FederationHandler(BaseHandler):
 
         # For encrypted messages we check that we know about the sending device,
         # if we don't then we mark the device cache for that user as stale.
-        if event.type == EventTypes.Encryption:
+        if event.type == EventTypes.Encrypted:
             device_id = event.content.get("device_id")
+            sender_key = event.content.get("sender_key")
+
+            cached_devices = await self.store.get_cached_devices_for_user(event.sender)
+
+            resync = False  # Whether we should resync device lists.
+
+            device = None
             if device_id is not None:
-                cached_devices = await self.store.get_cached_devices_for_user(
-                    event.sender
-                )
-                if device_id not in cached_devices:
+                device = cached_devices.get(device_id)
+                if device is None:
                     logger.info(
                         "Received event from remote device not in our cache: %s %s",
                         event.sender,
                         device_id,
                     )
-                    await self.store.mark_remote_user_device_cache_as_stale(
-                        event.sender
+                    resync = True
+
+            # We also check if the `sender_key` matches what we expect.
+            if sender_key is not None:
+                # Figure out what sender key we're expecting. If we know the
+                # device and recognize the algorithm then we can work out the
+                # exact key to expect. Otherwise check it matches any key we
+                # have for that device.
+                if device:
+                    keys = device.get("keys", {}).get("keys", {})
+
+                    if event.content.get("algorithm") == "m.megolm.v1.aes-sha2":
+                        # For this algorithm we expect a curve25519 key.
+                        key_name = "curve25519:%s" % (device_id,)
+                        current_keys = [keys.get(key_name)]
+                    else:
+                        # We don't know understand the algorithm, so we just
+                        # check it matches a key for the device.
+                        current_keys = keys.values()
+                elif device_id:
+                    # We don't have any keys for the device ID.
+                    current_keys = []
+                else:
+                    # The event didn't include a device ID, so we just look for
+                    # keys across all devices.
+                    current_keys = (
+                        key
+                        for device in cached_devices
+                        for key in device.get("keys", {}).get("keys", {}).values()
                     )
 
-                    # Immediately attempt a resync in the background
-                    if self.config.worker_app:
-                        return run_in_background(self._user_device_resync, event.sender)
-                    else:
-                        return run_in_background(
-                            self._device_list_updater.user_device_resync, event.sender
-                        )
+                # We now check that the sender key matches (one of) the expected
+                # keys.
+                if sender_key not in current_keys:
+                    logger.info(
+                        "Received event from remote device with unexpected sender key: %s %s: %s",
+                        event.sender,
+                        device_id or "<no device_id>",
+                        sender_key,
+                    )
+                    resync = True
+
+            if resync:
+                await self.store.mark_remote_user_device_cache_as_stale(event.sender)
+
+                # Immediately attempt a resync in the background
+                if self.config.worker_app:
+                    return run_in_background(self._user_device_resync, event.sender)
+                else:
+                    return run_in_background(
+                        self._device_list_updater.user_device_resync, event.sender
+                    )
 
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
@@ -810,7 +838,7 @@ class FederationHandler(BaseHandler):
 
         # Don't bother processing events we already have.
         seen_events = await self.store.have_events_in_timeline(
-            set(e.event_id for e in events)
+            {e.event_id for e in events}
         )
 
         events = [e for e in events if e.event_id not in seen_events]
@@ -820,7 +848,7 @@ class FederationHandler(BaseHandler):
 
         event_map = {e.event_id: e for e in events}
 
-        event_ids = set(e.event_id for e in events)
+        event_ids = {e.event_id for e in events}
 
         # build a list of events whose prev_events weren't in the batch.
         # (XXX: this will include events whose prev_events we already have; that doesn't
@@ -846,13 +874,13 @@ class FederationHandler(BaseHandler):
             state_events.update({s.event_id: s for s in state})
             events_to_state[e_id] = state
 
-        required_auth = set(
+        required_auth = {
             a_id
             for event in events
             + list(state_events.values())
             + list(auth_events.values())
             for a_id in event.auth_event_ids()
-        )
+        }
         auth_events.update(
             {e_id: event_map[e_id] for e_id in required_auth if e_id in event_map}
         )
@@ -1110,7 +1138,7 @@ class FederationHandler(BaseHandler):
         Logs a warning if we can't find the given event.
         """
 
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version(room_id)
 
         event_infos = []
 
@@ -1201,7 +1229,7 @@ class FederationHandler(BaseHandler):
     async def on_event_auth(self, event_id: str) -> List[EventBase]:
         event = await self.store.get_event(event_id)
         auth = await self.store.get_auth_chain(
-            [auth_id for auth_id in event.auth_event_ids()], include_given=True
+            list(event.auth_event_ids()), include_given=True
         )
         return list(auth)
 
@@ -1259,9 +1287,8 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
-            event_format_version = room_version_obj.event_format
             ret = await self.federation_client.send_join(
-                target_hosts, event, event_format_version
+                target_hosts, event, room_version_obj
             )
 
             origin = ret["origin"]
@@ -1278,16 +1305,18 @@ class FederationHandler(BaseHandler):
 
             logger.debug("do_invite_join event: %s", event)
 
-            try:
-                await self.store.store_room(
-                    room_id=room_id,
-                    room_creator_user_id="",
-                    is_public=False,
-                    room_version=room_version_obj,
-                )
-            except Exception:
-                # FIXME
-                pass
+            # if this is the first time we've joined this room, it's time to add
+            # a row to `rooms` with the correct room version. If there's already a
+            # row there, we should override it, since it may have been populated
+            # based on an invite request which lied about the room version.
+            #
+            # federation_client.send_join has already checked that the room
+            # version in the received create event is the same as room_version_obj,
+            # so we can rely on it now.
+            #
+            await self.store.upsert_room_on_join(
+                room_id=room_id, room_version=room_version_obj,
+            )
 
             await self._persist_auth_tree(
                 origin, auth_chain, state, event, room_version_obj
@@ -1512,6 +1541,13 @@ class FederationHandler(BaseHandler):
         # block any attempts to invite the server notices mxid
         if event.state_key == self._server_notices_mxid:
             raise SynapseError(http_client.FORBIDDEN, "Cannot invite this user")
+
+        # keep a record of the room version, if we don't yet know it.
+        # (this may get overwritten if we later get a different room version in a
+        # join dance).
+        await self._maybe_store_room_on_invite(
+            room_id=event.room_id, room_version=room_version
+        )
 
         event.internal_metadata.outlier = True
         event.internal_metadata.out_of_band_membership = True
@@ -1743,6 +1779,9 @@ class FederationHandler(BaseHandler):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
+        # Synapse asks for 100 events per backfill request. Do not allow more.
+        limit = min(limit, 100)
+
         events = yield self.store.get_backfill_events(room_id, pdu_list, limit)
 
         events = yield filter_events_for_server(self.storage, origin, events)
@@ -1916,11 +1955,7 @@ class FederationHandler(BaseHandler):
 
         for e_id in missing_auth_events:
             m_ev = await self.federation_client.get_pdu(
-                [origin],
-                e_id,
-                room_version=room_version.identifier,
-                outlier=True,
-                timeout=10000,
+                [origin], e_id, room_version=room_version, outlier=True, timeout=10000,
             )
             if m_ev and m_ev.event_id == e_id:
                 event_map[e_id] = m_ev
@@ -2108,7 +2143,7 @@ class FederationHandler(BaseHandler):
 
         # Now get the current auth_chain for the event.
         local_auth_chain = await self.store.get_auth_chain(
-            [auth_id for auth_id in event.auth_event_ids()], include_given=True
+            list(event.auth_event_ids()), include_given=True
         )
 
         # TODO: Check if we would now reject event_id. If so we need to tell
@@ -2127,6 +2162,7 @@ class FederationHandler(BaseHandler):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
+        # Only allow up to 20 events to be retrieved per request.
         limit = min(limit, 20)
 
         missing_events = await self.store.get_missing_events(
@@ -2609,7 +2645,7 @@ class FederationHandler(BaseHandler):
             member_handler = self.hs.get_room_member_handler()
             yield member_handler.send_membership_event(None, event, context)
         else:
-            destinations = set(x.split(":", 1)[-1] for x in (sender_user_id, room_id))
+            destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
             yield self.federation_client.forward_third_party_invite(
                 destinations, room_id, event_dict
             )

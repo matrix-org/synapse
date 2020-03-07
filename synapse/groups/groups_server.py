@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # TODO: Flairs
 
 
-class GroupsServerHandler(object):
+class GroupsServerWorkerHandler(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -50,9 +50,6 @@ class GroupsServerHandler(object):
         self.attestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
         self.profile_handler = hs.get_profile_handler()
-
-        # Ensure attestations get renewed
-        hs.get_groups_attestation_renewer()
 
     @defer.inlineCallbacks
     def check_group_is_ours(
@@ -168,68 +165,6 @@ class GroupsServerHandler(object):
         }
 
     @defer.inlineCallbacks
-    def update_group_summary_room(
-        self, group_id, requester_user_id, room_id, category_id, content
-    ):
-        """Add/update a room to the group summary
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        RoomID.from_string(room_id)  # Ensure valid room id
-
-        order = content.get("order", None)
-
-        is_public = _parse_visibility_from_contents(content)
-
-        yield self.store.add_room_to_summary(
-            group_id=group_id,
-            room_id=room_id,
-            category_id=category_id,
-            order=order,
-            is_public=is_public,
-        )
-
-        return {}
-
-    @defer.inlineCallbacks
-    def delete_group_summary_room(
-        self, group_id, requester_user_id, room_id, category_id
-    ):
-        """Remove a room from the summary
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        yield self.store.remove_room_from_summary(
-            group_id=group_id, room_id=room_id, category_id=category_id
-        )
-
-        return {}
-
-    @defer.inlineCallbacks
-    def set_group_join_policy(self, group_id, requester_user_id, content):
-        """Sets the group join policy.
-
-        Currently supported policies are:
-         - "invite": an invite must be received and accepted in order to join.
-         - "open": anyone can join.
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        join_policy = _parse_join_policy_from_contents(content)
-        if join_policy is None:
-            raise SynapseError(400, "No value specified for 'm.join_policy'")
-
-        yield self.store.set_group_join_policy(group_id, join_policy=join_policy)
-
-        return {}
-
-    @defer.inlineCallbacks
     def get_group_categories(self, group_id, requester_user_id):
         """Get all categories in a group (as seen by user)
         """
@@ -248,41 +183,9 @@ class GroupsServerHandler(object):
             group_id=group_id, category_id=category_id
         )
 
+        logger.info("group %s", res)
+
         return res
-
-    @defer.inlineCallbacks
-    def update_group_category(self, group_id, requester_user_id, category_id, content):
-        """Add/Update a group category
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        is_public = _parse_visibility_from_contents(content)
-        profile = content.get("profile")
-
-        yield self.store.upsert_group_category(
-            group_id=group_id,
-            category_id=category_id,
-            is_public=is_public,
-            profile=profile,
-        )
-
-        return {}
-
-    @defer.inlineCallbacks
-    def delete_group_category(self, group_id, requester_user_id, category_id):
-        """Delete a group category
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        yield self.store.remove_group_category(
-            group_id=group_id, category_id=category_id
-        )
-
-        return {}
 
     @defer.inlineCallbacks
     def get_group_roles(self, group_id, requester_user_id):
@@ -301,74 +204,6 @@ class GroupsServerHandler(object):
 
         res = yield self.store.get_group_role(group_id=group_id, role_id=role_id)
         return res
-
-    @defer.inlineCallbacks
-    def update_group_role(self, group_id, requester_user_id, role_id, content):
-        """Add/update a role in a group
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        is_public = _parse_visibility_from_contents(content)
-
-        profile = content.get("profile")
-
-        yield self.store.upsert_group_role(
-            group_id=group_id, role_id=role_id, is_public=is_public, profile=profile
-        )
-
-        return {}
-
-    @defer.inlineCallbacks
-    def delete_group_role(self, group_id, requester_user_id, role_id):
-        """Remove role from group
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        yield self.store.remove_group_role(group_id=group_id, role_id=role_id)
-
-        return {}
-
-    @defer.inlineCallbacks
-    def update_group_summary_user(
-        self, group_id, requester_user_id, user_id, role_id, content
-    ):
-        """Add/update a users entry in the group summary
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        order = content.get("order", None)
-
-        is_public = _parse_visibility_from_contents(content)
-
-        yield self.store.add_user_to_summary(
-            group_id=group_id,
-            user_id=user_id,
-            role_id=role_id,
-            order=order,
-            is_public=is_public,
-        )
-
-        return {}
-
-    @defer.inlineCallbacks
-    def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
-        """Remove a user from the group summary
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        yield self.store.remove_user_from_summary(
-            group_id=group_id, user_id=user_id, role_id=role_id
-        )
-
-        return {}
 
     @defer.inlineCallbacks
     def get_group_profile(self, group_id, requester_user_id):
@@ -393,24 +228,6 @@ class GroupsServerHandler(object):
             return group_description
         else:
             raise SynapseError(404, "Unknown group")
-
-    @defer.inlineCallbacks
-    def update_group_profile(self, group_id, requester_user_id, content):
-        """Update the group profile
-        """
-        yield self.check_group_is_ours(
-            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
-        )
-
-        profile = {}
-        for keyname in ("name", "avatar_url", "short_description", "long_description"):
-            if keyname in content:
-                value = content[keyname]
-                if not isinstance(value, string_types):
-                    raise SynapseError(400, "%r value is not a string" % (keyname,))
-                profile[keyname] = value
-
-        yield self.store.update_group_profile(group_id, profile)
 
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
@@ -530,6 +347,196 @@ class GroupsServerHandler(object):
 
         return {"chunk": chunk, "total_room_count_estimate": len(room_results)}
 
+
+class GroupsServerHandler(GroupsServerWorkerHandler):
+    def __init__(self, hs):
+        super(GroupsServerHandler, self).__init__(hs)
+
+        # Ensure attestations get renewed
+        hs.get_groups_attestation_renewer()
+
+    @defer.inlineCallbacks
+    def update_group_summary_room(
+        self, group_id, requester_user_id, room_id, category_id, content
+    ):
+        """Add/update a room to the group summary
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        RoomID.from_string(room_id)  # Ensure valid room id
+
+        order = content.get("order", None)
+
+        is_public = _parse_visibility_from_contents(content)
+
+        yield self.store.add_room_to_summary(
+            group_id=group_id,
+            room_id=room_id,
+            category_id=category_id,
+            order=order,
+            is_public=is_public,
+        )
+
+        return {}
+
+    @defer.inlineCallbacks
+    def delete_group_summary_room(
+        self, group_id, requester_user_id, room_id, category_id
+    ):
+        """Remove a room from the summary
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        yield self.store.remove_room_from_summary(
+            group_id=group_id, room_id=room_id, category_id=category_id
+        )
+
+        return {}
+
+    @defer.inlineCallbacks
+    def set_group_join_policy(self, group_id, requester_user_id, content):
+        """Sets the group join policy.
+
+        Currently supported policies are:
+         - "invite": an invite must be received and accepted in order to join.
+         - "open": anyone can join.
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        join_policy = _parse_join_policy_from_contents(content)
+        if join_policy is None:
+            raise SynapseError(400, "No value specified for 'm.join_policy'")
+
+        yield self.store.set_group_join_policy(group_id, join_policy=join_policy)
+
+        return {}
+
+    @defer.inlineCallbacks
+    def update_group_category(self, group_id, requester_user_id, category_id, content):
+        """Add/Update a group category
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        is_public = _parse_visibility_from_contents(content)
+        profile = content.get("profile")
+
+        yield self.store.upsert_group_category(
+            group_id=group_id,
+            category_id=category_id,
+            is_public=is_public,
+            profile=profile,
+        )
+
+        return {}
+
+    @defer.inlineCallbacks
+    def delete_group_category(self, group_id, requester_user_id, category_id):
+        """Delete a group category
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        yield self.store.remove_group_category(
+            group_id=group_id, category_id=category_id
+        )
+
+        return {}
+
+    @defer.inlineCallbacks
+    def update_group_role(self, group_id, requester_user_id, role_id, content):
+        """Add/update a role in a group
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        is_public = _parse_visibility_from_contents(content)
+
+        profile = content.get("profile")
+
+        yield self.store.upsert_group_role(
+            group_id=group_id, role_id=role_id, is_public=is_public, profile=profile
+        )
+
+        return {}
+
+    @defer.inlineCallbacks
+    def delete_group_role(self, group_id, requester_user_id, role_id):
+        """Remove role from group
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        yield self.store.remove_group_role(group_id=group_id, role_id=role_id)
+
+        return {}
+
+    @defer.inlineCallbacks
+    def update_group_summary_user(
+        self, group_id, requester_user_id, user_id, role_id, content
+    ):
+        """Add/update a users entry in the group summary
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        order = content.get("order", None)
+
+        is_public = _parse_visibility_from_contents(content)
+
+        yield self.store.add_user_to_summary(
+            group_id=group_id,
+            user_id=user_id,
+            role_id=role_id,
+            order=order,
+            is_public=is_public,
+        )
+
+        return {}
+
+    @defer.inlineCallbacks
+    def delete_group_summary_user(self, group_id, requester_user_id, user_id, role_id):
+        """Remove a user from the group summary
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        yield self.store.remove_user_from_summary(
+            group_id=group_id, user_id=user_id, role_id=role_id
+        )
+
+        return {}
+
+    @defer.inlineCallbacks
+    def update_group_profile(self, group_id, requester_user_id, content):
+        """Update the group profile
+        """
+        yield self.check_group_is_ours(
+            group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
+        )
+
+        profile = {}
+        for keyname in ("name", "avatar_url", "short_description", "long_description"):
+            if keyname in content:
+                value = content[keyname]
+                if not isinstance(value, string_types):
+                    raise SynapseError(400, "%r value is not a string" % (keyname,))
+                profile[keyname] = value
+
+        yield self.store.update_group_profile(group_id, profile)
+
     @defer.inlineCallbacks
     def add_room_to_group(self, group_id, requester_user_id, room_id, content):
         """Add room to group
@@ -601,7 +608,7 @@ class GroupsServerHandler(object):
         user_results = yield self.store.get_users_in_group(
             group_id, include_private=True
         )
-        if user_id in [user_result["user_id"] for user_result in user_results]:
+        if user_id in (user_result["user_id"] for user_result in user_results):
             raise SynapseError(400, "User already in group")
 
         content = {

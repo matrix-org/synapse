@@ -18,9 +18,10 @@ When setting up a reverse proxy, remember that Matrix clients and other
 Matrix servers do not necessarily need to connect to your server via the
 same server name or port. Indeed, clients will use port 443 by default,
 whereas servers default to port 8448. Where these are different, we
-refer to the 'client port' and the \'federation port\'. See [Setting
-up federation](federate.md) for more details of the algorithm used for
-federation connections.
+refer to the 'client port' and the \'federation port\'. See [the Matrix
+specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names)
+for more details of the algorithm used for federation connections, and
+[delegate.md](<delegate.md>) for instructions on setting up delegation.
 
 Let's assume that we expect clients to connect to our server at
 `https://matrix.example.com`, and other servers to connect at

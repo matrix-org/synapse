@@ -18,7 +18,7 @@ import unittest
 from synapse import event_auth
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 
 
 class EventAuthTestCase(unittest.TestCase):
@@ -94,7 +94,7 @@ TEST_ROOM_ID = "!test:room"
 
 
 def _create_event(user_id):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -106,7 +106,7 @@ def _create_event(user_id):
 
 
 def _join_event(user_id):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -119,7 +119,7 @@ def _join_event(user_id):
 
 
 def _power_levels_event(sender, content):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
@@ -132,7 +132,7 @@ def _power_levels_event(sender, content):
 
 
 def _random_state_event(sender):
-    return FrozenEvent(
+    return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
             "event_id": _get_event_id(),
