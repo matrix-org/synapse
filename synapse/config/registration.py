@@ -338,8 +338,8 @@ class RegistrationConfig(Config):
         # Useful when provisioning users based on the contents of a 3rd party
         # directory and to avoid ambiguities.
         #
-        #disable_set_displayname: False
-        #disable_set_avatar_url: False
+        #disable_set_displayname: false
+        #disable_set_avatar_url: false
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
