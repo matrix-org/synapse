@@ -19,7 +19,7 @@ from mock import Mock, NonCallableMock
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.profile import MasterProfileHandler
 from synapse.types import UserID
 
@@ -70,6 +70,7 @@ class ProfileTestCase(unittest.TestCase):
         yield self.store.create_profile(self.frank.localpart)
 
         self.handler = hs.get_profile_handler()
+        self.config = hs.config
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
@@ -89,6 +90,19 @@ class ProfileTestCase(unittest.TestCase):
             (yield self.store.get_profile_displayname(self.frank.localpart)),
             "Frank Jr.",
         )
+
+    @defer.inlineCallbacks
+    def test_set_my_name_if_disabled(self):
+        self.config.disable_set_displayname = True
+
+        # Set first displayname is allowed, if displayname is null
+        self.store.set_profile_displayname(self.frank.localpart, "Frank")
+
+        d = self.handler.set_displayname(
+            self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+        )
+
+        yield self.assertFailure(d, SynapseError)
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
@@ -147,3 +161,20 @@ class ProfileTestCase(unittest.TestCase):
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),
             "http://my.server/pic.gif",
         )
+
+    @defer.inlineCallbacks
+    def test_set_my_avatar_if_disabled(self):
+        self.config.disable_set_avatar_url = True
+
+        # Set first time avatar is allowed, if displayname is null
+        self.store.set_profile_avatar_url(
+            self.frank.localpart, "http://my.server/me.png"
+        )
+
+        d = self.handler.set_avatar_url(
+            self.frank,
+            synapse.types.create_requester(self.frank),
+            "http://my.server/pic.gif",
+        )
+
+        yield self.assertFailure(d, SynapseError)
