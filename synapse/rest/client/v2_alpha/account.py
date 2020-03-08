@@ -599,6 +599,9 @@ class ThreepidRestServlet(RestServlet):
         return 200, {"threepids": threepids}
 
     async def on_POST(self, request):
+        if self.hs.config.disable_3pid_changes:
+            raise SynapseError(400, "3PID changes disabled on this server")
+
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -643,6 +646,9 @@ class ThreepidAddRestServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request):
+        if self.hs.config.disable_3pid_changes:
+            raise SynapseError(400, "3PID changes disabled on this server")
+
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -738,10 +744,14 @@ class ThreepidDeleteRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(ThreepidDeleteRestServlet, self).__init__()
+        self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
     async def on_POST(self, request):
+        if self.hs.config.disable_3pid_changes:
+            raise SynapseError(400, "3PID changes disabled on this server")
+
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["medium", "address"])
 

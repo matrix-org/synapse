@@ -131,6 +131,7 @@ class RegistrationConfig(Config):
 
         self.disable_set_displayname = config.get("disable_set_displayname", False)
         self.disable_set_avatar_url = config.get("disable_set_avatar_url", False)
+        self.disable_3pid_changes = config.get("disable_3pid_changes", False)
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
@@ -340,6 +341,11 @@ class RegistrationConfig(Config):
         #
         #disable_set_displayname: false
         #disable_set_avatar_url: false
+
+        # If true, stop users from trying to change the 3PIDs associated with
+        # their accounts.
+        #
+        #disable_3pid_changes: false
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
