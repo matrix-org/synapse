@@ -1,0 +1,1 @@
+Add options to disable setting profile info for prevent changes.

@@ -160,7 +160,10 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and self.hs.config.disable_set_displayname:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             if profile.display_name:
-                raise SynapseError(400, "Changing displayname is disabled on this server")
+                raise SynapseError(
+                    400,
+                    "Changing displayname is disabled on this server"
+                )
 
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
@@ -226,7 +229,10 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and self.hs.config.disable_set_avatar_url:
             profile = yield self.store.get_profileinfo(target_user.localpart)
             if profile.avatar_url:
-                raise SynapseError(400, "Changing avatar url is disabled on this server")
+                raise SynapseError(
+                    400,
+                    "Changing avatar url is disabled on this server"
+                )
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
