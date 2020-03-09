@@ -438,7 +438,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("3PID changes disabled on this server", channel.json_body["error"])
+        self.assertEqual(
+            "3PID changes disabled on this server", channel.json_body["error"]
+        )
 
         # Get user
         request, channel = self.make_request(
@@ -466,10 +468,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             b"account/3pid/delete",
-            {
-                "medium": "email",
-                "address": self.email
-            },
+            {"medium": "email", "address": self.email},
             access_token=self.user_id_tok,
         )
         self.render(request)
@@ -503,16 +502,15 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             b"account/3pid/delete",
-            {
-                "medium": "email",
-                "address": self.email
-            },
+            {"medium": "email", "address": self.email},
             access_token=self.user_id_tok,
         )
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("3PID changes disabled on this server", channel.json_body["error"])
+        self.assertEqual(
+            "3PID changes disabled on this server", channel.json_body["error"]
+        )
 
         # Get user
         request, channel = self.make_request(
