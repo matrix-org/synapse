@@ -70,7 +70,7 @@ class ProfileTestCase(unittest.TestCase):
         yield self.store.create_profile(self.frank.localpart)
 
         self.handler = hs.get_profile_handler()
-        self.config = hs.config
+        self.hs = hs
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
@@ -93,7 +93,7 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_name_if_disabled(self):
-        self.config.disable_set_displayname = True
+        self.hs.config.disable_set_displayname = True
 
         # Set first displayname is allowed, if displayname is null
         self.store.set_profile_displayname(self.frank.localpart, "Frank")
@@ -164,7 +164,7 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_avatar_if_disabled(self):
-        self.config.disable_set_avatar_url = True
+        self.hs.config.disable_set_avatar_url = True
 
         # Set first time avatar is allowed, if displayname is null
         self.store.set_profile_avatar_url(
