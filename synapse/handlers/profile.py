@@ -161,7 +161,9 @@ class BaseProfileHandler(BaseHandler):
             profile = yield self.store.get_profileinfo(target_user.localpart)
             if profile.display_name:
                 raise SynapseError(
-                    400, "Changing display name is disabled on this server", Codes.FORBIDDEN
+                    400,
+                    "Changing display name is disabled on this server",
+                    Codes.FORBIDDEN,
                 )
 
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:

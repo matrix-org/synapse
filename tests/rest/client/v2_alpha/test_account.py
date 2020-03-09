@@ -413,7 +413,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     def test_add_email_if_disabled(self):
         """Test add mail to profile if disabled
         """
-        self.hs.config.enable_3pid_changes = True
+        self.hs.config.enable_3pid_changes = False
 
         client_secret = "foobar"
         session_id = self._request_token(self.email, client_secret)
@@ -485,7 +485,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     def test_delete_email_if_disabled(self):
         """Test delete mail from profile if disabled
         """
-        self.hs.config.enable_3pid_changes = True
+        self.hs.config.enable_3pid_changes = False
 
         # Add a threepid
         self.get_success(
