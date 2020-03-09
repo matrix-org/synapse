@@ -66,6 +66,7 @@ class Codes(object):
     EXPIRED_ACCOUNT = "ORG_MATRIX_EXPIRED_ACCOUNT"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+    BAD_ALIAS = "M_BAD_ALIAS"
 
 
 class CodeMessageException(RuntimeError):

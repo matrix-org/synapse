@@ -1,4 +1,7 @@
 import json
+import urllib.parse
+
+from mock import Mock
 
 import synapse.rest.admin
 from synapse.rest.client.v1 import login
@@ -252,3 +255,111 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
+
+
+class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        self.base_url = "https://matrix.goodserver.com/"
+        self.redirect_path = "_synapse/client/login/sso/redirect/confirm"
+
+        config = self.default_config()
+        config["cas_config"] = {
+            "enabled": True,
+            "server_url": "https://fake.test",
+            "service_url": "https://matrix.goodserver.com:8448",
+        }
+
+        async def get_raw(uri, args):
+            """Return an example response payload from a call to the `/proxyValidate`
+            endpoint of a CAS server, copied from
+            https://apereo.github.io/cas/5.0.x/protocol/CAS-Protocol-V2-Specification.html#26-proxyvalidate-cas-20
+
+            This needs to be returned by an async function (as opposed to set as the
+            mock's return value) because the corresponding Synapse code awaits on it.
+            """
+            return """
+                <cas:serviceResponse xmlns:cas='http://www.yale.edu/tp/cas'>
+                  <cas:authenticationSuccess>
+                      <cas:user>username</cas:user>
+                      <cas:proxyGrantingTicket>PGTIOU-84678-8a9d...</cas:proxyGrantingTicket>
+                      <cas:proxies>
+                          <cas:proxy>https://proxy2/pgtUrl</cas:proxy>
+                          <cas:proxy>https://proxy1/pgtUrl</cas:proxy>
+                      </cas:proxies>
+                  </cas:authenticationSuccess>
+                </cas:serviceResponse>
+            """
+
+        mocked_http_client = Mock(spec=["get_raw"])
+        mocked_http_client.get_raw.side_effect = get_raw
+
+        self.hs = self.setup_test_homeserver(
+            config=config, proxied_http_client=mocked_http_client,
+        )
+
+        return self.hs
+
+    def test_cas_redirect_confirm(self):
+        """Tests that the SSO login flow serves a confirmation page before redirecting a
+        user to the redirect URL.
+        """
+        base_url = "/_matrix/client/r0/login/cas/ticket?redirectUrl"
+        redirect_url = "https://dodgy-site.com/"
+
+        url_parts = list(urllib.parse.urlparse(base_url))
+        query = dict(urllib.parse.parse_qsl(url_parts[4]))
+        query.update({"redirectUrl": redirect_url})
+        query.update({"ticket": "ticket"})
+        url_parts[4] = urllib.parse.urlencode(query)
+        cas_ticket_url = urllib.parse.urlunparse(url_parts)
+
+        # Get Synapse to call the fake CAS and serve the template.
+        request, channel = self.make_request("GET", cas_ticket_url)
+        self.render(request)
+
+        # Test that the response is HTML.
+        self.assertEqual(channel.code, 200)
+        content_type_header_value = ""
+        for header in channel.result.get("headers", []):
+            if header[0] == b"Content-Type":
+                content_type_header_value = header[1].decode("utf8")
+
+        self.assertTrue(content_type_header_value.startswith("text/html"))
+
+        # Test that the body isn't empty.
+        self.assertTrue(len(channel.result["body"]) > 0)
+
+        # And that it contains our redirect link
+        self.assertIn(redirect_url, channel.result["body"].decode("UTF-8"))
+
+    @override_config(
+        {
+            "sso": {
+                "client_whitelist": [
+                    "https://legit-site.com/",
+                    "https://other-site.com/",
+                ]
+            }
+        }
+    )
+    def test_cas_redirect_whitelisted(self):
+        """Tests that the SSO login flow serves a redirect to a whitelisted url
+        """
+        redirect_url = "https://legit-site.com/"
+        cas_ticket_url = (
+            "/_matrix/client/r0/login/cas/ticket?redirectUrl=%s&ticket=ticket"
+            % (urllib.parse.quote(redirect_url))
+        )
+
+        # Get Synapse to call the fake CAS and serve the template.
+        request, channel = self.make_request("GET", cas_ticket_url)
+        self.render(request)
+
+        self.assertEqual(channel.code, 302)
+        location_headers = channel.headers.getRawHeaders("Location")
+        self.assertEqual(location_headers[0][: len(redirect_url)], redirect_url)

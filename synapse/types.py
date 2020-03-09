@@ -23,7 +23,7 @@ import attr
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
 
 # define a version of typing.Collection that works on python 3.5
 if sys.version_info[:3] >= (3, 6, 0):
@@ -166,11 +166,13 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         return self
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, s: str):
         """Parse the string given by 's' into a structure object."""
         if len(s) < 1 or s[0:1] != cls.SIGIL:
             raise SynapseError(
-                400, "Expected %s string to start with '%s'" % (cls.__name__, cls.SIGIL)
+                400,
+                "Expected %s string to start with '%s'" % (cls.__name__, cls.SIGIL),
+                Codes.INVALID_PARAM,
             )
 
         parts = s[1:].split(":", 1)
@@ -179,6 +181,7 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
                 400,
                 "Expected %s of the form '%slocalname:domain'"
                 % (cls.__name__, cls.SIGIL),
+                Codes.INVALID_PARAM,
             )
 
         domain = parts[1]
@@ -235,11 +238,13 @@ class GroupID(DomainSpecificString):
     def from_string(cls, s):
         group_id = super(GroupID, cls).from_string(s)
         if not group_id.localpart:
-            raise SynapseError(400, "Group ID cannot be empty")
+            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
 
         if contains_invalid_mxid_characters(group_id.localpart):
             raise SynapseError(
-                400, "Group ID can only contain characters a-z, 0-9, or '=_-./'"
+                400,
+                "Group ID can only contain characters a-z, 0-9, or '=_-./'",
+                Codes.INVALID_PARAM,
             )
 
         return group_id

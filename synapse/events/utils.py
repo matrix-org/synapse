@@ -23,6 +23,7 @@ from frozendict import frozendict
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.room_versions import RoomVersion
 from synapse.util.async_helpers import yieldable_gather_results
 
 from . import EventBase
@@ -35,26 +36,20 @@ from . import EventBase
 SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
-def prune_event(event):
+def prune_event(event: EventBase) -> EventBase:
     """ Returns a pruned version of the given event, which removes all keys we
     don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
-
-    Args:
-        event (FrozenEvent)
-
-    Returns:
-        FrozenEvent
     """
-    pruned_event_dict = prune_event_dict(event.get_dict())
+    pruned_event_dict = prune_event_dict(event.room_version, event.get_dict())
 
-    from . import event_type_from_format_version
+    from . import make_event_from_dict
 
-    pruned_event = event_type_from_format_version(event.format_version)(
-        pruned_event_dict, event.internal_metadata.get_dict()
+    pruned_event = make_event_from_dict(
+        pruned_event_dict, event.room_version, event.internal_metadata.get_dict()
     )
 
     # Mark the event as redacted
@@ -63,15 +58,12 @@ def prune_event(event):
     return pruned_event
 
 
-def prune_event_dict(event_dict):
+def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
     """Redacts the event_dict in the same way as `prune_event`, except it
     operates on dicts rather than event objects
 
-    Args:
-        event_dict (dict)
-
     Returns:
-        dict: A copy of the pruned event dict
+        A copy of the pruned event dict
     """
 
     allowed_keys = [
@@ -118,7 +110,7 @@ def prune_event_dict(event_dict):
             "kick",
             "redact",
         )
-    elif event_type == EventTypes.Aliases:
+    elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")

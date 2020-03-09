@@ -25,7 +25,6 @@ from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
 from synapse.http.servlet import parse_string
 from synapse.module_api import ModuleApi
-from synapse.rest.client.v1.login import SSOAuthHandler
 from synapse.types import (
     UserID,
     map_username_to_mxid_localpart,
@@ -48,7 +47,7 @@ class Saml2SessionData:
 class SamlHandler:
     def __init__(self, hs):
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
-        self._sso_auth_handler = SSOAuthHandler(hs)
+        self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
 
         self._clock = hs.get_clock()
@@ -116,7 +115,7 @@ class SamlHandler:
         self.expire_sessions()
 
         user_id = await self._map_saml_response_to_user(resp_bytes, relay_state)
-        self._sso_auth_handler.complete_sso_login(user_id, request, relay_state)
+        self._auth_handler.complete_sso_login(user_id, request, relay_state)
 
     async def _map_saml_response_to_user(self, resp_bytes, client_redirect_url):
         try:
