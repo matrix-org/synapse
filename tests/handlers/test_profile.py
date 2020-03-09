@@ -93,7 +93,7 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_name_if_disabled(self):
-        self.hs.config.disable_set_displayname = True
+        self.hs.config.enable_set_displayname = False
 
         # Set first displayname is allowed, if displayname is null
         yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
@@ -164,9 +164,9 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_avatar_if_disabled(self):
-        self.hs.config.disable_set_avatar_url = True
+        self.hs.config.enable_set_avatar_url = False
 
-        # Set first time avatar is allowed, if displayname is null
+        # Set first time avatar is allowed, if avatar is null
         yield self.store.set_profile_avatar_url(
             self.frank.localpart, "http://my.server/me.png"
         )

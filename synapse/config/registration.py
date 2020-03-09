@@ -129,9 +129,9 @@ class RegistrationConfig(Config):
                 raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
-        self.disable_set_displayname = config.get("disable_set_displayname", False)
-        self.disable_set_avatar_url = config.get("disable_set_avatar_url", False)
-        self.disable_3pid_changes = config.get("disable_3pid_changes", False)
+        self.enable_set_displayname = config.get("enable_set_displayname", True)
+        self.enable_set_avatar_url = config.get("enable_set_avatar_url", True)
+        self.enable_3pid_changes = config.get("enable_3pid_changes", True)
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
@@ -334,18 +334,18 @@ class RegistrationConfig(Config):
             #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
-        # If enabled, don't let users set their own display names/avatars
+        # If disabled, don't let users set their own display names/avatars
         # other than for the very first time (unless they are a server admin).
         # Useful when provisioning users based on the contents of a 3rd party
         # directory and to avoid ambiguities.
         #
-        #disable_set_displayname: false
-        #disable_set_avatar_url: false
+        #enable_set_displayname: true
+        #enable_set_avatar_url: true
 
-        # If true, stop users from trying to change the 3PIDs associated with
+        # If false, stop users from trying to change the 3PIDs associated with
         # their accounts.
         #
-        #disable_3pid_changes: false
+        #enable_3pid_changes: true
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms

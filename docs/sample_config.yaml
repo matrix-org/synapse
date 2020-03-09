@@ -1057,18 +1057,18 @@ account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
-# If enabled, don't let users set their own display names/avatars
+# If disabled, don't let users set their own display names/avatars
 # other than for the very first time (unless they are a server admin).
 # Useful when provisioning users based on the contents of a 3rd party
 # directory and to avoid ambiguities.
 #
-#disable_set_displayname: false
-#disable_set_avatar_url: false
+#enable_set_displayname: true
+#enable_set_avatar_url: true
 
-# If true, stop users from trying to change the 3PIDs associated with
+# If false, stop users from trying to change the 3PIDs associated with
 # their accounts.
 #
-#disable_3pid_changes: false
+#enable_3pid_changes: true
 
 # Users who register on this homeserver will automatically be joined
 # to these rooms

@@ -24,6 +24,7 @@ import pkg_resources
 
 import synapse.rest.admin
 from synapse.api.constants import LoginType, Membership
+from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
 
@@ -412,7 +413,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     def test_add_email_if_disabled(self):
         """Test add mail to profile if disabled
         """
-        self.hs.config.disable_3pid_changes = True
+        self.hs.config.enable_3pid_changes = True
 
         client_secret = "foobar"
         session_id = self._request_token(self.email, client_secret)
@@ -438,9 +439,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(
-            "3PID changes disabled on this server", channel.json_body["error"]
-        )
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Get user
         request, channel = self.make_request(
@@ -486,7 +485,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
     def test_delete_email_if_disabled(self):
         """Test delete mail from profile if disabled
         """
-        self.hs.config.disable_3pid_changes = True
+        self.hs.config.enable_3pid_changes = True
 
         # Add a threepid
         self.get_success(
@@ -508,9 +507,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(
-            "3PID changes disabled on this server", channel.json_body["error"]
-        )
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Get user
         request, channel = self.make_request(
@@ -547,7 +544,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("No validated 3pid session found", channel.json_body["error"])
+        self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
         # Get user
         request, channel = self.make_request(
@@ -582,7 +579,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("No validated 3pid session found", channel.json_body["error"])
+        self.assertEqual(Codes.THREEPID_AUTH_FAILED, channel.json_body["errcode"])
 
         # Get user
         request, channel = self.make_request(
