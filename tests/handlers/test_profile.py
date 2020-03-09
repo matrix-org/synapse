@@ -96,7 +96,7 @@ class ProfileTestCase(unittest.TestCase):
         self.hs.config.disable_set_displayname = True
 
         # Set first displayname is allowed, if displayname is null
-        self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
 
         d = self.handler.set_displayname(
             self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
@@ -167,7 +167,7 @@ class ProfileTestCase(unittest.TestCase):
         self.hs.config.disable_set_avatar_url = True
 
         # Set first time avatar is allowed, if displayname is null
-        self.store.set_profile_avatar_url(
+        yield self.store.set_profile_avatar_url(
             self.frank.localpart, "http://my.server/me.png"
         )
 
