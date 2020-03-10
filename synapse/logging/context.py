@@ -511,7 +511,7 @@ class PreserveLoggingContext(object):
 
     __slots__ = ["current_context", "new_context", "has_parent"]
 
-    def __init__(self, new_context: Optional[LoggingContext] = None) -> None:
+    def __init__(self, new_context: Optional[LoggingContextOrSentinel] = None) -> None:
         if new_context is None:
             self.new_context = LoggingContext.sentinel  # type: LoggingContextOrSentinel
         else:
