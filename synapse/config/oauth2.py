@@ -28,7 +28,9 @@ class OAuth2Config(Config):
         oauth2_config = config.get("oauth2_config", None)
         if oauth2_config:
             self.oauth2_enabled = oauth2_config.get("enabled", True)
-            self.oauth2_server_authorization_url = oauth2_config["server_authorization_url"]
+            self.oauth2_server_authorization_url = oauth2_config[
+                "server_authorization_url"
+            ]
             self.oauth2_server_token_url = oauth2_config["server_token_url"]
             self.oauth2_server_userinfo_url = oauth2_config["server_userinfo_url"]
             self.oauth2_client_id = oauth2_config["client_id"]

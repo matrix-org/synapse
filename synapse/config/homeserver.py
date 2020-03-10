@@ -19,7 +19,6 @@ from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
-from .oauth2 import OAuth2Config
 from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
@@ -28,6 +27,7 @@ from .jwt_config import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
+from .oauth2 import OAuth2Config
 from .password import PasswordConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
