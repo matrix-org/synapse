@@ -47,7 +47,7 @@ class OAuth2Config(Config):
         return """
         # Enable OAuth2 for registration and login.
         #
-        #oauth_config:
+        #oauth2_config:
         #   enabled: true
         #   server_authorization_url: "https://oauth.server.com/oauth2/authorize"
         #   server_token_url: "https://oauth.server.com/oauth2/token"
