@@ -32,8 +32,8 @@ SAML2_ERROR_DEFAULT_HTML = """
     <body>
         <p>Oops! Something went wrong</p>
         <p>
-            Try logging in again from the application and if the problem persists
-            please contact the administrator.
+            Try logging in again from your Matrix client and if the problem persists
+            please contact the server's administrator.
         </p>
     </body>
 </html>
