@@ -210,7 +210,7 @@ class LoggingContext(object):
     class Sentinel(object):
         """Sentinel to represent the root context"""
 
-        __slots__ = ["previous_context", "alive", "request", "scope"]
+        __slots__ = ["previous_context", "alive", "request", "scope", "tag"]
 
         def __init__(self) -> None:
             # Minimal set for compatibility with LoggingContext
@@ -218,6 +218,7 @@ class LoggingContext(object):
             self.alive = None
             self.request = None
             self.scope = None
+            self.tag = None
 
         def __str__(self):
             return "sentinel"
