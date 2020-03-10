@@ -91,6 +91,7 @@ class AuthHandler(BaseHandler):
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
+        self._saml2_enabled = hs.config.saml2_enabled
 
         # we keep this as a list despite the O(N^2) implication so that we can
         # keep PASSWORD first and avoid confusing clients which pick the first
@@ -105,6 +106,8 @@ class AuthHandler(BaseHandler):
                 for t in provider.get_supported_login_types().keys():
                     if t not in login_types:
                         login_types.append(t)
+        if self._saml2_enabled:
+            login_types.append(LoginType.SSO)
         self._supported_login_types = login_types
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
@@ -990,6 +993,47 @@ class AuthHandler(BaseHandler):
             return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
+
+    def complete_sso_ui_auth(
+        self,
+        registered_user_id: str,
+        session_id: str,
+        request: SynapseRequest,
+        requester: Requester,
+    ):
+        """Having figured out a mxid for this user, complete the HTTP request
+
+        Args:
+            registered_user_id: The registered user ID to complete SSO login for.
+            request: The request to complete.
+            client_redirect_url: The URL to which to redirect the user at the end of the
+                process.
+        """
+        # If the user ID of the SAML session does not match the user from the
+        # request, something went wrong.
+        if registered_user_id != requester.user.to_string():
+            raise SynapseError(403, "SAML user does not match requester.")
+
+        # Mark the stage of the authentication as successful.
+        sess = self._get_session_info(session_id)
+        if "creds" not in sess:
+            sess["creds"] = {}
+        creds = sess["creds"]
+
+        creds[LoginType.SSO] = True
+        self._save_session(sess)
+
+        # TODO Import this seems wrong.
+        from synapse.rest.client.v2_alpha.auth import SUCCESS_TEMPLATE
+
+        # Render the HTML and return.
+        html_bytes = SUCCESS_TEMPLATE.encode("utf8")
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+        request.write(html_bytes)
+        finish_request(request)
 
     def complete_sso_login(
         self,

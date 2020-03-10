@@ -113,6 +113,24 @@ if (window.onAuthDone) {
 </html>
 """
 
+SAML2_TEMPLATE = """
+<html>
+<head>
+<title>Authentication</title>
+</head>
+<body>
+<div>
+    <p>
+    A client is trying to remove a device/add an email address/take over
+    your account. To confirm this action,
+    <a href="%(myurl)s">re-authenticate with single sign-on</a>.
+    If you did not expect this, your account may be compromised!
+    </p>
+</div>
+</body>
+</html>
+"""
+
 
 class AuthRestServlet(RestServlet):
     """
@@ -129,6 +147,11 @@ class AuthRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
+
+        # SSO configuration.
+        self._saml_enabled = hs.config.saml2_enabled
+        if self._saml_enabled:
+            self._saml_handler = hs.get_saml_handler()
 
     def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
@@ -149,6 +172,17 @@ class AuthRestServlet(RestServlet):
                 % (self.hs.config.public_baseurl, self.hs.config.user_consent_version),
                 "myurl": "%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
+            }
+
+        elif stagetype == LoginType.SSO and self._saml_enabled:
+            # Display a confirmation page which prompts the user to
+            # re-authenticate with their SSO provider.
+            client_redirect_url = ""
+            value = self._saml_handler.handle_redirect_request(
+                client_redirect_url, session
+            )
+            html = SAML2_TEMPLATE % {
+                "myurl": value,
             }
         else:
             raise SynapseError(404, "Unknown auth stage type")
@@ -210,6 +244,9 @@ class AuthRestServlet(RestServlet):
                     "myurl": "%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
                 }
+        elif stagetype == LoginType.SSO:
+            # The SSO fallback workflow should not post here,
+            raise SynapseError(404, "Fallback SSO auth does not support POST requests.")
         else:
             raise SynapseError(404, "Unknown auth stage type")
 
