@@ -87,6 +87,7 @@ class LoginRestServlet(RestServlet):
         self.jwt_secret = hs.config.jwt_secret
         self.jwt_algorithm = hs.config.jwt_algorithm
         self.saml2_enabled = hs.config.saml2_enabled
+        self.oauth2_enabled = hs.config.oauth2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
@@ -102,6 +103,9 @@ class LoginRestServlet(RestServlet):
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
         if self.saml2_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
+            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
+        if self.oauth2_enabled:
             flows.append({"type": LoginRestServlet.SSO_TYPE})
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
         if self.cas_enabled:
@@ -425,6 +429,105 @@ class BaseSSORedirectServlet(RestServlet):
         raise NotImplementedError()
 
 
+class OAuth2RedirectServlet(BaseSSORedirectServlet):
+    def __init__(self, hs):
+        super(OAuth2RedirectServlet, self).__init__()
+        self.public_baseurl = hs.config.public_baseurl
+        self.oauth2_server_authorization_url = hs.config.oauth2_server_authorization_url
+        self.oauth2_client_id = hs.config.oauth2_client_id
+        self.oauth2_scope = "openid"
+        self.oauth2_response_type = "code"
+        self.oauth2_response_mode = "query"
+        self.oauth2_nonce = "dajmpe2p1x5" # TODO(Max): generate random
+
+    def get_sso_url(self, client_redirect_url):
+        # required to get back to the client later TODO(Max): store
+        client_redirect_url_param = urllib.parse.urlencode(
+            {b"redirectUrl": client_redirect_url}
+        ).encode("ascii")
+
+        # redirect to synapse to generate synapse token
+        redirect_uri = self.public_baseurl + "_matrix/client/r0/login/oauth/response"
+
+        service_param = urllib.parse.urlencode(
+            {
+                b"redirect_uri": redirect_uri,
+                b"client_id": self.oauth2_client_id,
+                b"scope": self.oauth2_scope,
+                b"response_type": self.oauth2_response_type,
+                b"response_mode": self.oauth2_response_mode,
+                b"nonce": self.oauth2_nonce,
+            }
+        ).encode("ascii")
+        return b"%s?%s" % (self.oauth2_server_authorization_url.encode("ascii"), service_param)
+
+class OAuth2ResponseServlet(RestServlet):
+    PATTERNS = client_patterns("/login/oauth/response", v1=True)
+
+    def __init__(self, hs):
+        super(OAuth2ResponseServlet, self).__init__()
+        self.oauth2_server_token_url = hs.config.oauth2_server_token_url
+        self.oauth2_server_userinfo_url = hs.config.oauth2_server_userinfo_url
+        self.oauth2_client_id = hs.config.oauth2_client_id
+        self.oauth2_client_secret = hs.config.oauth2_client_secret
+        self._sso_auth_handler = SSOAuthHandler(hs)
+        self._http_client = hs.get_proxied_http_client()
+
+    async def on_GET(self, request):
+        oauth2_code = parse_string(request, "code", required=True)
+        #oauth2_scope = parse_string(request, "scope", required=False)
+        #oauth2_state = parse_string(request, "state", required=False) # optional CSRF token
+
+        access_token = await self.get_access_token(oauth2_code)
+        userinfo = await self.get_userinfo(access_token)
+
+        user = "tv" + userinfo.get('sub')
+        displayname = userinfo.get('preferred_username')
+
+        result = await self._sso_auth_handler.on_successful_auth(
+            user, request, "https://riot.im/develop/", displayname
+        )
+        return result
+
+
+    async def get_access_token(self, oauth2_code):
+        # TODO(Max): get stored?
+        redirect_uri = "http://localhost:8008/_matrix/client/r0/login/oauth/response"
+        args = {
+            "client_id": self.oauth2_client_id,
+            "client_secret": self.oauth2_client_secret,
+            "code": oauth2_code,
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+        }
+
+        try:
+            body = await self._http_client.post_urlencoded_get_json(self.oauth2_server_token_url, args)
+        except PartialDownloadError as pde:
+            # Twisted raises this error if the connection is closed,
+            # even if that's being used old-http style to signal end-of-data
+            body = pde.response
+
+        logging.warning(body)
+        access_token = body.get('access_token')
+        return access_token
+
+    async def get_userinfo(self, access_token):
+        headers = {
+            "Authorization": ["Bearer "+ access_token],
+        }
+
+        try:
+            userinfo = await self._http_client.get_json(self.oauth2_server_userinfo_url, {}, headers)
+        except PartialDownloadError as pde:
+            # Twisted raises this error if the connection is closed,
+            # even if that's being used old-http style to signal end-of-data
+            userinfo = pde.response
+
+        logging.warning(userinfo)
+        return userinfo
+
+
 class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
@@ -600,5 +703,8 @@ def register_servlets(hs, http_server):
     if hs.config.cas_enabled:
         CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)
+    elif hs.config.oauth2_enabled:
+        OAuth2RedirectServlet(hs).register(http_server)
+        OAuth2ResponseServlet(hs).register(http_server)
     elif hs.config.saml2_enabled:
         SAMLRedirectServlet(hs).register(http_server)

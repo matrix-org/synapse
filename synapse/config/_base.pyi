@@ -5,6 +5,7 @@ from synapse.config import (
     appservice,
     captcha,
     cas,
+    oauth2,
     consent_config,
     database,
     emailconfig,
@@ -58,6 +59,7 @@ class RootConfig:
     key: key.KeyConfig
     saml2: saml2_config.SAML2Config
     cas: cas.CasConfig
+    oauth2: oauth2.OAuth2Config
     sso: sso.SSOConfig
     jwt: jwt_config.JWTConfig
     password: password.PasswordConfig

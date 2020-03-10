@@ -1359,6 +1359,15 @@ saml2_config:
 #   #required_attributes:
 #   #    name: value
 
+# Enable OAuth2 for registration and login.
+#
+#oauth2_config:
+#   enabled: true
+#   server_authorization_url: "https://oauth.server.com/oauth2/authorize"
+#   server_token_url: "https://oauth.server.com/oauth2/token"
+#   server_userinfo_url: "https://oauth.server.com/oauth2/userinfo"
+#   client_id: "FORM_OAUTH_SERVER"
+#   client_secret: "FORM_OAUTH_SERVER"
 
 # Additional settings to use with single-sign on systems such as SAML2 and CAS.
 #

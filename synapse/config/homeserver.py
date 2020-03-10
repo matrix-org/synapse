@@ -19,6 +19,7 @@ from .api import ApiConfig
 from .appservice import AppServiceConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
+from .oauth2 import OAuth2Config
 from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
@@ -66,6 +67,7 @@ class HomeServerConfig(RootConfig):
         KeyConfig,
         SAML2Config,
         CasConfig,
+        OAuth2Config,
         SSOConfig,
         JWTConfig,
         PasswordConfig,
