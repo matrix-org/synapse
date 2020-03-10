@@ -335,7 +335,7 @@ class RegistrationConfig(Config):
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # If disabled, don't let users set their own display names/avatars
-        # other than for the very first time (unless they are a server admin).
+        # (unless they are a server admin) other than for the very first time.
         # Useful when provisioning users based on the contents of a 3rd party
         # directory and to avoid ambiguities.
         #
