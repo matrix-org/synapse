@@ -23,6 +23,7 @@ from frozendict import frozendict
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.room_versions import RoomVersion
 from synapse.util.async_helpers import yieldable_gather_results
 
 from . import EventBase
@@ -43,7 +44,7 @@ def prune_event(event: EventBase) -> EventBase:
     the user has specified, but we do want to keep necessary information like
     type, state_key etc.
     """
-    pruned_event_dict = prune_event_dict(event.get_dict())
+    pruned_event_dict = prune_event_dict(event.room_version, event.get_dict())
 
     from . import make_event_from_dict
 
@@ -57,15 +58,12 @@ def prune_event(event: EventBase) -> EventBase:
     return pruned_event
 
 
-def prune_event_dict(event_dict):
+def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
     """Redacts the event_dict in the same way as `prune_event`, except it
     operates on dicts rather than event objects
 
-    Args:
-        event_dict (dict)
-
     Returns:
-        dict: A copy of the pruned event dict
+        A copy of the pruned event dict
     """
 
     allowed_keys = [
@@ -112,7 +110,7 @@ def prune_event_dict(event_dict):
             "kick",
             "redact",
         )
-    elif event_type == EventTypes.Aliases:
+    elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
