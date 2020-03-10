@@ -344,7 +344,7 @@ class SAML2Config(Config):
           # The default is 'uid'.
           #
           #grandfathered_mxid_source_attribute: upn
-          
+
           # Path to a file containing HTML content to serve in case an error happens
           # when the user gets redirected from the SAML IdP back to Synapse.
           # If no file is provided, this defaults to some minimalistic HTML telling the
