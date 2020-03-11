@@ -15,6 +15,9 @@
 # limitations under the License.
 
 import logging
+import os
+
+import pkg_resources
 
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
@@ -26,18 +29,6 @@ logger = logging.getLogger(__name__)
 DEFAULT_USER_MAPPING_PROVIDER = (
     "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
 )
-
-SAML2_ERROR_DEFAULT_HTML = """
-<html>
-    <body>
-        <p>Oops! Something went wrong</p>
-        <p>
-            Try logging in again from your Matrix client and if the problem persists
-            please contact the server's administrator.
-        </p>
-    </body>
-</html>
-"""
 
 
 def _dict_merge(merge_dict, into_dict):
@@ -172,12 +163,14 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "5m")
         )
 
-        if "error_html_path" in config:
-            self.saml2_error_html_content = self.read_file(
-                config["error_html_path"], "saml2_config.error_html_path",
-            )
-        else:
-            self.saml2_error_html_content = SAML2_ERROR_DEFAULT_HTML
+        error_html_path = config.get("error_html_path")
+        if not error_html_path:
+            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
+            error_html_path = os.path.join(template_dir, "saml_error.html")
+
+        self.saml2_error_html_content = self.read_file(
+            error_html_path, "saml2_config.error_html_path",
+        )
 
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set
