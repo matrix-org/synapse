@@ -132,7 +132,7 @@ def filter_events_for_client(
         # now we temporarily filter out m.room.aliases entirely to mitigate
         # abuse, while we spec a better solution to advertising aliases
         # on rooms.
-        if event.type == EventTypes.Aliases:
+        if event.type == EventTypes.Aliases and filter_send_to_client:
             return None
 
         # Don't try to apply the room's retention policy if the event is a state event, as
