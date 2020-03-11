@@ -347,6 +347,10 @@ class AuthHandler(BaseHandler):
                     creds,
                     list(clientdict),
                 )
+
+                # Blow away the session so it can not be re-used.
+                self._invalidate_session(session["id"])
+
                 return creds, clientdict, session["id"]
 
         ret = self._auth_dict_for_flows(flows, session)
@@ -518,6 +522,17 @@ class AuthHandler(BaseHandler):
             self.sessions[session_id] = {"id": session_id}
 
         return self.sessions[session_id]
+
+    def _invalidate_session(self, session_id) -> None:
+        """Invalidate session information for session ID"""
+        session = self.sessions.get(session_id, None)
+        if session and "ui_auth" in session:
+            # Set the items in the ui_auth session to sentinel values that can
+            # never be equaled.
+            session["ui_auth"] = {
+                "action_type": object(),
+                "action_id": object(),
+            }
 
     @defer.inlineCallbacks
     def get_access_token_for_user_id(

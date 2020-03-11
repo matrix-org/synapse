@@ -104,7 +104,7 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         )
         self.render(request)
 
-        # Now we should have fufilled a complete auth flow, including
+        # Now we should have fulfilled a complete auth flow, including
         # the recaptcha fallback step, we can then send a
         # request to the register API with the session in the authdict.
         request, channel = self.make_request(
