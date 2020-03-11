@@ -24,8 +24,8 @@
         // we just don't print anything specific.
         let searchStr = "";
         if (window.location.search) {
-            // For some reason window.location.searchParams isn't always defined when
-            // window.location.search is, so we can't just use it right away.
+            // window.location.searchParams isn't always defined when
+            // window.location.search is, so it's more reliable to parse the latter.
             searchStr = window.location.search;
         } else if (window.location.hash) {
             // Replace the # with a ? so that URLSearchParams does the right thing and

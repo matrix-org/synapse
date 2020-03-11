@@ -343,6 +343,9 @@ class SAML2Config(Config):
           # If no file is provided, this defaults to some minimalistic HTML telling the
           # user that something went wrong and they should try authenticating again.
           #
+          # See https://github.com/matrix-org/synapse/blob/master/synapse/res/templates/saml_error.html
+          # for an example.
+          #
           #error_html_path: /path/to/static/content/saml_error.html
         """ % {
             "config_dir_path": config_dir_path
