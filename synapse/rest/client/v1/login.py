@@ -73,6 +73,14 @@ def login_id_thirdparty_from_phone(identifier):
     return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
 
 
+def build_service_param(cas_service_url, client_redirect_url):
+    return "%s%s?redirectUrl=%s" % (
+        cas_service_url,
+        "/_matrix/client/r0/login/cas/ticket",
+        urllib.parse.quote(client_redirect_url, safe=""),
+    )
+
+
 class LoginRestServlet(RestServlet):
     PATTERNS = client_patterns("/login$", v1=True)
     CAS_TYPE = "m.login.cas"
@@ -428,18 +436,15 @@ class BaseSSORedirectServlet(RestServlet):
 class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
-        self.cas_server_url = hs.config.cas_server_url.encode("ascii")
-        self.cas_service_url = hs.config.cas_service_url.encode("ascii")
+        self.cas_server_url = hs.config.cas_server_url
+        self.cas_service_url = hs.config.cas_service_url
 
     def get_sso_url(self, client_redirect_url):
-        client_redirect_url_param = urllib.parse.urlencode(
-            {b"redirectUrl": client_redirect_url}
-        ).encode("ascii")
-        hs_redirect_url = self.cas_service_url + b"/_matrix/client/r0/login/cas/ticket"
-        service_param = urllib.parse.urlencode(
-            {b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)}
-        ).encode("ascii")
-        return b"%s/login?%s" % (self.cas_server_url, service_param)
+        args = urllib.parse.urlencode(
+            {"service": build_service_param(self.cas_service_url, client_redirect_url)}
+        )
+
+        return "%s/login?%s" % (self.cas_server_url, args)
 
 
 class CasTicketServlet(RestServlet):
@@ -448,10 +453,7 @@ class CasTicketServlet(RestServlet):
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url
-        self.cas_service_url = (
-            hs.config.cas_service_url.encode("ascii")
-            + b"/_matrix/client/r0/login/cas/ticket?redirectUrl="
-        )
+        self.cas_service_url = hs.config.cas_service_url
         self.cas_displayname_attribute = hs.config.cas_displayname_attribute
         self.cas_required_attributes = hs.config.cas_required_attributes
         self._sso_auth_handler = SSOAuthHandler(hs)
@@ -460,12 +462,9 @@ class CasTicketServlet(RestServlet):
     async def on_GET(self, request):
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
         uri = self.cas_server_url + "/proxyValidate"
-        service_url = self.cas_service_url + urllib.parse.quote(
-            client_redirect_url, safe=""
-        ).encode("ascii")
         args = {
             "ticket": parse_string(request, "ticket", required=True),
-            "service": service_url,
+            "service": build_service_param(self.cas_service_url, client_redirect_url),
         }
         try:
             body = await self._http_client.get_raw(uri, args)
