@@ -95,7 +95,7 @@ def filter_events_for_client(
 
     erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
 
-    if not filter_send_to_client:
+    if filter_send_to_client:
         room_ids = {e.room_id for e in events}
         retention_policies = {}
 
