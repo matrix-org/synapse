@@ -163,13 +163,13 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "5m")
         )
 
-        error_html_path = config.get("error_html_path")
-        if not error_html_path:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
-            error_html_path = os.path.join(template_dir, "saml_error.html")
+        template_dir = saml2_config.get("template_dir")
+        if not template_dir:
+            template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
 
         self.saml2_error_html_content = self.read_file(
-            error_html_path, "saml2_config.error_html_path",
+            os.path.join(template_dir, "saml_error.html"),
+            "saml2_config.saml_error",
         )
 
     def _default_saml_config_dict(
@@ -338,15 +338,24 @@ class SAML2Config(Config):
           #
           #grandfathered_mxid_source_attribute: upn
 
-          # Path to a file containing HTML content to serve in case an error happens
-          # when the user gets redirected from the SAML IdP back to Synapse.
-          # If no file is provided, this defaults to some minimalistic HTML telling the
-          # user that something went wrong and they should try authenticating again.
+          # Directory in which Synapse will try to find the template files below.
+          # If not set, default templates from within the Synapse package will be used.
           #
-          # See https://github.com/matrix-org/synapse/blob/master/synapse/res/templates/saml_error.html
-          # for an example.
+          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+          # If you *do* uncomment it, you will need to make sure that all the templates
+          # below are in the directory.
           #
-          #error_html_path: /path/to/static/content/saml_error.html
+          # Synapse will look for the following templates in this directory:
+          #
+          # * HTML page to display to users if something goes wrong during the
+          #   authentication process: 'saml_error.html'.
+          #
+          #   This template doesn't currently need any variable to render.
+          #
+          # You can see the default templates at:
+          # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+          #
+          #template_dir: "res/templates"
         """ % {
             "config_dir_path": config_dir_path
         }
