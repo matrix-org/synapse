@@ -81,7 +81,11 @@ class DeleteDevicesRestServlet(RestServlet):
         assert_params_in_dict(body, ["devices"])
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester,
+            body,
+            self.hs.get_ip_from_request(request),
+            "delete_devices",
+            "",  # TODO
         )
 
         await self.device_handler.delete_devices(
@@ -127,7 +131,11 @@ class DeviceRestServlet(RestServlet):
                 raise
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester,
+            body,
+            self.hs.get_ip_from_request(request),
+            "delete_device",
+            device_id,
         )
 
         await self.device_handler.delete_device(requester.user.to_string(), device_id)
