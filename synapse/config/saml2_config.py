@@ -168,8 +168,7 @@ class SAML2Config(Config):
             template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
 
         self.saml2_error_html_content = self.read_file(
-            os.path.join(template_dir, "saml_error.html"),
-            "saml2_config.saml_error",
+            os.path.join(template_dir, "saml_error.html"), "saml2_config.saml_error",
         )
 
     def _default_saml_config_dict(
