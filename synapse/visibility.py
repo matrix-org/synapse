@@ -121,7 +121,7 @@ def filter_events_for_client(
         if event.type == "org.matrix.dummy_event" and filter_send_to_client:
             return None
 
-        if not event.is_state() and event.sender in ignore_list:
+        if not event.is_state() and event.sender in ignore_list and filter_send_to_client:
             return None
 
         # Until MSC2261 has landed we can't redact malicious alias events, so for
