@@ -49,7 +49,7 @@ def filter_events_for_client(
     events,
     is_peeking=False,
     always_include_ids=frozenset(),
-    apply_retention_policies=True,
+    filter_send_to_client=True,
 ):
     """
     Check which events a user is allowed to see. If the user can see the event but its
@@ -65,10 +65,9 @@ def filter_events_for_client(
             events
         always_include_ids (set(event_id)): set of event ids to specifically
             include (unless sender is ignored)
-        apply_retention_policies (bool): Whether to filter out events that's older than
-            allowed by the room's retention policy. Useful when this function is called
-            to e.g. check whether a user should be allowed to see the state at a given
-            event rather than to know if it should send an event to a user's client(s).
+        filter_send_to_client (bool): Whether we're checking an event that's going to be
+            sent to a client. This might not always be the case since this function can
+            also be called to check whether a user can see the state at a given point.
 
     Returns:
         Deferred[list[synapse.events.EventBase]]
@@ -96,7 +95,7 @@ def filter_events_for_client(
 
     erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
 
-    if apply_retention_policies:
+    if not filter_send_to_client:
         room_ids = {e.room_id for e in events}
         retention_policies = {}
 
@@ -119,7 +118,7 @@ def filter_events_for_client(
 
                the original event if they can see it as normal.
         """
-        if event.type == "org.matrix.dummy_event":
+        if event.type == "org.matrix.dummy_event" and filter_send_to_client:
             return None
 
         if not event.is_state() and event.sender in ignore_list:
@@ -134,7 +133,7 @@ def filter_events_for_client(
 
         # Don't try to apply the room's retention policy if the event is a state event, as
         # MSC1763 states that retention is only considered for non-state events.
-        if apply_retention_policies and not event.is_state():
+        if filter_send_to_client and not event.is_state():
             retention_policy = retention_policies[event.room_id]
             max_lifetime = retention_policy.get("max_lifetime")
 
