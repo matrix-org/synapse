@@ -1,0 +1,1 @@
+Fix a bug causing `/sync` returning with 404 errors about missing events and unknown rooms.
