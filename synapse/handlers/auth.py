@@ -125,7 +125,7 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def validate_user_via_ui_auth(
-        self, requester: Requester, request_body: dict, clientip: str
+        self, requester: Requester, request_body: Dict[str, Any], clientip: str
     ):
         """
         Checks that the user is who they claim to be, via a UI auth.
@@ -210,7 +210,9 @@ class AuthHandler(BaseHandler):
         return self.checkers.keys()
 
     @defer.inlineCallbacks
-    def check_auth(self, flows: List[List[str]], clientdict: dict, clientip: str):
+    def check_auth(
+        self, flows: List[List[str]], clientdict: Dict[str, Any], clientip: str
+    ):
         """
         Takes a dictionary sent by the client in the login / registration
         protocol and handles the User-Interactive Auth flow.
@@ -287,7 +289,7 @@ class AuthHandler(BaseHandler):
         # check auth type currently being presented
         errordict = {}  # type: Dict[str, Any]
         if "type" in authdict:
-            login_type = authdict["type"]
+            login_type = authdict["type"]  # type: str
             try:
                 result = yield self._check_auth_dict(authdict, clientip)
                 if result:
@@ -328,7 +330,7 @@ class AuthHandler(BaseHandler):
         raise InteractiveAuthIncompleteError(ret)
 
     @defer.inlineCallbacks
-    def add_oob_auth(self, stagetype: str, authdict: dict, clientip: str):
+    def add_oob_auth(self, stagetype: str, authdict: Dict[str, Any], clientip: str):
         """
         Adds the result of out-of-band authentication into an existing auth
         session. Currently used for adding the result of fallback auth.
@@ -350,7 +352,7 @@ class AuthHandler(BaseHandler):
             return True
         return False
 
-    def get_session_id(self, clientdict: dict) -> Optional[str]:
+    def get_session_id(self, clientdict: Dict[str, Any]) -> Optional[str]:
         """
         Gets the session ID for a client given the client dictionary
 
@@ -398,7 +400,7 @@ class AuthHandler(BaseHandler):
         return sess.setdefault("serverdict", {}).get(key, default)
 
     @defer.inlineCallbacks
-    def _check_auth_dict(self, authdict: dict, clientip: str):
+    def _check_auth_dict(self, authdict: Dict[str, Any], clientip: str):
         """Attempt to validate the auth dict provided by a client
 
         Args:
@@ -449,7 +451,9 @@ class AuthHandler(BaseHandler):
             }
         }
 
-    def _auth_dict_for_flows(self, flows: List[List[str]], session: dict) -> dict:
+    def _auth_dict_for_flows(
+        self, flows: List[List[str]], session: Dict[str, Any]
+    ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
             public_flows.append(f)
@@ -606,7 +610,7 @@ class AuthHandler(BaseHandler):
         return self._supported_login_types
 
     @defer.inlineCallbacks
-    def validate_login(self, username: str, login_submission: dict):
+    def validate_login(self, username: str, login_submission: Dict[str, Any]):
         """Authenticates the user for the /login API
 
         Also used by the user-interactive auth flow to validate
@@ -877,13 +881,12 @@ class AuthHandler(BaseHandler):
         from the local database.
 
         Args:
-            user_id
-            medium
-            address
+            user_id: ID of user to remove the 3pid from.
+            medium: The medium of the 3pid being removed: "email" or "msisdn".
+            address: The 3pid address to remove.
             id_server: Use the given identity server when unbinding
                 any threepids. If None then will attempt to unbind using the
                 identity server specified when binding (if known).
-
 
         Returns:
             Deferred[bool]: Returns True if successfully unbound the 3pid on
@@ -903,8 +906,8 @@ class AuthHandler(BaseHandler):
         yield self.store.user_delete_threepid(user_id, medium, address)
         return result
 
-    def _save_session(self, session: dict) -> None:
-        """Update the time a session was last used and add it back to the session store."""
+    def _save_session(self, session: Dict[str, Any]) -> None:
+        """Update the last used time on the session to now and add it back to the session store."""
         # TODO: Persistent storage
         logger.debug("Saving session %s", session)
         session["last_used"] = self.hs.get_clock().time_msec()
@@ -1042,15 +1045,6 @@ class MacaroonGenerator(object):
     def generate_short_term_login_token(
         self, user_id: str, duration_in_ms: int = (2 * 60 * 1000)
     ) -> str:
-        """
-
-        Args:
-            user_id
-            duration_in_ms
-
-        Returns:
-            str
-        """
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
         now = self.hs.get_clock().time_msec()
