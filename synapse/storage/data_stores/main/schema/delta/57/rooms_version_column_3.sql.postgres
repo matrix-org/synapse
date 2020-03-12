@@ -32,6 +32,7 @@ UPDATE rooms SET room_version=(
     SELECT COALESCE(json::json->'content'->>'room_version','1')
     FROM state_events se INNER JOIN event_json ej USING (event_id)
     WHERE se.room_id=rooms.room_id AND se.type='m.room.create' AND se.state_key=''
+    LIMIT 1
 ) WHERE rooms.room_version IS NULL;
 
 -- see also rooms_version_column_3.sql.sqlite which has a copy of the above query, using
