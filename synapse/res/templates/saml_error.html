@@ -37,7 +37,8 @@
         // to print one.
         let errorDesc = new URLSearchParams(searchStr).get("error_description")
         if (errorDesc) {
-            document.getElementById("errormsg").innerHTML = ` ("${errorDesc}")`;
+
+            document.getElementById("errormsg").innerText = ` ("${errorDesc}")`;
         }
     </script>
 </body>
