@@ -42,15 +42,43 @@ the reverse proxy and the homeserver.
             location /_matrix {
                 proxy_pass http://localhost:8008;
                 proxy_set_header X-Forwarded-For $remote_addr;
+            }            
+            location /.well-known/matrix/server {
+                proxy_pass http://localhost:8008;
+                proxy_set_header X-Forwarded-For $remote_addr;
+            }
+            location /.well-known/matrix/client {
+                proxy_pass http://localhost:8008;
+                proxy_set_header X-Forwarded-For $remote_addr;
+            }
+            location /.well-known {
+                proxy_pass http://localhost:8008;
+                proxy_set_header X-Forwarded-For $remote_addr;
             }
         }
 
         server {
-            listen 8448 ssl default_server;
-            listen [::]:8448 ssl default_server;
+            listen 8448 ssl;
+            listen [::]:8448 ssl;
             server_name example.com;
 
             location / {
+                proxy_pass http://localhost:8008;
+                proxy_set_header X-Forwarded-For $remote_addr;
+            }            
+            location /.well-known/matrix/server {
+                proxy_pass http://localhost:8008;
+                proxy_set_header X-Forwarded-For $remote_addr;
+            }
+            location /.well-known/matrix/client {
+                proxy_pass http://localhost:8008;
+                proxy_set_header X-Forwarded-For $remote_addr;
+            }
+            location /.well-known {
+                proxy_pass http://localhost:8008;
+                proxy_set_header X-Forwarded-For $remote_addr;
+            }
+            location /_matrix {
                 proxy_pass http://localhost:8008;
                 proxy_set_header X-Forwarded-For $remote_addr;
             }
@@ -58,6 +86,8 @@ the reverse proxy and the homeserver.
 
 > **NOTE**: Do not add a `/` after the port in `proxy_pass`, otherwise nginx will
 canonicalise/normalise the URI.
+
+> **NOTE 2**: Remember to open the firewall port 8448(ex. if using `ufw`: `sudo ufw allow 8448`) and also in the router, if it's used.
 
 ### Caddy
 
