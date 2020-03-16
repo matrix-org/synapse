@@ -9,9 +9,7 @@
 set -xe
 cd `dirname $0`/../..
 
-# Create a virtualenv and use it.
-virtualenv env
-source env/bin/activate
+echo "--- Install dependencies"
 
 # Install dependencies for this test.
 pip install psycopg2 coverage coverage-enable-subprocess
@@ -19,11 +17,20 @@ pip install psycopg2 coverage coverage-enable-subprocess
 # Install Synapse itself. This won't update any libraries.
 pip install -e .
 
+echo "--- Generate the signing key"
+
+# Generate the server's signing key.
+python -m synapse.app.homeserver --generate-keys -c .buildkite/sqlite-config.yaml
+
+echo "--- Prepare the databases"
+
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
 
 # Create the PostgreSQL database.
-PGPASSWORD=postgres createdb -h postgres -U postgres synapse
+./.buildkite/scripts/create_postgres_db.py
+
+echo "+++ Run synapse_port_db"
 
 # Run the script
 coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml

@@ -3,6 +3,8 @@
 # CI's Docker setup at the point where this file is considered.
 server_name: "test"
 
+signing_key_path: "/src/.buildkite/test.signing.key"
+
 report_stats: false
 
 database:

@@ -3,6 +3,8 @@
 # schema and run background updates on it.
 server_name: "test"
 
+signing_key_path: "/src/.buildkite/test.signing.key"
+
 report_stats: false
 
 database:
