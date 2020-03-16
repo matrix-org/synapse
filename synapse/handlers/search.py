@@ -35,6 +35,8 @@ class SearchHandler(BaseHandler):
     def __init__(self, hs):
         super(SearchHandler, self).__init__(hs)
         self._event_serializer = hs.get_event_client_serializer()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
 
     @defer.inlineCallbacks
     def get_old_rooms_from_upgraded_room(self, room_id):
@@ -221,7 +223,7 @@ class SearchHandler(BaseHandler):
             filtered_events = search_filter.filter([r["event"] for r in results])
 
             events = yield filter_events_for_client(
-                self.store, user.to_string(), filtered_events
+                self.storage, user.to_string(), filtered_events
             )
 
             events.sort(key=lambda e: -rank_map[e.event_id])
@@ -271,7 +273,7 @@ class SearchHandler(BaseHandler):
                 filtered_events = search_filter.filter([r["event"] for r in results])
 
                 events = yield filter_events_for_client(
-                    self.store, user.to_string(), filtered_events
+                    self.storage, user.to_string(), filtered_events
                 )
 
                 room_events.extend(events)
@@ -340,11 +342,11 @@ class SearchHandler(BaseHandler):
                 )
 
                 res["events_before"] = yield filter_events_for_client(
-                    self.store, user.to_string(), res["events_before"]
+                    self.storage, user.to_string(), res["events_before"]
                 )
 
                 res["events_after"] = yield filter_events_for_client(
-                    self.store, user.to_string(), res["events_after"]
+                    self.storage, user.to_string(), res["events_after"]
                 )
 
                 res["start"] = now_token.copy_and_replace(
@@ -372,7 +374,7 @@ class SearchHandler(BaseHandler):
                         [(EventTypes.Member, sender) for sender in senders]
                     )
 
-                    state = yield self.store.get_state_for_event(
+                    state = yield self.state_store.get_state_for_event(
                         last_event_id, state_filter
                     )
 

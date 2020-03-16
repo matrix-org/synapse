@@ -159,6 +159,7 @@ class Notifier(object):
         self.room_to_user_streams = {}
 
         self.hs = hs
+        self.storage = hs.get_storage()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
         self.pending_new_room_events = []
@@ -425,7 +426,10 @@ class Notifier(object):
 
                 if name == "room":
                     new_events = yield filter_events_for_client(
-                        self.store, user.to_string(), new_events, is_peeking=is_peeking
+                        self.storage,
+                        user.to_string(),
+                        new_events,
+                        is_peeking=is_peeking,
                     )
                 elif name == "presence":
                     now = self.clock.time_msec()

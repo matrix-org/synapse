@@ -119,6 +119,7 @@ class Mailer(object):
         self.store = self.hs.get_datastore()
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
+        self.storage = hs.get_storage()
         self.app_name = app_name
 
         logger.info("Created Mailer for app_name %s" % app_name)
@@ -389,7 +390,7 @@ class Mailer(object):
         }
 
         the_events = yield filter_events_for_client(
-            self.store, user_id, results["events_before"]
+            self.storage, user_id, results["events_before"]
         )
         the_events.append(notif_event)
 

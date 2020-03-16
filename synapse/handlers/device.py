@@ -46,6 +46,7 @@ class DeviceWorkerHandler(BaseHandler):
 
         self.hs = hs
         self.state = hs.get_state_handler()
+        self.state_store = hs.get_storage().state
         self._auth_handler = hs.get_auth_handler()
 
     @trace
@@ -178,7 +179,7 @@ class DeviceWorkerHandler(BaseHandler):
                 continue
 
             # mapping from event_id -> state_dict
-            prev_state_ids = yield self.store.get_state_ids_for_events(event_ids)
+            prev_state_ids = yield self.state_store.get_state_ids_for_events(event_ids)
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.

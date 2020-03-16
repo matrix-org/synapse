@@ -104,6 +104,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         outdated events
         """
         store = self.hs.get_datastore()
+        storage = self.hs.get_storage()
         room_id = self.helper.create_room_as(self.user_id, tok=self.token)
         events = []
 
@@ -132,7 +133,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         # Run filter_events_for_client with our list of FrozenEvents.
         filtered_events = self.get_success(
-            filter_events_for_client(store, self.user_id, events)
+            filter_events_for_client(storage, self.user_id, events)
         )
 
         # We should only get one event back.

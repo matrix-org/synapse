@@ -14,6 +14,8 @@
 # limitations under the License.
 import logging
 
+from mock import Mock
+
 from twisted.internet import defer
 from twisted.internet.defer import succeed
 
@@ -63,7 +65,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             events_to_filter.append(evt)
 
         filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter
+            self.storage, "test_server", events_to_filter
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
@@ -101,7 +103,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         # ... and the filtering happens.
         filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter
+            self.storage, "test_server", events_to_filter
         )
 
         for i in range(0, len(events_to_filter)):
@@ -258,6 +260,11 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         logger.info("Starting filtering")
         start = time.time()
+
+        storage = Mock()
+        storage.main = test_store
+        storage.state = test_store
+
         filtered = yield filter_events_for_server(
             test_store, "test_server", events_to_filter
         )

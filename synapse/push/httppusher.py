@@ -64,6 +64,7 @@ class HttpPusher(object):
     def __init__(self, hs, pusherdict):
         self.hs = hs
         self.store = self.hs.get_datastore()
+        self.storage = self.hs.get_storage()
         self.clock = self.hs.get_clock()
         self.state_handler = self.hs.get_state_handler()
         self.user_id = pusherdict["user_name"]
@@ -329,7 +330,7 @@ class HttpPusher(object):
             return d
 
         ctx = yield push_tools.get_context_for_event(
-            self.store, self.state_handler, event, self.user_id
+            self.storage, self.state_handler, event, self.user_id
         )
 
         d = {
