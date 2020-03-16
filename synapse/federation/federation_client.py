@@ -196,7 +196,7 @@ class FederationClient(FederationBase):
             dest, room_id, extremities, limit
         )
 
-        logger.debug("backfill transaction_data=%s", repr(transaction_data))
+        logger.debug("backfill transaction_data=%r", transaction_data)
 
         room_version = yield self.store.get_room_version(room_id)
         format_ver = room_version_to_event_format(room_version)
