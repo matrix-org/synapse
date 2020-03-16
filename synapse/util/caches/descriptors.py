@@ -438,7 +438,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                 if isinstance(cached_result_d, ObservableDeferred):
                     observer = cached_result_d.observe()
                 else:
-                    observer = cached_result_d
+                    observer = defer.succeed(cached_result_d)
 
             except KeyError:
                 ret = defer.maybeDeferred(
@@ -482,9 +482,8 @@ class CacheListDescriptor(_CacheDescriptorBase):
     Given a list of keys it looks in the cache to find any hits, then passes
     the list of missing keys to the wrapped function.
 
-    Once wrapped, the function returns either a Deferred which resolves to
-    the list of results, or (if all results were cached), just the list of
-    results.
+    Once wrapped, the function returns a Deferred which resolves to the list
+    of results.
     """
 
     def __init__(
@@ -618,7 +617,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                 )
                 return make_deferred_yieldable(d)
             else:
-                return results
+                return defer.succeed(results)
 
         obj.__dict__[self.orig.__name__] = wrapped
 
