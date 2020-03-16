@@ -33,7 +33,7 @@ class EventContext:
     Attributes:
         rejected: A rejection reason if the event was rejected, else False
 
-        state_group: The ID of the state group for this event. Note that state events
+        _state_group: The ID of the state group for this event. Note that state events
             are persisted with a state group which includes the new event, so this is
             effectively the state *after* the event in question.
 
@@ -44,6 +44,9 @@ class EventContext:
 
             For an outlier, where we don't have the state at the event, this will be
             None.
+
+            Note that this is a private attribute: it should be accessed via
+            the ``state_group`` property.
 
         prev_group: If it is known, ``state_group``'s prev_group. Note that this being
             None does not necessarily mean that ``state_group`` does not have
@@ -88,7 +91,7 @@ class EventContext:
     """
 
     rejected = attr.ib(default=False, type=Union[bool, str])
-    state_group = attr.ib(default=None, type=Optional[int])
+    _state_group = attr.ib(default=None, type=Optional[int])
     prev_group = attr.ib(default=None, type=Optional[int])
     delta_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
     app_service = attr.ib(default=None, type=Optional[ApplicationService])
@@ -136,7 +139,7 @@ class EventContext:
             "prev_state_id": prev_state_id,
             "event_type": event.type,
             "event_state_key": event.state_key if event.is_state() else None,
-            "state_group": self.state_group,
+            "state_group": self._state_group,
             "rejected": self.rejected,
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
@@ -173,22 +176,52 @@ class EventContext:
 
         return context
 
+    @property
+    def state_group(self) -> Optional[int]:
+        """The ID of the state group for this event.
+
+        Note that state events are persisted with a state group which includes the new
+        event, so this is effectively the state *after* the event in question.
+
+        For an outlier, where we don't have the state at the event, this will be None.
+
+        It is an error to access this for a rejected event, since rejected state should
+        not make it into the room state. Accessing this property will raise an exception
+        if ``rejected`` is set.
+        """
+        if self.rejected:
+            raise RuntimeError("Attempt to access state_group of rejected event")
+
+        return self._state_group
+
     @defer.inlineCallbacks
     def get_current_state_ids(self, store):
-        """Gets the current state IDs
+        """
+        Gets the room state map, including this event - ie, the state in ``state_group``
+
+        It is an error to access this for a rejected event, since rejected state should
+        not make it into the room state. This method will raise an exception if
+        ``rejected`` is set.
 
         Returns:
             Deferred[dict[(str, str), str]|None]: Returns None if state_group
                 is None, which happens when the associated event is an outlier.
+
                 Maps a (type, state_key) to the event ID of the state event matching
                 this tuple.
         """
+        if self.rejected:
+            raise RuntimeError("Attempt to access state_ids of rejected event")
+
         yield self._ensure_fetched(store)
         return self._current_state_ids
 
     @defer.inlineCallbacks
     def get_prev_state_ids(self, store):
-        """Gets the prev state IDs
+        """
+        Gets the room state map, excluding this event.
+
+        For a non-state event, this will be the same as get_current_state_ids().
 
         Returns:
             Deferred[dict[(str, str), str]|None]: Returns None if state_group
@@ -202,11 +235,17 @@ class EventContext:
     def get_cached_current_state_ids(self):
         """Gets the current state IDs if we have them already cached.
 
+        It is an error to access this for a rejected event, since rejected state should
+        not make it into the room state. This method will raise an exception if
+        ``rejected`` is set.
+
         Returns:
             dict[(str, str), str]|None: Returns None if we haven't cached the
             state or if state_group is None, which happens when the associated
             event is an outlier.
         """
+        if self.rejected:
+            raise RuntimeError("Attempt to access state_ids of rejected event")
 
         return self._current_state_ids
 

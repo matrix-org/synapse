@@ -1,0 +1,1 @@
+Add some checks that we aren't using state from rejected events.
