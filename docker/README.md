@@ -101,7 +101,7 @@ is suitable for local testing, but for any practical use, you will either need
 to use a reverse proxy, or configure Synapse to expose an HTTPS port.
 
 For documentation on using a reverse proxy, see
-https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
 
 For more information on enabling TLS support in synapse itself, see
 https://github.com/matrix-org/synapse/blob/master/INSTALL.md#tls-certificates. Of
