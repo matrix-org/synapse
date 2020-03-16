@@ -383,17 +383,6 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_query_auth(self, destination, room_id, event_id, content):
-        path = _create_v1_path("/query_auth/%s/%s", room_id, event_id)
-
-        content = yield self.client.post_json(
-            destination=destination, path=path, data=content
-        )
-
-        return content
-
-    @defer.inlineCallbacks
-    @log_function
     def query_client_keys(self, destination, query_content, timeout):
         """Query the device keys for a list of user ids hosted on a remote
         server.
