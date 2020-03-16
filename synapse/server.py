@@ -224,6 +224,7 @@ class HomeServer(object):
         self.hostname = hostname
         self._building = {}
         self._listening_services = []
+        self.start_time = None
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
@@ -243,6 +244,7 @@ class HomeServer(object):
             datastore = self.DATASTORE_CLASS(conn, self)
             self.datastores = DataStores(datastore, conn, self)
             conn.commit()
+        self.start_time = int(self.get_clock().time())
         logger.info("Finished setting up.")
 
     def setup_master(self):

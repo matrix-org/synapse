@@ -61,7 +61,6 @@ REQUIREMENTS = [
     "bcrypt>=3.1.0",
     "pillow>=4.3.0",
     "sortedcontainers>=1.4.4",
-    "psutil>=2.0.0",
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
