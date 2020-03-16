@@ -87,8 +87,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         return payload
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, event_id):
+    async def _handle_request(self, request, event_id):
         with Measure(self.clock, "repl_send_event_parse"):
             content = parse_json_object_from_request(request)
 
@@ -101,7 +100,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             event = EventType(event_dict, internal_metadata, rejected_reason)
 
             requester = Requester.deserialize(self.store, content["requester"])
-            context = yield EventContext.deserialize(self.store, content["context"])
+            context = EventContext.deserialize(self.store, content["context"])
 
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]
@@ -113,7 +112,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
 
-        yield self.event_creation_handler.persist_and_notify_client_event(
+        await self.event_creation_handler.persist_and_notify_client_event(
             requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
