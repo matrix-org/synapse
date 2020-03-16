@@ -310,14 +310,14 @@ class DescriptorTestCase(unittest.TestCase):
 
         obj.mock.return_value = ["spam", "eggs"]
         r = obj.fn(1, 2)
-        self.assertEqual(r, ["spam", "eggs"])
+        self.assertEqual(r.result, ["spam", "eggs"])
         obj.mock.assert_called_once_with(1, 2)
         obj.mock.reset_mock()
 
         # a call with different params should call the mock again
         obj.mock.return_value = ["chips"]
         r = obj.fn(1, 3)
-        self.assertEqual(r, ["chips"])
+        self.assertEqual(r.result, ["chips"])
         obj.mock.assert_called_once_with(1, 3)
         obj.mock.reset_mock()
 

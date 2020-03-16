@@ -1,0 +1,1 @@
+Change cache descriptors to always return deferreds.
