@@ -36,7 +36,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
     args = [room_id]
 
     if limit:
-        sql += " ORDER BY topological_ordering DESC, stream_ordering DESC " "LIMIT ?"
+        sql += " ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ?"
 
         args.append(limit)
 
@@ -53,7 +53,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
 
     for event in events:
         c = conn.execute(
-            "SELECT state_group FROM event_to_state_groups " "WHERE event_id = ?",
+            "SELECT state_group FROM event_to_state_groups WHERE event_id = ?",
             (event.event_id,),
         )
 
