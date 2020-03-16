@@ -636,7 +636,7 @@ def run(hs):
 
     if hs.config.report_stats:
         logger.info("Scheduling stats reporting for 3 hour intervals")
-        clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000, hs, stats)
+        clock.looping_call(start_phone_stats_home, 3 * 60 * 60 * 1000)
 
         # We need to defer this init for the cases that we daemonize
         # otherwise the process ID we get is that of the non-daemon process
@@ -644,7 +644,7 @@ def run(hs):
 
         # We wait 5 minutes to send the first set of stats as the server can
         # be quite busy the first few minutes
-        clock.call_later(5 * 60, start_phone_stats_home, hs, stats)
+        clock.call_later(5 * 60, start_phone_stats_home)
 
     _base.start_reactor(
         "synapse-homeserver",
