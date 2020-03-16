@@ -25,8 +25,8 @@ from twisted.internet import defer, reactor
 from synapse.config.homeserver import HomeServerConfig
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.server import HomeServer
-from synapse.storage.engines import create_engine
 from synapse.storage import DataStore
+from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 
 logger = logging.getLogger("update_database")
@@ -122,4 +122,3 @@ if __name__ == "__main__":
     ))
 
     reactor.run()
-

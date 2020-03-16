@@ -1,0 +1,1 @@
+Update CI to run `isort` over the `scripts` and `scripts-dev` directories.
