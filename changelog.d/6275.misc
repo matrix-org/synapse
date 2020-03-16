@@ -1,0 +1,1 @@
+Port room rest handlers to async/await.
