@@ -27,17 +27,21 @@ connect to a postgres database.
 
 ## Set up database
 
-Assuming your PostgreSQL database user is called `postgres`, create a
-user `synapse_user` with:
+Assuming your PostgreSQL database user is called `postgres`, first authenticate as the database user with:
 
     su - postgres
+    # Or, if your system uses sudo to get administrative rights
+    sudo -u postgres bash
+  
+Then, create a user ``synapse_user`` with:
+
     createuser --pwprompt synapse_user
 
 Before you can authenticate with the `synapse_user`, you must create a
 database that it can access. To create a database, first connect to the
 database with your database user:
 
-    su - postgres
+    su - postgres # Or: sudo -u postgres bash
     psql
 
 and then run:
