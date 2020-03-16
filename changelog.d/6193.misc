@@ -1,1 +1,0 @@
-Make storage layer responsible for adding device names to key, rather than the handler.

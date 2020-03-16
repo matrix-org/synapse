@@ -1,1 +1,0 @@
-Edit header dicts docstrings in SimpleHttpClient to note that `str` or `bytes` can be passed as header keys.

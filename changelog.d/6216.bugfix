@@ -1,1 +1,0 @@
-synapse_port_db: Add 2 additional BOOLEAN_COLUMNS to be able to convert from database schema v56.
