@@ -48,9 +48,20 @@ class EventContext:
             Note that this is a private attribute: it should be accessed via
             the ``state_group`` property.
 
+        state_group_before_event: The ID of the state group representing the state
+            of the room before this event.
+
+            If this is a non-state event, this will be the same as ``state_group``. If
+            it's a state event, it will be the same as ``prev_group``.
+
+            If ``state_group`` is None (ie, the event is an outlier),
+            ``state_group_before_event`` will always also be ``None``.
+
         prev_group: If it is known, ``state_group``'s prev_group. Note that this being
             None does not necessarily mean that ``state_group`` does not have
             a prev_group!
+
+            If the event is a state event, this is normally the same as ``prev_group``.
 
             If ``state_group`` is None (ie, the event is an outlier), ``prev_group``
             will always also be ``None``.
@@ -77,7 +88,8 @@ class EventContext:
             ``get_current_state_ids``. _AsyncEventContext impl calculates this
             on-demand: it will be None until that happens.
 
-        _prev_state_ids: The room state map, excluding this event. For a non-state
+        _prev_state_ids: The room state map, excluding this event - ie, the state
+            in ``state_group_before_event``. For a non-state
             event, this will be the same as _current_state_events.
 
             Note that it is a completely different thing to prev_group!
@@ -92,6 +104,7 @@ class EventContext:
 
     rejected = attr.ib(default=False, type=Union[bool, str])
     _state_group = attr.ib(default=None, type=Optional[int])
+    state_group_before_event = attr.ib(default=None, type=Optional[int])
     prev_group = attr.ib(default=None, type=Optional[int])
     delta_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
     app_service = attr.ib(default=None, type=Optional[ApplicationService])
@@ -103,12 +116,18 @@ class EventContext:
 
     @staticmethod
     def with_state(
-        state_group, current_state_ids, prev_state_ids, prev_group=None, delta_ids=None
+        state_group,
+        state_group_before_event,
+        current_state_ids,
+        prev_state_ids,
+        prev_group=None,
+        delta_ids=None,
     ):
         return EventContext(
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
             state_group=state_group,
+            state_group_before_event=state_group_before_event,
             prev_group=prev_group,
             delta_ids=delta_ids,
         )
@@ -140,6 +159,7 @@ class EventContext:
             "event_type": event.type,
             "event_state_key": event.state_key if event.is_state() else None,
             "state_group": self._state_group,
+            "state_group_before_event": self.state_group_before_event,
             "rejected": self.rejected,
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
@@ -165,6 +185,7 @@ class EventContext:
             event_type=input["event_type"],
             event_state_key=input["event_state_key"],
             state_group=input["state_group"],
+            state_group_before_event=input["state_group_before_event"],
             prev_group=input["prev_group"],
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
