@@ -26,6 +26,7 @@ from twisted.internet.abstract import isIPAddress, isIPv6Address
 from twisted.internet.interfaces import IOpenSSLClientConnectionCreator
 from twisted.internet.ssl import CertificateOptions, ContextFactory, platformTrust
 from twisted.python.failure import Failure
+from twisted.web.iweb import IPolicyForHTTPS
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ class ServerContextFactory(ContextFactory):
         return self._context
 
 
+@implementer(IPolicyForHTTPS)
 class ClientTLSOptionsFactory(object):
     """Factory for Twisted SSLClientConnectionCreators that are used to make connections
     to remote servers for federation.
@@ -118,6 +120,12 @@ class ClientTLSOptionsFactory(object):
             logger.exception("Error during info_callback")
             f = Failure()
             tls_protocol.failVerification(f)
+
+    def creatorForNetloc(self, hostname, port):
+        """Implements the IPolicyForHTTPS interace so that this can be passed
+        directly to agents.
+        """
+        return self.get_options(hostname)
 
 
 @implementer(IOpenSSLClientConnectionCreator)

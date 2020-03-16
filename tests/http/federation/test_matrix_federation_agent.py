@@ -73,7 +73,6 @@ class MatrixFederationAgentTests(TestCase):
 
         config_dict = default_config("test", parse=False)
         config_dict["federation_custom_ca_list"] = [get_test_ca_cert_file()]
-        # config_dict["trusted_key_servers"] = []
 
         self._config = config = HomeServerConfig()
         config.parse_config_dict(config_dict)
@@ -81,7 +80,6 @@ class MatrixFederationAgentTests(TestCase):
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=ClientTLSOptionsFactory(config),
-            _well_known_tls_policy=TrustingTLSPolicyForHTTPS(),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,
         )
@@ -694,16 +692,18 @@ class MatrixFederationAgentTests(TestCase):
         not signed by a CA
         """
 
-        # we use the same test server as the other tests, but use an agent
-        # with _well_known_tls_policy left to the default, which will not
-        # trust it (since the presented cert is signed by a test CA)
+        # we use the same test server as the other tests, but use an agent with
+        # the config left to the default, which will not trust it (since the
+        # presented cert is signed by a test CA)
 
         self.mock_resolver.resolve_service.side_effect = lambda _: []
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
+        config = default_config("test", parse=True)
+
         agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=ClientTLSOptionsFactory(self._config),
+            tls_client_options_factory=ClientTLSOptionsFactory(config),
             _srv_resolver=self.mock_resolver,
             _well_known_cache=self.well_known_cache,
         )

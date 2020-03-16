@@ -1,0 +1,1 @@
+Improve performance when making `.well-known` requests by sharing the SSL options between requests.
