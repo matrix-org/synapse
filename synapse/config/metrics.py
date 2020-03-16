@@ -70,7 +70,7 @@ class MetricsConfig(Config):
 
         # Enable collection and rendering of performance metrics
         #
-        #enable_metrics: False
+        #enable_metrics: false
 
         # Enable sentry integration
         # NOTE: While attempts are made to ensure that the logs don't contain

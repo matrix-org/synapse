@@ -62,11 +62,11 @@ DEFAULT_CONFIG = """\
 #    body: >-
 #      To continue using this homeserver you must review and agree to the
 #      terms and conditions at %(consent_uri)s
-#  send_server_notice_to_guests: True
+#  send_server_notice_to_guests: true
 #  block_events_error: >-
 #    To continue using this homeserver you must review and agree to the
 #    terms and conditions at %(consent_uri)s
-#  require_at_registration: False
+#  require_at_registration: false
 #  policy_name: Privacy Policy
 #
 """
