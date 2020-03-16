@@ -37,9 +37,6 @@ class EventContext:
         delta_ids (dict[(str, str), str]): Delta from ``prev_group``.
             (type, state_key) -> event_id. ``None`` for an outlier.
 
-        prev_state_events (?): XXX: is this ever set to anything other than
-            the empty list?
-
         app_service: FIXME
 
         _current_state_ids (dict[(str, str), str]|None):
@@ -51,36 +48,16 @@ class EventContext:
             The current state map excluding the current event. None if outlier
             or we haven't fetched the state from DB yet.
             (type, state_key) -> event_id
-
-        _fetching_state_deferred (Deferred|None): Resolves when *_state_ids have
-            been calculated. None if we haven't started calculating yet
-
-        _event_type (str): The type of the event the context is associated with.
-            Only set when state has not been fetched yet.
-
-        _event_state_key (str|None): The state_key of the event the context is
-            associated with. Only set when state has not been fetched yet.
-
-        _prev_state_id (str|None): If the event associated with the context is
-            a state event, then `_prev_state_id` is the event_id of the state
-            that was replaced.
-            Only set when state has not been fetched yet.
     """
 
     state_group = attr.ib(default=None)
     rejected = attr.ib(default=False)
     prev_group = attr.ib(default=None)
     delta_ids = attr.ib(default=None)
-    prev_state_events = attr.ib(default=attr.Factory(list))
     app_service = attr.ib(default=None)
 
-    _current_state_ids = attr.ib(default=None)
     _prev_state_ids = attr.ib(default=None)
-    _prev_state_id = attr.ib(default=None)
-
-    _event_type = attr.ib(default=None)
-    _event_state_key = attr.ib(default=None)
-    _fetching_state_deferred = attr.ib(default=None)
+    _current_state_ids = attr.ib(default=None)
 
     @staticmethod
     def with_state(
@@ -90,7 +67,6 @@ class EventContext:
             current_state_ids=current_state_ids,
             prev_state_ids=prev_state_ids,
             state_group=state_group,
-            fetching_state_deferred=defer.succeed(None),
             prev_group=prev_group,
             delta_ids=delta_ids,
         )
@@ -125,7 +101,6 @@ class EventContext:
             "rejected": self.rejected,
             "prev_group": self.prev_group,
             "delta_ids": _encode_state_dict(self.delta_ids),
-            "prev_state_events": self.prev_state_events,
             "app_service_id": self.app_service.id if self.app_service else None,
         }
 
@@ -141,7 +116,7 @@ class EventContext:
         Returns:
             EventContext
         """
-        context = EventContext(
+        context = _AsyncEventContextImpl(
             # We use the state_group and prev_state_id stuff to pull the
             # current_state_ids out of the DB and construct prev_state_ids.
             prev_state_id=input["prev_state_id"],
@@ -151,7 +126,6 @@ class EventContext:
             prev_group=input["prev_group"],
             delta_ids=_decode_state_dict(input["delta_ids"]),
             rejected=input["rejected"],
-            prev_state_events=input["prev_state_events"],
         )
 
         app_service_id = input["app_service_id"]
@@ -170,14 +144,7 @@ class EventContext:
                 Maps a (type, state_key) to the event ID of the state event matching
                 this tuple.
         """
-
-        if not self._fetching_state_deferred:
-            self._fetching_state_deferred = run_in_background(
-                self._fill_out_state, store
-            )
-
-        yield make_deferred_yieldable(self._fetching_state_deferred)
-
+        yield self._ensure_fetched(store)
         return self._current_state_ids
 
     @defer.inlineCallbacks
@@ -190,14 +157,7 @@ class EventContext:
                 Maps a (type, state_key) to the event ID of the state event matching
                 this tuple.
         """
-
-        if not self._fetching_state_deferred:
-            self._fetching_state_deferred = run_in_background(
-                self._fill_out_state, store
-            )
-
-        yield make_deferred_yieldable(self._fetching_state_deferred)
-
+        yield self._ensure_fetched(store)
         return self._prev_state_ids
 
     def get_cached_current_state_ids(self):
@@ -210,6 +170,44 @@ class EventContext:
         """
 
         return self._current_state_ids
+
+    def _ensure_fetched(self, store):
+        return defer.succeed(None)
+
+
+@attr.s(slots=True)
+class _AsyncEventContextImpl(EventContext):
+    """
+    An implementation of EventContext which fetches _current_state_ids and
+    _prev_state_ids from the database on demand.
+
+    Attributes:
+
+        _fetching_state_deferred (Deferred|None): Resolves when *_state_ids have
+            been calculated. None if we haven't started calculating yet
+
+        _event_type (str): The type of the event the context is associated with.
+
+        _event_state_key (str): The state_key of the event the context is
+            associated with.
+
+        _prev_state_id (str|None): If the event associated with the context is
+            a state event, then `_prev_state_id` is the event_id of the state
+            that was replaced.
+    """
+
+    _prev_state_id = attr.ib(default=None)
+    _event_type = attr.ib(default=None)
+    _event_state_key = attr.ib(default=None)
+    _fetching_state_deferred = attr.ib(default=None)
+
+    def _ensure_fetched(self, store):
+        if not self._fetching_state_deferred:
+            self._fetching_state_deferred = run_in_background(
+                self._fill_out_state, store
+            )
+
+        return make_deferred_yieldable(self._fetching_state_deferred)
 
     @defer.inlineCallbacks
     def _fill_out_state(self, store):
@@ -227,27 +225,6 @@ class EventContext:
             self._prev_state_ids[key] = self._prev_state_id
         else:
             self._prev_state_ids = self._current_state_ids
-
-    @defer.inlineCallbacks
-    def update_state(
-        self, state_group, prev_state_ids, current_state_ids, prev_group, delta_ids
-    ):
-        """Replace the state in the context
-        """
-
-        # We need to make sure we wait for any ongoing fetching of state
-        # to complete so that the updated state doesn't get clobbered
-        if self._fetching_state_deferred:
-            yield make_deferred_yieldable(self._fetching_state_deferred)
-
-        self.state_group = state_group
-        self._prev_state_ids = prev_state_ids
-        self.prev_group = prev_group
-        self._current_state_ids = current_state_ids
-        self.delta_ids = delta_ids
-
-        # We need to ensure that that we've marked as having fetched the state
-        self._fetching_state_deferred = defer.succeed(None)
 
 
 def _encode_state_dict(state_dict):

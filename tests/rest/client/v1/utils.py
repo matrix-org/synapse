@@ -106,13 +106,22 @@ class RestHelper(object):
         self.auth_user_id = temp_id
 
     def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
-        if txn_id is None:
-            txn_id = "m%s" % (str(time.time()))
         if body is None:
             body = "body_text_here"
 
-        path = "/_matrix/client/r0/rooms/%s/send/m.room.message/%s" % (room_id, txn_id)
         content = {"msgtype": "m.text", "body": body}
+
+        return self.send_event(
+            room_id, "m.room.message", content, txn_id, tok, expect_code
+        )
+
+    def send_event(
+        self, room_id, type, content={}, txn_id=None, tok=None, expect_code=200
+    ):
+        if txn_id is None:
+            txn_id = "m%s" % (str(time.time()))
+
+        path = "/_matrix/client/r0/rooms/%s/send/%s/%s" % (room_id, type, txn_id)
         if tok:
             path = path + "?access_token=%s" % tok
 

@@ -65,6 +65,9 @@ class VersionsRestServlet(RestServlet):
                     "m.require_identity_server": False,
                     # as per MSC2290
                     "m.separate_add_and_bind": True,
+                    # Implements support for label-based filtering as described in
+                    # MSC2326.
+                    "org.matrix.label_based_filtering": True,
                 },
             },
         )
