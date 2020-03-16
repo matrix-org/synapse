@@ -119,9 +119,10 @@ class E2eKeysHandler(object):
                 else:
                     query_list.append((user_id, None))
 
-            user_ids_not_in_cache, remote_results = (
-                yield self.store.get_user_devices_from_cache(query_list)
-            )
+            (
+                user_ids_not_in_cache,
+                remote_results,
+            ) = yield self.store.get_user_devices_from_cache(query_list)
             for user_id, devices in iteritems(remote_results):
                 user_devices = results.setdefault(user_id, {})
                 for device_id, device in iteritems(devices):
@@ -688,17 +689,21 @@ class E2eKeysHandler(object):
 
         try:
             # get our self-signing key to verify the signatures
-            _, self_signing_key_id, self_signing_verify_key = yield self._get_e2e_cross_signing_verify_key(
-                user_id, "self_signing"
-            )
+            (
+                _,
+                self_signing_key_id,
+                self_signing_verify_key,
+            ) = yield self._get_e2e_cross_signing_verify_key(user_id, "self_signing")
 
             # get our master key, since we may have received a signature of it.
             # We need to fetch it here so that we know what its key ID is, so
             # that we can check if a signature that was sent is a signature of
             # the master key or of a device
-            master_key, _, master_verify_key = yield self._get_e2e_cross_signing_verify_key(
-                user_id, "master"
-            )
+            (
+                master_key,
+                _,
+                master_verify_key,
+            ) = yield self._get_e2e_cross_signing_verify_key(user_id, "master")
 
             # fetch our stored devices.  This is used to 1. verify
             # signatures on the master key, and 2. to compare with what
@@ -838,9 +843,11 @@ class E2eKeysHandler(object):
 
         try:
             # get our user-signing key to verify the signatures
-            user_signing_key, user_signing_key_id, user_signing_verify_key = yield self._get_e2e_cross_signing_verify_key(
-                user_id, "user_signing"
-            )
+            (
+                user_signing_key,
+                user_signing_key_id,
+                user_signing_verify_key,
+            ) = yield self._get_e2e_cross_signing_verify_key(user_id, "user_signing")
         except SynapseError as e:
             failure = _exception_to_failure(e)
             for user, devicemap in signatures.items():
@@ -859,7 +866,11 @@ class E2eKeysHandler(object):
             try:
                 # get the target user's master key, to make sure it matches
                 # what was sent
-                master_key, master_key_id, _ = yield self._get_e2e_cross_signing_verify_key(
+                (
+                    master_key,
+                    master_key_id,
+                    _,
+                ) = yield self._get_e2e_cross_signing_verify_key(
                     target_user, "master", user_id
                 )
 

@@ -108,7 +108,10 @@ class StatsHandler(StateDeltasHandler):
                 user_deltas = {}
 
             # Then count deltas for total_events and total_event_bytes.
-            room_count, user_count = yield self.store.get_changes_room_total_events_and_bytes(
+            (
+                room_count,
+                user_count,
+            ) = yield self.store.get_changes_room_total_events_and_bytes(
                 self.pos, max_pos
             )
 

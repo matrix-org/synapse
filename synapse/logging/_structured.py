@@ -185,7 +185,7 @@ DEFAULT_LOGGERS = {"synapse": {"level": "INFO"}}
 
 
 def parse_drain_configs(
-    drains: dict
+    drains: dict,
 ) -> typing.Generator[DrainConfiguration, None, None]:
     """
     Parse the drain configurations.

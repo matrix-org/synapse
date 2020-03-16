@@ -234,14 +234,12 @@ class EmailPusher(object):
             return
 
         self.last_stream_ordering = last_stream_ordering
-        pusher_still_exists = (
-            yield self.store.update_pusher_last_stream_ordering_and_success(
-                self.app_id,
-                self.email,
-                self.user_id,
-                last_stream_ordering,
-                self.clock.time_msec(),
-            )
+        pusher_still_exists = yield self.store.update_pusher_last_stream_ordering_and_success(
+            self.app_id,
+            self.email,
+            self.user_id,
+            last_stream_ordering,
+            self.clock.time_msec(),
         )
         if not pusher_still_exists:
             # The pusher has been deleted while we were processing, so

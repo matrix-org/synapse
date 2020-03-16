@@ -38,9 +38,10 @@ class AccountDataEventSource(object):
                 {"type": "m.tag", "content": {"tags": room_tags}, "room_id": room_id}
             )
 
-        account_data, room_account_data = (
-            yield self.store.get_updated_account_data_for_user(user_id, last_stream_id)
-        )
+        (
+            account_data,
+            room_account_data,
+        ) = yield self.store.get_updated_account_data_for_user(user_id, last_stream_id)
 
         for account_data_type, content in account_data.items():
             results.append({"type": account_data_type, "content": content})

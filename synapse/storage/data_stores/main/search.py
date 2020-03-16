@@ -672,7 +672,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                     )
                 )
                 txn.execute(query, (value, search_query))
-                headline, = txn.fetchall()[0]
+                (headline,) = txn.fetchall()[0]
 
                 # Now we need to pick the possible highlights out of the haedline
                 # result.

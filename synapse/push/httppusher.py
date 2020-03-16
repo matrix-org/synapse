@@ -211,14 +211,12 @@ class HttpPusher(object):
                 http_push_processed_counter.inc()
                 self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
                 self.last_stream_ordering = push_action["stream_ordering"]
-                pusher_still_exists = (
-                    yield self.store.update_pusher_last_stream_ordering_and_success(
-                        self.app_id,
-                        self.pushkey,
-                        self.user_id,
-                        self.last_stream_ordering,
-                        self.clock.time_msec(),
-                    )
+                pusher_still_exists = yield self.store.update_pusher_last_stream_ordering_and_success(
+                    self.app_id,
+                    self.pushkey,
+                    self.user_id,
+                    self.last_stream_ordering,
+                    self.clock.time_msec(),
                 )
                 if not pusher_still_exists:
                     # The pusher has been deleted while we were processing, so

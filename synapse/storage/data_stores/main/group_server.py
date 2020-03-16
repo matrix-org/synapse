@@ -249,7 +249,7 @@ class GroupServerStore(SQLBaseStore):
                 WHERE group_id = ? AND category_id = ?
             """
             txn.execute(sql, (group_id, category_id))
-            order, = txn.fetchone()
+            (order,) = txn.fetchone()
 
         if existing:
             to_update = {}
@@ -509,7 +509,7 @@ class GroupServerStore(SQLBaseStore):
                 WHERE group_id = ? AND role_id = ?
             """
             txn.execute(sql, (group_id, role_id))
-            order, = txn.fetchone()
+            (order,) = txn.fetchone()
 
         if existing:
             to_update = {}

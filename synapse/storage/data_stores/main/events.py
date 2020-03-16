@@ -1128,7 +1128,7 @@ class EventsStore(
                 AND stream_ordering > ?
             """
             txn.execute(sql, (self.stream_ordering_day_ago,))
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             return count
 
         ret = yield self.runInteraction("count_messages", _count_messages)
@@ -1149,7 +1149,7 @@ class EventsStore(
             """
 
             txn.execute(sql, (like_clause, self.stream_ordering_day_ago))
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             return count
 
         ret = yield self.runInteraction("count_daily_sent_messages", _count_messages)
@@ -1164,7 +1164,7 @@ class EventsStore(
                 AND stream_ordering > ?
             """
             txn.execute(sql, (self.stream_ordering_day_ago,))
-            count, = txn.fetchone()
+            (count,) = txn.fetchone()
             return count
 
         ret = yield self.runInteraction("count_daily_active_rooms", _count)
@@ -1649,7 +1649,7 @@ class EventsStore(
         """,
             (room_id,),
         )
-        min_depth, = txn.fetchone()
+        (min_depth,) = txn.fetchone()
 
         logger.info("[purge] updating room_depth to %d", min_depth)
 
