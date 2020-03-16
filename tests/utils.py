@@ -137,7 +137,6 @@ def default_config(name, parse=False):
         "limit_usage_by_mau": False,
         "hs_disabled": False,
         "hs_disabled_message": "",
-        "hs_disabled_limit_type": "",
         "max_mau_value": 50,
         "mau_trial_days": 0,
         "mau_stats_only": False,
