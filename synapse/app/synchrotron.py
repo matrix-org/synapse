@@ -54,8 +54,8 @@ from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.room import RoomInitialSyncRestServlet
 from synapse.rest.client.v2_alpha import sync
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.presence import UserPresenceState
 from synapse.storage.engines import create_engine
-from synapse.storage.presence import UserPresenceState
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.stringutils import random_string

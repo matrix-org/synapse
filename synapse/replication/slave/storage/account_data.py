@@ -16,8 +16,8 @@
 
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
-from synapse.storage.account_data import AccountDataWorkerStore
-from synapse.storage.tags import TagsWorkerStore
+from synapse.storage.data_stores.main.account_data import AccountDataWorkerStore
+from synapse.storage.data_stores.main.tags import TagsWorkerStore
 
 
 class SlavedAccountDataStore(TagsWorkerStore, AccountDataWorkerStore, BaseSlavedStore):

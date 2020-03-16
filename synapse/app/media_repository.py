@@ -39,8 +39,8 @@ from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.media_repository import MediaRepositoryStore
 from synapse.storage.engines import create_engine
-from synapse.storage.media_repository import MediaRepositoryStore
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
