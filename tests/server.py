@@ -161,7 +161,11 @@ def make_request(
         path = path.encode("ascii")
 
     # Decorate it to be the full path, if we're using shorthand
-    if shorthand and not path.startswith(b"/_matrix"):
+    if (
+        shorthand
+        and not path.startswith(b"/_matrix")
+        and not path.startswith(b"/_synapse")
+    ):
         path = b"/_matrix/client/r0/" + path
         path = path.replace(b"//", b"/")
 
