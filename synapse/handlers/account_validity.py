@@ -45,7 +45,11 @@ class AccountValidityHandler(object):
         self._show_users_in_user_directory = self.hs.config.show_users_in_user_directory
         self.profile_handler = self.hs.get_profile_handler()
 
-        if self._account_validity.renew_by_email_enabled and load_jinja2_templates:
+        if (
+            self._account_validity.enabled
+            and self._account_validity.renew_by_email_enabled
+            and load_jinja2_templates
+        ):
             # Don't do email-specific configuration if renewal by email is disabled.
             try:
                 app_name = self.hs.config.email_app_name

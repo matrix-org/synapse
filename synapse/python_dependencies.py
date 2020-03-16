@@ -42,7 +42,9 @@ REQUIREMENTS = [
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
     "canonicaljson>=1.1.3",
-    "signedjson>=1.0.0",
+    # Pin signedjson to 1.0.0 because this version of Synapse relies on a function that's
+    # been removed in 1.1.0. Hopefully, this will be fixed by the upcoming mainline merge.
+    "signedjson==1.0.0",
     "pynacl>=1.2.1",
     "idna>=2",
 
