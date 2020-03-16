@@ -36,6 +36,8 @@ from six import iteritems
 
 from sortedcontainers import SortedDict
 
+from twisted.internet import defer
+
 from synapse.metrics import LaterGauge
 from synapse.storage.presence import UserPresenceState
 from synapse.util.metrics import Measure
@@ -212,7 +214,7 @@ class FederationRemoteSendQueue(object):
             receipt (synapse.types.ReadReceipt):
         """
         # nothing to do here: the replication listener will handle it.
-        pass
+        return defer.succeed(None)
 
     def send_presence(self, states):
         """As per FederationSender

@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.util.async_helpers import Linearizer
 
 from ._base import BaseHandler
@@ -32,8 +30,7 @@ class ReadMarkerHandler(BaseHandler):
         self.read_marker_linearizer = Linearizer(name="read_marker")
         self.notifier = hs.get_notifier()
 
-    @defer.inlineCallbacks
-    def received_client_read_marker(self, room_id, user_id, event_id):
+    async def received_client_read_marker(self, room_id, user_id, event_id):
         """Updates the read marker for a given user in a given room if the event ID given
         is ahead in the stream relative to the current read marker.
 
@@ -41,8 +38,8 @@ class ReadMarkerHandler(BaseHandler):
         the read marker has changed.
         """
 
-        with (yield self.read_marker_linearizer.queue((room_id, user_id))):
-            existing_read_marker = yield self.store.get_account_data_for_room_and_type(
+        with await self.read_marker_linearizer.queue((room_id, user_id)):
+            existing_read_marker = await self.store.get_account_data_for_room_and_type(
                 user_id, room_id, "m.fully_read"
             )
 
@@ -50,13 +47,13 @@ class ReadMarkerHandler(BaseHandler):
 
             if existing_read_marker:
                 # Only update if the new marker is ahead in the stream
-                should_update = yield self.store.is_event_after(
+                should_update = await self.store.is_event_after(
                     event_id, existing_read_marker["event_id"]
                 )
 
             if should_update:
                 content = {"event_id": event_id}
-                max_id = yield self.store.add_account_data_to_room(
+                max_id = await self.store.add_account_data_to_room(
                     user_id, room_id, "m.fully_read", content
                 )
                 self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
