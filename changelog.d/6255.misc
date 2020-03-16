@@ -1,0 +1,1 @@
+Small performance improvement by removing repeated config lookups in room stats calculation.

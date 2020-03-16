@@ -45,6 +45,8 @@ class StatsHandler(StateDeltasHandler):
         self.is_mine_id = hs.is_mine_id
         self.stats_bucket_size = hs.config.stats_bucket_size
 
+        self.stats_enabled = hs.config.stats_enabled
+
         # The current position in the current_state_delta stream
         self.pos = None
 
@@ -61,7 +63,7 @@ class StatsHandler(StateDeltasHandler):
     def notify_new_event(self):
         """Called when there may be more deltas to process
         """
-        if not self.hs.config.stats_enabled or self._is_processing:
+        if not self.stats_enabled or self._is_processing:
             return
 
         self._is_processing = True
