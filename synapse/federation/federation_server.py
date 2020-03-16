@@ -370,6 +370,7 @@ class FederationServer(FederationBase):
         pdu = event_from_pdu_json(content, format_ver)
         origin_host, _ = parse_server_name(origin)
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
+        pdu = yield self._check_sigs_and_hash(room_version, pdu)
         ret_pdu = yield self.handler.on_invite_request(origin, pdu)
         time_now = self._clock.time_msec()
         return {"event": ret_pdu.get_pdu_json(time_now)}
@@ -386,6 +387,9 @@ class FederationServer(FederationBase):
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
 
         logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
+
+        pdu = yield self._check_sigs_and_hash(room_version, pdu)
+
         res_pdus = yield self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
         return (
@@ -421,6 +425,9 @@ class FederationServer(FederationBase):
         yield self.check_server_matches_acl(origin_host, pdu.room_id)
 
         logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
+
+        pdu = yield self._check_sigs_and_hash(room_version, pdu)
+
         yield self.handler.on_send_leave_request(origin, pdu)
         return 200, {}
 
