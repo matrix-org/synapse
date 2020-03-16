@@ -94,7 +94,9 @@ class ApplicationService(object):
         ip_range_whitelist=None,
     ):
         self.token = token
-        self.url = url
+        self.url = (
+            url.rstrip("/") if isinstance(url, str) else None
+        )  # url must not end with a slash
         self.hs_token = hs_token
         self.sender = sender
         self.server_name = hostname
