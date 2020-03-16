@@ -171,6 +171,7 @@ class HomeServer(object):
         "http_client_context_factory",
         "proxied_http_client",
         "simple_http_client",
+        "proxied_http_client",
         "media_repository",
         "media_repository_resource",
         "federation_transport_client",
