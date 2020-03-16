@@ -30,6 +30,7 @@ from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
+from synapse import event_auth
 from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.api.errors import (
     AuthError,
@@ -1770,7 +1771,7 @@ class FederationHandler(BaseHandler):
                 auth_for_e[(EventTypes.Create, "")] = create_event
 
             try:
-                self.auth.check(room_version, e, auth_events=auth_for_e)
+                event_auth.check(room_version, e, auth_events=auth_for_e)
             except SynapseError as err:
                 # we may get SynapseErrors here as well as AuthErrors. For
                 # instance, there are a couple of (ancient) events in some
@@ -1926,7 +1927,7 @@ class FederationHandler(BaseHandler):
             }
 
             try:
-                self.auth.check(room_version, event, auth_events=current_auth_events)
+                event_auth.check(room_version, event, auth_events=current_auth_events)
             except AuthError as e:
                 logger.warn("Soft-failing %r because %s", event, e)
                 event.internal_metadata.soft_failed = True
@@ -2025,7 +2026,7 @@ class FederationHandler(BaseHandler):
             )
 
         try:
-            self.auth.check(room_version, event, auth_events=auth_events)
+            event_auth.check(room_version, event, auth_events=auth_events)
         except AuthError as e:
             logger.warn("Failed auth resolution for %r because %s", event, e)
             raise e

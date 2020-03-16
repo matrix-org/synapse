@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -437,6 +439,21 @@ class DeviceHandler(DeviceWorkerHandler):
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
                 log_kv({"message": "sent device update to host", "host": host})
+
+    @defer.inlineCallbacks
+    def notify_user_signature_update(self, from_user_id, user_ids):
+        """Notify a user that they have made new signatures of other users.
+
+        Args:
+            from_user_id (str): the user who made the signature
+            user_ids (list[str]): the users IDs that have new signatures
+        """
+
+        position = yield self.store.add_user_signature_change_to_streams(
+            from_user_id, user_ids
+        )
+
+        self.notifier.on_new_event("device_list_key", position, users=[from_user_id])
 
     @defer.inlineCallbacks
     def on_federation_query_user_devices(self, user_id):
