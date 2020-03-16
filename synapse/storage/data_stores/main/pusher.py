@@ -44,7 +44,7 @@ class PusherWorkerStore(SQLBaseStore):
 
                 r["data"] = json.loads(dataJson)
             except Exception as e:
-                logger.warn(
+                logger.warning(
                     "Invalid JSON in data for pusher %d: %s, %s",
                     r["id"],
                     dataJson,

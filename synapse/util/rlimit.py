@@ -33,4 +33,4 @@ def change_resource_limit(soft_file_no):
             resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
         )
     except (ValueError, resource.error) as e:
-        logger.warn("Failed to set file or core limit: %s", e)
+        logger.warning("Failed to set file or core limit: %s", e)

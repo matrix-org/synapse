@@ -286,7 +286,7 @@ class PurgeHistoryRestServlet(RestServlet):
                 room_id, stream_ordering
             )
             if not r:
-                logger.warn(
+                logger.warning(
                     "[purge] purging events not possible: No event found "
                     "(received_ts %i => stream_ordering %i)",
                     ts,

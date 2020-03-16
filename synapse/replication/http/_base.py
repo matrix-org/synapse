@@ -180,7 +180,7 @@ class ReplicationEndpoint(object):
                         if e.code != 504 or not cls.RETRY_ON_TIMEOUT:
                             raise
 
-                    logger.warn("%s request timed out", cls.NAME)
+                    logger.warning("%s request timed out", cls.NAME)
 
                     # If we timed out we probably don't need to worry about backing
                     # off too much, but lets just wait a little anyway.

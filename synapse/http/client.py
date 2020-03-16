@@ -548,7 +548,7 @@ class SimpleHttpClient(object):
             b"Content-Length" in resp_headers
             and int(resp_headers[b"Content-Length"][0]) > max_size
         ):
-            logger.warn("Requested URL is too large > %r bytes" % (self.max_size,))
+            logger.warning("Requested URL is too large > %r bytes" % (self.max_size,))
             raise SynapseError(
                 502,
                 "Requested file is too large > %r bytes" % (self.max_size,),
@@ -556,7 +556,7 @@ class SimpleHttpClient(object):
             )
 
         if response.code > 299:
-            logger.warn("Got %d when downloading %s" % (response.code, url))
+            logger.warning("Got %d when downloading %s" % (response.code, url))
             raise SynapseError(502, "Got error %d" % (response.code,), Codes.UNKNOWN)
 
         # TODO: if our Content-Type is HTML or something, just read the first

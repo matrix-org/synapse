@@ -182,7 +182,7 @@ def _reload_stdlib_logging(*args, log_config=None):
     logger = logging.getLogger("")
 
     if not log_config:
-        logger.warn("Reloaded a blank config?")
+        logger.warning("Reloaded a blank config?")
 
     logging.config.dictConfig(log_config)
 

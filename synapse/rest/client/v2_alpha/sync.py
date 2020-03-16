@@ -394,7 +394,7 @@ class SyncRestServlet(RestServlet):
             # We've had bug reports that events were coming down under the
             # wrong room.
             if event.room_id != room.room_id:
-                logger.warn(
+                logger.warning(
                     "Event %r is under room %r instead of %r",
                     event.event_id,
                     room.room_id,

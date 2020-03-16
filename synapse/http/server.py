@@ -454,7 +454,7 @@ def respond_with_json(
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
     if request._disconnected:
-        logger.warn(
+        logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
         return

@@ -119,7 +119,7 @@ class Measure(object):
         context = LoggingContext.current_context()
 
         if context != self.start_context:
-            logger.warn(
+            logger.warning(
                 "Context has unexpectedly changed from '%s' to '%s'. (%r)",
                 self.start_context,
                 context,
@@ -128,7 +128,7 @@ class Measure(object):
             return
 
         if not context:
-            logger.warn("Expected context. (%r)", self.name)
+            logger.warning("Expected context. (%r)", self.name)
             return
 
         current = context.get_resource_usage()
@@ -140,7 +140,7 @@ class Measure(object):
             block_db_txn_duration.labels(self.name).inc(usage.db_txn_duration_sec)
             block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
         except ValueError:
-            logger.warn(
+            logger.warning(
                 "Failed to save metrics! OLD: %r, NEW: %r", self.start_usage, current
             )
 

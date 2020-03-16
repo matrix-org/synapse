@@ -157,7 +157,7 @@ class Store(
                         )
                     except self.database_engine.module.DatabaseError as e:
                         if self.database_engine.is_deadlock(e):
-                            logger.warn("[TXN DEADLOCK] {%s} %d/%d", desc, i, N)
+                            logger.warning("[TXN DEADLOCK] {%s} %d/%d", desc, i, N)
                             if i < N:
                                 i += 1
                                 conn.rollback()
@@ -432,7 +432,7 @@ class Porter(object):
                     for row in rows:
                         d = dict(zip(headers, row))
                         if "\0" in d['value']:
-                            logger.warn('dropping search row %s', d)
+                            logger.warning('dropping search row %s', d)
                         else:
                             rows_dict.append(d)
 
@@ -647,7 +647,7 @@ class Porter(object):
             if isinstance(col, bytes):
                 return bytearray(col)
             elif isinstance(col, string_types) and "\0" in col:
-                logger.warn(
+                logger.warning(
                     "DROPPING ROW: NUL value in table %s col %s: %r",
                     table,
                     headers[j],

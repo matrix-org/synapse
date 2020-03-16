@@ -114,7 +114,7 @@ class PusherServer(HomeServer):
                 )
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
-                    logger.warn(
+                    logger.warning(
                         (
                             "Metrics listener configured, but "
                             "enable_metrics is not True!"
@@ -123,7 +123,7 @@ class PusherServer(HomeServer):
                 else:
                     _base.listen_metrics(listener["bind_addresses"], listener["port"])
             else:
-                logger.warn("Unrecognized listener type: %s", listener["type"])
+                logger.warning("Unrecognized listener type: %s", listener["type"])
 
         self.get_tcp_replication().start_replication(self)
 
