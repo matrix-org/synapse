@@ -250,7 +250,7 @@ class DirectoryHandler(BaseHandler):
                     ignore_backoff=True,
                 )
             except CodeMessageException as e:
-                logging.warn("Error retrieving alias")
+                logging.warning("Error retrieving alias")
                 if e.code == 404:
                     result = None
                 else:
