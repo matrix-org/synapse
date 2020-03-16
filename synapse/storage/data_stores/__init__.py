@@ -12,3 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+
+class DataStores(object):
+    """The various data stores.
+
+    These are low level interfaces to physical databases.
+    """
+
+    def __init__(self, main_store, db_conn, hs):
+        # Note we pass in the main store here as workers use a different main
+        # store.
+        self.main = main_store

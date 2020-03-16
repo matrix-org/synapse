@@ -34,6 +34,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
         hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
 
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.event_creation_handler = hs.get_event_creation_handler()
 
@@ -63,7 +64,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
             builder
         )
 
-        yield self.store.persist_event(event, context)
+        yield self.storage.persistence.persist_event(event, context)
 
         return event
 

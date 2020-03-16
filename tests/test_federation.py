@@ -36,7 +36,8 @@ class MessageAcceptTests(unittest.TestCase):
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
             maybeDeferred(
-                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+                self.homeserver.get_datastore().get_latest_event_ids_in_room,
+                self.room_id,
             )
         )[0]
 
@@ -75,7 +76,8 @@ class MessageAcceptTests(unittest.TestCase):
         self.assertEqual(
             self.successResultOf(
                 maybeDeferred(
-                    self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+                    self.homeserver.get_datastore().get_latest_event_ids_in_room,
+                    self.room_id,
                 )
             )[0],
             "$join:test.serv",
@@ -97,7 +99,8 @@ class MessageAcceptTests(unittest.TestCase):
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
             maybeDeferred(
-                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+                self.homeserver.get_datastore().get_latest_event_ids_in_room,
+                self.room_id,
             )
         )[0]
 
@@ -137,6 +140,6 @@ class MessageAcceptTests(unittest.TestCase):
 
         # Make sure the invalid event isn't there
         extrem = maybeDeferred(
-            self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+            self.homeserver.get_datastore().get_latest_event_ids_in_room, self.room_id
         )
         self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")
