@@ -16,6 +16,7 @@
 import json
 
 import synapse.rest.admin
+from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login, room
 
 from tests import unittest
@@ -41,8 +42,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.second_user_id = self.register_user("second", "test")
         self.second_tok = self.login("second", "test")
 
-        self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
-        self.url = "/_synapse/admin/v1/join/{}".format(self.room_id)
+        self.public_room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=True
+        )
+        self.url = "/_synapse/admin/v1/join/{}".format(self.public_room_id)
 
     def test_requester_is_no_admin(self):
         """
@@ -59,7 +62,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("You are not a server admin", channel.json_body["error"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
     def test_invalid_parameter(self):
         """
@@ -76,7 +79,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Missing params: ['user_id']", channel.json_body["error"])
+        self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
 
     def test_local_user_does_not_exist(self):
         """
@@ -93,7 +96,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("User not found", channel.json_body["error"])
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_remote_user(self):
         """
@@ -154,9 +157,9 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
         )
 
-    def test_join_room(self):
+    def test_join_public_room(self):
         """
-        Test joining a local user to a room.
+        Test joining a local user to a public room with "JoinRules.PUBLIC"
         """
         body = json.dumps({"user_id": self.second_user_id})
 
@@ -169,7 +172,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(self.room_id, channel.json_body["room_id"])
+        self.assertEqual(self.public_room_id, channel.json_body["room_id"])
 
         # Validate if user is member of room
         request, channel = self.make_request(
@@ -177,4 +180,55 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(self.room_id, channel.json_body["joined_rooms"][0])
+        self.assertEqual(self.public_room_id, channel.json_body["joined_rooms"][0])
+
+    def test_join_private_room(self):
+        """
+        Test joining a local user to a private room with "JoinRules.INVITE"
+        """
+        private_room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=False
+        )
+        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        body = json.dumps({"user_id": self.second_user_id})
+
+        request, channel = self.make_request(
+            "POST",
+            url,
+            content=body.encode(encoding="utf_8"),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
+
+    def test_join_private_room_if_owner(self):
+        """
+        Test joining a local user to a private room with "JoinRules.INVITE",
+        when admin is owner of this room.
+        """
+        private_room_id = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok, is_public=False
+        )
+        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        body = json.dumps({"user_id": self.second_user_id})
+
+        request, channel = self.make_request(
+            "POST",
+            url,
+            content=body.encode(encoding="utf_8"),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(private_room_id, channel.json_body["room_id"])
+
+        # Validate if user is member of room
+        request, channel = self.make_request(
+            "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])

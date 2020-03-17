@@ -15,7 +15,7 @@
 import logging
 from typing import List, Optional
 
-from synapse.api.constants import Membership
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -249,6 +249,7 @@ class JoinRoomAliasServlet(RestServlet):
         self.auth = hs.get_auth()
         self.room_member_handler = hs.get_room_member_handler()
         self.admin_handler = hs.get_handlers().admin_handler
+        self.state_handler = hs.get_state_handler()
 
     async def on_POST(self, request, room_identifier):
         requester = await self.auth.get_user_by_req(request)
@@ -289,6 +290,21 @@ class JoinRoomAliasServlet(RestServlet):
             )
 
         fake_requester = create_requester(target_user)
+
+        # send invite if room has "JoinRules.INVITE"
+        room_state = await self.state_handler.get_current_state(room_id)
+        join_rules_event = room_state.get((EventTypes.JoinRules, ""))
+        if join_rules_event:
+            if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
+                await self.room_member_handler.update_membership(
+                    requester=requester,
+                    target=fake_requester.user,
+                    room_id=room_id,
+                    action="invite",
+                    remote_room_hosts=remote_room_hosts,
+                    ratelimit=False,
+                )
+
         await self.room_member_handler.update_membership(
             requester=fake_requester,
             target=fake_requester.user,
