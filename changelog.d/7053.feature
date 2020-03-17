@@ -1,0 +1,1 @@
+Add options to prevent users from changing their profile or associated 3PIDs.

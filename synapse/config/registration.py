@@ -129,6 +129,10 @@ class RegistrationConfig(Config):
                 raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
+        self.enable_set_displayname = config.get("enable_set_displayname", True)
+        self.enable_set_avatar_url = config.get("enable_set_avatar_url", True)
+        self.enable_3pid_changes = config.get("enable_3pid_changes", True)
+
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
         )
@@ -329,6 +333,22 @@ class RegistrationConfig(Config):
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
+
+        # If false, don't let users set their own display names/avatars
+        # (unless they are a server admin) other than for the very first time.
+        # Useful when provisioning users based on the contents of a 3rd party
+        # directory and to avoid ambiguities.
+        # Default is true and users can edit their own display names/avatars.
+        #
+        #enable_set_displayname: false
+        #
+        #enable_set_avatar_url: false
+
+        # If false, stop users from trying to change the 3PIDs associated with
+        # their accounts (email address and msisdn).
+        # Default is true and users can edit their own 3PIDs.
+        #
+        #enable_3pid_changes: false
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
