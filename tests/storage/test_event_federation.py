@@ -110,3 +110,119 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         r = self.get_success(self.store.get_rooms_with_many_extremities(5, 1, [room1]))
         self.assertTrue(r == [room2] or r == [room3])
+
+    def test_auth_difference(self):
+        room_id = "@ROOM:local"
+
+        # The silly auth graph we use to test th eauth difference algorithm,
+        # where the top are the most recent events.
+        #
+        #   A   B
+        #    \ /
+        #  D  E
+        #  \  |
+        #   ` F   C
+        #     |  /|
+        #     G ´ |
+        #     | \ |
+        #     H   I
+        #     |   |
+        #     K   J
+
+        auth_graph = {
+            "a": ["e"],
+            "b": ["e"],
+            "c": ["g", "i"],
+            "d": ["f"],
+            "e": ["f"],
+            "f": ["g"],
+            "g": ["h", "i"],
+            "h": ["k"],
+            "i": ["j"],
+            "k": [],
+            "j": [],
+        }
+
+        depth_map = {
+            "a": 7,
+            "b": 7,
+            "c": 4,
+            "d": 6,
+            "e": 6,
+            "f": 5,
+            "g": 3,
+            "h": 2,
+            "i": 2,
+            "k": 1,
+            "j": 1,
+        }
+
+        # We rudely fiddle with the appropriate tables directly, as that's much
+        # easier than constructing events properly.
+
+        def insert_event(txn, event_id):
+
+            depth = depth_map[event_id]
+
+            self.store.db.simple_insert_txn(
+                txn,
+                table="events",
+                values={
+                    "event_id": event_id,
+                    "room_id": room_id,
+                    "depth": depth,
+                    "topological_ordering": depth,
+                    "type": "m.test",
+                    "processed": True,
+                    "outlier": False,
+                },
+            )
+
+            self.store.db.simple_insert_many_txn(
+                txn,
+                table="event_auth",
+                values=[
+                    {"event_id": event_id, "room_id": room_id, "auth_id": a}
+                    for a in auth_graph[event_id]
+                ],
+            )
+
+        for event_id in auth_graph:
+            self.get_success(
+                self.store.db.runInteraction("insert", insert_event, event_id)
+            )
+
+        # Now actually test that various combinations give the right result:
+
+        difference = self.get_success(
+            self.store.get_auth_chain_difference([{"a"}, {"b"}])
+        )
+        self.assertSetEqual(difference, {"a", "b"})
+
+        difference = self.get_success(
+            self.store.get_auth_chain_difference([{"a"}, {"b"}, {"c"}])
+        )
+        self.assertSetEqual(difference, {"a", "b", "c", "e", "f"})
+
+        difference = self.get_success(
+            self.store.get_auth_chain_difference([{"a", "c"}, {"b"}])
+        )
+        self.assertSetEqual(difference, {"a", "b", "c"})
+
+        difference = self.get_success(
+            self.store.get_auth_chain_difference([{"a"}, {"b"}, {"d"}])
+        )
+        self.assertSetEqual(difference, {"a", "b", "d", "e"})
+
+        difference = self.get_success(
+            self.store.get_auth_chain_difference([{"a"}, {"b"}, {"c"}, {"d"}])
+        )
+        self.assertSetEqual(difference, {"a", "b", "c", "d", "e", "f"})
+
+        difference = self.get_success(
+            self.store.get_auth_chain_difference([{"a"}, {"b"}, {"e"}])
+        )
+        self.assertSetEqual(difference, {"a", "b"})
+
+        difference = self.get_success(self.store.get_auth_chain_difference([{"a"}]))
+        self.assertSetEqual(difference, set())
