@@ -160,7 +160,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         # We rudely fiddle with the appropriate tables directly, as that's much
         # easier than constructing events properly.
 
-        def insert_event(txn, event_id):
+        def insert_event(txn, event_id, stream_ordering):
 
             depth = depth_map[event_id]
 
@@ -175,7 +175,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                     "type": "m.test",
                     "processed": True,
                     "outlier": False,
-                    "stream_ordering": depth,
+                    "stream_ordering": stream_ordering,
                 },
             )
 
@@ -188,9 +188,13 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 ],
             )
 
+        next_stream_ordering = 0
         for event_id in auth_graph:
+            next_stream_ordering += 1
             self.get_success(
-                self.store.db.runInteraction("insert", insert_event, event_id)
+                self.store.db.runInteraction(
+                    "insert", insert_event, event_id, next_stream_ordering
+                )
             )
 
         # Now actually test that various combinations give the right result:
