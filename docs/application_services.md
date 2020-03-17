@@ -23,9 +23,13 @@ namespaces:
   users:  # List of users we're interested in
     - exclusive: <bool>
       regex: <regex>
+      group_id: <group>
     - ...
   aliases: []  # List of aliases we're interested in
   rooms: [] # List of room ids we're interested in
 ```
+
+`exclusive`: If enabled registrations of users in that namespace are only allowed for the application service  
+`group_id`: All users of this application service are dynamically registered for this group to e.g. use it as flair
 
 See the [spec](https://matrix.org/docs/spec/application_service/unstable.html) for further details on how application services work.
