@@ -175,6 +175,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                     "type": "m.test",
                     "processed": True,
                     "outlier": False,
+                    "stream_ordering": depth,
                 },
             )
 
