@@ -189,12 +189,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         content = parse_json_object_from_request(request)
 
-        if event_type == EventTypes.Aliases:
-            # MSC2260
-            raise SynapseError(
-                400, "Cannot send m.room.aliases events via /rooms/{room_id}/state"
-            )
-
         event_dict = {
             "type": event_type,
             "content": content,
@@ -241,12 +235,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     async def on_POST(self, request, room_id, event_type, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
-
-        if event_type == EventTypes.Aliases:
-            # MSC2260
-            raise SynapseError(
-                400, "Cannot send m.room.aliases events via /rooms/{room_id}/send"
-            )
 
         event_dict = {
             "type": event_type,

@@ -44,7 +44,11 @@ class AccountValidityHandler(object):
 
         self._account_validity = self.hs.config.account_validity
 
-        if self._account_validity.renew_by_email_enabled and load_jinja2_templates:
+        if (
+            self._account_validity.enabled
+            and self._account_validity.renew_by_email_enabled
+            and load_jinja2_templates
+        ):
             # Don't do email-specific configuration if renewal by email is disabled.
             try:
                 app_name = self.hs.config.email_app_name

@@ -1,0 +1,1 @@
+Fix a bug causing account validity renewal emails to be sent even if the feature is turned off in some cases.
