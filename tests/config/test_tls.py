@@ -181,11 +181,12 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t.read_config(config, config_dir_path="", data_dir_path="")
 
         cf = FederationPolicyForHTTPS(t)
+        options = _get_ssl_context_options(cf._verify_ssl_context)
 
         # The context has had NO_TLSv1_1 and NO_TLSv1_0 set, but not NO_TLSv1_2
-        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
-        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+        self.assertNotEqual(options & SSL.OP_NO_TLSv1, 0)
+        self.assertNotEqual(options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
 
     def test_tls_client_minimum_set_passed_through_1_0(self):
         """
@@ -196,11 +197,12 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t.read_config(config, config_dir_path="", data_dir_path="")
 
         cf = FederationPolicyForHTTPS(t)
+        options = _get_ssl_context_options(cf._verify_ssl_context)
 
         # The context has not had any of the NO_TLS set.
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
 
     def test_acme_disabled_in_generated_config_no_acme_domain_provied(self):
         """
@@ -282,3 +284,10 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         # Caught by the wildcard
         opts = cf.get_options(idna.encode("テスト.ドメイン.テスト"))
         self.assertFalse(opts._verifier._verify_certs)
+
+
+def _get_ssl_context_options(ssl_context: SSL.Context) -> int:
+    """get the options bits from an openssl context object"""
+    # the OpenSSL.SSL.Context wrapper doesn't expose get_options, so we have to
+    # use the low-level interface
+    return SSL._lib.SSL_CTX_get_options(ssl_context._context)
