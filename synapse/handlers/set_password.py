@@ -58,7 +58,7 @@ class SetPasswordHandler(BaseHandler):
             except_device_id = requester.device_id if requester else None
             except_access_token_id = requester.access_token_id if requester else None
 
-            # First delete all his other devices.
+            # First delete all of their other devices.
             yield self._device_handler.delete_all_devices_for_user(
                 user_id, except_device_id=except_device_id
             )
