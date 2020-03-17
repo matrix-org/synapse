@@ -72,8 +72,7 @@ underneath the database, or if a different version of the locale is used on any
 replicas.
 
 The safest way to fix the issue is to take a dump and recreate the database with
-the correct `COLLATE` and `CTYPE` parameters (as per
-[docs/postgres.md](docs/postgres.md)). It is also possible to change the
+the correct `COLLATE` and `CTYPE` parameters (as shown above). It is also possible to change the
 parameters on a live database and run a `REINDEX` on the entire database,
 however extreme care must be taken to avoid database corruption.
 
