@@ -61,7 +61,7 @@ class MatrixFederationAgent(object):
     Args:
         reactor (IReactor): twisted reactor to use for underlying requests
 
-        tls_client_options_factory (ClientTLSOptionsFactory|None):
+        tls_client_options_factory (FederationPolicyForHTTPS|None):
             factory to use for fetching client tls options, or none to disable TLS.
 
         _srv_resolver (SrvResolver|None):

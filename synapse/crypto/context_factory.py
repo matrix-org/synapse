@@ -61,7 +61,7 @@ class ServerContextFactory(ContextFactory):
 
 
 @implementer(IPolicyForHTTPS)
-class ClientTLSOptionsFactory(object):
+class FederationPolicyForHTTPS(object):
     """Factory for Twisted SSLClientConnectionCreators that are used to make connections
     to remote servers for federation.
 
@@ -82,10 +82,10 @@ class ClientTLSOptionsFactory(object):
             trust_root = platformTrust()
 
         self._verify_ssl_context = CertificateOptions(trustRoot=trust_root).getContext()
-        self._verify_ssl_context.set_info_callback(self._context_info_cb)
+        self._verify_ssl_context.set_info_callback(_context_info_cb)
 
         self._no_verify_ssl_context = CertificateOptions().getContext()
-        self._no_verify_ssl_context.set_info_callback(self._context_info_cb)
+        self._no_verify_ssl_context.set_info_callback(_context_info_cb)
 
     def get_options(self, host):
         # Check if certificate verification has been enabled
@@ -104,28 +104,48 @@ class ClientTLSOptionsFactory(object):
 
         return SSLClientConnectionCreator(host, ssl_context, should_verify)
 
-    @staticmethod
-    def _context_info_cb(ssl_connection, where, ret):
-        """The 'information callback' for our openssl context object."""
-        # we assume that the app_data on the connection object has been set to
-        # a TLSMemoryBIOProtocol object. (This is done by SSLClientConnectionCreator)
-        tls_protocol = ssl_connection.get_app_data()
-        try:
-            # ... we further assume that SSLClientConnectionCreator has set the
-            # '_synapse_tls_verifier' attribute to a ConnectionVerifier object.
-            tls_protocol._synapse_tls_verifier.verify_context_info_cb(
-                ssl_connection, where
-            )
-        except:  # noqa: E722, taken from the twisted implementation
-            logger.exception("Error during info_callback")
-            f = Failure()
-            tls_protocol.failVerification(f)
-
     def creatorForNetloc(self, hostname, port):
         """Implements the IPolicyForHTTPS interace so that this can be passed
         directly to agents.
         """
         return self.get_options(hostname)
+
+
+@implementer(IPolicyForHTTPS)
+class RegularPolicyForHTTPS(object):
+    """Factory for Twisted SSLClientConnectionCreators that are used to make connections
+    to remote servers, for other than federation.
+
+    Always uses the same OpenSSL context object, which uses the default OpenSSL CA
+    trust root.
+    """
+
+    def __init__(self):
+        trust_root = platformTrust()
+        self._ssl_context = CertificateOptions(trustRoot=trust_root).getContext()
+        self._ssl_context.set_info_callback(_context_info_cb)
+
+    def creatorForNetloc(self, hostname, port):
+        return SSLClientConnectionCreator(hostname, self._ssl_context, True)
+
+
+def _context_info_cb(ssl_connection, where, ret):
+    """The 'information callback' for our openssl context objects.
+
+    Note: Once this is set as the info callback on a Context object, the Context should
+    only be used with the SSLClientConnectionCreator.
+    """
+    # we assume that the app_data on the connection object has been set to
+    # a TLSMemoryBIOProtocol object. (This is done by SSLClientConnectionCreator)
+    tls_protocol = ssl_connection.get_app_data()
+    try:
+        # ... we further assume that SSLClientConnectionCreator has set the
+        # '_synapse_tls_verifier' attribute to a ConnectionVerifier object.
+        tls_protocol._synapse_tls_verifier.verify_context_info_cb(ssl_connection, where)
+    except:  # noqa: E722, taken from the twisted implementation
+        logger.exception("Error during info_callback")
+        f = Failure()
+        tls_protocol.failVerification(f)
 
 
 @implementer(IOpenSSLClientConnectionCreator)
