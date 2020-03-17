@@ -13,19 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 import tests.unittest
 import tests.utils
 
 
-class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
+class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
     def test_get_prev_events_for_room(self):
         room_id = "@ROOM:local"
 
@@ -61,15 +56,14 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
             )
 
         for i in range(0, 20):
-            yield self.store.db.runInteraction("insert", insert_event, i)
+            self.get_success(self.store.db.runInteraction("insert", insert_event, i))
 
         # this should get the last ten
-        r = yield self.store.get_prev_events_for_room(room_id)
+        r = self.get_success(self.store.get_prev_events_for_room(room_id))
         self.assertEqual(10, len(r))
         for i in range(0, 10):
             self.assertEqual("$event_%i:local" % (19 - i), r[i])
 
-    @defer.inlineCallbacks
     def test_get_rooms_with_many_extremities(self):
         room1 = "#room1"
         room2 = "#room2"
@@ -86,25 +80,33 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
             )
 
         for i in range(0, 20):
-            yield self.store.db.runInteraction("insert", insert_event, i, room1)
-            yield self.store.db.runInteraction("insert", insert_event, i, room2)
-            yield self.store.db.runInteraction("insert", insert_event, i, room3)
+            self.get_success(
+                self.store.db.runInteraction("insert", insert_event, i, room1)
+            )
+            self.get_success(
+                self.store.db.runInteraction("insert", insert_event, i, room2)
+            )
+            self.get_success(
+                self.store.db.runInteraction("insert", insert_event, i, room3)
+            )
 
         # Test simple case
-        r = yield self.store.get_rooms_with_many_extremities(5, 5, [])
+        r = self.get_success(self.store.get_rooms_with_many_extremities(5, 5, []))
         self.assertEqual(len(r), 3)
 
         # Does filter work?
 
-        r = yield self.store.get_rooms_with_many_extremities(5, 5, [room1])
+        r = self.get_success(self.store.get_rooms_with_many_extremities(5, 5, [room1]))
         self.assertTrue(room2 in r)
         self.assertTrue(room3 in r)
         self.assertEqual(len(r), 2)
 
-        r = yield self.store.get_rooms_with_many_extremities(5, 5, [room1, room2])
+        r = self.get_success(
+            self.store.get_rooms_with_many_extremities(5, 5, [room1, room2])
+        )
         self.assertEqual(r, [room3])
 
         # Does filter and limit work?
 
-        r = yield self.store.get_rooms_with_many_extremities(5, 1, [room1])
+        r = self.get_success(self.store.get_rooms_with_many_extremities(5, 1, [room1]))
         self.assertTrue(r == [room2] or r == [room3])
