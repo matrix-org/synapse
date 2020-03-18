@@ -146,6 +146,8 @@ class EmailConfig(Config):
                 if k not in email_config:
                     missing.append("email." + k)
 
+            # public_baseurl is required to build password reset and validation links that
+            # will be emailed to users
             if config.get("public_baseurl") is None:
                 missing.append("public_baseurl")
 

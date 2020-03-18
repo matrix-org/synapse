@@ -1,0 +1,1 @@
+Complain on startup instead of 500'ing during runtime when `public_baseurl` isn't set when necessary.
