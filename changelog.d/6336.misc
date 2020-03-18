@@ -1,1 +1,0 @@
-Remove the dependency on psutil and replace functionality with the stdlib `resource` module.
