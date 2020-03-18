@@ -227,25 +227,10 @@ def _get_auth_chain_difference(state_sets, event_map, state_res_store):
     Returns:
         Deferred[set[str]]: Set of event IDs
     """
-    auth_sets = []
-    for state_set in state_sets:
-        auth_sets.append(
-            {
-                eid
-                for key, eid in iteritems(state_set)
-                if (
-                    key[0] in (EventTypes.Member, EventTypes.ThirdPartyInvite)
-                    or key
-                    in (
-                        (EventTypes.PowerLevels, ""),
-                        (EventTypes.Create, ""),
-                        (EventTypes.JoinRules, ""),
-                    )
-                )
-            }
-        )
 
-    difference = yield state_res_store.get_auth_chain_difference(auth_sets)
+    difference = yield state_res_store.get_auth_chain_difference(
+        [set(state_set.values()) for state_set in state_sets]
+    )
 
     return difference
 

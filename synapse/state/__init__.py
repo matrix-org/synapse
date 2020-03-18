@@ -671,7 +671,7 @@ class StateResolutionStore(object):
         chain.
 
         Returns:
-            Deferred[Set[str]]
+            Deferred[Set[str]]: Set of event IDs.
         """
 
         return self.store.get_auth_chain_difference(state_sets)

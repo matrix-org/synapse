@@ -174,23 +174,24 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         }
 
         # We need to get the depth of the initial events for sorting purposes.
-        rows = self.db.simple_select_many_txn(
-            txn,
-            table="events",
-            column="event_id",
-            iterable=initial_events,
-            keyvalues={},
-            retcols=("event_id", "depth"),
+        sql = """
+            SELECT depth, event_id FROM events
+            WHERE %s
+            ORDER BY depth ASC
+        """
+        clause, args = make_in_list_sql_clause(
+            txn.database_engine, "event_id", initial_events
         )
+        txn.execute(sql % (clause,), args)
 
-        # The sorted list of events we should walk the auth chain off.
-        search = sorted((row["depth"], row["event_id"]) for row in rows)
+        # The sorted list of events whose auth chains we should walk.
+        search = txn.fetchall()
 
         # Map from event to its auth events
         event_to_auth_events = {}  # type: Dict[str, Set[str]]
 
         base_sql = """
-            SELECT depth, a.event_id, auth_id
+            SELECT a.event_id, auth_id, depth
             FROM event_auth AS a
             INNER JOIN events AS e ON (e.event_id = a.auth_id)
             WHERE
@@ -210,18 +211,25 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             )
             txn.execute(base_sql + clause, args)
 
-            for depth, event_id, auth_id in txn:
-                event_to_auth_events.setdefault(event_id, set()).add(auth_id)
+            for event_id, auth_event_id, auth_event_depth in txn:
+                event_to_auth_events.setdefault(event_id, set()).add(auth_event_id)
 
-                if auth_id not in event_to_missing_sets:
+                sets = event_to_missing_sets.get(auth_event_id)
+                if sets is None:
                     # First time we're seeing this event, so we add it to the
                     # queue of things to fetch.
-                    search.append((depth, auth_id))
+                    search.append((auth_event_depth, auth_event_id))
+
+                    # Assume that this event is unreachable from any of the
+                    # state sets until proven otherwise
+                    sets = event_to_missing_sets.setdefault(
+                        auth_event_id, set(range(len(state_sets)))
+                    )
                 else:
                     # We've previously seen this event, so look up its auth
                     # events and recursively mark all ancestors as reachable
-                    # by the current events state set.
-                    a_ids = event_to_auth_events.get(auth_id)
+                    # by the current event's state set.
+                    a_ids = event_to_auth_events.get(auth_event_id)
                     while a_ids:
                         new_aids = set()
                         for a_id in a_ids:
@@ -236,9 +244,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                         a_ids = new_aids
 
                 # Mark that the auth event is reachable by the approriate sets.
-                sets = event_to_missing_sets.setdefault(
-                    auth_id, set(range(len(state_sets)))
-                )
                 sets.intersection_update(event_to_missing_sets[event_id])
 
             search.sort()
