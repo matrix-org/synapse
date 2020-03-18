@@ -169,11 +169,11 @@ def run_generate_config(environ, ownership):
     # log("running %s" % (args, ))
 
     if ownership is not None:
-        args = ["su-exec", ownership] + args
-        os.execv("/sbin/su-exec", args)
-
         # make sure that synapse has perms to write to the data dir.
         subprocess.check_output(["chown", ownership, data_dir])
+
+        args = ["su-exec", ownership] + args
+        os.execv("/sbin/su-exec", args)
     else:
         os.execv("/usr/local/bin/python", args)
 

@@ -1,0 +1,1 @@
+Fix permission denied error when trying to generate a config file with the docker image.
