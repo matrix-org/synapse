@@ -379,6 +379,7 @@ class FakeTransport(object):
 
     disconnecting = False
     disconnected = False
+    connected = True
     buffer = attr.ib(default=b"")
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
@@ -402,6 +403,7 @@ class FakeTransport(object):
                     "FakeTransport: Delaying disconnect until buffer is flushed"
                 )
             else:
+                self.connected = False
                 self.disconnected = True
 
     def abortConnection(self):
