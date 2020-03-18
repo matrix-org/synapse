@@ -628,10 +628,12 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             "local_invites",
             "room_account_data",
             "room_tags",
+            "state_groups",
+            "state_groups_state",
         ):
             count = self.get_success(
                 self.store._simple_select_one_onecol(
-                    table="events",
+                    table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",
                     desc="test_purge_room",
