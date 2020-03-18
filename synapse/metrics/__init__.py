@@ -20,7 +20,6 @@ import os
 import platform
 import threading
 import time
-from numbers import Number
 from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
 import six
@@ -65,7 +64,7 @@ class LaterGauge(object):
     labels = attr.ib(hash=False, type=Optional[Iterable[str]])
     # callback: should either return a value (if there are no labels for this metric),
     # or dict mapping from a label tuple to a value
-    caller = attr.ib(type=Callable[[], Union[Dict[Tuple[str], Number], Number]])
+    caller = attr.ib(type=Callable[[], Union[Dict[Tuple[str, ...], float], float]])
 
     def collect(self):
 

@@ -16,7 +16,7 @@
 
 import logging
 from collections import defaultdict
-from typing import Dict, Union
+from typing import Dict, Tuple, Union
 
 from twisted.internet import defer
 
@@ -57,7 +57,7 @@ class PusherPool:
         self.pushers = {}  # type: Dict[str, Dict[str, Union[HttpPusher, EmailPusher]]]
 
         def count_pushers():
-            results = defaultdict(int)
+            results = defaultdict(int)  # type: Dict[Tuple[str, str], int]
             for pushers in self.pushers.values():
                 for pusher in pushers.values():
                     k = (type(pusher).__name__, pusher.app_id)
