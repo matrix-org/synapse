@@ -88,8 +88,7 @@ TagAccountDataStreamRow = namedtuple(
     "TagAccountDataStreamRow", ("user_id", "room_id", "data")  # str  # str  # dict
 )
 AccountDataStreamRow = namedtuple(
-    "AccountDataStream",
-    ("user_id", "room_id", "data_type", "data"),  # str  # str  # str  # dict
+    "AccountDataStream", ("user_id", "room_id", "data_type")  # str  # str  # str
 )
 GroupsStreamRow = namedtuple(
     "GroupsStreamRow",
@@ -421,8 +420,8 @@ class AccountDataStream(Stream):
 
         results = list(room_results)
         results.extend(
-            (stream_id, user_id, None, account_data_type, content)
-            for stream_id, user_id, account_data_type, content in global_results
+            (stream_id, user_id, None, account_data_type)
+            for stream_id, user_id, account_data_type in global_results
         )
 
         return results
