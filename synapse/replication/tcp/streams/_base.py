@@ -119,7 +119,7 @@ class Stream(object):
     """Base class for the streams.
 
     Provides a `get_updates()` function that returns new updates since the last
-    time it was called up.
+    time it was called.
     """
 
     NAME = None  # type: str  # The name of the stream
