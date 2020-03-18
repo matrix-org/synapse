@@ -44,7 +44,7 @@ class TransportLayerClient(object):
         given event.
 
         Args:
-            destination (str): The host name of the remote home server we want
+            destination (str): The host name of the remote homeserver we want
                 to get the state from.
             context (str): The name of the context we want the state of
             event_id (str): The event we want the context at.
@@ -68,7 +68,7 @@ class TransportLayerClient(object):
         given event. Returns the state's event_id's
 
         Args:
-            destination (str): The host name of the remote home server we want
+            destination (str): The host name of the remote homeserver we want
                 to get the state from.
             context (str): The name of the context we want the state of
             event_id (str): The event we want the context at.
@@ -91,7 +91,7 @@ class TransportLayerClient(object):
         """ Requests the pdu with give id and origin from the given server.
 
         Args:
-            destination (str): The host name of the remote home server we want
+            destination (str): The host name of the remote homeserver we want
                 to get the state from.
             event_id (str): The id of the event being requested.
             timeout (int): How long to try (in ms) the destination for before

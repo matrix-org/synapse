@@ -223,7 +223,7 @@ class AuthHandler(BaseHandler):
             # could continue registration from your phone having clicked the
             # email auth link on there). It's probably too open to abuse
             # because it lets unauthenticated clients store arbitrary objects
-            # on a home server.
+            # on a homeserver.
             # Revisit: Assumimg the REST APIs do sensible validation, the data
             # isn't arbintrary.
             session["clientdict"] = clientdict
@@ -810,7 +810,7 @@ class AuthHandler(BaseHandler):
     @defer.inlineCallbacks
     def add_threepid(self, user_id, medium, address, validated_at):
         # 'Canonicalise' email addresses down to lower case.
-        # We've now moving towards the Home Server being the entity that
+        # We've now moving towards the homeserver being the entity that
         # is responsible for validating threepids used for resetting passwords
         # on accounts, so in future Synapse will gain knowledge of specific
         # types (mediums) of threepid. For now, we still use the existing

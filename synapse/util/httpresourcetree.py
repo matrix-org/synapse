@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_resource_tree(desired_tree, root_resource):
-    """Create the resource tree for this Home Server.
+    """Create the resource tree for this homeserver.
 
     This in unduly complicated because Twisted does not support putting
     child resources more than 1 level deep at a time.

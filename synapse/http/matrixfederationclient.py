@@ -530,7 +530,7 @@ class MatrixFederationHttpClient(object):
         """
         Builds the Authorization headers for a federation request
         Args:
-            destination (bytes|None): The desination home server of the request.
+            destination (bytes|None): The desination homeserver of the request.
                 May be None if the destination is an identity server, in which case
                 destination_is must be non-None.
             method (bytes): The HTTP method of the request

@@ -283,7 +283,7 @@ class DirectoryHandler(BaseHandler):
     def on_directory_query(self, args):
         room_alias = RoomAlias.from_string(args["room_alias"])
         if not self.hs.is_mine(room_alias):
-            raise SynapseError(400, "Room Alias is not hosted on this Home Server")
+            raise SynapseError(400, "Room Alias is not hosted on this homeserver")
 
         result = yield self.get_association_from_room_alias(room_alias)
 

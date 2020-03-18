@@ -305,7 +305,7 @@ class EmailConfig(Config):
         #   smtp_user: "exampleusername"
         #   smtp_pass: "examplepassword"
         #   require_transport_security: false
-        #   notif_from: "Your Friendly %(app)s Home Server <noreply@example.com>"
+        #   notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
         #   app_name: Matrix
         #
         #   # Enable email notifications by default

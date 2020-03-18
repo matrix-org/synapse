@@ -144,8 +144,8 @@ def main():
     logging.captureWarnings(True)
 
     parser = argparse.ArgumentParser(
-        description="Used to register new users with a given home server when"
-        " registration has been disabled. The home server must be"
+        description="Used to register new users with a given homeserver when"
+        " registration has been disabled. The homeserver must be"
         " configured with the 'registration_shared_secret' option"
         " set."
     )
@@ -202,7 +202,7 @@ def main():
         "server_url",
         default="https://localhost:8448",
         nargs="?",
-        help="URL to use to talk to the home server. Defaults to "
+        help="URL to use to talk to the homeserver. Defaults to "
         " 'https://localhost:8448'.",
     )
 
