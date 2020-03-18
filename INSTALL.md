@@ -36,7 +36,7 @@ that your email address is probably `user@example.com` rather than
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, or 3.7
+- Python 3.5, 3.6, 3.7 or 3.8.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
