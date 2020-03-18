@@ -148,7 +148,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         #       B -´---------´
         #
         # and state sets {A} and {B} then walking the auth chains of A and B
-        # would immediatley show that C is reachable by both. However, if we
+        # would immediately show that C is reachable by both. However, if we
         # stopped at C then we'd only reach E via the auth chain of B and so E
         # would errornously get included in the returned difference.
         #
@@ -159,7 +159,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # lower depth are likely reachable by those with higher depths.
         #
         # We could use any ordering that we believe would give a rough
-        # toplogical ordfering, e.g. origin server timestamp. If the ordering
+        # topological ordering, e.g. origin server timestamp. If the ordering
         # chosen is not topological then the algorithm still produces the right
         # result, but perhaps a bit more inefficiently. This is why it is safe
         # to use "depth" here.

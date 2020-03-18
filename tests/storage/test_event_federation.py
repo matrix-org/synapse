@@ -114,7 +114,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
     def test_auth_difference(self):
         room_id = "@ROOM:local"
 
-        # The silly auth graph we use to test th eauth difference algorithm,
+        # The silly auth graph we use to test the auth difference algorithm,
         # where the top are the most recent events.
         #
         #   A   B
