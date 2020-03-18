@@ -7,7 +7,6 @@ who are present in a publicly viewable room present on the server.
 
 The directory info is stored in various tables, which can (typically after
 DB corruption) get stale or out of sync.  If this happens, for now the
-solution to fix it is to execute the SQL here
-https://github.com/matrix-org/synapse/blob/master/synapse/storage/schema/delta/53/user_dir_populate.sql
+solution to fix it is to execute the SQL [here](../synapse/storage/data_stores/main/schema/delta/53/user_dir_populate.sql)
 and then restart synapse. This should then start a background task to
 flush the current tables and regenerate the directory.
