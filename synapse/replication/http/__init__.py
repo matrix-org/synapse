@@ -14,7 +14,14 @@
 # limitations under the License.
 
 from synapse.http.server import JsonResource
-from synapse.replication.http import federation, login, membership, register, send_event
+from synapse.replication.http import (
+    devices,
+    federation,
+    login,
+    membership,
+    register,
+    send_event,
+)
 
 REPLICATION_PREFIX = "/_synapse/replication"
 
@@ -30,3 +37,4 @@ class ReplicationRestResource(JsonResource):
         federation.register_servlets(hs, self)
         login.register_servlets(hs, self)
         register.register_servlets(hs, self)
+        devices.register_servlets(hs, self)
