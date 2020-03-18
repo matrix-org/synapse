@@ -20,3 +20,23 @@ parts:
     source: .
     plugin: python
     python-version: python3
+    python-packages:
+      - '.[all]'
+    build-packages:
+      - libffi-dev
+      - libturbojpeg0-dev
+      - libssl-dev
+      - libxslt1-dev
+      - libpq-dev
+      - zlib1g-dev
+    stage-packages:
+      - libasn1-8-heimdal
+      - libgssapi3-heimdal
+      - libhcrypto4-heimdal
+      - libheimbase1-heimdal
+      - libheimntlm0-heimdal
+      - libhx509-5-heimdal
+      - libkrb5-26-heimdal
+      - libldap-2.4-2
+      - libpq5
+      - libsasl2-2
