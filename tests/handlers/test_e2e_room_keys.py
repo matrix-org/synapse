@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
+# Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,23 +95,29 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
         # check we can retrieve it as the current version
         res = yield self.handler.get_version_info(self.local_user)
+        version_etag = res["etag"]
+        del res["etag"]
         self.assertDictEqual(
             res,
             {
                 "version": "1",
                 "algorithm": "m.megolm_backup.v1",
                 "auth_data": "first_version_auth_data",
+                "count": 0,
             },
         )
 
         # check we can retrieve it as a specific version
         res = yield self.handler.get_version_info(self.local_user, "1")
+        self.assertEqual(res["etag"], version_etag)
+        del res["etag"]
         self.assertDictEqual(
             res,
             {
                 "version": "1",
                 "algorithm": "m.megolm_backup.v1",
                 "auth_data": "first_version_auth_data",
+                "count": 0,
             },
         )
 
@@ -126,12 +133,14 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
         # check we can retrieve it as the current version
         res = yield self.handler.get_version_info(self.local_user)
+        del res["etag"]
         self.assertDictEqual(
             res,
             {
                 "version": "2",
                 "algorithm": "m.megolm_backup.v1",
                 "auth_data": "second_version_auth_data",
+                "count": 0,
             },
         )
 
@@ -158,12 +167,14 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
         # check we can retrieve it as the current version
         res = yield self.handler.get_version_info(self.local_user)
+        del res["etag"]
         self.assertDictEqual(
             res,
             {
                 "algorithm": "m.megolm_backup.v1",
                 "auth_data": "revised_first_version_auth_data",
                 "version": version,
+                "count": 0,
             },
         )
 
@@ -207,12 +218,14 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
         # check we can retrieve it as the current version
         res = yield self.handler.get_version_info(self.local_user)
+        del res["etag"]  # etag is opaque, so don't test its contents
         self.assertDictEqual(
             res,
             {
                 "algorithm": "m.megolm_backup.v1",
                 "auth_data": "revised_first_version_auth_data",
                 "version": version,
+                "count": 0,
             },
         )
 
@@ -409,6 +422,11 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
 
         yield self.handler.upload_room_keys(self.local_user, version, room_keys)
 
+        # get the etag to compare to future versions
+        res = yield self.handler.get_version_info(self.local_user)
+        backup_etag = res["etag"]
+        self.assertEqual(res["count"], 1)
+
         new_room_keys = copy.deepcopy(room_keys)
         new_room_key = new_room_keys["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]
 
@@ -423,6 +441,10 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
             "SSBBTSBBIEZJU0gK",
         )
 
+        # the etag should be the same since the session did not change
+        res = yield self.handler.get_version_info(self.local_user)
+        self.assertEqual(res["etag"], backup_etag)
+
         # test that marking the session as verified however /does/ replace it
         new_room_key["is_verified"] = True
         yield self.handler.upload_room_keys(self.local_user, version, new_room_keys)
@@ -431,6 +453,11 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         self.assertEqual(
             res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
+
+        # the etag should NOT be equal now, since the key changed
+        res = yield self.handler.get_version_info(self.local_user)
+        self.assertNotEqual(res["etag"], backup_etag)
+        backup_etag = res["etag"]
 
         # test that a session with a higher forwarded_count doesn't replace one
         # with a lower forwarding count
@@ -442,6 +469,10 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         self.assertEqual(
             res["rooms"]["!abc:matrix.org"]["sessions"]["c0ff33"]["session_data"], "new"
         )
+
+        # the etag should be the same since the session did not change
+        res = yield self.handler.get_version_info(self.local_user)
+        self.assertEqual(res["etag"], backup_etag)
 
         # TODO: check edge cases as well as the common variations here
 

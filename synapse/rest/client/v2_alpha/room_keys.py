@@ -134,8 +134,8 @@ class RoomKeysServlet(RestServlet):
         if room_id:
             body = {"rooms": {room_id: body}}
 
-        yield self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
-        return 200, {}
+        ret = yield self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
+        return 200, ret
 
     @defer.inlineCallbacks
     def on_GET(self, request, room_id, session_id):
@@ -239,10 +239,10 @@ class RoomKeysServlet(RestServlet):
         user_id = requester.user.to_string()
         version = parse_string(request, "version")
 
-        yield self.e2e_room_keys_handler.delete_room_keys(
+        ret = yield self.e2e_room_keys_handler.delete_room_keys(
             user_id, version, room_id, session_id
         )
-        return 200, {}
+        return 200, ret
 
 
 class RoomKeysNewVersionServlet(RestServlet):
