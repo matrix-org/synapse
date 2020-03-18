@@ -54,7 +54,7 @@ class ConsentServerNotices(object):
                 )
             if "body" not in self._server_notice_content:
                 raise ConfigError(
-                    "user_consent server_notice_consent must contain a 'body' " "key."
+                    "user_consent server_notice_consent must contain a 'body' key."
                 )
 
             self._consent_uri_builder = ConsentURIBuilder(hs.config)
