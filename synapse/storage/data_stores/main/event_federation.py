@@ -14,7 +14,7 @@
 # limitations under the License.
 import itertools
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from six.moves.queue import Empty, PriorityQueue
 
@@ -185,7 +185,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         txn.execute(sql % (clause,), args)
 
         # The sorted list of events whose auth chains we should walk.
-        search = txn.fetchall()   # type: List[Tuple[int, str]]
+        search = txn.fetchall()  # type: List[Tuple[int, str]]
 
         # Map from event to its auth events
         event_to_auth_events = {}  # type: Dict[str, Set[str]]
@@ -222,7 +222,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
                     # Assume that this event is unreachable from any of the
                     # state sets until proven otherwise
-                    sets = event_to_missing_sets[auth_event_id] = set(range(len(state_sets)))
+                    sets = event_to_missing_sets[auth_event_id] = set(
+                        range(len(state_sets))
+                    )
                 else:
                     # We've previously seen this event, so look up its auth
                     # events and recursively mark all ancestors as reachable
