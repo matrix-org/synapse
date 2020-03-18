@@ -390,7 +390,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
         self.config = hs.config
 
         self.register_background_update_handler(
-            "insert_room_retention", self._background_insert_retention
+            "insert_room_retention", self._background_insert_retention,
         )
 
     @defer.inlineCallbacks
@@ -453,7 +453,7 @@ class RoomStore(RoomWorkerStore, SearchStore):
                 return False
 
         end = yield self.runInteraction(
-            "insert_room_retention", _background_insert_retention_txn
+            "insert_room_retention", _background_insert_retention_txn,
         )
 
         if end:

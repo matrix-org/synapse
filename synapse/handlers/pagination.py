@@ -154,12 +154,10 @@ class PaginationHandler(object):
             # Figure out what token we should start purging at.
             ts = self.clock.time_msec() - max_lifetime
 
-            stream_ordering = (yield self.store.find_first_stream_ordering_after_ts(ts))
+            stream_ordering = yield self.store.find_first_stream_ordering_after_ts(ts)
 
-            r = (
-                yield self.store.get_room_event_after_stream_ordering(
-                    room_id, stream_ordering
-                )
+            r = yield self.store.get_room_event_after_stream_ordering(
+                room_id, stream_ordering,
             )
             if not r:
                 logger.warning(
@@ -185,7 +183,7 @@ class PaginationHandler(object):
             # the background so that it's not blocking any other operation apart from
             # other purges in the same room.
             run_as_background_process(
-                "_purge_history", self._purge_history, purge_id, room_id, token, True
+                "_purge_history", self._purge_history, purge_id, room_id, token, True,
             )
 
     def start_purge_history(self, room_id, token, delete_local_events=False):

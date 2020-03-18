@@ -205,12 +205,14 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         config = self.default_config()
         config["default_room_version"] = "1"
-        config["retention"] = {"enabled": True}
+        config["retention"] = {
+            "enabled": True,
+        }
 
         mock_federation_client = Mock(spec=["backfill"])
 
         self.hs = self.setup_test_homeserver(
-            config=config, federation_client=mock_federation_client
+            config=config, federation_client=mock_federation_client,
         )
         return self.hs
 
