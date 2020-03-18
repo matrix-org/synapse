@@ -585,7 +585,7 @@ def run(hs):
     def performance_stats_init():
         _stats_process.clear()
         _stats_process.append(
-            (int(hs.get_clock().time(), resource.getrusage(resource.RUSAGE_SELF)))
+            (int(hs.get_clock().time()), resource.getrusage(resource.RUSAGE_SELF))
         )
 
     def start_phone_stats_home():
