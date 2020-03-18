@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mock import Mock
+
 from synapse.replication.tcp.commands import ReplicateCommand
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
@@ -30,7 +32,9 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         server = server_factory.buildProtocol(None)
 
         # build a replication client, with a dummy handler
+        handler_factory = Mock()
         self.test_handler = TestReplicationClientHandler()
+        self.test_handler.factory = handler_factory
         self.client = ClientReplicationStreamProtocol(
             "client", "test", clock, self.test_handler
         )
