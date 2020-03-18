@@ -1,1 +1,1 @@
-Fix LruCache callback deduplication.
+Fix LruCache callback deduplication for Python 3.8. Contributed by @V02460.
