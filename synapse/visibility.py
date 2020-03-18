@@ -118,30 +118,36 @@ def filter_events_for_client(
 
                the original event if they can see it as normal.
         """
-        if event.type == "org.matrix.dummy_event" and filter_send_to_client:
-            return None
+        # Only run some checks if these events aren't about to be sent to clients. This is
+        # because, if this is not the case, we're probably only checking if the users can
+        # see events in the room at that point in the DAG, and that shouldn't be decided
+        # on those checks.
+        if filter_send_to_client:
+            if event.type == "org.matrix.dummy_event":
+                return None
 
-        if not event.is_state() and event.sender in ignore_list and filter_send_to_client:
-            return None
+            if not event.is_state() and event.sender in ignore_list:
+                return None
 
-        # Until MSC2261 has landed we can't redact malicious alias events, so for
-        # now we temporarily filter out m.room.aliases entirely to mitigate
-        # abuse, while we spec a better solution to advertising aliases
-        # on rooms.
-        if event.type == EventTypes.Aliases:
-            return None
+            # Until MSC2261 has landed we can't redact malicious alias events, so for
+            # now we temporarily filter out m.room.aliases entirely to mitigate
+            # abuse, while we spec a better solution to advertising aliases
+            # on rooms.
+            if event.type == EventTypes.Aliases:
+                return None
 
-        # Don't try to apply the room's retention policy if the event is a state event, as
-        # MSC1763 states that retention is only considered for non-state events.
-        if filter_send_to_client and not event.is_state():
-            retention_policy = retention_policies[event.room_id]
-            max_lifetime = retention_policy.get("max_lifetime")
+            # Don't try to apply the room's retention policy if the event is a state
+            # event, as MSC1763 states that retention is only considered for non-state
+            # events.
+            if not event.is_state():
+                retention_policy = retention_policies[event.room_id]
+                max_lifetime = retention_policy.get("max_lifetime")
 
-            if max_lifetime is not None:
-                oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+                if max_lifetime is not None:
+                    oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
 
-                if event.origin_server_ts < oldest_allowed_ts:
-                    return None
+                    if event.origin_server_ts < oldest_allowed_ts:
+                        return None
 
         if event.event_id in always_include_ids:
             return event

@@ -31,7 +31,7 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.crypto.context_factory import ClientTLSOptionsFactory
+from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.http.federation.srv_resolver import Server
 from synapse.http.federation.well_known_resolver import (
@@ -79,7 +79,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self._config = config = HomeServerConfig()
         config.parse_config_dict(config_dict, "", "")
 
-        self.tls_factory = ClientTLSOptionsFactory(config)
+        self.tls_factory = FederationPolicyForHTTPS(config)
 
         self.well_known_cache = TTLCache("test_cache", timer=self.reactor.seconds)
         self.had_well_known_cache = TTLCache("test_cache", timer=self.reactor.seconds)
@@ -715,7 +715,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         config = default_config("test", parse=True)
 
         # Build a new agent and WellKnownResolver with a different tls factory
-        tls_factory = ClientTLSOptionsFactory(config)
+        tls_factory = FederationPolicyForHTTPS(config)
         agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=tls_factory,

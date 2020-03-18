@@ -7,7 +7,7 @@
 <body>
     <p>Oops! Something went wrong during authentication<span id="errormsg"></span>.</p>
     <p>
-        If you're seeing this page after clicking a link sent to you via email, make
+        If you are seeing this page after clicking a link sent to you via email, make
         sure you only click the confirmation link once, and that you open the
         validation link in the same client you're logging in from.
     </p>
@@ -24,18 +24,21 @@
         // we just don't print anything specific.
         let searchStr = "";
         if (window.location.search) {
-            // For some reason window.location.searchParams isn't always defined when
-            // window.location.search is, so we can't just use it right away.
+            // window.location.searchParams isn't always defined when
+            // window.location.search is, so it's more reliable to parse the latter.
             searchStr = window.location.search;
         } else if (window.location.hash) {
-            //
+            // Replace the # with a ? so that URLSearchParams does the right thing and
+            // doesn't parse the first parameter incorrectly.
             searchStr = window.location.hash.replace("#", "?");
         }
 
+        // We might end up with no error in the URL, so we need to check if we have one
+        // to print one.
         let errorDesc = new URLSearchParams(searchStr).get("error_description")
-
         if (errorDesc) {
-            document.getElementById("errormsg").innerHTML = ` ("${errorDesc}")`;
+
+            document.getElementById("errormsg").innerText = ` ("${errorDesc}")`;
         }
     </script>
 </body>
