@@ -1,3 +1,18 @@
+Synapse 1.6.1 (2019-11-28)
+==========================
+
+Security updates
+----------------
+
+This release includes a security fix ([\#6426](https://github.com/matrix-org/synapse/issues/6426), below). Administrators are encouraged to upgrade as soon as possible.
+
+Bugfixes
+--------
+
+- Clean up local threepids from user on account deactivation. ([\#6426](https://github.com/matrix-org/synapse/issues/6426))
+- Fix startup error when http proxy is defined. ([\#6421](https://github.com/matrix-org/synapse/issues/6421))
+
+
 Synapse 1.6.0 (2019-11-26)
 ==========================
 
