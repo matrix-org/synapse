@@ -1,1 +1,0 @@
-Refactor get_events_from_store_or_dest to return a dict.

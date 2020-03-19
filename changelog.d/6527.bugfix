@@ -1,1 +1,0 @@
-Fix a bug which could cause the federation server to incorrectly return errors when handling certain obscure event graphs.
