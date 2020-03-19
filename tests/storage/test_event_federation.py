@@ -61,7 +61,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
             )
 
         for i in range(0, 11):
-            yield self.store.runInteraction("insert", insert_event, i)
+            yield self.store.db.runInteraction("insert", insert_event, i)
 
         # this should get the last five and five others
         r = yield self.store.get_prev_events_for_room(room_id)
@@ -93,9 +93,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.TestCase):
             )
 
         for i in range(0, 20):
-            yield self.store.runInteraction("insert", insert_event, i, room1)
-            yield self.store.runInteraction("insert", insert_event, i, room2)
-            yield self.store.runInteraction("insert", insert_event, i, room3)
+            yield self.store.db.runInteraction("insert", insert_event, i, room1)
+            yield self.store.db.runInteraction("insert", insert_event, i, room2)
+            yield self.store.db.runInteraction("insert", insert_event, i, room3)
 
         # Test simple case
         r = yield self.store.get_rooms_with_many_extremities(5, 5, [])

@@ -129,7 +129,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
             )
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_recent_references_for_event", _get_recent_references_for_event_txn
         )
 
@@ -223,7 +223,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
             )
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
         )
 
@@ -268,7 +268,7 @@ class RelationsWorkerStore(SQLBaseStore):
             if row:
                 return row[0]
 
-        edit_id = yield self.runInteraction(
+        edit_id = yield self.db.runInteraction(
             "get_applicable_edit", _get_applicable_edit_txn
         )
 
@@ -318,7 +318,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             return bool(txn.fetchone())
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
         )
 
@@ -352,7 +352,7 @@ class RelationsStore(RelationsWorkerStore):
 
         aggregation_key = relation.get("key")
 
-        self.simple_insert_txn(
+        self.db.simple_insert_txn(
             txn,
             table="event_relations",
             values={
@@ -380,6 +380,6 @@ class RelationsStore(RelationsWorkerStore):
             redacted_event_id (str): The event that was redacted.
         """
 
-        self.simple_delete_txn(
+        self.db.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
         )

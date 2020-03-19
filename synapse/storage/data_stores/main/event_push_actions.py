@@ -93,7 +93,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
     def get_unread_event_push_actions_by_room_for_user(
         self, room_id, user_id, last_read_event_id
     ):
-        ret = yield self.runInteraction(
+        ret = yield self.db.runInteraction(
             "get_unread_event_push_actions_by_room",
             self._get_unread_counts_by_receipt_txn,
             room_id,
@@ -177,7 +177,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             txn.execute(sql, (min_stream_ordering, max_stream_ordering))
             return [r[0] for r in txn]
 
-        ret = yield self.runInteraction("get_push_action_users_in_range", f)
+        ret = yield self.db.runInteraction("get_push_action_users_in_range", f)
         return ret
 
     @defer.inlineCallbacks
@@ -229,7 +229,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             txn.execute(sql, args)
             return txn.fetchall()
 
-        after_read_receipt = yield self.runInteraction(
+        after_read_receipt = yield self.db.runInteraction(
             "get_unread_push_actions_for_user_in_range_http_arr", get_after_receipt
         )
 
@@ -257,7 +257,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             txn.execute(sql, args)
             return txn.fetchall()
 
-        no_read_receipt = yield self.runInteraction(
+        no_read_receipt = yield self.db.runInteraction(
             "get_unread_push_actions_for_user_in_range_http_nrr", get_no_receipt
         )
 
@@ -329,7 +329,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             txn.execute(sql, args)
             return txn.fetchall()
 
-        after_read_receipt = yield self.runInteraction(
+        after_read_receipt = yield self.db.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_arr", get_after_receipt
         )
 
@@ -357,7 +357,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             txn.execute(sql, args)
             return txn.fetchall()
 
-        no_read_receipt = yield self.runInteraction(
+        no_read_receipt = yield self.db.runInteraction(
             "get_unread_push_actions_for_user_in_range_email_nrr", get_no_receipt
         )
 
@@ -407,7 +407,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             txn.execute(sql, (user_id, min_stream_ordering))
             return bool(txn.fetchone())
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "get_if_maybe_push_in_range_for_user",
             _get_if_maybe_push_in_range_for_user_txn,
         )
@@ -458,7 +458,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 ),
             )
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "add_push_actions_to_staging", _add_push_actions_to_staging_txn
         )
 
@@ -472,7 +472,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         """
 
         try:
-            res = yield self.simple_delete(
+            res = yield self.db.simple_delete(
                 table="event_push_actions_staging",
                 keyvalues={"event_id": event_id},
                 desc="remove_push_actions_from_staging",
@@ -489,7 +489,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
     def _find_stream_orderings_for_times(self):
         return run_as_background_process(
             "event_push_action_stream_orderings",
-            self.runInteraction,
+            self.db.runInteraction,
             "_find_stream_orderings_for_times",
             self._find_stream_orderings_for_times_txn,
         )
@@ -525,7 +525,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             Deferred[int]: stream ordering of the first event received on/after
                 the timestamp
         """
-        return self.runInteraction(
+        return self.db.runInteraction(
             "_find_first_stream_ordering_after_ts_txn",
             self._find_first_stream_ordering_after_ts_txn,
             ts,
@@ -614,14 +614,14 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
     def __init__(self, db_conn, hs):
         super(EventPushActionsStore, self).__init__(db_conn, hs)
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             self.EPA_HIGHLIGHT_INDEX,
             index_name="event_push_actions_u_highlight",
             table="event_push_actions",
             columns=["user_id", "stream_ordering"],
         )
 
-        self.register_background_index_update(
+        self.db.updates.register_background_index_update(
             "event_push_actions_highlights_index",
             index_name="event_push_actions_highlights_index",
             table="event_push_actions",
@@ -677,7 +677,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             )
 
         for event, _ in events_and_contexts:
-            user_ids = self.simple_select_onecol_txn(
+            user_ids = self.db.simple_select_onecol_txn(
                 txn,
                 table="event_push_actions_staging",
                 keyvalues={"event_id": event.event_id},
@@ -727,9 +727,9 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 " LIMIT ?" % (before_clause,)
             )
             txn.execute(sql, args)
-            return self.cursor_to_dict(txn)
+            return self.db.cursor_to_dict(txn)
 
-        push_actions = yield self.runInteraction("get_push_actions_for_user", f)
+        push_actions = yield self.db.runInteraction("get_push_actions_for_user", f)
         for pa in push_actions:
             pa["actions"] = _deserialize_action(pa["actions"], pa["highlight"])
         return push_actions
@@ -748,7 +748,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             txn.execute(sql, (stream_ordering,))
             return txn.fetchone()
 
-        result = yield self.runInteraction("get_time_of_last_push_action_before", f)
+        result = yield self.db.runInteraction("get_time_of_last_push_action_before", f)
         return result[0] if result else None
 
     @defer.inlineCallbacks
@@ -757,7 +757,9 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             txn.execute("SELECT MAX(stream_ordering) FROM event_push_actions")
             return txn.fetchone()
 
-        result = yield self.runInteraction("get_latest_push_action_stream_ordering", f)
+        result = yield self.db.runInteraction(
+            "get_latest_push_action_stream_ordering", f
+        )
         return result[0] or 0
 
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
@@ -830,7 +832,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             while True:
                 logger.info("Rotating notifications")
 
-                caught_up = yield self.runInteraction(
+                caught_up = yield self.db.runInteraction(
                     "_rotate_notifs", self._rotate_notifs_txn
                 )
                 if caught_up:
@@ -844,7 +846,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         the archiving process has caught up or not.
         """
 
-        old_rotate_stream_ordering = self.simple_select_one_onecol_txn(
+        old_rotate_stream_ordering = self.db.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
             keyvalues={},
@@ -880,7 +882,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         return caught_up
 
     def _rotate_notifs_before_txn(self, txn, rotate_to_stream_ordering):
-        old_rotate_stream_ordering = self.simple_select_one_onecol_txn(
+        old_rotate_stream_ordering = self.db.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
             keyvalues={},
@@ -912,7 +914,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         # If the `old.user_id` above is NULL then we know there isn't already an
         # entry in the table, so we simply insert it. Otherwise we update the
         # existing table.
-        self.simple_insert_many_txn(
+        self.db.simple_insert_many_txn(
             txn,
             table="event_push_summary",
             values=[

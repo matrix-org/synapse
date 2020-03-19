@@ -269,7 +269,7 @@ def start(hs, listeners=None):
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
-        hs.get_datastore().start_profiling()
+        hs.get_datastore().db.start_profiling()
 
         setup_sentry(hs)
         setup_sdnotify(hs)

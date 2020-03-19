@@ -92,7 +92,7 @@ class KeyStore(SQLBaseStore):
                 _get_keys(txn, batch)
             return keys
 
-        return self.runInteraction("get_server_verify_keys", _txn)
+        return self.db.runInteraction("get_server_verify_keys", _txn)
 
     def store_server_verify_keys(self, from_server, ts_added_ms, verify_keys):
         """Stores NACL verification keys for remote servers.
@@ -127,9 +127,9 @@ class KeyStore(SQLBaseStore):
                 f((i,))
             return res
 
-        return self.runInteraction(
+        return self.db.runInteraction(
             "store_server_verify_keys",
-            self.simple_upsert_many_txn,
+            self.db.simple_upsert_many_txn,
             table="server_signature_keys",
             key_names=("server_name", "key_id"),
             key_values=key_values,
@@ -157,7 +157,7 @@ class KeyStore(SQLBaseStore):
             ts_valid_until_ms (int): The time when this json stops being valid.
             key_json (bytes): The encoded JSON.
         """
-        return self.simple_upsert(
+        return self.db.simple_upsert(
             table="server_keys_json",
             keyvalues={
                 "server_name": server_name,
@@ -196,7 +196,7 @@ class KeyStore(SQLBaseStore):
                     keyvalues["key_id"] = key_id
                 if from_server is not None:
                     keyvalues["from_server"] = from_server
-                rows = self.simple_select_list_txn(
+                rows = self.db.simple_select_list_txn(
                     txn,
                     "server_keys_json",
                     keyvalues=keyvalues,
@@ -211,4 +211,4 @@ class KeyStore(SQLBaseStore):
                 results[(server_name, key_id, from_server)] = rows
             return results
 
-        return self.runInteraction("get_server_keys_json", _get_server_keys_json_txn)
+        return self.db.runInteraction("get_server_keys_json", _get_server_keys_json_txn)

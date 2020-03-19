@@ -31,7 +31,7 @@ class UserErasureWorkerStore(SQLBaseStore):
         Returns:
             Deferred[bool]: True if the user has requested erasure
         """
-        return self.simple_select_onecol(
+        return self.db.simple_select_onecol(
             table="erased_users",
             keyvalues={"user_id": user_id},
             retcol="1",
@@ -56,7 +56,7 @@ class UserErasureWorkerStore(SQLBaseStore):
         # iterate it multiple times, and (b) avoiding duplicates.
         user_ids = tuple(set(user_ids))
 
-        rows = yield self.simple_select_many_batch(
+        rows = yield self.db.simple_select_many_batch(
             table="erased_users",
             column="user_id",
             iterable=user_ids,
@@ -88,4 +88,4 @@ class UserErasureStore(UserErasureWorkerStore):
 
             self._invalidate_cache_and_stream(txn, self.is_user_erased, (user_id,))
 
-        return self.runInteraction("mark_user_erased", f)
+        return self.db.runInteraction("mark_user_erased", f)
