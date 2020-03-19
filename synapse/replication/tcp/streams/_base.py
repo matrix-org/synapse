@@ -94,9 +94,13 @@ PublicRoomsStreamRow = namedtuple(
         "network_id",  # str, optional
     ),
 )
-DeviceListsStreamRow = namedtuple(
-    "DeviceListsStreamRow", ("user_id", "destination")  # str  # str
-)
+
+
+@attr.s
+class DeviceListsStreamRow:
+    entity = attr.ib(type=str)
+
+
 ToDeviceStreamRow = namedtuple("ToDeviceStreamRow", ("entity",))  # str
 TagAccountDataStreamRow = namedtuple(
     "TagAccountDataStreamRow", ("user_id", "room_id", "data")  # str  # str  # dict
@@ -363,7 +367,8 @@ class PublicRoomsStream(Stream):
 
 
 class DeviceListsStream(Stream):
-    """Someone added/changed/removed a device
+    """Either a user has updated their devices or a remote server needs to be
+    told about a device update.
     """
 
     NAME = "device_lists"
