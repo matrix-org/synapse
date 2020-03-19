@@ -1,1 +1,0 @@
-Document that the fallback auth endpoints must be routed to the same worker node as the register endpoints.
