@@ -383,7 +383,7 @@ Synapse can be found in the void repositories as 'synapse':
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
  - Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
- - Packages: `pkg install py27-matrix-synapse`
+ - Packages: `pkg install py37-matrix-synapse`
 
 
 ### NixOS
