@@ -39,30 +39,6 @@ class TransportLayerClient(object):
         self.client = hs.get_http_client()
 
     @log_function
-    def get_room_state(self, destination, room_id, event_id):
-        """ Requests all state for a given room from the given server at the
-        given event.
-
-        Args:
-            destination (str): The host name of the remote homeserver we want
-                to get the state from.
-            context (str): The name of the context we want the state of
-            event_id (str): The event we want the context at.
-
-        Returns:
-            Deferred: Results in a dict received from the remote homeserver.
-        """
-        logger.debug("get_room_state dest=%s, room=%s", destination, room_id)
-
-        path = _create_v1_path("/state/%s", room_id)
-        return self.client.get_json(
-            destination,
-            path=path,
-            args={"event_id": event_id},
-            try_trailing_slash_on_400=True,
-        )
-
-    @log_function
     def get_room_state_ids(self, destination, room_id, event_id):
         """ Requests all state for a given room from the given server at the
         given event. Returns the state's event_id's

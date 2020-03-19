@@ -324,87 +324,32 @@ class FederationClient(FederationBase):
                 A list of events in the state, and a list of events in the auth chain
                 for the given event.
         """
-        try:
-            # First we try and ask for just the IDs, as thats far quicker if
-            # we have most of the state and auth_chain already.
-            # However, this may 404 if the other side has an old synapse.
-            result = yield self.transport_layer.get_room_state_ids(
-                destination, room_id, event_id=event_id
-            )
-
-            state_event_ids = result["pdu_ids"]
-            auth_event_ids = result.get("auth_chain_ids", [])
-
-            fetched_events, failed_to_fetch = yield self.get_events_from_store_or_dest(
-                destination, room_id, set(state_event_ids + auth_event_ids)
-            )
-
-            if failed_to_fetch:
-                logger.warning(
-                    "Failed to fetch missing state/auth events for %s: %s",
-                    room_id,
-                    failed_to_fetch,
-                )
-
-            event_map = {ev.event_id: ev for ev in fetched_events}
-
-            pdus = [event_map[e_id] for e_id in state_event_ids if e_id in event_map]
-            auth_chain = [
-                event_map[e_id] for e_id in auth_event_ids if e_id in event_map
-            ]
-
-            auth_chain.sort(key=lambda e: e.depth)
-
-            return pdus, auth_chain
-        except HttpResponseException as e:
-            if e.code == 400 or e.code == 404:
-                logger.info("Failed to use get_room_state_ids API, falling back")
-            else:
-                raise e
-
-        result = yield self.transport_layer.get_room_state(
+        result = yield self.transport_layer.get_room_state_ids(
             destination, room_id, event_id=event_id
         )
 
-        room_version = yield self.store.get_room_version(room_id)
-        format_ver = room_version_to_event_format(room_version)
+        state_event_ids = result["pdu_ids"]
+        auth_event_ids = result.get("auth_chain_ids", [])
 
-        pdus = [
-            event_from_pdu_json(p, format_ver, outlier=True) for p in result["pdus"]
-        ]
-
-        auth_chain = [
-            event_from_pdu_json(p, format_ver, outlier=True)
-            for p in result.get("auth_chain", [])
-        ]
-
-        seen_events = yield self.store.get_events(
-            [ev.event_id for ev in itertools.chain(pdus, auth_chain)]
+        fetched_events, failed_to_fetch = yield self.get_events_from_store_or_dest(
+            destination, room_id, set(state_event_ids + auth_event_ids)
         )
 
-        signed_pdus = yield self._check_sigs_and_hash_and_fetch(
-            destination,
-            [p for p in pdus if p.event_id not in seen_events],
-            outlier=True,
-            room_version=room_version,
-        )
-        signed_pdus.extend(
-            seen_events[p.event_id] for p in pdus if p.event_id in seen_events
-        )
+        if failed_to_fetch:
+            logger.warning(
+                "Failed to fetch missing state/auth events for %s: %s",
+                room_id,
+                failed_to_fetch,
+            )
 
-        signed_auth = yield self._check_sigs_and_hash_and_fetch(
-            destination,
-            [p for p in auth_chain if p.event_id not in seen_events],
-            outlier=True,
-            room_version=room_version,
-        )
-        signed_auth.extend(
-            seen_events[p.event_id] for p in auth_chain if p.event_id in seen_events
-        )
+        event_map = {ev.event_id: ev for ev in fetched_events}
 
-        signed_auth.sort(key=lambda e: e.depth)
+        pdus = [event_map[e_id] for e_id in state_event_ids if e_id in event_map]
+        auth_chain = [event_map[e_id] for e_id in auth_event_ids if e_id in event_map]
 
-        return signed_pdus, signed_auth
+        auth_chain.sort(key=lambda e: e.depth)
+
+        return pdus, auth_chain
 
     @defer.inlineCallbacks
     def get_events_from_store_or_dest(self, destination, room_id, event_ids):
