@@ -18,6 +18,7 @@ import logging
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
+from synapse.handlers.auth import SUCCESS_TEMPLATE
 from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet, parse_string
 
@@ -85,30 +86,6 @@ TERMS_TEMPLATE = """
         <input type="submit" value="Agree" />
     </div>
 </form>
-</body>
-</html>
-"""
-
-SUCCESS_TEMPLATE = """
-<html>
-<head>
-<title>Success!</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-if (window.onAuthDone) {
-    window.onAuthDone();
-} else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
-}
-</script>
-</head>
-<body>
-    <div>
-        <p>Thank you</p>
-        <p>You may now close this window and return to the application</p>
-    </div>
 </body>
 </html>
 """
