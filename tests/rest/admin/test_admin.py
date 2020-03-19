@@ -870,6 +870,13 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Set this new alias as the canonical alias for this room
         self.helper.send_state(
             room_id,
+            "m.room.aliases",
+            {"aliases": [test_alias]},
+            tok=self.admin_user_tok,
+            state_key="test",
+        )
+        self.helper.send_state(
+            room_id,
             "m.room.canonical_alias",
             {"alias": test_alias},
             tok=self.admin_user_tok,

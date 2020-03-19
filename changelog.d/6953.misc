@@ -1,1 +1,0 @@
-Reduce time spent doing GC by freezing objects on startup.
