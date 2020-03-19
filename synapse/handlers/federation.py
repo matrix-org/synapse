@@ -605,7 +605,7 @@ class FederationHandler(BaseHandler):
             remote_event = event_map.get(event_id)
             if not remote_event:
                 raise Exception("Unable to get missing prev_event %s" % (event_id,))
-            if remote_event.is_state():
+            if remote_event.is_state() and remote_event.rejected_reason is None:
                 remote_state.append(remote_event)
 
         auth_chain = [event_map[e_id] for e_id in auth_event_ids if e_id in event_map]
