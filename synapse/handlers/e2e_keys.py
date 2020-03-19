@@ -264,7 +264,6 @@ class E2eKeysHandler(object):
 
         return ret
 
-    @defer.inlineCallbacks
     def get_cross_signing_keys_from_cache(self, query, from_user_id):
         """Get cross-signing keys for users from the database
 
@@ -284,35 +283,14 @@ class E2eKeysHandler(object):
         self_signing_keys = {}
         user_signing_keys = {}
 
-        for user_id in query:
-            # XXX: consider changing the store functions to allow querying
-            # multiple users simultaneously.
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "master", from_user_id
-            )
-            if key:
-                master_keys[user_id] = key
-
-            key = yield self.store.get_e2e_cross_signing_key(
-                user_id, "self_signing", from_user_id
-            )
-            if key:
-                self_signing_keys[user_id] = key
-
-            # users can see other users' master and self-signing keys, but can
-            # only see their own user-signing keys
-            if from_user_id == user_id:
-                key = yield self.store.get_e2e_cross_signing_key(
-                    user_id, "user_signing", from_user_id
-                )
-                if key:
-                    user_signing_keys[user_id] = key
-
-        return {
-            "master_keys": master_keys,
-            "self_signing_keys": self_signing_keys,
-            "user_signing_keys": user_signing_keys,
-        }
+        # Currently a stub, implementation coming in https://github.com/matrix-org/synapse/pull/6486
+        return defer.succeed(
+            {
+                "master_keys": master_keys,
+                "self_signing_keys": self_signing_keys,
+                "user_signing_keys": user_signing_keys,
+            }
+        )
 
     @trace
     @defer.inlineCallbacks

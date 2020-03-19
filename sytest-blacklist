@@ -34,6 +34,9 @@ New federated private chats get full presence information (SYN-115)
 # this requirement from the spec
 Inbound federation of state requires event_id as a mandatory paramater
 
+# Blacklisted until https://github.com/matrix-org/synapse/pull/6486 lands
+Can upload self-signing keys
+
 # flaky test
 If remote user leaves room we no longer receive device updates
 

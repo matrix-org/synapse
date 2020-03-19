@@ -13,6 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.database import Database
+from synapse.storage.prepare_database import prepare_database
+
 
 class DataStores(object):
     """The various data stores.
@@ -20,7 +23,14 @@ class DataStores(object):
     These are low level interfaces to physical databases.
     """
 
-    def __init__(self, main_store, db_conn, hs):
-        # Note we pass in the main store here as workers use a different main
+    def __init__(self, main_store_class, db_conn, hs):
+        # Note we pass in the main store class here as workers use a different main
         # store.
-        self.main = main_store
+        database = Database(hs)
+
+        # Check that db is correctly configured.
+        database.engine.check_database(db_conn.cursor())
+
+        prepare_database(db_conn, database.engine, config=hs.config)
+
+        self.main = main_store_class(database, db_conn, hs)

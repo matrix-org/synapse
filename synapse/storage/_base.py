@@ -37,11 +37,11 @@ class SQLBaseStore(object):
     per data store (and not one per physical database).
     """
 
-    def __init__(self, db_conn, hs):
+    def __init__(self, database: Database, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = hs.database_engine
-        self.db = Database(hs)  # In future this will be passed in
+        self.db = database
         self.rand = random.SystemRandom()
 
     def _invalidate_state_caches(self, room_id, members_changed):
