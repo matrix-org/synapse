@@ -159,9 +159,9 @@ class ProfileWorkerStore(SQLBaseStore):
 
 
 class ProfileStore(ProfileWorkerStore):
-    def __init__(self, db_conn, hs):
+    def __init__(self, database, db_conn, hs):
 
-        super(ProfileStore, self).__init__(db_conn, hs)
+        super(ProfileStore, self).__init__(database, db_conn, hs)
 
         self.db.updates.register_background_index_update(
             "profile_replication_status_host_index",
