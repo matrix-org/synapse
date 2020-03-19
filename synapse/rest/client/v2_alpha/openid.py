@@ -16,8 +16,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import AuthError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.util.stringutils import random_string
@@ -68,9 +66,8 @@ class IdTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.server_name = hs.config.server_name
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot request tokens for other users.")
 
@@ -81,7 +78,7 @@ class IdTokenServlet(RestServlet):
         token = random_string(24)
         ts_valid_until_ms = self.clock.time_msec() + self.EXPIRES_MS
 
-        yield self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
+        await self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
 
         return (
             200,

@@ -43,9 +43,8 @@ class AccountDataServlet(RestServlet):
         self.notifier = hs.get_notifier()
         self._profile_handler = hs.get_profile_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, user_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -54,9 +53,9 @@ class AccountDataServlet(RestServlet):
         if account_data_type == "im.vector.hide_profile":
             user = UserID.from_string(user_id)
             hide_profile = body.get("hide_profile")
-            yield self._profile_handler.set_active(user, not hide_profile, True)
+            await self._profile_handler.set_active(user, not hide_profile, True)
 
-        max_id = yield self.store.add_account_data_for_user(
+        max_id = await self.store.add_account_data_for_user(
             user_id, account_data_type, body
         )
 
@@ -64,13 +63,12 @@ class AccountDataServlet(RestServlet):
 
         return 200, {}
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, user_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
-        event = yield self.store.get_global_account_data_by_type_for_user(
+        event = await self.store.get_global_account_data_by_type_for_user(
             account_data_type, user_id
         )
 
@@ -98,9 +96,8 @@ class RoomAccountDataServlet(RestServlet):
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id, room_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, user_id, room_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -113,7 +110,7 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers",
             )
 
-        max_id = yield self.store.add_account_data_to_room(
+        max_id = await self.store.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )
 
@@ -121,13 +118,12 @@ class RoomAccountDataServlet(RestServlet):
 
         return 200, {}
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id, room_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, user_id, room_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
-        event = yield self.store.get_account_data_for_room_and_type(
+        event = await self.store.get_account_data_for_room_and_type(
             user_id, room_id, account_data_type
         )
 

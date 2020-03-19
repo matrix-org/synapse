@@ -42,8 +42,7 @@ class UserDirectorySearchRestServlet(RestServlet):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.http_client = hs.get_simple_http_client()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         """Searches for users in directory
 
         Returns:
@@ -60,7 +59,7 @@ class UserDirectorySearchRestServlet(RestServlet):
                     ]
                 }
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
         if not self.hs.config.user_directory_search_enabled:
@@ -75,7 +74,7 @@ class UserDirectorySearchRestServlet(RestServlet):
             url = "%s/_matrix/identity/api/v1/user_directory/search" % (
                 self.hs.config.user_directory_defer_to_id_server,
             )
-            resp = yield self.http_client.post_json_get_json(url, signed_body)
+            resp = await self.http_client.post_json_get_json(url, signed_body)
             defer.returnValue((200, resp))
 
         limit = body.get("limit", 10)
@@ -86,7 +85,7 @@ class UserDirectorySearchRestServlet(RestServlet):
         except Exception:
             raise SynapseError(400, "`search_term` is required field")
 
-        results = yield self.user_directory_handler.search_users(
+        results = await self.user_directory_handler.search_users(
             user_id, search_term, limit
         )
 

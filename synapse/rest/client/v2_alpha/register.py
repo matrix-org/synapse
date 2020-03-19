@@ -22,8 +22,6 @@ from typing import List, Union
 
 from six import string_types
 
-from twisted.internet import defer
-
 import synapse
 import synapse.types
 from synapse.api.constants import LoginType
@@ -105,8 +103,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 template_text=template_text,
             )
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
@@ -125,14 +122,14 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not (yield check_3pid_allowed(self.hs, "email", body["email"])):
+        if not (await check_3pid_allowed(self.hs, "email", body["email"])):
             raise SynapseError(
                 403,
                 "Your email is not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
 
-        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", body["email"]
         )
 
@@ -143,7 +140,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             assert self.hs.config.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
-            ret = yield self.identity_handler.requestEmailToken(
+            ret = await self.identity_handler.requestEmailToken(
                 self.hs.config.account_threepid_delegate_email,
                 email,
                 client_secret,
@@ -152,7 +149,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
         else:
             # Send registration emails from Synapse
-            sid = yield self.identity_handler.send_threepid_validation(
+            sid = await self.identity_handler.send_threepid_validation(
                 email,
                 client_secret,
                 send_attempt,
@@ -178,8 +175,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         self.hs = hs
         self.identity_handler = hs.get_handlers().identity_handler
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(
@@ -195,14 +191,14 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         assert_valid_client_secret(body["client_secret"])
 
-        if not (yield check_3pid_allowed(self.hs, "msisdn", msisdn)):
+        if not (await check_3pid_allowed(self.hs, "msisdn", msisdn)):
             raise SynapseError(
                 403,
                 "Phone numbers are not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
 
-        existing_user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+        existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
         )
 
@@ -220,7 +216,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 400, "Registration by phone number is not supported on this homeserver"
             )
 
-        ret = yield self.identity_handler.requestMsisdnToken(
+        ret = await self.identity_handler.requestMsisdnToken(
             self.hs.config.account_threepid_delegate_msisdn,
             country,
             phone_number,
@@ -263,8 +259,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
                 [self.config.email_registration_template_failure_html],
             )
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, medium):
+    async def on_GET(self, request, medium):
         if medium != "email":
             raise SynapseError(
                 400, "This medium is currently not supported for registration"
@@ -285,7 +280,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
         # Attempt to validate a 3PID session
         try:
             # Mark the session as valid
-            next_link = yield self.store.validate_threepid_session(
+            next_link = await self.store.validate_threepid_session(
                 sid, client_secret, token, self.clock.time_msec()
             )
 
@@ -343,8 +338,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
             ),
         )
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
+    async def on_GET(self, request):
         if not self.hs.config.enable_registration:
             raise SynapseError(
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
@@ -352,11 +346,11 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
         ip = self.hs.get_ip_from_request(request)
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
-            yield wait_deferred
+            await wait_deferred
 
             username = parse_string(request, "username", required=True)
 
-            yield self.registration_handler.check_username(username)
+            await self.registration_handler.check_username(username)
 
             return 200, {"available": True}
 
@@ -388,8 +382,7 @@ class RegisterRestServlet(RestServlet):
         )
 
     @interactive_auth_handler
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         body = parse_json_object_from_request(request)
 
         client_addr = request.getClientIP()
@@ -414,7 +407,7 @@ class RegisterRestServlet(RestServlet):
             kind = request.args[b"kind"][0]
 
         if kind == b"guest":
-            ret = yield self._do_guest_registration(body, address=client_addr)
+            ret = await self._do_guest_registration(body, address=client_addr)
             return ret
         elif kind != b"user":
             raise UnrecognizedRequestError(
@@ -446,7 +439,7 @@ class RegisterRestServlet(RestServlet):
 
         appservice = None
         if self.auth.has_access_token(request):
-            appservice = yield self.auth.get_appservice_by_req(request)
+            appservice = await self.auth.get_appservice_by_req(request)
 
         # fork off as soon as possible for ASes which have completely
         # different registration flows to normal users
@@ -466,7 +459,7 @@ class RegisterRestServlet(RestServlet):
             access_token = self.auth.get_access_token_from_request(request)
 
             if isinstance(desired_username, string_types):
-                result = yield self._do_appservice_registration(
+                result = await self._do_appservice_registration(
                     desired_username,
                     desired_password,
                     desired_display_name,
@@ -510,13 +503,13 @@ class RegisterRestServlet(RestServlet):
             )
 
         if desired_username is not None:
-            yield self.registration_handler.check_username(
+            await self.registration_handler.check_username(
                 desired_username,
                 guest_access_token=guest_access_token,
                 assigned_user_id=registered_user_id,
             )
 
-        auth_result, params, session_id = yield self.auth_handler.check_auth(
+        auth_result, params, session_id = await self.auth_handler.check_auth(
             self._registration_flows, body, self.hs.get_ip_from_request(request)
         )
 
@@ -532,7 +525,7 @@ class RegisterRestServlet(RestServlet):
                     medium = auth_result[login_type]["medium"]
                     address = auth_result[login_type]["address"]
 
-                    if not (yield check_3pid_allowed(self.hs, medium, address)):
+                    if not (await check_3pid_allowed(self.hs, medium, address)):
                         raise SynapseError(
                             403,
                             "Third party identifiers (email/phone numbers)"
@@ -540,7 +533,7 @@ class RegisterRestServlet(RestServlet):
                             Codes.THREEPID_DENIED,
                         )
 
-                    existingUid = yield self.store.get_user_id_by_threepid(
+                    existingUid = await self.store.get_user_id_by_threepid(
                         medium, address
                     )
 
@@ -572,7 +565,7 @@ class RegisterRestServlet(RestServlet):
                     # if needed
                     while True:
                         try:
-                            yield self.registration_handler.check_username(
+                            await self.registration_handler.check_username(
                                 desired_username,
                                 guest_access_token=guest_access_token,
                                 assigned_user_id=registered_user_id,
@@ -608,7 +601,7 @@ class RegisterRestServlet(RestServlet):
                     )
 
         if desired_username is not None:
-            yield self.registration_handler.check_username(
+            await self.registration_handler.check_username(
                 desired_username,
                 guest_access_token=guest_access_token,
                 assigned_user_id=registered_user_id,
@@ -653,7 +646,7 @@ class RegisterRestServlet(RestServlet):
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
 
-                        existing_user_id = yield self.store.get_user_id_by_threepid(
+                        existing_user_id = await self.store.get_user_id_by_threepid(
                             medium, address
                         )
 
@@ -664,7 +657,7 @@ class RegisterRestServlet(RestServlet):
                                 Codes.THREEPID_IN_USE,
                             )
 
-            registered_user_id = yield self.registration_handler.register_user(
+            registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
                 password=params.get("password", None),
                 guest_access_token=guest_access_token,
@@ -678,10 +671,10 @@ class RegisterRestServlet(RestServlet):
                 if is_threepid_reserved(
                     self.hs.config.mau_limits_reserved_threepids, threepid
                 ):
-                    yield self.store.upsert_monthly_active_user(registered_user_id)
+                    await self.store.upsert_monthly_active_user(registered_user_id)
 
             if self.hs.config.shadow_server:
-                yield self.registration_handler.shadow_register(
+                await self.registration_handler.shadow_register(
                     localpart=desired_username,
                     display_name=desired_display_name,
                     auth_result=auth_result,
@@ -696,12 +689,12 @@ class RegisterRestServlet(RestServlet):
 
             registered = True
 
-        return_dict = yield self._create_registration_details(
+        return_dict = await self._create_registration_details(
             registered_user_id, params
         )
 
         if registered:
-            yield self.registration_handler.post_registration_actions(
+            await self.registration_handler.post_registration_actions(
                 user_id=registered_user_id,
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
@@ -712,35 +705,32 @@ class RegisterRestServlet(RestServlet):
     def on_OPTIONS(self, _):
         return 200, {}
 
-    @defer.inlineCallbacks
-    def _do_appservice_registration(
+    async def _do_appservice_registration(
         self, username, password, display_name, as_token, body
     ):
-
         # FIXME: appservice_register() is horribly duplicated with register()
         # and they should probably just be combined together with a config flag.
-        user_id = yield self.registration_handler.appservice_register(
+        user_id = await self.registration_handler.appservice_register(
             username, as_token, password, display_name
         )
-        result = yield self._create_registration_details(user_id, body)
+        result = await self._create_registration_details(user_id, body)
 
         auth_result = body.get("auth_result")
         if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
             threepid = auth_result[LoginType.EMAIL_IDENTITY]
-            yield self._register_email_threepid(
+            await self._register_email_threepid(
                 user_id, threepid, result["access_token"], body.get("bind_email")
             )
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]
-            yield self._register_msisdn_threepid(
+            await self._register_msisdn_threepid(
                 user_id, threepid, result["access_token"], body.get("bind_msisdn")
             )
 
         return result
 
-    @defer.inlineCallbacks
-    def _create_registration_details(self, user_id, params):
+    async def _create_registration_details(self, user_id, params):
         """Complete registration of newly-registered user
 
         Allocates device_id if one was not given; also creates access_token.
@@ -756,18 +746,17 @@ class RegisterRestServlet(RestServlet):
         if not params.get("inhibit_login", False):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
-            device_id, access_token = yield self.registration_handler.register_device(
+            device_id, access_token = await self.registration_handler.register_device(
                 user_id, device_id, initial_display_name, is_guest=False
             )
 
             result.update({"access_token": access_token, "device_id": device_id})
         return result
 
-    @defer.inlineCallbacks
-    def _do_guest_registration(self, params, address=None):
+    async def _do_guest_registration(self, params, address=None):
         if not self.hs.config.allow_guest_access:
             raise SynapseError(403, "Guest access is disabled")
-        user_id = yield self.registration_handler.register_user(
+        user_id = await self.registration_handler.register_user(
             make_guest=True, address=address
         )
 
@@ -775,7 +764,7 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        device_id, access_token = yield self.registration_handler.register_device(
+        device_id, access_token = await self.registration_handler.register_device(
             user_id, device_id, initial_display_name, is_guest=True
         )
 
