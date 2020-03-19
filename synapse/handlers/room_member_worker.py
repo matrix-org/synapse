@@ -55,7 +55,9 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         return ret
 
-    def _remote_reject_invite(self, requester, remote_room_hosts, room_id, target):
+    def _remote_reject_invite(
+        self, requester, remote_room_hosts, room_id, target, content
+    ):
         """Implements RoomMemberHandler._remote_reject_invite
         """
         return self._remote_reject_client(
@@ -63,6 +65,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
             user_id=target.to_string(),
+            content=content,
         )
 
     def _user_joined_room(self, target, room_id):

@@ -100,9 +100,9 @@ def filter_events_for_client(
         retention_policies = {}
 
         for room_id in room_ids:
-            retention_policies[room_id] = (
-                yield storage.main.get_retention_policy_for_room(room_id)
-            )
+            retention_policies[
+                room_id
+            ] = yield storage.main.get_retention_policy_for_room(room_id)
 
     def allowed(event):
         """
