@@ -220,8 +220,7 @@ class FederationClient(FederationBase):
         # FIXME: We should handle signature failures more gracefully.
         pdus[:] = await make_deferred_yieldable(
             defer.gatherResults(
-                self._check_sigs_and_hashes(room_version.identifier, pdus),
-                consumeErrors=True,
+                self._check_sigs_and_hashes(room_version, pdus), consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )
 
@@ -291,9 +290,7 @@ class FederationClient(FederationBase):
                     pdu = pdu_list[0]
 
                     # Check signatures are correct.
-                    signed_pdu = await self._check_sigs_and_hash(
-                        room_version.identifier, pdu
-                    )
+                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
 
                     break
 
@@ -350,7 +347,7 @@ class FederationClient(FederationBase):
         self,
         origin: str,
         pdus: List[EventBase],
-        room_version: str,
+        room_version: RoomVersion,
         outlier: bool = False,
         include_none: bool = False,
     ) -> List[EventBase]:
@@ -396,7 +393,7 @@ class FederationClient(FederationBase):
                         self.get_pdu(
                             destinations=[pdu.origin],
                             event_id=pdu.event_id,
-                            room_version=room_version,  # type: ignore
+                            room_version=room_version,
                             outlier=outlier,
                             timeout=10000,
                         )
@@ -434,7 +431,7 @@ class FederationClient(FederationBase):
         ]
 
         signed_auth = await self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True, room_version=room_version.identifier
+            destination, auth_chain, outlier=True, room_version=room_version
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -661,7 +658,7 @@ class FederationClient(FederationBase):
                 destination,
                 list(pdus.values()),
                 outlier=True,
-                room_version=room_version.identifier,
+                room_version=room_version,
             )
 
             valid_pdus_map = {p.event_id: p for p in valid_pdus}
@@ -756,7 +753,7 @@ class FederationClient(FederationBase):
         pdu = event_from_pdu_json(pdu_dict, room_version)
 
         # Check signatures are correct.
-        pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
 
         # FIXME: We should handle signature failures more gracefully.
 
@@ -948,7 +945,7 @@ class FederationClient(FederationBase):
             ]
 
             signed_events = await self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False, room_version=room_version.identifier
+                destination, events, outlier=False, room_version=room_version
             )
         except HttpResponseException as e:
             if not e.code == 400:

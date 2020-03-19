@@ -25,11 +25,7 @@ from twisted.python.failure import Failure
 
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
-from synapse.api.room_versions import (
-    KNOWN_ROOM_VERSIONS,
-    EventFormatVersions,
-    RoomVersion,
-)
+from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, make_event_from_dict
@@ -55,13 +51,15 @@ class FederationBase(object):
         self.store = hs.get_datastore()
         self._clock = hs.get_clock()
 
-    def _check_sigs_and_hash(self, room_version: str, pdu: EventBase) -> Deferred:
+    def _check_sigs_and_hash(
+        self, room_version: RoomVersion, pdu: EventBase
+    ) -> Deferred:
         return make_deferred_yieldable(
             self._check_sigs_and_hashes(room_version, [pdu])[0]
         )
 
     def _check_sigs_and_hashes(
-        self, room_version: str, pdus: List[EventBase]
+        self, room_version: RoomVersion, pdus: List[EventBase]
     ) -> List[Deferred]:
         """Checks that each of the received events is correctly signed by the
         sending server.
@@ -146,7 +144,7 @@ class PduToCheckSig(
 
 
 def _check_sigs_on_pdus(
-    keyring: Keyring, room_version: str, pdus: Iterable[EventBase]
+    keyring: Keyring, room_version: RoomVersion, pdus: Iterable[EventBase]
 ) -> List[Deferred]:
     """Check that the given events are correctly signed
 
@@ -191,10 +189,6 @@ def _check_sigs_on_pdus(
         for p in pdus
     ]
 
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-    if not v:
-        raise RuntimeError("Unrecognized room version %s" % (room_version,))
-
     # First we check that the sender event is signed by the sender's domain
     # (except if its a 3pid invite, in which case it may be sent by any server)
     pdus_to_check_sender = [p for p in pdus_to_check if not _is_invite_via_3pid(p.pdu)]
@@ -204,7 +198,7 @@ def _check_sigs_on_pdus(
             (
                 p.sender_domain,
                 p.redacted_pdu_json,
-                p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
                 p.pdu.event_id,
             )
             for p in pdus_to_check_sender
@@ -227,7 +221,7 @@ def _check_sigs_on_pdus(
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
     # (ie, the room version uses old-style non-hash event IDs).
-    if v.event_format == EventFormatVersions.V1:
+    if room_version.event_format == EventFormatVersions.V1:
         pdus_to_check_event_id = [
             p
             for p in pdus_to_check
@@ -239,7 +233,7 @@ def _check_sigs_on_pdus(
                 (
                     get_domain_from_id(p.pdu.event_id),
                     p.redacted_pdu_json,
-                    p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                    p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
                     p.pdu.event_id,
                 )
                 for p in pdus_to_check_event_id
