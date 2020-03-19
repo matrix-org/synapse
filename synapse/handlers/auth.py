@@ -116,9 +116,20 @@ class AuthHandler(BaseHandler):
 
         self._clock = self.hs.get_clock()
 
-        # Load the SSO redirect confirmation page HTML template
+        # Load the SSO HTML templates.
+
+        # The following template is shown to the user before redirecting them to
+        # the SSO login page. It notifies the user they are about to be
+        # redirected and that the Synapse server will be gaining access to their
+        # SSO account.
         self._sso_redirect_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
+        )[0]
+        # The following template is shown during user interactive authentication
+        # in the fallback auth scenario. It notifies the user that they are
+        # authenticating for an operation to occur on their account.
+        self._sso_auth_confirm_template = load_jinja2_templates(
+            hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
         )[0]
 
         self._server_name = hs.config.server_name
@@ -993,6 +1004,15 @@ class AuthHandler(BaseHandler):
             return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
+
+    def start_sso_ui_auth(self, redirect_url: str) -> str:
+        """
+        Get the HTML for the SSO redirect confirmation page.
+
+        :param redirect_url: The URL to redirect to the SSO provider.
+        :return: The HTML to render.
+        """
+        return self._sso_auth_confirm_template.render(redirect_url=redirect_url,)
 
     def complete_sso_ui_auth(
         self,
