@@ -42,6 +42,8 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
     Returns:
          if the auth checks pass.
     """
+    assert isinstance(auth_events, dict)
+
     if do_size_check:
         _check_size_limits(event)
 
@@ -73,12 +75,6 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
             # Check the origin domain has signed the event
             if not event.signatures.get(event_id_domain):
                 raise AuthError(403, "Event not signed by sending server")
-
-    if auth_events is None:
-        # Oh, we don't know what the state of the room was, so we
-        # are trusting that this is allowed (at least for now)
-        logger.warning("Trusting event: %s", event.event_id)
-        return
 
     if event.type == EventTypes.Create:
         sender_domain = get_domain_from_id(event.sender)
