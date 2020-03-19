@@ -278,7 +278,7 @@ class RegistrationHandler(BaseHandler):
             }
 
             # Bind email to new account
-            yield self._register_email_threepid(user_id, threepid_dict, None, False)
+            yield self._register_email_threepid(user_id, threepid_dict, None)
 
         # Prevent the new user from showing up in the user directory if the server
         # mandates it.
