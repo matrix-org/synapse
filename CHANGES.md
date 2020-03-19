@@ -1,3 +1,14 @@
+Synapse 1.7.0rc2 (2019-12-11)
+=============================
+
+Bugfixes
+--------
+
+- Fix incorrect error message for invalid requests when setting user's avatar URL. ([\#6497](https://github.com/matrix-org/synapse/issues/6497))
+- Fix support for SQLite 3.7. ([\#6499](https://github.com/matrix-org/synapse/issues/6499))
+- Fix regression where sending email push would not work when using a pusher worker. ([\#6507](https://github.com/matrix-org/synapse/issues/6507), [\#6509](https://github.com/matrix-org/synapse/issues/6509))
+
+
 Synapse 1.7.0rc1 (2019-12-09)
 =============================
 
