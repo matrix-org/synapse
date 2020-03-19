@@ -15,11 +15,16 @@
 # limitations under the License.
 
 import logging
+from collections import defaultdict
+from typing import Dict, Tuple, Union
 
 from twisted.internet import defer
 
+from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
+from synapse.push.emailpusher import EmailPusher
+from synapse.push.httppusher import HttpPusher
 from synapse.push.pusher import PusherFactory
 from synapse.util.async_helpers import concurrently_execute
 
@@ -47,7 +52,24 @@ class PusherPool:
         self._should_start_pushers = _hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
-        self.pushers = {}
+
+        # map from user id to app_id:pushkey to pusher
+        self.pushers = {}  # type: Dict[str, Dict[str, Union[HttpPusher, EmailPusher]]]
+
+        def count_pushers():
+            results = defaultdict(int)  # type: Dict[Tuple[str, str], int]
+            for pushers in self.pushers.values():
+                for pusher in pushers.values():
+                    k = (type(pusher).__name__, pusher.app_id)
+                    results[k] += 1
+            return results
+
+        LaterGauge(
+            name="synapse_pushers",
+            desc="the number of active pushers",
+            labels=["kind", "app_id"],
+            caller=count_pushers,
+        )
 
     def start(self):
         """Starts the pushers off in a background process.
