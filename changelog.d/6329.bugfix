@@ -1,0 +1,1 @@
+Correctly apply the event filter to the `state`, `events_before` and `events_after` fields in the response to `/context` requests.
