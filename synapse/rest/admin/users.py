@@ -25,6 +25,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
@@ -59,71 +60,45 @@ class UsersRestServlet(RestServlet):
         return 200, ret
 
 
-class GetUsersPaginatedRestServlet(RestServlet):
-    """Get request to get specific number of users from Synapse.
-    This needs user to have administrator access in Synapse.
-        Example:
-            http://localhost:8008/_synapse/admin/v1/users_paginate/
-            @admin:user?access_token=admin_access_token&start=0&limit=10
-        Returns:
-            200 OK with json object {list[dict[str, Any]], count} or empty object.
-        """
+class UsersRestServletV2(RestServlet):
+    PATTERNS = (re.compile("^/_synapse/admin/v2/users$"),)
 
-    PATTERNS = historical_admin_path_patterns(
-        "/users_paginate/(?P<target_user_id>[^/]*)"
-    )
+    """Get request to list all local users.
+    This needs user to have administrator access in Synapse.
+
+    GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
+
+    returns:
+        200 OK with list of users if success otherwise an error.
+
+    The parameters `from` and `limit` are required only for pagination.
+    By default, a `limit` of 100 is used.
+    The parameter `user_id` can be used to filter by user id.
+    The parameter `guests` can be used to exclude guest users.
+    The parameter `deactivated` can be used to include deactivated users.
+    """
 
     def __init__(self, hs):
-        self.store = hs.get_datastore()
         self.hs = hs
         self.auth = hs.get_auth()
-        self.handlers = hs.get_handlers()
+        self.admin_handler = hs.get_handlers().admin_handler
 
-    async def on_GET(self, request, target_user_id):
-        """Get request to get specific number of users from Synapse.
-        This needs user to have administrator access in Synapse.
-        """
+    async def on_GET(self, request):
         await assert_requester_is_admin(self.auth, request)
 
-        target_user = UserID.from_string(target_user_id)
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+        user_id = parse_string(request, "user_id", default=None)
+        guests = parse_boolean(request, "guests", default=True)
+        deactivated = parse_boolean(request, "deactivated", default=False)
 
-        if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Can only users a local user")
+        users = await self.admin_handler.get_users_paginate(
+            start, limit, user_id, guests, deactivated
+        )
+        ret = {"users": users}
+        if len(users) >= limit:
+            ret["next_token"] = str(start + len(users))
 
-        order = "name"  # order by name in user table
-        start = parse_integer(request, "start", required=True)
-        limit = parse_integer(request, "limit", required=True)
-
-        logger.info("limit: %s, start: %s", limit, start)
-
-        ret = await self.handlers.admin_handler.get_users_paginate(order, start, limit)
-        return 200, ret
-
-    async def on_POST(self, request, target_user_id):
-        """Post request to get specific number of users from Synapse..
-        This needs user to have administrator access in Synapse.
-        Example:
-            http://localhost:8008/_synapse/admin/v1/users_paginate/
-            @admin:user?access_token=admin_access_token
-        JsonBodyToSend:
-            {
-                "start": "0",
-                "limit": "10
-            }
-        Returns:
-            200 OK with json object {list[dict[str, Any]], count} or empty object.
-        """
-        await assert_requester_is_admin(self.auth, request)
-        UserID.from_string(target_user_id)
-
-        order = "name"  # order by name in user table
-        params = parse_json_object_from_request(request)
-        assert_params_in_dict(params, ["limit", "start"])
-        limit = params["limit"]
-        start = params["start"]
-        logger.info("limit: %s, start: %s", limit, start)
-
-        ret = await self.handlers.admin_handler.get_users_paginate(order, start, limit)
         return 200, ret
 
 
