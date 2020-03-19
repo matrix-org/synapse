@@ -151,7 +151,7 @@ class SynchrotronPresence(object):
 
     def set_state(self, user, state, ignore_status_msg=False):
         # TODO Hows this supposed to work?
-        pass
+        return defer.succeed(None)
 
     get_states = __func__(PresenceHandler.get_states)
     get_state = __func__(PresenceHandler.get_state)
