@@ -1,1 +1,0 @@
-Back out cross-signing code added in Synapse 1.5.0, which caused a performance regression.

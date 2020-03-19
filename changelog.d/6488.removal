@@ -1,1 +1,0 @@
-Remove fallback for federation with old servers which lack the /federation/v1/state_ids API.

@@ -1,1 +1,0 @@
-Fix error when using synapse_port_db on a vanilla synapse db.
