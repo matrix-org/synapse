@@ -1,0 +1,1 @@
+Fix bug which lead to exceptions being thrown in a loop when a cross-signed device is deleted.
