@@ -676,8 +676,9 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
             elif stream_name == "device_lists":
                 all_room_ids = set()
                 for row in rows:
-                    room_ids = await self.store.get_rooms_for_user(row.user_id)
-                    all_room_ids.update(room_ids)
+                    if row.entity.startswith("@"):
+                        room_ids = await self.store.get_rooms_for_user(row.entity)
+                        all_room_ids.update(room_ids)
                 self.notifier.on_new_event("device_list_key", token, rooms=all_room_ids)
             elif stream_name == "presence":
                 await self.presence_handler.process_replication_rows(token, rows)
@@ -774,7 +775,10 @@ class FederationSenderHandler(object):
 
         # ... as well as device updates and messages
         elif stream_name == DeviceListsStream.NAME:
-            hosts = {row.destination for row in rows}
+            # The entities are either user IDs (starting with '@') whose devices
+            # have changed, or remote servers that we need to tell about
+            # changes.
+            hosts = {row.entity for row in rows if not row.entity.startswith("@")}
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
 

@@ -23,9 +23,9 @@ from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
+from synapse.http.server import finish_request
 from synapse.http.servlet import parse_string
 from synapse.module_api import ModuleApi
-from synapse.rest.client.v1.login import SSOAuthHandler
 from synapse.types import (
     UserID,
     map_username_to_mxid_localpart,
@@ -48,7 +48,7 @@ class Saml2SessionData:
 class SamlHandler:
     def __init__(self, hs):
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
-        self._sso_auth_handler = SSOAuthHandler(hs)
+        self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
 
         self._clock = hs.get_clock()
@@ -73,6 +73,8 @@ class SamlHandler:
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="saml_mapping", clock=self._clock)
+
+        self._error_html_content = hs.config.saml2_error_html_content
 
     def handle_redirect_request(self, client_redirect_url):
         """Handle an incoming request to /login/sso/redirect
@@ -115,8 +117,23 @@ class SamlHandler:
         # the dict.
         self.expire_sessions()
 
-        user_id = await self._map_saml_response_to_user(resp_bytes, relay_state)
-        self._sso_auth_handler.complete_sso_login(user_id, request, relay_state)
+        try:
+            user_id = await self._map_saml_response_to_user(resp_bytes, relay_state)
+        except Exception as e:
+            # If decoding the response or mapping it to a user failed, then log the
+            # error and tell the user that something went wrong.
+            logger.error(e)
+
+            request.setResponseCode(400)
+            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+            request.setHeader(
+                b"Content-Length", b"%d" % (len(self._error_html_content),)
+            )
+            request.write(self._error_html_content.encode("utf8"))
+            finish_request(request)
+            return
+
+        self._auth_handler.complete_sso_login(user_id, request, relay_state)
 
     async def _map_saml_response_to_user(self, resp_bytes, client_redirect_url):
         try:

@@ -29,7 +29,11 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
-from synapse.logging.context import LoggingContext, make_deferred_yieldable
+from synapse.logging.context import (
+    LoggingContext,
+    LoggingContextOrSentinel,
+    make_deferred_yieldable,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
@@ -543,7 +547,9 @@ class Database(object):
         Returns:
             Deferred: The result of func
         """
-        parent_context = LoggingContext.current_context()
+        parent_context = (
+            LoggingContext.current_context()
+        )  # type: Optional[LoggingContextOrSentinel]
         if parent_context == LoggingContext.sentinel:
             logger.warning(
                 "Starting db connection from sentinel context: metrics will be lost"
