@@ -29,6 +29,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client.v2_alpha import account
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -1597,3 +1598,129 @@ class LabelsTestCase(unittest.HomeserverTestCase):
         )
 
         return event_id
+
+
+class ContextTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+        account.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.user_id = self.register_user("user", "password")
+        self.tok = self.login("user", "password")
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
+        self.other_user_id = self.register_user("user2", "password")
+        self.other_tok = self.login("user2", "password")
+
+        self.helper.invite(self.room_id, self.user_id, self.other_user_id, tok=self.tok)
+        self.helper.join(self.room_id, self.other_user_id, tok=self.other_tok)
+
+    def test_erased_sender(self):
+        """Test that an erasure request results in the requester's events being hidden
+        from any new member of the room.
+        """
+
+        # Send a bunch of events in the room.
+
+        self.helper.send(self.room_id, "message 1", tok=self.tok)
+        self.helper.send(self.room_id, "message 2", tok=self.tok)
+        event_id = self.helper.send(self.room_id, "message 3", tok=self.tok)["event_id"]
+        self.helper.send(self.room_id, "message 4", tok=self.tok)
+        self.helper.send(self.room_id, "message 5", tok=self.tok)
+
+        # Check that we can still see the messages before the erasure request.
+
+        request, channel = self.make_request(
+            "GET",
+            '/rooms/%s/context/%s?filter={"types":["m.room.message"]}'
+            % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events_before = channel.json_body["events_before"]
+
+        self.assertEqual(len(events_before), 2, events_before)
+        self.assertEqual(
+            events_before[0].get("content", {}).get("body"),
+            "message 2",
+            events_before[0],
+        )
+        self.assertEqual(
+            events_before[1].get("content", {}).get("body"),
+            "message 1",
+            events_before[1],
+        )
+
+        self.assertEqual(
+            channel.json_body["event"].get("content", {}).get("body"),
+            "message 3",
+            channel.json_body["event"],
+        )
+
+        events_after = channel.json_body["events_after"]
+
+        self.assertEqual(len(events_after), 2, events_after)
+        self.assertEqual(
+            events_after[0].get("content", {}).get("body"),
+            "message 4",
+            events_after[0],
+        )
+        self.assertEqual(
+            events_after[1].get("content", {}).get("body"),
+            "message 5",
+            events_after[1],
+        )
+
+        # Deactivate the first account and erase the user's data.
+
+        deactivate_account_handler = self.hs.get_deactivate_account_handler()
+        self.get_success(
+            deactivate_account_handler.deactivate_account(self.user_id, erase_data=True)
+        )
+
+        # Invite another user in the room. This is needed because messages will be
+        # pruned only if the user wasn't a member of the room when the messages were
+        # sent.
+
+        invited_user_id = self.register_user("user3", "password")
+        invited_tok = self.login("user3", "password")
+
+        self.helper.invite(
+            self.room_id, self.other_user_id, invited_user_id, tok=self.other_tok
+        )
+        self.helper.join(self.room_id, invited_user_id, tok=invited_tok)
+
+        # Check that a user that joined the room after the erasure request can't see
+        # the messages anymore.
+
+        request, channel = self.make_request(
+            "GET",
+            '/rooms/%s/context/%s?filter={"types":["m.room.message"]}'
+            % (self.room_id, event_id),
+            access_token=invited_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events_before = channel.json_body["events_before"]
+
+        self.assertEqual(len(events_before), 2, events_before)
+        self.assertDictEqual(events_before[0].get("content"), {}, events_before[0])
+        self.assertDictEqual(events_before[1].get("content"), {}, events_before[1])
+
+        self.assertDictEqual(
+            channel.json_body["event"].get("content"), {}, channel.json_body["event"]
+        )
+
+        events_after = channel.json_body["events_after"]
+
+        self.assertEqual(len(events_after), 2, events_after)
+        self.assertDictEqual(events_after[0].get("content"), {}, events_after[0])
+        self.assertEqual(events_after[1].get("content"), {}, events_after[1])
