@@ -782,7 +782,10 @@ class Porter(object):
     def _setup_state_group_id_seq(self):
         def r(txn):
             txn.execute("SELECT MAX(id) FROM state_groups")
-            next_id = txn.fetchone()[0] + 1
+            curr_id = txn.fetchone()[0]
+            if not curr_id:
+                return
+            next_id = curr_id + 1
             txn.execute("ALTER SEQUENCE state_group_id_seq RESTART WITH %s", (next_id,))
 
         return self.postgres_store.runInteraction("setup_state_group_id_seq", r)
