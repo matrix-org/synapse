@@ -441,7 +441,7 @@ class SearchStore(SearchBackgroundUpdateStore):
         # entire table from the database.
         sql += " ORDER BY rank DESC LIMIT 500"
 
-        results = yield self._execute("search_msgs", self.cursor_to_dict, sql, *args)
+        results = yield self.execute("search_msgs", self.cursor_to_dict, sql, *args)
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
@@ -455,7 +455,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = yield self._execute(
+        count_results = yield self.execute(
             "search_rooms_count", self.cursor_to_dict, count_sql, *count_args
         )
 
@@ -586,7 +586,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         args.append(limit)
 
-        results = yield self._execute("search_rooms", self.cursor_to_dict, sql, *args)
+        results = yield self.execute("search_rooms", self.cursor_to_dict, sql, *args)
 
         results = list(filter(lambda row: row["room_id"] in room_ids, results))
 
@@ -600,7 +600,7 @@ class SearchStore(SearchBackgroundUpdateStore):
 
         count_sql += " GROUP BY room_id"
 
-        count_results = yield self._execute(
+        count_results = yield self.execute(
             "search_rooms_count", self.cursor_to_dict, count_sql, *count_args
         )
 

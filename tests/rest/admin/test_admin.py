@@ -632,7 +632,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store._simple_select_one_onecol(
+                self.store.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",

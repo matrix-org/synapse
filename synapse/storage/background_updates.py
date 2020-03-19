@@ -139,7 +139,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         # otherwise, check if there are updates to be run. This is important,
         # as we may be running on a worker which doesn't perform the bg updates
         # itself, but still wants to wait for them to happen.
-        updates = yield self._simple_select_onecol(
+        updates = yield self.simple_select_onecol(
             "background_updates",
             keyvalues=None,
             retcol="1",
@@ -161,7 +161,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         if update_name in self._background_update_queue:
             return False
 
-        update_exists = await self._simple_select_one_onecol(
+        update_exists = await self.simple_select_one_onecol(
             "background_updates",
             keyvalues={"update_name": update_name},
             retcol="1",
@@ -184,7 +184,7 @@ class BackgroundUpdateStore(SQLBaseStore):
             no more work to do.
         """
         if not self._background_update_queue:
-            updates = yield self._simple_select_list(
+            updates = yield self.simple_select_list(
                 "background_updates",
                 keyvalues=None,
                 retcols=("update_name", "depends_on"),
@@ -226,7 +226,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         else:
             batch_size = self.DEFAULT_BACKGROUND_BATCH_SIZE
 
-        progress_json = yield self._simple_select_one_onecol(
+        progress_json = yield self.simple_select_one_onecol(
             "background_updates",
             keyvalues={"update_name": update_name},
             retcol="progress_json",
@@ -413,7 +413,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_queue = []
         progress_json = json.dumps(progress)
 
-        return self._simple_insert(
+        return self.simple_insert(
             "background_updates",
             {"update_name": update_name, "progress_json": progress_json},
         )
@@ -429,7 +429,7 @@ class BackgroundUpdateStore(SQLBaseStore):
         self._background_update_queue = [
             name for name in self._background_update_queue if name != update_name
         ]
-        return self._simple_delete_one(
+        return self.simple_delete_one(
             "background_updates", keyvalues={"update_name": update_name}
         )
 
@@ -444,7 +444,7 @@ class BackgroundUpdateStore(SQLBaseStore):
 
         progress_json = json.dumps(progress)
 
-        self._simple_update_one_txn(
+        self.simple_update_one_txn(
             txn,
             "background_updates",
             keyvalues={"update_name": update_name},

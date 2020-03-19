@@ -75,7 +75,7 @@ class PushRulesWorkerStore(
     def __init__(self, db_conn, hs):
         super(PushRulesWorkerStore, self).__init__(db_conn, hs)
 
-        push_rules_prefill, push_rules_id = self._get_cache_dict(
+        push_rules_prefill, push_rules_id = self.get_cache_dict(
             db_conn,
             "push_rules_stream",
             entity_column="user_id",
@@ -100,7 +100,7 @@ class PushRulesWorkerStore(
 
     @cachedInlineCallbacks(max_entries=5000)
     def get_push_rules_for_user(self, user_id):
-        rows = yield self._simple_select_list(
+        rows = yield self.simple_select_list(
             table="push_rules",
             keyvalues={"user_name": user_id},
             retcols=(
@@ -124,7 +124,7 @@ class PushRulesWorkerStore(
 
     @cachedInlineCallbacks(max_entries=5000)
     def get_push_rules_enabled_for_user(self, user_id):
-        results = yield self._simple_select_list(
+        results = yield self.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},
             retcols=("user_name", "rule_id", "enabled"),
@@ -162,7 +162,7 @@ class PushRulesWorkerStore(
 
         results = {user_id: [] for user_id in user_ids}
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="push_rules",
             column="user_name",
             iterable=user_ids,
@@ -320,7 +320,7 @@ class PushRulesWorkerStore(
 
         results = {user_id: {} for user_id in user_ids}
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="push_rules_enable",
             column="user_name",
             iterable=user_ids,
@@ -395,7 +395,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         relative_to_rule = before or after
 
-        res = self._simple_select_one_txn(
+        res = self.simple_select_one_txn(
             txn,
             table="push_rules",
             keyvalues={"user_name": user_id, "rule_id": relative_to_rule},
@@ -499,7 +499,7 @@ class PushRuleStore(PushRulesWorkerStore):
         actions_json,
         update_stream=True,
     ):
-        """Specialised version of _simple_upsert_txn that picks a push_rule_id
+        """Specialised version of simple_upsert_txn that picks a push_rule_id
         using the _push_rule_id_gen if it needs to insert the rule. It assumes
         that the "push_rules" table is locked"""
 
@@ -518,7 +518,7 @@ class PushRuleStore(PushRulesWorkerStore):
             # We didn't update a row with the given rule_id so insert one
             push_rule_id = self._push_rule_id_gen.get_next()
 
-            self._simple_insert_txn(
+            self.simple_insert_txn(
                 txn,
                 table="push_rules",
                 values={
@@ -561,7 +561,7 @@ class PushRuleStore(PushRulesWorkerStore):
         """
 
         def delete_push_rule_txn(txn, stream_id, event_stream_ordering):
-            self._simple_delete_one_txn(
+            self.simple_delete_one_txn(
                 txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}
             )
 
@@ -596,7 +596,7 @@ class PushRuleStore(PushRulesWorkerStore):
         self, txn, stream_id, event_stream_ordering, user_id, rule_id, enabled
     ):
         new_id = self._push_rules_enable_id_gen.get_next()
-        self._simple_upsert_txn(
+        self.simple_upsert_txn(
             txn,
             "push_rules_enable",
             {"user_name": user_id, "rule_id": rule_id},
@@ -636,7 +636,7 @@ class PushRuleStore(PushRulesWorkerStore):
                     update_stream=False,
                 )
             else:
-                self._simple_update_one_txn(
+                self.simple_update_one_txn(
                     txn,
                     "push_rules",
                     {"user_name": user_id, "rule_id": rule_id},
@@ -675,7 +675,7 @@ class PushRuleStore(PushRulesWorkerStore):
         if data is not None:
             values.update(data)
 
-        self._simple_insert_txn(txn, "push_rules_stream", values=values)
+        self.simple_insert_txn(txn, "push_rules_stream", values=values)
 
         txn.call_after(self.get_push_rules_for_user.invalidate, (user_id,))
         txn.call_after(self.get_push_rules_enabled_for_user.invalidate, (user_id,))

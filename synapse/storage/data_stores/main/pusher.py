@@ -59,7 +59,7 @@ class PusherWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def user_has_pusher(self, user_id):
-        ret = yield self._simple_select_one_onecol(
+        ret = yield self.simple_select_one_onecol(
             "pushers", {"user_name": user_id}, "id", allow_none=True
         )
         return ret is not None
@@ -72,7 +72,7 @@ class PusherWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_pushers_by(self, keyvalues):
-        ret = yield self._simple_select_list(
+        ret = yield self.simple_select_list(
             "pushers",
             keyvalues,
             [
@@ -193,7 +193,7 @@ class PusherWorkerStore(SQLBaseStore):
         inlineCallbacks=True,
     )
     def get_if_users_have_pushers(self, user_ids):
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="pushers",
             column="user_name",
             iterable=user_ids,
@@ -229,8 +229,8 @@ class PusherStore(PusherWorkerStore):
     ):
         with self._pushers_id_gen.get_next() as stream_id:
             # no need to lock because `pushers` has a unique key on
-            # (app_id, pushkey, user_name) so _simple_upsert will retry
-            yield self._simple_upsert(
+            # (app_id, pushkey, user_name) so simple_upsert will retry
+            yield self.simple_upsert(
                 table="pushers",
                 keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
                 values={
@@ -269,7 +269,7 @@ class PusherStore(PusherWorkerStore):
                 txn, self.get_if_user_has_pusher, (user_id,)
             )
 
-            self._simple_delete_one_txn(
+            self.simple_delete_one_txn(
                 txn,
                 "pushers",
                 {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
@@ -278,7 +278,7 @@ class PusherStore(PusherWorkerStore):
             # it's possible for us to end up with duplicate rows for
             # (app_id, pushkey, user_id) at different stream_ids, but that
             # doesn't really matter.
-            self._simple_insert_txn(
+            self.simple_insert_txn(
                 txn,
                 table="deleted_pushers",
                 values={
@@ -296,7 +296,7 @@ class PusherStore(PusherWorkerStore):
     def update_pusher_last_stream_ordering(
         self, app_id, pushkey, user_id, last_stream_ordering
     ):
-        yield self._simple_update_one(
+        yield self.simple_update_one(
             "pushers",
             {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             {"last_stream_ordering": last_stream_ordering},
@@ -319,7 +319,7 @@ class PusherStore(PusherWorkerStore):
         Returns:
             Deferred[bool]: True if the pusher still exists; False if it has been deleted.
         """
-        updated = yield self._simple_update(
+        updated = yield self.simple_update(
             table="pushers",
             keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             updatevalues={
@@ -333,7 +333,7 @@ class PusherStore(PusherWorkerStore):
 
     @defer.inlineCallbacks
     def update_pusher_failing_since(self, app_id, pushkey, user_id, failing_since):
-        yield self._simple_update(
+        yield self.simple_update(
             table="pushers",
             keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             updatevalues={"failing_since": failing_since},
@@ -342,7 +342,7 @@ class PusherStore(PusherWorkerStore):
 
     @defer.inlineCallbacks
     def get_throttle_params_by_room(self, pusher_id):
-        res = yield self._simple_select_list(
+        res = yield self.simple_select_list(
             "pusher_throttle",
             {"pusher": pusher_id},
             ["room_id", "last_sent_ts", "throttle_ms"],
@@ -361,8 +361,8 @@ class PusherStore(PusherWorkerStore):
     @defer.inlineCallbacks
     def set_throttle_params(self, pusher_id, room_id, params):
         # no need to lock because `pusher_throttle` has a primary key on
-        # (pusher, room_id) so _simple_upsert will retry
-        yield self._simple_upsert(
+        # (pusher, room_id) so simple_upsert will retry
+        yield self.simple_upsert(
             "pusher_throttle",
             {"pusher": pusher_id, "room_id": room_id},
             params,

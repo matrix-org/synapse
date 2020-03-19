@@ -29,7 +29,7 @@ class ProfileWorkerStore(SQLBaseStore):
     @defer.inlineCallbacks
     def get_profileinfo(self, user_localpart):
         try:
-            profile = yield self._simple_select_one(
+            profile = yield self.simple_select_one(
                 table="profiles",
                 keyvalues={"user_id": user_localpart},
                 retcols=("displayname", "avatar_url"),
@@ -47,7 +47,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def get_profile_displayname(self, user_localpart):
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="displayname",
@@ -55,7 +55,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def get_profile_avatar_url(self, user_localpart):
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             retcol="avatar_url",
@@ -71,7 +71,7 @@ class ProfileWorkerStore(SQLBaseStore):
         return self.runInteraction("get_latest_profile_replication_batch_number", f)
 
     def get_profile_batch(self, batchnum):
-        return self._simple_select_list(
+        return self.simple_select_list(
             table="profiles",
             keyvalues={"batch": batchnum},
             retcols=("user_id", "displayname", "avatar_url", "active"),
@@ -103,7 +103,7 @@ class ProfileWorkerStore(SQLBaseStore):
         return self.runInteraction("get_replication_hosts", f)
 
     def update_replication_batch_for_host(self, host, last_synced_batch):
-        return self._simple_upsert(
+        return self.simple_upsert(
             table="profile_replication_status",
             keyvalues={"host": host},
             values={"last_synced_batch": last_synced_batch},
@@ -111,7 +111,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def get_from_remote_profile_cache(self, user_id):
-        return self._simple_select_one(
+        return self.simple_select_one(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             retcols=("displayname", "avatar_url"),
@@ -119,8 +119,13 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_from_remote_profile_cache",
         )
 
+    def create_profile(self, user_localpart):
+        return self.simple_insert(
+            table="profiles", values={"user_id": user_localpart}, desc="create_profile"
+        )
+
     def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
-        return self._simple_upsert(
+        return self.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             values={"displayname": new_displayname, "batch": batchnum},
@@ -129,7 +134,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
-        return self._simple_upsert(
+        return self.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             values={"avatar_url": new_avatar_url, "batch": batchnum},
@@ -144,7 +149,7 @@ class ProfileWorkerStore(SQLBaseStore):
             # so clear the profile.
             values["avatar_url"] = None
             values["displayname"] = None
-        return self._simple_upsert(
+        return self.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             values=values,
@@ -172,7 +177,7 @@ class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore)
         This should only be called when `is_subscribed_remote_profile_for_user`
         would return true for the user.
         """
-        return self._simple_upsert(
+        return self.simple_upsert(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             values={
@@ -184,7 +189,7 @@ class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore)
         )
 
     def update_remote_profile_cache(self, user_id, displayname, avatar_url):
-        return self._simple_update(
+        return self.simple_upsert(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             values={
@@ -202,7 +207,7 @@ class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore)
         """
         subscribed = yield self.is_subscribed_remote_profile_for_user(user_id)
         if not subscribed:
-            yield self._simple_delete(
+            yield self.simple_delete(
                 table="remote_profile_cache",
                 keyvalues={"user_id": user_id},
                 desc="delete_remote_profile_cache",
@@ -232,7 +237,7 @@ class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore)
     def is_subscribed_remote_profile_for_user(self, user_id):
         """Check whether we are interested in a remote user's profile.
         """
-        res = yield self._simple_select_one_onecol(
+        res = yield self.simple_select_one_onecol(
             table="group_users",
             keyvalues={"user_id": user_id},
             retcol="user_id",
@@ -243,7 +248,7 @@ class ProfileStore(ProfileWorkerStore, background_updates.BackgroundUpdateStore)
         if res:
             return True
 
-        res = yield self._simple_select_one_onecol(
+        res = yield self.simple_select_one_onecol(
             table="group_invites",
             keyvalues={"user_id": user_id},
             retcol="user_id",

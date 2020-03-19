@@ -132,7 +132,7 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
 
         # Register the background update to run again.
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 table="background_updates",
                 values={
                     "update_name": "current_state_events_membership",

@@ -173,7 +173,7 @@ class DataStore(
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 
-        presence_cache_prefill, min_presence_val = self._get_cache_dict(
+        presence_cache_prefill, min_presence_val = self.get_cache_dict(
             db_conn,
             "presence_stream",
             entity_column="user_id",
@@ -187,7 +187,7 @@ class DataStore(
         )
 
         max_device_inbox_id = self._device_inbox_id_gen.get_current_token()
-        device_inbox_prefill, min_device_inbox_id = self._get_cache_dict(
+        device_inbox_prefill, min_device_inbox_id = self.get_cache_dict(
             db_conn,
             "device_inbox",
             entity_column="user_id",
@@ -202,7 +202,7 @@ class DataStore(
         )
         # The federation outbox and the local device inbox uses the same
         # stream_id generator.
-        device_outbox_prefill, min_device_outbox_id = self._get_cache_dict(
+        device_outbox_prefill, min_device_outbox_id = self.get_cache_dict(
             db_conn,
             "device_federation_outbox",
             entity_column="destination",
@@ -228,7 +228,7 @@ class DataStore(
         )
 
         events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self._get_cache_dict(
+        curr_state_delta_prefill, min_curr_state_delta_id = self.get_cache_dict(
             db_conn,
             "current_state_delta_stream",
             entity_column="room_id",
@@ -242,7 +242,7 @@ class DataStore(
             prefilled_cache=curr_state_delta_prefill,
         )
 
-        _group_updates_prefill, min_group_updates_id = self._get_cache_dict(
+        _group_updates_prefill, min_group_updates_id = self.get_cache_dict(
             db_conn,
             "local_group_updates",
             entity_column="user_id",
@@ -482,7 +482,7 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self._simple_select_list(
+        return self.simple_select_list(
             table="users",
             keyvalues={},
             retcols=["name", "password_hash", "is_guest", "admin", "user_type"],
@@ -504,7 +504,7 @@ class DataStore(
         """
         users = yield self.runInteraction(
             "get_users_paginate",
-            self._simple_select_list_paginate_txn,
+            self.simple_select_list_paginate_txn,
             table="users",
             keyvalues={"is_guest": False},
             orderby=order,
@@ -526,7 +526,7 @@ class DataStore(
         Returns:
             defer.Deferred: resolves to list[dict[str, Any]]
         """
-        return self._simple_search_list(
+        return self.simple_search_list(
             table="users",
             term=term,
             col="name",

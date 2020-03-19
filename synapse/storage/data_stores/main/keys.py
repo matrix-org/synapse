@@ -129,7 +129,7 @@ class KeyStore(SQLBaseStore):
 
         return self.runInteraction(
             "store_server_verify_keys",
-            self._simple_upsert_many_txn,
+            self.simple_upsert_many_txn,
             table="server_signature_keys",
             key_names=("server_name", "key_id"),
             key_values=key_values,
@@ -157,7 +157,7 @@ class KeyStore(SQLBaseStore):
             ts_valid_until_ms (int): The time when this json stops being valid.
             key_json (bytes): The encoded JSON.
         """
-        return self._simple_upsert(
+        return self.simple_upsert(
             table="server_keys_json",
             keyvalues={
                 "server_name": server_name,
@@ -196,7 +196,7 @@ class KeyStore(SQLBaseStore):
                     keyvalues["key_id"] = key_id
                 if from_server is not None:
                     keyvalues["from_server"] = from_server
-                rows = self._simple_select_list_txn(
+                rows = self.simple_select_list_txn(
                     txn,
                     "server_keys_json",
                     keyvalues=keyvalues,

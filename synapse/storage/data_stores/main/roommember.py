@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from typing import Iterable, List
 
 from six import iteritems, itervalues
 
@@ -127,7 +128,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         membership column is up to date
         """
 
-        pending_update = self._simple_select_one_txn(
+        pending_update = self.simple_select_one_txn(
             txn,
             table="background_updates",
             keyvalues={"update_name": _CURRENT_STATE_MEMBERSHIP_UPDATE_NAME},
@@ -602,7 +603,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             to `user_id` and ProfileInfo (or None if not join event).
         """
 
-        rows = yield self._simple_select_many_batch(
+        rows = yield self.simple_select_many_batch(
             table="room_memberships",
             column="event_id",
             iterable=event_ids,
@@ -642,7 +643,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # the returned user actually has the correct domain.
         like_clause = "%:" + host
 
-        rows = yield self._execute("is_host_joined", None, sql, room_id, like_clause)
+        rows = yield self.execute("is_host_joined", None, sql, room_id, like_clause)
 
         if not rows:
             return False
@@ -682,7 +683,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # the returned user actually has the correct domain.
         like_clause = "%:" + host
 
-        rows = yield self._execute("was_host_joined", None, sql, room_id, like_clause)
+        rows = yield self.execute("was_host_joined", None, sql, room_id, like_clause)
 
         if not rows:
             return False
@@ -804,7 +805,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             Deferred[set[str]]: Set of room IDs.
         """
 
-        room_ids = yield self._simple_select_onecol(
+        room_ids = yield self.simple_select_onecol(
             table="room_memberships",
             keyvalues={"membership": Membership.JOIN, "user_id": user_id},
             retcol="room_id",
@@ -812,6 +813,22 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
         return set(room_ids)
+
+    def get_membership_from_event_ids(
+        self, member_event_ids: Iterable[str]
+    ) -> List[dict]:
+        """Get user_id and membership of a set of event IDs.
+        """
+
+        return self.simple_select_many_batch(
+            table="room_memberships",
+            column="event_id",
+            iterable=member_event_ids,
+            retcols=("user_id", "membership", "event_id"),
+            keyvalues={},
+            batch_size=500,
+            desc="get_membership_from_event_ids",
+        )
 
 
 class RoomMemberBackgroundUpdateStore(BackgroundUpdateStore):
@@ -973,7 +990,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
     def _store_room_members_txn(self, txn, events, backfilled):
         """Store a room member in the database.
         """
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="room_memberships",
             values=[
@@ -1011,7 +1028,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
             is_mine = self.hs.is_mine_id(event.state_key)
             if is_new_state and is_mine:
                 if event.membership == Membership.INVITE:
-                    self._simple_insert_txn(
+                    self.simple_insert_txn(
                         txn,
                         table="local_invites",
                         values={

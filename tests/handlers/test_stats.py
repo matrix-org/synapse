@@ -49,13 +49,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.store._all_done = False
 
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {"update_name": "populate_stats_prepare", "progress_json": "{}"},
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_rooms",
@@ -65,7 +65,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_users",
@@ -75,7 +75,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_cleanup",
@@ -86,7 +86,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         )
 
     def get_all_room_state(self):
-        return self.store._simple_select_list(
+        return self.store.simple_select_list(
             "room_stats_state", None, retcols=("name", "topic", "canonical_alias")
         )
 
@@ -100,7 +100,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         end_ts = self.store.quantise_stats_time(self.reactor.seconds() * 1000)
 
         return self.get_success(
-            self.store._simple_select_one(
+            self.store.simple_select_one(
                 table + "_historical",
                 {id_col: stat_id, end_ts: end_ts},
                 cols,
@@ -184,7 +184,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.handler.stats_enabled = True
         self.store._all_done = False
         self.get_success(
-            self.store._simple_update_one(
+            self.store.simple_update_one(
                 table="stats_incremental_position",
                 keyvalues={},
                 updatevalues={"stream_id": 0},
@@ -192,7 +192,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         )
 
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {"update_name": "populate_stats_prepare", "progress_json": "{}"},
             )
@@ -209,13 +209,13 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         # Now do the initial ingestion.
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {"update_name": "populate_stats_process_rooms", "progress_json": "{}"},
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_cleanup",
@@ -660,12 +660,12 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.store._all_done = False
 
         self.get_success(
-            self.store._simple_delete(
+            self.store.simple_delete(
                 "room_stats_current", {"1": 1}, "test_delete_stats"
             )
         )
         self.get_success(
-            self.store._simple_delete(
+            self.store.simple_delete(
                 "user_stats_current", {"1": 1}, "test_delete_stats"
             )
         )
@@ -679,7 +679,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.store._all_done = False
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_rooms",
@@ -689,7 +689,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_process_users",
@@ -699,7 +699,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_stats_cleanup",

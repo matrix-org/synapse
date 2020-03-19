@@ -352,7 +352,7 @@ class RelationsStore(RelationsWorkerStore):
 
         aggregation_key = relation.get("key")
 
-        self._simple_insert_txn(
+        self.simple_insert_txn(
             txn,
             table="event_relations",
             values={
@@ -380,6 +380,6 @@ class RelationsStore(RelationsWorkerStore):
             redacted_event_id (str): The event that was redacted.
         """
 
-        self._simple_delete_txn(
+        self.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
         )

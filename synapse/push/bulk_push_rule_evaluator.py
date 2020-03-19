@@ -386,15 +386,7 @@ class RulesForRoom(object):
         """
         sequence = self.sequence
 
-        rows = yield self.store._simple_select_many_batch(
-            table="room_memberships",
-            column="event_id",
-            iterable=member_event_ids.values(),
-            retcols=("user_id", "membership", "event_id"),
-            keyvalues={},
-            batch_size=500,
-            desc="_get_rules_for_member_event_ids",
-        )
+        rows = yield self.store.get_membership_from_event_ids(member_event_ids.values())
 
         members = {row["event_id"]: (row["user_id"], row["membership"]) for row in rows}
 

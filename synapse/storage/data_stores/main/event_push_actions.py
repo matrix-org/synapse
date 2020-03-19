@@ -441,7 +441,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             )
 
         def _add_push_actions_to_staging_txn(txn):
-            # We don't use _simple_insert_many here to avoid the overhead
+            # We don't use simple_insert_many here to avoid the overhead
             # of generating lists of dicts.
 
             sql = """
@@ -472,7 +472,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         """
 
         try:
-            res = yield self._simple_delete(
+            res = yield self.simple_delete(
                 table="event_push_actions_staging",
                 keyvalues={"event_id": event_id},
                 desc="remove_push_actions_from_staging",
@@ -677,7 +677,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             )
 
         for event, _ in events_and_contexts:
-            user_ids = self._simple_select_onecol_txn(
+            user_ids = self.simple_select_onecol_txn(
                 txn,
                 table="event_push_actions_staging",
                 keyvalues={"event_id": event.event_id},
@@ -844,7 +844,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         the archiving process has caught up or not.
         """
 
-        old_rotate_stream_ordering = self._simple_select_one_onecol_txn(
+        old_rotate_stream_ordering = self.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
             keyvalues={},
@@ -880,7 +880,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         return caught_up
 
     def _rotate_notifs_before_txn(self, txn, rotate_to_stream_ordering):
-        old_rotate_stream_ordering = self._simple_select_one_onecol_txn(
+        old_rotate_stream_ordering = self.simple_select_one_onecol_txn(
             txn,
             table="event_push_summary_stream_ordering",
             keyvalues={},
@@ -912,7 +912,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         # If the `old.user_id` above is NULL then we know there isn't already an
         # entry in the table, so we simply insert it. Otherwise we update the
         # existing table.
-        self._simple_insert_many_txn(
+        self.simple_insert_many_txn(
             txn,
             table="event_push_summary",
             values=[

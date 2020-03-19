@@ -262,7 +262,7 @@ class SQLBaseStore(object):
 
         If the background updates have not completed, wait 15 sec and check again.
         """
-        updates = yield self._simple_select_list(
+        updates = yield self.simple_select_list(
             "background_updates",
             keyvalues=None,
             retcols=["update_name"],
@@ -307,7 +307,7 @@ class SQLBaseStore(object):
 
         self._clock.looping_call(loop, 10000)
 
-    def _new_transaction(
+    def new_transaction(
         self, conn, desc, after_callbacks, exception_callbacks, func, *args, **kwargs
     ):
         start = monotonic_time()
@@ -444,7 +444,7 @@ class SQLBaseStore(object):
 
         try:
             result = yield self.runWithConnection(
-                self._new_transaction,
+                self.new_transaction,
                 desc,
                 after_callbacks,
                 exception_callbacks,
@@ -516,7 +516,7 @@ class SQLBaseStore(object):
         results = list(dict(zip(col_headers, row)) for row in cursor)
         return results
 
-    def _execute(self, desc, decoder, query, *args):
+    def execute(self, desc, decoder, query, *args):
         """Runs a single query for a result set.
 
         Args:
@@ -541,7 +541,7 @@ class SQLBaseStore(object):
     # no complex WHERE clauses, just a dict of values for columns.
 
     @defer.inlineCallbacks
-    def _simple_insert(self, table, values, or_ignore=False, desc="_simple_insert"):
+    def simple_insert(self, table, values, or_ignore=False, desc="simple_insert"):
         """Executes an INSERT query on the named table.
 
         Args:
@@ -557,7 +557,7 @@ class SQLBaseStore(object):
             `or_ignore` is True
         """
         try:
-            yield self.runInteraction(desc, self._simple_insert_txn, table, values)
+            yield self.runInteraction(desc, self.simple_insert_txn, table, values)
         except self.database_engine.module.IntegrityError:
             # We have to do or_ignore flag at this layer, since we can't reuse
             # a cursor after we receive an error from the db.
@@ -567,7 +567,7 @@ class SQLBaseStore(object):
         return True
 
     @staticmethod
-    def _simple_insert_txn(txn, table, values):
+    def simple_insert_txn(txn, table, values):
         keys, vals = zip(*values.items())
 
         sql = "INSERT INTO %s (%s) VALUES(%s)" % (
@@ -578,11 +578,11 @@ class SQLBaseStore(object):
 
         txn.execute(sql, vals)
 
-    def _simple_insert_many(self, table, values, desc):
-        return self.runInteraction(desc, self._simple_insert_many_txn, table, values)
+    def simple_insert_many(self, table, values, desc):
+        return self.runInteraction(desc, self.simple_insert_many_txn, table, values)
 
     @staticmethod
-    def _simple_insert_many_txn(txn, table, values):
+    def simple_insert_many_txn(txn, table, values):
         if not values:
             return
 
@@ -611,13 +611,13 @@ class SQLBaseStore(object):
         txn.executemany(sql, vals)
 
     @defer.inlineCallbacks
-    def _simple_upsert(
+    def simple_upsert(
         self,
         table,
         keyvalues,
         values,
         insertion_values={},
-        desc="_simple_upsert",
+        desc="simple_upsert",
         lock=True,
     ):
         """
@@ -649,7 +649,7 @@ class SQLBaseStore(object):
             try:
                 result = yield self.runInteraction(
                     desc,
-                    self._simple_upsert_txn,
+                    self.simple_upsert_txn,
                     table,
                     keyvalues,
                     values,
@@ -669,7 +669,7 @@ class SQLBaseStore(object):
                     "IntegrityError when upserting into %s; retrying: %s", table, e
                 )
 
-    def _simple_upsert_txn(
+    def simple_upsert_txn(
         self, txn, table, keyvalues, values, insertion_values={}, lock=True
     ):
         """
@@ -693,11 +693,11 @@ class SQLBaseStore(object):
             self.database_engine.can_native_upsert
             and table not in self._unsafe_to_upsert_tables
         ):
-            return self._simple_upsert_txn_native_upsert(
+            return self.simple_upsert_txn_native_upsert(
                 txn, table, keyvalues, values, insertion_values=insertion_values
             )
         else:
-            return self._simple_upsert_txn_emulated(
+            return self.simple_upsert_txn_emulated(
                 txn,
                 table,
                 keyvalues,
@@ -706,7 +706,7 @@ class SQLBaseStore(object):
                 lock=lock,
             )
 
-    def _simple_upsert_txn_emulated(
+    def simple_upsert_txn_emulated(
         self, txn, table, keyvalues, values, insertion_values={}, lock=True
     ):
         """
@@ -775,7 +775,7 @@ class SQLBaseStore(object):
         # successfully inserted
         return True
 
-    def _simple_upsert_txn_native_upsert(
+    def simple_upsert_txn_native_upsert(
         self, txn, table, keyvalues, values, insertion_values={}
     ):
         """
@@ -809,7 +809,7 @@ class SQLBaseStore(object):
         )
         txn.execute(sql, list(allvalues.values()))
 
-    def _simple_upsert_many_txn(
+    def simple_upsert_many_txn(
         self, txn, table, key_names, key_values, value_names, value_values
     ):
         """
@@ -829,15 +829,15 @@ class SQLBaseStore(object):
             self.database_engine.can_native_upsert
             and table not in self._unsafe_to_upsert_tables
         ):
-            return self._simple_upsert_many_txn_native_upsert(
+            return self.simple_upsert_many_txn_native_upsert(
                 txn, table, key_names, key_values, value_names, value_values
             )
         else:
-            return self._simple_upsert_many_txn_emulated(
+            return self.simple_upsert_many_txn_emulated(
                 txn, table, key_names, key_values, value_names, value_values
             )
 
-    def _simple_upsert_many_txn_emulated(
+    def simple_upsert_many_txn_emulated(
         self, txn, table, key_names, key_values, value_names, value_values
     ):
         """
@@ -862,9 +862,9 @@ class SQLBaseStore(object):
             _keys = {x: y for x, y in zip(key_names, keyv)}
             _vals = {x: y for x, y in zip(value_names, valv)}
 
-            self._simple_upsert_txn_emulated(txn, table, _keys, _vals)
+            self.simple_upsert_txn_emulated(txn, table, _keys, _vals)
 
-    def _simple_upsert_many_txn_native_upsert(
+    def simple_upsert_many_txn_native_upsert(
         self, txn, table, key_names, key_values, value_names, value_values
     ):
         """
@@ -909,8 +909,8 @@ class SQLBaseStore(object):
 
         return txn.execute_batch(sql, args)
 
-    def _simple_select_one(
-        self, table, keyvalues, retcols, allow_none=False, desc="_simple_select_one"
+    def simple_select_one(
+        self, table, keyvalues, retcols, allow_none=False, desc="simple_select_one"
     ):
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning multiple columns from it.
@@ -924,16 +924,16 @@ class SQLBaseStore(object):
               statement returns no rows
         """
         return self.runInteraction(
-            desc, self._simple_select_one_txn, table, keyvalues, retcols, allow_none
+            desc, self.simple_select_one_txn, table, keyvalues, retcols, allow_none
         )
 
-    def _simple_select_one_onecol(
+    def simple_select_one_onecol(
         self,
         table,
         keyvalues,
         retcol,
         allow_none=False,
-        desc="_simple_select_one_onecol",
+        desc="simple_select_one_onecol",
     ):
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning a single column from it.
@@ -945,7 +945,7 @@ class SQLBaseStore(object):
         """
         return self.runInteraction(
             desc,
-            self._simple_select_one_onecol_txn,
+            self.simple_select_one_onecol_txn,
             table,
             keyvalues,
             retcol,
@@ -953,10 +953,10 @@ class SQLBaseStore(object):
         )
 
     @classmethod
-    def _simple_select_one_onecol_txn(
+    def simple_select_one_onecol_txn(
         cls, txn, table, keyvalues, retcol, allow_none=False
     ):
-        ret = cls._simple_select_onecol_txn(
+        ret = cls.simple_select_onecol_txn(
             txn, table=table, keyvalues=keyvalues, retcol=retcol
         )
 
@@ -969,7 +969,7 @@ class SQLBaseStore(object):
                 raise StoreError(404, "No row found")
 
     @staticmethod
-    def _simple_select_onecol_txn(txn, table, keyvalues, retcol):
+    def simple_select_onecol_txn(txn, table, keyvalues, retcol):
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
         if keyvalues:
@@ -980,8 +980,8 @@ class SQLBaseStore(object):
 
         return [r[0] for r in txn]
 
-    def _simple_select_onecol(
-        self, table, keyvalues, retcol, desc="_simple_select_onecol"
+    def simple_select_onecol(
+        self, table, keyvalues, retcol, desc="simple_select_onecol"
     ):
         """Executes a SELECT query on the named table, which returns a list
         comprising of the values of the named column from the selected rows.
@@ -995,12 +995,10 @@ class SQLBaseStore(object):
             Deferred: Results in a list
         """
         return self.runInteraction(
-            desc, self._simple_select_onecol_txn, table, keyvalues, retcol
+            desc, self.simple_select_onecol_txn, table, keyvalues, retcol
         )
 
-    def _simple_select_list(
-        self, table, keyvalues, retcols, desc="_simple_select_list"
-    ):
+    def simple_select_list(self, table, keyvalues, retcols, desc="simple_select_list"):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1014,11 +1012,11 @@ class SQLBaseStore(object):
             defer.Deferred: resolves to list[dict[str, Any]]
         """
         return self.runInteraction(
-            desc, self._simple_select_list_txn, table, keyvalues, retcols
+            desc, self.simple_select_list_txn, table, keyvalues, retcols
         )
 
     @classmethod
-    def _simple_select_list_txn(cls, txn, table, keyvalues, retcols):
+    def simple_select_list_txn(cls, txn, table, keyvalues, retcols):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1044,14 +1042,14 @@ class SQLBaseStore(object):
         return cls.cursor_to_dict(txn)
 
     @defer.inlineCallbacks
-    def _simple_select_many_batch(
+    def simple_select_many_batch(
         self,
         table,
         column,
         iterable,
         retcols,
         keyvalues={},
-        desc="_simple_select_many_batch",
+        desc="simple_select_many_batch",
         batch_size=100,
     ):
         """Executes a SELECT query on the named table, which may return zero or
@@ -1080,7 +1078,7 @@ class SQLBaseStore(object):
         for chunk in chunks:
             rows = yield self.runInteraction(
                 desc,
-                self._simple_select_many_txn,
+                self.simple_select_many_txn,
                 table,
                 column,
                 chunk,
@@ -1093,7 +1091,7 @@ class SQLBaseStore(object):
         return results
 
     @classmethod
-    def _simple_select_many_txn(cls, txn, table, column, iterable, keyvalues, retcols):
+    def simple_select_many_txn(cls, txn, table, column, iterable, keyvalues, retcols):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1126,13 +1124,13 @@ class SQLBaseStore(object):
         txn.execute(sql, values)
         return cls.cursor_to_dict(txn)
 
-    def _simple_update(self, table, keyvalues, updatevalues, desc):
+    def simple_update(self, table, keyvalues, updatevalues, desc):
         return self.runInteraction(
-            desc, self._simple_update_txn, table, keyvalues, updatevalues
+            desc, self.simple_update_txn, table, keyvalues, updatevalues
         )
 
     @staticmethod
-    def _simple_update_txn(txn, table, keyvalues, updatevalues):
+    def simple_update_txn(txn, table, keyvalues, updatevalues):
         if keyvalues:
             where = "WHERE %s" % " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
         else:
@@ -1148,8 +1146,8 @@ class SQLBaseStore(object):
 
         return txn.rowcount
 
-    def _simple_update_one(
-        self, table, keyvalues, updatevalues, desc="_simple_update_one"
+    def simple_update_one(
+        self, table, keyvalues, updatevalues, desc="simple_update_one"
     ):
         """Executes an UPDATE query on the named table, setting new values for
         columns in a row matching the key values.
@@ -1169,12 +1167,12 @@ class SQLBaseStore(object):
         the update column in the 'keyvalues' dict as well.
         """
         return self.runInteraction(
-            desc, self._simple_update_one_txn, table, keyvalues, updatevalues
+            desc, self.simple_update_one_txn, table, keyvalues, updatevalues
         )
 
     @classmethod
-    def _simple_update_one_txn(cls, txn, table, keyvalues, updatevalues):
-        rowcount = cls._simple_update_txn(txn, table, keyvalues, updatevalues)
+    def simple_update_one_txn(cls, txn, table, keyvalues, updatevalues):
+        rowcount = cls.simple_update_txn(txn, table, keyvalues, updatevalues)
 
         if rowcount == 0:
             raise StoreError(404, "No row found (%s)" % (table,))
@@ -1182,7 +1180,7 @@ class SQLBaseStore(object):
             raise StoreError(500, "More than one row matched (%s)" % (table,))
 
     @staticmethod
-    def _simple_select_one_txn(txn, table, keyvalues, retcols, allow_none=False):
+    def simple_select_one_txn(txn, table, keyvalues, retcols, allow_none=False):
         select_sql = "SELECT %s FROM %s WHERE %s" % (
             ", ".join(retcols),
             table,
@@ -1201,7 +1199,7 @@ class SQLBaseStore(object):
 
         return dict(zip(retcols, row))
 
-    def _simple_delete_one(self, table, keyvalues, desc="_simple_delete_one"):
+    def simple_delete_one(self, table, keyvalues, desc="simple_delete_one"):
         """Executes a DELETE query on the named table, expecting to delete a
         single row.
 
@@ -1209,10 +1207,10 @@ class SQLBaseStore(object):
             table : string giving the table name
             keyvalues : dict of column names and values to select the row with
         """
-        return self.runInteraction(desc, self._simple_delete_one_txn, table, keyvalues)
+        return self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
 
     @staticmethod
-    def _simple_delete_one_txn(txn, table, keyvalues):
+    def simple_delete_one_txn(txn, table, keyvalues):
         """Executes a DELETE query on the named table, expecting to delete a
         single row.
 
@@ -1231,11 +1229,11 @@ class SQLBaseStore(object):
         if txn.rowcount > 1:
             raise StoreError(500, "More than one row matched (%s)" % (table,))
 
-    def _simple_delete(self, table, keyvalues, desc):
-        return self.runInteraction(desc, self._simple_delete_txn, table, keyvalues)
+    def simple_delete(self, table, keyvalues, desc):
+        return self.runInteraction(desc, self.simple_delete_txn, table, keyvalues)
 
     @staticmethod
-    def _simple_delete_txn(txn, table, keyvalues):
+    def simple_delete_txn(txn, table, keyvalues):
         sql = "DELETE FROM %s WHERE %s" % (
             table,
             " AND ".join("%s = ?" % (k,) for k in keyvalues),
@@ -1244,13 +1242,13 @@ class SQLBaseStore(object):
         txn.execute(sql, list(keyvalues.values()))
         return txn.rowcount
 
-    def _simple_delete_many(self, table, column, iterable, keyvalues, desc):
+    def simple_delete_many(self, table, column, iterable, keyvalues, desc):
         return self.runInteraction(
-            desc, self._simple_delete_many_txn, table, column, iterable, keyvalues
+            desc, self.simple_delete_many_txn, table, column, iterable, keyvalues
         )
 
     @staticmethod
-    def _simple_delete_many_txn(txn, table, column, iterable, keyvalues):
+    def simple_delete_many_txn(txn, table, column, iterable, keyvalues):
         """Executes a DELETE query on the named table.
 
         Filters rows by if value of `column` is in `iterable`.
@@ -1283,7 +1281,7 @@ class SQLBaseStore(object):
 
         return txn.rowcount
 
-    def _get_cache_dict(
+    def get_cache_dict(
         self, db_conn, table, entity_column, stream_column, max_value, limit=100000
     ):
         # Fetch a mapping of room_id -> max stream position for "recent" rooms.
@@ -1349,7 +1347,7 @@ class SQLBaseStore(object):
             # which is fine.
             pass
 
-    def _simple_select_list_paginate(
+    def simple_select_list_paginate(
         self,
         table,
         keyvalues,
@@ -1358,7 +1356,7 @@ class SQLBaseStore(object):
         limit,
         retcols,
         order_direction="ASC",
-        desc="_simple_select_list_paginate",
+        desc="simple_select_list_paginate",
     ):
         """
         Executes a SELECT query on the named table with start and limit,
@@ -1380,7 +1378,7 @@ class SQLBaseStore(object):
         """
         return self.runInteraction(
             desc,
-            self._simple_select_list_paginate_txn,
+            self.simple_select_list_paginate_txn,
             table,
             keyvalues,
             orderby,
@@ -1391,7 +1389,7 @@ class SQLBaseStore(object):
         )
 
     @classmethod
-    def _simple_select_list_paginate_txn(
+    def simple_select_list_paginate_txn(
         cls,
         txn,
         table,
@@ -1452,9 +1450,7 @@ class SQLBaseStore(object):
         txn.execute(sql_count)
         return txn.fetchone()[0]
 
-    def _simple_search_list(
-        self, table, term, col, retcols, desc="_simple_search_list"
-    ):
+    def simple_search_list(self, table, term, col, retcols, desc="simple_search_list"):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1469,11 +1465,11 @@ class SQLBaseStore(object):
         """
 
         return self.runInteraction(
-            desc, self._simple_search_list_txn, table, term, col, retcols
+            desc, self.simple_search_list_txn, table, term, col, retcols
         )
 
     @classmethod
-    def _simple_search_list_txn(cls, txn, table, term, col, retcols):
+    def simple_search_list_txn(cls, txn, table, term, col, retcols):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1495,14 +1491,6 @@ class SQLBaseStore(object):
             return 0
 
         return cls.cursor_to_dict(txn)
-
-    @property
-    def database_engine_name(self):
-        return self.database_engine.module.__name__
-
-    def get_server_version(self):
-        """Returns a string describing the server version number"""
-        return self.database_engine.server_version
 
 
 class _RollbackButIsFineException(Exception):

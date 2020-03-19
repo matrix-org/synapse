@@ -85,7 +85,7 @@ class TransactionStore(SQLBaseStore):
         )
 
     def _get_received_txn_response(self, txn, transaction_id, origin):
-        result = self._simple_select_one_txn(
+        result = self.simple_select_one_txn(
             txn,
             table="received_transactions",
             keyvalues={"transaction_id": transaction_id, "origin": origin},
@@ -119,7 +119,7 @@ class TransactionStore(SQLBaseStore):
             response_json (str)
         """
 
-        return self._simple_insert(
+        return self.simple_insert(
             table="received_transactions",
             values={
                 "transaction_id": transaction_id,
@@ -160,7 +160,7 @@ class TransactionStore(SQLBaseStore):
         return result
 
     def _get_destination_retry_timings(self, txn, destination):
-        result = self._simple_select_one_txn(
+        result = self.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
@@ -227,7 +227,7 @@ class TransactionStore(SQLBaseStore):
         # We need to be careful here as the data may have changed from under us
         # due to a worker setting the timings.
 
-        prev_row = self._simple_select_one_txn(
+        prev_row = self.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
@@ -236,7 +236,7 @@ class TransactionStore(SQLBaseStore):
         )
 
         if not prev_row:
-            self._simple_insert_txn(
+            self.simple_insert_txn(
                 txn,
                 table="destinations",
                 values={
@@ -247,7 +247,7 @@ class TransactionStore(SQLBaseStore):
                 },
             )
         elif retry_interval == 0 or prev_row["retry_interval"] < retry_interval:
-            self._simple_update_one_txn(
+            self.simple_update_one_txn(
                 txn,
                 "destinations",
                 keyvalues={"destination": destination},

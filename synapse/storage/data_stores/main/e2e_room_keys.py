@@ -38,7 +38,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             StoreError
         """
 
-        yield self._simple_update_one(
+        yield self.simple_update_one(
             table="e2e_room_keys",
             keyvalues={
                 "user_id": user_id,
@@ -89,7 +89,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 }
             )
 
-        yield self._simple_insert_many(
+        yield self.simple_insert_many(
             table="e2e_room_keys", values=values, desc="add_e2e_room_keys"
         )
 
@@ -125,7 +125,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        rows = yield self._simple_select_list(
+        rows = yield self.simple_select_list(
             table="e2e_room_keys",
             keyvalues=keyvalues,
             retcols=(
@@ -234,7 +234,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             version (str): the version ID of the backup we're querying about
         """
 
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="e2e_room_keys",
             keyvalues={"user_id": user_id, "version": version},
             retcol="COUNT(*)",
@@ -267,7 +267,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        yield self._simple_delete(
+        yield self.simple_delete(
             table="e2e_room_keys", keyvalues=keyvalues, desc="delete_e2e_room_keys"
         )
 
@@ -312,7 +312,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                     # it isn't there.
                     raise StoreError(404, "No row found")
 
-            result = self._simple_select_one_txn(
+            result = self.simple_select_one_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": this_version, "deleted": 0},
@@ -352,7 +352,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
 
             new_version = str(int(current_version) + 1)
 
-            self._simple_insert_txn(
+            self.simple_insert_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 values={
@@ -391,7 +391,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             updatevalues["etag"] = version_etag
 
         if updatevalues:
-            return self._simple_update(
+            return self.simple_update(
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": version},
                 updatevalues=updatevalues,
@@ -420,13 +420,13 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             else:
                 this_version = version
 
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn,
                 table="e2e_room_keys",
                 keyvalues={"user_id": user_id, "version": this_version},
             )
 
-            return self._simple_update_one_txn(
+            return self.simple_update_one_txn(
                 txn,
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": this_version},

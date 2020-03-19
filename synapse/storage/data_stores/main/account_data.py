@@ -67,7 +67,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         """
 
         def get_account_data_for_user_txn(txn):
-            rows = self._simple_select_list_txn(
+            rows = self.simple_select_list_txn(
                 txn,
                 "account_data",
                 {"user_id": user_id},
@@ -78,7 +78,7 @@ class AccountDataWorkerStore(SQLBaseStore):
                 row["account_data_type"]: json.loads(row["content"]) for row in rows
             }
 
-            rows = self._simple_select_list_txn(
+            rows = self.simple_select_list_txn(
                 txn,
                 "room_account_data",
                 {"user_id": user_id},
@@ -102,7 +102,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         Returns:
             Deferred: A dict
         """
-        result = yield self._simple_select_one_onecol(
+        result = yield self.simple_select_one_onecol(
             table="account_data",
             keyvalues={"user_id": user_id, "account_data_type": data_type},
             retcol="content",
@@ -127,7 +127,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         """
 
         def get_account_data_for_room_txn(txn):
-            rows = self._simple_select_list_txn(
+            rows = self.simple_select_list_txn(
                 txn,
                 "room_account_data",
                 {"user_id": user_id, "room_id": room_id},
@@ -156,7 +156,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         """
 
         def get_account_data_for_room_and_type_txn(txn):
-            content_json = self._simple_select_one_onecol_txn(
+            content_json = self.simple_select_one_onecol_txn(
                 txn,
                 table="room_account_data",
                 keyvalues={
@@ -300,9 +300,9 @@ class AccountDataStore(AccountDataWorkerStore):
 
         with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as room_account_data has a unique constraint
-            # on (user_id, room_id, account_data_type) so _simple_upsert will
+            # on (user_id, room_id, account_data_type) so simple_upsert will
             # retry if there is a conflict.
-            yield self._simple_upsert(
+            yield self.simple_upsert(
                 desc="add_room_account_data",
                 table="room_account_data",
                 keyvalues={
@@ -346,9 +346,9 @@ class AccountDataStore(AccountDataWorkerStore):
 
         with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as account_data has a unique constraint on
-            # (user_id, account_data_type) so _simple_upsert will retry if
+            # (user_id, account_data_type) so simple_upsert will retry if
             # there is a conflict.
-            yield self._simple_upsert(
+            yield self.simple_upsert(
                 desc="add_user_account_data",
                 table="account_data",
                 keyvalues={"user_id": user_id, "account_data_type": account_data_type},

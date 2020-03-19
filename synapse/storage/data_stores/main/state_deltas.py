@@ -105,7 +105,7 @@ class StateDeltasStore(SQLBaseStore):
         )
 
     def _get_max_stream_id_in_current_state_deltas_txn(self, txn):
-        return self._simple_select_one_onecol_txn(
+        return self.simple_select_one_onecol_txn(
             txn,
             table="current_state_delta_stream",
             keyvalues={},

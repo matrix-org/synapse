@@ -85,7 +85,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
             """
             txn.execute(sql)
             rooms = [{"room_id": x[0], "events": x[1]} for x in txn.fetchall()]
-            self._simple_insert_many_txn(txn, TEMP_TABLE + "_rooms", rooms)
+            self.simple_insert_many_txn(txn, TEMP_TABLE + "_rooms", rooms)
             del rooms
 
             # If search all users is on, get all the users we want to add.
@@ -100,13 +100,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
                 txn.execute("SELECT name FROM users")
                 users = [{"user_id": x[0]} for x in txn.fetchall()]
 
-                self._simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
+                self.simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
 
         new_pos = yield self.get_max_stream_id_in_current_state_deltas()
         yield self.runInteraction(
             "populate_user_directory_temp_build", _make_staging_area
         )
-        yield self._simple_insert(TEMP_TABLE + "_position", {"position": new_pos})
+        yield self.simple_insert(TEMP_TABLE + "_position", {"position": new_pos})
 
         yield self._end_background_update("populate_user_directory_createtables")
         return 1
@@ -116,7 +116,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
         """
         Update the user directory stream position, then clean up the old tables.
         """
-        position = yield self._simple_select_one_onecol(
+        position = yield self.simple_select_one_onecol(
             TEMP_TABLE + "_position", None, "position"
         )
         yield self.update_user_directory_stream_pos(position)
@@ -243,7 +243,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
                         to_insert.clear()
 
             # We've finished a room. Delete it from the table.
-            yield self._simple_delete_one(TEMP_TABLE + "_rooms", {"room_id": room_id})
+            yield self.simple_delete_one(TEMP_TABLE + "_rooms", {"room_id": room_id})
             # Update the remaining counter.
             progress["remaining"] -= 1
             yield self.runInteraction(
@@ -312,7 +312,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
             )
 
             # We've finished processing a user. Delete it from the table.
-            yield self._simple_delete_one(TEMP_TABLE + "_users", {"user_id": user_id})
+            yield self.simple_delete_one(TEMP_TABLE + "_users", {"user_id": user_id})
             # Update the remaining counter.
             progress["remaining"] -= 1
             yield self.runInteraction(
@@ -361,7 +361,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
         """
 
         def _update_profile_in_user_dir_txn(txn):
-            new_entry = self._simple_upsert_txn(
+            new_entry = self.simple_upsert_txn(
                 txn,
                 table="user_directory",
                 keyvalues={"user_id": user_id},
@@ -435,7 +435,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
                         )
             elif isinstance(self.database_engine, Sqlite3Engine):
                 value = "%s %s" % (user_id, display_name) if display_name else user_id
-                self._simple_upsert_txn(
+                self.simple_upsert_txn(
                     txn,
                     table="user_directory_search",
                     keyvalues={"user_id": user_id},
@@ -462,7 +462,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
         """
 
         def _add_users_who_share_room_txn(txn):
-            self._simple_upsert_many_txn(
+            self.simple_upsert_many_txn(
                 txn,
                 table="users_who_share_private_rooms",
                 key_names=["user_id", "other_user_id", "room_id"],
@@ -489,7 +489,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
 
         def _add_users_in_public_rooms_txn(txn):
 
-            self._simple_upsert_many_txn(
+            self.simple_upsert_many_txn(
                 txn,
                 table="users_in_public_rooms",
                 key_names=["user_id", "room_id"],
@@ -519,7 +519,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
 
     @cached()
     def get_user_in_directory(self, user_id):
-        return self._simple_select_one(
+        return self.simple_select_one(
             table="user_directory",
             keyvalues={"user_id": user_id},
             retcols=("display_name", "avatar_url"),
@@ -528,7 +528,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore, BackgroundUpdateStore
         )
 
     def update_user_directory_stream_pos(self, stream_id):
-        return self._simple_update_one(
+        return self.simple_update_one(
             table="user_directory_stream_pos",
             keyvalues={},
             updatevalues={"stream_id": stream_id},
@@ -547,21 +547,21 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
     def remove_from_user_dir(self, user_id):
         def _remove_from_user_dir_txn(txn):
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn, table="user_directory", keyvalues={"user_id": user_id}
             )
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn, table="user_directory_search", keyvalues={"user_id": user_id}
             )
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn, table="users_in_public_rooms", keyvalues={"user_id": user_id}
             )
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn,
                 table="users_who_share_private_rooms",
                 keyvalues={"user_id": user_id},
             )
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn,
                 table="users_who_share_private_rooms",
                 keyvalues={"other_user_id": user_id},
@@ -575,14 +575,14 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         """Get all user_ids that are in the room directory because they're
         in the given room_id
         """
-        user_ids_share_pub = yield self._simple_select_onecol(
+        user_ids_share_pub = yield self.simple_select_onecol(
             table="users_in_public_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_dir_due_to_room",
         )
 
-        user_ids_share_priv = yield self._simple_select_onecol(
+        user_ids_share_priv = yield self.simple_select_onecol(
             table="users_who_share_private_rooms",
             keyvalues={"room_id": room_id},
             retcol="other_user_id",
@@ -605,17 +605,17 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         """
 
         def _remove_user_who_share_room_txn(txn):
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn,
                 table="users_who_share_private_rooms",
                 keyvalues={"user_id": user_id, "room_id": room_id},
             )
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn,
                 table="users_who_share_private_rooms",
                 keyvalues={"other_user_id": user_id, "room_id": room_id},
             )
-            self._simple_delete_txn(
+            self.simple_delete_txn(
                 txn,
                 table="users_in_public_rooms",
                 keyvalues={"user_id": user_id, "room_id": room_id},
@@ -636,14 +636,14 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         Returns:
             list: user_id
         """
-        rows = yield self._simple_select_onecol(
+        rows = yield self.simple_select_onecol(
             table="users_who_share_private_rooms",
             keyvalues={"user_id": user_id},
             retcol="room_id",
             desc="get_rooms_user_is_in",
         )
 
-        pub_rows = yield self._simple_select_onecol(
+        pub_rows = yield self.simple_select_onecol(
             table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             retcol="room_id",
@@ -674,14 +674,14 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             ) f2 USING (room_id)
         """
 
-        rows = yield self._execute(
+        rows = yield self.execute(
             "get_rooms_in_common_for_users", None, sql, user_id, other_user_id
         )
 
         return [room_id for room_id, in rows]
 
     def get_user_directory_stream_pos(self):
-        return self._simple_select_one_onecol(
+        return self.simple_select_one_onecol(
             table="user_directory_stream_pos",
             keyvalues={},
             retcol="stream_id",
@@ -786,9 +786,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
-        results = yield self._execute(
-            "search_user_dir", self.cursor_to_dict, sql, *args
-        )
+        results = yield self.execute("search_user_dir", self.cursor_to_dict, sql, *args)
 
         limited = len(results) > limit
 
