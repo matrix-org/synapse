@@ -50,6 +50,3 @@ class AccountDataEventSource(object):
                 )
 
         return results, current_stream_id
-
-    async def get_pagination_rows(self, user, config, key):
-        return [], config.to_id
