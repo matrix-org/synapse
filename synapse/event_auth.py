@@ -50,6 +50,18 @@ def check(room_version, event, auth_events, do_sig_check=True, do_size_check=Tru
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
 
+    room_id = event.room_id
+
+    # I'm not really expecting to get auth events in the wrong room, but let's
+    # sanity-check it
+    for auth_event in auth_events.values():
+        if auth_event.room_id != room_id:
+            raise Exception(
+                "During auth for event %s in room %s, found event %s in the state "
+                "which is in room %s"
+                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id)
+            )
+
     if do_sig_check:
         sender_domain = get_domain_from_id(event.sender)
 
