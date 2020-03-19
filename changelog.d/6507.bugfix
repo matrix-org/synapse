@@ -1,0 +1,1 @@
+Fix pusher worker failing because it can't retrieve retention policies for rooms.
