@@ -44,6 +44,7 @@ from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
+from synapse.replication.slave.storage.user_directory import SlavedUserDirectoryStore
 from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.rest.client.v1.login import LoginRestServlet
 from synapse.rest.client.v1.push_rule import PushRuleRestServlet
@@ -84,6 +85,7 @@ class ClientReaderSlavedStore(
     SlavedTransactionStore,
     SlavedProfileStore,
     SlavedClientIpStore,
+    SlavedUserDirectoryStore,
     BaseSlavedStore,
 ):
     pass
