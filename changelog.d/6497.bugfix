@@ -1,0 +1,1 @@
+Fix error message when setting your profile's avatar URL mentioning displaynames, and prevent NoneType avatar_urls.
