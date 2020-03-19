@@ -906,7 +906,18 @@ class EventCreationHandler(object):
             directory_handler = self.hs.get_handlers().directory_handler
             if room_alias_str and room_alias_str != original_alias:
                 room_alias = RoomAlias.from_string(room_alias_str)
-                mapping = yield directory_handler.get_association(room_alias)
+                try:
+                    mapping = yield directory_handler.get_association(room_alias)
+                except SynapseError as e:
+                    # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
+                    if e.errcode == Codes.NOT_FOUND:
+                        raise SynapseError(
+                            400,
+                            "Room alias %s does not point to the room"
+                            % (room_alias_str,),
+                            Codes.BAD_ALIAS,
+                        )
+                    raise
 
                 if mapping["room_id"] != event.room_id:
                     raise SynapseError(
@@ -932,7 +943,18 @@ class EventCreationHandler(object):
             if new_alt_aliases:
                 for alias_str in new_alt_aliases:
                     room_alias = RoomAlias.from_string(alias_str)
-                    mapping = yield directory_handler.get_association(room_alias)
+                    try:
+                        mapping = yield directory_handler.get_association(room_alias)
+                    except SynapseError as e:
+                        # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
+                        if e.errcode == Codes.NOT_FOUND:
+                            raise SynapseError(
+                                400,
+                                "Room alias %s does not point to the room"
+                                % (room_alias_str,),
+                                Codes.BAD_ALIAS,
+                            )
+                        raise
 
                     if mapping["room_id"] != event.room_id:
                         raise SynapseError(
