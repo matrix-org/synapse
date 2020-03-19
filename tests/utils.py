@@ -260,9 +260,7 @@ def setup_test_homeserver(
         hs = homeserverToUse(
             name,
             config=config,
-            db_config=config.database_config,
             version_string="Synapse/tests",
-            database_engine=db_engine,
             tls_server_context_factory=Mock(),
             tls_client_options_factory=Mock(),
             reactor=reactor,
