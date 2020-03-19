@@ -1,0 +1,1 @@
+Fix race which occasionally caused deleted devices to reappear.
