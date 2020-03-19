@@ -104,8 +104,8 @@ class ServerConfig(Config):
 
         # Whether to require sharing a room with a user to retrieve their
         # profile data
-        self.limit_profile_requests_to_known_users = config.get(
-            "limit_profile_requests_to_known_users", False
+        self.limit_profile_requests_to_users_who_share_rooms = config.get(
+            "limit_profile_requests_to_users_who_share_rooms", False,
         )
 
         if "restrict_public_rooms_to_local_users" in config and (
@@ -633,12 +633,12 @@ class ServerConfig(Config):
         #
         #require_auth_for_profile_requests: true
 
-        # Whether to require a user to share a room with another user in order
+        # Uncomment to require a user to share a room with another user in order
         # to retrieve their profile information. Only checked on Client-Server
         # requests. Profile requests from other servers should be checked by the
         # requesting server. Defaults to 'false'.
         #
-        # limit_profile_requests_to_known_users: true
+        #limit_profile_requests_to_users_who_share_rooms: true
 
         # If set to 'true', removes the need for authentication to access the server's
         # public rooms directory through the client API, meaning that anyone can
