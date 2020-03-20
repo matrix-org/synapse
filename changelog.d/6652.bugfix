@@ -1,1 +1,0 @@
-Fix a bug causing Synapse not to fetch missing events when it believes it has every event in the room.
