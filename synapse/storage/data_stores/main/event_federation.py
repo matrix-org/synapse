@@ -470,7 +470,7 @@ class EventFederationStore(EventFederationWorkerStore):
     def _update_min_depth_for_room_txn(self, txn, room_id, depth):
         min_depth = self._get_min_depth_interaction(txn, room_id)
 
-        if min_depth and depth >= min_depth:
+        if min_depth is not None and depth >= min_depth:
             return
 
         self.db.simple_upsert_txn(
