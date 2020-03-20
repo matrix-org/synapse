@@ -179,7 +179,7 @@ class FederationHandler(BaseHandler):
         room_id = pdu.room_id
         event_id = pdu.event_id
 
-        logger.info("handling received PDU: %s", pdu)
+        logger.info("[%s %s] handling received PDU: %s", room_id, event_id, pdu)
 
         # We reprocess pdus when we have seen them only as outliers
         existing = await self.store.get_event(
@@ -294,6 +294,14 @@ class FederationHandler(BaseHandler):
                                 room_id,
                                 event_id,
                             )
+                elif missing_prevs:
+                    logger.info(
+                        "[%s %s] Not recursively fetching %d missing prev_events: %s",
+                        room_id,
+                        event_id,
+                        len(missing_prevs),
+                        shortstr(missing_prevs),
+                    )
 
             if prevs - seen:
                 # We've still not been able to get all of the prev_events for this event.
@@ -396,7 +404,6 @@ class FederationHandler(BaseHandler):
                     evs = await self.store.get_events(
                         list(state_map.values()),
                         get_prev_content=False,
-                        check_redacted=False,
                     )
                     event_map.update(evs)
 
