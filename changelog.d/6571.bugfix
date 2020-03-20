@@ -1,0 +1,1 @@
+Fix a bug which meant that we did not send systemd notifications on startup if acme was enabled.
