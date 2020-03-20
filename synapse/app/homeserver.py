@@ -342,13 +342,8 @@ def setup(config_options):
         hs.setup()
     except IncorrectDatabaseSetup as e:
         quit_with_error(str(e))
-    except UpgradeDatabaseException:
-        sys.stderr.write(
-            "\nFailed to upgrade database.\n"
-            "Have you checked for version specific instructions in"
-            " UPGRADES.rst?\n"
-        )
-        sys.exit(1)
+    except UpgradeDatabaseException as e:
+        quit_with_error("Failed to upgrade database: %s" % (e,))
 
     hs.setup_master()
 

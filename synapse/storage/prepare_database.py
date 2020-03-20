@@ -69,7 +69,10 @@ def prepare_database(db_conn, database_engine, config, data_stores=["main"]):
                 if user_version != SCHEMA_VERSION:
                     # If we don't pass in a config file then we are expecting to
                     # have already upgraded the DB.
-                    raise UpgradeDatabaseException("Database needs to be upgraded")
+                    raise UpgradeDatabaseException(
+                        "Expected database schema version %i but got %i"
+                        % (SCHEMA_VERSION, user_version)
+                    )
             else:
                 _upgrade_existing_database(
                     cur,
