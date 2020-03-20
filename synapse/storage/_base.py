@@ -40,7 +40,7 @@ class SQLBaseStore(object):
     def __init__(self, database: Database, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
-        self.database_engine = hs.database_engine
+        self.database_engine = database.engine
         self.db = database
         self.rand = random.SystemRandom()
 
