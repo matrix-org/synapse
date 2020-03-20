@@ -1,8 +1,12 @@
-matrix-synapse-py3 (1.7.3ubuntu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.8.0) stable; urgency=medium
 
+  [ Richard van der Hoff ]
   * Automate generation of the default log configuration file.
 
- -- Richard van der Hoff <richard@matrix.org>  Fri, 03 Jan 2020 13:55:38 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 1.8.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 09 Jan 2020 11:39:27 +0000
 
 matrix-synapse-py3 (1.7.3) stable; urgency=medium
 
