@@ -1,1 +1,1 @@
-Fix a bug introduced in Synapse 1.12.0 which meant that groups updates were not correctly replicated between workers.
+Fix a bug which meant that groups updates were not correctly replicated between workers.
