@@ -237,8 +237,7 @@ class PasswordRestServlet(RestServlet):
                 requester,
                 body,
                 self.hs.get_ip_from_request(request),
-                "modify_password",
-                "",  # TODO
+                {"operation": "modify_password", "user": requester.user.to_string()},
             )
             user_id = requester.user.to_string()
         else:
@@ -247,8 +246,7 @@ class PasswordRestServlet(RestServlet):
                 [[LoginType.EMAIL_IDENTITY]],
                 body,
                 self.hs.get_ip_from_request(request),
-                "modify_password",
-                "",  # TODO
+                {"operation": "modify_password"},  # TODO
             )
 
             if LoginType.EMAIL_IDENTITY in result:
@@ -319,8 +317,7 @@ class DeactivateAccountRestServlet(RestServlet):
             requester,
             body,
             self.hs.get_ip_from_request(request),
-            "deactivate",
-            requester.user.to_string(),
+            {"operation": "deactivate", "user": requester.user.to_string()},
         )
         result = await self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase, id_server=body.get("id_server")
@@ -668,7 +665,10 @@ class ThreepidAddRestServlet(RestServlet):
         assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request), "add_3pid", user_id
+            requester,
+            body,
+            self.hs.get_ip_from_request(request),
+            {"operation": "add_3pid", "user": user_id},
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(

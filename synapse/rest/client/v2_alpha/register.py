@@ -502,8 +502,7 @@ class RegisterRestServlet(RestServlet):
             self._registration_flows,
             body,
             self.hs.get_ip_from_request(request),
-            "register",
-            "",  # TODO
+            {"operation": "register"},
         )
 
         # Check that we're not trying to register a denied 3pid.

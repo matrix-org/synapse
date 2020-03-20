@@ -129,8 +129,7 @@ class AuthHandler(BaseHandler):
         requester: Requester,
         request_body: Dict[str, Any],
         clientip: str,
-        action_type,
-        action_id,
+        action_data,
     ):
         """
         Checks that the user is who they claim to be, via a UI auth.
@@ -145,6 +144,9 @@ class AuthHandler(BaseHandler):
             request_body: The body of the request sent by the client
 
             clientip: The IP address of the client.
+
+            action_data: An opaque object that should be provided initially and at the
+                end to ensure the request is not modified during a session.
 
         Returns:
             defer.Deferred[dict]: the parameters for this request (which may
@@ -178,7 +180,7 @@ class AuthHandler(BaseHandler):
 
         try:
             result, params, _ = yield self.check_auth(
-                flows, request_body, clientip, action_type, action_id
+                flows, request_body, clientip, action_data
             )
         except LoginError:
             # Update the ratelimite to say we failed (`can_do_action` doesn't raise).
@@ -222,8 +224,7 @@ class AuthHandler(BaseHandler):
         flows: List[List[str]],
         clientdict: Dict[str, Any],
         clientip: str,
-        action_type,
-        action_id,
+        action_data,
     ):
         """
         Takes a dictionary sent by the client in the login / registration
@@ -292,14 +293,8 @@ class AuthHandler(BaseHandler):
         # If ui_auth exists in the session this is a returning UI auth request.
         # Validate that none of the requested information has changed.
         if "ui_auth" not in session:
-            session["ui_auth"] = {
-                "action_type": action_type,
-                "action_id": action_id,
-            }
-        elif (
-            session["ui_auth"]["action_type"] != action_type
-            or session["ui_auth"]["action_id"] != action_id
-        ):
+            session["ui_auth"] = action_data
+        elif session["ui_auth"] != action_data:
             raise SynapseError(403, "Foobar")
 
         if not authdict:
@@ -529,10 +524,7 @@ class AuthHandler(BaseHandler):
         if session and "ui_auth" in session:
             # Set the items in the ui_auth session to sentinel values that can
             # never be equaled.
-            session["ui_auth"] = {
-                "action_type": object(),
-                "action_id": object(),
-            }
+            session["ui_auth"] = object()
 
     @defer.inlineCallbacks
     def get_access_token_for_user_id(

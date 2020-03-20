@@ -84,8 +84,7 @@ class DeleteDevicesRestServlet(RestServlet):
             requester,
             body,
             self.hs.get_ip_from_request(request),
-            "delete_devices",
-            "",  # TODO
+            {"operation": "delete_devices", "devices": body["devices"]},
         )
 
         await self.device_handler.delete_devices(
@@ -134,8 +133,7 @@ class DeviceRestServlet(RestServlet):
             requester,
             body,
             self.hs.get_ip_from_request(request),
-            "delete_device",
-            device_id,
+            {"operation": "delete_device", "device": device_id},
         )
 
         await self.device_handler.delete_device(requester.user.to_string(), device_id)
