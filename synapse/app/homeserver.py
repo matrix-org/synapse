@@ -310,7 +310,7 @@ def setup(config_options):
             "Synapse Homeserver", config_options
         )
     except ConfigError as e:
-        sys.stderr.write("\n" + str(e) + "\n")
+        sys.stderr.write("\nERROR: %s\n" % (e,))
         sys.exit(1)
 
     if not config:
