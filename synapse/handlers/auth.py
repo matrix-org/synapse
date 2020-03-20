@@ -343,8 +343,11 @@ class AuthHandler(BaseHandler):
                     list(clientdict),
                 )
 
-                # Blow away the session so it can not be re-used.
-                self._invalidate_session(session["id"])
+                # If the authentication flow is complete and this is the
+                # subsequent request, mark this session as invalid, so it cannot
+                # be re-used.
+                if "type" not in authdict:
+                    self._remove_session(session["id"])
 
                 return creds, clientdict, session["id"]
 
@@ -518,13 +521,9 @@ class AuthHandler(BaseHandler):
 
         return self.sessions[session_id]
 
-    def _invalidate_session(self, session_id) -> None:
-        """Invalidate session information for session ID"""
-        session = self.sessions.get(session_id, None)
-        if session and "ui_auth" in session:
-            # Set the items in the ui_auth session to sentinel values that can
-            # never be equaled.
-            session["ui_auth"] = object()
+    def _remove_session(self, session_id) -> None:
+        """Remove a session (if it exists)."""
+        self.sessions.pop(session_id, None)
 
     @defer.inlineCallbacks
     def get_access_token_for_user_id(
