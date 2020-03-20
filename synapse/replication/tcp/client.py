@@ -46,7 +46,8 @@ class ReplicationClientFactory(ReconnectingClientFactory):
     is required.
     """
 
-    maxDelay = 30  # Try at least once every N seconds
+    initialDelay = 0.1
+    maxDelay = 1  # Try at least once every N seconds
 
     def __init__(self, hs, client_name, handler: AbstractReplicationClientHandler):
         self.client_name = client_name
