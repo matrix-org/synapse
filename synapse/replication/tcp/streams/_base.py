@@ -204,7 +204,7 @@ class Stream(object):
         if len(updates) >= MAX_EVENTS_BEHIND:
             raise Exception("stream %s has fallen behind" % (self.NAME))
 
-        # The update function didn't hit the limit, so we must have got all 
+        # The update function didn't hit the limit, so we must have got all
         # the updates to `current_token`, and can return that as our new
         # stream position.
         return updates, current_token
