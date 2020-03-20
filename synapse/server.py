@@ -199,7 +199,7 @@ class HomeServer(object):
         "account_validity_handler",
         "saml_handler",
         "event_client_serializer",
-        'password_policy_handler',
+        "password_policy_handler",
         "storage",
     ]
 

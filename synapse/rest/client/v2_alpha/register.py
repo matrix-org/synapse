@@ -421,7 +421,7 @@ class RegisterRestServlet(RestServlet):
                 or len(body["password"]) > 512
             ):
                 raise SynapseError(400, "Invalid password")
-            self.password_policy_handler.validate_password(body['password'])
+            self.password_policy_handler.validate_password(body["password"])
 
         desired_username = None
         if "username" in body:

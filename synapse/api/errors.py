@@ -455,9 +455,7 @@ class PasswordRefusedError(SynapseError):
         errcode=Codes.WEAK_PASSWORD,
     ):
         super(PasswordRefusedError, self).__init__(
-            code=400,
-            msg=msg,
-            errcode=errcode,
+            code=400, msg=msg, errcode=errcode,
         )
 
 
