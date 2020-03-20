@@ -40,7 +40,14 @@ from synapse.util.versionstring import get_version_string
 from ._base import Config, ConfigError
 
 DEFAULT_LOG_CONFIG = Template(
-    """
+    """\
+# Log configuration for Synapse.
+#
+# This is a YAML file containing a standard Python logging configuration
+# dictionary. See [1] for details on the valid settings.
+#
+# [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
+
 version: 1
 
 formatters:
