@@ -165,7 +165,7 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
                     "type": LoginType.PASSWORD,
                     "user": user_id,
                 },
-             }
+            }
         )
         request, channel = self.make_request(
             "POST",
