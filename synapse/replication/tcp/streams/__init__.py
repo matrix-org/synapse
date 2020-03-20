@@ -25,6 +25,8 @@ Each stream is defined by the following information:
     update_function:    The function that returns a list of updates between two tokens
 """
 
+from typing import Dict, Type
+
 from . import _base, events, federation
 
 STREAMS_MAP = {
@@ -47,4 +49,4 @@ STREAMS_MAP = {
         _base.GroupServerStream,
         _base.UserSignatureStream,
     )
-}
+}  # type: Dict[str, Type[_base.Stream]]

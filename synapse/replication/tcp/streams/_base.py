@@ -20,6 +20,7 @@ from typing import Any, List, Optional, Tuple, Union
 
 import attr
 
+from synapse.replication.http.streams import ReplicationGetStreamUpdates
 from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,10 @@ class Stream(object):
     # The type of the row. Used by the default impl of parse_row.
     ROW_TYPE = None  # type: Any
 
+    # Whether the update function is only available on master. If True then
+    # calls to get updates are proxied to the master via a HTTP call.
+    _QUERY_MASTER = False
+
     @classmethod
     def parse_row(cls, row):
         """Parse a row received over replication
@@ -143,6 +148,11 @@ class Stream(object):
         return cls.ROW_TYPE(*row)
 
     def __init__(self, hs):
+        self._is_worker = hs.config.worker_app is not None
+
+        if self._QUERY_MASTER and self._is_worker:
+            self._replication_client = ReplicationGetStreamUpdates.make_client(hs)
+
         # The token from which we last asked for updates
         self.last_token = self.current_token()
 
@@ -191,14 +201,23 @@ class Stream(object):
         if from_token == upto_token:
             return [], upto_token, False
 
-        limited = False
-        rows = await self.update_function(from_token, upto_token, limit=limit)
-        updates = [(row[0], row[1:]) for row in rows]
-        if len(updates) == limit:
-            upto_token = rows[-1][0]
-            limited = True
+        if self._is_worker and self._QUERY_MASTER:
+            result = await self._replication_client(
+                stream_name=self.NAME,
+                from_token=from_token,
+                upto_token=upto_token,
+                limit=limit,
+            )
+            return result["updates"], result["upto_token"], result["limited"]
+        else:
+            limited = False
+            rows = await self.update_function(from_token, upto_token, limit=limit)
+            updates = [(row[0], row[1:]) for row in rows]
+            if len(updates) == limit:
+                upto_token = rows[-1][0]
+                limited = True
 
-        return updates, upto_token, limited
+            return updates, upto_token, limited
 
     def current_token(self):
         """Gets the current token of the underlying streams. Should be provided
@@ -239,13 +258,16 @@ class BackfillStream(Stream):
 class PresenceStream(Stream):
     NAME = "presence"
     ROW_TYPE = PresenceStreamRow
+    _QUERY_MASTER = True
 
     def __init__(self, hs):
         store = hs.get_datastore()
         presence_handler = hs.get_presence_handler()
 
         self.current_token = store.get_current_presence_token  # type: ignore
-        self.update_function = presence_handler.get_all_presence_updates  # type: ignore
+
+        if hs.config.worker_app is None:
+            self.update_function = presence_handler.get_all_presence_updates  # type: ignore
 
         super(PresenceStream, self).__init__(hs)
 
@@ -253,12 +275,15 @@ class PresenceStream(Stream):
 class TypingStream(Stream):
     NAME = "typing"
     ROW_TYPE = TypingStreamRow
+    _QUERY_MASTER = True
 
     def __init__(self, hs):
         typing_handler = hs.get_typing_handler()
 
         self.current_token = typing_handler.get_current_token  # type: ignore
-        self.update_function = typing_handler.get_all_typing_updates  # type: ignore
+
+        if hs.config.worker_app is None:
+            self.update_function = typing_handler.get_all_typing_updates  # type: ignore
 
         super(TypingStream, self).__init__(hs)
 
