@@ -204,8 +204,9 @@ class Stream(object):
         if len(updates) >= MAX_EVENTS_BEHIND:
             raise Exception("stream %s has fallen behind" % (self.NAME))
 
-        # Due to the assertin above we know we're up to date, so we know that
-        # our new stream position is `current_token`.
+        # The update function didn't hit the limit, so we must have got all 
+        # the updates to `current_token`, and can return that as our new
+        # stream position.
         return updates, current_token
 
     def current_token(self):
