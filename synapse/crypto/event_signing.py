@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import collections.abc
 import hashlib
 import logging
 
@@ -40,8 +40,11 @@ def check_event_content_hash(event, hash_algorithm=hashlib.sha256):
     # some malformed events lack a 'hashes'. Protect against it being missing
     # or a weird type by basically treating it the same as an unhashed event.
     hashes = event.get("hashes")
-    if not isinstance(hashes, dict):
-        raise SynapseError(400, "Malformed 'hashes'", Codes.UNAUTHORIZED)
+    # nb it might be a frozendict or a dict
+    if not isinstance(hashes, collections.abc.Mapping):
+        raise SynapseError(
+            400, "Malformed 'hashes': %s" % (type(hashes),), Codes.UNAUTHORIZED
+        )
 
     if name not in hashes:
         raise SynapseError(
