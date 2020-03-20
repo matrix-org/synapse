@@ -39,6 +39,8 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
         make
         make install
 
+### Configuration
+
 1.  Create or edit the config file in `/etc/turnserver.conf`. The relevant
     lines, with example values, are:
 
