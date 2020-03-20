@@ -39,7 +39,6 @@ import synapse
 import synapse.config.logger
 from synapse import events
 from synapse.api.urls import (
-    CONTENT_REPO_PREFIX,
     FEDERATION_PREFIX,
     LEGACY_MEDIA_PREFIX,
     MEDIA_PREFIX,
@@ -65,7 +64,6 @@ from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.key.v2 import KeyApiV2Resource
-from synapse.rest.media.v0.content_repository import ContentRepoResource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
@@ -223,13 +221,7 @@ class SynapseHomeServer(HomeServer):
             if self.get_config().enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
-                    {
-                        MEDIA_PREFIX: media_repo,
-                        LEGACY_MEDIA_PREFIX: media_repo,
-                        CONTENT_REPO_PREFIX: ContentRepoResource(
-                            self, self.config.uploads_path
-                        ),
-                    }
+                    {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
                 )
             elif name == "media":
                 raise ConfigError(
