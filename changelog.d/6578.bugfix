@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.7.0 which caused an error on startup when upgrading from versions before 1.3.0.
