@@ -28,7 +28,6 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import load_jinja2_templates
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -547,13 +546,6 @@ class SSOAuthHandler(object):
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
         self._macaroon_gen = hs.get_macaroon_generator()
-
-        # Load the redirect page HTML template
-        self._template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
-        )[0]
-
-        self._server_name = hs.config.server_name
 
         # cast to tuple for use with str.startswith
         self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
