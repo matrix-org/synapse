@@ -36,7 +36,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import JsonResource
-from synapse.http.site import SynapseRequest
+from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
@@ -209,6 +209,15 @@ class HomeserverTestCase(TestCase):
 
         # Register the resources
         self.resource = self.create_test_json_resource()
+
+        # create a site to wrap the resource.
+        self.site = SynapseSite(
+            logger_name="synapse.access.http.fake",
+            site_tag="test",
+            config={},
+            resource=self.resource,
+            server_version_string="1",
+        )
 
         from tests.rest.client.v1.utils import RestHelper
 
