@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import List
 
 from twisted.internet import defer
 
@@ -257,7 +258,13 @@ class TypingHandler(object):
             "typing_key", self._latest_room_serial, rooms=[member.room_id]
         )
 
-    async def get_all_typing_updates(self, last_id, current_id, limit):
+    async def get_all_typing_updates(
+        self, last_id: int, current_id: int, limit: int
+    ) -> List[dict]:
+        """Get up to `limit` typing updates between the given tokens, earliest
+        updates first.
+        """
+
         if last_id == current_id:
             return []
 
