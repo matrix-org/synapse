@@ -576,7 +576,7 @@ class DeviceWorkerStore(SQLBaseStore):
             return set()
 
     async def get_all_device_list_changes_for_remotes(
-        self, from_key: int, to_key: int
+        self, from_key: int, to_key: int, limit: int,
     ) -> List[Tuple[int, str]]:
         """Return a list of `(stream_id, entity)` which is the combined list of
         changes to devices and which destinations need to be poked. Entity is
@@ -592,10 +592,16 @@ class DeviceWorkerStore(SQLBaseStore):
                 SELECT stream_id, destination AS entity FROM device_lists_outbound_pokes
             ) AS e
             WHERE ? < stream_id AND stream_id <= ?
+            LIMIT ?
         """
 
         return await self.db.execute(
-            "get_all_device_list_changes_for_remotes", None, sql, from_key, to_key
+            "get_all_device_list_changes_for_remotes",
+            None,
+            sql,
+            from_key,
+            to_key,
+            limit,
         )
 
     @cached(max_entries=10000)

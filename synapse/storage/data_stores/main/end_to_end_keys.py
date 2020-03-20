@@ -537,7 +537,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         return result
 
-    def get_all_user_signature_changes_for_remotes(self, from_key, to_key):
+    def get_all_user_signature_changes_for_remotes(self, from_key, to_key, limit):
         """Return a list of changes from the user signature stream to notify remotes.
         Note that the user signature stream represents when a user signs their
         device with their user-signing key, which is not published to other
@@ -552,13 +552,19 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             Deferred[list[(int,str)]] a list of `(stream_id, user_id)`
         """
         sql = """
-            SELECT MAX(stream_id) AS stream_id, from_user_id AS user_id
+            SELECT stream_id, from_user_id AS user_id
             FROM user_signature_stream
             WHERE ? < stream_id AND stream_id <= ?
-            GROUP BY user_id
+            ORDER BY stream_id ASC
+            LIMIT ?
         """
         return self.db.execute(
-            "get_all_user_signature_changes_for_remotes", None, sql, from_key, to_key
+            "get_all_user_signature_changes_for_remotes",
+            None,
+            sql,
+            from_key,
+            to_key,
+            limit,
         )
 
 
