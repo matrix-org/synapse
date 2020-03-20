@@ -64,6 +64,13 @@ class Codes(object):
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
     WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
     EXPIRED_ACCOUNT = "ORG_MATRIX_EXPIRED_ACCOUNT"
+    PASSWORD_TOO_SHORT = "M_PASSWORD_TOO_SHORT"
+    PASSWORD_NO_DIGIT = "M_PASSWORD_NO_DIGIT"
+    PASSWORD_NO_UPPERCASE = "M_PASSWORD_NO_UPPERCASE"
+    PASSWORD_NO_LOWERCASE = "M_PASSWORD_NO_LOWERCASE"
+    PASSWORD_NO_SYMBOL = "M_PASSWORD_NO_SYMBOL"
+    PASSWORD_IN_DICTIONARY = "M_PASSWORD_IN_DICTIONARY"
+    WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
 
@@ -436,6 +443,22 @@ class IncompatibleRoomVersionError(SynapseError):
 
     def error_dict(self):
         return cs_error(self.msg, self.errcode, room_version=self._room_version)
+
+
+class PasswordRefusedError(SynapseError):
+    """A password has been refused, either during password reset/change or registration.
+    """
+
+    def __init__(
+        self,
+        msg="This password doesn't comply with the server's policy",
+        errcode=Codes.WEAK_PASSWORD,
+    ):
+        super(PasswordRefusedError, self).__init__(
+            code=400,
+            msg=msg,
+            errcode=errcode,
+        )
 
 
 class RequestSendFailed(RuntimeError):
