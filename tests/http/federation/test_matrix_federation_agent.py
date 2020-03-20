@@ -38,7 +38,7 @@ from synapse.http.federation.well_known_resolver import (
     WellKnownResolver,
     _cache_period_from_headers,
 )
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext
 from synapse.util.caches.ttlcache import TTLCache
 
 from tests import unittest
@@ -155,7 +155,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             self.assertNoResult(fetch_d)
 
             # should have reset logcontext to the sentinel
-            _check_logcontext(LoggingContext.sentinel)
+            _check_logcontext(SENTINEL_CONTEXT)
 
             try:
                 fetch_res = yield fetch_d

@@ -2,7 +2,7 @@ from mock import Mock, call
 
 from twisted.internet import defer, reactor
 
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext
 from synapse.rest.client.transactions import CLEANUP_PERIOD_MS, HttpTransactionCache
 from synapse.util import Clock
 
@@ -57,9 +57,9 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
 
         # run the test twice in parallel
         d = defer.gatherResults([test(), test()])
-        self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+        self.assertIs(LoggingContext.current_context(), SENTINEL_CONTEXT)
         yield d
-        self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+        self.assertIs(LoggingContext.current_context(), SENTINEL_CONTEXT)
 
     @defer.inlineCallbacks
     def test_does_not_cache_exceptions(self):

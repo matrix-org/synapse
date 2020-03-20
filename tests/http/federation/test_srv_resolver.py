@@ -22,7 +22,7 @@ from twisted.internet.error import ConnectError
 from twisted.names import dns, error
 
 from synapse.http.federation.srv_resolver import SrvResolver
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext
 
 from tests import unittest
 from tests.utils import MockClock
@@ -54,7 +54,7 @@ class SrvResolverTestCase(unittest.TestCase):
                 self.assertNoResult(resolve_d)
 
                 # should have reset to the sentinel context
-                self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+                self.assertIs(LoggingContext.current_context(), SENTINEL_CONTEXT)
 
                 result = yield resolve_d
 

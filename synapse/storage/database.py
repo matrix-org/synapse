@@ -510,7 +510,7 @@ class Database(object):
         after_callbacks = []  # type: List[_CallbackListEntry]
         exception_callbacks = []  # type: List[_CallbackListEntry]
 
-        if LoggingContext.current_context() == LoggingContext.sentinel:
+        if not LoggingContext.current_context():
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
@@ -549,8 +549,8 @@ class Database(object):
         """
         parent_context = (
             LoggingContext.current_context()
-        )  # type: Optional[LoggingContextOrSentinel]
-        if parent_context == LoggingContext.sentinel:
+        )  # type: LoggingContextOrSentinel
+        if not parent_context:
             logger.warning(
                 "Starting db connection from sentinel context: metrics will be lost"
             )

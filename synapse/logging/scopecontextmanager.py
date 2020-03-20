@@ -50,10 +50,7 @@ class LogContextScopeManager(ScopeManager):
             available.
         """
         ctx = LoggingContext.current_context()
-        if ctx is LoggingContext.sentinel:
-            return None
-        else:
-            return ctx.scope
+        return ctx.scope
 
     def activate(self, span, finish_on_close):
         """
@@ -72,7 +69,7 @@ class LogContextScopeManager(ScopeManager):
         enter_logcontext = False
         ctx = LoggingContext.current_context()
 
-        if ctx is LoggingContext.sentinel:
+        if not ctx:
             # We don't want this scope to affect.
             logger.error("Tried to activate scope outside of loggingcontext")
             return Scope(None, span)

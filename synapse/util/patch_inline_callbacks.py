@@ -79,7 +79,7 @@ def do_patch():
                     raise Exception(err)
                 return res
 
-            if LoggingContext.current_context() != LoggingContext.sentinel:
+            if LoggingContext.current_context():
                 err = (
                     "%s returned incomplete deferred in non-sentinel context "
                     "%s (start was %s)"
@@ -173,7 +173,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
                 # This happens if we yield on a deferred that doesn't follow
                 # the log context rules without wrapping in a `make_deferred_yieldable`.
                 # We raise here as this should never happen.
-                if LoggingContext.current_context() is not LoggingContext.sentinel:
+                if LoggingContext.current_context():
                     err = (
                         "%s yielded with context %s rather than sentinel,"
                         " yielded on line %d in %s"

@@ -16,7 +16,11 @@ from twisted.internet import defer
 from twisted.internet.defer import CancelledError, Deferred
 from twisted.internet.task import Clock
 
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import (
+    SENTINEL_CONTEXT,
+    LoggingContext,
+    PreserveLoggingContext,
+)
 from synapse.util.async_helpers import timeout_deferred
 
 from tests.unittest import TestCase
@@ -90,7 +94,7 @@ class TimeoutDeferredTest(TestCase):
             original_deferred.addErrback(errback, "orig")
             timing_out_d = timeout_deferred(original_deferred, 1.0, self.clock)
             self.assertNoResult(timing_out_d)
-            self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+            self.assertIs(LoggingContext.current_context(), SENTINEL_CONTEXT)
             timing_out_d.addErrback(errback, "timingout")
 
             self.clock.pump((1.0,))

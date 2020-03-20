@@ -2,6 +2,7 @@ import twisted.python.failure
 from twisted.internet import defer, reactor
 
 from synapse.logging.context import (
+    SENTINEL_CONTEXT,
     LoggingContext,
     PreserveLoggingContext,
     make_deferred_yieldable,
@@ -108,7 +109,7 @@ class LoggingContextTestCase(unittest.TestCase):
         async def testfunc():
             self._check_test_key("one")
             d = Clock(reactor).sleep(0)
-            self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+            self.assertIs(LoggingContext.current_context(), SENTINEL_CONTEXT)
             await d
             self._check_test_key("one")
 

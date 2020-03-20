@@ -38,7 +38,7 @@ from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext
 from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -97,7 +97,7 @@ class TestCase(unittest.TestCase):
         def setUp(orig):
             # if we're not starting in the sentinel logcontext, then to be honest
             # all future bets are off.
-            if LoggingContext.current_context() is not LoggingContext.sentinel:
+            if LoggingContext.current_context():
                 self.fail(
                     "Test starting with non-sentinel logging context %s"
                     % (LoggingContext.current_context(),)
@@ -122,7 +122,7 @@ class TestCase(unittest.TestCase):
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
             gc.collect()
-            LoggingContext.set_current_context(LoggingContext.sentinel)
+            LoggingContext.set_current_context(SENTINEL_CONTEXT)
 
             return ret
 
