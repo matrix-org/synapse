@@ -181,12 +181,11 @@ LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 class _Sentinel(object):
     """Sentinel to represent the root context"""
 
-    __slots__ = ["previous_context", "alive", "request", "scope", "tag"]
+    __slots__ = ["previous_context", "request", "scope", "tag"]
 
     def __init__(self) -> None:
         # Minimal set for compatibility with LoggingContext
         self.previous_context = None
-        self.alive = None
         self.request = None
         self.scope = None
         self.tag = None
@@ -246,7 +245,6 @@ class LoggingContext(object):
         "_resource_usage",
         "usage_start",
         "main_thread",
-        "alive",
         "request",
         "tag",
         "scope",
@@ -266,7 +264,6 @@ class LoggingContext(object):
         self.main_thread = get_thread_id()
         self.request = None
         self.tag = ""
-        self.alive = True
         self.scope = None  # type: Optional[_LogContextScope]
 
         self.parent_context = parent_context
@@ -292,7 +289,6 @@ class LoggingContext(object):
                 self.previous_context,
                 old_context,
             )
-        self.alive = True
 
         return self
 
@@ -310,8 +306,6 @@ class LoggingContext(object):
                 logger.warning(
                     "Expected logging context %s but found %s", self, current
                 )
-        self.alive = False
-
         # if we have a parent, pass our CPU usage stats on
         if self.parent_context is not None and hasattr(
             self.parent_context, "_resource_usage"
@@ -382,7 +376,7 @@ class LoggingContext(object):
         # If we are on the correct thread and we're currently running then we
         # can include resource usage so far.
         is_main_thread = get_thread_id() == self.main_thread
-        if self.alive and self.usage_start and is_main_thread:
+        if self.usage_start and is_main_thread:
             utime_delta, stime_delta = self._get_cputime()
             res.ru_utime += utime_delta
             res.ru_stime += stime_delta
@@ -496,8 +490,6 @@ class PreserveLoggingContext(object):
 
         if self.current_context:
             self.has_parent = self.current_context.previous_context is not None
-            if not self.current_context.alive:
-                logger.debug("Entering dead context: %s", self.current_context)
 
     def __exit__(self, type, value, traceback) -> None:
         """Restores the current logging context"""
@@ -512,10 +504,6 @@ class PreserveLoggingContext(object):
                     self.new_context,
                     context,
                 )
-
-        if self.current_context:
-            if not self.current_context.alive:
-                logger.debug("Restoring dead context: %s", self.current_context)
 
 
 _thread_local = threading.local()
