@@ -306,14 +306,6 @@ class LoggingContext(object):
                 logger.warning(
                     "Expected logging context %s but found %s", self, current
                 )
-        # if we have a parent, pass our CPU usage stats on
-        if self.parent_context is not None and hasattr(
-            self.parent_context, "_resource_usage"
-        ):
-            self.parent_context._resource_usage += self._resource_usage
-
-            # reset them in case we get entered again
-            self._resource_usage.reset()
 
     def copy_to(self, record) -> None:
         """Copy logging fields from this context to a log record or
@@ -362,6 +354,15 @@ class LoggingContext(object):
         self._resource_usage.ru_stime += stime_delta
 
         self.usage_start = None
+
+        # if we have a parent, pass our CPU usage stats on
+        if self.parent_context is not None and hasattr(
+            self.parent_context, "_resource_usage"
+        ):
+            self.parent_context._resource_usage += self._resource_usage
+
+            # reset them in case we get entered again
+            self._resource_usage.reset()
 
     def get_resource_usage(self) -> ContextResourceUsage:
         """Get resources used by this logcontext so far.
