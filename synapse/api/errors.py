@@ -73,6 +73,7 @@ class Codes(object):
     WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
+    BAD_ALIAS = "M_BAD_ALIAS"
 
 
 class CodeMessageException(RuntimeError):

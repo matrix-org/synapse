@@ -643,17 +643,6 @@ class FederationClientKeysClaimServlet(BaseFederationServlet):
         return 200, response
 
 
-class FederationQueryAuthServlet(BaseFederationServlet):
-    PATH = "/query_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
-
-    async def on_POST(self, origin, content, query, context, event_id):
-        new_content = await self.handler.on_query_auth_request(
-            origin, content, context, event_id
-        )
-
-        return 200, new_content
-
-
 class FederationGetMissingEventsServlet(BaseFederationServlet):
     # TODO(paul): Why does this path alone end with "/?" optional?
     PATH = "/get_missing_events/(?P<room_id>[^/]*)/?"
@@ -1412,7 +1401,6 @@ FEDERATION_SERVLET_CLASSES = (
     FederationV2SendLeaveServlet,
     FederationV1InviteServlet,
     FederationV2InviteServlet,
-    FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,
     FederationClientKeysQueryServlet,

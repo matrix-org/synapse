@@ -1,1 +1,0 @@
-Fix bug which caused an error when joining a room, with `'coroutine' object has no attribute 'event_id'`.
