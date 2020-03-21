@@ -32,6 +32,7 @@ from synapse.config.database import DatabaseConnectionConfig
 from synapse.logging.context import (
     LoggingContext,
     LoggingContextOrSentinel,
+    current_context,
     make_deferred_yieldable,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -483,7 +484,7 @@ class Database(object):
             end = monotonic_time()
             duration = end - start
 
-            LoggingContext.current_context().add_database_transaction(duration)
+            current_context().add_database_transaction(duration)
 
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
@@ -510,7 +511,7 @@ class Database(object):
         after_callbacks = []  # type: List[_CallbackListEntry]
         exception_callbacks = []  # type: List[_CallbackListEntry]
 
-        if not LoggingContext.current_context():
+        if not current_context():
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
@@ -547,9 +548,7 @@ class Database(object):
         Returns:
             Deferred: The result of func
         """
-        parent_context = (
-            LoggingContext.current_context()
-        )  # type: LoggingContextOrSentinel
+        parent_context = current_context()  # type: Optional[LoggingContextOrSentinel]
         if not parent_context:
             logger.warning(
                 "Starting db connection from sentinel context: metrics will be lost"

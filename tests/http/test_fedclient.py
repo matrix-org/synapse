@@ -29,14 +29,14 @@ from synapse.http.matrixfederationclient import (
     MatrixFederationHttpClient,
     MatrixFederationRequest,
 )
-from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
 
 from tests.server import FakeTransport
 from tests.unittest import HomeserverTestCase
 
 
 def check_logcontext(context):
-    current = LoggingContext.current_context()
+    current = current_context()
     if current is not context:
         raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 

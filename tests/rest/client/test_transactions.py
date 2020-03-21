@@ -2,7 +2,7 @@ from mock import Mock, call
 
 from twisted.internet import defer, reactor
 
-from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
 from synapse.rest.client.transactions import CLEANUP_PERIOD_MS, HttpTransactionCache
 from synapse.util import Clock
 
@@ -52,14 +52,14 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
         def test():
             with LoggingContext("c") as c1:
                 res = yield self.cache.fetch_or_execute(self.mock_key, cb)
-                self.assertIs(LoggingContext.current_context(), c1)
+                self.assertIs(current_context(), c1)
                 self.assertEqual(res, "yay")
 
         # run the test twice in parallel
         d = defer.gatherResults([test(), test()])
-        self.assertIs(LoggingContext.current_context(), SENTINEL_CONTEXT)
+        self.assertIs(current_context(), SENTINEL_CONTEXT)
         yield d
-        self.assertIs(LoggingContext.current_context(), SENTINEL_CONTEXT)
+        self.assertIs(current_context(), SENTINEL_CONTEXT)
 
     @defer.inlineCallbacks
     def test_does_not_cache_exceptions(self):
@@ -81,11 +81,11 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
                 yield self.cache.fetch_or_execute(self.mock_key, cb)
             except Exception as e:
                 self.assertEqual(e.args[0], "boo")
-            self.assertIs(LoggingContext.current_context(), test_context)
+            self.assertIs(current_context(), test_context)
 
             res = yield self.cache.fetch_or_execute(self.mock_key, cb)
             self.assertEqual(res, self.mock_http_response)
-            self.assertIs(LoggingContext.current_context(), test_context)
+            self.assertIs(current_context(), test_context)
 
     @defer.inlineCallbacks
     def test_does_not_cache_failures(self):
@@ -107,11 +107,11 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
                 yield self.cache.fetch_or_execute(self.mock_key, cb)
             except Exception as e:
                 self.assertEqual(e.args[0], "boo")
-            self.assertIs(LoggingContext.current_context(), test_context)
+            self.assertIs(current_context(), test_context)
 
             res = yield self.cache.fetch_or_execute(self.mock_key, cb)
             self.assertEqual(res, self.mock_http_response)
-            self.assertIs(LoggingContext.current_context(), test_context)
+            self.assertIs(current_context(), test_context)
 
     @defer.inlineCallbacks
     def test_cleans_up(self):

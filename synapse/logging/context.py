@@ -252,10 +252,8 @@ class LoggingContext(object):
         "scope",
     ]
 
-    thread_local = threading.local()
-
     def __init__(self, name=None, parent_context=None, request=None) -> None:
-        self.previous_context = LoggingContext.current_context()
+        self.previous_context = current_context()
         self.name = name
 
         # track the resources used by this context so far
@@ -285,36 +283,9 @@ class LoggingContext(object):
             return str(self.request)
         return "%s@%x" % (self.name, id(self))
 
-    @classmethod
-    def current_context(cls) -> LoggingContextOrSentinel:
-        """Get the current logging context from thread local storage
-
-        Returns:
-            LoggingContext: the current logging context
-        """
-        return getattr(cls.thread_local, "current_context", SENTINEL_CONTEXT)
-
-    @classmethod
-    def set_current_context(
-        cls, context: LoggingContextOrSentinel
-    ) -> LoggingContextOrSentinel:
-        """Set the current logging context in thread local storage
-        Args:
-            context(LoggingContext): The context to activate.
-        Returns:
-            The context that was previously active
-        """
-        current = cls.current_context()
-
-        if current is not context:
-            current.stop()
-            cls.thread_local.current_context = context
-            context.start()
-        return current
-
     def __enter__(self) -> "LoggingContext":
         """Enters this logging context into thread local storage"""
-        old_context = self.set_current_context(self)
+        old_context = set_current_context(self)
         if self.previous_context != old_context:
             logger.warning(
                 "Expected previous context %r, found %r",
@@ -331,7 +302,7 @@ class LoggingContext(object):
         Returns:
             None to avoid suppressing any exceptions that were thrown.
         """
-        current = self.set_current_context(self.previous_context)
+        current = set_current_context(self.previous_context)
         if current is not self:
             if current is SENTINEL_CONTEXT:
                 logger.warning("Expected logging context %s was lost", self)
@@ -494,7 +465,7 @@ class LoggingContextFilter(logging.Filter):
         Returns:
             True to include the record in the log output.
         """
-        context = LoggingContext.current_context()
+        context = current_context()
         for key, value in self.defaults.items():
             setattr(record, key, value)
 
@@ -521,7 +492,7 @@ class PreserveLoggingContext(object):
 
     def __enter__(self) -> None:
         """Captures the current logging context"""
-        self.current_context = LoggingContext.set_current_context(self.new_context)
+        self.current_context = set_current_context(self.new_context)
 
         if self.current_context:
             self.has_parent = self.current_context.previous_context is not None
@@ -530,7 +501,7 @@ class PreserveLoggingContext(object):
 
     def __exit__(self, type, value, traceback) -> None:
         """Restores the current logging context"""
-        context = LoggingContext.set_current_context(self.current_context)
+        context = set_current_context(self.current_context)
 
         if context != self.new_context:
             if not context:
@@ -545,6 +516,31 @@ class PreserveLoggingContext(object):
         if self.current_context:
             if not self.current_context.alive:
                 logger.debug("Restoring dead context: %s", self.current_context)
+
+
+_thread_local = threading.local()
+_thread_local.current_context = SENTINEL_CONTEXT
+
+
+def current_context() -> LoggingContextOrSentinel:
+    """Get the current logging context from thread local storage"""
+    return getattr(_thread_local, "current_context", SENTINEL_CONTEXT)
+
+
+def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSentinel:
+    """Set the current logging context in thread local storage
+    Args:
+        context(LoggingContext): The context to activate.
+    Returns:
+        The context that was previously active
+    """
+    current = current_context()
+
+    if current is not context:
+        current.stop()
+        _thread_local.current_context = context
+        context.start()
+    return current
 
 
 def nested_logging_context(
@@ -573,7 +569,7 @@ def nested_logging_context(
     if parent_context is not None:
         context = parent_context  # type: LoggingContextOrSentinel
     else:
-        context = LoggingContext.current_context()
+        context = current_context()
     return LoggingContext(
         parent_context=context, request=str(context.request) + "-" + suffix
     )
@@ -605,7 +601,7 @@ def run_in_background(f, *args, **kwargs):
     CRITICAL error about an unhandled error will be logged without much
     indication about where it came from.
     """
-    current = LoggingContext.current_context()
+    current = current_context()
     try:
         res = f(*args, **kwargs)
     except:  # noqa: E722
@@ -626,7 +622,7 @@ def run_in_background(f, *args, **kwargs):
 
     # The function may have reset the context before returning, so
     # we need to restore it now.
-    ctx = LoggingContext.set_current_context(current)
+    ctx = set_current_context(current)
 
     # The original context will be restored when the deferred
     # completes, but there is nothing waiting for it, so it will
@@ -675,7 +671,7 @@ def make_deferred_yieldable(deferred):
 
     # ok, we can't be sure that a yield won't block, so let's reset the
     # logcontext, and add a callback to the deferred to restore it.
-    prev_context = LoggingContext.set_current_context(SENTINEL_CONTEXT)
+    prev_context = set_current_context(SENTINEL_CONTEXT)
     deferred.addBoth(_set_context_cb, prev_context)
     return deferred
 
@@ -685,7 +681,7 @@ ResultT = TypeVar("ResultT")
 
 def _set_context_cb(result: ResultT, context: LoggingContext) -> ResultT:
     """A callback function which just sets the logging context"""
-    LoggingContext.set_current_context(context)
+    set_current_context(context)
     return result
 
 
@@ -753,7 +749,7 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
         Deferred: A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
-    logcontext = LoggingContext.current_context()
+    logcontext = current_context()
 
     def g():
         with LoggingContext(parent_context=logcontext):

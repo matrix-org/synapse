@@ -25,6 +25,7 @@ from synapse.logging.context import (
     SENTINEL_CONTEXT,
     LoggingContext,
     PreserveLoggingContext,
+    current_context,
     make_deferred_yieldable,
 )
 from synapse.util.caches import descriptors
@@ -195,7 +196,7 @@ class DescriptorTestCase(unittest.TestCase):
             with LoggingContext() as c1:
                 c1.name = "c1"
                 r = yield obj.fn(1)
-                self.assertEqual(LoggingContext.current_context(), c1)
+                self.assertEqual(current_context(), c1)
             return r
 
         def check_result(r):
@@ -205,12 +206,12 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(LoggingContext.current_context(), SENTINEL_CONTEXT)
+        self.assertEqual(current_context(), SENTINEL_CONTEXT)
         d1.addCallback(check_result)
 
         # and another
         d2 = do_lookup()
-        self.assertEqual(LoggingContext.current_context(), SENTINEL_CONTEXT)
+        self.assertEqual(current_context(), SENTINEL_CONTEXT)
         d2.addCallback(check_result)
 
         # let the lookup complete
@@ -240,14 +241,14 @@ class DescriptorTestCase(unittest.TestCase):
                 try:
                     d = obj.fn(1)
                     self.assertEqual(
-                        LoggingContext.current_context(), SENTINEL_CONTEXT,
+                        current_context(), SENTINEL_CONTEXT,
                     )
                     yield d
                     self.fail("No exception thrown")
                 except SynapseError:
                     pass
 
-                self.assertEqual(LoggingContext.current_context(), c1)
+                self.assertEqual(current_context(), c1)
 
             # the cache should now be empty
             self.assertEqual(len(obj.fn.cache.cache), 0)
@@ -256,7 +257,7 @@ class DescriptorTestCase(unittest.TestCase):
 
         # set off a deferred which will do a cache lookup
         d1 = do_lookup()
-        self.assertEqual(LoggingContext.current_context(), SENTINEL_CONTEXT)
+        self.assertEqual(current_context(), SENTINEL_CONTEXT)
 
         return d1
 
@@ -367,10 +368,10 @@ class CachedListDescriptorTestCase(unittest.TestCase):
 
             @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
             def list_fn(self, args1, arg2):
-                assert LoggingContext.current_context().request == "c1"
+                assert current_context().request == "c1"
                 # we want this to behave like an asynchronous function
                 yield run_on_reactor()
-                assert LoggingContext.current_context().request == "c1"
+                assert current_context().request == "c1"
                 return self.mock(args1, arg2)
 
         with LoggingContext() as c1:
@@ -378,9 +379,9 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             obj = Cls()
             obj.mock.return_value = {10: "fish", 20: "chips"}
             d1 = obj.list_fn([10, 20], 2)
-            self.assertEqual(LoggingContext.current_context(), SENTINEL_CONTEXT)
+            self.assertEqual(current_context(), SENTINEL_CONTEXT)
             r = yield d1
-            self.assertEqual(LoggingContext.current_context(), c1)
+            self.assertEqual(current_context(), c1)
             obj.mock.assert_called_once_with([10, 20], 2)
             self.assertEqual(r, {10: "fish", 20: "chips"})
             obj.mock.reset_mock()

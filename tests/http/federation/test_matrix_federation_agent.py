@@ -38,7 +38,7 @@ from synapse.http.federation.well_known_resolver import (
     WellKnownResolver,
     _cache_period_from_headers,
 )
-from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
 from synapse.util.caches.ttlcache import TTLCache
 
 from tests import unittest
@@ -1197,7 +1197,7 @@ class TestCachePeriodFromHeaders(unittest.TestCase):
 
 
 def _check_logcontext(context):
-    current = LoggingContext.current_context()
+    current = current_context()
     if current is not context:
         raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 
