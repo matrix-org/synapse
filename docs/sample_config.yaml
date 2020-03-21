@@ -1487,8 +1487,8 @@ email:
   
   # Edit these values to choose a custom notification template
   #
-  notif_template_html: notif_mail.html
-  notif_template_text: notif_mail.txt
+  email.notif_template_html: notif_mail.html
+  email.notif_template_text: notif_mail.txt
 
   # Custom URL for client links within the email notifications. By default
   # links will be based on "https://matrix.to".
