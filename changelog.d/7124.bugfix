@@ -1,0 +1,1 @@
+Fix a bug in the media repository where remote thumbnails with the same size but different crop methods would overwrite each other.
