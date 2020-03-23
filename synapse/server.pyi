@@ -107,3 +107,5 @@ class HomeServer(object):
         self,
     ) -> synapse.replication.tcp.client.ReplicationClientHandler:
         pass
+    def is_mine_id(self, domain_id: str) -> bool:
+        pass
