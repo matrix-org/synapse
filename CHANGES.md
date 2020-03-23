@@ -3,7 +3,7 @@ Synapse 1.12.0 (2020-03-23)
 
 No significant changes since 1.12.0rc1.
 
-Debian packages and Docker images are rebuilt using the letest versions of
+Debian packages and Docker images are rebuilt using the latest versions of
 dependency libraries, including Twisted 20.3.0. **Please see security advisory
 below**.
 
@@ -23,7 +23,7 @@ We are not aware of these vulnerabilities being exploited in the world, and
 do not believe that they are exploitable with current versions of any reverse
 proxies. Nevertheless, we recommend that all Synapse administrators ensure that
 they have the latest versions of the Twisted library to ensure that their
-installation remains secore.
+installation remains secure.
 
 * Administrators using the [`matrix.org` Docker
   image](https://hub.docker.com/r/matrixdotorg/synapse/) or the [Debian/Ubuntu
@@ -51,7 +51,7 @@ After the release of Synapse 1.13.0, we intend to change this default to
 practice and modern `git` usage.
 
 Although we try to keep `develop` in a stable state, there may be occasions
-where regressions keep in. Developers and distributors who have scripts which
+where regressions creep in. Developers and distributors who have scripts which
 run builds using the default branch of `Synapse` should therefore consider
 pinning their scripts to `master`.
 
