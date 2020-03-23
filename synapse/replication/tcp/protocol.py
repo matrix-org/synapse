@@ -459,7 +459,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         await self.streamer.on_remove_pusher(cmd.app_id, cmd.push_key, cmd.user_id)
 
     async def on_INVALIDATE_CACHE(self, cmd):
-        self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
+        await self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
 
     async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
         self.streamer.on_remote_server_up(cmd.data)
