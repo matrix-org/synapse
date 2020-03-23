@@ -58,7 +58,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     @cachedInlineCallbacks()
     def get_users_with_read_receipts_in_room(self, room_id):
         receipts = yield self.get_receipts_for_room(room_id, "m.read")
-        return set(r["user_id"] for r in receipts)
+        return {r["user_id"] for r in receipts}
 
     @cached(num_args=2)
     def get_receipts_for_room(self, room_id, receipt_type):
@@ -283,7 +283,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
                 args.append(limit)
             txn.execute(sql, args)
 
-            return list(r[0:5] + (json.loads(r[5]),) for r in txn)
+            return [r[0:5] + (json.loads(r[5]),) for r in txn]
 
         return self.db.runInteraction(
             "get_all_updated_receipts", get_all_updated_receipts_txn

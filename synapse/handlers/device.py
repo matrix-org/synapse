@@ -742,6 +742,6 @@ class DeviceListUpdater(object):
 
         # We clobber the seen updates since we've re-synced from a given
         # point.
-        self._seen_updates[user_id] = set([stream_id])
+        self._seen_updates[user_id] = {stream_id}
 
         defer.returnValue(result)

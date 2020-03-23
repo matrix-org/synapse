@@ -129,9 +129,9 @@ class FederationRemoteSendQueue(object):
             for key in keys[:i]:
                 del self.presence_changed[key]
 
-            user_ids = set(
+            user_ids = {
                 user_id for uids in self.presence_changed.values() for user_id in uids
-            )
+            }
 
             keys = self.presence_destinations.keys()
             i = self.presence_destinations.bisect_left(position_to_delete)

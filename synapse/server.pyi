@@ -3,6 +3,7 @@ import twisted.internet
 import synapse.api.auth
 import synapse.config.homeserver
 import synapse.crypto.keyring
+import synapse.federation.federation_server
 import synapse.federation.sender
 import synapse.federation.transport.client
 import synapse.handlers
@@ -106,6 +107,10 @@ class HomeServer(object):
     def get_tcp_replication(
         self,
     ) -> synapse.replication.tcp.client.ReplicationClientHandler:
+        pass
+    def get_federation_registry(
+        self,
+    ) -> synapse.federation.federation_server.FederationHandlerRegistry:
         pass
     def is_mine_id(self, domain_id: str) -> bool:
         pass

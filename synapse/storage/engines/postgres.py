@@ -15,16 +15,14 @@
 
 import logging
 
-from ._base import IncorrectDatabaseSetup
+from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(object):
-    single_threaded = False
-
+class PostgresEngine(BaseDatabaseEngine):
     def __init__(self, database_module, database_config):
-        self.module = database_module
+        super().__init__(database_module, database_config)
         self.module.extensions.register_type(self.module.extensions.UNICODE)
 
         # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
@@ -35,6 +33,10 @@ class PostgresEngine(object):
         self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
         self._version = None  # unknown as yet
+
+    @property
+    def single_threaded(self) -> bool:
+        return False
 
     def check_database(self, db_conn, allow_outdated_version: bool = False):
         # Get the version of PostgreSQL that we're using. As per the psycopg2
@@ -53,7 +55,7 @@ class PostgresEngine(object):
             if rows and rows[0][0] != "UTF8":
                 raise IncorrectDatabaseSetup(
                     "Database has incorrect encoding: '%s' instead of 'UTF8'\n"
-                    "See docs/postgres.rst for more information." % (rows[0][0],)
+                    "See docs/postgres.md for more information." % (rows[0][0],)
                 )
 
             txn.execute(
@@ -62,12 +64,16 @@ class PostgresEngine(object):
             collation, ctype = txn.fetchone()
             if collation != "C":
                 logger.warning(
-                    "Database has incorrect collation of %r. Should be 'C'", collation
+                    "Database has incorrect collation of %r. Should be 'C'\n"
+                    "See docs/postgres.md for more information.",
+                    collation,
                 )
 
             if ctype != "C":
                 logger.warning(
-                    "Database has incorrect ctype of %r. Should be 'C'", ctype
+                    "Database has incorrect ctype of %r. Should be 'C'\n"
+                    "See docs/postgres.md for more information.",
+                    ctype,
                 )
 
     def check_new_database(self, txn):

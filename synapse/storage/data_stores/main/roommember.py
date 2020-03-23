@@ -465,7 +465,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             txn.execute(sql % (clause,), args)
 
-            return set(row[0] for row in txn)
+            return {row[0] for row in txn}
 
         return await self.db.runInteraction(
             "get_users_server_still_shares_room_with",
@@ -826,7 +826,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 GROUP BY room_id, user_id;
             """
             txn.execute(sql, (user_id,))
-            return set(row[0] for row in txn if row[1] == 0)
+            return {row[0] for row in txn if row[1] == 0}
 
         return self.db.runInteraction(
             "get_forgotten_rooms_for_user", _get_forgotten_rooms_for_user_txn
