@@ -852,6 +852,38 @@ class EventCreationHandler(object):
                 )
 
     @defer.inlineCallbacks
+    def _validate_canonical_alias(
+        self, directory_handler, room_alias_str, expected_room_id
+    ):
+        """
+        Ensure that the given room alias points to the expected room ID.
+
+        Args:
+            directory_handler: The directory handler object.
+            room_alias_str: The room alias to check.
+            expected_room_id: The room ID that the alias should point to.
+        """
+        room_alias = RoomAlias.from_string(room_alias_str)
+        try:
+            mapping = yield directory_handler.get_association(room_alias)
+        except SynapseError as e:
+            # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
+            if e.errcode == Codes.NOT_FOUND:
+                raise SynapseError(
+                    400,
+                    "Room alias %s does not point to the room" % (room_alias_str,),
+                    Codes.BAD_ALIAS,
+                )
+            raise
+
+        if mapping["room_id"] != expected_room_id:
+            raise SynapseError(
+                400,
+                "Room alias %s does not point to the room" % (room_alias_str,),
+                Codes.BAD_ALIAS,
+            )
+
+    @defer.inlineCallbacks
     def persist_and_notify_client_event(
         self, requester, event, context, ratelimit=True, extra_users=[]
     ):
@@ -905,15 +937,9 @@ class EventCreationHandler(object):
             room_alias_str = event.content.get("alias", None)
             directory_handler = self.hs.get_handlers().directory_handler
             if room_alias_str and room_alias_str != original_alias:
-                room_alias = RoomAlias.from_string(room_alias_str)
-                mapping = yield directory_handler.get_association(room_alias)
-
-                if mapping["room_id"] != event.room_id:
-                    raise SynapseError(
-                        400,
-                        "Room alias %s does not point to the room" % (room_alias_str,),
-                        Codes.BAD_ALIAS,
-                    )
+                yield self._validate_canonical_alias(
+                    directory_handler, room_alias_str, event.room_id
+                )
 
             # Check that alt_aliases is the proper form.
             alt_aliases = event.content.get("alt_aliases", [])
@@ -931,16 +957,9 @@ class EventCreationHandler(object):
             new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
             if new_alt_aliases:
                 for alias_str in new_alt_aliases:
-                    room_alias = RoomAlias.from_string(alias_str)
-                    mapping = yield directory_handler.get_association(room_alias)
-
-                    if mapping["room_id"] != event.room_id:
-                        raise SynapseError(
-                            400,
-                            "Room alias %s does not point to the room"
-                            % (room_alias_str,),
-                            Codes.BAD_ALIAS,
-                        )
+                    yield self._validate_canonical_alias(
+                        directory_handler, alias_str, event.room_id
+                    )
 
         federation_handler = self.hs.get_handlers().federation_handler
 
