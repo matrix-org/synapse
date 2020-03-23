@@ -35,9 +35,9 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
         4. Password contains uppercase letter(s)
         5. Password contains lowercase letter(s)
 
-    Therefore, each test in this test case that tests whether a password triggers the
-    right error code to be returned provides a password good enough to pass the previous
-    steps but not the one it's testing (nor any step that comes after).
+    For each test below that checks whether a password triggers the right error code,
+    that test provides a password good enough to pass the previous tests, but not the
+    one it is currently testing (nor any test that comes afterward).
     """
 
     servlets = [
