@@ -32,7 +32,7 @@ class PasswordConfig(Config):
         self.password_pepper = password_config.get("pepper", "")
 
         # Password policy
-        self.password_policy = password_config.get("policy", {})
+        self.password_policy = password_config.get("policy") or {}
         self.password_policy_enabled = self.password_policy.get("enabled", False)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
