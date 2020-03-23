@@ -84,8 +84,7 @@ class AdminCmdServer(HomeServer):
 
 
 class AdminCmdReplicationHandler(ReplicationClientHandler):
-    @defer.inlineCallbacks
-    def on_rdata(self, stream_name, token, rows):
+    async def on_rdata(self, stream_name, token, rows):
         pass
 
     def get_streams_to_replicate(self):
