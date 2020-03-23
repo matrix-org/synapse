@@ -344,9 +344,10 @@ class RegistrationConfig(Config):
         #
         #enable_set_avatar_url: false
 
-        # If false, stop users from trying to change the 3PIDs associated with
-        # their accounts (email address and msisdn).
-        # Default is true and users can edit their own 3PIDs.
+        # Whether users can change the 3PIDs associated with their accounts
+        # (email address and msisdn).
+        #
+        # Defaults to 'true'
         #
         #enable_3pid_changes: false
 
