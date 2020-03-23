@@ -401,6 +401,22 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
+    def test_user_does_not_exist(self):
+        """
+        Tests that a lookup for a user that does not exist returns a 404
+        """
+        self.hs.config.registration_shared_secret = None
+
+        request, channel = self.make_request(
+            "GET",
+            "/_synapse/admin/v2/users/@unknown_person:test",
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(404, channel.code, msg=channel.json_body)
+        self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
+
     def test_requester_is_admin(self):
         """
         If the user is a server admin, a new user is created.
