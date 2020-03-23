@@ -21,8 +21,7 @@ import six
 
 from unpaddedbase64 import encode_base64
 
-from synapse.api.errors import UnsupportedRoomVersionError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.api.room_versions import EventFormatVersions
 from synapse.types import JsonDict
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
@@ -406,27 +405,6 @@ class FrozenEventV3(FrozenEventV2):
             compute_event_reference_hash(self)[1], urlsafe=True
         )
         return self._event_id
-
-
-def room_version_to_event_format(room_version):
-    """Converts a room version string to the event format
-
-    Args:
-        room_version (str)
-
-    Returns:
-        int
-
-    Raises:
-        UnsupportedRoomVersionError if the room version is unknown
-    """
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-
-    if not v:
-        # this can happen if support is withdrawn for a room version
-        raise UnsupportedRoomVersionError()
-
-    return v.event_format
 
 
 def event_type_from_format_version(format_version):
