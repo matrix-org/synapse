@@ -238,8 +238,11 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             @defer.inlineCallbacks
             def build(self, prev_event_ids):
                 built_event = yield self._base_builder.build(prev_event_ids)
-                built_event.event_id = self._event_id
+
+                built_event._event_id = self._event_id
                 built_event._event_dict["event_id"] = self._event_id
+                assert built_event.event_id == self._event_id
+
                 return built_event
 
             @property

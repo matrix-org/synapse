@@ -189,7 +189,13 @@ class EventBase(object):
     redacts = _event_dict_property("redacts", None)
     room_id = _event_dict_property("room_id")
     sender = _event_dict_property("sender")
+    state_key = _event_dict_property("state_key")
+    type = _event_dict_property("type")
     user_id = _event_dict_property("sender")
+
+    @property
+    def event_id(self) -> str:
+        raise NotImplementedError()
 
     @property
     def membership(self):
@@ -281,10 +287,7 @@ class FrozenEvent(EventBase):
         else:
             frozen_dict = event_dict
 
-        self.event_id = event_dict["event_id"]
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
+        self._event_id = event_dict["event_id"]
 
         super(FrozenEvent, self).__init__(
             frozen_dict,
@@ -293,6 +296,10 @@ class FrozenEvent(EventBase):
             internal_metadata_dict=internal_metadata_dict,
             rejected_reason=rejected_reason,
         )
+
+    @property
+    def event_id(self) -> str:
+        return self._event_id
 
     def __str__(self):
         return self.__repr__()
@@ -332,9 +339,6 @@ class FrozenEventV2(EventBase):
             frozen_dict = event_dict
 
         self._event_id = None
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
 
         super(FrozenEventV2, self).__init__(
             frozen_dict,
