@@ -579,7 +579,7 @@ class FederationV1InviteServlet(BaseFederationServlet):
         # state resolution algorithm, and we don't use that for processing
         # invites
         content = await self.handler.on_invite_request(
-            origin, content, room_version=RoomVersions.V1.identifier
+            origin, content, room_version_id=RoomVersions.V1.identifier
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
@@ -606,7 +606,7 @@ class FederationV2InviteServlet(BaseFederationServlet):
         event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
 
         content = await self.handler.on_invite_request(
-            origin, event, room_version=room_version
+            origin, event, room_version_id=room_version
         )
         return 200, content
 
