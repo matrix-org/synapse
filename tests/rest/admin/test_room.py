@@ -174,7 +174,8 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(self.public_room_id, channel.json_body["room_id"])
 
-        # Validate if user is member of room
+        # Validate if user is a member of the room
+
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
@@ -206,7 +207,8 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
     def test_join_private_room_if_owner(self):
         """
         Test joining a local user to a private room with "JoinRules.INVITE",
-        when admin is owner of this room.
+        when server admin is owner of this room.
+
         """
         private_room_id = self.helper.create_room_as(
             self.admin_user, tok=self.admin_user_tok, is_public=False
@@ -225,7 +227,8 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(private_room_id, channel.json_body["room_id"])
 
-        # Validate if user is member of room
+        # Validate if user is a member of the room
+
         request, channel = self.make_request(
             "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
         )
