@@ -32,7 +32,7 @@ def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
 
     Args:
         path_regex (str): The regex string to match. This should NOT have a ^
-        as this will be prefixed.
+            as this will be prefixed.
     Returns:
         SRE_Pattern
     """

@@ -15,15 +15,20 @@
 import logging
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_integer,
     parse_json_object_from_request,
+    parse_string,
 )
 from synapse.rest.admin._base import (
+    admin_patterns,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
+from synapse.storage.data_stores.main.room import RoomSortOrder
 from synapse.types import create_requester
 from synapse.util.async_helpers import maybe_awaitable
 
@@ -155,3 +160,80 @@ class ShutdownRoomRestServlet(RestServlet):
                 "new_room_id": new_room_id,
             },
         )
+
+
+class ListRoomRestServlet(RestServlet):
+    """
+    List all rooms that are known to the homeserver. Results are returned
+    in a dictionary containing room information. Supports pagination.
+    """
+
+    PATTERNS = admin_patterns("/rooms")
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+        self.admin_handler = hs.get_handlers().admin_handler
+
+    async def on_GET(self, request):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        # Extract query parameters
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+        order_by = parse_string(request, "order_by", default="alphabetical")
+        if order_by not in (
+            RoomSortOrder.ALPHABETICAL.value,
+            RoomSortOrder.SIZE.value,
+        ):
+            raise SynapseError(
+                400,
+                "Unknown value for order_by: %s" % (order_by,),
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        search_term = parse_string(request, "search_term")
+        if search_term == "":
+            raise SynapseError(
+                400,
+                "search_term cannot be an empty string",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        direction = parse_string(request, "dir", default="f")
+        if direction not in ("f", "b"):
+            raise SynapseError(
+                400, "Unknown direction: %s" % (direction,), errcode=Codes.INVALID_PARAM
+            )
+
+        reverse_order = True if direction == "b" else False
+
+        # Return list of rooms according to parameters
+        rooms, total_rooms = await self.store.get_rooms_paginate(
+            start, limit, order_by, reverse_order, search_term
+        )
+        response = {
+            # next_token should be opaque, so return a value the client can parse
+            "offset": start,
+            "rooms": rooms,
+            "total_rooms": total_rooms,
+        }
+
+        # Are there more rooms to paginate through after this?
+        if (start + limit) < total_rooms:
+            # There are. Calculate where the query should start from next time
+            # to get the next part of the list
+            response["next_batch"] = start + limit
+
+        # Is it possible to paginate backwards? Check if we currently have an
+        # offset
+        if start > 0:
+            if start > limit:
+                # Going back one iteration won't take us to the start.
+                # Calculate new offset
+                response["prev_batch"] = start - limit
+            else:
+                response["prev_batch"] = 0
+
+        return 200, response

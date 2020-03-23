@@ -18,7 +18,8 @@ import collections
 import logging
 import re
 from abc import abstractmethod
-from typing import List, Optional, Tuple
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 from six import integer_types
 
@@ -44,6 +45,18 @@ OpsLevel = collections.namedtuple(
 RatelimitOverride = collections.namedtuple(
     "RatelimitOverride", ("messages_per_second", "burst_count")
 )
+
+
+class RoomSortOrder(Enum):
+    """
+    Enum to define the sorting method used when returning rooms with get_rooms_paginate
+
+    ALPHABETICAL = sort rooms alphabetically by name
+    SIZE = sort rooms by membership size, highest to lowest
+    """
+
+    ALPHABETICAL = "alphabetical"
+    SIZE = "size"
 
 
 class RoomWorkerStore(SQLBaseStore):
@@ -298,6 +311,116 @@ class RoomWorkerStore(SQLBaseStore):
 
         # Check the is_public value
         defer.returnValue(room_info.get("is_public", False))
+
+    async def get_rooms_paginate(
+        self,
+        start: int,
+        limit: int,
+        order_by: RoomSortOrder,
+        reverse_order: bool,
+        search_term: Optional[str],
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Function to retrieve a paginated list of rooms as json.
+
+        Args:
+            start: offset in the list
+            limit: maximum amount of rooms to retrieve
+            order_by: the sort order of the returned list
+            reverse_order: whether to reverse the room list
+            search_term: a string to filter room names by
+        Returns:
+            A list of room dicts and an integer representing the total number of
+            rooms that exist given this query
+        """
+        # Filter room names by a string
+        where_statement = ""
+        if search_term:
+            where_statement = "WHERE state.name LIKE ?"
+
+            # Our postgres db driver converts ? -> %s in SQL strings as that's the
+            # placeholder for postgres.
+            # HOWEVER, if you put a % into your SQL then everything goes wibbly.
+            # To get around this, we're going to surround search_term with %'s
+            # before giving it to the database in python instead
+            search_term = "%" + search_term + "%"
+
+        # Set ordering
+        if RoomSortOrder(order_by) == RoomSortOrder.SIZE:
+            order_by_column = "curr.joined_members"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.ALPHABETICAL:
+            # Sort alphabetically
+            order_by_column = "state.name"
+            order_by_asc = True
+        else:
+            raise StoreError(
+                500, "Incorrect value for order_by provided: %s" % order_by
+            )
+
+        # Whether to return the list in reverse order
+        if reverse_order:
+            # Flip the boolean
+            order_by_asc = not order_by_asc
+
+        # Create one query for getting the limited number of events that the user asked
+        # for, and another query for getting the total number of events that could be
+        # returned. Thus allowing us to see if there are more events to paginate through
+        info_sql = """
+            SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members
+            FROM room_stats_state state
+            INNER JOIN room_stats_current curr USING (room_id)
+            %s
+            ORDER BY %s %s
+            LIMIT ?
+            OFFSET ?
+        """ % (
+            where_statement,
+            order_by_column,
+            "ASC" if order_by_asc else "DESC",
+        )
+
+        # Use a nested SELECT statement as SQL can't count(*) with an OFFSET
+        count_sql = """
+            SELECT count(*) FROM (
+              SELECT room_id FROM room_stats_state state
+              %s
+            ) AS get_room_ids
+        """ % (
+            where_statement,
+        )
+
+        def _get_rooms_paginate_txn(txn):
+            # Execute the data query
+            sql_values = (limit, start)
+            if search_term:
+                # Add the search term into the WHERE clause
+                sql_values = (search_term,) + sql_values
+            txn.execute(info_sql, sql_values)
+
+            # Refactor room query data into a structured dictionary
+            rooms = []
+            for room in txn:
+                rooms.append(
+                    {
+                        "room_id": room[0],
+                        "name": room[1],
+                        "canonical_alias": room[2],
+                        "joined_members": room[3],
+                    }
+                )
+
+            # Execute the count query
+
+            # Add the search term into the WHERE clause if present
+            sql_values = (search_term,) if search_term else ()
+            txn.execute(count_sql, sql_values)
+
+            room_count = txn.fetchone()
+            return rooms, room_count[0]
+
+        return await self.db.runInteraction(
+            "get_rooms_paginate", _get_rooms_paginate_txn,
+        )
 
     @cachedInlineCallbacks(max_entries=10000)
     def get_ratelimit_for_user(self, user_id):

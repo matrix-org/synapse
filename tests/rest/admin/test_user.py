@@ -461,7 +461,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("foobar", channel.json_body["displayname"])
+        self.assertEqual(None, channel.json_body["displayname"])  # deactivating a user removes their displayname
         self.assertEqual(True, channel.json_body["deactivated"])
 
         # Get user
@@ -472,7 +472,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("@bob:test", channel.json_body["name"])
-        self.assertEqual("foobar", channel.json_body["displayname"])
+        self.assertEqual(None, channel.json_body["displayname"])
         self.assertEqual(1, channel.json_body["admin"])
         self.assertEqual(0, channel.json_body["is_guest"])
         self.assertEqual(1, channel.json_body["deactivated"])
