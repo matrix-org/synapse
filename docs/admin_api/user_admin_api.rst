@@ -1,3 +1,33 @@
+Create or modify Account
+========================
+
+This API allows an administrator to create or modify a user account with a
+specific ``user_id``.
+
+This api is::
+
+    PUT /_synapse/admin/v2/users/<user_id>
+
+with a body of:
+
+.. code:: json
+
+    {
+        "password": "user_password",
+        "displayname": "User",
+        "avatar_url": "<avatar_url>",
+        "admin": false,
+        "deactivated": false
+    }
+
+including an ``access_token`` of a server admin.
+
+The parameter ``displayname`` is optional and defaults to ``user_id``.
+The parameter ``avatar_url`` is optional.
+The parameter ``admin`` is optional and defaults to 'false'.
+The parameter ``deactivated`` is optional and defaults to 'false'.
+If the user already exists then optional parameters default to the current value.
+
 List Accounts
 =============
 
@@ -50,7 +80,8 @@ This API returns information about a specific user account.
 
 The api is::
 
-    GET /_synapse/admin/v1/whois/<user_id>
+    GET /_synapse/admin/v1/whois/<user_id> (deprecated)
+    GET /_synapse/admin/v2/users/<user_id>
 
 including an ``access_token`` of a server admin.
 
