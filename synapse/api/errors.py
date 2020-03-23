@@ -410,11 +410,9 @@ class UnsupportedRoomVersionError(SynapseError):
     """The client's request to create a room used a room version that the server does
     not support."""
 
-    def __init__(self):
+    def __init__(self, msg="Homeserver does not support this room version"):
         super(UnsupportedRoomVersionError, self).__init__(
-            code=400,
-            msg="Homeserver does not support this room version",
-            errcode=Codes.UNSUPPORTED_ROOM_VERSION,
+            code=400, msg=msg, errcode=Codes.UNSUPPORTED_ROOM_VERSION,
         )
 
 

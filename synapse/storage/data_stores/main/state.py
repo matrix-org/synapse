@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +23,8 @@ from six import iteritems
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import NotFoundError
+from synapse.api.errors import NotFoundError, UnsupportedRoomVersionError
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.storage._base import SQLBaseStore
@@ -61,8 +63,29 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     def __init__(self, database: Database, db_conn, hs):
         super(StateGroupWorkerStore, self).__init__(database, db_conn, hs)
 
+    async def get_room_version(self, room_id: str) -> RoomVersion:
+        """Get the room_version of a given room
+
+        Raises:
+            NotFoundError: if the room is unknown
+
+            UnsupportedRoomVersionError: if the room uses an unknown room version.
+                Typically this happens if support for the room's version has been
+                removed from Synapse.
+        """
+        room_version_id = await self.get_room_version_id(room_id)
+        v = KNOWN_ROOM_VERSIONS.get(room_version_id)
+
+        if not v:
+            raise UnsupportedRoomVersionError(
+                "Room %s uses a room version %s which is no longer supported"
+                % (room_id, room_version_id)
+            )
+
+        return v
+
     @cached(max_entries=10000)
-    async def get_room_version(self, room_id: str) -> str:
+    async def get_room_version_id(self, room_id: str) -> str:
         """Get the room_version of a given room
 
         Raises:

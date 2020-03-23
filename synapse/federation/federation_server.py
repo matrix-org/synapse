@@ -234,7 +234,7 @@ class FederationServer(FederationBase):
                 continue
 
             try:
-                room_version = await self.store.get_room_version(room_id)
+                room_version = await self.store.get_room_version_id(room_id)
             except NotFoundError:
                 logger.info("Ignoring PDU for unknown room_id: %s", room_id)
                 continue
@@ -334,7 +334,7 @@ class FederationServer(FederationBase):
                 )
             )
 
-        room_version = await self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         resp["room_version"] = room_version
 
         return 200, resp
@@ -385,7 +385,7 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
-        room_version = await self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         if room_version not in supported_versions:
             logger.warning(
                 "Room version %s not in %s", room_version, supported_versions
@@ -417,7 +417,7 @@ class FederationServer(FederationBase):
     async def on_send_join_request(self, origin, content, room_id):
         logger.debug("on_send_join_request: content: %s", content)
 
-        room_version = await self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         format_ver = room_version_to_event_format(room_version)
         pdu = event_from_pdu_json(content, format_ver)
 
@@ -440,7 +440,7 @@ class FederationServer(FederationBase):
         await self.check_server_matches_acl(origin_host, room_id)
         pdu = await self.handler.on_make_leave_request(origin, room_id, user_id)
 
-        room_version = await self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
 
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
@@ -448,7 +448,7 @@ class FederationServer(FederationBase):
     async def on_send_leave_request(self, origin, content, room_id):
         logger.debug("on_send_leave_request: content: %s", content)
 
-        room_version = await self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         format_ver = room_version_to_event_format(room_version)
         pdu = event_from_pdu_json(content, format_ver)
 
@@ -495,7 +495,7 @@ class FederationServer(FederationBase):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
-            room_version = await self.store.get_room_version(room_id)
+            room_version = await self.store.get_room_version_id(room_id)
             format_ver = room_version_to_event_format(room_version)
 
             auth_chain = [
@@ -664,7 +664,7 @@ class FederationServer(FederationBase):
                 logger.info("Accepting join PDU %s from %s", pdu.event_id, origin)
 
         # We've already checked that we know the room version by this point
-        room_version = await self.store.get_room_version(pdu.room_id)
+        room_version = await self.store.get_room_version_id(pdu.room_id)
 
         # Check signature.
         try:
