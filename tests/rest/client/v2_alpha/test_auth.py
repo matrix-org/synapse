@@ -115,3 +115,69 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")
+
+    def test_cannot_change_operation(self):
+        """
+        The initial requested operation cannot be modified during the user interactive authentication session.
+        """
+
+        # Make the initial request to register. (Later on a different password
+        # will be used.)
+        request, channel = self.make_request(
+            "POST",
+            "register",
+            {"username": "user", "type": "m.login.password", "password": "bar"},
+        )
+        self.render(request)
+
+        # Returns a 401 as per the spec
+        self.assertEqual(request.code, 401)
+        # Grab the session
+        session = channel.json_body["session"]
+        # Assert our configured public key is being given
+        self.assertEqual(
+            channel.json_body["params"]["m.login.recaptcha"]["public_key"], "brokencake"
+        )
+
+        request, channel = self.make_request(
+            "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        request, channel = self.make_request(
+            "POST",
+            "auth/m.login.recaptcha/fallback/web?session="
+            + session
+            + "&g-recaptcha-response=a",
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        # The recaptcha handler is called with the response given
+        attempts = self.recaptcha_checker.recaptcha_attempts
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(attempts[0][0]["response"], "a")
+
+        # also complete the dummy auth
+        request, channel = self.make_request(
+            "POST", "register", {"auth": {"session": session, "type": "m.login.dummy"}}
+        )
+        self.render(request)
+
+        # Now we should have fulfilled a complete auth flow, including
+        # the recaptcha fallback step. Make the initial request again, but
+        # with a different password. This causes the request to fail since the
+        # operaiton was modified during the ui auth session.
+        request, channel = self.make_request(
+            "POST",
+            "register",
+            {
+                "username": "user",
+                "type": "m.login.password",
+                "password": "foo",  # Note this doesn't match the original request.
+                "auth": {"session": session},
+            },
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 403)
