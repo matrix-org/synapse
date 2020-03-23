@@ -32,7 +32,15 @@ from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, Syna
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
-from synapse.types import RoomAlias, RoomID, RoomStreamToken, StreamToken, UserID
+from synapse.types import (
+    Requester,
+    RoomAlias,
+    RoomID,
+    RoomStreamToken,
+    StateMap,
+    StreamToken,
+    UserID,
+)
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
@@ -209,15 +217,19 @@ class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def _update_upgraded_room_pls(
-        self, requester, old_room_id, new_room_id, old_room_state,
+        self,
+        requester: Requester,
+        old_room_id: str,
+        new_room_id: str,
+        old_room_state: StateMap[str],
     ):
         """Send updated power levels in both rooms after an upgrade
 
         Args:
-            requester (synapse.types.Requester): the user requesting the upgrade
-            old_room_id (str): the id of the room to be replaced
-            new_room_id (str): the id of the replacement room
-            old_room_state (dict[tuple[str, str], str]): the state map for the old room
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            new_room_id: the id of the replacement room
+            old_room_state: the state map for the old room
 
         Returns:
             Deferred

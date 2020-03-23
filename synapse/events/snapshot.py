@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, Optional, Tuple, Union
+from typing import Optional, Union
 
 from six import iteritems
 
@@ -23,6 +23,7 @@ from twisted.internet import defer
 
 from synapse.appservice import ApplicationService
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.types import StateMap
 
 
 @attr.s(slots=True)
@@ -106,13 +107,11 @@ class EventContext:
     _state_group = attr.ib(default=None, type=Optional[int])
     state_group_before_event = attr.ib(default=None, type=Optional[int])
     prev_group = attr.ib(default=None, type=Optional[int])
-    delta_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
+    delta_ids = attr.ib(default=None, type=Optional[StateMap[str]])
     app_service = attr.ib(default=None, type=Optional[ApplicationService])
 
-    _current_state_ids = attr.ib(
-        default=None, type=Optional[Dict[Tuple[str, str], str]]
-    )
-    _prev_state_ids = attr.ib(default=None, type=Optional[Dict[Tuple[str, str], str]])
+    _current_state_ids = attr.ib(default=None, type=Optional[StateMap[str]])
+    _prev_state_ids = attr.ib(default=None, type=Optional[StateMap[str]])
 
     @staticmethod
     def with_state(

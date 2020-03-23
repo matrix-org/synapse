@@ -165,19 +165,20 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
     # FIXME: how should this be cached?
-    def get_filtered_current_state_ids(self, room_id, state_filter=StateFilter.all()):
+    def get_filtered_current_state_ids(
+        self, room_id: str, state_filter: StateFilter = StateFilter.all()
+    ):
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
         of doing a fresh state resolution as per state_handler.get_current_state
 
         Args:
-            room_id (str)
-            state_filter (StateFilter): The state filter used to fetch state
+            room_id
+            state_filter: The state filter used to fetch state
                 from the database.
 
         Returns:
-            Deferred[dict[tuple[str, str], str]]: Map from type/state_key to
-            event ID.
+            defer.Deferred[StateMap[str]]: Map from type/state_key to event ID.
         """
 
         where_clause, where_args = state_filter.make_sql_filter_clause()

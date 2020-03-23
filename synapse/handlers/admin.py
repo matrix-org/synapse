@@ -14,9 +14,11 @@
 # limitations under the License.
 
 import logging
+from typing import List
 
 from synapse.api.constants import Membership
-from synapse.types import RoomStreamToken
+from synapse.events import FrozenEvent
+from synapse.types import RoomStreamToken, StateMap
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -259,35 +261,26 @@ class ExfiltrationWriter(object):
     """Interface used to specify how to write exported data.
     """
 
-    def write_events(self, room_id, events):
+    def write_events(self, room_id: str, events: List[FrozenEvent]):
         """Write a batch of events for a room.
-
-        Args:
-            room_id (str)
-            events (list[FrozenEvent])
         """
         pass
 
-    def write_state(self, room_id, event_id, state):
+    def write_state(self, room_id: str, event_id: str, state: StateMap[FrozenEvent]):
         """Write the state at the given event in the room.
 
         This only gets called for backward extremities rather than for each
         event.
-
-        Args:
-            room_id (str)
-            event_id (str)
-            state (dict[tuple[str, str], FrozenEvent])
         """
         pass
 
-    def write_invite(self, room_id, event, state):
+    def write_invite(self, room_id: str, event: FrozenEvent, state: StateMap[dict]):
         """Write an invite for the room, with associated invite state.
 
         Args:
-            room_id (str)
-            event (FrozenEvent)
-            state (dict[tuple[str, str], dict]): A subset of the state at the
+            room_id
+            event
+            state: A subset of the state at the
                 invite, with a subset of the event keys (type, state_key
                 content and sender)
         """
