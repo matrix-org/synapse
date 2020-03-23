@@ -638,8 +638,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         # We've now caught up to position sent to us, notify handler.
         await self.handler.on_position(cmd.stream_name, cmd.token)
 
-        # When we get a `POSITION` command it means we've finished getting
-        # missing updates for the given stream, and are now up to date.
+        # We're now up to date wit the stream
         self.streams_connecting.discard(cmd.stream_name)
         if not self.streams_connecting:
             self.handler.finished_connecting()

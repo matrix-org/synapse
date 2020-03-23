@@ -79,10 +79,10 @@ class Stream(object):
         since the stream was constructed if it hadn't been called before).
 
         Returns:
-            Resolves to a pair `(updates, new_last_token, limited)`, where
-            `updates` is a list of `(token, row)` entries, `new_last_token` is
-            the new position in stream, and `limited` is whether there are
-            more updates to fetch.
+            A triplet `(updates, new_last_token, limited)`, where `updates` is
+            a list of `(token, row)` entries, `new_last_token` is the new
+            position in stream, and `limited` is whether there are more updates
+            to fetch.
         """
         current_token = self.current_token()
         updates, current_token, limited = await self.get_updates_since(
@@ -99,10 +99,10 @@ class Stream(object):
         stream updates
 
         Returns:
-            Resolves to a pair `(updates, new_last_token, limited)`, where
-            `updates` is a list of `(token, row)` entries, `new_last_token` is
-            the new position in stream, and `limited` is whether there are
-            more updates to fetch.
+            A triplet `(updates, new_last_token, limited)`, where `updates` is
+            a list of `(token, row)` entries, `new_last_token` is the new
+            position in stream, and `limited` is whether there are more updates
+            to fetch.
         """
 
         if from_token in ("NOW", "now"):

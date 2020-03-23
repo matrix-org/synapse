@@ -25,6 +25,19 @@ logger = logging.getLogger(__name__)
 class ReplicationGetStreamUpdates(ReplicationEndpoint):
     """Fetches stream updates from a server. Used for streams not persisted to
     the database, e.g. typing notifications.
+
+    The API looks like:
+
+        GET /_synapse/replication/get_repl_stream_updates/events?from_token=0&to_token=10&limit=100
+
+        200 OK
+
+        {
+            updates: [ ... ],
+            upto_token: 10,
+            limited: False,
+        }
+
     """
 
     NAME = "get_repl_stream_updates"
@@ -32,7 +45,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
     METHOD = "GET"
 
     def __init__(self, hs):
-        super(ReplicationGetStreamUpdates, self).__init__(hs)
+        super().__init__(hs)
 
         from synapse.replication.tcp.streams import STREAMS_MAP
 
