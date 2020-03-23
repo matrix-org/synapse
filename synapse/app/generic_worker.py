@@ -804,7 +804,7 @@ class FederationSenderHandler(object):
     async def _on_new_receipts(self, rows):
         """
         Args:
-            rows (iterable[synapse.replication.tcp.streams.ReceiptsStreamRow]):
+            rows (Iterable[synapse.replication.tcp.streams.ReceiptsStream.ReceiptsStreamRow]):
                 new receipts to be processed
         """
         for receipt in rows:
