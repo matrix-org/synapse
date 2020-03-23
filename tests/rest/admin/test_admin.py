@@ -516,7 +516,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
             ),
         )
 
-    def test_quarantine_all_media_in_room(self):
+    def test_quarantine_all_media_in_room(self, override_url_template=None):
         self.register_user("room_admin", "pass", admin=True)
         admin_user_tok = self.login("room_admin", "pass")
 
@@ -555,9 +555,12 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Quarantine all media in the room
-        url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
-            room_id
-        )
+        if override_url_template:
+            url = override_url_template % urllib.parse.quote(room_id)
+        else:
+            url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
+                room_id
+            )
         request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
         self.render(request)
         self.pump(1.0)
@@ -610,6 +613,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
                 % server_and_media_id_2
             ),
         )
+
+    def test_quaraantine_all_media_in_room_deprecated_api_path(self):
+        # Perform the above test with the deprecated API path
+        self.test_quarantine_all_media_in_room("/_synapse/admin/v1/quarantine_media/%s")
 
     def test_quarantine_all_media_by_user(self):
         self.register_user("user_admin", "pass", admin=True)
