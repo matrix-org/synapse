@@ -91,13 +91,29 @@ class ProfileTestCase(unittest.TestCase):
             "Frank Jr.",
         )
 
+        # Set second time displayname
+        yield self.handler.set_displayname(
+            self.frank, synapse.types.create_requester(self.frank), "Frank"
+        )
+
+        self.assertEquals(
+            (yield self.store.get_profile_displayname(self.frank.localpart)),
+            "Frank",
+        )
+
     @defer.inlineCallbacks
     def test_set_my_name_if_disabled(self):
         self.hs.config.enable_set_displayname = False
 
-        # Set first displayname is allowed, if displayname is null
+        # Set first time displayname is allowed, if displayname is null
         yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
 
+        self.assertEquals(
+            (yield self.store.get_profile_displayname(self.frank.localpart)),
+            "Frank",
+        )
+
+        # Set second time displayname is forbidden
         d = self.handler.set_displayname(
             self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
         )
@@ -162,6 +178,18 @@ class ProfileTestCase(unittest.TestCase):
             "http://my.server/pic.gif",
         )
 
+        # Set second time avatar
+        yield self.handler.set_avatar_url(
+            self.frank,
+            synapse.types.create_requester(self.frank),
+            "http://my.server/me.png",
+        )
+
+        self.assertEquals(
+            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            "http://my.server/me.png",
+        )
+
     @defer.inlineCallbacks
     def test_set_my_avatar_if_disabled(self):
         self.hs.config.enable_set_avatar_url = False
@@ -171,6 +199,12 @@ class ProfileTestCase(unittest.TestCase):
             self.frank.localpart, "http://my.server/me.png"
         )
 
+        self.assertEquals(
+            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            "http://my.server/me.png",
+        )
+
+        # Set second time avatar is forbidden
         d = self.handler.set_avatar_url(
             self.frank,
             synapse.types.create_requester(self.frank),
