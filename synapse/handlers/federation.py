@@ -1538,7 +1538,7 @@ class FederationHandler(BaseHandler):
         if self.hs.config.block_non_admin_invites:
             raise SynapseError(403, "This server does not accept room invites")
 
-        is_published = yield self.store.is_room_published(event.room_id)
+        is_published = await self.store.is_room_published(event.room_id)
 
         if not self.spam_checker.user_may_invite(
             event.sender,

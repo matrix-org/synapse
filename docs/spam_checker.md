@@ -54,6 +54,9 @@ class ExampleSpamChecker:
 
     def user_may_publish_room(self, userid, room_id):
         return True  # allow publishing of all rooms
+
+    def check_username_for_spam(self, user_profile):
+        return False  # allow all usernames
 ```
 
 ## Configuration
