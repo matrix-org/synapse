@@ -932,6 +932,7 @@ class SyncHandler(object):
             for e in sync_config.filter_collection.filter_room_state(
                 list(state.values())
             )
+            if e.type != EventTypes.Aliases  # until MSC2261 or alternative solution
         }
 
     async def unread_notifs_for_room_id(
