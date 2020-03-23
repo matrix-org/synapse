@@ -32,8 +32,8 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
     def test_wait_for_sync_for_user_auth_blocking(self):
 
-        user_id1 = "@user1:server"
-        user_id2 = "@user2:server"
+        user_id1 = "@user1:test"
+        user_id2 = "@user2:test"
         sync_config = self._generate_sync_config(user_id1)
 
         self.reactor.advance(100)  # So we get not 0 time

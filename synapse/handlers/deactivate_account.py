@@ -144,7 +144,7 @@ class DeactivateAccountHandler(BaseHandler):
             user_id (str): The user ID to reject pending invites for.
         """
         user = UserID.from_string(user_id)
-        pending_invites = await self.store.get_invited_rooms_for_user(user_id)
+        pending_invites = await self.store.get_invited_rooms_for_local_user(user_id)
 
         for room in pending_invites:
             try:

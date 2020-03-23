@@ -470,7 +470,7 @@ class Porter(object):
             engine.check_database(
                 db_conn, allow_outdated_version=allow_outdated_version
             )
-            prepare_database(db_conn, engine, config=None)
+            prepare_database(db_conn, engine, config=self.hs_config)
             store = Store(Database(hs, db_config, engine), db_conn, hs)
             db_conn.commit()
 
