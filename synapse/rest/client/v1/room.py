@@ -16,6 +16,7 @@
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
+from typing import List, Optional
 
 from six.moves.urllib import parse as urlparse
 
@@ -207,7 +208,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 requester, event_dict, txn_id=txn_id
             )
 
-        ret = {}
+        ret = {}  # type: dict
         if event:
             set_tag("event_id", event.event_id)
             ret = {"event_id": event.event_id}
@@ -285,7 +286,7 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             try:
                 remote_room_hosts = [
                     x.decode("ascii") for x in request.args[b"server_name"]
-                ]
+                ]  # type: Optional[List[str]]
             except Exception:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
@@ -375,7 +376,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         server = parse_string(request, "server", default=None)
         content = parse_json_object_from_request(request)
 
-        limit = int(content.get("limit", 100))
+        limit = int(content.get("limit", 100))  # type: Optional[int]
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
@@ -504,11 +505,16 @@ class RoomMessageListRestServlet(RestServlet):
         filter_bytes = parse_string(request, b"filter", encoding=None)
         if filter_bytes:
             filter_json = urlparse.unquote(filter_bytes.decode("UTF-8"))
-            event_filter = Filter(json.loads(filter_json))
-            if event_filter.filter_json.get("event_format", "client") == "federation":
+            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            if (
+                event_filter
+                and event_filter.filter_json.get("event_format", "client")
+                == "federation"
+            ):
                 as_client_event = False
         else:
             event_filter = None
+
         msgs = await self.pagination_handler.get_messages(
             room_id=room_id,
             requester=requester,
@@ -611,7 +617,7 @@ class RoomEventContextServlet(RestServlet):
         filter_bytes = parse_string(request, "filter")
         if filter_bytes:
             filter_json = urlparse.unquote(filter_bytes)
-            event_filter = Filter(json.loads(filter_json))
+            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
         else:
             event_filter = None
 
