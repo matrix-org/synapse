@@ -27,12 +27,76 @@ logger = logging.getLogger(__name__)
 LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 
-class MonthlyActiveUsersStore(SQLBaseStore):
+class MonthlyActiveUsersWorkerStore(SQLBaseStore):
     def __init__(self, database: Database, db_conn, hs):
-        super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
+        super(MonthlyActiveUsersWorkerStore, self).__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
+
+    @cached(num_args=0)
+    def get_monthly_active_count(self):
+        """Generates current count of monthly active users
+
+        Returns:
+            Defered[int]: Number of current monthly active users
+        """
+
+        def _count_users(txn):
+            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
+
+            txn.execute(sql)
+            (count,) = txn.fetchone()
+            return count
+
+        return self.db.runInteraction("count_users", _count_users)
+
+    @defer.inlineCallbacks
+    def get_registered_reserved_users(self):
+        """Of the reserved threepids defined in config, which are associated
+        with registered users?
+
+        Returns:
+            Defered[list]: Real reserved users
+        """
+        users = []
+
+        for tp in self.hs.config.mau_limits_reserved_threepids[
+            : self.hs.config.max_mau_value
+        ]:
+            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+                tp["medium"], tp["address"]
+            )
+            if user_id:
+                users.append(user_id)
+
+        return users
+
+    @cached(num_args=1)
+    def user_last_seen_monthly_active(self, user_id):
+        """
+            Checks if a given user is part of the monthly active user group
+            Arguments:
+                user_id (str): user to add/update
+            Return:
+                Deferred[int] : timestamp since last seen, None if never seen
+
+        """
+
+        return self.db.simple_select_one_onecol(
+            table="monthly_active_users",
+            keyvalues={"user_id": user_id},
+            retcol="timestamp",
+            allow_none=True,
+            desc="user_last_seen_monthly_active",
+        )
+
+
+class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
+    def __init__(self, database: Database, db_conn, hs):
+        super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
+
         # Do not add more reserved users than the total allowable number
+        # cur = LoggingTransaction(
         self.db.new_transaction(
             db_conn,
             "initialise_mau_threepids",
@@ -146,57 +210,22 @@ class MonthlyActiveUsersStore(SQLBaseStore):
 
                     txn.execute(sql, query_args)
 
+            # It seems poor to invalidate the whole cache, Postgres supports
+            # 'Returning' which would allow me to invalidate only the
+            # specific users, but sqlite has no way to do this and instead
+            # I would need to SELECT and the DELETE which without locking
+            # is racy.
+            # Have resolved to invalidate the whole cache for now and do
+            # something about it if and when the perf becomes significant
+            self._invalidate_all_cache_and_stream(
+                txn, self.user_last_seen_monthly_active
+            )
+            self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
+
         reserved_users = yield self.get_registered_reserved_users()
         yield self.db.runInteraction(
             "reap_monthly_active_users", _reap_users, reserved_users
         )
-        # It seems poor to invalidate the whole cache, Postgres supports
-        # 'Returning' which would allow me to invalidate only the
-        # specific users, but sqlite has no way to do this and instead
-        # I would need to SELECT and the DELETE which without locking
-        # is racy.
-        # Have resolved to invalidate the whole cache for now and do
-        # something about it if and when the perf becomes significant
-        self.user_last_seen_monthly_active.invalidate_all()
-        self.get_monthly_active_count.invalidate_all()
-
-    @cached(num_args=0)
-    def get_monthly_active_count(self):
-        """Generates current count of monthly active users
-
-        Returns:
-            Defered[int]: Number of current monthly active users
-        """
-
-        def _count_users(txn):
-            sql = "SELECT COALESCE(count(*), 0) FROM monthly_active_users"
-
-            txn.execute(sql)
-            (count,) = txn.fetchone()
-            return count
-
-        return self.db.runInteraction("count_users", _count_users)
-
-    @defer.inlineCallbacks
-    def get_registered_reserved_users(self):
-        """Of the reserved threepids defined in config, which are associated
-        with registered users?
-
-        Returns:
-            Defered[list]: Real reserved users
-        """
-        users = []
-
-        for tp in self.hs.config.mau_limits_reserved_threepids[
-            : self.hs.config.max_mau_value
-        ]:
-            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
-                tp["medium"], tp["address"]
-            )
-            if user_id:
-                users.append(user_id)
-
-        return users
 
     @defer.inlineCallbacks
     def upsert_monthly_active_user(self, user_id):
@@ -222,22 +251,8 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn, user_id
         )
 
-        user_in_mau = self.user_last_seen_monthly_active.cache.get(
-            (user_id,), None, update_metrics=False
-        )
-        if user_in_mau is None:
-            self.get_monthly_active_count.invalidate(())
-
-        self.user_last_seen_monthly_active.invalidate((user_id,))
-
     def upsert_monthly_active_user_txn(self, txn, user_id):
         """Updates or inserts monthly active user member
-
-        Note that, after calling this method, it will generally be necessary
-        to invalidate the caches on user_last_seen_monthly_active and
-        get_monthly_active_count. We can't do that here, because we are running
-        in a database thread rather than the main thread, and we can't call
-        txn.call_after because txn may not be a LoggingTransaction.
 
         We consciously do not call is_support_txn from this method because it
         is not possible to cache the response. is_support_txn will be false in
@@ -269,26 +284,12 @@ class MonthlyActiveUsersStore(SQLBaseStore):
             values={"timestamp": int(self._clock.time_msec())},
         )
 
-        return is_insert
-
-    @cached(num_args=1)
-    def user_last_seen_monthly_active(self, user_id):
-        """
-            Checks if a given user is part of the monthly active user group
-            Arguments:
-                user_id (str): user to add/update
-            Return:
-                Deferred[int] : timestamp since last seen, None if never seen
-
-        """
-
-        return self.db.simple_select_one_onecol(
-            table="monthly_active_users",
-            keyvalues={"user_id": user_id},
-            retcol="timestamp",
-            allow_none=True,
-            desc="user_last_seen_monthly_active",
+        self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
+        self._invalidate_cache_and_stream(
+            txn, self.user_last_seen_monthly_active, (user_id,)
         )
+
+        return is_insert
 
     @defer.inlineCallbacks
     def populate_monthly_active_users(self, user_id):
