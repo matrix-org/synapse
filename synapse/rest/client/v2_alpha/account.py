@@ -173,11 +173,9 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             )
 
         sid = parse_string(request, "sid", required=True)
-        client_secret = parse_string(request, "client_secret", required=True)
-
-        assert_valid_client_secret(client_secret)
-
         token = parse_string(request, "token", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        assert_valid_client_secret(client_secret)
 
         # Attempt to validate a 3PID session
         try:
@@ -386,6 +384,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["client_secret", "email", "send_attempt"])
         client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
+
         email = body["email"]
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
@@ -448,6 +448,8 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
         client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
+
         country = body["country"]
         phone_number = body["phone_number"]
         send_attempt = body["send_attempt"]
@@ -530,8 +532,9 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
             )
 
         sid = parse_string(request, "sid", required=True)
-        client_secret = parse_string(request, "client_secret", required=True)
         token = parse_string(request, "token", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+        assert_valid_client_secret(client_secret)
 
         # Attempt to validate a 3PID session
         try:
@@ -596,6 +599,7 @@ class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
 
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["client_secret", "sid", "token"])
+        assert_valid_client_secret(body["client_secret"])
 
         # Proxy submit_token request to msisdn threepid delegate
         response = await self.identity_handler.proxy_msisdn_submit_token(
@@ -661,8 +665,9 @@ class ThreepidRestServlet(RestServlet):
             )
         assert_params_in_dict(threepid_creds, ["client_secret", "sid"])
 
-        client_secret = threepid_creds["client_secret"]
         sid = threepid_creds["sid"]
+        client_secret = threepid_creds["client_secret"]
+        assert_valid_client_secret(client_secret)
 
         validation_session = await self.identity_handler.validate_threepid_session(
             client_secret, sid
@@ -722,8 +727,9 @@ class ThreepidAddRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         assert_params_in_dict(body, ["client_secret", "sid"])
-        client_secret = body["client_secret"]
         sid = body["sid"]
+        client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
             requester, body, self.hs.get_ip_from_request(request)
@@ -771,8 +777,9 @@ class ThreepidBindRestServlet(RestServlet):
         assert_params_in_dict(body, ["id_server", "sid", "client_secret"])
         id_server = body["id_server"]
         sid = body["sid"]
-        client_secret = body["client_secret"]
         id_access_token = body.get("id_access_token")  # optional
+        client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()

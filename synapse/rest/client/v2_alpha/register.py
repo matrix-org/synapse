@@ -119,6 +119,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
         # Extract params from body
         client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
+
         email = body["email"]
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
