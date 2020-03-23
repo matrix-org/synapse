@@ -84,7 +84,7 @@ class RoomAccessRules(object):
         else:
             raise ConfigError("No IS for event rules TchapEventRules")
 
-    def on_create_room(self, requester, config, is_requester_admin):
+    def on_create_room(self, requester, config, is_requester_admin) -> bool:
         """Implements synapse.events.ThirdPartyEventRules.on_create_room
 
         Checks if a im.vector.room.access_rules event is being set during room creation.
@@ -166,6 +166,8 @@ class RoomAccessRules(object):
                 )
                 if not allowed:
                     raise SynapseError(400, "Invalid power levels content")
+
+        return True
 
     @defer.inlineCallbacks
     def check_threepid_can_be_invited(self, medium, address, state_events):
