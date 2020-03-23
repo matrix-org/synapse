@@ -22,7 +22,7 @@ import attr
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.event_auth import auth_types_for_event
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 from synapse.state.v2 import lexicographical_topological_sort, resolve_events_with_store
 from synapse.types import EventID
 
@@ -89,7 +89,7 @@ class FakeEvent(object):
         if self.state_key is not None:
             event_dict["state_key"] = self.state_key
 
-        return FrozenEvent(event_dict)
+        return make_event_from_dict(event_dict)
 
 
 # All graphs start with this set of events

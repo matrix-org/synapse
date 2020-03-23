@@ -29,7 +29,7 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.crypto.event_signing import check_event_content_hash
-from synapse.events import EventBase, event_type_from_format_version
+from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
@@ -374,8 +374,7 @@ def event_from_pdu_json(
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
 
-    event = event_type_from_format_version(room_version.event_format)(pdu_json)
-
+    event = make_event_from_dict(pdu_json, room_version)
     event.internal_metadata.outlier = outlier
 
     return event
