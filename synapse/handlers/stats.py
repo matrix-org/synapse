@@ -286,7 +286,7 @@ class StatsHandler(StateDeltasHandler):
                 room_state["history_visibility"] = event_content.get(
                     "history_visibility"
                 )
-            elif typ == EventTypes.Encryption:
+            elif typ == EventTypes.RoomEncryption:
                 room_state["encryption"] = event_content.get("algorithm")
             elif typ == EventTypes.Name:
                 room_state["name"] = event_content.get("name")

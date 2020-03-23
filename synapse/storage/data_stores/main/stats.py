@@ -744,7 +744,7 @@ class StatsStore(StateDeltasStore):
                     EventTypes.Create,
                     EventTypes.JoinRules,
                     EventTypes.RoomHistoryVisibility,
-                    EventTypes.Encryption,
+                    EventTypes.RoomEncryption,
                     EventTypes.Name,
                     EventTypes.Topic,
                     EventTypes.RoomAvatar,
@@ -816,7 +816,7 @@ class StatsStore(StateDeltasStore):
                 room_state["history_visibility"] = event.content.get(
                     "history_visibility"
                 )
-            elif event.type == EventTypes.Encryption:
+            elif event.type == EventTypes.RoomEncryption:
                 room_state["encryption"] = event.content.get("algorithm")
             elif event.type == EventTypes.Name:
                 room_state["name"] = event.content.get("name")
