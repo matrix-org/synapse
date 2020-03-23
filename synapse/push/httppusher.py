@@ -398,7 +398,7 @@ class HttpPusher(object):
         Args:
             badge (int): number of unread messages
         """
-        logger.info("Sending updated badge count %d to %s", badge, self.name)
+        logger.debug("Sending updated badge count %d to %s", badge, self.name)
         d = {
             "notification": {
                 "id": "",

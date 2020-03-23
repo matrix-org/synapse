@@ -573,7 +573,7 @@ class FederationServer(FederationBase):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
-            logger.info(
+            logger.debug(
                 "on_get_missing_events: earliest_events: %r, latest_events: %r,"
                 " limit: %d",
                 earliest_events,
@@ -586,11 +586,11 @@ class FederationServer(FederationBase):
             )
 
             if len(missing_events) < 5:
-                logger.info(
+                logger.debug(
                     "Returning %d events: %r", len(missing_events), missing_events
                 )
             else:
-                logger.info("Returning %d events", len(missing_events))
+                logger.debug("Returning %d events", len(missing_events))
 
             time_now = self._clock.time_msec()
 
