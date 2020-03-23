@@ -176,6 +176,7 @@ endpoints matching the following regular expressions:
     ^/_matrix/federation/v1/query_auth/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
+    ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/send/
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
