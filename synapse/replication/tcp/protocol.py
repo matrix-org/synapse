@@ -35,9 +35,7 @@ indicate which side is sending, these are *not* included on the wire::
     > PING 1490197665618
     < NAME synapse.app.appservice
     < PING 1490197665618
-    < REPLICATE events 1
-    < REPLICATE backfill 1
-    < REPLICATE caches 1
+    < REPLICATE
     > POSITION events 1
     > POSITION backfill 1
     > POSITION caches 1
@@ -662,7 +660,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         """
         logger.info("[%s] Subscribing to replication streams", self.id())
 
-        self.send_command(ReplicateCommand("ALL"))
+        self.send_command(ReplicateCommand())
 
     def on_connection_closed(self):
         BaseReplicationStreamProtocol.on_connection_closed(self)

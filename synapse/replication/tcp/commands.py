@@ -179,29 +179,24 @@ class NameCommand(Command):
 
 
 class ReplicateCommand(Command):
-    """Sent by the client to subscribe to the stream.
+    """Sent by the client to subscribe to streams.
 
     Format::
 
-        REPLICATE <stream_name>
-
-    The <stream_name> can be "ALL" to subscribe to all known streams
+        REPLICATE
     """
 
     NAME = "REPLICATE"
 
-    def __init__(self, stream_name):
-        self.stream_name = stream_name
+    def __init__(self):
+        pass
 
     @classmethod
     def from_line(cls, line):
-        return cls(line)
+        return cls()
 
     def to_line(self):
-        return self.stream_name
-
-    def get_logcontext_id(self):
-        return "REPLICATE-" + self.stream_name
+        return ""
 
 
 class UserSyncCommand(Command):
