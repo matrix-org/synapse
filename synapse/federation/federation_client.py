@@ -516,7 +516,7 @@ class FederationClient(FederationBase):
         )
 
     async def send_join(
-        self, destinations: Iterable[str], pdu: EventBase, event_format_version: int
+        self, destinations: Iterable[str], pdu: EventBase, room_version: RoomVersion
     ) -> Dict[str, Any]:
         """Sends a join event to one of a list of homeservers.
 
@@ -527,7 +527,8 @@ class FederationClient(FederationBase):
             destinations: Candidate homeservers which are probably
                 participating in the room.
             pdu: event to be sent
-            event_format_version: The event format version
+            room_version: the version of the room (according to the server that
+                did the make_join)
 
         Returns:
             a dict with members ``origin`` (a string
@@ -540,58 +541,51 @@ class FederationClient(FederationBase):
             RuntimeError: if no servers were reachable.
         """
 
-        def check_authchain_validity(signed_auth_chain):
-            for e in signed_auth_chain:
-                if e.type == EventTypes.Create:
-                    create_event = e
-                    break
-            else:
-                raise InvalidResponseError("no %s in auth chain" % (EventTypes.Create,))
-
-            # the room version should be sane.
-            room_version = create_event.content.get("room_version", "1")
-            if room_version not in KNOWN_ROOM_VERSIONS:
-                # This shouldn't be possible, because the remote server should have
-                # rejected the join attempt during make_join.
-                raise InvalidResponseError(
-                    "room appears to have unsupported version %s" % (room_version,)
-                )
-
         async def send_request(destination) -> Dict[str, Any]:
             content = await self._do_send_join(destination, pdu)
 
             logger.debug("Got content: %s", content)
 
             state = [
-                event_from_pdu_json(p, event_format_version, outlier=True)
+                event_from_pdu_json(p, room_version.event_format, outlier=True)
                 for p in content.get("state", [])
             ]
 
             auth_chain = [
-                event_from_pdu_json(p, event_format_version, outlier=True)
+                event_from_pdu_json(p, room_version.event_format, outlier=True)
                 for p in content.get("auth_chain", [])
             ]
 
             pdus = {p.event_id: p for p in itertools.chain(state, auth_chain)}
 
-            room_version = None
+            create_event = None
             for e in state:
                 if (e.type, e.state_key) == (EventTypes.Create, ""):
-                    room_version = e.content.get(
-                        "room_version", RoomVersions.V1.identifier
-                    )
+                    create_event = e
                     break
 
-            if room_version is None:
+            if create_event is None:
                 # If the state doesn't have a create event then the room is
                 # invalid, and it would fail auth checks anyway.
                 raise SynapseError(400, "No create event in state")
+
+            # the room version should be sane.
+            create_room_version = create_event.content.get(
+                "room_version", RoomVersions.V1.identifier
+            )
+            if create_room_version != room_version.identifier:
+                # either the server that fulfilled the make_join, or the server that is
+                # handling the send_join, is lying.
+                raise InvalidResponseError(
+                    "Unexpected room version %s in create event"
+                    % (create_room_version,)
+                )
 
             valid_pdus = await self._check_sigs_and_hash_and_fetch(
                 destination,
                 list(pdus.values()),
                 outlier=True,
-                room_version=room_version,
+                room_version=room_version.identifier,
             )
 
             valid_pdus_map = {p.event_id: p for p in valid_pdus}
@@ -615,7 +609,17 @@ class FederationClient(FederationBase):
             for s in signed_state:
                 s.internal_metadata = copy.deepcopy(s.internal_metadata)
 
-            check_authchain_validity(signed_auth)
+            # double-check that the same create event has ended up in the auth chain
+            auth_chain_create_events = [
+                e.event_id
+                for e in signed_auth
+                if (e.type, e.state_key) == (EventTypes.Create, "")
+            ]
+            if auth_chain_create_events != [create_event.event_id]:
+                raise InvalidResponseError(
+                    "Unexpected create event(s) in auth chain"
+                    % (auth_chain_create_events,)
+                )
 
             return {
                 "state": signed_state,
