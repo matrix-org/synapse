@@ -341,7 +341,7 @@ class RegistrationConfig(Config):
         # Does not apply to server administrators. Defaults to 'true'
         #
         #enable_set_displayname: false
-        
+
         # Whether users are allowed to change their avatar after it has been
         # initially set. Useful when provisioning users based on the contents
         # of a third-party directory.

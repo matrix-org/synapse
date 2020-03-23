@@ -97,8 +97,7 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)),
-            "Frank",
+            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
         )
 
     @defer.inlineCallbacks
@@ -109,8 +108,7 @@ class ProfileTestCase(unittest.TestCase):
         yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)),
-            "Frank",
+            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
         )
 
         # Set second time displayname is forbidden
