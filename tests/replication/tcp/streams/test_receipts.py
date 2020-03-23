@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.replication.tcp.streams._base import ReceiptsStreamRow
+from synapse.replication.tcp.streams._base import ReceiptsStream
 
 from tests.replication.tcp.streams._base import BaseStreamTestCase
 
@@ -40,7 +40,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "receipts")
         self.assertEqual(1, len(rdata_rows))
-        row = rdata_rows[0]  # type: ReceiptsStreamRow
+        row = rdata_rows[0]  # type: ReceiptsStream.ReceiptsStreamRow
         self.assertEqual("!room:blue", row.room_id)
         self.assertEqual("m.read", row.receipt_type)
         self.assertEqual(USER_ID, row.user_id)
@@ -72,7 +72,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         self.assertEqual(token, 3)
         self.assertEqual(1, len(rdata_rows))
 
-        row = rdata_rows[0]  # type: ReceiptsStreamRow
+        row = rdata_rows[0]  # type: ReceiptsStream.ReceiptsStreamRow
         self.assertEqual("!room2:blue", row.room_id)
         self.assertEqual("m.read", row.receipt_type)
         self.assertEqual(USER_ID, row.user_id)
