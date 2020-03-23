@@ -263,6 +263,15 @@ class SynapseHomeServer(HomeServer):
     def start_listening(self, listeners):
         config = self.get_config()
 
+        if config.redis_enabled:
+            from synapse.replication.tcp.redis import RedisFactory
+
+            logger.info("Connecting to redis.")
+            factory = RedisFactory(self)
+            self.get_reactor().connectTCP(
+                self.config.redis.redis_host, self.config.redis.redis_port, factory
+            )
+
         for listener in listeners:
             if listener["type"] == "http":
                 self._listening_services.extend(self._listener_http(config, listener))
@@ -282,6 +291,7 @@ class SynapseHomeServer(HomeServer):
                 )
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
+
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warning(

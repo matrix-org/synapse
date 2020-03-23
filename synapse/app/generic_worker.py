@@ -599,10 +599,19 @@ class GenericWorkerServer(HomeServer):
             else:
                 logger.warning("Unrecognized listener type: %s", listener["type"])
 
-        factory = ReplicationClientFactory(self, self.config.worker_name)
-        host = self.config.worker_replication_host
-        port = self.config.worker_replication_port
-        self.get_reactor().connectTCP(host, port, factory)
+        if self.config.redis.redis_enabled:
+            from synapse.replication.tcp.redis import RedisFactory
+
+            logger.info("Connecting to redis.")
+            factory = RedisFactory(self)
+            self.get_reactor().connectTCP(
+                self.config.redis.redis_host, self.config.redis.redis_port, factory
+            )
+        else:
+            factory = ReplicationClientFactory(self, self.config.worker_name)
+            host = self.config.worker_replication_host
+            port = self.config.worker_replication_port
+            self.get_reactor().connectTCP(host, port, factory)
 
     def remove_pusher(self, app_id, push_key, user_id):
         self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
