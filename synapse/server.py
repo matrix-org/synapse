@@ -50,7 +50,7 @@ from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
-from synapse.groups.groups_server import GroupsServerHandler
+from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
@@ -62,7 +62,7 @@ from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
-from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
@@ -463,10 +463,16 @@ class HomeServer(object):
         return UserDirectoryHandler(self)
 
     def build_groups_local_handler(self):
-        return GroupsLocalHandler(self)
+        if self.config.worker_app:
+            return GroupsLocalWorkerHandler(self)
+        else:
+            return GroupsLocalHandler(self)
 
     def build_groups_server_handler(self):
-        return GroupsServerHandler(self)
+        if self.config.worker_app:
+            return GroupsServerWorkerHandler(self)
+        else:
+            return GroupsServerHandler(self)
 
     def build_groups_attestation_signing(self):
         return GroupAttestationSigning(self)
