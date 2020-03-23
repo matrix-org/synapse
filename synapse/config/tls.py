@@ -109,6 +109,8 @@ class TlsConfig(Config):
         fed_whitelist_entries = config.get(
             "federation_certificate_verification_whitelist", []
         )
+        if fed_whitelist_entries is None:
+            fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
         self.federation_certificate_verification_whitelist = []  # type: List[str]
