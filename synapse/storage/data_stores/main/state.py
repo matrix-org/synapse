@@ -60,24 +60,34 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     def __init__(self, database: Database, db_conn, hs):
         super(StateGroupWorkerStore, self).__init__(database, db_conn, hs)
 
-    @defer.inlineCallbacks
-    def get_room_version(self, room_id):
+    @cached(max_entries=10000)
+    async def get_room_version(self, room_id: str) -> str:
         """Get the room_version of a given room
 
-        Args:
-            room_id (str)
-
-        Returns:
-            Deferred[str]
-
         Raises:
-            NotFoundError if the room is unknown
+            NotFoundError: if the room is unknown
         """
-        # for now we do this by looking at the create event. We may want to cache this
-        # more intelligently in future.
+
+        # First we try looking up room version from the database, but for old
+        # rooms we might not have added the room version to it yet so we fall
+        # back to previous behaviour and look in current state events.
+
+        # We really should have an entry in the rooms table for every room we
+        # care about, but let's be a bit paranoid (at least while the background
+        # update is happening) to avoid breaking existing rooms.
+        version = await self.db.simple_select_one_onecol(
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            retcol="room_version",
+            desc="get_room_version",
+            allow_none=True,
+        )
+
+        if version is not None:
+            return version
 
         # Retrieve the room's create event
-        create_event = yield self.get_create_event_for_room(room_id)
+        create_event = await self.get_create_event_for_room(room_id)
         return create_event.content.get("room_version", "1")
 
     @defer.inlineCallbacks

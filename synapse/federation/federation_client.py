@@ -17,6 +17,7 @@
 import copy
 import itertools
 import logging
+from typing import Dict, Iterable
 
 from prometheus_client import Counter
 
@@ -29,6 +30,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
     SynapseError,
+    UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -385,6 +387,8 @@ class FederationClient(FederationBase):
                 return res
             except InvalidResponseError as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
+            except UnsupportedRoomVersionError:
+                raise
             except HttpResponseException as e:
                 if not 500 <= e.code < 600:
                     raise e.to_synapse_error()
@@ -404,7 +408,13 @@ class FederationClient(FederationBase):
         raise SynapseError(502, "Failed to %s via any server" % (description,))
 
     def make_membership_event(
-        self, destinations, room_id, user_id, membership, content, params
+        self,
+        destinations: Iterable[str],
+        room_id: str,
+        user_id: str,
+        membership: str,
+        content: dict,
+        params: Dict[str, str],
     ):
         """
         Creates an m.room.member event, with context, without participating in the room.
@@ -417,21 +427,23 @@ class FederationClient(FederationBase):
         Note that this does not append any events to any graphs.
 
         Args:
-            destinations (Iterable[str]): Candidate homeservers which are probably
+            destinations: Candidate homeservers which are probably
                 participating in the room.
-            room_id (str): The room in which the event will happen.
-            user_id (str): The user whose membership is being evented.
-            membership (str): The "membership" property of the event. Must be
-                one of "join" or "leave".
-            content (dict): Any additional data to put into the content field
-                of the event.
-            params (dict[str, str|Iterable[str]]): Query parameters to include in the
-                request.
+            room_id: The room in which the event will happen.
+            user_id: The user whose membership is being evented.
+            membership: The "membership" property of the event. Must be one of
+                "join" or "leave".
+            content: Any additional data to put into the content field of the
+                event.
+            params: Query parameters to include in the request.
         Return:
-            Deferred[tuple[str, FrozenEvent, int]]: resolves to a tuple of
-            `(origin, event, event_format)` where origin is the remote
-            homeserver which generated the event, and event_format is one of
-            `synapse.api.room_versions.EventFormatVersions`.
+            Deferred[Tuple[str, FrozenEvent, RoomVersion]]: resolves to a tuple of
+            `(origin, event, room_version)` where origin is the remote
+            homeserver which generated the event, and room_version is the
+            version of the room.
+
+            Fails with a `UnsupportedRoomVersionError` if remote responds with
+            a room version we don't understand.
 
             Fails with a ``SynapseError`` if the chosen remote server
             returns a 300/400 code.
@@ -453,8 +465,12 @@ class FederationClient(FederationBase):
 
             # Note: If not supplied, the room version may be either v1 or v2,
             # however either way the event format version will be v1.
-            room_version = ret.get("room_version", RoomVersions.V1.identifier)
-            event_format = room_version_to_event_format(room_version)
+            room_version_id = ret.get("room_version", RoomVersions.V1.identifier)
+            room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version:
+                raise UnsupportedRoomVersionError()
+
+            event_format = room_version_to_event_format(room_version_id)
 
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
@@ -478,7 +494,7 @@ class FederationClient(FederationBase):
                 event_dict=pdu_dict,
             )
 
-            return (destination, ev, event_format)
+            return (destination, ev, room_version)
 
         return self._try_destination_list(
             "make_" + membership, destinations, send_request

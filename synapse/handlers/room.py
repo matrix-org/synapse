@@ -29,7 +29,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -102,13 +102,15 @@ class RoomCreationHandler(BaseHandler):
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
     @defer.inlineCallbacks
-    def upgrade_room(self, requester, old_room_id, new_version):
+    def upgrade_room(
+        self, requester: Requester, old_room_id: str, new_version: RoomVersion
+    ):
         """Replace a room with a new room with a different version
 
         Args:
-            requester (synapse.types.Requester): the user requesting the upgrade
-            old_room_id (unicode): the id of the room to be replaced
-            new_version (unicode): the new room version to use
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            new_version: the new room version to use
 
         Returns:
             Deferred[unicode]: the new room id
@@ -153,7 +155,7 @@ class RoomCreationHandler(BaseHandler):
         if r is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
         new_room_id = yield self._generate_room_id(
-            creator_id=user_id, is_public=r["is_public"]
+            creator_id=user_id, is_public=r["is_public"], room_version=new_version,
         )
 
         logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
@@ -301,18 +303,22 @@ class RoomCreationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def clone_existing_room(
-        self, requester, old_room_id, new_room_id, new_room_version, tombstone_event_id
+        self,
+        requester: Requester,
+        old_room_id: str,
+        new_room_id: str,
+        new_room_version: RoomVersion,
+        tombstone_event_id: str,
     ):
         """Populate a new room based on an old room
 
         Args:
-            requester (synapse.types.Requester): the user requesting the upgrade
-            old_room_id (unicode): the id of the room to be replaced
-            new_room_id (unicode): the id to give the new room (should already have been
+            requester: the user requesting the upgrade
+            old_room_id : the id of the room to be replaced
+            new_room_id: the id to give the new room (should already have been
                 created with _gemerate_room_id())
-            new_room_version (unicode): the new room version to use
-            tombstone_event_id (unicode|str): the ID of the tombstone event in the old
-                room.
+            new_room_version: the new room version to use
+            tombstone_event_id: the ID of the tombstone event in the old room.
         Returns:
             Deferred
         """
@@ -334,7 +340,7 @@ class RoomCreationHandler(BaseHandler):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         creation_content = {
-            "room_version": new_room_version,
+            "room_version": new_room_version.identifier,
             "predecessor": {"room_id": old_room_id, "event_id": tombstone_event_id},
         }
 
@@ -597,14 +603,15 @@ class RoomCreationHandler(BaseHandler):
         if ratelimit:
             yield self.ratelimit(requester)
 
-        room_version = config.get(
+        room_version_id = config.get(
             "room_version", self.config.default_room_version.identifier
         )
 
-        if not isinstance(room_version, string_types):
+        if not isinstance(room_version_id, string_types):
             raise SynapseError(400, "room_version must be a string", Codes.BAD_JSON)
 
-        if room_version not in KNOWN_ROOM_VERSIONS:
+        room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
+        if room_version is None:
             raise SynapseError(
                 400,
                 "Your homeserver does not support this room version",
@@ -648,7 +655,9 @@ class RoomCreationHandler(BaseHandler):
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
 
-        room_id = yield self._generate_room_id(creator_id=user_id, is_public=is_public)
+        room_id = yield self._generate_room_id(
+            creator_id=user_id, is_public=is_public, room_version=room_version,
+        )
 
         directory_handler = self.hs.get_handlers().directory_handler
         if room_alias:
@@ -677,7 +686,7 @@ class RoomCreationHandler(BaseHandler):
         creation_content = config.get("creation_content", {})
 
         # override any attempt to set room versions via the creation_content
-        creation_content["room_version"] = room_version
+        creation_content["room_version"] = room_version.identifier
 
         yield self._send_events_for_new_room(
             requester,
@@ -876,7 +885,9 @@ class RoomCreationHandler(BaseHandler):
             )
 
     @defer.inlineCallbacks
-    def _generate_room_id(self, creator_id, is_public):
+    def _generate_room_id(
+        self, creator_id: str, is_public: str, room_version: RoomVersion,
+    ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
         attempts = 0
@@ -890,6 +901,7 @@ class RoomCreationHandler(BaseHandler):
                     room_id=gen_room_id,
                     room_creator_user_id=creator_id,
                     is_public=is_public,
+                    room_version=room_version,
                 )
                 return gen_room_id
             except StoreError:
