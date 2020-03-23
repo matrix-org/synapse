@@ -17,6 +17,7 @@
 import nacl.signing
 from unpaddedbase64 import decode_base64
 
+from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import FrozenEvent
 
@@ -49,7 +50,9 @@ class EventSigningTestCase(unittest.TestCase):
             "unsigned": {"age_ts": 1000000},
         }
 
-        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(
+            RoomVersions.V1, event_dict, HOSTNAME, self.signing_key
+        )
 
         event = FrozenEvent(event_dict)
 
@@ -81,7 +84,9 @@ class EventSigningTestCase(unittest.TestCase):
             "unsigned": {"age_ts": 1000000},
         }
 
-        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(
+            RoomVersions.V1, event_dict, HOSTNAME, self.signing_key
+        )
 
         event = FrozenEvent(event_dict)
 
