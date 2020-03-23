@@ -19,7 +19,7 @@ and
 For a good introduction to this class of request-smuggling attacks, see
 https://portswigger.net/research/http-desync-attacks-request-smuggling-reborn.
 
-We are not aware of these vulnerabilities being exploited in the world, and
+We are not aware of these vulnerabilities being exploited in the wild, and
 do not believe that they are exploitable with current versions of any reverse
 proxies. Nevertheless, we recommend that all Synapse administrators ensure that
 they have the latest versions of the Twisted library to ensure that their
