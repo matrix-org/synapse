@@ -1,0 +1,1 @@
+Fix bug where setting `mau_limit_reserved_threepids` config would cause Synapse to refuse to start.
