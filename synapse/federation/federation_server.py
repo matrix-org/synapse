@@ -38,7 +38,6 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.events import room_version_to_event_format
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
@@ -234,24 +233,17 @@ class FederationServer(FederationBase):
                 continue
 
             try:
-                room_version = await self.store.get_room_version_id(room_id)
+                room_version = await self.store.get_room_version(room_id)
             except NotFoundError:
                 logger.info("Ignoring PDU for unknown room_id: %s", room_id)
                 continue
-
-            try:
-                format_ver = room_version_to_event_format(room_version)
-            except UnsupportedRoomVersionError:
+            except UnsupportedRoomVersionError as e:
                 # this can happen if support for a given room version is withdrawn,
                 # so that we still get events for said room.
-                logger.info(
-                    "Ignoring PDU for room %s with unknown version %s",
-                    room_id,
-                    room_version,
-                )
+                logger.info("Ignoring PDU: %s", e)
                 continue
 
-            event = event_from_pdu_json(p, format_ver)
+            event = event_from_pdu_json(p, room_version)
             pdus_by_room.setdefault(room_id, []).append(event)
 
         pdu_results = {}
@@ -407,9 +399,7 @@ class FederationServer(FederationBase):
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
-        format_ver = room_version.event_format
-
-        pdu = event_from_pdu_json(content, format_ver)
+        pdu = event_from_pdu_json(content, room_version)
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
         pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
@@ -420,16 +410,15 @@ class FederationServer(FederationBase):
     async def on_send_join_request(self, origin, content, room_id):
         logger.debug("on_send_join_request: content: %s", content)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        format_ver = room_version_to_event_format(room_version)
-        pdu = event_from_pdu_json(content, format_ver)
+        room_version = await self.store.get_room_version(room_id)
+        pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
 
         logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
 
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
 
         res_pdus = await self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
@@ -451,16 +440,15 @@ class FederationServer(FederationBase):
     async def on_send_leave_request(self, origin, content, room_id):
         logger.debug("on_send_leave_request: content: %s", content)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        format_ver = room_version_to_event_format(room_version)
-        pdu = event_from_pdu_json(content, format_ver)
+        room_version = await self.store.get_room_version(room_id)
+        pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, pdu.room_id)
 
         logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
 
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
 
         await self.handler.on_send_leave_request(origin, pdu)
         return {}
@@ -498,15 +486,14 @@ class FederationServer(FederationBase):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
-            room_version = await self.store.get_room_version_id(room_id)
-            format_ver = room_version_to_event_format(room_version)
+            room_version = await self.store.get_room_version(room_id)
 
             auth_chain = [
-                event_from_pdu_json(e, format_ver) for e in content["auth_chain"]
+                event_from_pdu_json(e, room_version) for e in content["auth_chain"]
             ]
 
             signed_auth = await self._check_sigs_and_hash_and_fetch(
-                origin, auth_chain, outlier=True, room_version=room_version
+                origin, auth_chain, outlier=True, room_version=room_version.identifier
             )
 
             ret = await self.handler.on_query_auth(
