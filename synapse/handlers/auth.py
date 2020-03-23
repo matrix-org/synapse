@@ -351,9 +351,9 @@ class AuthHandler(BaseHandler):
                     list(clientdict),
                 )
 
-                # If the authentication flow is complete and this is the
-                # subsequent request, mark this session as invalid, so it cannot
-                # be re-used.
+                # Once the authentication flow has completed and the final
+                # operation is requested, the session should be removed so it
+                # cannot be re-used.
                 if "type" not in authdict:
                     self._remove_session(session["id"])
 
