@@ -166,12 +166,6 @@ class UserDeactivatedError(SynapseError):
         )
 
 
-class RegistrationError(SynapseError):
-    """An error raised when a registration event fails."""
-
-    pass
-
-
 class FederationDeniedError(SynapseError):
     """An error raised when the server tries to federate with a server which
     is not on its federation whitelist.
