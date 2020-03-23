@@ -234,19 +234,16 @@ class PasswordRestServlet(RestServlet):
         if self.auth.has_access_token(request):
             requester = await self.auth.get_user_by_req(request)
             params = await self.auth_handler.validate_user_via_ui_auth(
-                requester,
-                body,
-                self.hs.get_ip_from_request(request),
-                {"operation": "modify_password", "user": requester.user.to_string()},
+                requester, request, body, self.hs.get_ip_from_request(request),
             )
             user_id = requester.user.to_string()
         else:
             requester = None
             result, params, _ = await self.auth_handler.check_auth(
                 [[LoginType.EMAIL_IDENTITY]],
+                request,
                 body,
                 self.hs.get_ip_from_request(request),
-                {"operation": "modify_password"},  # TODO
             )
 
             if LoginType.EMAIL_IDENTITY in result:
@@ -314,10 +311,7 @@ class DeactivateAccountRestServlet(RestServlet):
             return 200, {}
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester,
-            body,
-            self.hs.get_ip_from_request(request),
-            {"operation": "deactivate", "user": requester.user.to_string()},
+            requester, request, body, self.hs.get_ip_from_request(request),
         )
         result = await self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase, id_server=body.get("id_server")
@@ -665,10 +659,7 @@ class ThreepidAddRestServlet(RestServlet):
         assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester,
-            body,
-            self.hs.get_ip_from_request(request),
-            {"operation": "add_3pid", "user": user_id},
+            requester, request, body, self.hs.get_ip_from_request(request),
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(

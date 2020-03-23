@@ -500,9 +500,9 @@ class RegisterRestServlet(RestServlet):
 
         auth_result, params, session_id = await self.auth_handler.check_auth(
             self._registration_flows,
+            request,
             body,
             self.hs.get_ip_from_request(request),
-            {"operation": "register"},
         )
 
         # Check that we're not trying to register a denied 3pid.
