@@ -40,6 +40,8 @@ installation remains secure.
 * Administrators who have installed Synapse from distribution packages should
   consult the information from their distributions.
 
+The `matrix.org` Synapse instance was not vulnerable to these vulnerabilities.
+
 Advance notice of change to the default `git` branch for Synapse
 ----------------------------------------------------------------
 
