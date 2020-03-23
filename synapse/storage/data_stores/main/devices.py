@@ -940,13 +940,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             lock=False,
         )
 
-        # If we're replacing the remote user's device list cache presumably
-        # we've done a full resync, so we remove the entry that says we need
-        # to resync
-        self.db.simple_delete_txn(
-            txn, table="device_lists_remote_resync", keyvalues={"user_id": user_id},
-        )
-
     def update_remote_device_list_cache(self, user_id, devices, stream_id):
         """Replace the entire cache of the remote user's devices.
 
@@ -1001,6 +994,13 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             # we don't need to lock, because we can assume we are the only thread
             # updating this user's extremity.
             lock=False,
+        )
+
+        # If we're replacing the remote user's device list cache presumably
+        # we've done a full resync, so we remove the entry that says we need
+        # to resync
+        self.db.simple_delete_txn(
+            txn, table="device_lists_remote_resync", keyvalues={"user_id": user_id},
         )
 
     @defer.inlineCallbacks
