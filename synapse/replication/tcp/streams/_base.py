@@ -280,7 +280,7 @@ class PushRulesStream(Stream):
             to_token = rows[-1][0]
             limited = True
 
-        return [(row[0], row[2]) for row in rows], to_token, limited
+        return [(row[0], (row[2],)) for row in rows], to_token, limited
 
 
 class PushersStream(Stream):
