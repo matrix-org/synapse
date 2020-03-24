@@ -133,7 +133,7 @@ class PaginationHandler(object):
             include_null = False
 
         logger.info(
-            "[purge] Running purge job for %d < max_lifetime <= %d (include NULLs = %s)",
+            "[purge] Running purge job for %s < max_lifetime <= %s (include NULLs = %s)",
             min_ms,
             max_ms,
             include_null,
