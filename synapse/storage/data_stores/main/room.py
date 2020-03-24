@@ -977,6 +977,23 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         self.config = hs.config
 
+    async def upsert_room_on_join(self, room_id: str, room_version: RoomVersion):
+        """Ensure that the room is stored in the table
+
+        Called when we join a room over federation, and overwrites any room version
+        currently in the table.
+        """
+        await self.db.simple_upsert(
+            desc="upsert_room_on_join",
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            values={"room_version": room_version.identifier},
+            insertion_values={"is_public": False, "creator": ""},
+            # rooms has a unique constraint on room_id, so no need to lock when doing an
+            # emulated upsert.
+            lock=False,
+        )
+
     @defer.inlineCallbacks
     def store_room(
         self,

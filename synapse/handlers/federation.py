@@ -1327,16 +1327,18 @@ class FederationHandler(BaseHandler):
 
             logger.debug("do_invite_join event: %s", event)
 
-            try:
-                await self.store.store_room(
-                    room_id=room_id,
-                    room_creator_user_id="",
-                    is_public=False,
-                    room_version=room_version_obj,
-                )
-            except Exception:
-                # FIXME
-                pass
+            # if this is the first time we've joined this room, it's time to add
+            # a row to `rooms` with the correct room version. If there's already a
+            # row there, we should override it, since it may have been populated
+            # based on an invite request which lied about the room version.
+            #
+            # federation_client.send_join has already checked that the room
+            # version in the received create event is the same as room_version_obj,
+            # so we can rely on it now.
+            #
+            await self.store.upsert_room_on_join(
+                room_id=room_id, room_version=room_version_obj,
+            )
 
             await self._persist_auth_tree(
                 origin, auth_chain, state, event, room_version_obj
