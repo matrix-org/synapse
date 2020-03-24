@@ -16,7 +16,6 @@ import itertools
 import logging
 from typing import List, Optional, Set
 
-from six.moves import range
 from six.moves.queue import Empty, PriorityQueue
 
 from twisted.internet import defer
@@ -28,6 +27,7 @@ from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.data_stores.main.signatures import SignatureWorkerStore
 from synapse.storage.database import Database
 from synapse.util.caches.descriptors import cached
+from synapse.util.iterutils import batch_iter
 
 logger = logging.getLogger(__name__)
 
@@ -88,14 +88,12 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         front = set(event_ids)
         while front:
             new_front = set()
-            front_list = list(front)
-            chunks = [front_list[x : x + 100] for x in range(0, len(front), 100)]
-            for chunk in chunks:
+            for chunk in batch_iter(front, 100):
                 clause, args = make_in_list_sql_clause(
                     txn.database_engine, "event_id", chunk
                 )
-                txn.execute(base_sql + clause, list(args))
-                new_front.update([r[0] for r in txn])
+                txn.execute(base_sql + clause, args)
+                new_front.update(r[0] for r in txn)
 
             new_front -= ignore_events
             new_front -= results

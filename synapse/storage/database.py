@@ -1504,7 +1504,7 @@ class Database(object):
 
 def make_in_list_sql_clause(
     database_engine, column: str, iterable: Iterable
-) -> Tuple[str, Iterable]:
+) -> Tuple[str, list]:
     """Returns an SQL clause that checks the given column is in the iterable.
 
     On SQLite this expands to `column IN (?, ?, ...)`, whereas on Postgres
