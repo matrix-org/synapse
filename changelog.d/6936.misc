@@ -1,0 +1,1 @@
+Increase DB/CPU perf of `_is_server_still_joined` check.
