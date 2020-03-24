@@ -219,7 +219,9 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             targ=self.admin_user,
             tok=self.creator_tok,
         )
-        self.helper.join(room=private_room_id, user=self.admin_user, tok=self.admin_user_tok)
+        self.helper.join(
+            room=private_room_id, user=self.admin_user, tok=self.admin_user_tok
+        )
 
         # Validate if server admin is a member of the room
 
