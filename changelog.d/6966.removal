@@ -1,0 +1,1 @@
+Synapse no longer uses room alias events to calculate room names for email notifications.
