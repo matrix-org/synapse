@@ -1,0 +1,1 @@
+Remove the unused query_auth federation endpoint per MSC2451.
