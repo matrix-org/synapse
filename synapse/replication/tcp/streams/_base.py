@@ -105,9 +105,6 @@ class Stream(object):
             to fetch.
         """
 
-        if from_token in ("NOW", "now"):
-            return [], upto_token, False
-
         from_token = int(from_token)
 
         if from_token == upto_token:
