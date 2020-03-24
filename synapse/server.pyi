@@ -106,7 +106,7 @@ class HomeServer(object):
         pass
     def get_tcp_replication(
         self,
-    ) -> synapse.replication.tcp.client.ReplicationClientHandler:
+    ) -> synapse.replication.tcp.handler.ReplicationClientHandler:
         pass
     def get_federation_registry(
         self,
