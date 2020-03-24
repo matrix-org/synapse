@@ -1,0 +1,1 @@
+Stop sending alias events during adding / removing aliases. Check alt_aliases in the latest canonical aliases event when deleting an alias.
