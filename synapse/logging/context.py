@@ -271,7 +271,7 @@ class LoggingContext(object):
         # keep track of whether we have hit the __exit__ block for this context
         # (suggesting that the the thing that created the context thinks it should
         # be finished, and that re-activating it would suggest an error).
-        self.finished = True
+        self.finished = False
 
         self.parent_context = parent_context
 
