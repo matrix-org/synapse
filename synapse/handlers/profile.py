@@ -33,7 +33,7 @@ from synapse.api.errors import (
 )
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import UserID, create_requester, get_domain_from_id
 
 from ._base import BaseHandler
 
@@ -268,6 +268,12 @@ class BaseProfileHandler(BaseHandler):
         else:
             new_batchnum = None
 
+        # If the admin changes the display name of a user, the requesting user cannot send
+        # the join event to update the displayname in the rooms.
+        # This must be done by the target user himself.
+        if by_admin:
+            requester = create_requester(target_user)
+
         yield self.store.set_profile_displayname(
             target_user.localpart, new_displayname, new_batchnum
         )
@@ -398,6 +404,10 @@ class BaseProfileHandler(BaseHandler):
                 raise SynapseError(
                     400, "Avatar file type '%s' not allowed" % media_info["media_type"]
                 )
+
+        # Same like set_displayname
+        if by_admin:
+            requester = create_requester(target_user)
 
         yield self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url, new_batchnum
