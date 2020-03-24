@@ -66,7 +66,7 @@ from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientFactory
 from synapse.replication.tcp.commands import ClearUserSyncsCommand
-from synapse.replication.tcp.handler import WorkerReplicationDataHandler
+from synapse.replication.tcp.handler import ReplicationDataHandler
 from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
@@ -77,7 +77,6 @@ from synapse.replication.tcp.streams import (
     ReceiptsStream,
     TagAccountDataStream,
     ToDeviceStream,
-    TypingStream,
 )
 from synapse.replication.tcp.streams.events import (
     EventsStream,
@@ -381,43 +380,6 @@ class GenericWorkerPresence(object):
             return set()
 
 
-class GenericWorkerTyping(object):
-    def __init__(self, hs):
-        self._latest_room_serial = 0
-        self._reset()
-
-    def _reset(self):
-        """
-        Reset the typing handler's data caches.
-        """
-        # map room IDs to serial numbers
-        self._room_serials = {}
-        # map room IDs to sets of users currently typing
-        self._room_typing = {}
-
-    def stream_positions(self):
-        # We must update this typing token from the response of the previous
-        # sync. In particular, the stream id may "reset" back to zero/a low
-        # value which we *must* use for the next replication request.
-        return {"typing": self._latest_room_serial}
-
-    def process_replication_rows(self, token, rows):
-        if self._latest_room_serial > token:
-            # The master has gone backwards. To prevent inconsistent data, just
-            # clear everything.
-            self._reset()
-
-        # Set the latest serial token to whatever the server gave us.
-        self._latest_room_serial = token
-
-        for row in rows:
-            self._room_serials[row.room_id] = token
-            self._room_typing[row.room_id] = row.user_ids
-
-    def get_current_token(self) -> int:
-        return self._latest_room_serial
-
-
 class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
@@ -619,17 +581,15 @@ class GenericWorkerServer(HomeServer):
     def build_presence_handler(self):
         return GenericWorkerPresence(self)
 
-    def build_typing_handler(self):
-        return GenericWorkerTyping(self)
-
     def build_replication_data_handler(self):
         return GenericWorkerReplicationHandler(self)
 
 
-class GenericWorkerReplicationHandler(WorkerReplicationDataHandler):
+class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
+        super().__init__(hs)
+
         self.store = hs.get_datastore()
-        self.typing_handler = hs.get_typing_handler()
         # NB this is a SynchrotronPresence, not a normal PresenceHandler
         self.presence_handler = hs.get_presence_handler()
         self.notifier = hs.get_notifier()
@@ -643,14 +603,12 @@ class GenericWorkerReplicationHandler(WorkerReplicationDataHandler):
             self.send_handler = None
 
     async def on_rdata(self, stream_name, token, rows):
-        await super(GenericWorkerReplicationHandler, self).on_rdata(
-            stream_name, token, rows
-        )
+        await super().on_rdata(stream_name, token, rows)
         run_in_background(self.process_and_notify, stream_name, token, rows)
 
     def get_streams_to_replicate(self):
-        args = super(GenericWorkerReplicationHandler, self).get_streams_to_replicate()
-        args.update(self.typing_handler.stream_positions())
+        args = super().get_streams_to_replicate()
+
         if self.send_handler:
             args.update(self.send_handler.stream_positions())
         return args
@@ -697,11 +655,6 @@ class GenericWorkerReplicationHandler(WorkerReplicationDataHandler):
                 )
                 await self.pusher_pool.on_new_receipts(
                     token, token, {row.room_id for row in rows}
-                )
-            elif stream_name == TypingStream.NAME:
-                self.typing_handler.process_replication_rows(token, rows)
-                self.notifier.on_new_event(
-                    "typing_key", token, rooms=[row.room_id for row in rows]
                 )
             elif stream_name == ToDeviceStream.NAME:
                 entities = [row.entity for row in rows if row.entity.startswith("@")]
@@ -937,6 +890,8 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.send_federation = True
+
+    config.server.handle_typing = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

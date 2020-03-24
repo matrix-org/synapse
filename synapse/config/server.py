@@ -83,6 +83,8 @@ class ServerConfig(Config):
         # "disable" federation
         self.send_federation = config.get("send_federation", True)
 
+        self.handle_typing = config.get("handle_typing", True)
+
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
 

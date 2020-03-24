@@ -25,7 +25,7 @@ from twisted.internet.protocol import Factory
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.protocol import ServerReplicationStreamProtocol
-from synapse.replication.tcp.streams import STREAMS_MAP, Stream
+from synapse.replication.tcp.streams import STREAMS_MAP, Stream, TypingStream
 from synapse.replication.tcp.streams.federation import FederationStream
 from synapse.util.metrics import Measure
 
@@ -79,7 +79,13 @@ class ReplicationStreamer(object):
                     # hase been disabled on the master.
                     continue
 
+                if stream == TypingStream:
+                    continue
+
                 self.streams.append(stream(hs))
+
+        if hs.config.server.handle_typing:
+            self.streams.append(TypingStream(hs))
 
         self.streams_by_name = {stream.NAME: stream for stream in self.streams}
 

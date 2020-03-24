@@ -78,7 +78,7 @@ from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
-from synapse.handlers.typing import TypingHandler
+from synapse.handlers.typing import TypingHandler, TypingSlaveHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
@@ -86,8 +86,8 @@ from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.handler import (
-    DummyReplicationDataHandler,
     ReplicationClientHandler,
+    ReplicationDataHandler,
 )
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.rest.media.v1.media_repository import (
@@ -354,7 +354,10 @@ class HomeServer(object):
         return PresenceHandler(self)
 
     def build_typing_handler(self):
-        return TypingHandler(self)
+        if self.config.handle_typing:
+            return TypingHandler(self)
+        else:
+            return TypingSlaveHandler(self)
 
     def build_sync_handler(self):
         return SyncHandler(self)
@@ -555,7 +558,7 @@ class HomeServer(object):
         return ReplicationStreamer(self)
 
     def build_replication_data_handler(self):
-        return DummyReplicationDataHandler()
+        return ReplicationDataHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
