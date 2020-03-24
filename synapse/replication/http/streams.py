@@ -47,9 +47,9 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
     def __init__(self, hs):
         super().__init__(hs)
 
-        from synapse.replication.tcp.streams import STREAMS_MAP
-
-        self.streams = {stream.NAME: stream(hs) for stream in STREAMS_MAP.values()}
+        # We pull the streams from the replication steamer (if we try and make
+        # them ourselves we end up in an import loop).
+        self.streams = hs.get_replication_streamer().get_streams()
 
     @staticmethod
     def _serialize_payload(stream_name, from_token, upto_token, limit):
