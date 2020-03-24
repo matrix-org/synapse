@@ -544,6 +544,11 @@ retention:
 # ACME support: This will configure Synapse to request a valid TLS certificate
 # for your configured `server_name` via Let's Encrypt.
 #
+# Note that ACME v1 is now deprecated, and Synapse currently doesn't support
+# ACME v2. This means that this feature currently won't work with installs set
+# up after November 2019. For more info, and alternative solutions, see
+# https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
+#
 # Note that provisioning a certificate in this way requires port 80 to be
 # routed to Synapse so that it can complete the http-01 ACME challenge.
 # By default, if you enable ACME support, Synapse will attempt to listen on
