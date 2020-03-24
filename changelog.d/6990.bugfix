@@ -1,1 +1,0 @@
-Prevent user from setting 'deactivated' to anything other than a bool on the v2 PUT /users Admin API.
