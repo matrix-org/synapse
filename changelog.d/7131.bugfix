@@ -1,0 +1,1 @@
+Bump Twisted version to 20.3.0 to fix vulnerabilities when using Synapse behind a reverse-proxy. Contributed by @DylanVanAssche.
