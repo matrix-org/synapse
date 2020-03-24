@@ -1729,8 +1729,7 @@ class ContextTestCase(unittest.HomeserverTestCase):
         self.assertEqual(events_after[1].get("content"), {}, events_after[1])
 
 
-class DirectoryTestCase(unittest.HomeserverTestCase):
-
+class RoomAliasListTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         directory.register_servlets,
@@ -1756,6 +1755,16 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         res = self._get_aliases(user_tok, expected_code=403)
         self.assertEqual(res["errcode"], "M_FORBIDDEN")
 
+    def test_admin_user(self):
+        alias1 = self._random_alias()
+        self._set_alias_via_directory(alias1)
+
+        self.register_user("user", "test", admin=True)
+        user_tok = self.login("user", "test")
+
+        res = self._get_aliases(user_tok)
+        self.assertEqual(res["aliases"], [alias1])
+
     def test_with_aliases(self):
         alias1 = self._random_alias()
         alias2 = self._random_alias()
@@ -1770,7 +1779,8 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         """Calls the endpoint under test. returns the json response object."""
         request, channel = self.make_request(
             "GET",
-            "/_matrix/client/r0/rooms/%s/aliases" % (self.room_id,),
+            "/_matrix/client/unstable/org.matrix.msc2432/rooms/%s/aliases"
+            % (self.room_id,),
             access_token=access_token,
         )
         self.render(request)

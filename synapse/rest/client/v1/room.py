@@ -16,6 +16,7 @@
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
+import re
 from typing import List, Optional
 
 from six.moves.urllib import parse as urlparse
@@ -849,7 +850,12 @@ class RoomTypingRestServlet(RestServlet):
 
 
 class RoomAliasListServlet(RestServlet):
-    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/aliases", unstable=False)
+    PATTERNS = [
+        re.compile(
+            r"^/_matrix/client/unstable/org\.matrix\.msc2432"
+            r"/rooms/(?P<room_id>[^/]*)/aliases"
+        ),
+    ]
 
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__()
