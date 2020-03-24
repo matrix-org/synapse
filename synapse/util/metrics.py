@@ -21,7 +21,7 @@ from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import LoggingContext, current_context
 from synapse.metrics import InFlightGauge
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ class Measure(object):
             raise RuntimeError("Measure() objects cannot be re-used")
 
         self.start = self.clock.time()
-        parent_context = LoggingContext.current_context()
+        parent_context = current_context()
         self._logging_context = LoggingContext(
             "Measure[%s]" % (self.name,), parent_context
         )
