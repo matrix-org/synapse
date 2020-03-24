@@ -56,7 +56,7 @@ class TypingHandler(object):
         self.clock = hs.get_clock()
         self.wheel_timer = WheelTimer(bucket_size=5000)
 
-        self.federation = hs.get_federation_sender()
+        # self.federation = hs.get_federation_sender()
 
         hs.get_federation_registry().register_edu_handler("m.typing", self._recv_edu)
 
@@ -203,16 +203,16 @@ class TypingHandler(object):
             for domain in {get_domain_from_id(u) for u in users}:
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
-                    self.federation.build_and_send_edu(
-                        destination=domain,
-                        edu_type="m.typing",
-                        content={
-                            "room_id": member.room_id,
-                            "user_id": member.user_id,
-                            "typing": typing,
-                        },
-                        key=member,
-                    )
+                    # self.federation.build_and_send_edu(
+                    #     destination=domain,
+                    #     edu_type="m.typing",
+                    #     content={
+                    #         "room_id": member.room_id,
+                    #         "user_id": member.user_id,
+                    #         "typing": typing,
+                    #     },
+                    #     key=member,
+                    # )
         except Exception:
             logger.exception("Error pushing typing notif to remotes")
 

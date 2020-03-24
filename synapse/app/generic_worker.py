@@ -105,6 +105,7 @@ from synapse.rest.client.v1.room import (
     RoomSendEventRestServlet,
     RoomStateEventRestServlet,
     RoomStateRestServlet,
+    RoomTypingRestServlet,
 )
 from synapse.rest.client.v1.voip import VoipRestServlet
 from synapse.rest.client.v2_alpha import groups, sync, user_directory
@@ -464,6 +465,7 @@ class GenericWorkerServer(HomeServer):
                     ProfileDisplaynameRestServlet(self).register(resource)
                     ProfileRestServlet(self).register(resource)
                     KeyUploadServlet(self).register(resource)
+                    RoomTypingRestServlet(self).register(resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
@@ -892,6 +894,8 @@ def start(config_options):
         config.send_federation = True
 
     config.server.handle_typing = False
+    if config.worker_app == "synapse.app.client_reader":
+        config.server.handle_typing = True
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -907,6 +911,8 @@ def start(config_options):
     reactor.addSystemEventTrigger(
         "before", "startup", _base.start, ss, config.worker_listeners
     )
+
+    ss.get_replication_streamer()
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 

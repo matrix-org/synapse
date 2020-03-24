@@ -816,7 +816,7 @@ class RoomTypingRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
 
-        await self.presence_handler.bump_presence_active_time(requester.user)
+        # await self.presence_handler.bump_presence_active_time(requester.user)
 
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)

@@ -218,7 +218,7 @@ class ReplicationClientHandler:
             rows: a list of Stream.ROW_TYPE objects as returned by
                 Stream.parse_row.
         """
-        logger.debug("Received rdata %s -> %s", stream_name, token)
+        logger.info("Received rdata %s -> %s", stream_name, token)
         await self.replication_data_handler.on_rdata(stream_name, token, rows)
 
     async def on_POSITION(self, cmd: PositionCommand):
