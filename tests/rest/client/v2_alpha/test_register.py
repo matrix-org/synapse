@@ -36,8 +36,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
     servlets = [register.register_servlets]
     url = b"/_matrix/client/r0/register"
 
-    def default_config(self, name="test"):
-        config = super().default_config(name)
+    def default_config(self):
+        config = super().default_config()
         config["allow_guest_access"] = True
         return config
 

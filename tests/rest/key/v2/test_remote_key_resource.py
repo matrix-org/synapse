@@ -143,8 +143,8 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
     endpoint, to check that the two implementations are compatible.
     """
 
-    def default_config(self, *args, **kwargs):
-        config = super().default_config(*args, **kwargs)
+    def default_config(self):
+        config = super().default_config()
 
         # replace the signing key with our own
         self.hs_signing_key = signedjson.key.generate_signing_key("kssk")

@@ -28,8 +28,8 @@ from tests import unittest
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
-    def default_config(self, name="test"):
-        config = super().default_config(name)
+    def default_config(self):
+        config = super().default_config()
         config.update(
             {
                 "public_baseurl": "https://example.org/",

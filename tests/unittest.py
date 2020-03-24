@@ -311,14 +311,11 @@ class HomeserverTestCase(TestCase):
 
         return resource
 
-    def default_config(self, name="test"):
+    def default_config(self):
         """
         Get a default HomeServer config dict.
-
-        Args:
-            name (str): The homeserver name/domain.
         """
-        config = default_config(name)
+        config = default_config("test")
 
         # apply any additional config which was specified via the override_config
         # decorator.
