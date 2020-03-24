@@ -80,13 +80,13 @@ _background_process_db_sched_duration = Counter(
 # map from description to a counter, so that we can name our logcontexts
 # incrementally. (It actually duplicates _background_process_start_count, but
 # it's much simpler to do so than to try to combine them.)
-_background_process_counts = dict()  # type: dict[str, int]
+_background_process_counts = {}  # type: dict[str, int]
 
 # map from description to the currently running background processes.
 #
 # it's kept as a dict of sets rather than a big set so that we can keep track
 # of process descriptions that no longer have any active processes.
-_background_processes = dict()  # type: dict[str, set[_BackgroundProcess]]
+_background_processes = {}  # type: dict[str, set[_BackgroundProcess]]
 
 # A lock that covers the above dicts
 _bg_metrics_lock = threading.Lock()

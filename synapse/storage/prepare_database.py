@@ -345,9 +345,9 @@ def _upgrade_existing_database(
                     "Could not open delta dir for version %d: %s" % (v, directory)
                 )
 
-        duplicates = set(
+        duplicates = {
             file_name for file_name, count in file_name_counter.items() if count > 1
-        )
+        }
         if duplicates:
             # We don't support using the same file name in the same delta version.
             raise PrepareDatabaseException(
@@ -454,7 +454,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
         ),
         (modname,),
     )
-    applied_deltas = set(d for d, in cur)
+    applied_deltas = {d for d, in cur}
     for (name, stream) in names_and_streams:
         if name in applied_deltas:
             continue

@@ -1140,12 +1140,12 @@ KNOWN_RESOURCES = (
 
 
 def _check_resource_config(listeners):
-    resource_names = set(
+    resource_names = {
         res_name
         for listener in listeners
         for res in listener.get("resources", [])
         for res_name in res.get("names", [])
-    )
+    }
 
     for resource in resource_names:
         if resource not in KNOWN_RESOURCES:

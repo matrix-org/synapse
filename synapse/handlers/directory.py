@@ -72,7 +72,7 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Check if there is a current association.
         if not servers:
             users = yield self.state.get_current_users_in_room(room_id)
-            servers = set(get_domain_from_id(u) for u in users)
+            servers = {get_domain_from_id(u) for u in users}
 
         if not servers:
             raise SynapseError(400, "Failed to get server list")
@@ -255,7 +255,7 @@ class DirectoryHandler(BaseHandler):
             )
 
         users = yield self.state.get_current_users_in_room(room_id)
-        extra_servers = set(get_domain_from_id(u) for u in users)
+        extra_servers = {get_domain_from_id(u) for u in users}
         servers = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.

@@ -135,7 +135,7 @@ class ApplicationServiceTransactionWorkerStore(
             may be empty.
         """
         results = yield self.db.simple_select_list(
-            "application_services_state", dict(state=state), ["as_id"]
+            "application_services_state", {"state": state}, ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
         as_list = self.get_app_services()
@@ -158,7 +158,7 @@ class ApplicationServiceTransactionWorkerStore(
         """
         result = yield self.db.simple_select_one(
             "application_services_state",
-            dict(as_id=service.id),
+            {"as_id": service.id},
             ["state"],
             allow_none=True,
             desc="get_appservice_state",
@@ -177,7 +177,7 @@ class ApplicationServiceTransactionWorkerStore(
             A Deferred which resolves when the state was set successfully.
         """
         return self.db.simple_upsert(
-            "application_services_state", dict(as_id=service.id), dict(state=state)
+            "application_services_state", {"as_id": service.id}, {"state": state}
         )
 
     def create_appservice_txn(self, service, events):
@@ -253,13 +253,15 @@ class ApplicationServiceTransactionWorkerStore(
             self.db.simple_upsert_txn(
                 txn,
                 "application_services_state",
-                dict(as_id=service.id),
-                dict(last_txn=txn_id),
+                {"as_id": service.id},
+                {"last_txn": txn_id},
             )
 
             # Delete txn
             self.db.simple_delete_txn(
-                txn, "application_services_txns", dict(txn_id=txn_id, as_id=service.id)
+                txn,
+                "application_services_txns",
+                {"txn_id": txn_id, "as_id": service.id},
             )
 
         return self.db.runInteraction(

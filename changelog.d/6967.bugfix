@@ -1,0 +1,1 @@
+Fix an issue affecting worker-based deployments where replication would stop working, necessitating a full restart, after joining a large room.

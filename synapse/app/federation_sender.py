@@ -262,7 +262,7 @@ class FederationSenderHandler(object):
 
         # ... as well as device updates and messages
         elif stream_name == DeviceListsStream.NAME:
-            hosts = set(row.destination for row in rows)
+            hosts = {row.destination for row in rows}
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
 
@@ -270,7 +270,7 @@ class FederationSenderHandler(object):
             # The to_device stream includes stuff to be pushed to both local
             # clients and remote servers, so we ignore entities that start with
             # '@' (since they'll be local users rather than destinations).
-            hosts = set(row.entity for row in rows if not row.entity.startswith("@"))
+            hosts = {row.entity for row in rows if not row.entity.startswith("@")}
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
 

@@ -394,7 +394,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
         ) = self.state_datastore._state_group_cache.get(group)
 
         self.assertEqual(is_all, False)
-        self.assertEqual(known_absent, set([(e1.type, e1.state_key)]))
+        self.assertEqual(known_absent, {(e1.type, e1.state_key)})
         self.assertDictEqual(state_dict_ids, {(e1.type, e1.state_key): e1.event_id})
 
         ############################################

@@ -260,7 +260,7 @@ class TlsConfig(Config):
                 crypto.FILETYPE_ASN1, self.tls_certificate
             )
             sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
-            sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
+            sha256_fingerprints = {f["sha256"] for f in self.tls_fingerprints}
             if sha256_fingerprint not in sha256_fingerprints:
                 self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
