@@ -274,8 +274,11 @@ class PasswordRestServlet(RestServlet):
 
         assert_params_in_dict(params, ["new_password"])
         new_password = params["new_password"]
+        logout_devices = params.get("logout_devices", True)
 
-        await self._set_password_handler.set_password(user_id, new_password, requester)
+        await self._set_password_handler.set_password(
+            user_id, new_password, logout_devices, requester
+        )
 
         if self.hs.config.shadow_server:
             shadow_user = UserID(
