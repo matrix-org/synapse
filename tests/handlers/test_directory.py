@@ -88,6 +88,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
 
     def test_delete_alias_not_allowed(self):
+        """Removing an alias should be denied if a user does not have the proper permissions."""
         room_id = "!8765qwer:test"
         self.get_success(
             self.store.create_room_alias_association(self.my_room, room_id, ["test"])
@@ -101,6 +102,7 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
 
     def test_delete_alias(self):
+        """Removing an alias should work when a user does has the proper permissions."""
         room_id = "!8765qwer:test"
         user_id = "@user:test"
         self.get_success(
@@ -159,30 +161,42 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         self.test_alias = "#test:test"
-        self.room_alias = RoomAlias.from_string(self.test_alias)
+        self.room_alias = self._add_alias(self.test_alias)
+
+    def _add_alias(self, alias: str) -> RoomAlias:
+        """Add an alias to the test room."""
+        room_alias = RoomAlias.from_string(alias)
 
         # Create a new alias to this room.
         self.get_success(
             self.store.create_room_alias_association(
-                self.room_alias, self.room_id, ["test"], self.admin_user
+                room_alias, self.room_id, ["test"], self.admin_user
+            )
+        )
+        return room_alias
+
+    def _set_canonical_alias(self, content):
+        """Configure the canonical alias state on the room."""
+        self.helper.send_state(
+            self.room_id, "m.room.canonical_alias", content, tok=self.admin_user_tok,
+        )
+
+    def _get_canonical_alias(self):
+        """Get the canonical alias state of the room."""
+        return self.get_success(
+            self.state_handler.get_current_state(
+                self.room_id, EventTypes.CanonicalAlias, ""
             )
         )
 
     def test_remove_alias(self):
         """Removing an alias that is the canonical alias should remove it there too."""
         # Set this new alias as the canonical alias for this room
-        self.helper.send_state(
-            self.room_id,
-            "m.room.canonical_alias",
-            {"alias": self.test_alias, "alt_aliases": [self.test_alias]},
-            tok=self.admin_user_tok,
+        self._set_canonical_alias(
+            {"alias": self.test_alias, "alt_aliases": [self.test_alias]}
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertEqual(data["content"]["alias"], self.test_alias)
         self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
 
@@ -193,11 +207,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertNotIn("alias", data["content"])
         self.assertNotIn("alt_aliases", data["content"])
 
@@ -205,29 +215,17 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         """Removing an alias listed as in alt_aliases should remove it there too."""
         # Create a second alias.
         other_test_alias = "#test2:test"
-        other_room_alias = RoomAlias.from_string(other_test_alias)
-        self.get_success(
-            self.store.create_room_alias_association(
-                other_room_alias, self.room_id, ["test"], self.admin_user
-            )
-        )
+        other_room_alias = self._add_alias(other_test_alias)
 
         # Set the alias as the canonical alias for this room.
-        self.helper.send_state(
-            self.room_id,
-            "m.room.canonical_alias",
+        self._set_canonical_alias(
             {
                 "alias": self.test_alias,
                 "alt_aliases": [self.test_alias, other_test_alias],
-            },
-            tok=self.admin_user_tok,
+            }
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertEqual(data["content"]["alias"], self.test_alias)
         self.assertEqual(
             data["content"]["alt_aliases"], [self.test_alias, other_test_alias]
@@ -240,11 +238,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertEqual(data["content"]["alias"], self.test_alias)
         self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
 
