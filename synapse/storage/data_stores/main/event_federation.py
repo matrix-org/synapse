@@ -26,7 +26,6 @@ from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.data_stores.main.signatures import SignatureWorkerStore
 from synapse.storage.database import Database
-from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -66,33 +65,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             results = set(event_ids)
         else:
             results = set()
-
-        if isinstance(self.database_engine, PostgresEngine):
-            # For efficiency we make the database do this if we can.
-
-            # We need to be a little careful with querying large amounts at
-            # once, for some reason postgres really doesn't like it. We do this
-            # by only asking for auth chain of 500 events at a time.
-            event_ids = list(event_ids)
-            chunks = [event_ids[x : x + 500] for x in range(0, len(event_ids), 500)]
-            for chunk in chunks:
-                sql = """
-                    WITH RECURSIVE auth_chain(event_id) AS (
-                        SELECT auth_id FROM event_auth WHERE event_id = ANY(?)
-                        UNION
-                        SELECT auth_id FROM event_auth
-                        INNER JOIN auth_chain USING (event_id)
-                    )
-                    SELECT event_id FROM auth_chain
-                """
-                txn.execute(sql, (chunk,))
-
-                results.update(event_id for event_id, in txn)
-
-            return list(results)
-
-        # Database doesn't necessarily support recursive CTE, so we fall
-        # back to do doing it manually.
 
         base_sql = "SELECT auth_id FROM event_auth WHERE "
 
