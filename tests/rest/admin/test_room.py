@@ -183,9 +183,10 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(self.public_room_id, channel.json_body["joined_rooms"][0])
 
-    def test_join_private_room(self):
+    def test_join_private_room_if_not_member(self):
         """
         Test joining a local user to a private room with "JoinRules.INVITE"
+        when server admin is not member of this room.
         """
         private_room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=False
@@ -204,11 +205,59 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
+    def test_join_private_room_if_member(self):
+        """
+        Test joining a local user to a private room with "JoinRules.INVITE",
+        when server admin is member of this room.
+        """
+        private_room_id = self.helper.create_room_as(
+            self.creator, tok=self.creator_tok, is_public=False
+        )
+        self.helper.invite(
+            room=private_room_id,
+            src=self.creator,
+            targ=self.admin_user,
+            tok=self.creator_tok,
+        )
+        self.helper.join(room=private_room_id, user=self.admin_user, tok=self.admin_user_tok)
+
+        # Validate if server admin is a member of the room
+
+        request, channel = self.make_request(
+            "GET", "/_matrix/client/r0/joined_rooms", access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
+
+        # Join user to room.
+
+        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        body = json.dumps({"user_id": self.second_user_id})
+
+        request, channel = self.make_request(
+            "POST",
+            url,
+            content=body.encode(encoding="utf_8"),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(private_room_id, channel.json_body["room_id"])
+
+        # Validate if user is a member of the room
+
+        request, channel = self.make_request(
+            "GET", "/_matrix/client/r0/joined_rooms", access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEquals(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(private_room_id, channel.json_body["joined_rooms"][0])
+
     def test_join_private_room_if_owner(self):
         """
         Test joining a local user to a private room with "JoinRules.INVITE",
         when server admin is owner of this room.
-
         """
         private_room_id = self.helper.create_room_as(
             self.admin_user, tok=self.admin_user_tok, is_public=False

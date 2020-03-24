@@ -255,12 +255,7 @@ class JoinRoomAliasServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        try:
-            content = parse_json_object_from_request(request)
-        except Exception:
-            # Turns out we used to ignore the body entirely, and some clients
-            # cheekily send invalid bodies.
-            content = {}
+        content = parse_json_object_from_request(request)
 
         assert_params_in_dict(content, ["user_id"])
         target_user = UserID.from_string(content["user_id"])

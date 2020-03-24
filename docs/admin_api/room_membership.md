@@ -1,11 +1,12 @@
 # Edit Room Membership API
 
-The API allow an administrator to join an user account with a specific `user_id`
-to a room with a specific `roomIdOrAlias`.
-You can only modify local users.
-The room must have join rule `JoinRules.PUBLIC`. It is default for public rooms.
-The administrator must be admin or creator of a room, if the room has join rule
-`JoinRules.INVITE` (default for private rooms).
+The API allows an administrator to join an user account with a given `user_id`
+to a room with a given `roomIdOrAlias`. You can only modify the membership of
+local users. The room must have join rule `JoinRules.PUBLIC`, which is the
+default for public rooms. If the room has the join rule `JoinRules.INVITE`
+(default for private rooms), the server administrator must have permissions
+to invite users to this room. Per default you can invite users if you are
+member of a room.
 
 ## Parameters
 
