@@ -181,11 +181,12 @@ LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 class _Sentinel(object):
     """Sentinel to represent the root context"""
 
-    __slots__ = ["previous_context", "request", "scope", "tag"]
+    __slots__ = ["previous_context", "finished", "request", "scope", "tag"]
 
     def __init__(self) -> None:
         # Minimal set for compatibility with LoggingContext
         self.previous_context = None
+        self.finished = False
         self.request = None
         self.scope = None
         self.tag = None
@@ -245,6 +246,7 @@ class LoggingContext(object):
         "_resource_usage",
         "usage_start",
         "main_thread",
+        "finished",
         "request",
         "tag",
         "scope",
@@ -257,14 +259,19 @@ class LoggingContext(object):
         # track the resources used by this context so far
         self._resource_usage = ContextResourceUsage()
 
-        # If alive has the thread resource usage when the logcontext last
-        # became active.
+        # The thread resource usage when the logcontext became active. None
+        # if the context is not currently active.
         self.usage_start = None
 
         self.main_thread = get_thread_id()
         self.request = None
         self.tag = ""
         self.scope = None  # type: Optional[_LogContextScope]
+
+        # keep track of whether we have hit the __exit__ block for this context
+        # (suggesting that the the thing that created the context thinks it should
+        # be finished, and that re-activating it would suggest an error).
+        self.finished = True
 
         self.parent_context = parent_context
 
@@ -289,7 +296,6 @@ class LoggingContext(object):
                 self.previous_context,
                 old_context,
             )
-
         return self
 
     def __exit__(self, type, value, traceback) -> None:
@@ -306,6 +312,11 @@ class LoggingContext(object):
                 logger.warning(
                     "Expected logging context %s but found %s", self, current
                 )
+
+        # the fact that we are here suggests that the caller thinks that everything
+        # is done and dusted for this logcontext, and further activity will not get
+        # recorded against the correct metrics.
+        self.finished = True
 
     def copy_to(self, record) -> None:
         """Copy logging fields from this context to a log record or
@@ -330,9 +341,14 @@ class LoggingContext(object):
             logger.warning("Started logcontext %s on different thread", self)
             return
 
+        if self.finished:
+            logger.warning("Re-starting finished log context %s", self)
+
         # If we haven't already started record the thread resource usage so
         # far
-        if not self.usage_start:
+        if self.usage_start:
+            logger.warning("Re-starting already-active log context %s", self)
+        else:
             self.usage_start = get_thread_resource_usage()
 
     def stop(self) -> None:
