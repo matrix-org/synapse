@@ -26,7 +26,6 @@ import logging
 import os
 
 from twisted.mail.smtp import sendmail
-from twisted.web.client import BrowserLikePolicyForHTTPS
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
@@ -35,6 +34,7 @@ from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
+from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
 from synapse.events.spamcheck import SpamChecker
@@ -313,7 +313,7 @@ class HomeServer(object):
         return (
             InsecureInterceptableContextFactory()
             if self.config.use_insecure_ssl_client_just_for_testing_do_not_use
-            else BrowserLikePolicyForHTTPS()
+            else RegularPolicyForHTTPS()
         )
 
     def build_simple_http_client(self):
@@ -423,7 +423,7 @@ class HomeServer(object):
         return PusherPool(self)
 
     def build_http_client(self):
-        tls_client_options_factory = context_factory.ClientTLSOptionsFactory(
+        tls_client_options_factory = context_factory.FederationPolicyForHTTPS(
             self.config
         )
         return MatrixFederationHttpClient(self, tls_client_options_factory)
