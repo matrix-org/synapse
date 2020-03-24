@@ -72,12 +72,14 @@ from synapse.replication.tcp.commands import (
     ServerCommand,
 )
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
+from synapse.types import Collection
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 MYPY = False
 if MYPY:
-    import synapse.server
+    from synapse.server import HomeServer
+
 
 connection_close_counter = Counter(
     "synapse_replication_tcp_protocol_close_reason", "", ["reason_type"]
@@ -423,7 +425,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
 class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
     def __init__(
         self,
-        hs: "synapse.server.HomeServer",
+        hs: "HomeServer",
         client_name: str,
         server_name: str,
         clock: Clock,

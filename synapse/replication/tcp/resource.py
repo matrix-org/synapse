@@ -17,7 +17,7 @@
 
 import logging
 import random
-from typing import List
+from typing import List, Dict
 
 from prometheus_client import Counter
 
@@ -96,6 +96,11 @@ class ReplicationStreamer(object):
         self.pending_updates = False
 
         self.client = hs.get_tcp_replication()
+
+    def get_streams(self) -> Dict[str, Stream]:
+        """Get a mapp from stream name to stream instance.
+        """
+        return self.streams_by_name
 
     def on_notifier_poke(self):
         """Checks if there is actually any new data and sends it to the

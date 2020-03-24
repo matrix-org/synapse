@@ -175,7 +175,8 @@ client (C):
 #### POSITION (S)
 
    On receipt of a POSITION command clients should check if they have missed any
-   updates, and if so then fetch them out of band.
+   updates, and if so then fetch them out of band. Sent in response to a
+   REPLICATE command (but can happen at any time).
 
 #### ERROR (S, C)
 
