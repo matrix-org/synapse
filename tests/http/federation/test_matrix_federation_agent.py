@@ -32,7 +32,9 @@ from twisted.web.iweb import IPolicyForHTTPS
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
-from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.http.federation.matrix_federation_agent import (
+    MatrixFederationAgent,
+)
 from synapse.http.federation.srv_resolver import Server
 from synapse.http.federation.well_known_resolver import (
     WellKnownResolver,
@@ -92,7 +94,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
-            tls_client_options_factory=self.tls_factory,
+            tls_client_options_factory=FederationPolicyForHTTPS(config),
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=self.well_known_resolver,
         )

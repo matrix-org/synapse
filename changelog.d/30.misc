@@ -1,0 +1,1 @@
+Improve performance when making HTTP requests to sygnal, sydent, etc, by sharing the SSL context object between connections.
