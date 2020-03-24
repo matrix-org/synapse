@@ -323,7 +323,11 @@ class ReplicationStreamer(object):
 
         # We need to tell the presence handler that the connection has been
         # lost so that it can handle any ongoing syncs on that connection.
-        self.presence_handler.update_external_syncs_clear(connection.conn_id)
+        run_as_background_process(
+            "update_external_syncs_clear",
+            self.presence_handler.update_external_syncs_clear,
+            connection.conn_id,
+        )
 
 
 def _batch_updates(updates):
