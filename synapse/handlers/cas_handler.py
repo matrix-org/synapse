@@ -15,6 +15,7 @@
 
 import logging
 import xml.etree.ElementTree as ET
+from typing import Awaitable, Dict, Optional, Tuple
 
 from six.moves import urllib
 
@@ -22,6 +23,7 @@ from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError
 from synapse.http.servlet import parse_string
+from synapse.http.site import SynapseRequest
 from synapse.types import UserID, map_username_to_mxid_localpart
 
 logger = logging.getLogger(__name__)
@@ -50,14 +52,16 @@ class CasHandler:
         # cast to tuple for use with str.startswith
         self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
 
-    def _build_service_param(self, client_redirect_url):
+    def _build_service_param(self, client_redirect_url: str) -> str:
         return "%s%s?redirectUrl=%s" % (
             self._cas_service_url,
             "/_matrix/client/r0/login/cas/ticket",
             urllib.parse.quote(client_redirect_url, safe=""),
         )
 
-    def _handle_cas_response(self, request, cas_response_body, client_redirect_url):
+    def _handle_cas_response(
+        self, request: SynapseRequest, cas_response_body: str, client_redirect_url: str
+    ) -> Awaitable:
         user, attributes = self._parse_cas_response(cas_response_body)
         displayname = attributes.pop(self._cas_displayname_attribute, None)
 
@@ -75,7 +79,9 @@ class CasHandler:
 
         return self._on_successful_auth(user, request, client_redirect_url, displayname)
 
-    def _parse_cas_response(self, cas_response_body):
+    def _parse_cas_response(
+        self, cas_response_body: str
+    ) -> Tuple[str, Dict[str, Optional[str]]]:
         user = None
         attributes = {}
         try:
@@ -108,28 +114,32 @@ class CasHandler:
         return user, attributes
 
     async def _on_successful_auth(
-        self, username, request, client_redirect_url, user_display_name=None
-    ):
+        self,
+        username: str,
+        request: SynapseRequest,
+        client_redirect_url: str,
+        user_display_name: Optional[str] = None,
+    ) -> None:
         """Called once the user has successfully authenticated with the SSO.
 
         Registers the user if necessary, and then returns a redirect (with
         a login token) to the client.
 
         Args:
-            username (unicode|bytes): the remote user id. We'll map this onto
+            username: the remote user id. We'll map this onto
                 something sane for a MXID localpath.
 
-            request (SynapseRequest): the incoming request from the browser. We'll
+            request: the incoming request from the browser. We'll
                 respond to it with a redirect.
 
-            client_redirect_url (unicode): the redirect_url the client gave us when
+            client_redirect_url: the redirect_url the client gave us when
                 it first started the process.
 
-            user_display_name (unicode|None): if set, and we have to register a new user,
+            user_display_name: if set, and we have to register a new user,
                 we will set their displayname to this.
 
         Returns:
-            Deferred[none]: Completes once we have handled the request.
+            Completes once we have handled the request.
         """
         localpart = map_username_to_mxid_localpart(username)
         user_id = UserID(localpart, self._hostname).to_string()
@@ -143,14 +153,14 @@ class CasHandler:
             registered_user_id, request, client_redirect_url
         )
 
-    def handle_redirect_request(self, client_redirect_url):
+    def handle_redirect_request(self, client_redirect_url: str) -> str:
         args = urllib.parse.urlencode(
             {"service": self._build_service_param(client_redirect_url)}
         )
 
         return "%s/login?%s" % (self._cas_server_url, args)
 
-    async def handle_ticket_request(self, request):
+    async def handle_ticket_request(self, request: SynapseRequest):
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
         uri = self._cas_server_url + "/proxyValidate"
         args = {
@@ -164,4 +174,4 @@ class CasHandler:
             # even if that's being used old-http style to signal end-of-data
             body = pde.response
 
-        return await self._handle_cas_response(request, body, client_redirect_url)
+        await self._handle_cas_response(request, body, client_redirect_url)
