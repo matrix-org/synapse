@@ -16,7 +16,7 @@ from mock import Mock, patch
 
 from parameterized import parameterized
 
-from synapse.app.federation_reader import FederationReaderServer
+from synapse.app.generic_worker import GenericWorkerServer
 from synapse.app.homeserver import SynapseHomeServer
 
 from tests.unittest import HomeserverTestCase
@@ -25,7 +25,7 @@ from tests.unittest import HomeserverTestCase
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=FederationReaderServer
+            http_client=None, homeserverToUse=GenericWorkerServer
         )
         return hs
 
