@@ -27,6 +27,18 @@ DEFAULT_USER_MAPPING_PROVIDER = (
     "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
 )
 
+SAML2_ERROR_DEFAULT_HTML = """
+<html>
+    <body>
+        <p>Oops! Something went wrong</p>
+        <p>
+            Try logging in again from your Matrix client and if the problem persists
+            please contact the server's administrator.
+        </p>
+    </body>
+</html>
+"""
+
 
 def _dict_merge(merge_dict, into_dict):
     """Do a deep merge of two dicts
@@ -159,6 +171,13 @@ class SAML2Config(Config):
         self.saml2_session_lifetime = self.parse_duration(
             saml2_config.get("saml_session_lifetime", "5m")
         )
+
+        if "error_html_path" in config:
+            self.saml2_error_html_content = self.read_file(
+                config["error_html_path"], "saml2_config.error_html_path",
+            )
+        else:
+            self.saml2_error_html_content = SAML2_ERROR_DEFAULT_HTML
 
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set
@@ -325,6 +344,13 @@ class SAML2Config(Config):
           # The default is 'uid'.
           #
           #grandfathered_mxid_source_attribute: upn
+
+          # Path to a file containing HTML content to serve in case an error happens
+          # when the user gets redirected from the SAML IdP back to Synapse.
+          # If no file is provided, this defaults to some minimalistic HTML telling the
+          # user that something went wrong and they should try authenticating again.
+          #
+          #error_html_path: /path/to/static/content/saml_error.html
         """ % {
             "config_dir_path": config_dir_path
         }
