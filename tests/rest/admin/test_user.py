@@ -507,3 +507,62 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(1, channel.json_body["admin"])
         self.assertEqual(0, channel.json_body["is_guest"])
         self.assertEqual(1, channel.json_body["deactivated"])
+
+    def test_accidental_deactivation_prevention(self):
+        """
+        Ensure an account can't accidentally be deactivated by using a str value
+        for the deactivated body parameter
+        """
+        self.hs.config.registration_shared_secret = None
+
+        # Create user
+        body = json.dumps({"password": "abc123"})
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("bob", channel.json_body["displayname"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("bob", channel.json_body["displayname"])
+        self.assertEqual(0, channel.json_body["deactivated"])
+
+        # Change password (and use a str for deactivate instead of a bool)
+        body = json.dumps({"password": "abc123", "deactivated": "false"})  # oops!
+
+        request, channel = self.make_request(
+            "PUT",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Check user is not deactivated
+        request, channel = self.make_request(
+            "GET", self.url, access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("bob", channel.json_body["displayname"])
+
+        # Ensure they're still alive
+        self.assertEqual(0, channel.json_body["deactivated"])

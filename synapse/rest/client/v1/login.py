@@ -599,6 +599,7 @@ class SSOAuthHandler(object):
         redirect_url = self._add_login_token_to_redirect_url(
             client_redirect_url, login_token
         )
+        # Load page
         request.redirect(redirect_url)
         finish_request(request)
 
