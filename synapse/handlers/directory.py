@@ -16,6 +16,7 @@
 
 import logging
 import string
+from typing import List
 
 from twisted.internet import defer
 
@@ -28,7 +29,7 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.types import RoomAlias, UserID, get_domain_from_id
+from synapse.types import Requester, RoomAlias, UserID, get_domain_from_id
 
 from ._base import BaseHandler
 
@@ -452,3 +453,17 @@ class DirectoryHandler(BaseHandler):
         yield self.store.set_room_is_public_appservice(
             room_id, appservice_id, network_id, visibility == "public"
         )
+
+    async def get_aliases_for_room(
+        self, requester: Requester, room_id: str
+    ) -> List[str]:
+        """
+        Get a list of the aliases that currently point to this room on this server
+        """
+        # allow access to server admins and current members of the room
+        is_admin = await self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            await self.auth.check_joined_room(room_id, requester.user.to_string())
+
+        aliases = await self.store.get_aliases_for_room(room_id)
+        return aliases
