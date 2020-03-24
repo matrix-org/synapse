@@ -353,10 +353,12 @@ class JsonResource(HttpServer, resource.Resource):
         if request.method == b"OPTIONS":
             return _options_handler, "options_request_handler", {}
 
+        request_path = request.path.decode("ascii")
+
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path.decode("ascii"))
+            m = path_entry.pattern.match(request_path)
             if m:
                 # We found a match!
                 return path_entry.callback, path_entry.servlet_classname, m.groupdict()
