@@ -228,8 +228,10 @@ class ReplicationClientHandler:
             return
 
         # Find where we previously streamed up to.
-        current_token = self.replication_data_handler.get_streams_to_replicate().get(
-            cmd.stream_name
+        current_token = (
+            self.replication_data_handler.get_streams_to_replicate()
+            .get(cmd.stream_name, {})
+            .get(cmd.instance_name)
         )
         if current_token is None:
             logger.debug(
@@ -370,12 +372,6 @@ class ReplicationDataHandler:
 
         if self.slaved_store:
             args = self.store.stream_positions()
-            user_account_data = args.pop("user_account_data", None)
-            room_account_data = args.pop("room_account_data", None)
-            if user_account_data:
-                args["account_data"] = user_account_data
-            elif room_account_data:
-                args["account_data"] = room_account_data
 
         if self.slaved_typing:
             args.update(self.typing_handler.stream_positions())

@@ -54,8 +54,8 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
         # device list stream, so set them both to the device list ID
         # generator's current token.
         current_token = self._device_list_id_gen.get_current_token()
-        result[DeviceListsStream.NAME] = current_token
-        result[UserSignatureStream.NAME] = current_token
+        result[DeviceListsStream.NAME] = {"master": current_token}
+        result[UserSignatureStream.NAME] = {"master": current_token}
         return result
 
     def process_replication_rows(self, stream_name, token, rows):

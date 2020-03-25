@@ -309,7 +309,7 @@ class TypingSlaveHandler(object):
         # We must update this typing token from the response of the previous
         # sync. In particular, the stream id may "reset" back to zero/a low
         # value which we *must* use for the next replication request.
-        return {"typing": self._latest_room_serial}
+        return {"typing": {"master": self._latest_room_serial}}
 
     def process_replication_rows(self, stream_name, token, rows):
         if stream_name != TypingStream.NAME:

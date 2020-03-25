@@ -46,7 +46,7 @@ class SlavedPresenceStore(BaseSlavedStore):
 
         if self.hs.config.use_presence:
             position = self._presence_id_gen.get_current_token()
-            result["presence"] = position
+            result["presence"] = {"master": position}
 
         return result
 

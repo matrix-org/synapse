@@ -45,7 +45,7 @@ class SlavedDeviceInboxStore(DeviceInboxWorkerStore, BaseSlavedStore):
 
     def stream_positions(self):
         result = super(SlavedDeviceInboxStore, self).stream_positions()
-        result["to_device"] = self._device_inbox_id_gen.get_current_token()
+        result["to_device"] = {"master": self._device_inbox_id_gen.get_current_token()}
         return result
 
     def process_replication_rows(self, stream_name, token, rows):

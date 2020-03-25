@@ -59,7 +59,7 @@ class BaseSlavedStore(CacheInvalidationWorkerStore):
         """
         pos = {}
         if self._cache_id_gen:
-            pos["caches"] = self._cache_id_gen.get_current_token()
+            pos["caches"] = {"master": self._cache_id_gen.get_current_token()}
         return pos
 
     def get_cache_stream_token(self):

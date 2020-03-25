@@ -95,8 +95,8 @@ class SlavedEventStore(
 
     def stream_positions(self):
         result = super(SlavedEventStore, self).stream_positions()
-        result["events"] = self._stream_id_gen.get_current_token()
-        result["backfill"] = -self._backfill_id_gen.get_current_token()
+        result["events"] = {"master": self._stream_id_gen.get_current_token()}
+        result["backfill"] = {"master": -self._backfill_id_gen.get_current_token()}
         return result
 
     def process_replication_rows(self, stream_name, token, rows):

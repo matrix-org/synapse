@@ -30,7 +30,7 @@ class SlavedPusherStore(PusherWorkerStore, BaseSlavedStore):
 
     def stream_positions(self):
         result = super(SlavedPusherStore, self).stream_positions()
-        result["pushers"] = self._pushers_id_gen.get_current_token()
+        result["pushers"] = {"master": self._pushers_id_gen.get_current_token()}
         return result
 
     def get_pushers_stream_token(self):

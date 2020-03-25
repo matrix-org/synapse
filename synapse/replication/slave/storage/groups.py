@@ -39,7 +39,7 @@ class SlavedGroupServerStore(GroupServerWorkerStore, BaseSlavedStore):
 
     def stream_positions(self):
         result = super(SlavedGroupServerStore, self).stream_positions()
-        result["groups"] = self._group_updates_id_gen.get_current_token()
+        result["groups"] = {"master": self._group_updates_id_gen.get_current_token()}
         return result
 
     def process_replication_rows(self, stream_name, token, rows):

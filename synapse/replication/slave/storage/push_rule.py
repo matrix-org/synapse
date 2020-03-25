@@ -39,7 +39,9 @@ class SlavedPushRuleStore(SlavedEventStore, PushRulesWorkerStore):
 
     def stream_positions(self):
         result = super(SlavedPushRuleStore, self).stream_positions()
-        result["push_rules"] = self._push_rules_stream_id_gen.get_current_token()
+        result["push_rules"] = {
+            "master": self._push_rules_stream_id_gen.get_current_token()
+        }
         return result
 
     def process_replication_rows(self, stream_name, token, rows):
