@@ -16,6 +16,11 @@ import platform
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 
+MYPY = False
+if MYPY:
+    from .sqlite import Sqlite3Engine
+    from .postgres import PostgresEngine
+
 
 def create_engine(database_config) -> BaseDatabaseEngine:
     name = database_config["name"]
