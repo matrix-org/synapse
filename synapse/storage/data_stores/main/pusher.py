@@ -197,6 +197,84 @@ class PusherWorkerStore(SQLBaseStore):
 
         return result
 
+    @defer.inlineCallbacks
+    def update_pusher_last_stream_ordering(
+        self, app_id, pushkey, user_id, last_stream_ordering
+    ):
+        yield self.db.simple_update_one(
+            "pushers",
+            {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
+            {"last_stream_ordering": last_stream_ordering},
+            desc="update_pusher_last_stream_ordering",
+        )
+
+    @defer.inlineCallbacks
+    def update_pusher_last_stream_ordering_and_success(
+        self, app_id, pushkey, user_id, last_stream_ordering, last_success
+    ):
+        """Update the last stream ordering position we've processed up to for
+        the given pusher.
+
+        Args:
+            app_id (str)
+            pushkey (str)
+            last_stream_ordering (int)
+            last_success (int)
+
+        Returns:
+            Deferred[bool]: True if the pusher still exists; False if it has been deleted.
+        """
+        updated = yield self.db.simple_update(
+            table="pushers",
+            keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
+            updatevalues={
+                "last_stream_ordering": last_stream_ordering,
+                "last_success": last_success,
+            },
+            desc="update_pusher_last_stream_ordering_and_success",
+        )
+
+        return bool(updated)
+
+    @defer.inlineCallbacks
+    def update_pusher_failing_since(self, app_id, pushkey, user_id, failing_since):
+        yield self.db.simple_update(
+            table="pushers",
+            keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
+            updatevalues={"failing_since": failing_since},
+            desc="update_pusher_failing_since",
+        )
+
+    @defer.inlineCallbacks
+    def get_throttle_params_by_room(self, pusher_id):
+        res = yield self.db.simple_select_list(
+            "pusher_throttle",
+            {"pusher": pusher_id},
+            ["room_id", "last_sent_ts", "throttle_ms"],
+            desc="get_throttle_params_by_room",
+        )
+
+        params_by_room = {}
+        for row in res:
+            params_by_room[row["room_id"]] = {
+                "last_sent_ts": row["last_sent_ts"],
+                "throttle_ms": row["throttle_ms"],
+            }
+
+        return params_by_room
+
+    @defer.inlineCallbacks
+    def set_throttle_params(self, pusher_id, room_id, params):
+        # no need to lock because `pusher_throttle` has a primary key on
+        # (pusher, room_id) so simple_upsert will retry
+        yield self.db.simple_upsert(
+            "pusher_throttle",
+            {"pusher": pusher_id, "room_id": room_id},
+            params,
+            desc="set_throttle_params",
+            lock=False,
+        )
+
 
 class PusherStore(PusherWorkerStore):
     def get_pushers_stream_token(self):
@@ -282,81 +360,3 @@ class PusherStore(PusherWorkerStore):
 
         with self._pushers_id_gen.get_next() as stream_id:
             yield self.db.runInteraction("delete_pusher", delete_pusher_txn, stream_id)
-
-    @defer.inlineCallbacks
-    def update_pusher_last_stream_ordering(
-        self, app_id, pushkey, user_id, last_stream_ordering
-    ):
-        yield self.db.simple_update_one(
-            "pushers",
-            {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
-            {"last_stream_ordering": last_stream_ordering},
-            desc="update_pusher_last_stream_ordering",
-        )
-
-    @defer.inlineCallbacks
-    def update_pusher_last_stream_ordering_and_success(
-        self, app_id, pushkey, user_id, last_stream_ordering, last_success
-    ):
-        """Update the last stream ordering position we've processed up to for
-        the given pusher.
-
-        Args:
-            app_id (str)
-            pushkey (str)
-            last_stream_ordering (int)
-            last_success (int)
-
-        Returns:
-            Deferred[bool]: True if the pusher still exists; False if it has been deleted.
-        """
-        updated = yield self.db.simple_update(
-            table="pushers",
-            keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
-            updatevalues={
-                "last_stream_ordering": last_stream_ordering,
-                "last_success": last_success,
-            },
-            desc="update_pusher_last_stream_ordering_and_success",
-        )
-
-        return bool(updated)
-
-    @defer.inlineCallbacks
-    def update_pusher_failing_since(self, app_id, pushkey, user_id, failing_since):
-        yield self.db.simple_update(
-            table="pushers",
-            keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
-            updatevalues={"failing_since": failing_since},
-            desc="update_pusher_failing_since",
-        )
-
-    @defer.inlineCallbacks
-    def get_throttle_params_by_room(self, pusher_id):
-        res = yield self.db.simple_select_list(
-            "pusher_throttle",
-            {"pusher": pusher_id},
-            ["room_id", "last_sent_ts", "throttle_ms"],
-            desc="get_throttle_params_by_room",
-        )
-
-        params_by_room = {}
-        for row in res:
-            params_by_room[row["room_id"]] = {
-                "last_sent_ts": row["last_sent_ts"],
-                "throttle_ms": row["throttle_ms"],
-            }
-
-        return params_by_room
-
-    @defer.inlineCallbacks
-    def set_throttle_params(self, pusher_id, room_id, params):
-        # no need to lock because `pusher_throttle` has a primary key on
-        # (pusher, room_id) so simple_upsert will retry
-        yield self.db.simple_upsert(
-            "pusher_throttle",
-            {"pusher": pusher_id, "room_id": room_id},
-            params,
-            desc="set_throttle_params",
-            lock=False,
-        )

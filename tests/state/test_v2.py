@@ -603,7 +603,7 @@ class TestStateResolutionStore(object):
 
         return {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
 
-    def get_auth_chain(self, event_ids):
+    def _get_auth_chain(self, event_ids):
         """Gets the full auth chain for a set of events (including rejected
         events).
 
@@ -617,7 +617,6 @@ class TestStateResolutionStore(object):
         Args:
             event_ids (list): The event IDs of the events to fetch the auth
                 chain for. Must be state events.
-
         Returns:
             Deferred[list[str]]: List of event IDs of the auth chain.
         """
@@ -637,3 +636,9 @@ class TestStateResolutionStore(object):
                 stack.append(aid)
 
         return list(result)
+
+    def get_auth_chain_difference(self, auth_sets):
+        chains = [frozenset(self._get_auth_chain(a)) for a in auth_sets]
+
+        common = set(chains[0]).intersection(*chains[1:])
+        return set(chains[0]).union(*chains[1:]) - common

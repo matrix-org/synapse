@@ -137,7 +137,7 @@ def check(
             raise AuthError(403, "This room has been marked as unfederatable.")
 
     # 4. If type is m.room.aliases
-    if event.type == EventTypes.Aliases:
+    if event.type == EventTypes.Aliases and room_version_obj.special_case_aliases_auth:
         # 4a. If event has no state_key, reject
         if not event.is_state():
             raise AuthError(403, "Alias event must be a state event")
@@ -152,10 +152,8 @@ def check(
             )
 
         # 4c. Otherwise, allow.
-        # This is removed by https://github.com/matrix-org/matrix-doc/pull/2260
-        if room_version_obj.special_case_aliases_auth:
-            logger.debug("Allowing! %s", event)
-            return
+        logger.debug("Allowing! %s", event)
+        return
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])

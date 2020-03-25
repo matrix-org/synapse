@@ -16,6 +16,7 @@
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
+import re
 from typing import List, Optional
 
 from six.moves.urllib import parse as urlparse
@@ -188,12 +189,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         content = parse_json_object_from_request(request)
 
-        if event_type == EventTypes.Aliases:
-            # MSC2260
-            raise SynapseError(
-                400, "Cannot send m.room.aliases events via /rooms/{room_id}/state"
-            )
-
         event_dict = {
             "type": event_type,
             "content": content,
@@ -240,12 +235,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     async def on_POST(self, request, room_id, event_type, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
-
-        if event_type == EventTypes.Aliases:
-            # MSC2260
-            raise SynapseError(
-                400, "Cannot send m.room.aliases events via /rooms/{room_id}/send"
-            )
 
         event_dict = {
             "type": event_type,
@@ -848,7 +837,12 @@ class RoomTypingRestServlet(RestServlet):
 
 
 class RoomAliasListServlet(RestServlet):
-    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/aliases", unstable=False)
+    PATTERNS = [
+        re.compile(
+            r"^/_matrix/client/unstable/org\.matrix\.msc2432"
+            r"/rooms/(?P<room_id>[^/]*)/aliases"
+        ),
+    ]
 
     def __init__(self, hs: "synapse.server.HomeServer"):
         super().__init__()

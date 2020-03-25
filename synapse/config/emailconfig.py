@@ -27,6 +27,12 @@ import pkg_resources
 
 from ._base import Config, ConfigError
 
+MISSING_PASSWORD_RESET_CONFIG_ERROR = """\
+Password reset emails are enabled on this homeserver due to a partial
+'email' block. However, the following required keys are missing:
+    %s
+"""
+
 
 class EmailConfig(Config):
     section = "email"
@@ -142,24 +148,18 @@ class EmailConfig(Config):
             bleach
 
         if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            required = ["smtp_host", "smtp_port", "notif_from"]
-
             missing = []
-            for k in required:
-                if k not in email_config:
-                    missing.append("email." + k)
+            if not self.email_notif_from:
+                missing.append("email.notif_from")
 
             # public_baseurl is required to build password reset and validation links that
             # will be emailed to users
             if config.get("public_baseurl") is None:
                 missing.append("public_baseurl")
 
-            if len(missing) > 0:
-                raise RuntimeError(
-                    "Password resets emails are configured to be sent from "
-                    "this homeserver due to a partial 'email' block. "
-                    "However, the following required keys are missing: %s"
-                    % (", ".join(missing),)
+            if missing:
+                raise ConfigError(
+                    MISSING_PASSWORD_RESET_CONFIG_ERROR % (", ".join(missing),)
                 )
 
             # These email templates have placeholders in them, and thus must be
@@ -245,32 +245,25 @@ class EmailConfig(Config):
             )
 
         if self.email_enable_notifs:
-            required = [
-                "smtp_host",
-                "smtp_port",
-                "notif_from",
-                "notif_template_html",
-                "notif_template_text",
-            ]
-
             missing = []
-            for k in required:
-                if k not in email_config:
-                    missing.append(k)
-
-            if len(missing) > 0:
-                raise RuntimeError(
-                    "email.enable_notifs is True but required keys are missing: %s"
-                    % (", ".join(["email." + k for k in missing]),)
-                )
+            if not self.email_notif_from:
+                missing.append("email.notif_from")
 
             if config.get("public_baseurl") is None:
-                raise RuntimeError(
-                    "email.enable_notifs is True but no public_baseurl is set"
+                missing.append("public_baseurl")
+
+            if missing:
+                raise ConfigError(
+                    "email.enable_notifs is True but required keys are missing: %s"
+                    % (", ".join(missing),)
                 )
 
-            self.email_notif_template_html = email_config["notif_template_html"]
-            self.email_notif_template_text = email_config["notif_template_text"]
+            self.email_notif_template_html = email_config.get(
+                "notif_template_html", "notif_mail.html"
+            )
+            self.email_notif_template_text = email_config.get(
+                "notif_template_text", "notif_mail.txt"
+            )
 
             for f in self.email_notif_template_text, self.email_notif_template_html:
                 p = os.path.join(self.email_template_dir, f)
@@ -323,10 +316,6 @@ class EmailConfig(Config):
           #
           #require_transport_security: true
 
-          # Enable sending emails for messages that the user has missed
-          #
-          #enable_notifs: false
-
           # notif_from defines the "From" address to use when sending emails.
           # It must be set if email sending is enabled.
           #
@@ -343,6 +332,11 @@ class EmailConfig(Config):
           # defaults to 'Matrix'.
           #
           #app_name: my_branded_matrix_server
+
+          # Uncomment the following to enable sending emails for messages that the user
+          # has missed. Disabled by default.
+          #
+          #enable_notifs: true
 
           # Uncomment the following to disable automatic subscription to email
           # notifications for new users. Enabled by default.

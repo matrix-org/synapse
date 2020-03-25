@@ -124,12 +124,21 @@ sudo pacman -S base-devel python python-pip \
 
 #### CentOS/Fedora
 
-Installing prerequisites on CentOS 7 or Fedora 25:
+Installing prerequisites on CentOS 8 or Fedora>26:
+
+```
+sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
+                 libwebp-devel tk-devel redhat-rpm-config \
+                 python3-virtualenv libffi-devel openssl-devel
+sudo dnf groupinstall "Development Tools"
+```
+
+Installing prerequisites on CentOS 7 or Fedora<=25:
 
 ```
 sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
-                 python-virtualenv libffi-devel openssl-devel
+                 python3-virtualenv libffi-devel openssl-devel
 sudo yum groupinstall "Development Tools"
 ```
 
@@ -374,7 +383,7 @@ Synapse can be found in the void repositories as 'synapse':
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
  - Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
- - Packages: `pkg install py27-matrix-synapse`
+ - Packages: `pkg install py37-matrix-synapse`
 
 
 ### NixOS
@@ -418,13 +427,12 @@ so, you will need to edit `homeserver.yaml`, as follows:
   for having Synapse automatically provision and renew federation
   certificates through ACME can be found at [ACME.md](docs/ACME.md).
   Note that, as pointed out in that document, this feature will not
-  work with installs set up after November 2020. 
+  work with installs set up after November 2019. 
   
-  If you are using your
-  own certificate, be sure to use a `.pem` file that includes the full
-  certificate chain including any intermediate certificates (for
-  instance, if using certbot, use `fullchain.pem` as your certificate,
-  not `cert.pem`).
+  If you are using your own certificate, be sure to use a `.pem` file that
+  includes the full certificate chain including any intermediate certificates
+  (for instance, if using certbot, use `fullchain.pem` as your certificate, not
+  `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
 [federate.md](docs/federate.md)

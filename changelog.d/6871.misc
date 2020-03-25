@@ -1,1 +1,0 @@
-Add typing to `synapse.federation.sender` and port to async/await.

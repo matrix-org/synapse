@@ -402,7 +402,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                     keyvalues={},
                     retcols=("room_id",),
                 )
-                room_ids = set(row["room_id"] for row in rows)
+                room_ids = {row["room_id"] for row in rows}
                 for room_id in room_ids:
                     txn.call_after(
                         self.get_latest_event_ids_in_room.invalidate, (room_id,)

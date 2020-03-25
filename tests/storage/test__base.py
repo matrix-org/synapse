@@ -373,7 +373,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             set(self._dump_to_tuple(res)),
-            set([(1, "user1", "hello"), (2, "user2", "there")]),
+            {(1, "user1", "hello"), (2, "user2", "there")},
         )
 
         # Update only user2
@@ -400,5 +400,5 @@ class UpsertManyTests(unittest.HomeserverTestCase):
         )
         self.assertEqual(
             set(self._dump_to_tuple(res)),
-            set([(1, "user1", "hello"), (2, "user2", "bleb")]),
+            {(1, "user1", "hello"), (2, "user2", "bleb")},
         )

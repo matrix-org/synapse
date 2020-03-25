@@ -6,12 +6,7 @@
 set -ex
 
 apt-get update
-apt-get install -y python3.5 python3.5-dev python3-pip libxml2-dev libxslt-dev zlib1g-dev
-
-# workaround for https://github.com/jaraco/zipp/issues/40
-python3.5 -m pip install 'setuptools>=34.4.0'
-
-python3.5 -m pip install tox
+apt-get install -y python3.5 python3.5-dev python3-pip libxml2-dev libxslt-dev zlib1g-dev tox
 
 export LANG="C.UTF-8"
 

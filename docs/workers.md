@@ -273,6 +273,7 @@ Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance:
 
     ^/_matrix/client/(r0|unstable)/register$
+    ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
 
 Pagination requests can also be handled, but all requests with the same path
 room must be routed to the same instance. Additionally, care must be taken to

@@ -15,10 +15,9 @@ services:
     restart: unless-stopped
     # See the readme for a full documentation of the environment settings
     environment:
-      - SYNAPSE_CONFIG_PATH=/etc/homeserver.yaml
+      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
     volumes:
       # You may either store all the files in a local folder
-      - ./matrix-config/homeserver.yaml:/etc/homeserver.yaml
       - ./files:/data
       # .. or you may split this between different storage points
       # - ./files:/data
@@ -58,7 +57,7 @@ services:
       - POSTGRES_PASSWORD=changeme
       # ensure the database gets created correctly
       # https://github.com/matrix-org/synapse/blob/master/docs/postgres.md#set-up-database
-      - POSTGRES_INITDB_ARGS="--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
       # You may store the database tables in a local folder..
       - ./schemas:/var/lib/postgresql/data

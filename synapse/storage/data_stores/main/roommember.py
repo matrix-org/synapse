@@ -465,7 +465,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             txn.execute(sql % (clause,), args)
 
-            return set(row[0] for row in txn)
+            return {row[0] for row in txn}
 
         return await self.db.runInteraction(
             "get_users_server_still_shares_room_with",
@@ -826,7 +826,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 GROUP BY room_id, user_id;
             """
             txn.execute(sql, (user_id,))
-            return set(row[0] for row in txn if row[1] == 0)
+            return {row[0] for row in txn if row[1] == 0}
 
         return self.db.runInteraction(
             "get_forgotten_rooms_for_user", _get_forgotten_rooms_for_user_txn
@@ -866,6 +866,37 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             keyvalues={},
             batch_size=500,
             desc="get_membership_from_event_ids",
+        )
+
+    async def is_local_host_in_room_ignoring_users(
+        self, room_id: str, ignore_users: Collection[str]
+    ) -> bool:
+        """Check if there are any local users, excluding those in the given
+        list, in the room.
+        """
+
+        clause, args = make_in_list_sql_clause(
+            self.database_engine, "user_id", ignore_users
+        )
+
+        sql = """
+            SELECT 1 FROM local_current_membership
+            WHERE
+                room_id = ? AND membership = ?
+                AND NOT (%s)
+                LIMIT 1
+        """ % (
+            clause,
+        )
+
+        def _is_local_host_in_room_ignoring_users_txn(txn):
+            txn.execute(sql, (room_id, Membership.JOIN, *args))
+
+            return bool(txn.fetchone())
+
+        return await self.db.runInteraction(
+            "is_local_host_in_room_ignoring_users",
+            _is_local_host_in_room_ignoring_users_txn,
         )
 
 
