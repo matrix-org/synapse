@@ -15,6 +15,7 @@
 
 from collections import namedtuple
 
+from typing import Optional
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
@@ -159,7 +160,12 @@ class DirectoryStore(DirectoryWorkerStore):
 
         return room_id
 
-    def update_aliases_for_room(self, old_room_id, new_room_id, creator=None):
+    def update_aliases_for_room(
+        self,
+        old_room_id: str,
+        new_room_id: str,
+        creator: Optional[str] = None,
+    ):
         """Repoint the aliases from one room to another
 
         Args:
