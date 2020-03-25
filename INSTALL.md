@@ -2,7 +2,6 @@
 - [Installing Synapse](#installing-synapse)
   - [Installing from source](#installing-from-source)
     - [Platform-Specific Instructions](#platform-specific-instructions)
-    - [Troubleshooting Installation](#troubleshooting-installation)
   - [Prebuilt packages](#prebuilt-packages)
 - [Setting up Synapse](#setting-up-synapse)
   - [TLS certificates](#tls-certificates)
@@ -10,6 +9,7 @@
   - [Registering a user](#registering-a-user)
   - [Setting up a TURN server](#setting-up-a-turn-server)
   - [URL previews](#url-previews)
+- [Troubleshooting Installation](#troubleshooting-installation)
 
 # Choosing your server name
 
@@ -218,25 +218,6 @@ Debian, Fedora, or source installation methods. More information about WSL can
 be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 for
 Windows 10 and https://docs.microsoft.com/en-us/windows/wsl/install-on-server
 for Windows Server.
-
-### Troubleshooting Installation
-
-If `pip` crashes mid-installation for some reason (e.g. lost terminal), `pip` may
-refuse to run until you remove the temporary installation directory it created.
-To reset the installation:
-
-```
-rm -rf /tmp/pip_install_matrix
-```
-
-`pip` seems to leak *lots* of memory during installation. For instance, a Linux
-host with 512MB of RAM may run out of memory whilst installing Twisted. If this
-happens, you will have to individually install the dependencies which are
-failing, e.g.:
-
-```
-pip install twisted
-```
 
 ## Prebuilt packages
 
@@ -483,3 +464,17 @@ This also requires the optional `lxml` and `netaddr` python dependencies to be
 installed. This in turn requires the `libxml2` library to be available - on
 Debian/Ubuntu this means `apt-get install libxml2-dev`, or equivalent for
 your OS.
+
+# Troubleshooting Installation
+
+`pip` seems to leak *lots* of memory during installation. For instance, a Linux
+host with 512MB of RAM may run out of memory whilst installing Twisted. If this
+happens, you will have to individually install the dependencies which are
+failing, e.g.:
+
+```
+pip install twisted
+```
+
+If you have any other problems, feel free to ask in
+[#synapse:matrix.org](https://matrix.to/#/#synapse:matrix.org).
