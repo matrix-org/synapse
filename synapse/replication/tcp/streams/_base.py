@@ -69,6 +69,8 @@ class Stream(object):
         # The token from which we last asked for updates
         self.last_token = self.current_token()
 
+        self.local_instance_name = hs.config.worker_name or "master"
+
     def discard_updates_and_advance(self):
         """Called when the stream should advance but the updates would be discarded,
         e.g. when there are no currently connected workers.
@@ -87,7 +89,7 @@ class Stream(object):
         """
         current_token = self.current_token()
         updates, current_token, limited = await self.get_updates_since(
-            "master", self.last_token, current_token
+            self.local_instance_name, self.last_token, current_token
         )
         self.last_token = current_token
 
