@@ -378,17 +378,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     server, limit=limit, since_token=since_token
                 )
             except HttpResponseException as e:
-                if e.code == 401:
-                    raise SynapseError(
-                        400,
-                        "The remote server is only allowing local users to view "
-                        "its public rooms list",
-                        errcode=Codes.FORBIDDEN,
-                    )
-                else:
-                    raise SynapseError(
-                        400, "Unable to retrieve remote public rooms list"
-                    )
+                raise e.to_synapse_error()
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit, since_token=since_token
@@ -436,17 +426,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     third_party_instance_id=third_party_instance_id,
                 )
             except HttpResponseException as e:
-                if e.code == 401:
-                    raise SynapseError(
-                        400,
-                        "The remote server is only allowing local users to view "
-                        "its public rooms list",
-                        errcode=Codes.FORBIDDEN,
-                    )
-                else:
-                    raise SynapseError(
-                        400, "Unable to retrieve remote public rooms list"
-                    )
+                raise e.to_synapse_error()
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit,
