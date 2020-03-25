@@ -425,7 +425,9 @@ class CasRedirectServlet(BaseSSORedirectServlet):
         self._cas_handler = hs.get_cas_handler()
 
     def get_sso_url(self, client_redirect_url: bytes) -> bytes:
-        return self._cas_handler.handle_redirect_request(client_redirect_url)
+        return self._cas_handler.get_redirect_url(
+            "/_matrix/client/r0/login/cas/ticket", redirectUrl=client_redirect_url
+        ).encode("ascii")
 
 
 class CasTicketServlet(RestServlet):
@@ -438,7 +440,7 @@ class CasTicketServlet(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> None:
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
         ticket = parse_string(request, "ticket", required=True)
-        await self._cas_handler.handle_ticket_request(
+        await self._cas_handler.handle_login_request(
             request, client_redirect_url, ticket
         )
 

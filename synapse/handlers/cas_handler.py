@@ -15,7 +15,7 @@
 
 import logging
 import xml.etree.ElementTree as ET
-from typing import AnyStr, Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 from six.moves import urllib
 
@@ -48,26 +48,53 @@ class CasHandler:
 
         self._http_client = hs.get_proxied_http_client()
 
-    def _build_service_param(self, client_redirect_url: AnyStr) -> str:
-        return "%s%s?%s" % (
-            self._cas_service_url,
-            "/_matrix/client/r0/login/cas/ticket",
-            urllib.parse.urlencode({"redirectUrl": client_redirect_url}),
-        )
-
-    async def _handle_cas_response(
-        self, request: SynapseRequest, cas_response_body: str, client_redirect_url: str
-    ) -> None:
+    def _build_service_param(self, service_redirect_endpoint: str, **kwargs) -> str:
         """
-        Retrieves the user and display name from the CAS response and continues with the authentication.
+        Generates a value to use as the "service" parameter when redirecting or
+        querying the CAS service.
 
         Args:
-            request: The original client request.
-            cas_response_body: The response from the CAS server.
-            client_redirect_url: The URl to redirect the client to when
-                everything is done.
+            service_redirect_endpoint: The homeserver endpoint to redirect
+                the client to after successful SSO negotiation.
+            kwargs: Additional arguments to include in the final redirect URL.
+
+        Returns:
+            The URL to use as a "service" parameter.
         """
-        user, attributes = self._parse_cas_response(cas_response_body)
+        return "%s%s?%s" % (
+            self._cas_service_url,
+            service_redirect_endpoint,
+            urllib.parse.urlencode(kwargs),
+        )
+
+    async def _validate_ticket(
+        self, ticket: str, service_redirect_endpoint: str, client_redirect_url: str
+    ) -> Tuple[str, Optional[str]]:
+        """
+        Validate a CAS ticket with the server, parse the response, and return the user and display name.
+
+        Args:
+            ticket: The CAS ticket from the client.
+            service_redirect_endpoint: The homeserver endpoint that the client
+                accessed to validate the ticket.
+            client_redirect_url: The URL to redirect the client to after
+                validation is done.
+        """
+        uri = self._cas_server_url + "/proxyValidate"
+        args = {
+            "ticket": ticket,
+            "service": self._build_service_param(
+                service_redirect_endpoint, redirectUrl=client_redirect_url
+            ),
+        }
+        try:
+            body = await self._http_client.get_raw(uri, args)
+        except PartialDownloadError as pde:
+            # Twisted raises this error if the connection is closed,
+            # even if that's being used old-http style to signal end-of-data
+            body = pde.response
+
+        user, attributes = self._parse_cas_response(body)
         displayname = attributes.pop(self._cas_displayname_attribute, None)
 
         for required_attribute, required_value in self._cas_required_attributes.items():
@@ -82,7 +109,7 @@ class CasHandler:
                 if required_value != actual_value:
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
-        await self._on_successful_auth(user, request, client_redirect_url, displayname)
+        return user, displayname
 
     def _parse_cas_response(
         self, cas_response_body: str
@@ -127,31 +154,46 @@ class CasHandler:
             )
         return user, attributes
 
-    async def _on_successful_auth(
-        self,
-        username: str,
-        request: SynapseRequest,
-        client_redirect_url: str,
-        user_display_name: Optional[str] = None,
+    def get_redirect_url(self, service_redirect_endpoint: str, **kwargs) -> str:
+        """
+        Generates a URL to the CAS server where the client should be redirected.
+
+        Args:
+            service_redirect_endpoint: The homeserver endpoint to redirect
+                the client to after successful SSO negotiation.
+            kwargs: Additional arguments to include in the final redirect URL.
+
+        Returns:
+            The URL to redirect the client to.
+        """
+        args = urllib.parse.urlencode(
+            {"service": self._build_service_param(service_redirect_endpoint, **kwargs)}
+        )
+
+        return "%s/login?%s" % (self._cas_server_url, args)
+
+    async def handle_login_request(
+        self, request: SynapseRequest, client_redirect_url: str, ticket: str
     ) -> None:
-        """Called once the user has successfully authenticated with the SSO.
+        """
+        Validates a CAS ticket sent by the client for login and authenticates the user with SSO.
 
         Registers the user if necessary, and then returns a redirect (with
         a login token) to the client.
 
         Args:
-            username: the remote user id. We'll map this onto
-                something sane for a MXID localpath.
-
             request: the incoming request from the browser. We'll
                 respond to it with a redirect.
 
             client_redirect_url: the redirect_url the client gave us when
                 it first started the process.
 
-            user_display_name: if set, and we have to register a new user,
-                we will set their displayname to this.
+            ticket: The CAS ticket provided by the client.
         """
+        username, user_display_name = await self._validate_ticket(
+            ticket, "/_matrix/client/r0/login/cas/ticket", client_redirect_url
+        )
+
         localpart = map_username_to_mxid_localpart(username)
         user_id = UserID(localpart, self._hostname).to_string()
         registered_user_id = await self._auth_handler.check_user_exists(user_id)
@@ -164,41 +206,31 @@ class CasHandler:
             registered_user_id, request, client_redirect_url
         )
 
-    def handle_redirect_request(self, client_redirect_url: bytes) -> bytes:
-        """
-        Generates a URL to the CAS server where the client should be redirected.
-
-        Args:
-            client_redirect_url: The final URL the client should go to after the
-                user has negotiated SSO.
-
-        Returns:
-            The URL to redirect to.
-        """
-        args = urllib.parse.urlencode(
-            {"service": self._build_service_param(client_redirect_url)}
-        )
-
-        return ("%s/login?%s" % (self._cas_server_url, args)).encode("ascii")
-
-    async def handle_ticket_request(
-        self, request: SynapseRequest, client_redirect_url: str, ticket: str
+    async def handle_ui_auth_response(
+        self, request: SynapseRequest, ticket: str, session_id: str
     ) -> None:
         """
-        Validates a CAS ticket sent by the client for login/registration.
+        Validates a CAS ticket sent by the client for user interactive authentication.
 
-        On a successful request, writes a redirect to the request.
+        If successful, this completes the SSO step of UI auth and returns a
+        an HTML page to the client.
+
+        Args:
+            request: the incoming request from the browser.
+
+            ticket: The CAS ticket provided by the client.
+
+            session_id: The UI Auth session ID.
         """
-        uri = self._cas_server_url + "/proxyValidate"
-        args = {
-            "ticket": ticket,
-            "service": self._build_service_param(client_redirect_url),
-        }
-        try:
-            body = await self._http_client.get_raw(uri, args)
-        except PartialDownloadError as pde:
-            # Twisted raises this error if the connection is closed,
-            # even if that's being used old-http style to signal end-of-data
-            body = pde.response
+        client_redirect_url = ""
+        user, _ = await self._validate_ticket(
+            ticket, "/_matrix/client/r0/auth/cas/ticket", client_redirect_url
+        )
 
-        await self._handle_cas_response(request, body, client_redirect_url)
+        localpart = map_username_to_mxid_localpart(user)
+        user_id = UserID(localpart, self._hostname).to_string()
+        registered_user_id = await self._auth_handler.check_user_exists(user_id)
+
+        self._auth_handler.complete_sso_ui_auth(
+            registered_user_id, session_id, request,
+        )
