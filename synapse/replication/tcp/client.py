@@ -86,7 +86,9 @@ class ReplicationDataHandler:
     def __init__(self, store: BaseSlavedStore):
         self.store = store
 
-    async def on_rdata(self, stream_name: str, token: int, rows: list):
+    async def on_rdata(
+        self, stream_name: str, instance_name: str, token: int, rows: list
+    ):
         """Called to handle a batch of replication data with a given stream token.
 
         By default this just pokes the slave store. Can be overridden in subclasses to
