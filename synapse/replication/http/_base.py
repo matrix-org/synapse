@@ -60,6 +60,8 @@ class ReplicationEndpoint(object):
     must call `register` to register the path with the HTTP server.
 
     Requests can be sent by calling the client returned by `make_client`.
+    Requests are sent to master process by default, but can be sent to other
+    named processes by specifying an `instance_name` keyword argument.
 
     Attributes:
         NAME (str): A name for the endpoint, added to the path as well as used
@@ -135,7 +137,11 @@ class ReplicationEndpoint(object):
 
         @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
-        def send_request(**kwargs):
+        def send_request(instance_name="master", **kwargs):
+            # Currently we only support sending requests to master process.
+            if instance_name != "master":
+                raise Exception("Unknown instance")
+
             data = yield cls._serialize_payload(**kwargs)
 
             url_args = [
