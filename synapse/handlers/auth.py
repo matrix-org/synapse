@@ -351,12 +351,6 @@ class AuthHandler(BaseHandler):
                     list(clientdict),
                 )
 
-                # Once the authentication flow has completed and the final
-                # operation is requested, the session should be removed so it
-                # cannot be re-used.
-                if "type" not in authdict:
-                    self._remove_session(session["id"])
-
                 return creds, clientdict, session["id"]
 
         ret = self._auth_dict_for_flows(flows, session)
@@ -528,10 +522,6 @@ class AuthHandler(BaseHandler):
             self.sessions[session_id] = {"id": session_id}
 
         return self.sessions[session_id]
-
-    def _remove_session(self, session_id) -> None:
-        """Remove a session (if it exists)."""
-        self.sessions.pop(session_id, None)
 
     @defer.inlineCallbacks
     def get_access_token_for_user_id(
