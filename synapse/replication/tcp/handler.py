@@ -79,6 +79,7 @@ class ReplicationCommandHandler:
         self._notifier = hs.get_notifier()
         self._clock = hs.get_clock()
         self._instance_id = hs.get_instance_id()
+        self._instance_name = hs.get_instance_name()
 
         # Set of streams that we've caught up with.
         self._streams_connected = set()  # type: Set[str]
@@ -169,7 +170,9 @@ class ReplicationCommandHandler:
 
         for stream_name, stream in self._streams.items():
             current_token = stream.current_token()
-            self.send_command(PositionCommand(stream_name, current_token))
+            self.send_command(
+                PositionCommand(stream_name, self._instance_name, current_token)
+            )
 
     async def on_USER_SYNC(self, cmd: UserSyncCommand):
         user_sync_counter.inc()
@@ -448,7 +451,7 @@ class ReplicationCommandHandler:
 
         We need to check if the client is interested in the stream or not
         """
-        self.send_command(RdataCommand(stream_name, token, data))
+        self.send_command(RdataCommand(stream_name, self._instance_name, token, data))
 
 
 UpdateToken = TypeVar("UpdateToken")

@@ -15,15 +15,17 @@ example flow would be (where '>' indicates master to worker and
 
     > SERVER example.com
     < REPLICATE
-    > POSITION events 53
-    > RDATA events 54 ["$foo1:bar.com", ...]
-    > RDATA events 55 ["$foo4:bar.com", ...]
+    > POSITION events master 53
+    > RDATA events master 54 ["$foo1:bar.com", ...]
+    > RDATA events master 55 ["$foo4:bar.com", ...]
 
 The example shows the server accepting a new connection and sending its identity
 with the `SERVER` command, followed by the client server to respond with the
 position of all streams. The server then periodically sends `RDATA` commands
-which have the format `RDATA <stream_name> <token> <row>`, where the format of
-`<row>` is defined by the individual streams.
+which have the format `RDATA <stream_name> <instance_name> <token> <row>`, where
+the format of `<row>` is defined by the individual streams. The
+`<instance_name>` is the name of the Synapse process that generated the data
+(e.g. usually "master").
 
 Error reporting happens by either the client or server sending an ERROR
 command, and usually the connection will be closed.
@@ -52,7 +54,7 @@ The basic structure of the protocol is line based, where the initial
 word of each line specifies the command. The rest of the line is parsed
 based on the command. For example, the RDATA command is defined as:
 
-    RDATA <stream_name> <token> <row_json>
+    RDATA <stream_name> <instance_name> <token> <row_json>
 
 (Note that <row_json> may contains spaces, but cannot contain
 newlines.)
@@ -136,11 +138,11 @@ the wire:
     < NAME synapse.app.appservice
     < PING 1490197665618
     < REPLICATE
-    > POSITION events 1
-    > POSITION backfill 1
-    > POSITION caches 1
-    > RDATA caches 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
-    > RDATA events 14 ["$149019767112vOHxz:localhost:8823",
+    > POSITION events master 1
+    > POSITION backfill master 1
+    > POSITION caches master 1
+    > RDATA caches master 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
+    > RDATA events master 14 ["$149019767112vOHxz:localhost:8823",
         "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]
     < PING 1490197675618
     > ERROR server stopping
@@ -151,10 +153,10 @@ position without needing to send data with the `RDATA` command.
 
 An example of a batched set of `RDATA` is:
 
-    > RDATA caches batch ["get_user_by_id",["@test:localhost:8823"],1490197670513]
-    > RDATA caches batch ["get_user_by_id",["@test2:localhost:8823"],1490197670513]
-    > RDATA caches batch ["get_user_by_id",["@test3:localhost:8823"],1490197670513]
-    > RDATA caches 54 ["get_user_by_id",["@test4:localhost:8823"],1490197670513]
+    > RDATA caches master batch ["get_user_by_id",["@test:localhost:8823"],1490197670513]
+    > RDATA caches master batch ["get_user_by_id",["@test2:localhost:8823"],1490197670513]
+    > RDATA caches master batch ["get_user_by_id",["@test3:localhost:8823"],1490197670513]
+    > RDATA caches master 54 ["get_user_by_id",["@test4:localhost:8823"],1490197670513]
 
 In this case the client shouldn't advance their caches token until it
 sees the the last `RDATA`.
@@ -177,6 +179,11 @@ client (C):
    On receipt of a POSITION command clients should check if they have missed any
    updates, and if so then fetch them out of band. Sent in response to a
    REPLICATE command (but can happen at any time).
+
+   The POSITION command includes the source of the stream. Currently all streams
+   are written by a single process (usually "master"). If fetching missing
+   updates via HTTP API, rather than via the DB, then processes should make the
+   request to the appropriate process.
 
 #### ERROR (S, C)
 
@@ -234,12 +241,12 @@ Each individual cache invalidation results in a row being sent down
 replication, which includes the cache name (the name of the function)
 and they key to invalidate. For example:
 
-    > RDATA caches 550953771 ["get_user_by_id", ["@bob:example.com"], 1550574873251]
+    > RDATA caches master 550953771 ["get_user_by_id", ["@bob:example.com"], 1550574873251]
 
 Alternatively, an entire cache can be invalidated by sending down a `null`
 instead of the key. For example:
 
-    > RDATA caches 550953772 ["get_user_by_id", null, 1550574873252]
+    > RDATA caches master 550953772 ["get_user_by_id", null, 1550574873252]
 
 However, there are times when a number of caches need to be invalidated
 at the same time with the same key. To reduce traffic we batch those
