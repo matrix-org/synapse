@@ -875,6 +875,9 @@ def start(config_options):
 
         # Force the appservice to start since they will be disabled in the main config
         config.notify_appservices = True
+    else:
+        # For other worker types we force this to off.
+        config.notify_appservices = False
 
     if config.worker_app == "synapse.app.pusher":
         if config.start_pushers:
@@ -888,6 +891,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.start_pushers = True
+    else:
+        # For other worker types we force this to off.
+        config.start_pushers = False
 
     if config.worker_app == "synapse.app.user_dir":
         if config.update_user_directory:
@@ -901,6 +907,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.update_user_directory = True
+    else:
+        # For other worker types we force this to off.
+        config.update_user_directory = False
 
     if config.worker_app == "synapse.app.federation_sender":
         if config.send_federation:
@@ -914,6 +923,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.send_federation = True
+    else:
+        # For other worker types we force this to off.
+        config.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
