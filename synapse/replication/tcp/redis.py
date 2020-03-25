@@ -122,7 +122,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
         We need to check if the client is interested in the stream or not
         """
-        self.send_command(RdataCommand(stream_name, token, data))
+        self.send_command(RdataCommand(stream_name, "master", token, data))
 
 
 class RedisFactory(txredisapi.SubscriberFactory):

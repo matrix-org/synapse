@@ -134,7 +134,7 @@ class ReplicationClientHandler:
 
         for stream_name, stream in self.streams.items():
             current_token = stream.current_token()
-            self.send_command(PositionCommand(stream_name, current_token))
+            self.send_command(PositionCommand(stream_name, "master", current_token))
 
     async def on_USER_SYNC(self, cmd: UserSyncCommand):
         user_sync_counter.inc()
@@ -326,7 +326,7 @@ class ReplicationClientHandler:
 
         We need to check if the client is interested in the stream or not
         """
-        self.send_command(RdataCommand(stream_name, token, data))
+        self.send_command(RdataCommand(stream_name, "master", token, data))
 
 
 class ReplicationDataHandler:
