@@ -1,0 +1,1 @@
+Prevent `sqlite3` module from being imported even when using the postgres backend.
