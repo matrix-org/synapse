@@ -17,21 +17,18 @@ import platform
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 
 MYPY = False
-if MYPY:
-    from .sqlite import Sqlite3Engine
-    from .postgres import PostgresEngine
 
 
 def create_engine(database_config) -> BaseDatabaseEngine:
     name = database_config["name"]
 
-    if name == "sqlite3":
+    if name == "sqlite3" or MYPY:
         import sqlite3
         from .sqlite import Sqlite3Engine
 
         return Sqlite3Engine(sqlite3, database_config)
 
-    if name == "psycopg2":
+    if name == "psycopg2" or MYPY:
         # pypy requires psycopg2cffi rather than psycopg2
         if platform.python_implementation() == "PyPy":
             import psycopg2cffi as psycopg2  # type: ignore
