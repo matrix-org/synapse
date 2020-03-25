@@ -15,7 +15,7 @@
 
 import logging
 import xml.etree.ElementTree as ET
-from typing import Awaitable, Dict, Optional, Tuple
+from typing import AnyStr, Awaitable, Dict, Optional, Tuple
 
 from six.moves import urllib
 
@@ -49,11 +49,11 @@ class CasHandler:
 
         self._http_client = hs.get_proxied_http_client()
 
-    def _build_service_param(self, client_redirect_url: str) -> str:
-        return "%s%s?redirectUrl=%s" % (
+    def _build_service_param(self, client_redirect_url: AnyStr) -> str:
+        return "%s%s?%s" % (
             self._cas_service_url,
             "/_matrix/client/r0/login/cas/ticket",
-            urllib.parse.quote(client_redirect_url, safe=""),
+            urllib.parse.urlencode({"redirectUrl": client_redirect_url}),
         )
 
     def _handle_cas_response(
@@ -150,12 +150,12 @@ class CasHandler:
             registered_user_id, request, client_redirect_url
         )
 
-    def handle_redirect_request(self, client_redirect_url: str) -> str:
+    def handle_redirect_request(self, client_redirect_url: bytes) -> bytes:
         args = urllib.parse.urlencode(
             {"service": self._build_service_param(client_redirect_url)}
         )
 
-        return "%s/login?%s" % (self._cas_server_url, args)
+        return ("%s/login?%s" % (self._cas_server_url, args)).encode("ascii")
 
     async def handle_ticket_request(self, request: SynapseRequest):
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
