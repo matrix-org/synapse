@@ -49,9 +49,6 @@ class CasHandler:
 
         self._http_client = hs.get_proxied_http_client()
 
-        # cast to tuple for use with str.startswith
-        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
-
     def _build_service_param(self, client_redirect_url: str) -> str:
         return "%s%s?redirectUrl=%s" % (
             self._cas_service_url,
