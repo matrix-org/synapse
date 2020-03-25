@@ -19,6 +19,7 @@ from synapse import event_auth
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
+from synapse.types import get_domain_from_id
 
 
 class EventAuthTestCase(unittest.TestCase):
@@ -51,7 +52,7 @@ class EventAuthTestCase(unittest.TestCase):
             _random_state_event(joiner),
             auth_events,
             do_sig_check=False,
-        ),
+        )
 
     def test_state_default_level(self):
         """
@@ -86,6 +87,83 @@ class EventAuthTestCase(unittest.TestCase):
         event_auth.check(
             RoomVersions.V1, _random_state_event(king), auth_events, do_sig_check=False,
         )
+
+    def test_alias_event(self):
+        """Alias events have special behavior up through room version 6."""
+        creator = "@creator:example.com"
+        other = "@other:example.com"
+        auth_events = {
+            ("m.room.create", ""): _create_event(creator),
+            ("m.room.member", creator): _join_event(creator),
+        }
+
+        # creator should be able to send aliases
+        event_auth.check(
+            RoomVersions.V1, _alias_event(creator), auth_events, do_sig_check=False,
+        )
+
+        # Reject an event with no state key.
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.V1,
+                _alias_event(creator, state_key=""),
+                auth_events,
+                do_sig_check=False,
+            )
+
+        # If the domain of the sender does not match the state key, reject.
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.V1,
+                _alias_event(creator, state_key="test.com"),
+                auth_events,
+                do_sig_check=False,
+            )
+
+        # Note that the member does *not* need to be in the room.
+        event_auth.check(
+            RoomVersions.V1, _alias_event(other), auth_events, do_sig_check=False,
+        )
+
+    def test_msc2432_alias_event(self):
+        """After MSC2432, alias events have no special behavior."""
+        creator = "@creator:example.com"
+        other = "@other:example.com"
+        auth_events = {
+            ("m.room.create", ""): _create_event(creator),
+            ("m.room.member", creator): _join_event(creator),
+        }
+
+        # creator should be able to send aliases
+        event_auth.check(
+            RoomVersions.MSC2432_DEV,
+            _alias_event(creator),
+            auth_events,
+            do_sig_check=False,
+        )
+
+        # No particular checks are done on the state key.
+        event_auth.check(
+            RoomVersions.MSC2432_DEV,
+            _alias_event(creator, state_key=""),
+            auth_events,
+            do_sig_check=False,
+        )
+        event_auth.check(
+            RoomVersions.MSC2432_DEV,
+            _alias_event(creator, state_key="test.com"),
+            auth_events,
+            do_sig_check=False,
+        )
+
+        # Per standard auth rules, the member must be in the room.
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.MSC2432_DEV,
+                _alias_event(other),
+                auth_events,
+                do_sig_check=False,
+            )
 
 
 # helpers for making events
@@ -129,6 +207,19 @@ def _power_levels_event(sender, content):
             "content": content,
         }
     )
+
+
+def _alias_event(sender, **kwargs):
+    data = {
+        "room_id": TEST_ROOM_ID,
+        "event_id": _get_event_id(),
+        "type": "m.room.aliases",
+        "sender": sender,
+        "state_key": get_domain_from_id(sender),
+        "content": {"aliases": []},
+    }
+    data.update(**kwargs)
+    return make_event_from_dict(data)
 
 
 def _random_state_event(sender):

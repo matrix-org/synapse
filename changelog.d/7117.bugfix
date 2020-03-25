@@ -1,0 +1,1 @@
+Fix a bug which meant that groups updates were not correctly replicated between workers.

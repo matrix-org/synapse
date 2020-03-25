@@ -2,7 +2,8 @@ Create or modify Account
 ========================
 
 This API allows an administrator to create or modify a user account with a
-specific ``user_id``.
+specific ``user_id``. Be aware that ``user_id`` is fully qualified: for example,
+``@user:server.com``.
 
 This api is::
 
@@ -37,6 +38,7 @@ The parameter ``threepids`` is optional.
 The parameter ``avatar_url`` is optional.
 The parameter ``admin`` is optional and defaults to 'false'.
 The parameter ``deactivated`` is optional and defaults to 'false'.
+The parameter ``password`` is optional. If provided the user's password is updated and all devices are logged out.
 If the user already exists then optional parameters default to the current value.
 
 List Accounts
@@ -167,11 +169,14 @@ with a body of:
 .. code:: json
 
    {
-       "new_password": "<secret>"
+       "new_password": "<secret>",
+       "logout_devices": true,
    }
 
 including an ``access_token`` of a server admin.
 
+The parameter ``new_password`` is required.
+The parameter ``logout_devices`` is optional and defaults to ``true``.
 
 Get whether a user is a server administrator or not
 ===================================================

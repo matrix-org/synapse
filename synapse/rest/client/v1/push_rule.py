@@ -49,7 +49,7 @@ class PushRuleRestServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle PUT /push_rules on worker")
 
-        spec = _rule_spec_from_path([x for x in path.split("/")])
+        spec = _rule_spec_from_path(path.split("/"))
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
@@ -110,7 +110,7 @@ class PushRuleRestServlet(RestServlet):
         if self._is_worker:
             raise Exception("Cannot handle DELETE /push_rules on worker")
 
-        spec = _rule_spec_from_path([x for x in path.split("/")])
+        spec = _rule_spec_from_path(path.split("/"))
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
@@ -138,7 +138,7 @@ class PushRuleRestServlet(RestServlet):
 
         rules = format_push_rules_for_user(requester.user, rules)
 
-        path = [x for x in path.split("/")][1:]
+        path = path.split("/")[1:]
 
         if path == []:
             # we're a reference impl: pedantry is our job.

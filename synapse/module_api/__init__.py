@@ -17,6 +17,7 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID
 
@@ -211,3 +212,21 @@ class ModuleApi(object):
             Deferred[object]: result of func
         """
         return self._store.db.runInteraction(desc, func, *args, **kwargs)
+
+    def complete_sso_login(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Complete a SSO login by redirecting the user to a page to confirm whether they
+        want their access token sent to `client_redirect_url`, or redirect them to that
+        URL with a token directly if the URL matches with one of the whitelisted clients.
+
+        Args:
+            registered_user_id: The MXID that has been registered as a previous step of
+                of this SSO login.
+            request: The request to respond to.
+            client_redirect_url: The URL to which to offer to redirect the user (or to
+                redirect them directly if whitelisted).
+        """
+        self._auth_handler.complete_sso_login(
+            registered_user_id, request, client_redirect_url,
+        )

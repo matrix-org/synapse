@@ -1,1 +1,0 @@
-Fix Synapse refusing to start if `federation_certificate_verification_whitelist` option is blank.

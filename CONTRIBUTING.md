@@ -60,7 +60,7 @@ python 3.6 and to install each tool:
 
 ```
 # Install the dependencies
-pip install -U black flake8 isort
+pip install -U black flake8 flake8-comprehensions isort
 
 # Run the linter script
 ./scripts-dev/lint.sh

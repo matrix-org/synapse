@@ -204,7 +204,7 @@ class EmailPusher(object):
                 yield self.send_notification(unprocessed, reason)
 
                 yield self.save_last_stream_ordering_and_success(
-                    max([ea["stream_ordering"] for ea in unprocessed])
+                    max(ea["stream_ordering"] for ea in unprocessed)
                 )
 
                 # we update the throttle on all the possible unprocessed push actions

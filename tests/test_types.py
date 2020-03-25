@@ -75,7 +75,7 @@ class GroupIDTestCase(unittest.TestCase):
                 self.fail("Parsing '%s' should raise exception" % id_string)
             except SynapseError as exc:
                 self.assertEqual(400, exc.code)
-                self.assertEqual("M_UNKNOWN", exc.errcode)
+                self.assertEqual("M_INVALID_PARAM", exc.errcode)
 
 
 class MapUsernameTestCase(unittest.TestCase):

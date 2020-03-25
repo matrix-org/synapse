@@ -114,7 +114,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         self.assertEqual(
-            self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
         )
         self.assertEqual(public_users, [])
 
@@ -146,6 +146,98 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
+
+    def test_spam_checker(self):
+        """
+        A user which fails to the spam checks will not appear in search results.
+        """
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
+        u2 = self.register_user("user2", "pass")
+        u2_token = self.login(u2, "pass")
+
+        # We do not add users to the directory until they join a room.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+        room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
+        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        # Check we have populated the database correctly.
+        shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
+
+        self.assertEqual(
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+        )
+        self.assertEqual(public_users, [])
+
+        # We get one search result when searching for user2 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 1)
+
+        # Configure a spam checker that does not filter any users.
+        spam_checker = self.hs.get_spam_checker()
+
+        class AllowAll(object):
+            def check_username_for_spam(self, user_profile):
+                # Allow all users.
+                return False
+
+        spam_checker.spam_checker = AllowAll()
+
+        # The results do not change:
+        # We get one search result when searching for user2 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 1)
+
+        # Configure a spam checker that filters all users.
+        class BlockAll(object):
+            def check_username_for_spam(self, user_profile):
+                # All users are spammy.
+                return True
+
+        spam_checker.spam_checker = BlockAll()
+
+        # User1 now gets no search results for any of the other users.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+    def test_legacy_spam_checker(self):
+        """
+        A spam checker without the expected method should be ignored.
+        """
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
+        u2 = self.register_user("user2", "pass")
+        u2_token = self.login(u2, "pass")
+
+        # We do not add users to the directory until they join a room.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+        room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
+        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        # Check we have populated the database correctly.
+        shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
+
+        self.assertEqual(
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+        )
+        self.assertEqual(public_users, [])
+
+        # Configure a spam checker.
+        spam_checker = self.hs.get_spam_checker()
+        # The spam checker doesn't need any methods, so create a bare object.
+        spam_checker.spam_checker = object()
+
+        # We get one search result when searching for user2 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 1)
 
     def _compress_shared(self, shared):
         """
@@ -266,12 +358,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         # User 1 and User 2 are in the same public room
-        self.assertEqual(set(public_users), set([(u1, room), (u2, room)]))
+        self.assertEqual(set(public_users), {(u1, room), (u2, room)})
 
         # User 1 and User 3 share private rooms
         self.assertEqual(
             self._compress_shared(shares_private),
-            set([(u1, u3, private_room), (u3, u1, private_room)]),
+            {(u1, u3, private_room), (u3, u1, private_room)},
         )
 
     def test_initial_share_all_users(self):
@@ -306,7 +398,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # No users share rooms
         self.assertEqual(public_users, [])
-        self.assertEqual(self._compress_shared(shares_private), set([]))
+        self.assertEqual(self._compress_shared(shares_private), set())
 
         # Despite not sharing a room, search_all_users means we get a search
         # result.

@@ -15,6 +15,7 @@ import logging
 
 from canonicaljson import encode_canonical_json
 
+from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.handlers.room import RoomEventSource
@@ -57,6 +58,15 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         # whether lists of events match using assertEquals
         self.unpatches = [patch__eq__(_EventInternalMetadata), patch__eq__(FrozenEvent)]
         return super(SlavedEventStoreTestCase, self).setUp()
+
+    def prepare(self, *args, **kwargs):
+        super().prepare(*args, **kwargs)
+
+        self.get_success(
+            self.master_store.store_room(
+                ROOM_ID, USER_ID, is_public=False, room_version=RoomVersions.V1,
+            )
+        )
 
     def tearDown(self):
         [unpatch() for unpatch in self.unpatches]

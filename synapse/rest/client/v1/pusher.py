@@ -54,9 +54,9 @@ class PushersRestServlet(RestServlet):
 
         pushers = await self.hs.get_datastore().get_pushers_by_user_id(user.to_string())
 
-        filtered_pushers = list(
+        filtered_pushers = [
             {k: v for k, v in p.items() if k in ALLOWED_KEYS} for p in pushers
-        )
+        ]
 
         return 200, {"pushers": filtered_pushers}
 

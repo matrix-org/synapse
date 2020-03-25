@@ -129,9 +129,9 @@ class FederationRemoteSendQueue(object):
             for key in keys[:i]:
                 del self.presence_changed[key]
 
-            user_ids = set(
+            user_ids = {
                 user_id for uids in self.presence_changed.values() for user_id in uids
-            )
+            }
 
             keys = self.presence_destinations.keys()
             i = self.presence_destinations.bisect_left(position_to_delete)
@@ -477,7 +477,7 @@ def process_rows_for_federation(transaction_queue, rows):
 
     Args:
         transaction_queue (FederationSender)
-        rows (list(synapse.replication.tcp.streams.FederationStreamRow))
+        rows (list(synapse.replication.tcp.streams.federation.FederationStream.FederationStreamRow))
     """
 
     # The federation stream contains a bunch of different types of

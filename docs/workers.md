@@ -261,7 +261,8 @@ following regular expressions:
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
-    ^/_matrix/client/(api/v1|r0|unstable)/get_groups_publicised$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
@@ -272,6 +273,7 @@ Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance:
 
     ^/_matrix/client/(r0|unstable)/register$
+    ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
 
 Pagination requests can also be handled, but all requests with the same path
 room must be routed to the same instance. Additionally, care must be taken to
@@ -287,8 +289,8 @@ the following regular expressions:
 
     ^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$
 
-When using this worker you must also set `update_user_directory: False` in the 
-shared configuration file to stop the main synapse running background 
+When using this worker you must also set `update_user_directory: False` in the
+shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.
 
 ### `synapse.app.frontend_proxy`

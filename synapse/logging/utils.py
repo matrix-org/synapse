@@ -148,7 +148,7 @@ def trace_function(f):
             pathname=pathname,
             lineno=lineno,
             msg=msg,
-            args=tuple(),
+            args=(),
             exc_info=None,
         )
 

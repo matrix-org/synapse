@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.events.utils import (
     copy_power_levels_contents,
@@ -36,9 +37,9 @@ class PruneEventTestCase(unittest.TestCase):
     """ Asserts that a new event constructed with `evdict` will look like
     `matchdict` when it is redacted. """
 
-    def run_test(self, evdict, matchdict):
+    def run_test(self, evdict, matchdict, **kwargs):
         self.assertEquals(
-            prune_event(make_event_from_dict(evdict)).get_dict(), matchdict
+            prune_event(make_event_from_dict(evdict, **kwargs)).get_dict(), matchdict
         )
 
     def test_minimal(self):
@@ -126,6 +127,36 @@ class PruneEventTestCase(unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
+        )
+
+    def test_alias_event(self):
+        """Alias events have special behavior up through room version 6."""
+        self.run_test(
+            {
+                "type": "m.room.aliases",
+                "event_id": "$test:domain",
+                "content": {"aliases": ["test"]},
+            },
+            {
+                "type": "m.room.aliases",
+                "event_id": "$test:domain",
+                "content": {"aliases": ["test"]},
+                "signatures": {},
+                "unsigned": {},
+            },
+        )
+
+    def test_msc2432_alias_event(self):
+        """After MSC2432, alias events have no special behavior."""
+        self.run_test(
+            {"type": "m.room.aliases", "content": {"aliases": ["test"]}},
+            {
+                "type": "m.room.aliases",
+                "content": {},
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.MSC2432_DEV,
         )
 
 

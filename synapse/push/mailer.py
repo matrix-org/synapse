@@ -526,12 +526,10 @@ class Mailer(object):
                     # If the room doesn't have a name, say who the messages
                     # are from explicitly to avoid, "messages in the Bob room"
                     sender_ids = list(
-                        set(
-                            [
-                                notif_events[n["event_id"]].sender
-                                for n in notifs_by_room[room_id]
-                            ]
-                        )
+                        {
+                            notif_events[n["event_id"]].sender
+                            for n in notifs_by_room[room_id]
+                        }
                     )
 
                     member_events = yield self.store.get_events(
@@ -557,13 +555,13 @@ class Mailer(object):
             else:
                 # If the reason room doesn't have a name, say who the messages
                 # are from explicitly to avoid, "messages in the Bob room"
+                room_id = reason["room_id"]
+
                 sender_ids = list(
-                    set(
-                        [
-                            notif_events[n["event_id"]].sender
-                            for n in notifs_by_room[reason["room_id"]]
-                        ]
-                    )
+                    {
+                        notif_events[n["event_id"]].sender
+                        for n in notifs_by_room[room_id]
+                    }
                 )
 
                 member_events = yield self.store.get_events(

@@ -20,6 +20,7 @@ import logging
 import time
 
 from synapse.api.constants import PresenceState
+from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
@@ -117,16 +118,6 @@ class DataStore(
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        all_users_native = are_all_users_on_domain(
-            db_conn.cursor(), database.engine, hs.hostname
-        )
-        if not all_users_native:
-            raise Exception(
-                "Found users in database not native to %s!\n"
-                "You cannot changed a synapse server_name after it's been configured"
-                % (hs.hostname,)
-            )
-
         self._stream_id_gen = StreamIdGenerator(
             db_conn,
             "events",
@@ -153,7 +144,10 @@ class DataStore(
             db_conn,
             "device_lists_stream",
             "stream_id",
-            extra_tables=[("user_signature_stream", "stream_id")],
+            extra_tables=[
+                ("user_signature_stream", "stream_id"),
+                ("device_lists_outbound_pokes", "stream_id"),
+            ],
         )
         self._cross_signing_id_gen = StreamIdGenerator(
             db_conn, "e2e_cross_signing_keys", "stream_id"
@@ -567,13 +561,26 @@ class DataStore(
         )
 
 
-def are_all_users_on_domain(txn, database_engine, domain):
+def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig):
+    """Called before upgrading an existing database to check that it is broadly sane
+    compared with the configuration.
+    """
+    domain = config.server_name
+
     sql = database_engine.convert_param_style(
         "SELECT COUNT(*) FROM users WHERE name NOT LIKE ?"
     )
     pat = "%:" + domain
-    txn.execute(sql, (pat,))
-    num_not_matching = txn.fetchall()[0][0]
+    cur.execute(sql, (pat,))
+    num_not_matching = cur.fetchall()[0][0]
     if num_not_matching == 0:
-        return True
-    return False
+        return
+
+    raise Exception(
+        "Found users in database not native to %s!\n"
+        "You cannot changed a synapse server_name after it's been configured"
+        % (domain,)
+    )
+
+
+__all__ = ["DataStore", "check_database_before_upgrade"]
