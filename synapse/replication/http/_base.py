@@ -128,15 +128,23 @@ class ReplicationEndpoint(object):
         Returns a callable that accepts the same parameters as `_serialize_payload`.
         """
         clock = hs.get_clock()
-        host = hs.config.worker_replication_host
-        port = hs.config.worker_replication_http_port
+        master_host = hs.config.worker_replication_host
+        master_port = hs.config.worker_replication_http_port
+
+        instance_http_map = hs.config.instance_http_map
 
         client = hs.get_simple_http_client()
 
         @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
         def send_request(instance_name="master", **kwargs):
-            if instance_name != "master":
+            if instance_name == "master":
+                host = master_host
+                port = master_port
+            elif instance_name in instance_http_map:
+                host = instance_http_map[instance_name]["host"]
+                port = instance_http_map[instance_name]["port"]
+            else:
                 raise Exception("Unknown instance")
 
             data = yield cls._serialize_payload(**kwargs)

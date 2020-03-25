@@ -74,9 +74,7 @@ class ReplicationStreamer(object):
         self.streams = []  # type: List[Stream]
         if hs.config.worker_app is None:
             for stream in STREAMS_MAP.values():
-                if stream == FederationStream and hs.config.send_federation:
-                    # We only support federation stream if federation sending
-                    # hase been disabled on the master.
+                if stream == FederationStream:
                     continue
 
                 if stream == TypingStream:
@@ -86,6 +84,9 @@ class ReplicationStreamer(object):
 
         if hs.config.server.handle_typing:
             self.streams.append(TypingStream(hs))
+
+        # We always add federation stream
+        self.streams.append(FederationStream(hs))
 
         self.streams_by_name = {stream.NAME: stream for stream in self.streams}
 

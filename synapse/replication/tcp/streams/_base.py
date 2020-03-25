@@ -256,7 +256,7 @@ class TypingStream(Stream):
 
         self.current_token = typing_handler.get_current_token  # type: ignore
 
-        if hs.config.worker_app is None:
+        if hs.config.handle_typing:
             self.update_function = db_query_to_update_function(typing_handler.get_all_typing_updates)  # type: ignore
         else:
             # Query master process

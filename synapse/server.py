@@ -457,10 +457,8 @@ class HomeServer(object):
     def build_federation_sender(self):
         if self.should_send_federation():
             return FederationSender(self)
-        elif not self.config.worker_app:
-            return FederationRemoteSendQueue(self)
         else:
-            raise Exception("Workers cannot send federation traffic")
+            return FederationRemoteSendQueue(self)
 
     def build_receipts_handler(self):
         return ReceiptsHandler(self)

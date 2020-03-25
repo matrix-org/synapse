@@ -277,8 +277,10 @@ class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
 
 
 def register_servlets(hs, http_server):
-    ReplicationFederationSendEventsRestServlet(hs).register(http_server)
+    if hs.config.worker_app is None:
+        ReplicationFederationSendEventsRestServlet(hs).register(http_server)
+        ReplicationGetQueryRestServlet(hs).register(http_server)
+        ReplicationCleanRoomRestServlet(hs).register(http_server)
+        ReplicationStoreRoomOnInviteRestServlet(hs).register(http_server)
+
     ReplicationFederationSendEduRestServlet(hs).register(http_server)
-    ReplicationGetQueryRestServlet(hs).register(http_server)
-    ReplicationCleanRoomRestServlet(hs).register(http_server)
-    ReplicationStoreRoomOnInviteRestServlet(hs).register(http_server)

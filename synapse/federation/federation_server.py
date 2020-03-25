@@ -819,7 +819,16 @@ class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
                 edu_type, origin, content
             )
 
-        return await self._send_edu(edu_type=edu_type, origin=origin, content=content)
+        if edu_type == "m.typing":
+            instance_name = "synapse.app.client_reader"
+        else:
+            instance_name = "master"
+        return await self._send_edu(
+            instance_name=instance_name,
+            edu_type=edu_type,
+            origin=origin,
+            content=content,
+        )
 
     async def on_query(self, query_type, args):
         """Overrides FederationHandlerRegistry

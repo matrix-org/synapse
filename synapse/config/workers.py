@@ -48,6 +48,8 @@ class WorkerConfig(Config):
 
         self.worker_main_http_uri = config.get("worker_main_http_uri", None)
 
+        self.instance_http_map = config.get("instance_http_map", {})
+
         # This option is really only here to support `--manhole` command line
         # argument.
         manhole = config.get("worker_manhole")

@@ -51,6 +51,8 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         # them ourselves we end up in an import loop).
         self.streams = hs.get_replication_streamer().get_streams()
 
+        self.instance_name = hs.config.worker_name or "master"
+
     @staticmethod
     def _serialize_payload(stream_name, from_token, upto_token, limit):
         return {"from_token": from_token, "upto_token": upto_token, "limit": limit}
