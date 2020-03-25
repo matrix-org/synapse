@@ -17,7 +17,7 @@
 
 import logging
 import random
-from typing import List, Dict
+from typing import Dict, List
 
 from prometheus_client import Counter
 

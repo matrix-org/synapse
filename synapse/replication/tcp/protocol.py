@@ -72,7 +72,6 @@ from synapse.replication.tcp.commands import (
     ServerCommand,
 )
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
-from synapse.types import Collection
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
