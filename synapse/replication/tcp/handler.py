@@ -207,9 +207,11 @@ class ReplicationClientHandler:
             # Check if this is the last of a batch of updates
             rows = self.pending_batches.pop(stream_name, [])
             rows.append(row)
-            await self.on_rdata(stream_name, cmd.token, rows)
+            await self.on_rdata(stream_name, cmd.instance_name, cmd.token, rows)
 
-    async def on_rdata(self, stream_name: str, token: int, rows: list):
+    async def on_rdata(
+        self, stream_name: str, instance_name: str, token: int, rows: list
+    ):
         """Called to handle a batch of replication data with a given stream token.
 
         Args:
@@ -218,8 +220,10 @@ class ReplicationClientHandler:
             rows: a list of Stream.ROW_TYPE objects as returned by
                 Stream.parse_row.
         """
-        logger.info("Received rdata %s -> %s", stream_name, token)
-        await self.replication_data_handler.on_rdata(stream_name, token, rows)
+        logger.info("Received rdata %s %s -> %s", stream_name, instance_name, token)
+        await self.replication_data_handler.on_rdata(
+            stream_name, instance_name, token, rows
+        )
 
     async def on_POSITION(self, cmd: PositionCommand):
         stream = self.streams.get(cmd.stream_name)
@@ -243,11 +247,12 @@ class ReplicationClientHandler:
         limited = cmd.token != current_token
         while limited:
             updates, current_token, limited = await stream.get_updates_since(
-                current_token, cmd.token
+                cmd.instance_name, current_token, cmd.token
             )
             if updates:
                 await self.on_rdata(
                     cmd.stream_name,
+                    cmd.instance_name,
                     current_token,
                     [stream.parse_row(update[1]) for update in updates],
                 )
@@ -258,7 +263,9 @@ class ReplicationClientHandler:
         # Handle any RDATA that came in while we were catching up.
         rows = self.pending_batches.pop(cmd.stream_name, [])
         if rows:
-            await self.on_rdata(cmd.stream_name, rows[-1].token, rows)
+            await self.on_rdata(
+                cmd.stream_name, cmd.instance_name, rows[-1].token, rows
+            )
 
     async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
         """Called when get a new REMOTE_SERVER_UP command."""
@@ -342,7 +349,9 @@ class ReplicationDataHandler:
         self.slaved_store = hs.config.worker_app is not None
         self.slaved_typing = not hs.config.server.handle_typing
 
-    async def on_rdata(self, stream_name: str, token: int, rows: list):
+    async def on_rdata(
+        self, stream_name: str, instance_name: str, token: int, rows: list
+    ):
         """Called to handle a batch of replication data with a given stream token.
 
         By default this just pokes the slave store. Can be overridden in subclasses to

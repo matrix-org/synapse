@@ -65,7 +65,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         limit = parse_integer(request, "limit", required=True)
 
         updates, upto_token, limited = await stream.get_updates_since(
-            from_token, upto_token, limit
+            self.instance_name, from_token, upto_token, limit
         )
 
         return (
