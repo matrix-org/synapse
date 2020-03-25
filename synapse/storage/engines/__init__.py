@@ -15,8 +15,6 @@
 import platform
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
-from .postgres import PostgresEngine
-from .sqlite import Sqlite3Engine
 
 
 def create_engine(database_config) -> BaseDatabaseEngine:
@@ -24,6 +22,7 @@ def create_engine(database_config) -> BaseDatabaseEngine:
 
     if name == "sqlite3":
         import sqlite3
+        from .sqlite import Sqlite3Engine
 
         return Sqlite3Engine(sqlite3, database_config)
 
@@ -33,6 +32,8 @@ def create_engine(database_config) -> BaseDatabaseEngine:
             import psycopg2cffi as psycopg2  # type: ignore
         else:
             import psycopg2  # type: ignore
+
+        from .postgres import PostgresEngine
 
         return PostgresEngine(psycopg2, database_config)
 
