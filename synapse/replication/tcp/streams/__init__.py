@@ -24,6 +24,9 @@ Each stream is defined by the following information:
     current_token:      The function that returns the current token for the stream
     update_function:    The function that returns a list of updates between two tokens
 """
+
+from typing import Dict, Type
+
 from synapse.replication.tcp.streams._base import (
     AccountDataStream,
     BackfillStream,
@@ -35,6 +38,7 @@ from synapse.replication.tcp.streams._base import (
     PushersStream,
     PushRulesStream,
     ReceiptsStream,
+    Stream,
     TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
@@ -63,10 +67,12 @@ STREAMS_MAP = {
         GroupServerStream,
         UserSignatureStream,
     )
-}
+}  # type: Dict[str, Type[Stream]]
+
 
 __all__ = [
     "STREAMS_MAP",
+    "Stream",
     "BackfillStream",
     "PresenceStream",
     "TypingStream",
