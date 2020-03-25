@@ -12,11 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sqlite3
 import struct
 import threading
 
+from pip._internal.utils.typing import MYPY_CHECK_RUNNING
+
 from synapse.storage.engines import BaseDatabaseEngine
+
+if MYPY_CHECK_RUNNING:
+    import sqlite3
 
 
 class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
