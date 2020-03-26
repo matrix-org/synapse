@@ -5,6 +5,8 @@ window.matrixLogin = {
     serverAcceptsSso: false,
 };
 
+var title_pre_auth = "Log in with one of the following methods"
+
 var submitPassword = function(user, pwd) {
     console.log("Logging in with password...");
     var data = {
@@ -13,7 +15,6 @@ var submitPassword = function(user, pwd) {
         password: pwd,
     };
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
-        show_login();
         matrixLogin.onLogin(response);
     }).error(errorFunc);
 };
@@ -25,7 +26,6 @@ var submitToken = function(loginToken) {
         token: loginToken
     };
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
-        show_login();
         matrixLogin.onLogin(response);
     }).error(errorFunc);
 };
@@ -46,20 +46,37 @@ var setFeedbackString = function(text) {
 };
 
 var show_login = function() {
-    $("#loading").hide();
-
     var this_page = window.location.origin + window.location.pathname;
     $("#sso_redirect_url").val(this_page);
 
-    if (matrixLogin.serverAcceptsPassword) {
-        $("#password_flow").show();
+    if (matrixLogin.serverAcceptsCas) {
+        $("#sso_form").attr("action", "/_matrix/client/r0/login/cas/redirect");
     }
 
-    if (matrixLogin.serverAcceptsSso) {
-        $("#sso_flow").show();
-    } else if (matrixLogin.serverAcceptsCas) {
-        $("#sso_form").attr("action", "/_matrix/client/r0/login/cas/redirect");
-        $("#sso_flow").show();
+    if ((matrixLogin.serverAcceptsSso || matrixLogin.serverAcceptsCas)) {
+        if (try_token()) {
+            // Only show the SSO form if there's a login token in the query. That's
+            // because, if there is a token, and this function is run, it means an error
+            // happened, and in this case it's nicer to show the form with an error
+            // rather than redirect immediately to the SSO portal.
+            $("#sso_form").show();
+        } else {
+            // Submit the SSO form instead of displaying it. The reason behind this
+            // behaviour is that the user will likely arrive here after clicking on a
+            // button, in the client, with a label such as "Continue with SSO". And even
+            // if that's not the case, it kind of makes sense to direct the user directly
+            // to the SSO portal and skip the password login form.
+            $("#sso_form").submit();
+            return;
+        }
+    }
+
+    set_title(title_pre_auth);
+
+    $("#loading").hide();
+
+    if (matrixLogin.serverAcceptsPassword) {
+        $("#password_flow").show();
     }
 
     if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsCas && !matrixLogin.serverAcceptsSso) {
@@ -74,6 +91,9 @@ var show_spinner = function() {
     $("#loading").show();
 };
 
+var set_title = function(title) {
+    $("#title").innerText = title;
+};
 
 var fetch_info = function(cb) {
     $.get(matrixLogin.endpoint, function(response) {
