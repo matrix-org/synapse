@@ -1392,7 +1392,11 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
-    # By default, this list is empty.
+    # If public_baseurl is set, then the login fallback page (used by clients
+    # that don't have full support for SSO) is always included in this list.
+    #
+    # By default, this list is empty, except if public_baseurl is set (in which
+    # case the login fallback page is the only element in the list).
     #
     #client_whitelist:
     #  - https://riot.im/develop
