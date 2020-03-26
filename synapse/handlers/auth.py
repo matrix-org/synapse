@@ -993,9 +993,8 @@ class AuthHandler(BaseHandler):
         # Skip the confirmation step and redirect to the client if that step is
         # explicitly disabled in the server's configuration, or if the client is
         # whitelisted.
-        if (
-            not self._sso_enable_redirect_confirm
-            or client_redirect_url.startswith(self._whitelisted_sso_clients)
+        if not self._sso_enable_redirect_confirm or client_redirect_url.startswith(
+            self._whitelisted_sso_clients
         ):
             request.redirect(redirect_url)
             finish_request(request)
