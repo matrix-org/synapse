@@ -113,6 +113,8 @@ class AuthHandler(BaseHandler):
 
         self._clock = self.hs.get_clock()
 
+        self._sso_enable_redirect_confirm = hs.config.sso_enable_redirect_confirm
+
         # Load the SSO redirect confirmation page HTML template
         self._sso_redirect_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
@@ -988,8 +990,12 @@ class AuthHandler(BaseHandler):
             client_redirect_url, "loginToken", login_token
         )
 
-        # if the client is whitelisted, we can redirect straight to it
-        if client_redirect_url.startswith(self._whitelisted_sso_clients):
+        # Skip the confirmation step and redirect to the client if it is whitelisted or
+        # if the server's configuration explicitly disables that step.
+        if (
+            client_redirect_url.startswith(self._whitelisted_sso_clients)
+            or not self._sso_enable_redirect_confirm
+        ):
             request.redirect(redirect_url)
             finish_request(request)
             return

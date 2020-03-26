@@ -28,6 +28,10 @@ class SSOConfig(Config):
     def read_config(self, config, **kwargs):
         sso_config = config.get("sso") or {}  # type: Dict[str, Any]
 
+        self.sso_enable_redirect_confirm = sso_config.get(
+            "enable_redirect_confirm", True,
+        )
+
         # Pick a template directory in order of:
         # * The sso-specific template_dir
         # * /path/to/synapse/install/res/templates
@@ -44,6 +48,12 @@ class SSOConfig(Config):
         # Additional settings to use with single-sign on systems such as SAML2 and CAS.
         #
         sso:
+            # Uncomment the following to disable the extra confirmation step before
+            # redirecting to the client after a successful authentication. This step is
+            # enabled by default.
+            #
+            #enable_redirect_confirm: false
+
             # A list of client URLs which are whitelisted so that the user does not
             # have to confirm giving access to their account to the URL. Any client
             # whose URL starts with an entry in the following list will not be subject
