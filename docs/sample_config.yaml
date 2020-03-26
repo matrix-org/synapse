@@ -578,13 +578,46 @@ acme:
 
 ## Database ##
 
+# The 'database' setting defines the database that synapse uses to store all of
+# its data.
+#
+# 'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
+# 'psycopg2' (for PostgreSQL).
+#
+# 'args' gives options which are passed through to the database engine,
+# except for options starting 'cp_', which are used to configure the Twisted
+# connection pool. For a reference to valid arguments, see:
+#   * for sqlite: https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
+#   * for postgres: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
+#   * for the connection pool: https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__
+#
+#
+# Example SQLite configuration:
+#
+#database:
+#  name: sqlite3
+#  args:
+#    database: /path/to/homeserver.db
+#
+#
+# Example Postgres configuration:
+#
+#database:
+#  name: psycopg2
+#  args:
+#    user: synapse
+#    password: secretpassword
+#    database: synapse
+#    host: localhost
+#    cp_min: 5
+#    cp_max: 10
+#
+# For more information on using Synapse with Postgres, see `docs/postgres.md`.
+#
 database:
-  # The database engine name
-  name: "sqlite3"
-  # Arguments to pass to the engine
+  name: sqlite3
   args:
-    # Path to the database
-    database: "DATADIR/homeserver.db"
+    database: DATADIR/homeserver.db
 
 # Number of events to cache in memory.
 #
@@ -838,10 +871,6 @@ media_store_path: "DATADIR/media_store"
 # public/private key.
 #
 #enable_registration_captcha: false
-
-# A secret key used to bypass the captcha test entirely.
-#
-#captcha_bypass_secret: "YOUR_SECRET_HERE"
 
 # The API endpoint to use for verifying m.login.recaptcha responses.
 #

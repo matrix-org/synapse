@@ -142,14 +142,6 @@ class AuthRestServlet(RestServlet):
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                 "sitekey": self.hs.config.recaptcha_public_key,
             }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-            request.write(html_bytes)
-            finish_request(request)
-            return None
         elif stagetype == LoginType.TERMS:
             html = TERMS_TEMPLATE % {
                 "session": session,
@@ -158,16 +150,18 @@ class AuthRestServlet(RestServlet):
                 "myurl": "%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
             }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-            request.write(html_bytes)
-            finish_request(request)
-            return None
         else:
             raise SynapseError(404, "Unknown auth stage type")
+
+        # Render the HTML and return.
+        html_bytes = html.encode("utf8")
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+        request.write(html_bytes)
+        finish_request(request)
+        return None
 
     async def on_POST(self, request, stagetype):
 
@@ -196,15 +190,6 @@ class AuthRestServlet(RestServlet):
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                     "sitekey": self.hs.config.recaptcha_public_key,
                 }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-            request.write(html_bytes)
-            finish_request(request)
-
-            return None
         elif stagetype == LoginType.TERMS:
             authdict = {"session": session}
 
@@ -225,16 +210,18 @@ class AuthRestServlet(RestServlet):
                     "myurl": "%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
                 }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-            request.write(html_bytes)
-            finish_request(request)
-            return None
         else:
             raise SynapseError(404, "Unknown auth stage type")
+
+        # Render the HTML and return.
+        html_bytes = html.encode("utf8")
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+        request.write(html_bytes)
+        finish_request(request)
+        return None
 
     def on_OPTIONS(self, _):
         return 200, {}

@@ -125,7 +125,11 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def validate_user_via_ui_auth(
-        self, requester: Requester, request_body: Dict[str, Any], clientip: str
+        self,
+        requester: Requester,
+        request: SynapseRequest,
+        request_body: Dict[str, Any],
+        clientip: str,
     ):
         """
         Checks that the user is who they claim to be, via a UI auth.
@@ -136,6 +140,8 @@ class AuthHandler(BaseHandler):
 
         Args:
             requester: The user, as given by the access token
+
+            request: The request sent by the client.
 
             request_body: The body of the request sent by the client
 
@@ -172,7 +178,9 @@ class AuthHandler(BaseHandler):
         flows = [[login_type] for login_type in self._supported_login_types]
 
         try:
-            result, params, _ = yield self.check_auth(flows, request_body, clientip)
+            result, params, _ = yield self.check_auth(
+                flows, request, request_body, clientip
+            )
         except LoginError:
             # Update the ratelimite to say we failed (`can_do_action` doesn't raise).
             self._failed_uia_attempts_ratelimiter.can_do_action(
@@ -211,7 +219,11 @@ class AuthHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def check_auth(
-        self, flows: List[List[str]], clientdict: Dict[str, Any], clientip: str
+        self,
+        flows: List[List[str]],
+        request: SynapseRequest,
+        clientdict: Dict[str, Any],
+        clientip: str,
     ):
         """
         Takes a dictionary sent by the client in the login / registration
@@ -230,6 +242,8 @@ class AuthHandler(BaseHandler):
             flows: A list of login flows. Each flow is an ordered list of
                    strings representing auth-types. At least one full
                    flow must be completed in order for auth to be successful.
+
+            request: The request sent by the client.
 
             clientdict: The dictionary from the client root level, not the
                         'auth' key: this method prompts for auth if none is sent.
@@ -270,12 +284,26 @@ class AuthHandler(BaseHandler):
             # email auth link on there). It's probably too open to abuse
             # because it lets unauthenticated clients store arbitrary objects
             # on a homeserver.
-            # Revisit: Assumimg the REST APIs do sensible validation, the data
+            # Revisit: Assuming the REST APIs do sensible validation, the data
             # isn't arbintrary.
             session["clientdict"] = clientdict
             self._save_session(session)
         elif "clientdict" in session:
             clientdict = session["clientdict"]
+
+        # Ensure that the queried operation does not vary between stages of
+        # the UI authentication session. This is done by generating a stable
+        # comparator based on the URI, method, and body (minus the auth dict)
+        # and storing it during the initial query. Subsequent queries ensure
+        # that this comparator has not changed.
+        comparator = (request.uri, request.method, clientdict)
+        if "ui_auth" not in session:
+            session["ui_auth"] = comparator
+        elif session["ui_auth"] != comparator:
+            raise SynapseError(
+                403,
+                "Requested operation has changed during the UI authentication session.",
+            )
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
@@ -322,6 +350,7 @@ class AuthHandler(BaseHandler):
                     creds,
                     list(clientdict),
                 )
+
                 return creds, clientdict, session["id"]
 
         ret = self._auth_dict_for_flows(flows, session)

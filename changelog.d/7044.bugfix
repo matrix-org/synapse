@@ -1,1 +1,0 @@
-Fix a bug that renders UTF-8 text files incorrectly when loaded from media. Contributed by @TheStranjer.
