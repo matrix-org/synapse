@@ -352,11 +352,7 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
         """
         self._test_redirect("https://legit-site.com/")
 
-    @override_config(
-        {
-            "public_baseurl": "https://example.com"
-        }
-    )
+    @override_config({"public_baseurl": "https://example.com"})
     def test_cas_redirect_login_fallback(self):
         self._test_redirect("https://example.com/_matrix/static/client/login")
 
