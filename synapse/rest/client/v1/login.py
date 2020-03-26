@@ -18,7 +18,12 @@ import logging
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import finish_request
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.servlet import (
+    RestServlet,
+    parse_json_object_from_request,
+    parse_string,
+)
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID
@@ -392,7 +397,7 @@ class BaseSSORedirectServlet(RestServlet):
 
     PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
-    def on_GET(self, request):
+    def on_GET(self, request: SynapseRequest):
         args = request.args
         if b"redirectUrl" not in args:
             return 400, "Redirect URL not specified for SSO auth"
@@ -401,15 +406,15 @@ class BaseSSORedirectServlet(RestServlet):
         request.redirect(sso_url)
         finish_request(request)
 
-    def get_sso_url(self, client_redirect_url):
+    def get_sso_url(self, client_redirect_url: bytes) -> bytes:
         """Get the URL to redirect to, to perform SSO auth
 
         Args:
-            client_redirect_url (bytes): the URL that we should redirect the
+            client_redirect_url: the URL that we should redirect the
                 client to when everything is done
 
         Returns:
-            bytes: URL to redirect to
+            URL to redirect to
         """
         # to be implemented by subclasses
         raise NotImplementedError()
@@ -419,7 +424,7 @@ class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         self._cas_handler = hs.get_cas_handler()
 
-    def get_sso_url(self, client_redirect_url):
+    def get_sso_url(self, client_redirect_url: bytes) -> bytes:
         return self._cas_handler.handle_redirect_request(client_redirect_url)
 
 
@@ -430,8 +435,12 @@ class CasTicketServlet(RestServlet):
         super(CasTicketServlet, self).__init__()
         self._cas_handler = hs.get_cas_handler()
 
-    async def on_GET(self, request):
-        return await self._cas_handler.handle_ticket_request(request)
+    async def on_GET(self, request: SynapseRequest) -> None:
+        client_redirect_url = parse_string(request, "redirectUrl", required=True)
+        ticket = parse_string(request, "ticket", required=True)
+        await self._cas_handler.handle_ticket_request(
+            request, client_redirect_url, ticket
+        )
 
 
 class SAMLRedirectServlet(BaseSSORedirectServlet):
@@ -440,7 +449,7 @@ class SAMLRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         self._saml_handler = hs.get_saml_handler()
 
-    def get_sso_url(self, client_redirect_url):
+    def get_sso_url(self, client_redirect_url: bytes) -> bytes:
         return self._saml_handler.handle_redirect_request(client_redirect_url)
 
 

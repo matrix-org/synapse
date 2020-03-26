@@ -22,7 +22,6 @@ from six.moves import urllib
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError
-from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.types import UserID, map_username_to_mxid_localpart
 
@@ -59,6 +58,15 @@ class CasHandler:
     async def _handle_cas_response(
         self, request: SynapseRequest, cas_response_body: str, client_redirect_url: str
     ) -> None:
+        """
+        Retrieves the user and display name from the CAS response and continues with the authentication.
+
+        Args:
+            request: The original client request.
+            cas_response_body: The response from the CAS server.
+            client_redirect_url: The URl to redirect the client to when
+                everything is done.
+        """
         user, attributes = self._parse_cas_response(cas_response_body)
         displayname = attributes.pop(self._cas_displayname_attribute, None)
 
@@ -79,6 +87,15 @@ class CasHandler:
     def _parse_cas_response(
         self, cas_response_body: str
     ) -> Tuple[str, Dict[str, Optional[str]]]:
+        """
+        Retrieve the user and other parameters from the CAS response.
+
+        Args:
+            cas_response_body: The response from the CAS query.
+
+        Returns:
+            A tuple of the user and a mapping of other attributes.
+        """
         user = None
         attributes = {}
         try:
@@ -148,17 +165,33 @@ class CasHandler:
         )
 
     def handle_redirect_request(self, client_redirect_url: bytes) -> bytes:
+        """
+        Generates a URL to the CAS server where the client should be redirected.
+
+        Args:
+            client_redirect_url: The final URL the client should go to after the
+                user has negotiated SSO.
+
+        Returns:
+            The URL to redirect to.
+        """
         args = urllib.parse.urlencode(
             {"service": self._build_service_param(client_redirect_url)}
         )
 
         return ("%s/login?%s" % (self._cas_server_url, args)).encode("ascii")
 
-    async def handle_ticket_request(self, request: SynapseRequest):
-        client_redirect_url = parse_string(request, "redirectUrl", required=True)
+    async def handle_ticket_request(
+        self, request: SynapseRequest, client_redirect_url: str, ticket: str
+    ) -> None:
+        """
+        Validates a CAS ticket sent by the client for login/registration.
+
+        On a successful request, writes a redirect to the request.
+        """
         uri = self._cas_server_url + "/proxyValidate"
         args = {
-            "ticket": parse_string(request, "ticket", required=True),
+            "ticket": ticket,
             "service": self._build_service_param(client_redirect_url),
         }
         try:
