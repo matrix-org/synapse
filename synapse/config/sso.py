@@ -52,9 +52,10 @@ class SSOConfig(Config):
             # redirecting to the client after a successful authentication. This step is
             # enabled by default.
             #
-            # Make sure the SSO backend allows sensible authentication options (e.g. no
-            # "passwordless" authentication) before disabling this step, otherwise users
-            # could be vulnerable to phishing attacks.
+            # Authentication methods that involve sending an authentication link to an
+            # email which includes a redirect URL (e.g. "passwordless" login) are
+            # vulnerable to "open redirect" phishing attacks, and in such cases it is
+            # highly recommended to keep this option enabled.
             #
             #enable_redirect_confirm: false
 

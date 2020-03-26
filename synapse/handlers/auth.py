@@ -990,11 +990,12 @@ class AuthHandler(BaseHandler):
             client_redirect_url, "loginToken", login_token
         )
 
-        # Skip the confirmation step and redirect to the client if it is whitelisted or
-        # if the server's configuration explicitly disables that step.
+        # Skip the confirmation step and redirect to the client if that step is
+        # explicitly disabled in the server's configuration, or if the client is
+        # whitelisted.
         if (
-            client_redirect_url.startswith(self._whitelisted_sso_clients)
-            or not self._sso_enable_redirect_confirm
+            not self._sso_enable_redirect_confirm
+            or client_redirect_url.startswith(self._whitelisted_sso_clients)
         ):
             request.redirect(redirect_url)
             finish_request(request)
