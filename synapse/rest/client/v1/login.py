@@ -28,7 +28,6 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import load_jinja2_templates
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -71,6 +70,14 @@ def login_id_thirdparty_from_phone(identifier):
     msisdn = phone_number_to_msisdn(identifier["country"], identifier["number"])
 
     return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
+
+
+def build_service_param(cas_service_url, client_redirect_url):
+    return "%s%s?redirectUrl=%s" % (
+        cas_service_url,
+        "/_matrix/client/r0/login/cas/ticket",
+        urllib.parse.quote(client_redirect_url, safe=""),
+    )
 
 
 class LoginRestServlet(RestServlet):
@@ -428,18 +435,15 @@ class BaseSSORedirectServlet(RestServlet):
 class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
-        self.cas_server_url = hs.config.cas_server_url.encode("ascii")
-        self.cas_service_url = hs.config.cas_service_url.encode("ascii")
+        self.cas_server_url = hs.config.cas_server_url
+        self.cas_service_url = hs.config.cas_service_url
 
     def get_sso_url(self, client_redirect_url):
-        client_redirect_url_param = urllib.parse.urlencode(
-            {b"redirectUrl": client_redirect_url}
-        ).encode("ascii")
-        hs_redirect_url = self.cas_service_url + b"/_matrix/client/r0/login/cas/ticket"
-        service_param = urllib.parse.urlencode(
-            {b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)}
-        ).encode("ascii")
-        return b"%s/login?%s" % (self.cas_server_url, service_param)
+        args = urllib.parse.urlencode(
+            {"service": build_service_param(self.cas_service_url, client_redirect_url)}
+        )
+
+        return "%s/login?%s" % (self.cas_server_url, args)
 
 
 class CasTicketServlet(RestServlet):
@@ -459,7 +463,7 @@ class CasTicketServlet(RestServlet):
         uri = self.cas_server_url + "/proxyValidate"
         args = {
             "ticket": parse_string(request, "ticket", required=True),
-            "service": self.cas_service_url,
+            "service": build_service_param(self.cas_service_url, client_redirect_url),
         }
         try:
             body = await self._http_client.get_raw(uri, args)
@@ -547,13 +551,6 @@ class SSOAuthHandler(object):
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
         self._macaroon_gen = hs.get_macaroon_generator()
-
-        # Load the redirect page HTML template
-        self._template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
-        )[0]
-
-        self._server_name = hs.config.server_name
 
         # cast to tuple for use with str.startswith
         self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)

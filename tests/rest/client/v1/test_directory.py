@@ -51,29 +51,25 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.user = self.register_user("user", "test")
         self.user_tok = self.login("user", "test")
 
-    def test_cannot_set_alias_via_state_event(self):
-        self.ensure_user_joined_room()
-        url = "/_matrix/client/r0/rooms/%s/state/m.room.aliases/%s" % (
-            self.room_id,
-            self.hs.hostname,
-        )
-
-        data = {"aliases": [self.random_alias(5)]}
-        request_data = json.dumps(data)
-
-        request, channel = self.make_request(
-            "PUT", url, request_data, access_token=self.user_tok
-        )
-        self.render(request)
-        self.assertEqual(channel.code, 400, channel.result)
+    def test_state_event_not_in_room(self):
+        self.ensure_user_left_room()
+        self.set_alias_via_state_event(403)
 
     def test_directory_endpoint_not_in_room(self):
         self.ensure_user_left_room()
         self.set_alias_via_directory(403)
 
+    def test_state_event_in_room_too_long(self):
+        self.ensure_user_joined_room()
+        self.set_alias_via_state_event(400, alias_length=256)
+
     def test_directory_in_room_too_long(self):
         self.ensure_user_joined_room()
         self.set_alias_via_directory(400, alias_length=256)
+
+    def test_state_event_in_room(self):
+        self.ensure_user_joined_room()
+        self.set_alias_via_state_event(200)
 
     def test_directory_in_room(self):
         self.ensure_user_joined_room()
@@ -105,6 +101,21 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
+
+    def set_alias_via_state_event(self, expected_code, alias_length=5):
+        url = "/_matrix/client/r0/rooms/%s/state/m.room.aliases/%s" % (
+            self.room_id,
+            self.hs.hostname,
+        )
+
+        data = {"aliases": [self.random_alias(alias_length)]}
+        request_data = json.dumps(data)
+
+        request, channel = self.make_request(
+            "PUT", url, request_data, access_token=self.user_tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
 
     def set_alias_via_directory(self, expected_code, alias_length=5):
         url = "/_matrix/client/r0/directory/room/%s" % self.random_alias(alias_length)

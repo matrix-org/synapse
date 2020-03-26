@@ -408,7 +408,6 @@ def setup(config_options):
 
             _base.start(hs, config.listeners)
 
-            hs.get_pusherpool().start()
             hs.get_datastore().db.updates.start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.

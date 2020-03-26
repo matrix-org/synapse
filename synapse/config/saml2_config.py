@@ -15,6 +15,9 @@
 # limitations under the License.
 
 import logging
+import os
+
+import pkg_resources
 
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
@@ -158,6 +161,14 @@ class SAML2Config(Config):
         # session lifetime: in milliseconds
         self.saml2_session_lifetime = self.parse_duration(
             saml2_config.get("saml_session_lifetime", "5m")
+        )
+
+        template_dir = saml2_config.get("template_dir")
+        if not template_dir:
+            template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
+
+        self.saml2_error_html_content = self.read_file(
+            os.path.join(template_dir, "saml_error.html"), "saml2_config.saml_error",
         )
 
     def _default_saml_config_dict(
@@ -325,6 +336,25 @@ class SAML2Config(Config):
           # The default is 'uid'.
           #
           #grandfathered_mxid_source_attribute: upn
+
+          # Directory in which Synapse will try to find the template files below.
+          # If not set, default templates from within the Synapse package will be used.
+          #
+          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+          # If you *do* uncomment it, you will need to make sure that all the templates
+          # below are in the directory.
+          #
+          # Synapse will look for the following templates in this directory:
+          #
+          # * HTML page to display to users if something goes wrong during the
+          #   authentication process: 'saml_error.html'.
+          #
+          #   This template doesn't currently need any variable to render.
+          #
+          # You can see the default templates at:
+          # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+          #
+          #template_dir: "res/templates"
         """ % {
             "config_dir_path": config_dir_path
         }

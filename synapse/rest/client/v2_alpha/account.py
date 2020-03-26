@@ -234,13 +234,16 @@ class PasswordRestServlet(RestServlet):
         if self.auth.has_access_token(request):
             requester = await self.auth.get_user_by_req(request)
             params = await self.auth_handler.validate_user_via_ui_auth(
-                requester, body, self.hs.get_ip_from_request(request)
+                requester, request, body, self.hs.get_ip_from_request(request),
             )
             user_id = requester.user.to_string()
         else:
             requester = None
             result, params, _ = await self.auth_handler.check_auth(
-                [[LoginType.EMAIL_IDENTITY]], body, self.hs.get_ip_from_request(request)
+                [[LoginType.EMAIL_IDENTITY]],
+                request,
+                body,
+                self.hs.get_ip_from_request(request),
             )
 
             if LoginType.EMAIL_IDENTITY in result:
@@ -265,8 +268,11 @@ class PasswordRestServlet(RestServlet):
 
         assert_params_in_dict(params, ["new_password"])
         new_password = params["new_password"]
+        logout_devices = params.get("logout_devices", True)
 
-        await self._set_password_handler.set_password(user_id, new_password, requester)
+        await self._set_password_handler.set_password(
+            user_id, new_password, logout_devices, requester
+        )
 
         return 200, {}
 
@@ -305,7 +311,7 @@ class DeactivateAccountRestServlet(RestServlet):
             return 200, {}
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester, request, body, self.hs.get_ip_from_request(request),
         )
         result = await self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase, id_server=body.get("id_server")
@@ -653,7 +659,7 @@ class ThreepidAddRestServlet(RestServlet):
         assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester, request, body, self.hs.get_ip_from_request(request),
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(

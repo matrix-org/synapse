@@ -25,24 +25,18 @@ from twisted.python.failure import Failure
 
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
-from synapse.api.room_versions import (
-    KNOWN_ROOM_VERSIONS,
-    EventFormatVersions,
-    RoomVersion,
-)
+from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, make_event_from_dict
 from synapse.events.utils import prune_event
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
-    LoggingContext,
     PreserveLoggingContext,
+    current_context,
     make_deferred_yieldable,
-    preserve_fn,
 )
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util import unwrapFirstError
 
 logger = logging.getLogger(__name__)
 
@@ -57,93 +51,15 @@ class FederationBase(object):
         self.store = hs.get_datastore()
         self._clock = hs.get_clock()
 
-    @defer.inlineCallbacks
-    def _check_sigs_and_hash_and_fetch(
-        self,
-        origin: str,
-        pdus: List[EventBase],
-        room_version: str,
-        outlier: bool = False,
-        include_none: bool = False,
-    ):
-        """Takes a list of PDUs and checks the signatures and hashs of each
-        one. If a PDU fails its signature check then we check if we have it in
-        the database and if not then request if from the originating server of
-        that PDU.
-
-        If a PDU fails its content hash check then it is redacted.
-
-        The given list of PDUs are not modified, instead the function returns
-        a new list.
-
-        Args:
-            origin
-            pdu
-            room_version
-            outlier: Whether the events are outliers or not
-            include_none: Whether to include None in the returned list
-                for events that have failed their checks
-
-        Returns:
-            Deferred : A list of PDUs that have valid signatures and hashes.
-        """
-        deferreds = self._check_sigs_and_hashes(room_version, pdus)
-
-        @defer.inlineCallbacks
-        def handle_check_result(pdu: EventBase, deferred: Deferred):
-            try:
-                res = yield make_deferred_yieldable(deferred)
-            except SynapseError:
-                res = None
-
-            if not res:
-                # Check local db.
-                res = yield self.store.get_event(
-                    pdu.event_id, allow_rejected=True, allow_none=True
-                )
-
-            if not res and pdu.origin != origin:
-                try:
-                    # This should not exist in the base implementation, until
-                    # this is fixed, ignore it for typing. See issue #6997.
-                    res = yield defer.ensureDeferred(
-                        self.get_pdu(  # type: ignore
-                            destinations=[pdu.origin],
-                            event_id=pdu.event_id,
-                            room_version=room_version,
-                            outlier=outlier,
-                            timeout=10000,
-                        )
-                    )
-                except SynapseError:
-                    pass
-
-            if not res:
-                logger.warning(
-                    "Failed to find copy of %s with valid signature", pdu.event_id
-                )
-
-            return res
-
-        handle = preserve_fn(handle_check_result)
-        deferreds2 = [handle(pdu, deferred) for pdu, deferred in zip(pdus, deferreds)]
-
-        valid_pdus = yield make_deferred_yieldable(
-            defer.gatherResults(deferreds2, consumeErrors=True)
-        ).addErrback(unwrapFirstError)
-
-        if include_none:
-            return valid_pdus
-        else:
-            return [p for p in valid_pdus if p]
-
-    def _check_sigs_and_hash(self, room_version: str, pdu: EventBase) -> Deferred:
+    def _check_sigs_and_hash(
+        self, room_version: RoomVersion, pdu: EventBase
+    ) -> Deferred:
         return make_deferred_yieldable(
             self._check_sigs_and_hashes(room_version, [pdu])[0]
         )
 
     def _check_sigs_and_hashes(
-        self, room_version: str, pdus: List[EventBase]
+        self, room_version: RoomVersion, pdus: List[EventBase]
     ) -> List[Deferred]:
         """Checks that each of the received events is correctly signed by the
         sending server.
@@ -162,7 +78,7 @@ class FederationBase(object):
         """
         deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
 
-        ctx = LoggingContext.current_context()
+        ctx = current_context()
 
         def callback(_, pdu: EventBase):
             with PreserveLoggingContext(ctx):
@@ -228,7 +144,7 @@ class PduToCheckSig(
 
 
 def _check_sigs_on_pdus(
-    keyring: Keyring, room_version: str, pdus: Iterable[EventBase]
+    keyring: Keyring, room_version: RoomVersion, pdus: Iterable[EventBase]
 ) -> List[Deferred]:
     """Check that the given events are correctly signed
 
@@ -273,10 +189,6 @@ def _check_sigs_on_pdus(
         for p in pdus
     ]
 
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-    if not v:
-        raise RuntimeError("Unrecognized room version %s" % (room_version,))
-
     # First we check that the sender event is signed by the sender's domain
     # (except if its a 3pid invite, in which case it may be sent by any server)
     pdus_to_check_sender = [p for p in pdus_to_check if not _is_invite_via_3pid(p.pdu)]
@@ -286,7 +198,7 @@ def _check_sigs_on_pdus(
             (
                 p.sender_domain,
                 p.redacted_pdu_json,
-                p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
                 p.pdu.event_id,
             )
             for p in pdus_to_check_sender
@@ -309,7 +221,7 @@ def _check_sigs_on_pdus(
     # event id's domain (normally only the case for joins/leaves), and add additional
     # checks. Only do this if the room version has a concept of event ID domain
     # (ie, the room version uses old-style non-hash event IDs).
-    if v.event_format == EventFormatVersions.V1:
+    if room_version.event_format == EventFormatVersions.V1:
         pdus_to_check_event_id = [
             p
             for p in pdus_to_check
@@ -321,7 +233,7 @@ def _check_sigs_on_pdus(
                 (
                     get_domain_from_id(p.pdu.event_id),
                     p.redacted_pdu_json,
-                    p.pdu.origin_server_ts if v.enforce_key_validity else 0,
+                    p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
                     p.pdu.event_id,
                 )
                 for p in pdus_to_check_event_id

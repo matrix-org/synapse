@@ -165,8 +165,7 @@ class PreviewUrlResource(DirectServeResource):
         og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
-    @defer.inlineCallbacks
-    def _do_preview(self, url, user, ts):
+    async def _do_preview(self, url, user, ts):
         """Check the db, and download the URL and build a preview
 
         Args:
@@ -179,7 +178,7 @@ class PreviewUrlResource(DirectServeResource):
         """
         # check the URL cache in the DB (which will also provide us with
         # historical previews, if we have any)
-        cache_result = yield self.store.get_url_cache(url, ts)
+        cache_result = await self.store.get_url_cache(url, ts)
         if (
             cache_result
             and cache_result["expires_ts"] > ts
@@ -192,13 +191,13 @@ class PreviewUrlResource(DirectServeResource):
                 og = og.encode("utf8")
             return og
 
-        media_info = yield self._download_url(url, user)
+        media_info = await self._download_url(url, user)
 
         logger.debug("got media_info of '%s'", media_info)
 
         if _is_media(media_info["media_type"]):
             file_id = media_info["filesystem_id"]
-            dims = yield self.media_repo._generate_thumbnails(
+            dims = await self.media_repo._generate_thumbnails(
                 None, file_id, file_id, media_info["media_type"], url_cache=True
             )
 
@@ -248,14 +247,14 @@ class PreviewUrlResource(DirectServeResource):
             # request itself and benefit from the same caching etc.  But for now we
             # just rely on the caching on the master request to speed things up.
             if "og:image" in og and og["og:image"]:
-                image_info = yield self._download_url(
+                image_info = await self._download_url(
                     _rebase_url(og["og:image"], media_info["uri"]), user
                 )
 
                 if _is_media(image_info["media_type"]):
                     # TODO: make sure we don't choke on white-on-transparent images
                     file_id = image_info["filesystem_id"]
-                    dims = yield self.media_repo._generate_thumbnails(
+                    dims = await self.media_repo._generate_thumbnails(
                         None, file_id, file_id, image_info["media_type"], url_cache=True
                     )
                     if dims:
@@ -293,7 +292,7 @@ class PreviewUrlResource(DirectServeResource):
         jsonog = json.dumps(og)
 
         # store OG in history-aware DB cache
-        yield self.store.store_url_cache(
+        await self.store.store_url_cache(
             url,
             media_info["response_code"],
             media_info["etag"],
@@ -305,8 +304,7 @@ class PreviewUrlResource(DirectServeResource):
 
         return jsonog.encode("utf8")
 
-    @defer.inlineCallbacks
-    def _download_url(self, url, user):
+    async def _download_url(self, url, user):
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -318,7 +316,7 @@ class PreviewUrlResource(DirectServeResource):
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
                 logger.debug("Trying to get url '%s'", url)
-                length, headers, uri, code = yield self.client.get_file(
+                length, headers, uri, code = await self.client.get_file(
                     url, output_stream=f, max_size=self.max_spider_size
                 )
             except SynapseError:
@@ -345,7 +343,7 @@ class PreviewUrlResource(DirectServeResource):
                     % (traceback.format_exception_only(sys.exc_info()[0], e),),
                     Codes.UNKNOWN,
                 )
-            yield finish()
+            await finish()
 
         try:
             if b"Content-Type" in headers:
@@ -356,7 +354,7 @@ class PreviewUrlResource(DirectServeResource):
 
             download_name = get_filename_from_headers(headers)
 
-            yield self.store.store_local_media(
+            await self.store.store_local_media(
                 media_id=file_id,
                 media_type=media_type,
                 time_now_ms=self.clock.time_msec(),
@@ -393,8 +391,7 @@ class PreviewUrlResource(DirectServeResource):
             "expire_url_cache_data", self._expire_url_cache_data
         )
 
-    @defer.inlineCallbacks
-    def _expire_url_cache_data(self):
+    async def _expire_url_cache_data(self):
         """Clean up expired url cache content, media and thumbnails.
         """
         # TODO: Delete from backup media store
@@ -403,12 +400,12 @@ class PreviewUrlResource(DirectServeResource):
 
         logger.info("Running url preview cache expiry")
 
-        if not (yield self.store.db.updates.has_completed_background_updates()):
+        if not (await self.store.db.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
             return
 
         # First we delete expired url cache entries
-        media_ids = yield self.store.get_expired_url_cache(now)
+        media_ids = await self.store.get_expired_url_cache(now)
 
         removed_media = []
         for media_id in media_ids:
@@ -430,7 +427,7 @@ class PreviewUrlResource(DirectServeResource):
             except Exception:
                 pass
 
-        yield self.store.delete_url_cache(removed_media)
+        await self.store.delete_url_cache(removed_media)
 
         if removed_media:
             logger.info("Deleted %d entries from url cache", len(removed_media))
@@ -440,7 +437,7 @@ class PreviewUrlResource(DirectServeResource):
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
         expire_before = now - 2 * 24 * 60 * 60 * 1000
-        media_ids = yield self.store.get_url_cache_media_before(expire_before)
+        media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
         for media_id in media_ids:
@@ -478,7 +475,7 @@ class PreviewUrlResource(DirectServeResource):
             except Exception:
                 pass
 
-        yield self.store.delete_url_cache_media(removed_media)
+        await self.store.delete_url_cache_media(removed_media)
 
         logger.info("Deleted %d media from url cache", len(removed_media))
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +15,6 @@
 # limitations under the License.
 import logging
 import os
-from textwrap import indent
-
-import yaml
 
 from synapse.config._base import Config, ConfigError
 
@@ -25,6 +23,55 @@ logger = logging.getLogger(__name__)
 NON_SQLITE_DATABASE_PATH_WARNING = """\
 Ignoring 'database_path' setting: not using a sqlite3 database.
 --------------------------------------------------------------------------------
+"""
+
+DEFAULT_CONFIG = """\
+## Database ##
+
+# The 'database' setting defines the database that synapse uses to store all of
+# its data.
+#
+# 'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
+# 'psycopg2' (for PostgreSQL).
+#
+# 'args' gives options which are passed through to the database engine,
+# except for options starting 'cp_', which are used to configure the Twisted
+# connection pool. For a reference to valid arguments, see:
+#   * for sqlite: https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
+#   * for postgres: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
+#   * for the connection pool: https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__
+#
+#
+# Example SQLite configuration:
+#
+#database:
+#  name: sqlite3
+#  args:
+#    database: /path/to/homeserver.db
+#
+#
+# Example Postgres configuration:
+#
+#database:
+#  name: psycopg2
+#  args:
+#    user: synapse
+#    password: secretpassword
+#    database: synapse
+#    host: localhost
+#    cp_min: 5
+#    cp_max: 10
+#
+# For more information on using Synapse with Postgres, see `docs/postgres.md`.
+#
+database:
+  name: sqlite3
+  args:
+    database: %(database_path)s
+
+# Number of events to cache in memory.
+#
+#event_cache_size: 10K
 """
 
 
@@ -41,10 +88,12 @@ class DatabaseConnectionConfig:
     """
 
     def __init__(self, name: str, db_config: dict):
-        if db_config["name"] not in ("sqlite3", "psycopg2"):
-            raise ConfigError("Unsupported database type %r" % (db_config["name"],))
+        db_engine = db_config.get("name", "sqlite3")
 
-        if db_config["name"] == "sqlite3":
+        if db_engine not in ("sqlite3", "psycopg2"):
+            raise ConfigError("Unsupported database type %r" % (db_engine,))
+
+        if db_engine == "sqlite3":
             db_config.setdefault("args", {}).update(
                 {"cp_min": 1, "cp_max": 1, "check_same_thread": False}
             )
@@ -112,34 +161,10 @@ class DatabaseConfig(Config):
             self.databases = [DatabaseConnectionConfig("master", database_config)]
             self.set_databasepath(database_path)
 
-    def generate_config_section(self, data_dir_path, database_conf, **kwargs):
-        if not database_conf:
-            database_path = os.path.join(data_dir_path, "homeserver.db")
-            database_conf = (
-                """# The database engine name
-          name: "sqlite3"
-          # Arguments to pass to the engine
-          args:
-            # Path to the database
-            database: "%(database_path)s"
-            """
-                % locals()
-            )
-        else:
-            database_conf = indent(yaml.dump(database_conf), " " * 10).lstrip()
-
-        return (
-            """\
-        ## Database ##
-
-        database:
-          %(database_conf)s
-        # Number of events to cache in memory.
-        #
-        #event_cache_size: 10K
-        """
-            % locals()
-        )
+    def generate_config_section(self, data_dir_path, **kwargs):
+        return DEFAULT_CONFIG % {
+            "database_path": os.path.join(data_dir_path, "homeserver.db")
+        }
 
     def read_arguments(self, args):
         """
