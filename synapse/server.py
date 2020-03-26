@@ -66,6 +66,7 @@ from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerH
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
+from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import PresenceHandler
 from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
@@ -199,6 +200,7 @@ class HomeServer(object):
         "account_validity_handler",
         "saml_handler",
         "event_client_serializer",
+        "password_policy_handler",
         "storage",
         "replication_streamer",
     ]
@@ -534,6 +536,9 @@ class HomeServer(object):
 
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
+
+    def build_password_policy_handler(self):
+        return PasswordPolicyHandler(self)
 
     def build_storage(self) -> Storage:
         return Storage(self, self.datastores)

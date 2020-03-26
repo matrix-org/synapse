@@ -32,6 +32,7 @@ class SetPasswordHandler(BaseHandler):
         super(SetPasswordHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
+        self._password_policy_handler = hs.get_password_policy_handler()
 
     @defer.inlineCallbacks
     def set_password(
@@ -44,6 +45,7 @@ class SetPasswordHandler(BaseHandler):
         if not self.hs.config.password_localdb_enabled:
             raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
 
+        self._password_policy_handler.validate_password(new_password)
         password_hash = yield self._auth_handler.hash(new_password)
 
         try:
