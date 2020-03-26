@@ -352,13 +352,7 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
         """
         self._test_no_confirmation_step()
 
-    @override_config(
-        {
-            "sso": {
-                "enable_redirect_confirm": False,
-            }
-        }
-    )
+    @override_config({"sso": {"enable_redirect_confirm": False}})
     def test_cas_redirect_confirm_disabled(self):
         """Tests that the SSO login flow serves a redirect if the confirmation step is
         explicitly disabled in the server's configuration.
