@@ -15,7 +15,7 @@
 
 import logging
 import xml.etree.ElementTree as ET
-from typing import AnyStr, Awaitable, Dict, Optional, Tuple
+from typing import AnyStr, Dict, Optional, Tuple
 
 from six.moves import urllib
 
@@ -56,9 +56,9 @@ class CasHandler:
             urllib.parse.urlencode({"redirectUrl": client_redirect_url}),
         )
 
-    def _handle_cas_response(
+    async def _handle_cas_response(
         self, request: SynapseRequest, cas_response_body: str, client_redirect_url: str
-    ) -> Awaitable:
+    ) -> None:
         user, attributes = self._parse_cas_response(cas_response_body)
         displayname = attributes.pop(self._cas_displayname_attribute, None)
 
@@ -74,7 +74,7 @@ class CasHandler:
                 if required_value != actual_value:
                     raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
 
-        return self._on_successful_auth(user, request, client_redirect_url, displayname)
+        await self._on_successful_auth(user, request, client_redirect_url, displayname)
 
     def _parse_cas_response(
         self, cas_response_body: str
@@ -134,9 +134,6 @@ class CasHandler:
 
             user_display_name: if set, and we have to register a new user,
                 we will set their displayname to this.
-
-        Returns:
-            Completes once we have handled the request.
         """
         localpart = map_username_to_mxid_localpart(username)
         user_id = UserID(localpart, self._hostname).to_string()
