@@ -1,0 +1,1 @@
+Add a configuration flag to disable the extra confirmation step after a successful SSO authentication. Server admins should make sure their SSO backend allows sensible authentication options before using this flag.
