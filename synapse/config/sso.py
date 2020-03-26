@@ -52,6 +52,11 @@ class SSOConfig(Config):
             # redirecting to the client after a successful authentication. This step is
             # enabled by default.
             #
+            # Make sure the SSO backend is sufficiently locked down and allows sensible
+            # authentication options (e.g. no "passwordless" authentication) before
+            # disabling this step, otherwise users could be vulnerable to phishing
+            # attacks.
+            #
             #enable_redirect_confirm: false
 
             # A list of client URLs which are whitelisted so that the user does not
