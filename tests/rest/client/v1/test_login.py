@@ -350,6 +350,25 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
     def test_cas_redirect_whitelisted(self):
         """Tests that the SSO login flow serves a redirect to a whitelisted url
         """
+        self._test_no_confirmation_step()
+
+    @override_config(
+        {
+            "sso": {
+                "enable_redirect_confirm": False,
+            }
+        }
+    )
+    def test_cas_redirect_confirm_disabled(self):
+        """Tests that the SSO login flow serves a redirect if the confirmation step is
+        explicitly disabled in the server's configuration.
+        """
+        self._test_no_confirmation_step()
+
+    def _test_no_confirmation_step(self):
+        """Tests that the SSO login flows serves a redirect with the current test's
+        configuration.
+        """
         redirect_url = "https://legit-site.com/"
         cas_ticket_url = (
             "/_matrix/client/r0/login/cas/ticket?redirectUrl=%s&ticket=ticket"
