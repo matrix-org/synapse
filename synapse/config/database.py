@@ -20,6 +20,11 @@ from synapse.config._base import Config, ConfigError
 
 logger = logging.getLogger(__name__)
 
+NON_SQLITE_DATABASE_PATH_WARNING = """\
+Ignoring 'database_path' setting: not using a sqlite3 database.
+--------------------------------------------------------------------------------
+"""
+
 DEFAULT_CONFIG = """\
 ## Database ##
 
@@ -105,6 +110,11 @@ class DatabaseConnectionConfig:
 class DatabaseConfig(Config):
     section = "database"
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.databases = []
+
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 
@@ -125,12 +135,13 @@ class DatabaseConfig(Config):
 
         multi_database_config = config.get("databases")
         database_config = config.get("database")
+        database_path = config.get("database_path")
 
         if multi_database_config and database_config:
             raise ConfigError("Can't specify both 'database' and 'datbases' in config")
 
         if multi_database_config:
-            if config.get("database_path"):
+            if database_path:
                 raise ConfigError("Can't specify 'database_path' with 'databases'")
 
             self.databases = [
@@ -138,13 +149,17 @@ class DatabaseConfig(Config):
                 for name, db_conf in multi_database_config.items()
             ]
 
-        else:
-            if database_config is None:
-                database_config = {"name": "sqlite3", "args": {}}
-
+        if database_config:
             self.databases = [DatabaseConnectionConfig("master", database_config)]
 
-            self.set_databasepath(config.get("database_path"))
+        if database_path:
+            if self.databases and self.databases[0].name != "sqlite3":
+                logger.warning(NON_SQLITE_DATABASE_PATH_WARNING)
+                return
+
+            database_config = {"name": "sqlite3", "args": {}}
+            self.databases = [DatabaseConnectionConfig("master", database_config)]
+            self.set_databasepath(database_path)
 
     def generate_config_section(self, data_dir_path, **kwargs):
         return DEFAULT_CONFIG % {
@@ -152,27 +167,37 @@ class DatabaseConfig(Config):
         }
 
     def read_arguments(self, args):
-        self.set_databasepath(args.database_path)
+        """
+        Cases for the cli input:
+          - If no databases are configured and no database_path is set, raise.
+          - No databases and only database_path available ==> sqlite3 db.
+          - If there are multiple databases and a database_path raise an error.
+          - If the database set in the config file is sqlite then
+            overwrite with the command line argument.
+        """
+
+        if args.database_path is None:
+            if not self.databases:
+                raise ConfigError("No database config provided")
+            return
+
+        if len(self.databases) == 0:
+            database_config = {"name": "sqlite3", "args": {}}
+            self.databases = [DatabaseConnectionConfig("master", database_config)]
+            self.set_databasepath(args.database_path)
+            return
+
+        if self.get_single_database().name == "sqlite3":
+            self.set_databasepath(args.database_path)
+        else:
+            logger.warning(NON_SQLITE_DATABASE_PATH_WARNING)
 
     def set_databasepath(self, database_path):
-        if database_path is None:
-            return
 
         if database_path != ":memory:":
             database_path = self.abspath(database_path)
 
-        # We only support setting a database path if we have a single sqlite3
-        # database.
-        if len(self.databases) != 1:
-            raise ConfigError("Cannot specify 'database_path' with multiple databases")
-
-        database = self.get_single_database()
-        if database.config["name"] != "sqlite3":
-            # We don't raise here as we haven't done so before for this case.
-            logger.warn("Ignoring 'database_path' for non-sqlite3 database")
-            return
-
-        database.config["args"]["database"] = database_path
+        self.databases[0].config["args"]["database"] = database_path
 
     @staticmethod
     def add_arguments(parser):
@@ -187,7 +212,7 @@ class DatabaseConfig(Config):
     def get_single_database(self) -> DatabaseConnectionConfig:
         """Returns the database if there is only one, useful for e.g. tests
         """
-        if len(self.databases) != 1:
+        if not self.databases:
             raise Exception("More than one database exists")
 
         return self.databases[0]
