@@ -1,1 +1,1 @@
-Allow custom SAML handlers to redirect after processing an auth response.
+Fix error page being shown when a custom SAML handler attempted to redirect when processing an auth response.
