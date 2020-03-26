@@ -190,6 +190,9 @@ class RoomKeysServlet(RestServlet):
         user_id = requester.user.to_string()
         version = parse_string(request, "version")
 
+        if not version:
+            raise SynapseError(400, "Missing version query parameter", errcode=Codes.MISSING_PARAM)
+
         room_keys = await self.e2e_room_keys_handler.get_room_keys(
             user_id, version, room_id, session_id
         )
