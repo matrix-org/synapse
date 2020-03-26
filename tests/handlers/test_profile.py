@@ -91,7 +91,7 @@ class ProfileTestCase(unittest.TestCase):
             "Frank Jr.",
         )
 
-        # Set second time displayname
+        # Set displayname again
         yield self.handler.set_displayname(
             self.frank, synapse.types.create_requester(self.frank), "Frank"
         )
@@ -104,14 +104,14 @@ class ProfileTestCase(unittest.TestCase):
     def test_set_my_name_if_disabled(self):
         self.hs.config.enable_set_displayname = False
 
-        # Set first time displayname is allowed, if displayname is null
+        # Setting displayname for the first time is allowed
         yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
 
         self.assertEquals(
             (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
         )
 
-        # Set second time displayname is forbidden
+        # Setting displayname a second time is forbidden
         d = self.handler.set_displayname(
             self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
         )
@@ -176,7 +176,7 @@ class ProfileTestCase(unittest.TestCase):
             "http://my.server/pic.gif",
         )
 
-        # Set second time avatar
+        # Set avatar again
         yield self.handler.set_avatar_url(
             self.frank,
             synapse.types.create_requester(self.frank),
@@ -192,7 +192,7 @@ class ProfileTestCase(unittest.TestCase):
     def test_set_my_avatar_if_disabled(self):
         self.hs.config.enable_set_avatar_url = False
 
-        # Set first time avatar is allowed, if avatar is null
+        # Setting displayname for the first time is allowed
         yield self.store.set_profile_avatar_url(
             self.frank.localpart, "http://my.server/me.png"
         )
@@ -202,7 +202,7 @@ class ProfileTestCase(unittest.TestCase):
             "http://my.server/me.png",
         )
 
-        # Set second time avatar is forbidden
+        # Set avatar a second time is forbidden
         d = self.handler.set_avatar_url(
             self.frank,
             synapse.types.create_requester(self.frank),

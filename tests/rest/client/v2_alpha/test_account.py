@@ -344,7 +344,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
             self.email_attempts.append(msg)
-            return
 
         config["email"] = {
             "enable_notifs": False,
@@ -372,7 +371,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.url_3pid = b"account/3pid"
 
     def test_add_email(self):
-        """Test add mail to profile
+        """Test adding an email to profile
         """
         client_secret = "foobar"
         session_id = self._request_token(self.email, client_secret)
@@ -411,7 +410,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.email, channel.json_body["threepids"][0]["address"])
 
     def test_add_email_if_disabled(self):
-        """Test add mail to profile if disabled
+        """Test adding email to profile when doing so is disallowed
         """
         self.hs.config.enable_3pid_changes = False
 
@@ -451,7 +450,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email(self):
-        """Test delete mail from profile
+        """Test deleting an email from profile
         """
         # Add a threepid
         self.get_success(
@@ -483,7 +482,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email_if_disabled(self):
-        """Test delete mail from profile if disabled
+        """Test deleting an email from profile when disallowed
         """
         self.hs.config.enable_3pid_changes = False
 
