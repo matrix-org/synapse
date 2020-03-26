@@ -1,0 +1,1 @@
+Allow custom SAML handlers to redirect after processing an auth response.
