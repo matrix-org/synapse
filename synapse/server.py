@@ -56,6 +56,7 @@ from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
+from synapse.handlers.cas_handler import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
@@ -198,6 +199,7 @@ class HomeServer(object):
         "sendmail",
         "registration_handler",
         "account_validity_handler",
+        "cas_handler",
         "saml_handler",
         "event_client_serializer",
         "password_policy_handler",
@@ -528,6 +530,9 @@ class HomeServer(object):
 
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
+
+    def build_cas_handler(self):
+        return CasHandler(self)
 
     def build_saml_handler(self):
         from synapse.handlers.saml_handler import SamlHandler
