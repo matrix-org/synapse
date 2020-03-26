@@ -26,6 +26,7 @@ from synapse.config import ConfigError
 from synapse.http.server import finish_request
 from synapse.http.servlet import parse_string
 from synapse.module_api import ModuleApi
+from synapse.module_api.errors import RedirectException
 from synapse.types import (
     UserID,
     map_username_to_mxid_localpart,
@@ -119,6 +120,9 @@ class SamlHandler:
 
         try:
             user_id = await self._map_saml_response_to_user(resp_bytes, relay_state)
+        except RedirectException:
+            # Raise the exception as per the wishes of the SAML module response
+            raise
         except Exception as e:
             # If decoding the response or mapping it to a user failed, then log the
             # error and tell the user that something went wrong.
