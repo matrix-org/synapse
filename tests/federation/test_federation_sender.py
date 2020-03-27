@@ -370,6 +370,43 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         devices = {edu["content"]["device_id"] for edu in self.edus}
         self.assertEqual({"D1", "D2", "D3"}, devices)
 
+    def test_prune_outbound_device_pokes(self):
+        """If a destination is unreachable, and the updates are pruned, we should get
+        a single update"""
+        mock_send_txn = self.hs.get_federation_transport_client().send_transaction
+        mock_send_txn.side_effect = lambda t, cb: defer.fail("fail")
+
+        # create devices
+        u1 = self.register_user("user", "pass")
+        self.login("user", "pass", device_id="D1")
+        self.login("user", "pass", device_id="D2")
+        self.login("user", "pass", device_id="D3")
+
+        # delete them again
+        self.get_success(
+            self.hs.get_device_handler().delete_devices(u1, ["D1", "D2", "D3"])
+        )
+
+        self.assertGreaterEqual(mock_send_txn.call_count, 4)
+
+        # run the prune job
+        self.reactor.advance(10)
+        self.get_success(
+            self.hs.get_datastore()._prune_old_outbound_device_pokes(prune_age=1)
+        )
+
+        # recover the server
+        mock_send_txn.side_effect = self.record_transaction
+        self.hs.get_federation_sender().send_device_messages("host2")
+        self.pump()
+
+        # there should be a single update for this user.
+        self.assertEqual(len(self.edus), 1)
+        edu = self.edus.pop(0)
+        self.assertEqual(edu["edu_type"], "m.device_list_update")
+        c = edu["content"]
+        self.assertEqual(c["prev_id"], [])
+
     def check_device_update_edu(
         self,
         edu: JsonDict,
