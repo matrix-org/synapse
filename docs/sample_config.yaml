@@ -1393,10 +1393,10 @@ sso:
     # hostname: "https://my.client/".
     #
     # If public_baseurl is set, then the login fallback page (used by clients
-    # that don't have full support for SSO) is always included in this list.
+    # that don't natively support the required login flows) is whitelisted in
+    # addition to any URLs in this list.
     #
-    # By default, this list is empty, except if public_baseurl is set (in which
-    # case the login fallback page is the only element in the list).
+    # By default, this list is empty.
     #
     #client_whitelist:
     #  - https://riot.im/develop
