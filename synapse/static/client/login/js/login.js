@@ -61,7 +61,7 @@ var show_login = function(inhibit_redirect) {
             return;
         }
 
-        // Otherwise, show the SSO form the form
+        // Otherwise, show the SSO form
         $("#sso_form").show();
     }
 
