@@ -12,14 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sqlite3
 import struct
 import threading
+import typing
 
 from synapse.storage.engines import BaseDatabaseEngine
 
+if typing.TYPE_CHECKING:
+    import sqlite3  # noqa: F401
 
-class Sqlite3Engine(BaseDatabaseEngine[sqlite3.Connection]):
+
+class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def __init__(self, database_module, database_config):
         super().__init__(database_module, database_config)
 
