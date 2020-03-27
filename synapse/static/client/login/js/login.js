@@ -52,23 +52,19 @@ var show_login = function() {
     var this_page = window.location.origin + window.location.pathname;
     $("#sso_redirect_url").val(this_page);
 
-    if (matrixLogin.serverAcceptsCas) {
-        $("#sso_form").attr("action", "/_matrix/client/r0/login/cas/redirect");
-    }
-
-    if ((matrixLogin.serverAcceptsSso || matrixLogin.serverAcceptsCas)) {
-        if (try_token()) {
-            // Only show the SSO form if there's a login token in the query. That's
-            // because, if there is a token, and this function is run, it means an error
-            // happened, and in this case it's nicer to show the form with an error
-            // rather than redirect immediately to the SSO portal.
+    if (matrixLogin.serverAcceptsSso) {
+        if (try_token() || matrixLogin.serverAcceptsPassword) {
+            // Show the SSO form if there's a login token in the query. That's because,
+            // if there is a token, and this function is run, it means an error happened,
+            // and in this case it's nicer to show the form with an error rather than
+            // redirect immediately to the SSO portal.
+            // Also show the form if the server is accepting password login as well.
             $("#sso_form").show();
         } else {
             // Submit the SSO form instead of displaying it. The reason behind this
             // behaviour is that the user will likely arrive here after clicking on a
-            // button, in the client, with a label such as "Continue with SSO". And even
-            // if that's not the case, it kind of makes sense to direct the user directly
-            // to the SSO portal and skip the password login form.
+            // button, in the client, with a label such as "Continue with SSO", so
+            // clicking on another button with the same semantics is a bit pointless.
             $("#sso_form").submit();
             return;
         }
