@@ -297,6 +297,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             c = edu["content"]
             if stream_id is not None:
                 self.assertEqual(c["prev_id"], [stream_id])
+                self.assertGreaterEqual(c["stream_id"], stream_id)
             stream_id = c["stream_id"]
         devices = {edu["content"]["device_id"] for edu in self.edus}
         self.assertEqual({"D1", "D2"}, devices)
@@ -330,6 +331,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
                 c.items(),
                 {"user_id": u1, "prev_id": [stream_id], "deleted": True}.items(),
             )
+            self.assertGreaterEqual(c["stream_id"], stream_id)
             stream_id = c["stream_id"]
         devices = {edu["content"]["device_id"] for edu in self.edus}
         self.assertEqual({"D1", "D2", "D3"}, devices)
@@ -366,6 +368,8 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
             self.assertEqual(edu["edu_type"], "m.device_list_update")
             c = edu["content"]
             self.assertEqual(c["prev_id"], [stream_id] if stream_id is not None else [])
+            if stream_id is not None:
+                self.assertGreaterEqual(c["stream_id"], stream_id)
             stream_id = c["stream_id"]
         devices = {edu["content"]["device_id"] for edu in self.edus}
         self.assertEqual({"D1", "D2", "D3"}, devices)
@@ -390,6 +394,8 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
         }
 
         self.assertLessEqual(expected.items(), content.items())
+        if prev_stream_id is not None:
+            self.assertGreaterEqual(content["stream_id"], prev_stream_id)
         return content["stream_id"]
 
     def check_signing_key_update_txn(self, txn: JsonDict,) -> None:
