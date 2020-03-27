@@ -1045,11 +1045,7 @@ class AuthHandler(BaseHandler):
         return self._sso_auth_confirm_template.render(redirect_url=redirect_url,)
 
     def complete_sso_ui_auth(
-        self,
-        registered_user_id: str,
-        session_id: str,
-        request: SynapseRequest,
-        requester: Requester,
+        self, registered_user_id: str, session_id: str, request: SynapseRequest,
     ):
         """Having figured out a mxid for this user, complete the HTTP request
 
@@ -1059,18 +1055,15 @@ class AuthHandler(BaseHandler):
             client_redirect_url: The URL to which to redirect the user at the end of the
                 process.
         """
-        # If the user ID of the SAML session does not match the user from the
-        # request, something went wrong.
-        if registered_user_id != requester.user.to_string():
-            raise SynapseError(403, "SAML user does not match requester.")
-
         # Mark the stage of the authentication as successful.
         sess = self._get_session_info(session_id)
         if "creds" not in sess:
             sess["creds"] = {}
         creds = sess["creds"]
 
-        creds[LoginType.SSO] = True
+        # Save the user who authenticated with SSO, this will be used to ensure
+        # that the account be modified is also the person who logged in.
+        creds[LoginType.SSO] = registered_user_id
         self._save_session(sess)
 
         # Render the HTML and return.
