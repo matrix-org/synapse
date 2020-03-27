@@ -350,14 +350,7 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
     def test_cas_redirect_whitelisted(self):
         """Tests that the SSO login flow serves a redirect to a whitelisted url
         """
-        self._test_redirect("https://legit-site.com/")
-
-    @override_config({"public_baseurl": "https://example.com"})
-    def test_cas_redirect_login_fallback(self):
-        self._test_redirect("https://example.com/_matrix/static/client/login")
-
-    def _test_redirect(self, redirect_url):
-        """Tests that the SSO login flow serves a redirect for the given redirect URL."""
+        redirect_url = "https://legit-site.com/"
         cas_ticket_url = (
             "/_matrix/client/r0/login/cas/ticket?redirectUrl=%s&ticket=ticket"
             % (urllib.parse.quote(redirect_url))
