@@ -131,9 +131,14 @@ class AuthHandler(BaseHandler):
                 for t in provider.get_supported_login_types().keys():
                     if t not in login_types:
                         login_types.append(t)
-        if self._saml2_enabled:
-            login_types.append(LoginType.SSO)
         self._supported_login_types = login_types
+        # Login types and UI Auth types have a heavy overlap, but are not
+        # necessarily identical. Login types have SSO (and other login types)
+        # added in the rest layer, see synapse.rest.client.v1.login.LoginRestServerlet.on_GET.
+        ui_auth_types = login_types.copy()
+        if self._saml2_enabled:
+            ui_auth_types.append(LoginType.SSO)
+        self._supported_ui_auth_types = ui_auth_types
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -214,7 +219,7 @@ class AuthHandler(BaseHandler):
         )
 
         # build a list of supported flows
-        flows = [[login_type] for login_type in self._supported_login_types]
+        flows = [[login_type] for login_type in self._supported_ui_auth_types]
 
         try:
             result, params, _ = yield self.check_auth(
@@ -232,7 +237,7 @@ class AuthHandler(BaseHandler):
             raise
 
         # find the completed login type
-        for login_type in self._supported_login_types:
+        for login_type in self._supported_ui_auth_types:
             if login_type not in result:
                 continue
 
