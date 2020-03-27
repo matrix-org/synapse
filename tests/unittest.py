@@ -490,6 +490,7 @@ class HomeserverTestCase(TestCase):
                 "password": password,
                 "admin": admin,
                 "mac": want_mac,
+                "inhibit_login": True,
             }
         )
         request, channel = self.make_request(
