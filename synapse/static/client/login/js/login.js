@@ -33,7 +33,7 @@ var submitToken = function(loginToken) {
 };
 
 var errorFunc = function(err) {
-    show_login();
+    show_login(true);
 
     if (err.responseJSON && err.responseJSON.error) {
         setFeedbackString(err.responseJSON.error + " (" + err.responseJSON.errcode + ")");
@@ -47,31 +47,23 @@ var setFeedbackString = function(text) {
     $("#feedback").text(text);
 };
 
-var show_login = function() {
+var show_login = function(inhibit_redirect) {
     var this_page = window.location.origin + window.location.pathname;
     $("#sso_redirect_url").val(this_page);
 
+    // If inhibit_redirect is false, and SSO is the only supported login method, we can
+    // redirect straight to the SSO page
     if (matrixLogin.serverAcceptsSso) {
-        if (try_token() || matrixLogin.serverAcceptsPassword) {
-            // Show the SSO form if there's a login token in the query. That's because,
-            // if there is a token, and this function is run, it means an error happened,
-            // and in this case it's nicer to show the form with an error rather than
-            // redirect immediately to the SSO portal.
-            // Also show the form if the server is accepting password login as well.
-            $("#sso_form").show();
-        } else {
-            // Submit the SSO form instead of displaying it. The reason behind this
-            // behaviour is that the user will likely arrive here after clicking on a
-            // button, in the client, with a label such as "Continue with SSO", so
-            // clicking on another button with the same semantics is a bit pointless.
+        if (!inhibit_redirect && !matrixLogin.serverAcceptsPassword) {
             $("#sso_form").submit();
             return;
         }
+
+        // Otherwise, show the SSO form the form
+        $("#sso_form").show();
     }
 
     set_title(title_pre_auth);
-
-    $("#loading").hide();
 
     if (matrixLogin.serverAcceptsPassword) {
         $("#password_flow").show();
@@ -80,6 +72,8 @@ var show_login = function() {
     if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
+
+    $("#loading").hide();
 };
 
 var show_spinner = function() {
@@ -115,7 +109,7 @@ var fetch_info = function(cb) {
 matrixLogin.onLoad = function() {
     fetch_info(function() {
         if (!try_token()) {
-            show_login();
+            show_login(false);
         }
     });
 };
