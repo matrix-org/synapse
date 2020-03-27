@@ -33,6 +33,8 @@ var submitToken = function(loginToken) {
 };
 
 var errorFunc = function(err) {
+    // We want to show the error to the user rather than redirecting immediately to the
+    // SSO portal (if SSO is the only login option), so we inhibit the redirect.
     show_login(true);
 
     if (err.responseJSON && err.responseJSON.error) {
@@ -63,8 +65,6 @@ var show_login = function(inhibit_redirect) {
         $("#sso_form").show();
     }
 
-    set_title(title_pre_auth);
-
     if (matrixLogin.serverAcceptsPassword) {
         $("#password_flow").show();
     }
@@ -72,6 +72,8 @@ var show_login = function(inhibit_redirect) {
     if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
+
+    set_title(title_pre_auth);
 
     $("#loading").hide();
 };
