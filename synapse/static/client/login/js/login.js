@@ -5,10 +5,12 @@ window.matrixLogin = {
     serverAcceptsSso: false,
 };
 
-var title_pre_auth = "Log in with one of the following methods"
+var title_pre_auth = "Log in with one of the following methods";
+var title_post_auth = "Logging in...";
 
 var submitPassword = function(user, pwd) {
     console.log("Logging in with password...");
+    set_title(title_post_auth);
     var data = {
         type: "m.login.password",
         user: user,
@@ -21,6 +23,7 @@ var submitPassword = function(user, pwd) {
 
 var submitToken = function(loginToken) {
     console.log("Logging in with login token...");
+    set_title(title_post_auth);
     var data = {
         type: "m.login.token",
         token: loginToken
@@ -92,7 +95,7 @@ var show_spinner = function() {
 };
 
 var set_title = function(title) {
-    $("#title").innerText = title;
+    $("#title").text(title);
 };
 
 var fetch_info = function(cb) {
