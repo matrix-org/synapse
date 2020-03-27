@@ -1139,13 +1139,14 @@ class SyncHandler(object):
             # room with by looking at all users that have left a room plus users
             # that were in a room we've left.
 
-            users_who_share_room = await self.store.get_users_who_share_room_with_user(
+            users_we_track = await self.store.get_users_who_share_room_with_user(
                 user_id
             )
+            users_we_track.add(user_id)
 
             # Step 1a, check for changes in devices of users we share a room with
             users_that_have_changed = await self.store.get_users_whose_devices_changed(
-                since_token.device_list_key, users_who_share_room
+                since_token.device_list_key, users_we_track
             )
 
             # Step 1b, check for newly joined rooms
@@ -1168,7 +1169,7 @@ class SyncHandler(object):
                 newly_left_users.update(left_users)
 
             # Remove any users that we still share a room with.
-            newly_left_users -= users_who_share_room
+            newly_left_users -= users_we_track
 
             return DeviceLists(changed=users_that_have_changed, left=newly_left_users)
         else:
