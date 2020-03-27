@@ -1,7 +1,6 @@
 window.matrixLogin = {
     endpoint: location.origin + "/_matrix/client/r0/login",
     serverAcceptsPassword: false,
-    serverAcceptsCas: false,
     serverAcceptsSso: false,
 };
 
@@ -78,7 +77,7 @@ var show_login = function() {
         $("#password_flow").show();
     }
 
-    if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsCas && !matrixLogin.serverAcceptsSso) {
+    if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
 };
@@ -97,13 +96,8 @@ var set_title = function(title) {
 var fetch_info = function(cb) {
     $.get(matrixLogin.endpoint, function(response) {
         var serverAcceptsPassword = false;
-        var serverAcceptsCas = false;
         for (var i=0; i<response.flows.length; i++) {
             var flow = response.flows[i];
-            if ("m.login.cas" === flow.type) {
-                matrixLogin.serverAcceptsCas = true;
-                console.log("Server accepts CAS");
-            }
             if ("m.login.sso" === flow.type) {
                 matrixLogin.serverAcceptsSso = true;
                 console.log("Server accepts SSO");
