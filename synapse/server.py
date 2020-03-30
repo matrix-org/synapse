@@ -103,6 +103,7 @@ from synapse.storage import DataStores, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +231,8 @@ class HomeServer(object):
         self._listening_services = []
         self.start_time = None
 
+        self.instance_id = random_string(5)
+
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
@@ -241,6 +244,14 @@ class HomeServer(object):
         # Other kwargs are explicit dependencies
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
+
+    def get_instance_id(self):
+        """A unique ID for this synapse process instance.
+
+        This is used to distinguish running instances in worker-based
+        deployments.
+        """
+        return self.instance_id
 
     def setup(self):
         logger.info("Setting up.")
