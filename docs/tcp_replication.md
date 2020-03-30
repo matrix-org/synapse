@@ -202,6 +202,8 @@ Asks the server for the current position of all streams.
 
    The server should clear all associated user sync data from the worker.
 
+   This is used when a worker is shutting down.
+
 #### FEDERATION_ACK (C)
 
    Acknowledge receipt of some federation data

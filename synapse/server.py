@@ -243,6 +243,9 @@ class HomeServer(object):
 
     def get_instance_id(self):
         """A unique ID for this synapse process instance.
+
+        This is used to distinguish running instances in worker-based
+        deployments.
         """
         return self.instance_id
 
