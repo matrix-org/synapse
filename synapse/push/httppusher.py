@@ -375,6 +375,7 @@ class HttpPusher(object):
         if not notification_dict:
             return []
         try:
+            logger.info("SENDING PUSH EVENT to %s: %s", self.url, notification_dict)
             resp = yield self.http_client.post_json_get_json(
                 self.url, notification_dict
             )
