@@ -1144,6 +1144,8 @@ class SyncHandler(object):
             )
 
             tracked_users = set(users_who_share_room)
+
+            # Always tell the user about their own devices
             tracked_users.add(user_id)
 
             # Step 1a, check for changes in devices of users we share a room with

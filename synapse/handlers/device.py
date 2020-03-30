@@ -127,7 +127,8 @@ class DeviceWorkerHandler(BaseHandler):
         )
 
         tracked_users = set(users_who_share_room)
-        # always tell the user about their own devices
+
+        # Always tell the user about their own devices
         tracked_users.add(user_id)
 
         changed = yield self.store.get_users_whose_devices_changed(
