@@ -163,12 +163,13 @@ class DirectoryStore(DirectoryWorkerStore):
     def update_aliases_for_room(
         self, old_room_id: str, new_room_id: str, creator: Optional[str] = None,
     ):
-        """Repoint the aliases from one room to another
+        """Repoint all of the aliases for a given room, to a different room.
 
         Args:
             old_room_id:
             new_room_id:
-            creator: The creator of the alias mapping. If None, don't update
+            creator: The user to record as the creator of the new mapping. 
+                If None, the creator will be left unchanged.
         """
 
         def _update_aliases_for_room_txn(txn):
