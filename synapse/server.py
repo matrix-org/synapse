@@ -235,6 +235,7 @@ class HomeServer(object):
         self.start_time = None
 
         self.instance_id = random_string(5)
+        self.instance_name = config.worker_name or "master"
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
@@ -255,6 +256,14 @@ class HomeServer(object):
         deployments.
         """
         return self.instance_id
+
+    def get_instance_name(self) -> str:
+        """A unique name for this synapse process.
+
+        Used to identify the process over replication and in config. Does not
+        change over restarts.
+        """
+        return self.instance_name
 
     def setup(self):
         logger.info("Setting up.")

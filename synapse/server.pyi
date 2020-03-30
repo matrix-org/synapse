@@ -121,3 +121,5 @@ class HomeServer(object):
         pass
     def get_instance_id(self) -> str:
         pass
+    def get_instance_name(self) -> str:
+        pass
