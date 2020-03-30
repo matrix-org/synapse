@@ -168,7 +168,7 @@ class DirectoryStore(DirectoryWorkerStore):
         Args:
             old_room_id:
             new_room_id:
-            creator: The user to record as the creator of the new mapping. 
+            creator: The user to record as the creator of the new mapping.
                 If None, the creator will be left unchanged.
         """
 
