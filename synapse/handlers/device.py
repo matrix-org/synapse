@@ -122,7 +122,9 @@ class DeviceWorkerHandler(BaseHandler):
 
         # First we check if any devices have changed for users that we share
         # rooms with.
-        tracked_users = yield self.store.get_users_who_share_room_with_user(user_id)
+        users_who_share_room = yield self.store.get_users_who_share_room_with_user(user_id)
+
+        tracked_users = set(users_who_share_room)
         # always tell the user about their own devices
         tracked_users.add(user_id)
 
@@ -217,8 +219,8 @@ class DeviceWorkerHandler(BaseHandler):
         if possibly_changed or possibly_left:
             # Take the intersection of the users whose devices may have changed
             # and those that actually still share a room with the user
-            possibly_joined = possibly_changed & tracked_users
-            possibly_left = (possibly_changed | possibly_left) - tracked_users
+            possibly_joined = possibly_changed & users_who_share_room
+            possibly_left = (possibly_changed | possibly_left) - users_who_share_room
         else:
             possibly_joined = []
             possibly_left = []
