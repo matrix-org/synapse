@@ -126,7 +126,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         if not check_3pid_valid_format("email", email):
             raise SynapseError(
                 400,
-                "Third party identifier has not a valid format",
+                "Third party identifier has an invalid format",
                 Codes.INVALID_THREEPID,
             )
 
@@ -200,7 +200,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         if not check_3pid_valid_format("msisdn", msisdn):
             raise SynapseError(
                 400,
-                "Third party identifier has not a valid format",
+                "Third party identifier has an invalid format",
                 Codes.INVALID_THREEPID,
             )
 
@@ -531,7 +531,7 @@ class RegisterRestServlet(RestServlet):
                     if not check_3pid_valid_format(medium, address):
                         raise SynapseError(
                             400,
-                            "Third party identifier has not a valid format",
+                            "Third party identifier has an invalid format",
                             Codes.INVALID_THREEPID,
                         )
 

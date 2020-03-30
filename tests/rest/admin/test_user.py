@@ -22,6 +22,7 @@ from mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
+from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login
 
 from tests import unittest
@@ -624,7 +625,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Threepid is already in use", channel.json_body["error"])
+        self.assertEqual(Codes.THREEPID_IN_USE, channel.json_body["errcode"])
 
     def test_set_invalid_threepid(self):
         """
@@ -644,9 +645,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(
-            "Third party identifier has not a valid format", channel.json_body["error"]
-        )
+        self.assertEqual(Codes.INVALID_THREEPID, channel.json_body["errcode"])
 
     def test_set_not_allowed_threepid(self):
         """
@@ -671,9 +670,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(
-            "Your email domain or account phone number is not authorized on this server",
-            channel.json_body["error"],
+        self.assertEqual(Codes.THREEPID_DENIED, channel.json_body["errcode"],
         )
 
     def test_deactivate_user(self):

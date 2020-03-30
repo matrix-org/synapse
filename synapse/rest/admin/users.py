@@ -203,7 +203,7 @@ class UserRestServletV2(RestServlet):
                     if not check_3pid_valid_format(threepid["medium"], address):
                         raise SynapseError(
                             400,
-                            "Third party identifier has not a valid format",
+                            "Third party identifier has an invalid format",
                             Codes.INVALID_THREEPID,
                         )
 
@@ -306,7 +306,7 @@ class UserRestServletV2(RestServlet):
                     if not check_3pid_valid_format(threepid["medium"], address):
                         raise SynapseError(
                             400,
-                            "Third party identifier has not a valid format",
+                            "Third party identifier has an invalid format",
                             Codes.INVALID_THREEPID,
                         )
 
