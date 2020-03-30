@@ -11,7 +11,7 @@ TURN server.
 
 The following sections describe how to install [coturn](<https://github.com/coturn/coturn>) (which implements the TURN REST API) and integrate it with synapse.
 
-## requirements
+## Requirements
 
 For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
 
