@@ -426,7 +426,7 @@ class FederationSenderDevicesTestCases(HomeserverTestCase):
 
         # expect the update EDU
         self.assertEqual(len(self.edus), 1)
-        stream_id = self.check_device_update_edu(self.edus.pop(0), u1, "D1", None)
+        self.check_device_update_edu(self.edus.pop(0), u1, "D1", None)
 
         # now the server goes offline
         mock_send_txn = self.hs.get_federation_transport_client().send_transaction
