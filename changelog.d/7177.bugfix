@@ -1,0 +1,1 @@
+Mitigation for a bug in `_get_e2e_device_keys_txn` which broke federation for some servers.
