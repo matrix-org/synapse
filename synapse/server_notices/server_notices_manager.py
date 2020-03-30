@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
 
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
-from synapse.types import create_requester
+from synapse.types import create_requester, UserID
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
@@ -36,10 +37,12 @@ class ServerNoticesManager(object):
         self._store = hs.get_datastore()
         self._config = hs.config
         self._room_creation_handler = hs.get_room_creation_handler()
+        self._room_member_handler = hs.get_room_member_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
         self._is_mine_id = hs.is_mine_id
 
         self._notifier = hs.get_notifier()
+        self.server_notices_mxid = self._config.server_notices_mxid
 
     def is_enabled(self):
         """Checks if server notices are enabled on this server.
@@ -66,7 +69,8 @@ class ServerNoticesManager(object):
         Returns:
             Deferred[FrozenEvent]
         """
-        room_id = yield self.get_notice_room_for_user(user_id)
+        room_id = yield self.get_or_create_notice_room_for_user(user_id)
+        yield self.invite_user_in_notice_room(user_id, room_id)
 
         system_mxid = self._config.server_notices_mxid
         requester = create_requester(system_mxid)
@@ -89,7 +93,7 @@ class ServerNoticesManager(object):
         return res
 
     @cachedInlineCallbacks()
-    def get_notice_room_for_user(self, user_id):
+    def get_or_create_notice_room_for_user(self, user_id):
         """Get the room for notices for a given user
 
         If we have not yet created a notice room for this user, create it
@@ -105,22 +109,9 @@ class ServerNoticesManager(object):
 
         assert self._is_mine_id(user_id), "Cannot send server notices to remote users"
 
-        rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
-            user_id, [Membership.INVITE, Membership.JOIN]
-        )
-        system_mxid = self._config.server_notices_mxid
-        for room in rooms:
-            # it's worth noting that there is an asymmetry here in that we
-            # expect the user to be invited or joined, but the system user must
-            # be joined. This is kinda deliberate, in that if somebody somehow
-            # manages to invite the system user to a room, that doesn't make it
-            # the server notices room.
-            user_ids = yield self._store.get_users_in_room(room.room_id)
-            if system_mxid in user_ids:
-                # we found a room which our user shares with the system notice
-                # user
-                logger.info("Using room %s", room.room_id)
-                return room.room_id
+        existing_room_id = yield self._get_existing_notice_room_for_user(user_id)
+        if existing_room_id:
+            return existing_room_id
 
         # apparently no existing notice room: create a new one
         logger.info("Creating server notices room for %s", user_id)
@@ -138,14 +129,13 @@ class ServerNoticesManager(object):
                 "avatar_url": self._config.server_notices_mxid_avatar_url,
             }
 
-        requester = create_requester(system_mxid)
+        requester = create_requester(self.server_notices_mxid)
         info = yield self._room_creation_handler.create_room(
             requester,
             config={
                 "preset": RoomCreationPreset.PRIVATE_CHAT,
                 "name": self._config.server_notices_room_name,
                 "power_level_content_override": {"users_default": -10},
-                "invite": (user_id,),
             },
             ratelimit=False,
             creator_join_profile=join_profile,
@@ -159,3 +149,56 @@ class ServerNoticesManager(object):
 
         logger.info("Created server notices room %s for %s", room_id, user_id)
         return room_id
+
+    @defer.inlineCallbacks
+    def _get_existing_notice_room_for_user(
+        self, user_id: str,
+    ) -> defer.Deferred[Optional[str]]:
+        """Retrieve the ID for the existing notice room for the given user ID if it
+        exists.
+
+        Returns:
+            The ID of the notice room, None if no room exist for this user.
+        """
+        room_id = None
+
+        rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
+            user_id, [Membership.INVITE, Membership.JOIN]
+        )
+        for room in rooms:
+            # it's worth noting that there is an asymmetry here in that we
+            # expect the user to be invited or joined, but the system user must
+            # be joined. This is kinda deliberate, in that if somebody somehow
+            # manages to invite the system user to a room, that doesn't make it
+            # the server notices room.
+            user_ids = yield self._store.get_users_in_room(room.room_id)
+            if self.server_notices_mxid in user_ids:
+                # we found a room which our user shares with the system notice
+                # user
+                logger.info("Using room %s", room.room_id)
+                room_id = room.room_id
+
+        return room_id
+
+    @defer.inlineCallbacks
+    def invite_user_in_notice_room(self, user_id: str, room_id: str):
+        """Invite the given user to the given server notices room.
+
+        Args:
+            user_id: The ID of the user to invite.
+            room_id: The ID of the room to invite the user to.
+        """
+        requester = create_requester(self.server_notices_mxid)
+
+        # Make sure a notice room doesn't already exist for this user, otherwise the auth
+        # checks will make the current request (i.e. sync) fail.
+        existing_room_id = yield self._get_existing_notice_room_for_user(user_id)
+        if existing_room_id:
+            return
+
+        yield self._room_member_handler.update_membership(
+            requester=requester,
+            target=UserID.from_string(user_id),
+            room_id=room_id,
+            action="invite",
+        )
