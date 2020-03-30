@@ -125,8 +125,14 @@ class DeviceWorkerHandler(BaseHandler):
         users_who_share_room = yield self.store.get_users_who_share_room_with_user(
             user_id
         )
+
+        tracked_users = set(users_who_share_room)
+
+        # Always tell the user about their own devices
+        tracked_users.add(user_id)
+
         changed = yield self.store.get_users_whose_devices_changed(
-            from_token.device_list_key, users_who_share_room
+            from_token.device_list_key, tracked_users
         )
 
         # Then work out if any users have since joined
@@ -456,7 +462,11 @@ class DeviceHandler(DeviceWorkerHandler):
 
         room_ids = yield self.store.get_rooms_for_user(user_id)
 
-        yield self.notifier.on_new_event("device_list_key", position, rooms=room_ids)
+        # specify the user ID too since the user should always get their own device list
+        # updates, even if they aren't in any rooms.
+        yield self.notifier.on_new_event(
+            "device_list_key", position, users=[user_id], rooms=room_ids
+        )
 
         if hosts:
             logger.info(

@@ -1,0 +1,1 @@
+Refactored the CAS authentication logic to a separate class.

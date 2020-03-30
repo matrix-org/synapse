@@ -65,6 +65,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
@@ -124,7 +125,6 @@ from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
-from synapse.util.stringutils import random_string
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.generic_worker")
@@ -233,6 +233,7 @@ class GenericWorkerPresence(object):
         self.user_to_num_current_syncs = {}
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
+        self.instance_id = hs.get_instance_id()
 
         active_presence = self.store.take_presence_startup_info()
         self.user_to_current_state = {state.user_id: state for state in active_presence}
@@ -245,13 +246,24 @@ class GenericWorkerPresence(object):
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
 
-        self.process_id = random_string(16)
-        logger.info("Presence process_id is %r", self.process_id)
+        hs.get_reactor().addSystemEventTrigger(
+            "before",
+            "shutdown",
+            run_as_background_process,
+            "generic_presence.on_shutdown",
+            self._on_shutdown,
+        )
+
+    def _on_shutdown(self):
+        if self.hs.config.use_presence:
+            self.hs.get_tcp_replication().send_command(
+                ClearUserSyncsCommand(self.instance_id)
+            )
 
     def send_user_sync(self, user_id, is_syncing, last_sync_ms):
         if self.hs.config.use_presence:
             self.hs.get_tcp_replication().send_user_sync(
-                user_id, is_syncing, last_sync_ms
+                self.instance_id, user_id, is_syncing, last_sync_ms
             )
 
     def mark_as_coming_online(self, user_id):
@@ -400,6 +412,9 @@ class GenericWorkerTyping(object):
         for row in rows:
             self._room_serials[row.room_id] = token
             self._room_typing[row.room_id] = row.user_ids
+
+    def get_current_token(self) -> int:
+        return self._latest_room_serial
 
 
 class GenericWorkerSlavedStore(
@@ -875,6 +890,9 @@ def start(config_options):
 
         # Force the appservice to start since they will be disabled in the main config
         config.notify_appservices = True
+    else:
+        # For other worker types we force this to off.
+        config.notify_appservices = False
 
     if config.worker_app == "synapse.app.pusher":
         if config.start_pushers:
@@ -888,6 +906,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.start_pushers = True
+    else:
+        # For other worker types we force this to off.
+        config.start_pushers = False
 
     if config.worker_app == "synapse.app.user_dir":
         if config.update_user_directory:
@@ -901,6 +922,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.update_user_directory = True
+    else:
+        # For other worker types we force this to off.
+        config.update_user_directory = False
 
     if config.worker_app == "synapse.app.federation_sender":
         if config.send_federation:
@@ -914,6 +938,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.send_federation = True
+    else:
+        # For other worker types we force this to off.
+        config.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

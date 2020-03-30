@@ -19,7 +19,7 @@ from six.moves import range
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import LoggingContext, current_context
 from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 
@@ -54,11 +54,11 @@ class LinearizerTestCase(unittest.TestCase):
         def func(i, sleep=False):
             with LoggingContext("func(%s)" % i) as lc:
                 with (yield linearizer.queue("")):
-                    self.assertEqual(LoggingContext.current_context(), lc)
+                    self.assertEqual(current_context(), lc)
                     if sleep:
                         yield Clock(reactor).sleep(0)
 
-                self.assertEqual(LoggingContext.current_context(), lc)
+                self.assertEqual(current_context(), lc)
 
         func(0, sleep=True)
         for i in range(1, 100):
