@@ -412,12 +412,6 @@ class GenericWorkerTyping(object):
         # map room IDs to sets of users currently typing
         self._room_typing = {}
 
-    def stream_positions(self):
-        # We must update this typing token from the response of the previous
-        # sync. In particular, the stream id may "reset" back to zero/a low
-        # value which we *must* use for the next replication request.
-        return {"typing": self._latest_room_serial}
-
     def process_replication_rows(self, token, rows):
         if self._latest_room_serial > token:
             # The master has gone backwards. To prevent inconsistent data, just
@@ -656,13 +650,6 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
         )
         await self.process_and_notify(stream_name, token, rows)
 
-    def get_streams_to_replicate(self):
-        args = super(GenericWorkerReplicationHandler, self).get_streams_to_replicate()
-        args.update(self.typing_handler.stream_positions())
-        if self.send_handler:
-            args.update(self.send_handler.stream_positions())
-        return args
-
     async def process_and_notify(self, stream_name, token, rows):
         try:
             if self.send_handler:
@@ -796,9 +783,6 @@ class FederationSenderHandler(object):
 
     def wake_destination(self, server: str):
         self.federation_sender.wake_destination(server)
-
-    def stream_positions(self):
-        return {"federation": self.federation_position}
 
     async def process_replication_rows(self, stream_name, token, rows):
         # The federation stream contains things that we want to send out, e.g.
