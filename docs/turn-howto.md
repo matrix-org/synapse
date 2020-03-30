@@ -15,7 +15,8 @@ The following sections describe how to install [coturn](<https://github.com/cotu
 
 For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
 
-Hosting TURN behind a NAT (even with appropriate pirt forwarding) is known to cause issues and often not work.
+Hosting TURN behind a NAT (even with appropriate port forwarding) is known to cause issues
+and to often not work.
 
 ## `coturn` Setup
 
