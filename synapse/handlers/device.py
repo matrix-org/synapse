@@ -122,7 +122,9 @@ class DeviceWorkerHandler(BaseHandler):
 
         # First we check if any devices have changed for users that we share
         # rooms with.
-        users_who_share_room = yield self.store.get_users_who_share_room_with_user(user_id)
+        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+            user_id
+        )
 
         tracked_users = set(users_who_share_room)
         # always tell the user about their own devices
