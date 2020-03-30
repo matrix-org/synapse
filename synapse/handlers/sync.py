@@ -1143,9 +1143,14 @@ class SyncHandler(object):
                 user_id
             )
 
+            tracked_users = set(users_who_share_room)
+
+            # Always tell the user about their own devices
+            tracked_users.add(user_id)
+
             # Step 1a, check for changes in devices of users we share a room with
             users_that_have_changed = await self.store.get_users_whose_devices_changed(
-                since_token.device_list_key, users_who_share_room
+                since_token.device_list_key, tracked_users
             )
 
             # Step 1b, check for newly joined rooms
