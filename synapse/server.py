@@ -583,24 +583,22 @@ def _make_dependency_method(depname):
         try:
             builder = getattr(hs, "build_%s" % (depname))
         except AttributeError:
-            builder = None
+            raise NotImplementedError(
+                "%s has no %s nor a builder for it" % (type(hs).__name__, depname)
+            )
 
-        if builder:
-            # Prevent cyclic dependencies from deadlocking
-            if depname in hs._building:
-                raise ValueError("Cyclic dependency while building %s" % (depname,))
-            hs._building[depname] = 1
+        # Prevent cyclic dependencies from deadlocking
+        if depname in hs._building:
+            raise ValueError("Cyclic dependency while building %s" % (depname,))
 
+        hs._building[depname] = 1
+        try:
             dep = builder()
             setattr(hs, depname, dep)
-
+        finally:
             del hs._building[depname]
 
-            return dep
-
-        raise NotImplementedError(
-            "%s has no %s nor a builder for it" % (type(hs).__name__, depname)
-        )
+        return dep
 
     setattr(HomeServer, "get_%s" % (depname), _get)
 
