@@ -195,7 +195,7 @@ class SynapseRequest(Request):
 
         if self.logcontext is None:
             logger.info(
-                "Connection from %s lost before request headears were read", self.client
+                "Connection from %s lost before request headers were read", self.client
             )
             return
 
