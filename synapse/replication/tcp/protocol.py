@@ -69,12 +69,8 @@ from synapse.replication.tcp.commands import (
     ErrorCommand,
     NameCommand,
     PingCommand,
-    PositionCommand,
-    RdataCommand,
-    RemoteServerUpCommand,
     ReplicateCommand,
     ServerCommand,
-    SyncCommand,
     UserSyncCommand,
 )
 from synapse.types import Collection
@@ -134,8 +130,9 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
     max_line_buffer = 10000
 
-    def __init__(self, clock):
+    def __init__(self, clock, handler):
         self.clock = clock
+        self.handler = handler
 
         self.last_received_command = self.clock.time_msec()
         self.last_sent_command = 0
@@ -174,6 +171,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         # Always send the initial PING so that the other side knows that they
         # can time us out.
         self.send_command(PingCommand(self.clock.time_msec()))
+
+        self.handler.new_connection(self)
 
     def send_ping(self):
         """Periodically sends a ping and checks if we should close the connection
@@ -248,8 +247,23 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         Args:
             cmd: received command
         """
-        handler = getattr(self, "on_%s" % (cmd.NAME,))
-        await handler(cmd)
+        handled = False
+
+        # First call any command handlers on this instance. These are for TCP
+        # specific handling.
+        cmd_func = getattr(self, "on_%s" % (cmd.NAME,), None)
+        if cmd_func:
+            await cmd_func(cmd)
+            handled = True
+
+        # Then call out to the handler.
+        cmd_func = getattr(self.handler, "on_%s" % (cmd.NAME,), None)
+        if cmd_func:
+            await cmd_func(cmd)
+            handled = True
+
+        if not handled:
+            logger.warning("Unhandled command: %r", cmd)
 
     def close(self):
         logger.warning("[%s] Closing connection", self.id())
@@ -378,6 +392,8 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.state = ConnectionStates.CLOSED
         self.pending_commands = []
 
+        self.handler.lost_connection(self)
+
         if self.transport:
             self.transport.unregisterProducer()
 
@@ -404,73 +420,18 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     VALID_INBOUND_COMMANDS = VALID_CLIENT_COMMANDS
     VALID_OUTBOUND_COMMANDS = VALID_SERVER_COMMANDS
 
-    def __init__(self, server_name, clock, streamer):
-        BaseReplicationStreamProtocol.__init__(self, clock)  # Old style class
+    def __init__(self, server_name, clock, handler):
+        BaseReplicationStreamProtocol.__init__(self, clock, handler)  # Old style class
 
         self.server_name = server_name
-        self.streamer = streamer
 
     def connectionMade(self):
         self.send_command(ServerCommand(self.server_name))
         BaseReplicationStreamProtocol.connectionMade(self)
-        self.streamer.new_connection(self)
 
     async def on_NAME(self, cmd):
         logger.info("[%s] Renamed to %r", self.id(), cmd.data)
         self.name = cmd.data
-
-    async def on_USER_SYNC(self, cmd):
-        await self.streamer.on_user_sync(
-            cmd.instance_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
-        )
-
-    async def on_CLEAR_USER_SYNC(self, cmd):
-        await self.streamer.on_clear_user_syncs(cmd.instance_id)
-
-    async def on_REPLICATE(self, cmd):
-        # Subscribe to all streams we're publishing to.
-        for stream_name in self.streamer.streams_by_name:
-            current_token = self.streamer.get_stream_token(stream_name)
-            self.send_command(PositionCommand(stream_name, current_token))
-
-    async def on_FEDERATION_ACK(self, cmd):
-        self.streamer.federation_ack(cmd.token)
-
-    async def on_REMOVE_PUSHER(self, cmd):
-        await self.streamer.on_remove_pusher(cmd.app_id, cmd.push_key, cmd.user_id)
-
-    async def on_INVALIDATE_CACHE(self, cmd):
-        await self.streamer.on_invalidate_cache(cmd.cache_func, cmd.keys)
-
-    async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
-        self.streamer.on_remote_server_up(cmd.data)
-
-    async def on_USER_IP(self, cmd):
-        self.streamer.on_user_ip(
-            cmd.user_id,
-            cmd.access_token,
-            cmd.ip,
-            cmd.user_agent,
-            cmd.device_id,
-            cmd.last_seen,
-        )
-
-    def stream_update(self, stream_name, token, data):
-        """Called when a new update is available to stream to clients.
-
-        We need to check if the client is interested in the stream or not
-        """
-        self.send_command(RdataCommand(stream_name, token, data))
-
-    def send_sync(self, data):
-        self.send_command(SyncCommand(data))
-
-    def send_remote_server_up(self, server: str):
-        self.send_command(RemoteServerUpCommand(server))
-
-    def on_connection_closed(self):
-        BaseReplicationStreamProtocol.on_connection_closed(self)
-        self.streamer.lost_connection(self)
 
 
 class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
@@ -485,13 +446,12 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         clock: Clock,
         command_handler: "ReplicationCommandHandler",
     ):
-        BaseReplicationStreamProtocol.__init__(self, clock)
+        BaseReplicationStreamProtocol.__init__(self, clock, command_handler)
 
         self.instance_id = hs.get_instance_id()
 
         self.client_name = client_name
         self.server_name = server_name
-        self.handler = command_handler
 
     def connectionMade(self):
         self.send_command(NameCommand(self.client_name))
@@ -507,36 +467,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         for user_id in currently_syncing:
             self.send_command(UserSyncCommand(self.instance_id, user_id, True, now))
 
-        # We've now finished connecting to so inform the client handler
-        self.handler.new_connection(self)
-
-    async def handle_command(self, cmd: Command):
-        """Handle a command we have received over the replication stream.
-
-        Delegates to `command_handler.on_<COMMAND>`, which must return an
-        awaitable.
-
-        Args:
-            cmd: received command
-        """
-        handled = False
-
-        # First call any command handlers on this instance. These are for TCP
-        # specific handling.
-        cmd_func = getattr(self, "on_%s" % (cmd.NAME,), None)
-        if cmd_func:
-            await cmd_func(cmd)
-            handled = True
-
-        # Then call out to the handler.
-        cmd_func = getattr(self.handler, "on_%s" % (cmd.NAME,), None)
-        if cmd_func:
-            await cmd_func(cmd)
-            handled = True
-
-        if not handled:
-            logger.warning("Unhandled command: %r", cmd)
-
     async def on_SERVER(self, cmd):
         if cmd.data != self.server_name:
             logger.error("[%s] Connected to wrong remote: %r", self.id(), cmd.data)
@@ -548,10 +478,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         logger.info("[%s] Subscribing to replication streams", self.id())
 
         self.send_command(ReplicateCommand())
-
-    def on_connection_closed(self):
-        BaseReplicationStreamProtocol.on_connection_closed(self)
-        self.handler.lost_connection(self)
 
 
 # The following simply registers metrics for the replication connections

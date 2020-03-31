@@ -19,8 +19,10 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from prometheus_client import Counter
 
+from synapse.metrics import LaterGauge
 from synapse.replication.tcp.client import ReplicationClientFactory
 from synapse.replication.tcp.commands import (
+    ClearUserSyncsCommand,
     Command,
     FederationAckCommand,
     InvalidateCacheCommand,
@@ -28,6 +30,7 @@ from synapse.replication.tcp.commands import (
     RdataCommand,
     RemoteServerUpCommand,
     RemovePusherCommand,
+    ReplicateCommand,
     SyncCommand,
     UserIpCommand,
     UserSyncCommand,
@@ -42,6 +45,13 @@ logger = logging.getLogger(__name__)
 inbound_rdata_count = Counter(
     "synapse_replication_tcp_protocol_inbound_rdata_count", "", ["stream_name"]
 )
+user_sync_counter = Counter("synapse_replication_tcp_resource_user_sync", "")
+federation_ack_counter = Counter("synapse_replication_tcp_resource_federation_ack", "")
+remove_pusher_counter = Counter("synapse_replication_tcp_resource_remove_pusher", "")
+invalidate_cache_counter = Counter(
+    "synapse_replication_tcp_resource_invalidate_cache", ""
+)
+user_ip_cache_counter = Counter("synapse_replication_tcp_resource_user_ip_cache", "")
 
 
 class ReplicationCommandHandler:
@@ -52,6 +62,8 @@ class ReplicationCommandHandler:
     def __init__(self, hs):
         self._replication_data_handler = hs.get_replication_data_handler()
         self._presence_handler = hs.get_presence_handler()
+        self._store = hs.get_datastore()
+        self._notifier = hs.get_notifier()
 
         # Set of streams that we've caught up with.
         self._streams_connected = set()  # type: Set[str]
@@ -70,7 +82,25 @@ class ReplicationCommandHandler:
         self._factory = None  # type: Optional[ReplicationClientFactory]
 
         # The currently connected connections.
-        self._connections = []
+        self._connections = []  # type: List[Any]
+
+        LaterGauge(
+            "synapse_replication_tcp_resource_total_connections",
+            "",
+            [],
+            lambda: len(self._connections),
+        )
+
+        self._is_master = hs.config.worker_app is None
+
+        self._federation_sender = None
+        if self._is_master and not hs.config.send_federation:
+            self._federation_sender = hs.get_federation_sender()
+
+        self._server_notices_sender = None
+        if self._is_master:
+            self._server_notices_sender = hs.get_server_notices_sender()
+            self._notifier.add_remote_server_up_callback(self.send_remote_server_up)
 
     def start_replication(self, hs):
         """Helper method to start a replication connection to the remote server
@@ -81,6 +111,73 @@ class ReplicationCommandHandler:
         host = hs.config.worker_replication_host
         port = hs.config.worker_replication_port
         hs.get_reactor().connectTCP(host, port, self._factory)
+
+    async def on_REPLICATE(self, cmd: ReplicateCommand):
+        # We only want to announce positions by the writer of the streams.
+        # Currently this is just the master process.
+        if not self._is_master:
+            return
+
+        if not self._connections:
+            raise Exception("Not connected")
+
+        for stream_name, stream in self._streams.items():
+            current_token = stream.current_token()
+            self.send_command(PositionCommand(stream_name, current_token))
+
+    async def on_USER_SYNC(self, cmd: UserSyncCommand):
+        user_sync_counter.inc()
+
+        if self._is_master:
+            await self._presence_handler.update_external_syncs_row(
+                cmd.instance_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
+            )
+
+    async def on_CLEAR_USER_SYNC(self, cmd: ClearUserSyncsCommand):
+        if self._is_master:
+            await self._presence_handler.update_external_syncs_clear(cmd.instance_id)
+
+    async def on_FEDERATION_ACK(self, cmd: FederationAckCommand):
+        federation_ack_counter.inc()
+
+        if self._federation_sender:
+            self._federation_sender.federation_ack(cmd.token)
+
+    async def on_REMOVE_PUSHER(self, cmd: RemovePusherCommand):
+        remove_pusher_counter.inc()
+
+        if self._is_master:
+            await self._store.delete_pusher_by_app_id_pushkey_user_id(
+                app_id=cmd.app_id, pushkey=cmd.push_key, user_id=cmd.user_id
+            )
+
+            self._notifier.on_new_replication_data()
+
+    async def on_INVALIDATE_CACHE(self, cmd: InvalidateCacheCommand):
+        invalidate_cache_counter.inc()
+
+        if self._is_master:
+            # We invalidate the cache locally, but then also stream that to other
+            # workers.
+            await self._store.invalidate_cache_and_stream(
+                cmd.cache_func, tuple(cmd.keys)
+            )
+
+    async def on_USER_IP(self, cmd: UserIpCommand):
+        user_ip_cache_counter.inc()
+
+        if self._is_master:
+            await self._store.insert_client_ip(
+                cmd.user_id,
+                cmd.access_token,
+                cmd.ip,
+                cmd.user_agent,
+                cmd.device_id,
+                cmd.last_seen,
+            )
+
+        if self._server_notices_sender:
+            await self._server_notices_sender.on_user_ip(cmd.user_id)
 
     async def on_RDATA(self, cmd: RdataCommand):
         stream_name = cmd.stream_name
@@ -174,6 +271,9 @@ class ReplicationCommandHandler:
         """"Called when get a new REMOTE_SERVER_UP command."""
         self._replication_data_handler.on_remote_server_up(cmd.data)
 
+        if self._is_master:
+            self._notifier.notify_remote_server_up(cmd.data)
+
     def get_currently_syncing_users(self):
         """Get the list of currently syncing users (if any). This is called
         when a connection has been established and we need to send the
@@ -261,3 +361,10 @@ class ReplicationCommandHandler:
 
     def send_remote_server_up(self, server: str):
         self.send_command(RemoteServerUpCommand(server))
+
+    def stream_update(self, stream_name: str, token: str, data: Any):
+        """Called when a new update is available to stream to clients.
+
+        We need to check if the client is interested in the stream or not
+        """
+        self.send_command(RdataCommand(stream_name, token, data))
