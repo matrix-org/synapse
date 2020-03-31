@@ -35,6 +35,7 @@ from synapse.replication.tcp.commands import (
     UserSyncCommand,
 )
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
+from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,8 @@ class ReplicationCommandHandler:
         self.streams = {
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
         }  # type: Dict[str, Stream]
+
+        self._position_linearizer = Linearizer("replication_position")
 
         # Map of stream to batched updates. See RdataCommand for info on how
         # batching works.
@@ -122,31 +125,35 @@ class ReplicationCommandHandler:
         # to stop RDATA being handled at the same time.
         self.streams_connecting.add(cmd.stream_name)
 
-        # Find where we previously streamed up to.
-        current_token = self.replication_data_handler.get_streams_to_replicate().get(
-            cmd.stream_name
-        )
-        if current_token is None:
-            logger.warning(
-                "Got POSITION for stream we're not subscribed to: %s", cmd.stream_name
+        # We protect catching up with a linearizer in case the replicaiton
+        # connection reconnects under us.
+        with await self._position_linearizer.queue(cmd.stream_name):
+            # Find where we previously streamed up to.
+            current_token = self.replication_data_handler.get_streams_to_replicate().get(
+                cmd.stream_name
             )
-            return
-
-        # Fetch all updates between then and now.
-        limited = True
-        while limited:
-            updates, current_token, limited = await stream.get_updates_since(
-                current_token, cmd.token
-            )
-            if updates:
-                await self.on_rdata(
+            if current_token is None:
+                logger.warning(
+                    "Got POSITION for stream we're not subscribed to: %s",
                     cmd.stream_name,
-                    current_token,
-                    [stream.parse_row(update[1]) for update in updates],
                 )
+                return
 
-        # We've now caught up to position sent to us, notify handler.
-        await self.replication_data_handler.on_position(cmd.stream_name, cmd.token)
+            # Fetch all updates between then and now.
+            limited = True
+            while limited:
+                updates, current_token, limited = await stream.get_updates_since(
+                    current_token, cmd.token
+                )
+                if updates:
+                    await self.on_rdata(
+                        cmd.stream_name,
+                        current_token,
+                        [stream.parse_row(update[1]) for update in updates],
+                    )
+
+            # We've now caught up to position sent to us, notify handler.
+            await self.replication_data_handler.on_position(cmd.stream_name, cmd.token)
 
         self.streams_connecting.discard(cmd.stream_name)
 

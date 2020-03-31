@@ -15,9 +15,11 @@
 
 from mock import Mock, NonCallableMock
 
-from synapse.replication.tcp.client import ReplicationClientFactory
+from synapse.replication.tcp.client import (
+    ReplicationClientFactory,
+    ReplicationDataHandler,
+)
 from synapse.replication.tcp.handler import ReplicationCommandHandler
-from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.storage.database import make_conn
 
