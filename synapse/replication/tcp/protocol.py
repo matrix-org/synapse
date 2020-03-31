@@ -508,8 +508,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             self.send_command(UserSyncCommand(self.instance_id, user_id, True, now))
 
         # We've now finished connecting to so inform the client handler
-        self.handler.update_connection(self)
-        self.handler.finished_connecting()
+        self.handler.new_connection(self)
 
     async def handle_command(self, cmd: Command):
         """Handle a command we have received over the replication stream.
@@ -552,7 +551,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
     def on_connection_closed(self):
         BaseReplicationStreamProtocol.on_connection_closed(self)
-        self.handler.update_connection(None)
+        self.handler.lost_connection(self)
 
 
 # The following simply registers metrics for the replication connections
