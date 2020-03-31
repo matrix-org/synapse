@@ -637,12 +637,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
             updates, current_token, limited = await stream.get_updates_since(
                 current_token, cmd.token
             )
-
-            # Check if the connection was closed underneath us, if so we bail
-            # rather than risk having concurrent catch ups going on.
-            if self.state == ConnectionStates.CLOSED:
-                return
-
             if updates:
                 await self.handler.on_rdata(
                     cmd.stream_name,
@@ -656,11 +650,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.streams_connecting.discard(cmd.stream_name)
         if not self.streams_connecting:
             self.handler.finished_connecting()
-
-        # Check if the connection was closed underneath us, if so we bail
-        # rather than risk having concurrent catch ups going on.
-        if self.state == ConnectionStates.CLOSED:
-            return
 
         # Handle any RDATA that came in while we were catching up.
         rows = self.pending_batches.pop(cmd.stream_name, [])
