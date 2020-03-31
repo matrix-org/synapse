@@ -20,7 +20,9 @@ from typing import Dict, List, Optional
 
 from twisted.internet import defer
 from twisted.internet.protocol import ReconnectingClientFactory
+
 from synapse.replication.slave.storage._base import BaseSlavedStore
+from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.protocol import (
     AbstractReplicationClientHandler,
     ClientReplicationStreamProtocol,
@@ -56,7 +58,7 @@ class ReplicationClientFactory(ReconnectingClientFactory):
 
     def __init__(self, hs, client_name, handler: AbstractReplicationClientHandler):
         self.client_name = client_name
-        self.handler = handler
+        self.command_handler = ReplicationCommandHandler(hs, handler)
         self.server_name = hs.config.server_name
         self.hs = hs
         self._clock = hs.get_clock()  # As self.clock is defined in super class
@@ -69,7 +71,11 @@ class ReplicationClientFactory(ReconnectingClientFactory):
     def buildProtocol(self, addr):
         logger.info("Connected to replication: %r", addr)
         return ClientReplicationStreamProtocol(
-            self.hs, self.client_name, self.server_name, self._clock, self.handler,
+            self.hs,
+            self.client_name,
+            self.server_name,
+            self._clock,
+            self.command_handler,
         )
 
     def clientConnectionLost(self, connector, reason):
