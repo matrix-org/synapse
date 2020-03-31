@@ -427,7 +427,7 @@ class PreviewUrlResource(DirectServeResource):
             except Exception:
                 pass
 
-        await defer.ensureDeferred(self.store.delete_url_cache(removed_media))
+        await self.store.delete_url_cache(removed_media)
 
         if removed_media:
             logger.info("Deleted %d entries from url cache", len(removed_media))
