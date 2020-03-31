@@ -140,7 +140,7 @@ class AuthRestServlet(RestServlet):
             sso_redirect_url = self._saml_handler.handle_redirect_request(
                 client_redirect_url, session
             )
-            html = self.auth_handler.start_sso_ui_auth(sso_redirect_url)
+            html = self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
         else:
             raise SynapseError(404, "Unknown auth stage type")
 

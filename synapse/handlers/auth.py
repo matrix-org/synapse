@@ -174,6 +174,7 @@ class AuthHandler(BaseHandler):
         request: SynapseRequest,
         request_body: Dict[str, Any],
         clientip: str,
+        description: str,
     ):
         """
         Checks that the user is who they claim to be, via a UI auth.
@@ -190,6 +191,9 @@ class AuthHandler(BaseHandler):
             request_body: The body of the request sent by the client
 
             clientip: The IP address of the client.
+
+            description: A human readable string to be displayed to the user that
+                         describes the operation happening on their account.
 
         Returns:
             defer.Deferred[dict]: the parameters for this request (which may
@@ -223,7 +227,7 @@ class AuthHandler(BaseHandler):
 
         try:
             result, params, _ = yield self.check_auth(
-                flows, request, request_body, clientip
+                flows, request, request_body, clientip, description
             )
         except LoginError:
             # Update the ratelimite to say we failed (`can_do_action` doesn't raise).
@@ -268,6 +272,7 @@ class AuthHandler(BaseHandler):
         request: SynapseRequest,
         clientdict: Dict[str, Any],
         clientip: str,
+        description: str,
     ):
         """
         Takes a dictionary sent by the client in the login / registration
@@ -293,6 +298,9 @@ class AuthHandler(BaseHandler):
                         'auth' key: this method prompts for auth if none is sent.
 
             clientip: The IP address of the client.
+
+            description: A human readable string to be displayed to the user that
+                         describes the operation happening on their account.
 
         Returns:
             defer.Deferred[dict, dict, str]: a deferred tuple of
@@ -343,11 +351,17 @@ class AuthHandler(BaseHandler):
         comparator = (request.uri, request.method, clientdict)
         if "ui_auth" not in session:
             session["ui_auth"] = comparator
+            self._save_session(session)
         elif session["ui_auth"] != comparator:
             raise SynapseError(
                 403,
                 "Requested operation has changed during the UI authentication session.",
             )
+
+        # Add a human readable description to the session.
+        if "description" not in session:
+            session["description"] = description
+            self._save_session(session)
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
@@ -1035,17 +1049,24 @@ class AuthHandler(BaseHandler):
         else:
             return defer.succeed(False)
 
-    def start_sso_ui_auth(self, redirect_url: str) -> str:
+    def start_sso_ui_auth(self, redirect_url: str, session_id: str) -> str:
         """
         Get the HTML for the SSO redirect confirmation page.
 
         Args:
             redirect_url: The URL to redirect to the SSO provider.
+            session_id: The user interactive authentication session ID.
 
         Returns:
             The HTML to render.
         """
-        return self._sso_auth_confirm_template.render(redirect_url=redirect_url,)
+        session = self._get_session_info(session_id)
+        # Get the human readable operation of what is occurring, falling back to
+        # a generic message if it isn't available for some reason.
+        description = session.get("description", "modify your account")
+        return self._sso_auth_confirm_template.render(
+            description=description, redirect_url=redirect_url,
+        )
 
     def complete_sso_ui_auth(
         self, registered_user_id: str, session_id: str, request: SynapseRequest,

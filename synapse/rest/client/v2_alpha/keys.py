@@ -263,7 +263,11 @@ class SigningKeyUploadServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, request, body, self.hs.get_ip_from_request(request),
+            requester,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "add a device signing key to your account",
         )
 
         result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)
