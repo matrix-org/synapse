@@ -148,10 +148,10 @@ class AuthHandler(BaseHandler):
 
         # Load the SSO HTML templates.
 
-        # The following template is shown to the user before redirecting them to
-        # the SSO login page. It notifies the user they are about to be
-        # redirected and that the Synapse server will be gaining access to their
-        # SSO account.
+        # The following template is shown to the user during a client login via SSO,
+        # after the SSO completes and before redirecting them back to their client.
+        # It notifies the user they are about to give access to their matrix account
+        # to the client.
         self._sso_redirect_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
         )[0]
