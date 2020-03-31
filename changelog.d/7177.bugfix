@@ -1,1 +1,1 @@
-Mitigation for a bug in `_get_e2e_device_keys_txn` which broke federation for some servers.
+Fix a bug which could cause outbound federation traffic to stop working if a client uploaded an incorrect e2e device signature.
