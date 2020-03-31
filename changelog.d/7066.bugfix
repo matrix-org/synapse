@@ -1,1 +1,0 @@
-Fix a bug that would cause Synapse to respond with an error about event visibility if a client tried to request the state of a room at a given token.

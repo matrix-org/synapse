@@ -1,1 +1,0 @@
-Stop sending m.room.aliases events during room creation and upgrade.
