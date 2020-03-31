@@ -17,6 +17,7 @@
 """Contains exceptions and error codes."""
 
 import logging
+from http import HTTPStatus
 from typing import Dict, List
 
 from six import iteritems
@@ -86,6 +87,11 @@ class CodeMessageException(RuntimeError):
 
     def __init__(self, code, msg):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
+
+        # Convert http.HTTPStatus objects to their int status code equivalents
+        if isinstance(code, HTTPStatus):
+            code = code.value
+
         self.code = code
         self.msg = msg
 
