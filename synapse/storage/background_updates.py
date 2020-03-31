@@ -400,27 +400,6 @@ class BackgroundUpdater(object):
 
         self.register_background_update_handler(update_name, updater)
 
-    def start_background_update(self, update_name, progress):
-        """Starts a background update running.
-
-        Args:
-            update_name: The update to set running.
-            progress: The initial state of the progress of the update.
-
-        Returns:
-            A deferred that completes once the task has been added to the
-            queue.
-        """
-        # Clear the background update queue so that we will pick up the new
-        # task on the next iteration of do_background_update.
-        self._background_update_queue = []
-        progress_json = json.dumps(progress)
-
-        return self.db.simple_insert(
-            "background_updates",
-            {"update_name": update_name, "progress_json": progress_json},
-        )
-
     def _end_background_update(self, update_name):
         """Removes a completed background update task from the queue.
 
