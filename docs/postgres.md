@@ -82,8 +82,8 @@ user "synapse_user"`, you may need to use an authentication method other than
   host    synapse     synapse_user    ::1/128     trust
   ```
 
-Note that line order matters in `pg_hba.conf`, so make sure that the line you
-add is inserted before:
+Note that line order matters in `pg_hba.conf`, so make sure that if you do add a
+new line, it is inserted before:
 
 ```
 host    all         all             ::1/128     ident
