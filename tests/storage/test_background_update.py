@@ -56,7 +56,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
             ),
             by=0.1,
         )
-        self.assertIsNotNone(res)
+        self.assertFalse(res)
 
         # on the first call, we should get run with the default background update size
         self.update_handler.assert_called_once_with(
@@ -79,7 +79,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.updates.do_next_background_update(target_background_update_duration_ms)
         )
-        self.assertIsNotNone(result)
+        self.assertFalse(result)
         self.update_handler.assert_called_once()
 
         # third step: we don't expect to be called any more
@@ -87,5 +87,5 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.updates.do_next_background_update(target_background_update_duration_ms)
         )
-        self.assertIsNone(result)
+        self.assertTrue(result)
         self.assertFalse(self.update_handler.called)

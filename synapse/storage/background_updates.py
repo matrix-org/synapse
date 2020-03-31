@@ -111,7 +111,7 @@ class BackgroundUpdater(object):
             except Exception:
                 logger.exception("Error doing update")
             else:
-                if result is None:
+                if result:
                     logger.info(
                         "No more background updates to do."
                         " Unscheduling background update task."
@@ -169,9 +169,7 @@ class BackgroundUpdater(object):
 
         return not update_exists
 
-    async def do_next_background_update(
-        self, desired_duration_ms: float
-    ) -> Optional[int]:
+    async def do_next_background_update(self, desired_duration_ms: float) -> bool:
         """Does some amount of work on the next queued background update
 
         Returns once some amount of work is done.
@@ -180,7 +178,7 @@ class BackgroundUpdater(object):
             desired_duration_ms(float): How long we want to spend
                 updating.
         Returns:
-            None if there is no more work to do, otherwise an int
+            True if there is no more work to do, otherwise False
         """
         if not self._background_update_queue:
             updates = await self.db.simple_select_list(
@@ -195,14 +193,14 @@ class BackgroundUpdater(object):
 
         if not self._background_update_queue:
             # no work left to do
-            return None
+            return True
 
         # pop from the front, and add back to the back
         update_name = self._background_update_queue.pop(0)
         self._background_update_queue.append(update_name)
 
         res = await self._do_background_update(update_name, desired_duration_ms)
-        return res
+        return False
 
     async def _do_background_update(
         self, update_name: str, desired_duration_ms: float
