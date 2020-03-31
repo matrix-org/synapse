@@ -11,7 +11,9 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.updates = self.hs.get_datastore().db.updates  # type: BackgroundUpdater
         # the base test class should have run the real bg updates for us
-        self.assertTrue(self.updates.has_completed_background_updates())
+        self.assertTrue(
+            self.get_success(self.updates.has_completed_background_updates())
+        )
 
         self.update_handler = Mock()
         self.updates.register_background_update_handler(

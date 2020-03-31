@@ -119,12 +119,11 @@ class BackgroundUpdater(object):
                     self._all_done = True
                     return None
 
-    @defer.inlineCallbacks
-    def has_completed_background_updates(self):
+    async def has_completed_background_updates(self) -> bool:
         """Check if all the background updates have completed
 
         Returns:
-            Deferred[bool]: True if all background updates have completed
+            True if all background updates have completed
         """
         # if we've previously determined that there is nothing left to do, that
         # is easy
@@ -138,7 +137,7 @@ class BackgroundUpdater(object):
         # otherwise, check if there are updates to be run. This is important,
         # as we may be running on a worker which doesn't perform the bg updates
         # itself, but still wants to wait for them to happen.
-        updates = yield self.db.simple_select_onecol(
+        updates = await self.db.simple_select_onecol(
             "background_updates",
             keyvalues=None,
             retcol="1",
