@@ -19,6 +19,7 @@ import synapse.handlers.set_password
 import synapse.http.client
 import synapse.notifier
 import synapse.replication.tcp.client
+import synapse.replication.tcp.handler
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
@@ -106,7 +107,7 @@ class HomeServer(object):
         pass
     def get_tcp_replication(
         self,
-    ) -> synapse.replication.tcp.client.ReplicationClientHandler:
+    ) -> synapse.replication.tcp.handler.ReplicationCommandHandler:
         pass
     def get_replication_data_handler(
         self,

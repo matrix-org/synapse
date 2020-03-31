@@ -87,10 +87,8 @@ from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
-from synapse.replication.tcp.client import (
-    ReplicationClientHandler,
-    ReplicationDataHandler,
-)
+from synapse.replication.tcp.client import ReplicationDataHandler
+from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.rest.media.v1.media_repository import (
     MediaRepository,
@@ -473,7 +471,7 @@ class HomeServer(object):
         return ReadMarkerHandler(self)
 
     def build_tcp_replication(self):
-        return ReplicationClientHandler(self)
+        return ReplicationCommandHandler(self)
 
     def build_action_generator(self):
         return ActionGenerator(self)
