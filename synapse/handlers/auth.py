@@ -1039,8 +1039,11 @@ class AuthHandler(BaseHandler):
         """
         Get the HTML for the SSO redirect confirmation page.
 
-        :param redirect_url: The URL to redirect to the SSO provider.
-        :return: The HTML to render.
+        Args:
+            redirect_url: The URL to redirect to the SSO provider.
+
+        Returns:
+            The HTML to render.
         """
         return self._sso_auth_confirm_template.render(redirect_url=redirect_url,)
 
