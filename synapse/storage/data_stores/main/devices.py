@@ -286,14 +286,16 @@ class DeviceWorkerStore(SQLBaseStore):
                     key_json = device.get("key_json", None)
                     if key_json:
                         result["keys"] = db_to_json(key_json)
+
+                        if "signatures" in device:
+                            for sig_user_id, sigs in device["signatures"].items():
+                                result["keys"].setdefault("signatures", {}).setdefault(
+                                    sig_user_id, {}
+                                ).update(sigs)
+
                     device_display_name = device.get("device_display_name", None)
                     if device_display_name:
                         result["device_display_name"] = device_display_name
-                    if "signatures" in device:
-                        for sig_user_id, sigs in device["signatures"].items():
-                            result["keys"].setdefault("signatures", {}).setdefault(
-                                sig_user_id, {}
-                            ).update(sigs)
                 else:
                     result["deleted"] = True
 
@@ -494,14 +496,16 @@ class DeviceWorkerStore(SQLBaseStore):
                 key_json = device.get("key_json", None)
                 if key_json:
                     result["keys"] = db_to_json(key_json)
+
+                    if "signatures" in device:
+                        for sig_user_id, sigs in device["signatures"].items():
+                            result["keys"].setdefault("signatures", {}).setdefault(
+                                sig_user_id, {}
+                            ).update(sigs)
+
                 device_display_name = device.get("device_display_name", None)
                 if device_display_name:
                     result["device_display_name"] = device_display_name
-                if "signatures" in device:
-                    for sig_user_id, sigs in device["signatures"].items():
-                        result["keys"].setdefault("signatures", {}).setdefault(
-                            sig_user_id, {}
-                        ).update(sigs)
 
                 results.append(result)
 
