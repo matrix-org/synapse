@@ -539,6 +539,11 @@ def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSe
     Returns:
         The context that was previously active
     """
+    # everything blows up if we allow current_context to be set to None, so sanity-check
+    # that now.
+    if context is None:
+        raise TypeError("'context' argument may not be None")
+
     current = current_context()
 
     if current is not context:
