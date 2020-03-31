@@ -87,6 +87,10 @@ from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
+from synapse.replication.tcp.client import (
+    ReplicationClientHandler,
+    ReplicationDataHandler,
+)
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.rest.media.v1.media_repository import (
     MediaRepository,
@@ -206,6 +210,7 @@ class HomeServer(object):
         "password_policy_handler",
         "storage",
         "replication_streamer",
+        "replication_data_handler",
     ]
 
     REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
@@ -468,7 +473,7 @@ class HomeServer(object):
         return ReadMarkerHandler(self)
 
     def build_tcp_replication(self):
-        raise NotImplementedError()
+        return ReplicationClientHandler(self)
 
     def build_action_generator(self):
         return ActionGenerator(self)
@@ -561,6 +566,9 @@ class HomeServer(object):
 
     def build_replication_streamer(self) -> ReplicationStreamer:
         return ReplicationStreamer(self)
+
+    def build_replication_data_handler(self):
+        return ReplicationDataHandler(self.get_datastore())
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
