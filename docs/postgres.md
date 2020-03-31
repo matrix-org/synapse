@@ -63,20 +63,31 @@ You may need to enable password authentication so `synapse_user` can
 connect to the database. See
 <https://www.postgresql.org/docs/current/auth-pg-hba-conf.html>.
 
-If you get an error like `FATAL:  Ident authentication failed for user "synapse_user"`, you may need to use an authentication method other than `ident`.
+If you get an error along the lines of `FATAL:  Ident authentication failed for
+user "synapse_user"`, you may need to use an authentication method other than
+`ident`:
 
-If the `synapse_user` user has a password, add the password to the `database:` section of `homeserver.yaml`. Then add the following to `pg_hba.conf`:
+* If the `synapse_user` user has a password, add the password to the `database:`
+  section of `homeserver.yaml`. Add the following to `pg_hba.conf`:
 
-    host    synapse     synapse_user    ::1/128     md5
-(or `scram-sha-256` instead of `md5` if you use that)
+  ```
+  host    synapse     synapse_user    ::1/128     md5  # or `scram-sha-256` instead of `md5` if you use that
+  ```
 
-If the `synapse_user` user doesn't have a password, then a password doesn't have to be added to `homeserver.yaml`. But the following does need to be added to `pg_hba.conf`:
+* If the `synapse_user` user does not have a password, then a password doesn't
+  have to be added to `homeserver.yaml`. But the following does need to be added
+  to `pg_hba.conf`:
 
-    host    synapse     synapse_user    ::1/128     trust
+  ```
+  host    synapse     synapse_user    ::1/128     trust
+  ```
 
-Note that line order matters in `pg_hba.conf`, so make sure that the line you add is inserted before:
+Note that line order matters in `pg_hba.conf`, so make sure that the line you
+add is inserted before:
 
-    host    all         all             ::1/128     ident
+```
+host    all         all             ::1/128     ident
+```
 
 ### Fixing incorrect `COLLATE` or `CTYPE`
 
