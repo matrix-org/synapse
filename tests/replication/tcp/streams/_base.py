@@ -15,7 +15,7 @@
 
 from mock import Mock
 
-from synapse.replication.tcp.commands import ReplicateCommand
+from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 
@@ -26,15 +26,20 @@ from tests.server import FakeTransport
 class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
 
+    def make_homeserver(self, reactor, clock):
+        self.test_handler = Mock(wraps=TestReplicationClientHandler())
+        return self.setup_test_homeserver(replication_data_handler=self.test_handler)
+
     def prepare(self, reactor, clock, hs):
         # build a replication server
-        server_factory = ReplicationStreamProtocolFactory(self.hs)
-        self.streamer = server_factory.streamer
+        server_factory = ReplicationStreamProtocolFactory(hs)
+        self.streamer = hs.get_replication_streamer()
         self.server = server_factory.buildProtocol(None)
 
-        self.test_handler = Mock(wraps=TestReplicationClientHandler())
+        repl_handler = ReplicationCommandHandler(hs)
+        repl_handler.handler = self.test_handler
         self.client = ClientReplicationStreamProtocol(
-            hs, "client", "test", clock, self.test_handler,
+            hs, "client", "test", clock, repl_handler,
         )
 
         self._client_transport = None
@@ -69,14 +74,8 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.streamer.on_notifier_poke()
         self.pump(0.1)
 
-    def replicate_stream(self):
-        """Make the client end a REPLICATE command to set up a subscription to a stream"""
-        self.client.send_command(ReplicateCommand())
 
-
-class TestReplicationClientHandler(object):
-    """Drop-in for ReplicationClientHandler which just collects RDATA rows"""
-
+class TestReplicationClientHandler:
     def __init__(self):
         self.streams = set()
         self._received_rdata_rows = []
@@ -88,18 +87,9 @@ class TestReplicationClientHandler(object):
                 positions[stream] = max(token, positions.get(stream, 0))
         return positions
 
-    def get_currently_syncing_users(self):
-        return []
-
-    def update_connection(self, connection):
-        pass
-
-    def finished_connecting(self):
-        pass
-
-    async def on_position(self, stream_name, token):
-        """Called when we get new position data."""
-
     async def on_rdata(self, stream_name, token, rows):
         for r in rows:
             self._received_rdata_rows.append((stream_name, token, r))
+
+    async def on_position(self, stream_name, token):
+        pass
