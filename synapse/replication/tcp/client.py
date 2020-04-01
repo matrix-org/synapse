@@ -119,3 +119,6 @@ class ReplicationDataHandler:
 
     async def on_position(self, stream_name: str, token: int):
         self.store.process_replication_rows(stream_name, token, [])
+
+    def on_remote_server_up(self, server: str):
+        """Called when get a new REMOTE_SERVER_UP command."""

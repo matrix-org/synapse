@@ -165,6 +165,7 @@ class ReplicationCommandHandler:
 
     async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
         """"Called when get a new REMOTE_SERVER_UP command."""
+        self._replication_data_handler.on_remote_server_up(cmd.data)
 
     def get_currently_syncing_users(self):
         """Get the list of currently syncing users (if any). This is called
