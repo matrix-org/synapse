@@ -176,7 +176,8 @@ class CasHandler:
         self, request: SynapseRequest, client_redirect_url: str, ticket: str,
     ) -> None:
         """
-        Validates a CAS ticket sent by the client and completes the login process.
+        Called once the user has successfully authenticated with the SSO,
+        validates a CAS ticket sent by the client and completes the login process.
 
         Registers the user if necessary, and then returns a redirect (with
         a login token) to the client.
@@ -210,7 +211,9 @@ class CasHandler:
         self, request: SynapseRequest, ticket: str, session_id: str
     ) -> None:
         """
-        Validates a CAS ticket sent by the client for user interactive authentication.
+        Called once the user has successfully authenticated with the SSO,
+        validates a CAS ticket sent by the client and completes user interactive
+        authentication.
 
         If successful, this completes the SSO step of UI auth and returns a
         an HTML page to the client.
