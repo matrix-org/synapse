@@ -173,7 +173,7 @@ class CasHandler:
         return "%s/login?%s" % (self._cas_server_url, args)
 
     async def handle_ticket_for_login(
-        self, request: SynapseRequest, client_redirect_url: str, ticket: str
+        self, request: SynapseRequest, client_redirect_url: str, ticket: str,
     ) -> None:
         """
         Validates a CAS ticket sent by the client and completes the login process.
@@ -191,7 +191,7 @@ class CasHandler:
             ticket: The CAS ticket provided by the client.
         """
         username, user_display_name = await self._validate_ticket(
-            ticket, "/_matrix/client/r0/login/cas/ticket", client_redirect_url
+            ticket, request.path, client_redirect_url
         )
 
         localpart = map_username_to_mxid_localpart(username)
@@ -223,9 +223,7 @@ class CasHandler:
             session_id: The UI Auth session ID.
         """
         client_redirect_url = ""
-        user, _ = await self._validate_ticket(
-            ticket, "/_matrix/client/r0/auth/cas/ticket", client_redirect_url
-        )
+        user, _ = await self._validate_ticket(ticket, request.path, client_redirect_url)
 
         localpart = map_username_to_mxid_localpart(user)
         user_id = UserID(localpart, self._hostname).to_string()
