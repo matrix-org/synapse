@@ -27,7 +27,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
 
     def make_homeserver(self, reactor, clock):
-        self.test_handler = Mock(wraps=TestReplicationClientHandler())
+        self.test_handler = Mock(wraps=TestReplicationDataHandler())
         return self.setup_test_homeserver(replication_data_handler=self.test_handler)
 
     def prepare(self, reactor, clock, hs):
@@ -75,7 +75,9 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.pump(0.1)
 
 
-class TestReplicationClientHandler:
+class TestReplicationDataHandler:
+    """Drop-in for ReplicationDataHandler which just collects RDATA rows"""
+
     def __init__(self):
         self.streams = set()
         self._received_rdata_rows = []
