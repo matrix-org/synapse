@@ -25,6 +25,7 @@ from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.replication.tcp.handler import ReplicationCommandHandler
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +34,18 @@ class ReplicationClientFactory(ReconnectingClientFactory):
     """Factory for building connections to the master. Will reconnect if the
     connection is lost.
 
-    Accepts a handler that will be called when new data is available or data
-    is required.
+    Accepts a handler that is passed to `ClientReplicationStreamProtocol`.
     """
 
     initialDelay = 0.1
     maxDelay = 1  # Try at least once every N seconds
 
-    def __init__(self, hs: "HomeServer", client_name, command_handler):
+    def __init__(
+        self,
+        hs: "HomeServer",
+        client_name: str,
+        command_handler: "ReplicationCommandHandler",
+    ):
         self.client_name = client_name
         self.command_handler = command_handler
         self.server_name = hs.config.server_name
