@@ -426,7 +426,7 @@ class CasRedirectServlet(BaseSSORedirectServlet):
 
     def get_sso_url(self, client_redirect_url: bytes) -> bytes:
         return self._cas_handler.get_redirect_url(
-            "/_matrix/client/r0/login/cas/ticket", redirectUrl=client_redirect_url
+            {"redirectUrl": client_redirect_url}
         ).encode("ascii")
 
 
@@ -438,10 +438,20 @@ class CasTicketServlet(RestServlet):
         self._cas_handler = hs.get_cas_handler()
 
     async def on_GET(self, request: SynapseRequest) -> None:
-        client_redirect_url = parse_string(request, "redirectUrl", required=True)
+        client_redirect_url = parse_string(request, "redirectUrl")
         ticket = parse_string(request, "ticket", required=True)
-        await self._cas_handler.handle_ticket_for_login(
-            request, client_redirect_url, ticket
+
+        # Maybe get a session ID (if this ticket is from user interactive
+        # authentication).
+        session = parse_string(request, "session")
+
+        # Either client_redirect_url or session must be provided.
+        if not client_redirect_url and not session:
+            message = "Missing string query parameter redirectUrl or session"
+            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+
+        await self._cas_handler.handle_ticket(
+            request, ticket, client_redirect_url, session
         )
 
 

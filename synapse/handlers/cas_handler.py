@@ -48,44 +48,37 @@ class CasHandler:
 
         self._http_client = hs.get_proxied_http_client()
 
-    def _build_service_param(self, service_redirect_endpoint: str, **kwargs) -> str:
+    def _build_service_param(self, args: Dict[str, str]) -> str:
         """
         Generates a value to use as the "service" parameter when redirecting or
         querying the CAS service.
 
         Args:
-            service_redirect_endpoint: The homeserver endpoint to redirect
-                the client to after successful SSO negotiation.
-            kwargs: Additional arguments to include in the final redirect URL.
+            args: Additional arguments to include in the final redirect URL.
 
         Returns:
             The URL to use as a "service" parameter.
         """
         return "%s%s?%s" % (
             self._cas_service_url,
-            service_redirect_endpoint,
-            urllib.parse.urlencode(kwargs),
+            "/_matrix/client/r0/login/cas/ticket",
+            urllib.parse.urlencode(args),
         )
 
     async def _validate_ticket(
-        self, ticket: str, service_redirect_endpoint: str, client_redirect_url: str
+        self, ticket: str, service_args: Dict[str, str]
     ) -> Tuple[str, Optional[str]]:
         """
         Validate a CAS ticket with the server, parse the response, and return the user and display name.
 
         Args:
             ticket: The CAS ticket from the client.
-            service_redirect_endpoint: The homeserver endpoint that the client
-                accessed to validate the ticket.
-            client_redirect_url: The URL to redirect the client to after
-                validation is done.
+            service_args: Additional arguments to include in the service URL.
         """
         uri = self._cas_server_url + "/proxyValidate"
         args = {
             "ticket": ticket,
-            "service": self._build_service_param(
-                service_redirect_endpoint, redirectUrl=client_redirect_url
-            ),
+            "service": self._build_service_param(service_args),
         }
         try:
             body = await self._http_client.get_raw(uri, args)
@@ -154,26 +147,28 @@ class CasHandler:
             )
         return user, attributes
 
-    def get_redirect_url(self, service_redirect_endpoint: str, **kwargs) -> str:
+    def get_redirect_url(self, service_args: Dict[str, str]) -> str:
         """
         Generates a URL to the CAS server where the client should be redirected.
 
         Args:
-            service_redirect_endpoint: The homeserver endpoint to redirect
-                the client to after successful SSO negotiation.
-            kwargs: Additional arguments to include in the final redirect URL.
+            service_args: Additional arguments to include in the final redirect URL.
 
         Returns:
             The URL to redirect the client to.
         """
         args = urllib.parse.urlencode(
-            {"service": self._build_service_param(service_redirect_endpoint, **kwargs)}
+            {"service": self._build_service_param(service_args)}
         )
 
         return "%s/login?%s" % (self._cas_server_url, args)
 
-    async def handle_ticket_for_login(
-        self, request: SynapseRequest, client_redirect_url: str, ticket: str,
+    async def handle_ticket(
+        self,
+        request: SynapseRequest,
+        ticket: str,
+        client_redirect_url: Optional[str],
+        session: Optional[str],
     ) -> None:
         """
         Called once the user has successfully authenticated with the SSO,
@@ -186,52 +181,35 @@ class CasHandler:
             request: the incoming request from the browser. We'll
                 respond to it with a redirect.
 
+            ticket: The CAS ticket provided by the client.
+
             client_redirect_url: the redirect_url the client gave us when
                 it first started the process.
 
-            ticket: The CAS ticket provided by the client.
+            session_id: The UI Auth session ID, if applicable.
         """
-        username, user_display_name = await self._validate_ticket(
-            ticket, request.path, client_redirect_url
-        )
+        args = {}
+        if client_redirect_url:
+            args["redirectUrl"] = client_redirect_url
+        if session:
+            args["session"] = session
+        username, user_display_name = await self._validate_ticket(ticket, args)
 
         localpart = map_username_to_mxid_localpart(username)
         user_id = UserID(localpart, self._hostname).to_string()
         registered_user_id = await self._auth_handler.check_user_exists(user_id)
-        if not registered_user_id:
-            registered_user_id = await self._registration_handler.register_user(
-                localpart=localpart, default_display_name=user_display_name
+
+        if session:
+            self._auth_handler.complete_sso_ui_auth(
+                registered_user_id, session, request,
             )
 
-        self._auth_handler.complete_sso_login(
-            registered_user_id, request, client_redirect_url
-        )
+        else:
+            if not registered_user_id:
+                registered_user_id = await self._registration_handler.register_user(
+                    localpart=localpart, default_display_name=user_display_name
+                )
 
-    async def handle_ticket_for_ui_auth(
-        self, request: SynapseRequest, ticket: str, session_id: str
-    ) -> None:
-        """
-        Called once the user has successfully authenticated with the SSO,
-        validates a CAS ticket sent by the client and completes user interactive
-        authentication.
-
-        If successful, this completes the SSO step of UI auth and returns a
-        an HTML page to the client.
-
-        Args:
-            request: the incoming request from the browser.
-
-            ticket: The CAS ticket provided by the client.
-
-            session_id: The UI Auth session ID.
-        """
-        client_redirect_url = ""
-        user, _ = await self._validate_ticket(ticket, request.path, client_redirect_url)
-
-        localpart = map_username_to_mxid_localpart(user)
-        user_id = UserID(localpart, self._hostname).to_string()
-        registered_user_id = await self._auth_handler.check_user_exists(user_id)
-
-        self._auth_handler.complete_sso_ui_auth(
-            registered_user_id, session_id, request,
-        )
+            self._auth_handler.complete_sso_login(
+                registered_user_id, request, client_redirect_url
+            )

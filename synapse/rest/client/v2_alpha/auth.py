@@ -145,7 +145,7 @@ class AuthRestServlet(RestServlet):
                 # Generate a request to CAS that redirects back to an endpoint
                 # to verify the successful authentication.
                 sso_redirect_url = self._cas_handler.get_redirect_url(
-                    "/_matrix/client/r0/auth/cas/ticket", session=session,
+                    {"session": session},
                 )
 
             elif self._saml_enabled:
@@ -239,35 +239,5 @@ class AuthRestServlet(RestServlet):
         return 200, {}
 
 
-class CasAuthTicketServlet(RestServlet):
-    """
-    Completes a user interactive authentication session when using CAS.
-
-    It is called after the user has completed SSO with the CAS provider and
-    received a ticket in response. It does the following:
-
-    * Retrieves the CAS ticket and the UI auth session from the request.
-    * Validates the CAS ticket.
-    * Marks the UI auth session as complete.
-    """
-
-    PATTERNS = client_patterns(r"/auth/cas/ticket")
-
-    def __init__(self, hs):
-        super(CasAuthTicketServlet, self).__init__()
-        self._cas_handler = hs.get_cas_handler()
-
-    async def on_GET(self, request):
-        ticket = parse_string(request, "ticket", required=True)
-        # Pull the UI Auth session ID out.
-        session_id = parse_string(request, "session", required=True)
-
-        return await self._cas_handler.handle_ticket_for_ui_auth(
-            request, ticket, session_id
-        )
-
-
 def register_servlets(hs, http_server):
     AuthRestServlet(hs).register(http_server)
-    if hs.config.cas_enabled:
-        CasAuthTicketServlet(hs).register(http_server)
