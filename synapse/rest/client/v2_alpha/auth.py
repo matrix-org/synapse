@@ -240,6 +240,17 @@ class AuthRestServlet(RestServlet):
 
 
 class CasAuthTicketServlet(RestServlet):
+    """
+    Completes a user interactive authentication session when using CAS.
+
+    It is called after the user has completed SSO with the CAS provider and
+    received a ticket in response. It does the following:
+
+    * Retrieves the CAS ticket and the UI auth session from the request.
+    * Validates the CAS ticket.
+    * Marks the UI auth session as complete.
+    """
+
     PATTERNS = client_patterns(r"/auth/cas/ticket")
 
     def __init__(self, hs):
