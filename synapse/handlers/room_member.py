@@ -477,6 +477,23 @@ class RoomMemberHandler(object):
                     )
                     return res
 
+            # If the room is a server notice room, and the user is leaving it, then
+            # invalidate the cache for get_or_create_notice_room_for_user for this user.
+            # Only consider the user leaving, as the server notices user doesn't ban
+            # users.
+            is_server_notice = yield self._is_server_notice_room(room_id)
+            if is_server_notice:
+                # Get the server_notices_manager here rather than in the constructor
+                # because otherwise it would create a cyclic dependency.
+                snm = self.hs.get_server_notices_manager()
+                # Invalidate the cache for get_or_create_notice_room_for_user
+                # At this point we already know that the user has already joined the room
+                # and this is not an invite being rejected, because this check has
+                # already happened.
+                snm.get_or_create_notice_room_for_user.invalidate(
+                    (target.to_string(),),
+                )
+
         res = yield self._local_membership_update(
             requester=requester,
             target=target,
