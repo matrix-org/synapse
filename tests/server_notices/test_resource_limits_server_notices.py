@@ -331,6 +331,21 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         self.assertTrue(notice_in_room, "No server notice in room")
 
+    def test_new_room_created_on_leave(self):
+        """Tests that, if a user leaves the server notices room, and the server needs to
+        send them another notice, it creates another room and doesn't try to do that in
+        the room the user has just left.
+        """
+        user_id, tok, room_id = self._trigger_notice_and_join()
+
+        self.helper.leave(room=room_id, user=user_id, tok=tok)
+
+        new_room_id = self.get_success(
+            self.server_notices_manager.get_or_create_notice_room_for_user(user_id)
+        )
+
+        self.assertNotEqual(room_id, new_room_id)
+
     def _trigger_notice_and_join(self):
         """Creates enough active users to hit the MAU limit and trigger a system notice
         about it, then joins the system notices room with one of the users created.
