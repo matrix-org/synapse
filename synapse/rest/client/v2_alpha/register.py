@@ -505,7 +505,7 @@ class RegisterRestServlet(RestServlet):
             request,
             body,
             self.hs.get_ip_from_request(request),
-            "log into your account",
+            "register a new account",
         )
 
         # Check that we're not trying to register a denied 3pid.
