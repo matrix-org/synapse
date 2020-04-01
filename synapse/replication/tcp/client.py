@@ -73,7 +73,10 @@ class ReplicationClientFactory(ReconnectingClientFactory):
 
 
 class ReplicationDataHandler:
-    """A replication data handler that calls slave data stores.
+    """A replication data handler handles incoming stream updates from replication.
+
+    This instance notifies the slave data store about updates. Can be subclassed
+    to handle updates in additional ways.
     """
 
     def __init__(self, store: BaseSlavedStore):
