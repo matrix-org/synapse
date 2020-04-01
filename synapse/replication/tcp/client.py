@@ -16,15 +16,14 @@
 """
 
 import logging
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 
-MYPY = False
-if MYPY:
+if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
