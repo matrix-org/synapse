@@ -19,12 +19,12 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, LimitBlockingTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
-from synapse.server_notices.resource_limits_server_notices import (
-    ResourceLimitsServerNotices,
-)
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import sync
+from synapse.server_notices.resource_limits_server_notices import (
+    ResourceLimitsServerNotices,
+)
 
 from tests import unittest
 

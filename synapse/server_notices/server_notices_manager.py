@@ -18,7 +18,7 @@ from typing import Optional
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
-from synapse.types import create_requester, UserID
+from synapse.types import UserID, create_requester
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
@@ -151,7 +151,7 @@ class ServerNoticesManager(object):
         return room_id
 
     @defer.inlineCallbacks
-    def _get_existing_notice_room_for_user(self, user_id,):
+    def _get_existing_notice_room_for_user(self, user_id):
         # type: (str) -> defer.Deferred[Optional[str]]
         """Retrieve the ID for the existing notice room for the given user ID if it
         exists.
