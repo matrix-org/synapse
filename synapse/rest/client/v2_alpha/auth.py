@@ -262,7 +262,7 @@ class CasAuthTicketServlet(RestServlet):
         # Pull the UI Auth session ID out.
         session_id = parse_string(request, "session", required=True)
 
-        return await self._cas_handler.handle_ui_auth_response(
+        return await self._cas_handler.handle_ticket_for_ui_auth(
             request, ticket, session_id
         )
 

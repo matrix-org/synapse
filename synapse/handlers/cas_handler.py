@@ -172,11 +172,11 @@ class CasHandler:
 
         return "%s/login?%s" % (self._cas_server_url, args)
 
-    async def handle_login_request(
+    async def handle_ticket_for_login(
         self, request: SynapseRequest, client_redirect_url: str, ticket: str
     ) -> None:
         """
-        Validates a CAS ticket sent by the client for login and authenticates the user with SSO.
+        Validates a CAS ticket sent by the client and completes the login process.
 
         Registers the user if necessary, and then returns a redirect (with
         a login token) to the client.
@@ -206,7 +206,7 @@ class CasHandler:
             registered_user_id, request, client_redirect_url
         )
 
-    async def handle_ui_auth_response(
+    async def handle_ticket_for_ui_auth(
         self, request: SynapseRequest, ticket: str, session_id: str
     ) -> None:
         """

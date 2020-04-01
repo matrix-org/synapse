@@ -440,7 +440,7 @@ class CasTicketServlet(RestServlet):
     async def on_GET(self, request: SynapseRequest) -> None:
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
         ticket = parse_string(request, "ticket", required=True)
-        await self._cas_handler.handle_login_request(
+        await self._cas_handler.handle_ticket_for_login(
             request, client_redirect_url, ticket
         )
 
