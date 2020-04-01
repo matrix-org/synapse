@@ -99,22 +99,6 @@ class ReplicationStreamer(object):
 
         self.streams_by_name = {stream.NAME: stream for stream in self.streams}
 
-        LaterGauge(
-            "synapse_replication_tcp_resource_connections_per_stream",
-            "",
-            ["stream_name"],
-            lambda: {
-                (stream_name,): len(
-                    [
-                        conn
-                        for conn in self.connections
-                        if stream_name in conn.replication_streams
-                    ]
-                )
-                for stream_name in self.streams_by_name
-            },
-        )
-
         self.federation_sender = None
         if not hs.config.send_federation:
             self.federation_sender = hs.get_federation_sender()
