@@ -68,7 +68,7 @@ user "synapse_user"`, you may need to use an authentication method other than
 `ident`:
 
 * If the `synapse_user` user has a password, add the password to the `database:`
-  section of `homeserver.yaml`. Add the following to `pg_hba.conf`:
+  section of `homeserver.yaml`. Then add the following to `pg_hba.conf`:
 
   ```
   host    synapse     synapse_user    ::1/128     md5  # or `scram-sha-256` instead of `md5` if you use that
