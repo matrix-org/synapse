@@ -1,3 +1,11 @@
+Next version
+============
+
+* A new template (`sso_auth_confirm.html`) was added to Synapse. If your Synapse
+  is configured to use SSO and a custom `sso_redirect_confirm_template_dir`
+  configuration then this template will need to be duplicated into that
+  directory.
+
 Synapse 1.12.0 (2020-03-23)
 ===========================
 

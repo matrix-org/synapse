@@ -53,6 +53,31 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
+SUCCESS_TEMPLATE = """
+<html>
+<head>
+<title>Success!</title>
+<meta name='viewport' content='width=device-width, initial-scale=1,
+    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
+<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
+<script>
+if (window.onAuthDone) {
+    window.onAuthDone();
+} else if (window.opener && window.opener.postMessage) {
+     window.opener.postMessage("authDone", "*");
+}
+</script>
+</head>
+<body>
+    <div>
+        <p>Thank you</p>
+        <p>You may now close this window and return to the application</p>
+    </div>
+</body>
+</html>
+"""
+
+
 class AuthHandler(BaseHandler):
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
@@ -91,6 +116,7 @@ class AuthHandler(BaseHandler):
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
+        self._saml2_enabled = hs.config.saml2_enabled
 
         # we keep this as a list despite the O(N^2) implication so that we can
         # keep PASSWORD first and avoid confusing clients which pick the first
@@ -106,6 +132,13 @@ class AuthHandler(BaseHandler):
                     if t not in login_types:
                         login_types.append(t)
         self._supported_login_types = login_types
+        # Login types and UI Auth types have a heavy overlap, but are not
+        # necessarily identical. Login types have SSO (and other login types)
+        # added in the rest layer, see synapse.rest.client.v1.login.LoginRestServerlet.on_GET.
+        ui_auth_types = login_types.copy()
+        if self._saml2_enabled:
+            ui_auth_types.append(LoginType.SSO)
+        self._supported_ui_auth_types = ui_auth_types
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
@@ -113,9 +146,20 @@ class AuthHandler(BaseHandler):
 
         self._clock = self.hs.get_clock()
 
-        # Load the SSO redirect confirmation page HTML template
+        # Load the SSO HTML templates.
+
+        # The following template is shown to the user during a client login via SSO,
+        # after the SSO completes and before redirecting them back to their client.
+        # It notifies the user they are about to give access to their matrix account
+        # to the client.
         self._sso_redirect_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
+        )[0]
+        # The following template is shown during user interactive authentication
+        # in the fallback auth scenario. It notifies the user that they are
+        # authenticating for an operation to occur on their account.
+        self._sso_auth_confirm_template = load_jinja2_templates(
+            hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
         )[0]
 
         self._server_name = hs.config.server_name
@@ -130,6 +174,7 @@ class AuthHandler(BaseHandler):
         request: SynapseRequest,
         request_body: Dict[str, Any],
         clientip: str,
+        description: str,
     ):
         """
         Checks that the user is who they claim to be, via a UI auth.
@@ -146,6 +191,9 @@ class AuthHandler(BaseHandler):
             request_body: The body of the request sent by the client
 
             clientip: The IP address of the client.
+
+            description: A human readable string to be displayed to the user that
+                         describes the operation happening on their account.
 
         Returns:
             defer.Deferred[dict]: the parameters for this request (which may
@@ -175,11 +223,11 @@ class AuthHandler(BaseHandler):
         )
 
         # build a list of supported flows
-        flows = [[login_type] for login_type in self._supported_login_types]
+        flows = [[login_type] for login_type in self._supported_ui_auth_types]
 
         try:
             result, params, _ = yield self.check_auth(
-                flows, request, request_body, clientip
+                flows, request, request_body, clientip, description
             )
         except LoginError:
             # Update the ratelimite to say we failed (`can_do_action` doesn't raise).
@@ -193,7 +241,7 @@ class AuthHandler(BaseHandler):
             raise
 
         # find the completed login type
-        for login_type in self._supported_login_types:
+        for login_type in self._supported_ui_auth_types:
             if login_type not in result:
                 continue
 
@@ -224,6 +272,7 @@ class AuthHandler(BaseHandler):
         request: SynapseRequest,
         clientdict: Dict[str, Any],
         clientip: str,
+        description: str,
     ):
         """
         Takes a dictionary sent by the client in the login / registration
@@ -249,6 +298,9 @@ class AuthHandler(BaseHandler):
                         'auth' key: this method prompts for auth if none is sent.
 
             clientip: The IP address of the client.
+
+            description: A human readable string to be displayed to the user that
+                         describes the operation happening on their account.
 
         Returns:
             defer.Deferred[dict, dict, str]: a deferred tuple of
@@ -299,11 +351,17 @@ class AuthHandler(BaseHandler):
         comparator = (request.uri, request.method, clientdict)
         if "ui_auth" not in session:
             session["ui_auth"] = comparator
+            self._save_session(session)
         elif session["ui_auth"] != comparator:
             raise SynapseError(
                 403,
                 "Requested operation has changed during the UI authentication session.",
             )
+
+        # Add a human readable description to the session.
+        if "description" not in session:
+            session["description"] = description
+            self._save_session(session)
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
@@ -990,6 +1048,56 @@ class AuthHandler(BaseHandler):
             return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
             return defer.succeed(False)
+
+    def start_sso_ui_auth(self, redirect_url: str, session_id: str) -> str:
+        """
+        Get the HTML for the SSO redirect confirmation page.
+
+        Args:
+            redirect_url: The URL to redirect to the SSO provider.
+            session_id: The user interactive authentication session ID.
+
+        Returns:
+            The HTML to render.
+        """
+        session = self._get_session_info(session_id)
+        # Get the human readable operation of what is occurring, falling back to
+        # a generic message if it isn't available for some reason.
+        description = session.get("description", "modify your account")
+        return self._sso_auth_confirm_template.render(
+            description=description, redirect_url=redirect_url,
+        )
+
+    def complete_sso_ui_auth(
+        self, registered_user_id: str, session_id: str, request: SynapseRequest,
+    ):
+        """Having figured out a mxid for this user, complete the HTTP request
+
+        Args:
+            registered_user_id: The registered user ID to complete SSO login for.
+            request: The request to complete.
+            client_redirect_url: The URL to which to redirect the user at the end of the
+                process.
+        """
+        # Mark the stage of the authentication as successful.
+        sess = self._get_session_info(session_id)
+        if "creds" not in sess:
+            sess["creds"] = {}
+        creds = sess["creds"]
+
+        # Save the user who authenticated with SSO, this will be used to ensure
+        # that the account be modified is also the person who logged in.
+        creds[LoginType.SSO] = registered_user_id
+        self._save_session(sess)
+
+        # Render the HTML and return.
+        html_bytes = SUCCESS_TEMPLATE.encode("utf8")
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+        request.write(html_bytes)
+        finish_request(request)
 
     def complete_sso_login(
         self,

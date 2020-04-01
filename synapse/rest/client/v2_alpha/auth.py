@@ -18,6 +18,7 @@ import logging
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
+from synapse.handlers.auth import SUCCESS_TEMPLATE
 from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet, parse_string
 
@@ -89,30 +90,6 @@ TERMS_TEMPLATE = """
 </html>
 """
 
-SUCCESS_TEMPLATE = """
-<html>
-<head>
-<title>Success!</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-if (window.onAuthDone) {
-    window.onAuthDone();
-} else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
-}
-</script>
-</head>
-<body>
-    <div>
-        <p>Thank you</p>
-        <p>You may now close this window and return to the application</p>
-    </div>
-</body>
-</html>
-"""
-
 
 class AuthRestServlet(RestServlet):
     """
@@ -129,6 +106,11 @@ class AuthRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
+
+        # SSO configuration.
+        self._saml_enabled = hs.config.saml2_enabled
+        if self._saml_enabled:
+            self._saml_handler = hs.get_saml_handler()
 
     def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
@@ -150,6 +132,15 @@ class AuthRestServlet(RestServlet):
                 "myurl": "%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
             }
+
+        elif stagetype == LoginType.SSO and self._saml_enabled:
+            # Display a confirmation page which prompts the user to
+            # re-authenticate with their SSO provider.
+            client_redirect_url = ""
+            sso_redirect_url = self._saml_handler.handle_redirect_request(
+                client_redirect_url, session
+            )
+            html = self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
         else:
             raise SynapseError(404, "Unknown auth stage type")
 
@@ -210,6 +201,9 @@ class AuthRestServlet(RestServlet):
                     "myurl": "%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
                 }
+        elif stagetype == LoginType.SSO:
+            # The SSO fallback workflow should not post here,
+            raise SynapseError(404, "Fallback SSO auth does not support POST requests.")
         else:
             raise SynapseError(404, "Unknown auth stage type")
 
