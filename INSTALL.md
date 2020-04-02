@@ -36,7 +36,7 @@ that your email address is probably `user@example.com` rather than
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, 3.7 or 3.8.
+- Python 3.5.2 or later, up to Python 3.8.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -393,8 +393,8 @@ so, you will need to edit `homeserver.yaml`, as follows:
   for having Synapse automatically provision and renew federation
   certificates through ACME can be found at [ACME.md](docs/ACME.md).
   Note that, as pointed out in that document, this feature will not
-  work with installs set up after November 2019. 
-  
+  work with installs set up after November 2019.
+
   If you are using your own certificate, be sure to use a `.pem` file that
   includes the full certificate chain including any intermediate certificates
   (for instance, if using certbot, use `fullchain.pem` as your certificate, not
