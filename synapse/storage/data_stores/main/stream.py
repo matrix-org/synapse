@@ -481,11 +481,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id, limit, end_token
         )
 
-        logger.debug("stream before")
         events = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
-        logger.debug("stream after")
 
         self._set_before_and_after(events, rows)
 
