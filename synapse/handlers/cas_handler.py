@@ -173,10 +173,14 @@ class CasHandler:
     ) -> None:
         """
         Called once the user has successfully authenticated with the SSO.
-        validates a CAS ticket sent by the client and completes the auth process.
+        Validates a CAS ticket sent by the client and completes the auth process.
 
-        Registers the user if necessary, and then returns a redirect (with
-        a login token) to the client.
+        If the user interactive authentication session is provided, marks the
+        UI Auth session as complete, then returns an HTML page notifying the
+        user they are done.
+
+        Otherwise, this registers the user if necessary, and then returns a
+        redirect (with a login token) to the client.
 
         Args:
             request: the incoming request from the browser. We'll
@@ -187,7 +191,7 @@ class CasHandler:
             client_redirect_url: the redirectUrl parameter from the `/cas/ticket` HTTP request, if given.
                 This should be the same as the redirectUrl from the original `/login/sso/redirect` request.
 
-            session_id: The session_id parameter from the `/cas/ticket` HTTP request, if given.
+            session: The session parameter from the `/cas/ticket` HTTP request, if given.
                 This should be the UI Auth session id.
         """
         args = {}
