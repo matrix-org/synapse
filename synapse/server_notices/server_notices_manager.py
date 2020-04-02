@@ -70,7 +70,7 @@ class ServerNoticesManager(object):
             Deferred[FrozenEvent]
         """
         room_id = yield self.get_or_create_notice_room_for_user(user_id)
-        yield self.invite_user_in_notice_room(user_id, room_id)
+        yield self.invite_user_to_notice_room(user_id, room_id)
 
         system_mxid = self._config.server_notices_mxid
         requester = create_requester(system_mxid)
@@ -96,7 +96,8 @@ class ServerNoticesManager(object):
     def get_or_create_notice_room_for_user(self, user_id):
         """Get the room for notices for a given user
 
-        If we have not yet created a notice room for this user, create it
+        If we have not yet created a notice room for this user, create it, but don't
+        invite the user to it.
 
         Args:
             user_id (str): complete user id for the user we want a room for
@@ -109,9 +110,25 @@ class ServerNoticesManager(object):
 
         assert self._is_mine_id(user_id), "Cannot send server notices to remote users"
 
-        existing_room_id = yield self._get_existing_notice_room_for_user(user_id)
-        if existing_room_id:
-            return existing_room_id
+        rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
+            user_id, [Membership.INVITE, Membership.JOIN]
+        )
+        for room in rooms:
+            # it's worth noting that there is an asymmetry here in that we
+            # expect the user to be invited or joined, but the system user must
+            # be joined. This is kinda deliberate, in that if somebody somehow
+            # manages to invite the system user to a room, that doesn't make it
+            # the server notices room.
+            user_ids = yield self._store.get_users_in_room(room.room_id)
+            if self.server_notices_mxid in user_ids:
+                # we found a room which our user shares with the system notice
+                # user
+                logger.info(
+                    "Using existing server notices room %s for user %s",
+                    room.room_id,
+                    user_id,
+                )
+                return room.room_id
 
         # apparently no existing notice room: create a new one
         logger.info("Creating server notices room for %s", user_id)
@@ -151,37 +168,9 @@ class ServerNoticesManager(object):
         return room_id
 
     @defer.inlineCallbacks
-    def _get_existing_notice_room_for_user(self, user_id):
-        # type: (str) -> defer.Deferred[Optional[str]]
-        """Retrieve the ID for the existing notice room for the given user ID if it
-        exists.
-
-        Returns:
-            The ID of the notice room, None if no room exist for this user.
-        """
-        room_id = None
-
-        rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
-            user_id, [Membership.INVITE, Membership.JOIN]
-        )
-        for room in rooms:
-            # it's worth noting that there is an asymmetry here in that we
-            # expect the user to be invited or joined, but the system user must
-            # be joined. This is kinda deliberate, in that if somebody somehow
-            # manages to invite the system user to a room, that doesn't make it
-            # the server notices room.
-            user_ids = yield self._store.get_users_in_room(room.room_id)
-            if self.server_notices_mxid in user_ids:
-                # we found a room which our user shares with the system notice
-                # user
-                logger.info("Using room %s", room.room_id)
-                room_id = room.room_id
-
-        return room_id
-
-    @defer.inlineCallbacks
-    def invite_user_in_notice_room(self, user_id: str, room_id: str):
-        """Invite the given user to the given server notices room.
+    def invite_user_to_notice_room(self, user_id: str, room_id: str):
+        """Invite the given user to the given server notices room, unless the user has
+        already joined or been invited to this room.
 
         Args:
             user_id: The ID of the user to invite.
@@ -189,11 +178,15 @@ class ServerNoticesManager(object):
         """
         requester = create_requester(self.server_notices_mxid)
 
-        # Make sure a notice room doesn't already exist for this user, otherwise the auth
-        # checks will make the current request (i.e. sync) fail.
-        existing_room_id = yield self._get_existing_notice_room_for_user(user_id)
-        if existing_room_id:
-            return
+        # Check whether the user has already joined or been invited to this room. If
+        # that's the case, don't invite because otherwise it would make the auth checks
+        # fail.
+        joined_rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
+            user_id, [Membership.INVITE, Membership.JOIN]
+        )
+        for room in joined_rooms:
+            if room.room_id == room_id:
+                return
 
         yield self._room_member_handler.update_membership(
             requester=requester,
