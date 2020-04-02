@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import psycopg2.extras
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 
@@ -24,6 +25,7 @@ class PostgresEngine(BaseDatabaseEngine):
     def __init__(self, database_module, database_config):
         super().__init__(database_module, database_config)
         self.module.extensions.register_type(self.module.extensions.UNICODE)
+        self.module.extensions.set_wait_callback(psycopg2.extras.wait_select)
 
         # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
         # actually want to use bytes than wrap it in `bytearray`.
