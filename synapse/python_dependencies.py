@@ -61,9 +61,7 @@ REQUIREMENTS = [
     "pyasn1-modules>=0.0.7",
     "daemonize>=2.3.1",
     "bcrypt>=3.1.0",
-    # Pillow 7.1.0 causes the following issue on debian buster:
-    # https://github.com/python-pillow/Pillow/issues/2377
-    "pillow>=4.3.0,<7.1.0",
+    "pillow>=4.3.0",
     "sortedcontainers>=1.4.4",
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
