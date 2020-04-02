@@ -34,7 +34,7 @@ esac
 # than the 2/3 compatible `virtualenv`.
 
 dh_virtualenv \
-    --install-suffix "matrix-synapse" \
+    --install-suffix "matrix-synapse[debian]" \
     --builtin-venv \
     --setuptools \
     --python "$SNAKE" \
