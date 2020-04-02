@@ -132,7 +132,7 @@ class BackgroundUpdater(object):
         if self._all_done:
             return True
 
-        # obviously, if we have things in our queue, we're not done.
+        # obviously, if we are currently processing an update, we're not done.
         if self._current_background_update:
             return False
 
