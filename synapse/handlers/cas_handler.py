@@ -74,6 +74,7 @@ class CasHandler:
         Args:
             ticket: The CAS ticket from the client.
             service_args: Additional arguments to include in the service URL.
+                Should be the same as those passed to `get_redirect_url`.
         """
         uri = self._cas_server_url + "/proxyValidate"
         args = {
@@ -149,7 +150,7 @@ class CasHandler:
 
     def get_redirect_url(self, service_args: Dict[str, str]) -> str:
         """
-        Generates a URL to the CAS server where the client should be redirected.
+        Generates a URL for the CAS server where the client should be redirected.
 
         Args:
             service_args: Additional arguments to include in the final redirect URL.
@@ -171,22 +172,23 @@ class CasHandler:
         session: Optional[str],
     ) -> None:
         """
-        Called once the user has successfully authenticated with the SSO,
-        validates a CAS ticket sent by the client and completes the login process.
+        Called once the user has successfully authenticated with the SSO.
+        validates a CAS ticket sent by the client and completes the auth process.
 
         Registers the user if necessary, and then returns a redirect (with
         a login token) to the client.
 
         Args:
             request: the incoming request from the browser. We'll
-                respond to it with a redirect.
+                respond to it with a redirect or an HTML page.
 
             ticket: The CAS ticket provided by the client.
 
-            client_redirect_url: the redirect_url the client gave us when
-                it first started the process.
+            client_redirect_url: the redirectUrl parameter from the `/cas/ticket` HTTP request, if given.
+                This should be the same as the redirectUrl from the original `/login/sso/redirect` request.
 
-            session_id: The UI Auth session ID, if applicable.
+            session_id: The session_id parameter from the `/cas/ticket` HTTP request, if given.
+                This should be the UI Auth session id.
         """
         args = {}
         if client_redirect_url:
