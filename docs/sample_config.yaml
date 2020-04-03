@@ -1927,3 +1927,18 @@ opentracing:
     #
     #  logging:
     #    false
+
+
+# Cache configuration
+#
+# 'global_factor' controls the global cache factor. This overrides the
+# "SYNAPSE_CACHE_FACTOR" environment variable.
+#
+# 'per_cache_factors' is a dictionary of cache name to cache factor for that
+# individual cache.
+#
+#caches:
+#  global_factor: 0.5
+#  per_cache_factors:
+#    get_users_who_share_room_with_user: 2
+#
