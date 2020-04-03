@@ -184,7 +184,7 @@ class SearchHandler(BaseHandler):
             membership_list=[Membership.JOIN],
             # membership_list=[Membership.JOIN, Membership.LEAVE, Membership.Ban],
         )
-        room_ids = set(r.room_id for r in rooms)
+        room_ids = {r.room_id for r in rooms}
 
         # If doing a subset of all rooms seearch, check if any of the rooms
         # are from an upgraded room, and search their contents as well
@@ -374,12 +374,12 @@ class SearchHandler(BaseHandler):
                 ).to_string()
 
                 if include_profile:
-                    senders = set(
+                    senders = {
                         ev.sender
                         for ev in itertools.chain(
                             res["events_before"], [event], res["events_after"]
                         )
-                    )
+                    }
 
                     if res["events_after"]:
                         last_event_id = res["events_after"][-1].event_id
@@ -421,7 +421,7 @@ class SearchHandler(BaseHandler):
 
         state_results = {}
         if include_state:
-            rooms = set(e.room_id for e in allowed_events)
+            rooms = {e.room_id for e in allowed_events}
             for room_id in rooms:
                 state = yield self.state_handler.get_current_state(room_id)
                 state_results[room_id] = list(state.values())

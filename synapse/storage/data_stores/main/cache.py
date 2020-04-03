@@ -16,12 +16,13 @@
 
 import itertools
 import logging
+from typing import Any, Iterable, Optional, Tuple
 
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.engines import PostgresEngine
-from synapse.util import batch_iter
+from synapse.util.iterutils import batch_iter
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,49 @@ logger = logging.getLogger(__name__)
 CURRENT_STATE_CACHE_NAME = "cs_cache_fake"
 
 
-class CacheInvalidationStore(SQLBaseStore):
+class CacheInvalidationWorkerStore(SQLBaseStore):
+    def get_all_updated_caches(self, last_id, current_id, limit):
+        if last_id == current_id:
+            return defer.succeed([])
+
+        def get_all_updated_caches_txn(txn):
+            # We purposefully don't bound by the current token, as we want to
+            # send across cache invalidations as quickly as possible. Cache
+            # invalidations are idempotent, so duplicates are fine.
+            sql = (
+                "SELECT stream_id, cache_func, keys, invalidation_ts"
+                " FROM cache_invalidation_stream"
+                " WHERE stream_id > ? ORDER BY stream_id ASC LIMIT ?"
+            )
+            txn.execute(sql, (last_id, limit))
+            return txn.fetchall()
+
+        return self.db.runInteraction(
+            "get_all_updated_caches", get_all_updated_caches_txn
+        )
+
+
+class CacheInvalidationStore(CacheInvalidationWorkerStore):
+    async def invalidate_cache_and_stream(self, cache_name: str, keys: Tuple[Any, ...]):
+        """Invalidates the cache and adds it to the cache stream so slaves
+        will know to invalidate their caches.
+
+        This should only be used to invalidate caches where slaves won't
+        otherwise know from other replication streams that the cache should
+        be invalidated.
+        """
+        cache_func = getattr(self, cache_name, None)
+        if not cache_func:
+            return
+
+        cache_func.invalidate(keys)
+        await self.runInteraction(
+            "invalidate_cache_and_stream",
+            self._send_invalidation_to_replication,
+            cache_func.__name__,
+            keys,
+        )
+
     def _invalidate_cache_and_stream(self, txn, cache_func, keys):
         """Invalidates the cache and adds it to the cache stream so slaves
         will know to invalidate their caches.
@@ -42,6 +85,14 @@ class CacheInvalidationStore(SQLBaseStore):
         """
         txn.call_after(cache_func.invalidate, keys)
         self._send_invalidation_to_replication(txn, cache_func.__name__, keys)
+
+    def _invalidate_all_cache_and_stream(self, txn, cache_func):
+        """Invalidates the entire cache and adds it to the cache stream so slaves
+        will know to invalidate their caches.
+        """
+
+        txn.call_after(cache_func.invalidate_all)
+        self._send_invalidation_to_replication(txn, cache_func.__name__, None)
 
     def _invalidate_state_caches_and_stream(self, txn, room_id, members_changed):
         """Special case invalidation of caches based on current state.
@@ -73,16 +124,23 @@ class CacheInvalidationStore(SQLBaseStore):
                 txn, CURRENT_STATE_CACHE_NAME, [room_id]
             )
 
-    def _send_invalidation_to_replication(self, txn, cache_name, keys):
+    def _send_invalidation_to_replication(
+        self, txn, cache_name: str, keys: Optional[Iterable[Any]]
+    ):
         """Notifies replication that given cache has been invalidated.
 
         Note that this does *not* invalidate the cache locally.
 
         Args:
             txn
-            cache_name (str)
-            keys (iterable[str])
+            cache_name
+            keys: Entry to invalidate. If None will invalidate all.
         """
+
+        if cache_name == CURRENT_STATE_CACHE_NAME and keys is None:
+            raise Exception(
+                "Can't stream invalidate all with magic current state cache"
+            )
 
         if isinstance(self.database_engine, PostgresEngine):
             # get_next() returns a context manager which is designed to wrap
@@ -95,36 +153,19 @@ class CacheInvalidationStore(SQLBaseStore):
             txn.call_after(ctx.__exit__, None, None, None)
             txn.call_after(self.hs.get_notifier().on_new_replication_data)
 
+            if keys is not None:
+                keys = list(keys)
+
             self.db.simple_insert_txn(
                 txn,
                 table="cache_invalidation_stream",
                 values={
                     "stream_id": stream_id,
                     "cache_func": cache_name,
-                    "keys": list(keys),
+                    "keys": keys,
                     "invalidation_ts": self.clock.time_msec(),
                 },
             )
-
-    def get_all_updated_caches(self, last_id, current_id, limit):
-        if last_id == current_id:
-            return defer.succeed([])
-
-        def get_all_updated_caches_txn(txn):
-            # We purposefully don't bound by the current token, as we want to
-            # send across cache invalidations as quickly as possible. Cache
-            # invalidations are idempotent, so duplicates are fine.
-            sql = (
-                "SELECT stream_id, cache_func, keys, invalidation_ts"
-                " FROM cache_invalidation_stream"
-                " WHERE stream_id > ? ORDER BY stream_id ASC LIMIT ?"
-            )
-            txn.execute(sql, (last_id, limit))
-            return txn.fetchall()
-
-        return self.db.runInteraction(
-            "get_all_updated_caches", get_all_updated_caches_txn
-        )
 
     def get_cache_stream_token(self):
         if self._cache_id_gen:

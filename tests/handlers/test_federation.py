@@ -99,6 +99,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
         room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(self.store.get_room_version(room_id))
 
         # pretend that another server has joined
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
@@ -120,7 +121,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 "auth_events": [],
                 "origin_server_ts": self.clock.time_msec(),
             },
-            join_event.format_version,
+            room_version,
         )
 
         with LoggingContext(request="send_rejected"):
@@ -149,6 +150,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
         room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_version = self.get_success(self.store.get_room_version(room_id))
 
         # pretend that another server has joined
         join_event = self._build_and_send_join_event(OTHER_SERVER, OTHER_USER, room_id)
@@ -171,7 +173,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 "auth_events": [],
                 "origin_server_ts": self.clock.time_msec(),
             },
-            join_event.format_version,
+            room_version,
         )
 
         with LoggingContext(request="send_rejected"):

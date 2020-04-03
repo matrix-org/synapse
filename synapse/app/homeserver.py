@@ -298,6 +298,11 @@ class SynapseHomeServer(HomeServer):
 
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
+current_mau_by_service_gauge = Gauge(
+    "synapse_admin_mau_current_mau_by_service",
+    "Current MAU by service",
+    ["app_service"],
+)
 max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
 registered_reserved_users_mau_gauge = Gauge(
     "synapse_admin_mau:registered_reserved_users",
@@ -403,7 +408,6 @@ def setup(config_options):
 
             _base.start(hs, config.listeners)
 
-            hs.get_pusherpool().start()
             hs.get_datastore().db.updates.start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.
@@ -585,12 +589,20 @@ def run(hs):
     @defer.inlineCallbacks
     def generate_monthly_active_users():
         current_mau_count = 0
+        current_mau_count_by_service = {}
         reserved_users = ()
         store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
             current_mau_count = yield store.get_monthly_active_count()
+            current_mau_count_by_service = (
+                yield store.get_monthly_active_count_by_service()
+            )
             reserved_users = yield store.get_registered_reserved_users()
         current_mau_gauge.set(float(current_mau_count))
+
+        for app_service, count in current_mau_count_by_service.items():
+            current_mau_by_service_gauge.labels(app_service).set(float(count))
+
         registered_reserved_users_mau_gauge.set(float(len(reserved_users)))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 

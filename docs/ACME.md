@@ -1,12 +1,48 @@
 # ACME
 
-Synapse v1.0 will require valid TLS certificates for communication between
-servers (port `8448` by default) in addition to those that are client-facing
-(port `443`). If you do not already have a valid certificate for your domain,
-the easiest way to get one is with Synapse's new ACME support, which will use
-the ACME protocol to provision a certificate automatically. Synapse v0.99.0+
-will provision server-to-server certificates automatically for you for free
-through [Let's Encrypt](https://letsencrypt.org/) if you tell it to.
+From version 1.0 (June 2019) onwards, Synapse requires valid TLS
+certificates for communication between servers (by default on port
+`8448`) in addition to those that are client-facing (port `443`). To
+help homeserver admins fulfil this new requirement, Synapse v0.99.0
+introduced support for automatically provisioning certificates through 
+[Let's Encrypt](https://letsencrypt.org/) using the ACME protocol.
+
+## Deprecation of ACME v1
+
+In [March 2019](https://community.letsencrypt.org/t/end-of-life-plan-for-acmev1/88430),
+Let's Encrypt announced that they were deprecating version 1 of the ACME
+protocol, with the plan to disable the use of it for new accounts in
+November 2019, and for existing accounts in June 2020.
+
+Synapse doesn't currently support version 2 of the ACME protocol, which
+means that:
+
+* for existing installs, Synapse's built-in ACME support will continue
+  to work until June 2020.
+* for new installs, this feature will not work at all.
+
+Either way, it is recommended to move from Synapse's ACME support
+feature to an external automated tool such as [certbot](https://github.com/certbot/certbot)
+(or browse [this list](https://letsencrypt.org/fr/docs/client-options/)
+for an alternative ACME client).
+
+It's also recommended to use a reverse proxy for the server-facing
+communications (more documentation about this can be found
+[here](/docs/reverse_proxy.md)) as well as the client-facing ones and
+have it serve the certificates.
+
+In case you can't do that and need Synapse to serve them itself, make
+sure to set the `tls_certificate_path` configuration setting to the path
+of the certificate (make sure to use the certificate containing the full
+certification chain, e.g. `fullchain.pem` if using certbot) and
+`tls_private_key_path` to the path of the matching private key. Note
+that in this case you will need to restart Synapse after each
+certificate renewal so that Synapse stops using the old certificate.
+
+If you still want to use Synapse's built-in ACME support, the rest of
+this document explains how to set it up. 
+
+## Initial setup 
 
 In the case that your `server_name` config variable is the same as
 the hostname that the client connects to, then the same certificate can be
@@ -31,11 +67,6 @@ available under "ACME setup" below.
 If you already have certificates, you will need to back up or delete them
 (files `example.com.tls.crt` and `example.com.tls.key` in Synapse's root
 directory), Synapse's ACME implementation will not overwrite them.
-
-You may wish to use alternate methods such as Certbot to obtain a certificate
-from Let's Encrypt, depending on your server configuration. Of course, if you
-already have a valid certificate for your homeserver's domain, that can be
-placed in Synapse's config directory without the need for any ACME setup.
 
 ## ACME setup
 

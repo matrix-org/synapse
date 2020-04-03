@@ -16,7 +16,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Set
 
 from six import iteritems, itervalues
 
@@ -394,7 +394,7 @@ class StateHandler(object):
                 delta_ids=delta_ids,
             )
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
 
         result = yield self._state_resolution_handler.resolve_state_groups(
             room_id,
@@ -662,23 +662,16 @@ class StateResolutionStore(object):
             allow_rejected=allow_rejected,
         )
 
-    def get_auth_chain(self, event_ids):
-        """Gets the full auth chain for a set of events (including rejected
-        events).
+    def get_auth_chain_difference(self, state_sets: List[Set[str]]):
+        """Given sets of state events figure out the auth chain difference (as
+        per state res v2 algorithm).
 
-        Includes the given event IDs in the result.
-
-        Note that:
-            1. All events must be state events.
-            2. For v1 rooms this may not have the full auth chain in the
-               presence of rejected events
-
-        Args:
-            event_ids (list): The event IDs of the events to fetch the auth
-                chain for. Must be state events.
+        This equivalent to fetching the full auth chain for each set of state
+        and returning the events that don't appear in each and every auth
+        chain.
 
         Returns:
-            Deferred[list[str]]: List of event IDs of the auth chain.
+            Deferred[Set[str]]: Set of event IDs.
         """
 
-        return self.store.get_auth_chain_ids(event_ids, include_given=True)
+        return self.store.get_auth_chain_difference(state_sets)

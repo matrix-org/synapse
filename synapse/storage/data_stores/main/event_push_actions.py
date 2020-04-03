@@ -608,6 +608,23 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
         return range_end
 
+    @defer.inlineCallbacks
+    def get_time_of_last_push_action_before(self, stream_ordering):
+        def f(txn):
+            sql = (
+                "SELECT e.received_ts"
+                " FROM event_push_actions AS ep"
+                " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
+                " WHERE ep.stream_ordering > ?"
+                " ORDER BY ep.stream_ordering ASC"
+                " LIMIT 1"
+            )
+            txn.execute(sql, (stream_ordering,))
+            return txn.fetchone()
+
+        result = yield self.db.runInteraction("get_time_of_last_push_action_before", f)
+        return result[0] if result else None
+
 
 class EventPushActionsStore(EventPushActionsWorkerStore):
     EPA_HIGHLIGHT_INDEX = "epa_highlight_index"
@@ -734,23 +751,6 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         for pa in push_actions:
             pa["actions"] = _deserialize_action(pa["actions"], pa["highlight"])
         return push_actions
-
-    @defer.inlineCallbacks
-    def get_time_of_last_push_action_before(self, stream_ordering):
-        def f(txn):
-            sql = (
-                "SELECT e.received_ts"
-                " FROM event_push_actions AS ep"
-                " JOIN events e ON ep.room_id = e.room_id AND ep.event_id = e.event_id"
-                " WHERE ep.stream_ordering > ?"
-                " ORDER BY ep.stream_ordering ASC"
-                " LIMIT 1"
-            )
-            txn.execute(sql, (stream_ordering,))
-            return txn.fetchone()
-
-        result = yield self.db.runInteraction("get_time_of_last_push_action_before", f)
-        return result[0] if result else None
 
     @defer.inlineCallbacks
     def get_latest_push_action_stream_ordering(self):

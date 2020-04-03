@@ -41,6 +41,7 @@ def _load_rules(rawrules, enabled_map):
         rule = dict(rawrule)
         rule["conditions"] = json.loads(rawrule["conditions"])
         rule["actions"] = json.loads(rawrule["actions"])
+        rule["default"] = False
         ruleslist.append(rule)
 
     # We're going to be mutating this a lot, so do a deep copy
@@ -276,21 +277,21 @@ class PushRulesWorkerStore(
         # We ignore app service users for now. This is so that we don't fill
         # up the `get_if_users_have_pushers` cache with AS entries that we
         # know don't have pushers, nor even read receipts.
-        local_users_in_room = set(
+        local_users_in_room = {
             u
             for u in users_in_room
             if self.hs.is_mine_id(u)
             and not self.get_if_app_services_interested_in_user(u)
-        )
+        }
 
         # users in the room who have pushers need to get push rules run because
         # that's how their pushers work
         if_users_with_pushers = yield self.get_if_users_have_pushers(
             local_users_in_room, on_invalidate=cache_context.invalidate
         )
-        user_ids = set(
+        user_ids = {
             uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
-        )
+        }
 
         users_with_receipts = yield self.get_users_with_read_receipts_in_room(
             room_id, on_invalidate=cache_context.invalidate

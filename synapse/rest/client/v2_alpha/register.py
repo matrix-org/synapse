@@ -21,6 +21,7 @@ from typing import List, Union
 from six import string_types
 
 import synapse
+import synapse.api.auth
 import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -48,6 +49,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.stringutils import assert_valid_client_secret
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -115,6 +117,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
 
         # Extract params from body
         client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
+
         email = body["email"]
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
@@ -369,6 +373,7 @@ class RegisterRestServlet(RestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()
+        self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
 
         self._registration_flows = _calculate_registration_flows(
@@ -405,7 +410,7 @@ class RegisterRestServlet(RestServlet):
             return ret
         elif kind != b"user":
             raise UnrecognizedRequestError(
-                "Do not understand membership kind: %s" % (kind,)
+                "Do not understand membership kind: %s" % (kind.decode("utf8"),)
             )
 
         # we do basic sanity checks here because the auth layer will store these
@@ -416,6 +421,7 @@ class RegisterRestServlet(RestServlet):
                 or len(body["password"]) > 512
             ):
                 raise SynapseError(400, "Invalid password")
+            self.password_policy_handler.validate_password(body["password"])
 
         desired_username = None
         if "username" in body:
@@ -495,7 +501,11 @@ class RegisterRestServlet(RestServlet):
             )
 
         auth_result, params, session_id = await self.auth_handler.check_auth(
-            self._registration_flows, body, self.hs.get_ip_from_request(request)
+            self._registration_flows,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "register a new account",
         )
 
         # Check that we're not trying to register a denied 3pid.

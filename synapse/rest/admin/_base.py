@@ -29,7 +29,7 @@ def historical_admin_path_patterns(path_regex):
     Note that this should only be used for existing endpoints: new ones should just
     register for the /_synapse/admin path.
     """
-    return list(
+    return [
         re.compile(prefix + path_regex)
         for prefix in (
             "^/_synapse/admin/v1",
@@ -37,7 +37,22 @@ def historical_admin_path_patterns(path_regex):
             "^/_matrix/client/unstable/admin",
             "^/_matrix/client/r0/admin",
         )
-    )
+    ]
+
+
+def admin_patterns(path_regex: str):
+    """Returns the list of patterns for an admin endpoint
+
+    Args:
+        path_regex: The regex string to match. This should NOT have a ^
+            as this will be prefixed.
+
+    Returns:
+        A list of regex patterns.
+    """
+    admin_prefix = "^/_synapse/admin/v1"
+    patterns = [re.compile(admin_prefix + path_regex)]
+    return patterns
 
 
 async def assert_requester_is_admin(auth, request):

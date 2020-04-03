@@ -13,11 +13,10 @@
 # limitations under the License.
 
 import logging
+from typing import Dict, Set
 
 from canonicaljson import encode_canonical_json, json
 from signedjson.sign import sign_json
-
-from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
@@ -103,7 +102,7 @@ class RemoteKey(DirectServeResource):
     async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
             (server,) = request.postpath
-            query = {server.decode("ascii"): {}}
+            query = {server.decode("ascii"): {}}  # type: dict
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
             minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
@@ -124,8 +123,7 @@ class RemoteKey(DirectServeResource):
 
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    @defer.inlineCallbacks
-    def query_keys(self, request, query, query_remote_on_cache_miss=False):
+    async def query_keys(self, request, query, query_remote_on_cache_miss=False):
         logger.info("Handling query for keys %r", query)
 
         store_queries = []
@@ -142,13 +140,13 @@ class RemoteKey(DirectServeResource):
             for key_id in key_ids:
                 store_queries.append((server_name, key_id, None))
 
-        cached = yield self.store.get_server_keys_json(store_queries)
+        cached = await self.store.get_server_keys_json(store_queries)
 
         json_results = set()
 
         time_now_ms = self.clock.time_msec()
 
-        cache_misses = dict()
+        cache_misses = {}  # type: Dict[str, Set[str]]
         for (server_name, key_id, from_server), results in cached.items():
             results = [(result["ts_added_ms"], result) for result in results]
 
@@ -214,8 +212,8 @@ class RemoteKey(DirectServeResource):
                     json_results.add(bytes(result["key_json"]))
 
         if cache_misses and query_remote_on_cache_miss:
-            yield self.fetcher.get_keys(cache_misses)
-            yield self.query_keys(request, query, query_remote_on_cache_miss=False)
+            await self.fetcher.get_keys(cache_misses)
+            await self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
             signed_keys = []
             for key_json in json_results:

@@ -52,7 +52,6 @@ class VersionsRestServlet(RestServlet):
                 ],
                 # as per MSC1497:
                 "unstable_features": {
-                    "m.lazy_load_members": True,
                     # as per MSC2190, as amended by MSC2264
                     # to be removed in r0.6.0
                     "m.id_access_token": True,
@@ -73,6 +72,8 @@ class VersionsRestServlet(RestServlet):
                     "org.matrix.label_based_filtering": True,
                     # Implements support for cross signing as described in MSC1756
                     "org.matrix.e2e_cross_signing": True,
+                    # Implements additional endpoints as described in MSC2432
+                    "org.matrix.msc2432": True,
                 },
             },
         )

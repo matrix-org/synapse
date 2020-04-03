@@ -58,71 +58,11 @@ class AdminHandler(BaseHandler):
         ret = await self.store.get_user_by_id(user.to_string())
         if ret:
             profile = await self.store.get_profileinfo(user.localpart)
+            threepids = await self.store.user_get_threepids(user.to_string())
             ret["displayname"] = profile.display_name
             ret["avatar_url"] = profile.avatar_url
+            ret["threepids"] = threepids
         return ret
-
-    async def get_users(self):
-        """Function to retrieve a list of users in users table.
-
-        Args:
-        Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
-        """
-        ret = await self.store.get_users()
-
-        return ret
-
-    async def get_users_paginate(self, start, limit, name, guests, deactivated):
-        """Function to retrieve a paginated list of users from
-        users list. This will return a json list of users.
-
-        Args:
-            start (int): start number to begin the query from
-            limit (int): number of rows to retrieve
-            name (string): filter for user names
-            guests (bool): whether to in include guest users
-            deactivated (bool): whether to include deactivated users
-        Returns:
-            defer.Deferred: resolves to json list[dict[str, Any]]
-        """
-        ret = await self.store.get_users_paginate(
-            start, limit, name, guests, deactivated
-        )
-
-        return ret
-
-    async def search_users(self, term):
-        """Function to search users list for one or more users with
-        the matched term.
-
-        Args:
-            term (str): search term
-        Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
-        """
-        ret = await self.store.search_users(term)
-
-        return ret
-
-    def get_user_server_admin(self, user):
-        """
-        Get the admin bit on a user.
-
-        Args:
-            user_id (UserID): the (necessarily local) user to manipulate
-        """
-        return self.store.is_server_admin(user)
-
-    def set_user_server_admin(self, user, admin):
-        """
-        Set the admin bit on a user.
-
-        Args:
-            user_id (UserID): the (necessarily local) user to manipulate
-            admin (bool): whether or not the user should be an admin of this server
-        """
-        return self.store.set_server_admin(user, admin)
 
     async def export_user_data(self, user_id, writer):
         """Write all data we have on the user to the given writer.

@@ -17,8 +17,8 @@ from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.presence import UserPresenceState
-from synapse.util import batch_iter
 from synapse.util.caches.descriptors import cached, cachedList
+from synapse.util.iterutils import batch_iter
 
 
 class PresenceStore(SQLBaseStore):
@@ -60,7 +60,7 @@ class PresenceStore(SQLBaseStore):
                     "status_msg": state.status_msg,
                     "currently_active": state.currently_active,
                 }
-                for state in presence_states
+                for stream_id, state in zip(stream_orderings, presence_states)
             ],
         )
 
@@ -73,19 +73,22 @@ class PresenceStore(SQLBaseStore):
             )
             txn.execute(sql + clause, [stream_id] + list(args))
 
-    def get_all_presence_updates(self, last_id, current_id):
+    def get_all_presence_updates(self, last_id, current_id, limit):
         if last_id == current_id:
             return defer.succeed([])
 
         def get_all_presence_updates_txn(txn):
-            sql = (
-                "SELECT stream_id, user_id, state, last_active_ts,"
-                " last_federation_update_ts, last_user_sync_ts, status_msg,"
-                " currently_active"
-                " FROM presence_stream"
-                " WHERE ? < stream_id AND stream_id <= ?"
-            )
-            txn.execute(sql, (last_id, current_id))
+            sql = """
+                SELECT stream_id, user_id, state, last_active_ts,
+                    last_federation_update_ts, last_user_sync_ts,
+                    status_msg,
+                currently_active
+                FROM presence_stream
+                WHERE ? < stream_id AND stream_id <= ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """
+            txn.execute(sql, (last_id, current_id, limit))
             return txn.fetchall()
 
         return self.db.runInteraction(

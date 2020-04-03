@@ -57,6 +57,9 @@ class RoomVersion(object):
     state_res = attr.ib()  # int; one of the StateResolutionVersions
     enforce_key_validity = attr.ib()  # bool
 
+    # bool: before MSC2261/MSC2432, m.room.aliases had special auth rules and redaction rules
+    special_case_aliases_auth = attr.ib(type=bool, default=False)
+
 
 class RoomVersions(object):
     V1 = RoomVersion(
@@ -65,6 +68,7 @@ class RoomVersions(object):
         EventFormatVersions.V1,
         StateResolutionVersions.V1,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
     )
     V2 = RoomVersion(
         "2",
@@ -72,6 +76,7 @@ class RoomVersions(object):
         EventFormatVersions.V1,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
     )
     V3 = RoomVersion(
         "3",
@@ -79,6 +84,7 @@ class RoomVersions(object):
         EventFormatVersions.V2,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
     )
     V4 = RoomVersion(
         "4",
@@ -86,6 +92,7 @@ class RoomVersions(object):
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
     )
     V5 = RoomVersion(
         "5",
@@ -93,6 +100,15 @@ class RoomVersions(object):
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
+        special_case_aliases_auth=True,
+    )
+    MSC2432_DEV = RoomVersion(
+        "org.matrix.msc2432",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
     )
 
 
@@ -104,5 +120,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V3,
         RoomVersions.V4,
         RoomVersions.V5,
+        RoomVersions.MSC2432_DEV,
     )
 }  # type: Dict[str, RoomVersion]

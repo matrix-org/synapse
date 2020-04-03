@@ -35,7 +35,7 @@ class PushConfig(Config):
 
         # Now check for the one in the 'email' section and honour it,
         # with a warning.
-        push_config = config.get("email", {})
+        push_config = config.get("email") or {}
         redact_content = push_config.get("redact_content")
         if redact_content is not None:
             print(
