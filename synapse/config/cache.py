@@ -44,6 +44,10 @@ class CacheConfig(Config):
 
     @staticmethod
     def _reset():
+        """Resets the caches to their defaults.
+
+        Used for tests.
+        """
         CACHE_PROPERTIES["default_size_factor"] = float(os.environ.get(_CACHE_PREFIX, 0.5))
         CACHE_PROPERTIES["ensure_correct_cache_sizing"] = None
         _CACHES.clear()
