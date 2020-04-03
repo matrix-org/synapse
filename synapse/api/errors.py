@@ -93,7 +93,6 @@ class CodeMessageException(RuntimeError):
         # This causes inconsistency in our log lines.
         #
         # To eliminate this behaviour, we convert them to their integer equivalents here.
-        # TODO: Clean up all calls to this method such that this type cast isn't needed
         self.code = int(code)
         self.msg = msg
 
