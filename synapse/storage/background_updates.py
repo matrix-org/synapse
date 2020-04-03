@@ -179,7 +179,7 @@ class BackgroundUpdater(object):
             desired_duration_ms(float): How long we want to spend
                 updating.
         Returns:
-            True if there is no more work to do, otherwise False
+            True if we have finished running all the background updates, otherwise False
         """
 
         def get_background_updates_txn(txn):
