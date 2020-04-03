@@ -1,3 +1,13 @@
+Synapse 1.12.2 (2020-04-02)
+===========================
+
+This release works around [an
+issue](https://github.com/matrix-org/synapse/issues/7208) with building the
+debian packages.
+
+No other significant changes since 1.12.1.
+
+
 Synapse 1.12.1 (2020-04-02)
 ===========================
 
