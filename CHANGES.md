@@ -1,3 +1,9 @@
+Synapse 1.12.3 (2020-04-03)
+===========================
+
+- Remove the the pin to Pillow 7.0 which was introduced in Synapse 1.12.2, and
+correctly fix the issue with building the Debian packages. ([\#7212](https://github.com/matrix-org/synapse/issues/7212))
+
 Synapse 1.12.2 (2020-04-02)
 ===========================
 

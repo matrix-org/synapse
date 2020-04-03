@@ -1,3 +1,14 @@
+matrix-synapse-py3 (1.12.3) stable; urgency=medium
+
+  [ Richard van der Hoff ]
+  * Update the Debian build scripts to handle the new installation paths
+   for the support libraries introduced by Pillow 7.1.1.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.12.3.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 03 Apr 2020 10:55:03 +0100
+
 matrix-synapse-py3 (1.12.2) stable; urgency=medium
 
   * New synapse release 1.12.2.
