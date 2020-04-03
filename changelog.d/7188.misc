@@ -1,1 +1,1 @@
-Fix consistency of HTTP status codes reported in log lines. Instances of `HTTPStatus.*` are replaced with their integer equivalent.
+Fix consistency of HTTP status codes reported in log lines.

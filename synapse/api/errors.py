@@ -80,7 +80,7 @@ class CodeMessageException(RuntimeError):
     """An exception with integer code and message string attributes.
 
     Attributes:
-        code (int): HTTP error code.
+        code (int): HTTP error code
         msg (str): string describing the error
     """
 
