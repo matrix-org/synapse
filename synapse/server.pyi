@@ -114,3 +114,5 @@ class HomeServer(object):
         pass
     def is_mine_id(self, domain_id: str) -> bool:
         pass
+    def get_instance_id(self) -> str:
+        pass

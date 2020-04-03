@@ -127,7 +127,11 @@ class DirectoryHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE,
                 )
         else:
-            if self.require_membership and check_membership:
+            # Server admins are not subject to the same constraints as normal
+            # users when creating an alias (e.g. being in the room).
+            is_admin = yield self.auth.is_server_admin(requester.user)
+
+            if (self.require_membership and check_membership) and not is_admin:
                 rooms_for_user = yield self.store.get_rooms_for_user(user_id)
                 if room_id not in rooms_for_user:
                     raise AuthError(

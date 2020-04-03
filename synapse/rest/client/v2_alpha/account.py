@@ -234,13 +234,21 @@ class PasswordRestServlet(RestServlet):
         if self.auth.has_access_token(request):
             requester = await self.auth.get_user_by_req(request)
             params = await self.auth_handler.validate_user_via_ui_auth(
-                requester, body, self.hs.get_ip_from_request(request)
+                requester,
+                request,
+                body,
+                self.hs.get_ip_from_request(request),
+                "modify your account password",
             )
             user_id = requester.user.to_string()
         else:
             requester = None
             result, params, _ = await self.auth_handler.check_auth(
-                [[LoginType.EMAIL_IDENTITY]], body, self.hs.get_ip_from_request(request)
+                [[LoginType.EMAIL_IDENTITY]],
+                request,
+                body,
+                self.hs.get_ip_from_request(request),
+                "modify your account password",
             )
 
             if LoginType.EMAIL_IDENTITY in result:
@@ -308,7 +316,11 @@ class DeactivateAccountRestServlet(RestServlet):
             return 200, {}
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "deactivate your account",
         )
         result = await self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase, id_server=body.get("id_server")
@@ -602,6 +614,11 @@ class ThreepidRestServlet(RestServlet):
         return 200, {"threepids": threepids}
 
     async def on_POST(self, request):
+        if not self.hs.config.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -646,6 +663,11 @@ class ThreepidAddRestServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request):
+        if not self.hs.config.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -656,7 +678,11 @@ class ThreepidAddRestServlet(RestServlet):
         assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "add a third-party identifier to your account",
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(
@@ -741,10 +767,16 @@ class ThreepidDeleteRestServlet(RestServlet):
 
     def __init__(self, hs):
         super(ThreepidDeleteRestServlet, self).__init__()
+        self.hs = hs
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
 
     async def on_POST(self, request):
+        if not self.hs.config.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["medium", "address"])
 

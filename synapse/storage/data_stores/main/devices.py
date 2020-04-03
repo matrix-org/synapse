@@ -41,6 +41,7 @@ from synapse.util.caches.descriptors import (
     cachedList,
 )
 from synapse.util.iterutils import batch_iter
+from synapse.util.stringutils import shortstr
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +165,6 @@ class DeviceWorkerStore(SQLBaseStore):
         # the max stream_id across each set of duplicate entries
         #
         # maps (user_id, device_id) -> (stream_id, opentracing_context)
-        # as long as their stream_id does not match that of the last row
         #
         # opentracing_context contains the opentracing metadata for the request
         # that created the poke
@@ -269,7 +269,14 @@ class DeviceWorkerStore(SQLBaseStore):
             prev_id = yield self._get_last_device_update_for_remote_user(
                 destination, user_id, from_stream_id
             )
-            for device_id, device in iteritems(user_devices):
+
+            # make sure we go through the devices in stream order
+            device_ids = sorted(
+                user_devices.keys(), key=lambda i: query_map[(user_id, i)][0],
+            )
+
+            for device_id in device_ids:
+                device = user_devices[device_id]
                 stream_id, opentracing_context = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
@@ -285,14 +292,16 @@ class DeviceWorkerStore(SQLBaseStore):
                     key_json = device.get("key_json", None)
                     if key_json:
                         result["keys"] = db_to_json(key_json)
+
+                        if "signatures" in device:
+                            for sig_user_id, sigs in device["signatures"].items():
+                                result["keys"].setdefault("signatures", {}).setdefault(
+                                    sig_user_id, {}
+                                ).update(sigs)
+
                     device_display_name = device.get("device_display_name", None)
                     if device_display_name:
                         result["device_display_name"] = device_display_name
-                    if "signatures" in device:
-                        for sig_user_id, sigs in device["signatures"].items():
-                            result["keys"].setdefault("signatures", {}).setdefault(
-                                sig_user_id, {}
-                            ).update(sigs)
                 else:
                     result["deleted"] = True
 
@@ -493,14 +502,16 @@ class DeviceWorkerStore(SQLBaseStore):
                 key_json = device.get("key_json", None)
                 if key_json:
                     result["keys"] = db_to_json(key_json)
+
+                    if "signatures" in device:
+                        for sig_user_id, sigs in device["signatures"].items():
+                            result["keys"].setdefault("signatures", {}).setdefault(
+                                sig_user_id, {}
+                            ).update(sigs)
+
                 device_display_name = device.get("device_display_name", None)
                 if device_display_name:
                     result["device_display_name"] = device_display_name
-                if "signatures" in device:
-                    for sig_user_id, sigs in device["signatures"].items():
-                        result["keys"].setdefault("signatures", {}).setdefault(
-                            sig_user_id, {}
-                        ).update(sigs)
 
                 results.append(result)
 
@@ -1092,18 +1103,47 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             ],
         )
 
-    def _prune_old_outbound_device_pokes(self):
+    def _prune_old_outbound_device_pokes(self, prune_age=24 * 60 * 60 * 1000):
         """Delete old entries out of the device_lists_outbound_pokes to ensure
-        that we don't fill up due to dead servers. We keep one entry per
-        (destination, user_id) tuple to ensure that the prev_ids remain correct
-        if the server does come back.
+        that we don't fill up due to dead servers.
+
+        Normally, we try to send device updates as a delta since a previous known point:
+        this is done by setting the prev_id in the m.device_list_update EDU. However,
+        for that to work, we have to have a complete record of each change to
+        each device, which can add up to quite a lot of data.
+
+        An alternative mechanism is that, if the remote server sees that it has missed
+        an entry in the stream_id sequence for a given user, it will request a full
+        list of that user's devices. Hence, we can reduce the amount of data we have to
+        store (and transmit in some future transaction), by clearing almost everything
+        for a given destination out of the database, and having the remote server
+        resync.
+
+        All we need to do is make sure we keep at least one row for each
+        (user, destination) pair, to remind us to send a m.device_list_update EDU for
+        that user when the destination comes back. It doesn't matter which device
+        we keep.
         """
-        yesterday = self._clock.time_msec() - 24 * 60 * 60 * 1000
+        yesterday = self._clock.time_msec() - prune_age
 
         def _prune_txn(txn):
+            # look for (user, destination) pairs which have an update older than
+            # the cutoff.
+            #
+            # For each pair, we also need to know the most recent stream_id, and
+            # an arbitrary device_id at that stream_id.
             select_sql = """
-                SELECT destination, user_id, max(stream_id) as stream_id
-                FROM device_lists_outbound_pokes
+            SELECT
+                dlop1.destination,
+                dlop1.user_id,
+                MAX(dlop1.stream_id) AS stream_id,
+                (SELECT MIN(dlop2.device_id) AS device_id FROM
+                    device_lists_outbound_pokes dlop2
+                    WHERE dlop2.destination = dlop1.destination AND
+                      dlop2.user_id=dlop1.user_id AND
+                      dlop2.stream_id=MAX(dlop1.stream_id)
+                )
+            FROM device_lists_outbound_pokes dlop1
                 GROUP BY destination, user_id
                 HAVING min(ts) < ? AND count(*) > 1
             """
@@ -1114,14 +1154,29 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             if not rows:
                 return
 
+            logger.info(
+                "Pruning old outbound device list updates for %i users/destinations: %s",
+                len(rows),
+                shortstr((row[0], row[1]) for row in rows),
+            )
+
+            # we want to keep the update with the highest stream_id for each user.
+            #
+            # there might be more than one update (with different device_ids) with the
+            # same stream_id, so we also delete all but one rows with the max stream id.
             delete_sql = """
                 DELETE FROM device_lists_outbound_pokes
-                WHERE ts < ? AND destination = ? AND user_id = ? AND stream_id < ?
+                WHERE destination = ? AND user_id = ? AND (
+                    stream_id < ? OR
+                    (stream_id = ? AND device_id != ?)
+                )
             """
-
-            txn.executemany(
-                delete_sql, ((yesterday, row[0], row[1], row[2]) for row in rows)
-            )
+            count = 0
+            for (destination, user_id, stream_id, device_id) in rows:
+                txn.execute(
+                    delete_sql, (destination, user_id, stream_id, stream_id, device_id)
+                )
+                count += txn.rowcount
 
             # Since we've deleted unsent deltas, we need to remove the entry
             # of last successful sent so that the prev_ids are correctly set.
@@ -1131,7 +1186,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             """
             txn.executemany(sql, ((row[0], row[1]) for row in rows))
 
-            logger.info("Pruned %d device list outbound pokes", txn.rowcount)
+            logger.info("Pruned %d device list outbound pokes", count)
 
         return run_as_background_process(
             "prune_old_outbound_device_pokes",

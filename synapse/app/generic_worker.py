@@ -42,7 +42,7 @@ from synapse.handlers.presence import PresenceHandler, get_interested_parties
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
-from synapse.logging.context import LoggingContext, run_in_background
+from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.slave.storage._base import BaseSlavedStore, __func__
@@ -65,6 +65,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import (
     AccountDataStream,
     DeviceListsStream,
@@ -124,7 +125,6 @@ from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
-from synapse.util.stringutils import random_string
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.generic_worker")
@@ -233,6 +233,7 @@ class GenericWorkerPresence(object):
         self.user_to_num_current_syncs = {}
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
+        self.instance_id = hs.get_instance_id()
 
         active_presence = self.store.take_presence_startup_info()
         self.user_to_current_state = {state.user_id: state for state in active_presence}
@@ -245,13 +246,24 @@ class GenericWorkerPresence(object):
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
 
-        self.process_id = random_string(16)
-        logger.info("Presence process_id is %r", self.process_id)
+        hs.get_reactor().addSystemEventTrigger(
+            "before",
+            "shutdown",
+            run_as_background_process,
+            "generic_presence.on_shutdown",
+            self._on_shutdown,
+        )
+
+    def _on_shutdown(self):
+        if self.hs.config.use_presence:
+            self.hs.get_tcp_replication().send_command(
+                ClearUserSyncsCommand(self.instance_id)
+            )
 
     def send_user_sync(self, user_id, is_syncing, last_sync_ms):
         if self.hs.config.use_presence:
             self.hs.get_tcp_replication().send_user_sync(
-                user_id, is_syncing, last_sync_ms
+                self.instance_id, user_id, is_syncing, last_sync_ms
             )
 
     def mark_as_coming_online(self, user_id):
@@ -400,6 +412,9 @@ class GenericWorkerTyping(object):
         for row in rows:
             self._room_serials[row.room_id] = token
             self._room_typing[row.room_id] = row.user_ids
+
+    def get_current_token(self) -> int:
+        return self._latest_room_serial
 
 
 class GenericWorkerSlavedStore(
@@ -620,7 +635,7 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
         await super(GenericWorkerReplicationHandler, self).on_rdata(
             stream_name, token, rows
         )
-        run_in_background(self.process_and_notify, stream_name, token, rows)
+        await self.process_and_notify(stream_name, token, rows)
 
     def get_streams_to_replicate(self):
         args = super(GenericWorkerReplicationHandler, self).get_streams_to_replicate()
@@ -635,7 +650,9 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
     async def process_and_notify(self, stream_name, token, rows):
         try:
             if self.send_handler:
-                self.send_handler.process_replication_rows(stream_name, token, rows)
+                await self.send_handler.process_replication_rows(
+                    stream_name, token, rows
+                )
 
             if stream_name == EventsStream.NAME:
                 # We shouldn't get multiple rows per token for events stream, so
@@ -767,12 +784,12 @@ class FederationSenderHandler(object):
     def stream_positions(self):
         return {"federation": self.federation_position}
 
-    def process_replication_rows(self, stream_name, token, rows):
+    async def process_replication_rows(self, stream_name, token, rows):
         # The federation stream contains things that we want to send out, e.g.
         # presence, typing, etc.
         if stream_name == "federation":
             send_queue.process_rows_for_federation(self.federation_sender, rows)
-            run_in_background(self.update_token, token)
+            await self.update_token(token)
 
         # We also need to poke the federation sender when new events happen
         elif stream_name == "events":
@@ -780,9 +797,7 @@ class FederationSenderHandler(object):
 
         # ... and when new receipts happen
         elif stream_name == ReceiptsStream.NAME:
-            run_as_background_process(
-                "process_receipts_for_federation", self._on_new_receipts, rows
-            )
+            await self._on_new_receipts(rows)
 
         # ... as well as device updates and messages
         elif stream_name == DeviceListsStream.NAME:

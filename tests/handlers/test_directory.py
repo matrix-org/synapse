@@ -102,6 +102,68 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
 
 
+class TestCreateAlias(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        directory.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.handler = hs.get_handlers().directory_handler
+
+        # Create user
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        # Create a test room
+        self.room_id = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok
+        )
+
+        self.test_alias = "#test:test"
+        self.room_alias = RoomAlias.from_string(self.test_alias)
+
+        # Create a test user.
+        self.test_user = self.register_user("user", "pass", admin=False)
+        self.test_user_tok = self.login("user", "pass")
+        self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
+
+    def test_create_alias_joined_room(self):
+        """A user can create an alias for a room they're in."""
+        self.get_success(
+            self.handler.create_association(
+                create_requester(self.test_user), self.room_alias, self.room_id,
+            )
+        )
+
+    def test_create_alias_other_room(self):
+        """A user cannot create an alias for a room they're NOT in."""
+        other_room_id = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok
+        )
+
+        self.get_failure(
+            self.handler.create_association(
+                create_requester(self.test_user), self.room_alias, other_room_id,
+            ),
+            synapse.api.errors.SynapseError,
+        )
+
+    def test_create_alias_admin(self):
+        """An admin can create an alias for a room they're NOT in."""
+        other_room_id = self.helper.create_room_as(
+            self.test_user, tok=self.test_user_tok
+        )
+
+        self.get_success(
+            self.handler.create_association(
+                create_requester(self.admin_user), self.room_alias, other_room_id,
+            )
+        )
+
+
 class TestDeleteAlias(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,

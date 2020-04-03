@@ -872,10 +872,6 @@ media_store_path: "DATADIR/media_store"
 #
 #enable_registration_captcha: false
 
-# A secret key used to bypass the captcha test entirely.
-#
-#captcha_bypass_secret: "YOUR_SECRET_HERE"
-
 # The API endpoint to use for verifying m.login.recaptcha responses.
 #
 #recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
@@ -1090,6 +1086,29 @@ account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
+# Whether users are allowed to change their displayname after it has
+# been initially set. Useful when provisioning users based on the
+# contents of a third-party directory.
+#
+# Does not apply to server administrators. Defaults to 'true'
+#
+#enable_set_displayname: false
+
+# Whether users are allowed to change their avatar after it has been
+# initially set. Useful when provisioning users based on the contents
+# of a third-party directory.
+#
+# Does not apply to server administrators. Defaults to 'true'
+#
+#enable_set_avatar_url: false
+
+# Whether users can change the 3PIDs associated with their accounts
+# (email address and msisdn).
+#
+# Defaults to 'true'
+#
+#enable_3pid_changes: false
+
 # Users who register on this homeserver will automatically be joined
 # to these rooms
 #
@@ -1125,7 +1144,7 @@ account_threepid_delegates:
 # enabled by default, either for performance reasons or limited use.
 #
 metrics_flags:
-    # Publish synapse_federation_known_servers, a g auge of the number of
+    # Publish synapse_federation_known_servers, a gauge of the number of
     # servers this homeserver knows about, including itself. May cause
     # performance problems on large homeservers.
     #
@@ -1425,6 +1444,10 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
+    # If public_baseurl is set, then the login fallback page (used by clients
+    # that don't natively support the required login flows) is whitelisted in
+    # addition to any URLs in this list.
+    #
     # By default, this list is empty.
     #
     #client_whitelist:
@@ -1485,6 +1508,41 @@ password_config:
    # DO NOT CHANGE THIS AFTER INITIAL SETUP!
    #
    #pepper: "EVEN_MORE_SECRET"
+
+   # Define and enforce a password policy. Each parameter is optional.
+   # This is an implementation of MSC2000.
+   #
+   policy:
+      # Whether to enforce the password policy.
+      # Defaults to 'false'.
+      #
+      #enabled: true
+
+      # Minimum accepted length for a password.
+      # Defaults to 0.
+      #
+      #minimum_length: 15
+
+      # Whether a password must contain at least one digit.
+      # Defaults to 'false'.
+      #
+      #require_digit: true
+
+      # Whether a password must contain at least one symbol.
+      # A symbol is any character that's not a number or a letter.
+      # Defaults to 'false'.
+      #
+      #require_symbol: true
+
+      # Whether a password must contain at least one lowercase letter.
+      # Defaults to 'false'.
+      #
+      #require_lowercase: true
+
+      # Whether a password must contain at least one lowercase letter.
+      # Defaults to 'false'.
+      #
+      #require_uppercase: true
 
 
 # Configuration for sending emails from Synapse.
