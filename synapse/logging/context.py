@@ -51,7 +51,7 @@ try:
 
     is_thread_resource_usage_supported = True
 
-    def get_thread_resource_usage():
+    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
         return resource.getrusage(RUSAGE_THREAD)
 
 
@@ -60,7 +60,7 @@ except Exception:
     # won't track resource usage.
     is_thread_resource_usage_supported = False
 
-    def get_thread_resource_usage():
+    def get_thread_resource_usage() -> "Optional[resource._RUsage]":
         return None
 
 
@@ -201,10 +201,10 @@ class _Sentinel(object):
         record["request"] = None
         record["scope"] = None
 
-    def start(self):
+    def start(self, rusage: "Optional[resource._RUsage]"):
         pass
 
-    def stop(self):
+    def stop(self, rusage: "Optional[resource._RUsage]"):
         pass
 
     def add_database_transaction(self, duration_sec):
@@ -261,7 +261,7 @@ class LoggingContext(object):
 
         # The thread resource usage when the logcontext became active. None
         # if the context is not currently active.
-        self.usage_start = None
+        self.usage_start = None  # type: Optional[resource._RUsage]
 
         self.main_thread = get_thread_id()
         self.request = None
@@ -336,7 +336,17 @@ class LoggingContext(object):
         record["request"] = self.request
         record["scope"] = self.scope
 
-    def start(self) -> None:
+    def start(self, rusage: "Optional[resource._RUsage]") -> None:
+        """
+        Record that this logcontext is currently running.
+
+        This should not be called directly: use set_current_context
+
+        Args:
+            rusage: the resources used by the current thread, at the point of
+                switching to this logcontext. May be None if this platform doesn't
+                support getrusuage.
+        """
         if get_thread_id() != self.main_thread:
             logger.warning("Started logcontext %s on different thread", self)
             return
@@ -349,36 +359,48 @@ class LoggingContext(object):
         if self.usage_start:
             logger.warning("Re-starting already-active log context %s", self)
         else:
-            self.usage_start = get_thread_resource_usage()
+            self.usage_start = rusage
 
-    def stop(self) -> None:
-        if get_thread_id() != self.main_thread:
-            logger.warning("Stopped logcontext %s on different thread", self)
-            return
+    def stop(self, rusage: "Optional[resource._RUsage]") -> None:
+        """
+        Record that this logcontext is no longer running.
 
-        # When we stop, let's record the cpu used since we started
-        if not self.usage_start:
-            # Log a warning on platforms that support thread usage tracking
-            if is_thread_resource_usage_supported:
+        This should not be called directly: use set_current_context
+
+        Args:
+            rusage: the resources used by the current thread, at the point of
+                switching away from this logcontext. May be None if this platform
+                doesn't support getrusuage.
+        """
+
+        try:
+            if get_thread_id() != self.main_thread:
+                logger.warning("Stopped logcontext %s on different thread", self)
+                return
+
+            if not rusage:
+                return
+
+            # Record the cpu used since we started
+            if not self.usage_start:
                 logger.warning(
-                    "Called stop on logcontext %s without calling start", self
+                    "Called stop on logcontext %s without recording a start rusage",
+                    self,
                 )
-            return
+                return
 
-        utime_delta, stime_delta = self._get_cputime()
-        self._resource_usage.ru_utime += utime_delta
-        self._resource_usage.ru_stime += stime_delta
+            utime_delta, stime_delta = self._get_cputime(rusage)
+            self._resource_usage.ru_utime += utime_delta
+            self._resource_usage.ru_stime += stime_delta
 
-        self.usage_start = None
+            # if we have a parent, pass our CPU usage stats on
+            if self.parent_context:
+                self.parent_context._resource_usage += self._resource_usage
 
-        # if we have a parent, pass our CPU usage stats on
-        if self.parent_context is not None and hasattr(
-            self.parent_context, "_resource_usage"
-        ):
-            self.parent_context._resource_usage += self._resource_usage
-
-            # reset them in case we get entered again
-            self._resource_usage.reset()
+                # reset them in case we get entered again
+                self._resource_usage.reset()
+        finally:
+            self.usage_start = None
 
     def get_resource_usage(self) -> ContextResourceUsage:
         """Get resources used by this logcontext so far.
@@ -394,22 +416,22 @@ class LoggingContext(object):
         # can include resource usage so far.
         is_main_thread = get_thread_id() == self.main_thread
         if self.usage_start and is_main_thread:
-            utime_delta, stime_delta = self._get_cputime()
+            rusage = get_thread_resource_usage()
+            assert rusage is not None
+            utime_delta, stime_delta = self._get_cputime(rusage)
             res.ru_utime += utime_delta
             res.ru_stime += stime_delta
 
         return res
 
-    def _get_cputime(self) -> Tuple[float, float]:
-        """Get the cpu usage time so far
+    def _get_cputime(self, current: "resource._RUsage") -> Tuple[float, float]:
+        """Get the cpu usage time between start() and the given rusage
+
+        Args:
+            rusage: the current resource usage
 
         Returns: Tuple[float, float]: seconds in user mode, seconds in system mode
         """
-        assert self.usage_start is not None
-
-        current = get_thread_resource_usage()
-
-        # Indicate to mypy that we know that self.usage_start is None.
         assert self.usage_start is not None
 
         utime_delta = current.ru_utime - self.usage_start.ru_utime
@@ -547,9 +569,11 @@ def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSe
     current = current_context()
 
     if current is not context:
-        current.stop()
+        rusage = get_thread_resource_usage()
+        current.stop(rusage)
         _thread_local.current_context = context
-        context.start()
+        context.start(rusage)
+
     return current
 
 
