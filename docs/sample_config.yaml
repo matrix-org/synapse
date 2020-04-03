@@ -33,10 +33,15 @@ server_name: "SERVERNAME"
 #
 pid_file: DATADIR/homeserver.pid
 
-# The path to the web client which will be served at /_matrix/client/
-# if 'webclient' is configured under the 'listeners' configuration.
+# The absolute URL to the web client which /_matrix/client will redirect
+# to if 'webclient' is configured under the 'listeners' configuration.
 #
-#web_client_location: "/path/to/web/root"
+# This option can be also set to the filesystem path to the web client
+# which will be served at /_matrix/client/ if 'webclient' is configured
+# under the 'listeners' configuration, however this is a security risk:
+# https://github.com/matrix-org/synapse#security-note
+#
+#web_client_location: https://riot.example.com/
 
 # The public-facing base URL that clients use to access this HS
 # (not including _matrix/...). This is the same URL a user would
