@@ -45,7 +45,8 @@ inbound_rdata_count = Counter(
 
 
 class ReplicationCommandHandler:
-    """Handles incoming commands from replication.
+    """Handles incoming commands from replication as well as sending commands
+    back out to connections.
     """
 
     def __init__(self, hs):
@@ -92,8 +93,9 @@ class ReplicationCommandHandler:
             raise
 
         if cmd.token is None or stream_name not in self._streams_connected:
-            # I.e. this is part of a batch of updates for this stream. Batch
-            # until we get an update for the stream with a non None token
+            # I.e. either this is part of a batch of updates for this stream (in
+            # which case batch until we get an update for the stream with a non
+            # None token) or we're currently connecting so we queue up rows.
             self._pending_batches.setdefault(stream_name, []).append(row)
         else:
             # Check if this is the last of a batch of updates
@@ -126,7 +128,7 @@ class ReplicationCommandHandler:
         self._streams_connected.discard(cmd.stream_name)
         self._pending_batches.clear()
 
-        # We protect catching up with a linearizer in case the replicaiton
+        # We protect catching up with a linearizer in case the replication
         # connection reconnects under us.
         with await self._position_linearizer.queue(cmd.stream_name):
             # Find where we previously streamed up to.
