@@ -6,6 +6,23 @@ Next version
   configuration then this template will need to be duplicated into that
   directory.
 
+Synapse 1.12.3 (2020-04-03)
+===========================
+
+- Remove the the pin to Pillow 7.0 which was introduced in Synapse 1.12.2, and
+correctly fix the issue with building the Debian packages. ([\#7212](https://github.com/matrix-org/synapse/issues/7212))
+
+Synapse 1.12.2 (2020-04-02)
+===========================
+
+This release works around [an
+issue](https://github.com/matrix-org/synapse/issues/7208) with building the
+debian packages.
+
+No other significant changes since 1.12.1.
+
+>>>>>>> master
+
 Synapse 1.12.1 (2020-04-02)
 ===========================
 
