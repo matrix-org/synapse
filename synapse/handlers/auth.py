@@ -116,7 +116,7 @@ class AuthHandler(BaseHandler):
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
-        self._saml2_enabled = hs.config.saml2_enabled
+        self._sso_enabled = hs.config.saml2_enabled or hs.config.cas_enabled
 
         # we keep this as a list despite the O(N^2) implication so that we can
         # keep PASSWORD first and avoid confusing clients which pick the first
@@ -136,7 +136,7 @@ class AuthHandler(BaseHandler):
         # necessarily identical. Login types have SSO (and other login types)
         # added in the rest layer, see synapse.rest.client.v1.login.LoginRestServerlet.on_GET.
         ui_auth_types = login_types.copy()
-        if self._saml2_enabled:
+        if self._sso_enabled:
             ui_auth_types.append(LoginType.SSO)
         self._supported_ui_auth_types = ui_auth_types
 

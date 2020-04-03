@@ -111,6 +111,11 @@ class AuthRestServlet(RestServlet):
         self._saml_enabled = hs.config.saml2_enabled
         if self._saml_enabled:
             self._saml_handler = hs.get_saml_handler()
+        self._cas_enabled = hs.config.cas_enabled
+        if self._cas_enabled:
+            self._cas_handler = hs.get_cas_handler()
+            self._cas_server_url = hs.config.cas_server_url
+            self._cas_service_url = hs.config.cas_service_url
 
     def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
@@ -133,14 +138,27 @@ class AuthRestServlet(RestServlet):
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
             }
 
-        elif stagetype == LoginType.SSO and self._saml_enabled:
+        elif stagetype == LoginType.SSO:
             # Display a confirmation page which prompts the user to
             # re-authenticate with their SSO provider.
-            client_redirect_url = ""
-            sso_redirect_url = self._saml_handler.handle_redirect_request(
-                client_redirect_url, session
-            )
+            if self._cas_enabled:
+                # Generate a request to CAS that redirects back to an endpoint
+                # to verify the successful authentication.
+                sso_redirect_url = self._cas_handler.get_redirect_url(
+                    {"session": session},
+                )
+
+            elif self._saml_enabled:
+                client_redirect_url = ""
+                sso_redirect_url = self._saml_handler.handle_redirect_request(
+                    client_redirect_url, session
+                )
+
+            else:
+                raise SynapseError(400, "Homeserver not configured for SSO.")
+
             html = self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
+
         else:
             raise SynapseError(404, "Unknown auth stage type")
 
