@@ -55,6 +55,10 @@ class CacheConfig(Config):
 
     @staticmethod
     def _reset():
+        """Resets the caches to their defaults.
+        
+        Used for tests.
+        """
         global DEFAULT_CACHE_SIZE_FACTOR
         global _ENSURE_CORRECT_CACHE_SIZING
 
