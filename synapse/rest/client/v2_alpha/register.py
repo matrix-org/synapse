@@ -373,6 +373,7 @@ class RegisterRestServlet(RestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.macaroon_gen = hs.get_macaroon_generator()
         self.ratelimiter = hs.get_registration_ratelimiter()
+        self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
 
         self._registration_flows = _calculate_registration_flows(
@@ -420,6 +421,7 @@ class RegisterRestServlet(RestServlet):
                 or len(body["password"]) > 512
             ):
                 raise SynapseError(400, "Invalid password")
+            self.password_policy_handler.validate_password(body["password"])
 
         desired_username = None
         if "username" in body:
@@ -499,7 +501,11 @@ class RegisterRestServlet(RestServlet):
             )
 
         auth_result, params, session_id = await self.auth_handler.check_auth(
-            self._registration_flows, body, self.hs.get_ip_from_request(request)
+            self._registration_flows,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "register a new account",
         )
 
         # Check that we're not trying to register a denied 3pid.

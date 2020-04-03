@@ -41,6 +41,7 @@ def _load_rules(rawrules, enabled_map):
         rule = dict(rawrule)
         rule["conditions"] = json.loads(rawrule["conditions"])
         rule["actions"] = json.loads(rawrule["actions"])
+        rule["default"] = False
         ruleslist.append(rule)
 
     # We're going to be mutating this a lot, so do a deep copy

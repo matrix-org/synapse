@@ -32,7 +32,7 @@ def do_patch():
     Patch defer.inlineCallbacks so that it checks the state of the logcontext on exit
     """
 
-    from synapse.logging.context import LoggingContext
+    from synapse.logging.context import current_context
 
     global _already_patched
 
@@ -43,35 +43,35 @@ def do_patch():
     def new_inline_callbacks(f):
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
-            start_context = LoggingContext.current_context()
+            start_context = current_context()
             changes = []  # type: List[str]
             orig = orig_inline_callbacks(_check_yield_points(f, changes))
 
             try:
                 res = orig(*args, **kwargs)
             except Exception:
-                if LoggingContext.current_context() != start_context:
+                if current_context() != start_context:
                     for err in changes:
                         print(err, file=sys.stderr)
 
                     err = "%s changed context from %s to %s on exception" % (
                         f,
                         start_context,
-                        LoggingContext.current_context(),
+                        current_context(),
                     )
                     print(err, file=sys.stderr)
                     raise Exception(err)
                 raise
 
             if not isinstance(res, Deferred) or res.called:
-                if LoggingContext.current_context() != start_context:
+                if current_context() != start_context:
                     for err in changes:
                         print(err, file=sys.stderr)
 
                     err = "Completed %s changed context from %s to %s" % (
                         f,
                         start_context,
-                        LoggingContext.current_context(),
+                        current_context(),
                     )
                     # print the error to stderr because otherwise all we
                     # see in travis-ci is the 500 error
@@ -79,23 +79,23 @@ def do_patch():
                     raise Exception(err)
                 return res
 
-            if LoggingContext.current_context() != LoggingContext.sentinel:
+            if current_context():
                 err = (
                     "%s returned incomplete deferred in non-sentinel context "
                     "%s (start was %s)"
-                ) % (f, LoggingContext.current_context(), start_context)
+                ) % (f, current_context(), start_context)
                 print(err, file=sys.stderr)
                 raise Exception(err)
 
             def check_ctx(r):
-                if LoggingContext.current_context() != start_context:
+                if current_context() != start_context:
                     for err in changes:
                         print(err, file=sys.stderr)
                     err = "%s completion of %s changed context from %s to %s" % (
                         "Failure" if isinstance(r, Failure) else "Success",
                         f,
                         start_context,
-                        LoggingContext.current_context(),
+                        current_context(),
                     )
                     print(err, file=sys.stderr)
                     raise Exception(err)
@@ -127,7 +127,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
         function
     """
 
-    from synapse.logging.context import LoggingContext
+    from synapse.logging.context import current_context
 
     @functools.wraps(f)
     def check_yield_points_inner(*args, **kwargs):
@@ -136,7 +136,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
         last_yield_line_no = gen.gi_frame.f_lineno
         result = None  # type: Any
         while True:
-            expected_context = LoggingContext.current_context()
+            expected_context = current_context()
 
             try:
                 isFailure = isinstance(result, Failure)
@@ -145,7 +145,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
                 else:
                     d = gen.send(result)
             except (StopIteration, defer._DefGen_Return) as e:
-                if LoggingContext.current_context() != expected_context:
+                if current_context() != expected_context:
                     # This happens when the context is lost sometime *after* the
                     # final yield and returning. E.g. we forgot to yield on a
                     # function that returns a deferred.
@@ -159,7 +159,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
                         % (
                             f.__qualname__,
                             expected_context,
-                            LoggingContext.current_context(),
+                            current_context(),
                             f.__code__.co_filename,
                             last_yield_line_no,
                         )
@@ -173,13 +173,13 @@ def _check_yield_points(f: Callable, changes: List[str]):
                 # This happens if we yield on a deferred that doesn't follow
                 # the log context rules without wrapping in a `make_deferred_yieldable`.
                 # We raise here as this should never happen.
-                if LoggingContext.current_context() is not LoggingContext.sentinel:
+                if current_context():
                     err = (
                         "%s yielded with context %s rather than sentinel,"
                         " yielded on line %d in %s"
                         % (
                             frame.f_code.co_name,
-                            LoggingContext.current_context(),
+                            current_context(),
                             frame.f_lineno,
                             frame.f_code.co_filename,
                         )
@@ -191,7 +191,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
             except Exception as e:
                 result = Failure(e)
 
-            if LoggingContext.current_context() != expected_context:
+            if current_context() != expected_context:
 
                 # This happens because the context is lost sometime *after* the
                 # previous yield and *after* the current yield. E.g. the
@@ -206,7 +206,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
                     % (
                         frame.f_code.co_name,
                         expected_context,
-                        LoggingContext.current_context(),
+                        current_context(),
                         last_yield_line_no,
                         frame.f_lineno,
                         frame.f_code.co_filename,

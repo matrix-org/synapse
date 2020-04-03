@@ -15,16 +15,14 @@
 
 import logging
 
-from ._base import IncorrectDatabaseSetup
+from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 
 logger = logging.getLogger(__name__)
 
 
-class PostgresEngine(object):
-    single_threaded = False
-
+class PostgresEngine(BaseDatabaseEngine):
     def __init__(self, database_module, database_config):
-        self.module = database_module
+        super().__init__(database_module, database_config)
         self.module.extensions.register_type(self.module.extensions.UNICODE)
 
         # Disables passing `bytes` to txn.execute, c.f. #6186. If you do
@@ -35,6 +33,10 @@ class PostgresEngine(object):
         self.module.extensions.register_adapter(bytes, _disable_bytes_adapter)
         self.synchronous_commit = database_config.get("synchronous_commit", True)
         self._version = None  # unknown as yet
+
+    @property
+    def single_threaded(self) -> bool:
+        return False
 
     def check_database(self, db_conn, allow_outdated_version: bool = False):
         # Get the version of PostgreSQL that we're using. As per the psycopg2

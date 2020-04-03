@@ -244,9 +244,6 @@ class SimpleHttpClient(object):
         pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
-        # The default context factory in Twisted 14.0.0 (which we require) is
-        # BrowserLikePolicyForHTTPS which will do regular cert validation
-        # 'like a browser'
         self.agent = ProxyAgent(
             self.reactor,
             connectTimeout=15,

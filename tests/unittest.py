@@ -38,7 +38,12 @@ from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import (
+    SENTINEL_CONTEXT,
+    LoggingContext,
+    current_context,
+    set_current_context,
+)
 from synapse.server import HomeServer
 from synapse.types import Requester, UserID, create_requester
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -97,10 +102,10 @@ class TestCase(unittest.TestCase):
         def setUp(orig):
             # if we're not starting in the sentinel logcontext, then to be honest
             # all future bets are off.
-            if LoggingContext.current_context() is not LoggingContext.sentinel:
+            if current_context():
                 self.fail(
                     "Test starting with non-sentinel logging context %s"
-                    % (LoggingContext.current_context(),)
+                    % (current_context(),)
                 )
 
             old_level = logging.getLogger().level
@@ -122,7 +127,7 @@ class TestCase(unittest.TestCase):
             # force a GC to workaround problems with deferreds leaking logcontexts when
             # they are GCed (see the logcontext docs)
             gc.collect()
-            LoggingContext.set_current_context(LoggingContext.sentinel)
+            set_current_context(SENTINEL_CONTEXT)
 
             return ret
 
@@ -311,14 +316,11 @@ class HomeserverTestCase(TestCase):
 
         return resource
 
-    def default_config(self, name="test"):
+    def default_config(self):
         """
         Get a default HomeServer config dict.
-
-        Args:
-            name (str): The homeserver name/domain.
         """
-        config = default_config(name)
+        config = default_config("test")
 
         # apply any additional config which was specified via the override_config
         # decorator.
@@ -418,15 +420,17 @@ class HomeserverTestCase(TestCase):
         config_obj.parse_config_dict(config, "", "")
         kwargs["config"] = config_obj
 
+        async def run_bg_updates():
+            with LoggingContext("run_bg_updates", request="run_bg_updates-1"):
+                while not await stor.db.updates.has_completed_background_updates():
+                    await stor.db.updates.do_next_background_update(1)
+
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
 
         # Run the database background updates, when running against "master".
         if hs.__class__.__name__ == "TestHomeServer":
-            while not self.get_success(
-                stor.db.updates.has_completed_background_updates()
-            ):
-                self.get_success(stor.db.updates.do_next_background_update(1))
+            self.get_success(run_bg_updates())
 
         return hs
 
@@ -493,6 +497,7 @@ class HomeserverTestCase(TestCase):
                 "password": password,
                 "admin": admin,
                 "mac": want_mac,
+                "inhibit_login": True,
             }
         )
         request, channel = self.make_request(

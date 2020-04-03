@@ -34,6 +34,7 @@ from synapse.crypto.keyring import (
 from synapse.logging.context import (
     LoggingContext,
     PreserveLoggingContext,
+    current_context,
     make_deferred_yieldable,
 )
 from synapse.storage.keys import FetchKeyResult
@@ -83,9 +84,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         )
 
     def check_context(self, _, expected):
-        self.assertEquals(
-            getattr(LoggingContext.current_context(), "request", None), expected
-        )
+        self.assertEquals(getattr(current_context(), "request", None), expected)
 
     def test_verify_json_objects_for_server_awaits_previous_requests(self):
         key1 = signedjson.key.generate_signing_key(1)
@@ -105,7 +104,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
         @defer.inlineCallbacks
         def get_perspectives(**kwargs):
-            self.assertEquals(LoggingContext.current_context().request, "11")
+            self.assertEquals(current_context().request, "11")
             with PreserveLoggingContext():
                 yield persp_deferred
             return persp_resp

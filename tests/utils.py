@@ -35,7 +35,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import HttpServer
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import current_context, set_current_context
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import PostgresEngine, create_engine
@@ -494,10 +494,10 @@ class MockClock(object):
         return self.time() * 1000
 
     def call_later(self, delay, callback, *args, **kwargs):
-        current_context = LoggingContext.current_context()
+        ctx = current_context()
 
         def wrapped_callback():
-            LoggingContext.thread_local.current_context = current_context
+            set_current_context(ctx)
             callback(*args, **kwargs)
 
         t = [self.now + delay, wrapped_callback, False]

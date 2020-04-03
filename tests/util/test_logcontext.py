@@ -2,8 +2,10 @@ import twisted.python.failure
 from twisted.internet import defer, reactor
 
 from synapse.logging.context import (
+    SENTINEL_CONTEXT,
     LoggingContext,
     PreserveLoggingContext,
+    current_context,
     make_deferred_yieldable,
     nested_logging_context,
     run_in_background,
@@ -15,7 +17,7 @@ from .. import unittest
 
 class LoggingContextTestCase(unittest.TestCase):
     def _check_test_key(self, value):
-        self.assertEquals(LoggingContext.current_context().request, value)
+        self.assertEquals(current_context().request, value)
 
     def test_with_context(self):
         with LoggingContext() as context_one:
@@ -41,7 +43,7 @@ class LoggingContextTestCase(unittest.TestCase):
             self._check_test_key("one")
 
     def _test_run_in_background(self, function):
-        sentinel_context = LoggingContext.current_context()
+        sentinel_context = current_context()
 
         callback_completed = [False]
 
@@ -71,7 +73,7 @@ class LoggingContextTestCase(unittest.TestCase):
             # make sure that the context was reset before it got thrown back
             # into the reactor
             try:
-                self.assertIs(LoggingContext.current_context(), sentinel_context)
+                self.assertIs(current_context(), sentinel_context)
                 d2.callback(None)
             except BaseException:
                 d2.errback(twisted.python.failure.Failure())
@@ -108,7 +110,7 @@ class LoggingContextTestCase(unittest.TestCase):
         async def testfunc():
             self._check_test_key("one")
             d = Clock(reactor).sleep(0)
-            self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
+            self.assertIs(current_context(), SENTINEL_CONTEXT)
             await d
             self._check_test_key("one")
 
@@ -129,14 +131,14 @@ class LoggingContextTestCase(unittest.TestCase):
             reactor.callLater(0, d.callback, None)
             return d
 
-        sentinel_context = LoggingContext.current_context()
+        sentinel_context = current_context()
 
         with LoggingContext() as context_one:
             context_one.request = "one"
 
             d1 = make_deferred_yieldable(blocking_function())
             # make sure that the context was reset by make_deferred_yieldable
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assertIs(current_context(), sentinel_context)
 
             yield d1
 
@@ -145,14 +147,14 @@ class LoggingContextTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_make_deferred_yieldable_with_chained_deferreds(self):
-        sentinel_context = LoggingContext.current_context()
+        sentinel_context = current_context()
 
         with LoggingContext() as context_one:
             context_one.request = "one"
 
             d1 = make_deferred_yieldable(_chained_deferred_function())
             # make sure that the context was reset by make_deferred_yieldable
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assertIs(current_context(), sentinel_context)
 
             yield d1
 
@@ -189,14 +191,14 @@ class LoggingContextTestCase(unittest.TestCase):
             reactor.callLater(0, d.callback, None)
             await d
 
-        sentinel_context = LoggingContext.current_context()
+        sentinel_context = current_context()
 
         with LoggingContext() as context_one:
             context_one.request = "one"
 
             d1 = make_deferred_yieldable(blocking_function())
             # make sure that the context was reset by make_deferred_yieldable
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assertIs(current_context(), sentinel_context)
 
             yield d1
 

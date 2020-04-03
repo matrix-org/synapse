@@ -27,6 +27,11 @@ class FrontendProxyTests(HomeserverTestCase):
 
         return hs
 
+    def default_config(self):
+        c = super().default_config()
+        c["worker_app"] = "synapse.app.frontend_proxy"
+        return c
+
     def test_listen_http_with_presence_enabled(self):
         """
         When presence is on, the stub servlet will not register.

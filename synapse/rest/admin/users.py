@@ -211,9 +211,7 @@ class UserRestServletV2(RestServlet):
                     if target_user == auth_user and not set_admin_to:
                         raise SynapseError(400, "You may not demote yourself.")
 
-                    await self.admin_handler.set_user_server_admin(
-                        target_user, set_admin_to
-                    )
+                    await self.store.set_server_admin(target_user, set_admin_to)
 
             if "password" in body:
                 if (
@@ -223,8 +221,9 @@ class UserRestServletV2(RestServlet):
                     raise SynapseError(400, "Invalid password")
                 else:
                     new_password = body["password"]
+                    logout_devices = True
                     await self.set_password_handler.set_password(
-                        target_user.to_string(), new_password, requester
+                        target_user.to_string(), new_password, logout_devices, requester
                     )
 
             if "deactivated" in body:
@@ -538,9 +537,10 @@ class ResetPasswordRestServlet(RestServlet):
         params = parse_json_object_from_request(request)
         assert_params_in_dict(params, ["new_password"])
         new_password = params["new_password"]
+        logout_devices = params.get("logout_devices", True)
 
         await self._set_password_handler.set_password(
-            target_user_id, new_password, requester
+            target_user_id, new_password, logout_devices, requester
         )
         return 200, {}
 
@@ -651,6 +651,6 @@ class UserAdminServlet(RestServlet):
         if target_user == auth_user and not set_admin_to:
             raise SynapseError(400, "You may not demote yourself.")
 
-        await self.store.set_user_server_admin(target_user, set_admin_to)
+        await self.store.set_server_admin(target_user, set_admin_to)
 
         return 200, {}
