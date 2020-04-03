@@ -165,7 +165,6 @@ class DeviceWorkerStore(SQLBaseStore):
         # the max stream_id across each set of duplicate entries
         #
         # maps (user_id, device_id) -> (stream_id, opentracing_context)
-        # as long as their stream_id does not match that of the last row
         #
         # opentracing_context contains the opentracing metadata for the request
         # that created the poke
@@ -270,7 +269,14 @@ class DeviceWorkerStore(SQLBaseStore):
             prev_id = yield self._get_last_device_update_for_remote_user(
                 destination, user_id, from_stream_id
             )
-            for device_id, device in iteritems(user_devices):
+
+            # make sure we go through the devices in stream order
+            device_ids = sorted(
+                user_devices.keys(), key=lambda i: query_map[(user_id, i)][0],
+            )
+
+            for device_id in device_ids:
+                device = user_devices[device_id]
                 stream_id, opentracing_context = query_map[(user_id, device_id)]
                 result = {
                     "user_id": user_id,
