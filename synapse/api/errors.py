@@ -86,7 +86,14 @@ class CodeMessageException(RuntimeError):
 
     def __init__(self, code, msg):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
-        self.code = code
+
+        # Some calls to this method pass instances of http.HTTPStatus for `code`.
+        # While HTTPStatus is a subclass of int, it has magic __str__ methods
+        # which emit `HTTPStatus.FORBIDDEN` when converted to a str, instead of `403`.
+        # This causes inconsistency in our log lines.
+        #
+        # To eliminate this behaviour, we convert them to their integer equivalents here.
+        self.code = int(code)
         self.msg = msg
 
 
