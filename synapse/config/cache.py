@@ -20,7 +20,16 @@ from ._base import Config, ConfigError
 
 _CACHES = {}
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
-DEFAULT_CACHE_SIZE_FACTOR = float(os.environ.get(_CACHE_PREFIX, 0.5))
+
+# Wrap all global vars into a single object to eliminate `global` calls
+CACHE_PROPERTIES = {
+    "prefix": _CACHE_PREFIX,
+    "default_size_factor": float(os.environ.get(_CACHE_PREFIX, 0.5)),
+
+    # Callback to ensure that all caches are the correct size, registered when the
+    # configuration has been loaded.
+    "ensure_correct_cache_sizing": None,
+}
 
 _DEFAULT_CONFIG = """\
 # Cache configuration
@@ -38,15 +47,11 @@ _DEFAULT_CONFIG = """\
 #
 """
 
-# Callback to ensure that all caches are the correct size, registered when the
-# configuration has been loaded.
-_ENSURE_CORRECT_CACHE_SIZING = None
-
 
 def add_resizable_cache(cache_name, cache_resize_callback):
     _CACHES[cache_name.lower()] = cache_resize_callback
-    if _ENSURE_CORRECT_CACHE_SIZING:
-        _ENSURE_CORRECT_CACHE_SIZING()
+    if CACHE_PROPERTIES["ensure_correct_cache_sizing"]:
+        CACHE_PROPERTIES["ensure_correct_cache_sizing"]()
 
 
 class CacheConfig(Config):
@@ -55,36 +60,30 @@ class CacheConfig(Config):
 
     @staticmethod
     def _reset():
-        global DEFAULT_CACHE_SIZE_FACTOR
-        global _ENSURE_CORRECT_CACHE_SIZING
-
-        DEFAULT_CACHE_SIZE_FACTOR = float(os.environ.get(_CACHE_PREFIX, 0.5))
-        _ENSURE_CORRECT_CACHE_SIZING = None
+        CACHE_PROPERTIES["default_size_factor"] = float(os.environ.get(_CACHE_PREFIX, 0.5))
+        CACHE_PROPERTIES["ensure_correct_cache_sizing"] = None
         _CACHES.clear()
 
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
 
-        global DEFAULT_CACHE_SIZE_FACTOR
-        global _ENSURE_CORRECT_CACHE_SIZING
-
         cache_config = config.get("caches", {})
 
         self.global_factor = cache_config.get(
-            "global_factor", DEFAULT_CACHE_SIZE_FACTOR
+            "global_factor", CACHE_PROPERTIES["default_cache_size_factor"]
         )
         if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
 
         # Set the global one so that it's reflected in new caches
-        DEFAULT_CACHE_SIZE_FACTOR = self.global_factor
+        CACHE_PROPERTIES["default_cache_size_factor"] = self.global_factor
 
         # Load cache factors from the environment, but override them with the
         # ones in the config file if they exist
         individual_factors = {
-            key[len(_CACHE_PREFIX) + 1 :].lower(): float(val)
+            key[len(CACHE_PROPERTIES["prefix"]) + 1:].lower(): float(val)
             for key, val in self._environ.items()
-            if key.startswith(_CACHE_PREFIX + "_")
+            if key.startswith(CACHE_PROPERTIES["prefix"] + "_")
         }
 
         individual_factors_config = cache_config.get("per_cache_factors", {}) or {}
@@ -108,5 +107,5 @@ class CacheConfig(Config):
                 new_factor = self.cache_factors.get(cache_name, self.global_factor)
                 callback(new_factor)
 
-        _ENSURE_CORRECT_CACHE_SIZING = ensure_cache_sizes
-        _ENSURE_CORRECT_CACHE_SIZING()
+        CACHE_PROPERTIES["ensure_correct_cache_sizing"] = ensure_cache_sizes
+        CACHE_PROPERTIES["ensure_correct_cache_sizing"]()
