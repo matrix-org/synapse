@@ -183,7 +183,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             )
             return 1
 
-        logger.info(
+        logger.debug(
             "Processing the next %d rooms of %d remaining"
             % (len(rooms_to_work_on), progress["remaining"])
         )
@@ -308,7 +308,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             )
             return 1
 
-        logger.info(
+        logger.debug(
             "Processing the next %d users of %d remaining"
             % (len(users_to_work_on), progress["remaining"])
         )

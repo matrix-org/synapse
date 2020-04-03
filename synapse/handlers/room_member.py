@@ -519,6 +519,9 @@ class RoomMemberHandler(object):
             yield self.store.set_room_is_public(old_room_id, False)
             yield self.store.set_room_is_public(room_id, True)
 
+        # Transfer alias mappings in the room directory
+        yield self.store.update_aliases_for_room(old_room_id, room_id)
+
         # Check if any groups we own contain the predecessor room
         local_group_ids = yield self.store.get_local_groups_for_room(old_room_id)
         for group_id in local_group_ids:
@@ -944,8 +947,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         # join dance for now, since we're kinda implicitly checking
         # that we are allowed to join when we decide whether or not we
         # need to do the invite/join dance.
-        yield self.federation_handler.do_invite_join(
-            remote_room_hosts, room_id, user.to_string(), content
+        yield defer.ensureDeferred(
+            self.federation_handler.do_invite_join(
+                remote_room_hosts, room_id, user.to_string(), content
+            )
         )
         yield self._user_joined_room(user, room_id)
 
@@ -982,8 +987,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         """
         fed_handler = self.federation_handler
         try:
-            ret = yield fed_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, target.to_string(), content=content,
+            ret = yield defer.ensureDeferred(
+                fed_handler.do_remotely_reject_invite(
+                    remote_room_hosts, room_id, target.to_string(), content=content,
+                )
             )
             return ret
         except Exception as e:

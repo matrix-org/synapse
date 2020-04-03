@@ -144,7 +144,7 @@ class ResponseCache(object):
         """
         result = self.get(key)
         if not result:
-            logger.info(
+            logger.debug(
                 "[%s]: no cached result for [%s], calculating new one", self._name, key
             )
             d = run_in_background(callback, *args, **kwargs)

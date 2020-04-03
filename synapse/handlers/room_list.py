@@ -216,15 +216,6 @@ class RoomListHandler(BaseHandler):
                         direction_is_forward=False,
                     ).to_token()
 
-        for room in results:
-            # populate search result entries with additional fields, namely
-            # 'aliases'
-            room_id = room["room_id"]
-
-            aliases = yield self.store.get_aliases_for_room(room_id)
-            if aliases:
-                room["aliases"] = aliases
-
         response["chunk"] = results
 
         response["total_room_count_estimate"] = yield self.store.count_public_rooms(

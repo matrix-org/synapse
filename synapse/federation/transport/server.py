@@ -158,7 +158,7 @@ class Authenticator(object):
             origin, json_request, now, "Incoming request"
         )
 
-        logger.info("Request from %s", origin)
+        logger.debug("Request from %s", origin)
         request.authenticated_entity = origin
 
         # If we get a valid signed request from the other side, its probably
@@ -641,17 +641,6 @@ class FederationClientKeysClaimServlet(BaseFederationServlet):
     async def on_POST(self, origin, content, query):
         response = await self.handler.on_claim_client_keys(origin, content)
         return 200, response
-
-
-class FederationQueryAuthServlet(BaseFederationServlet):
-    PATH = "/query_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
-
-    async def on_POST(self, origin, content, query, context, event_id):
-        new_content = await self.handler.on_query_auth_request(
-            origin, content, context, event_id
-        )
-
-        return 200, new_content
 
 
 class FederationGetMissingEventsServlet(BaseFederationServlet):
@@ -1412,7 +1401,6 @@ FEDERATION_SERVLET_CLASSES = (
     FederationV2SendLeaveServlet,
     FederationV1InviteServlet,
     FederationV2InviteServlet,
-    FederationQueryAuthServlet,
     FederationGetMissingEventsServlet,
     FederationEventAuthServlet,
     FederationClientKeysQueryServlet,

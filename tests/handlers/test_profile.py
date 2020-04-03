@@ -19,7 +19,7 @@ from mock import Mock, NonCallableMock
 from twisted.internet import defer
 
 import synapse.types
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.handlers.profile import MasterProfileHandler
 from synapse.types import UserID
 
@@ -70,6 +70,7 @@ class ProfileTestCase(unittest.TestCase):
         yield self.store.create_profile(self.frank.localpart)
 
         self.handler = hs.get_profile_handler()
+        self.hs = hs
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
@@ -89,6 +90,33 @@ class ProfileTestCase(unittest.TestCase):
             (yield self.store.get_profile_displayname(self.frank.localpart)),
             "Frank Jr.",
         )
+
+        # Set displayname again
+        yield self.handler.set_displayname(
+            self.frank, synapse.types.create_requester(self.frank), "Frank"
+        )
+
+        self.assertEquals(
+            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
+        )
+
+    @defer.inlineCallbacks
+    def test_set_my_name_if_disabled(self):
+        self.hs.config.enable_set_displayname = False
+
+        # Setting displayname for the first time is allowed
+        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
+
+        self.assertEquals(
+            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
+        )
+
+        # Setting displayname a second time is forbidden
+        d = self.handler.set_displayname(
+            self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+        )
+
+        yield self.assertFailure(d, SynapseError)
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
@@ -147,3 +175,38 @@ class ProfileTestCase(unittest.TestCase):
             (yield self.store.get_profile_avatar_url(self.frank.localpart)),
             "http://my.server/pic.gif",
         )
+
+        # Set avatar again
+        yield self.handler.set_avatar_url(
+            self.frank,
+            synapse.types.create_requester(self.frank),
+            "http://my.server/me.png",
+        )
+
+        self.assertEquals(
+            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            "http://my.server/me.png",
+        )
+
+    @defer.inlineCallbacks
+    def test_set_my_avatar_if_disabled(self):
+        self.hs.config.enable_set_avatar_url = False
+
+        # Setting displayname for the first time is allowed
+        yield self.store.set_profile_avatar_url(
+            self.frank.localpart, "http://my.server/me.png"
+        )
+
+        self.assertEquals(
+            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            "http://my.server/me.png",
+        )
+
+        # Set avatar a second time is forbidden
+        d = self.handler.set_avatar_url(
+            self.frank,
+            synapse.types.create_requester(self.frank),
+            "http://my.server/pic.gif",
+        )
+
+        yield self.assertFailure(d, SynapseError)

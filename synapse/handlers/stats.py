@@ -286,7 +286,7 @@ class StatsHandler(StateDeltasHandler):
                 room_state["history_visibility"] = event_content.get(
                     "history_visibility"
                 )
-            elif typ == EventTypes.Encryption:
+            elif typ == EventTypes.RoomEncryption:
                 room_state["encryption"] = event_content.get("algorithm")
             elif typ == EventTypes.Name:
                 room_state["name"] = event_content.get("name")
@@ -300,7 +300,7 @@ class StatsHandler(StateDeltasHandler):
                 room_state["guest_access"] = event_content.get("guest_access")
 
         for room_id, state in room_to_state_updates.items():
-            logger.info("Updating room_stats_state for %s: %s", room_id, state)
+            logger.debug("Updating room_stats_state for %s: %s", room_id, state)
             yield self.store.update_room_state(room_id, state)
 
         return room_to_stats_deltas, user_to_stats_deltas

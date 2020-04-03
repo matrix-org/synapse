@@ -43,8 +43,8 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.context import (
-    LoggingContext,
     PreserveLoggingContext,
+    current_context,
     make_deferred_yieldable,
     preserve_fn,
     run_in_background,
@@ -236,7 +236,7 @@ class Keyring(object):
         """
 
         try:
-            ctx = LoggingContext.current_context()
+            ctx = current_context()
 
             # map from server name to a set of outstanding request ids
             server_to_request_ids = {}
@@ -326,9 +326,7 @@ class Keyring(object):
             verify_requests (list[VerifyJsonRequest]): list of verify requests
         """
 
-        remaining_requests = set(
-            (rq for rq in verify_requests if not rq.key_ready.called)
-        )
+        remaining_requests = {rq for rq in verify_requests if not rq.key_ready.called}
 
         @defer.inlineCallbacks
         def do_iterations():
@@ -396,7 +394,7 @@ class Keyring(object):
 
         results = yield fetcher.get_keys(missing_keys)
 
-        completed = list()
+        completed = []
         for verify_request in remaining_requests:
             server_name = verify_request.server_name
 

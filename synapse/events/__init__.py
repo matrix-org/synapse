@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import os
 from distutils.util import strtobool
+from typing import Dict, Optional, Type
 
 import six
 
 from unpaddedbase64 import encode_base64
 
-from synapse.api.errors import UnsupportedRoomVersionError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, EventFormatVersions
+from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.types import JsonDict
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
@@ -37,34 +39,115 @@ from synapse.util.frozenutils import freeze
 USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 
 
+class DictProperty:
+    """An object property which delegates to the `_dict` within its parent object."""
+
+    __slots__ = ["key"]
+
+    def __init__(self, key: str):
+        self.key = key
+
+    def __get__(self, instance, owner=None):
+        # if the property is accessed as a class property rather than an instance
+        # property, return the property itself rather than the value
+        if instance is None:
+            return self
+        try:
+            return instance._dict[self.key]
+        except KeyError as e1:
+            # We want this to look like a regular attribute error (mostly so that
+            # hasattr() works correctly), so we convert the KeyError into an
+            # AttributeError.
+            #
+            # To exclude the KeyError from the traceback, we explicitly
+            # 'raise from e1.__context__' (which is better than 'raise from None',
+            # becuase that would omit any *earlier* exceptions).
+            #
+            raise AttributeError(
+                "'%s' has no '%s' property" % (type(instance), self.key)
+            ) from e1.__context__
+
+    def __set__(self, instance, v):
+        instance._dict[self.key] = v
+
+    def __delete__(self, instance):
+        try:
+            del instance._dict[self.key]
+        except KeyError as e1:
+            raise AttributeError(
+                "'%s' has no '%s' property" % (type(instance), self.key)
+            ) from e1.__context__
+
+
+class DefaultDictProperty(DictProperty):
+    """An extension of DictProperty which provides a default if the property is
+    not present in the parent's _dict.
+
+    Note that this means that hasattr() on the property always returns True.
+    """
+
+    __slots__ = ["default"]
+
+    def __init__(self, key, default):
+        super().__init__(key)
+        self.default = default
+
+    def __get__(self, instance, owner=None):
+        if instance is None:
+            return self
+        return instance._dict.get(self.key, self.default)
+
+
 class _EventInternalMetadata(object):
-    def __init__(self, internal_metadata_dict):
-        self.__dict__ = dict(internal_metadata_dict)
+    __slots__ = ["_dict"]
 
-    def get_dict(self):
-        return dict(self.__dict__)
+    def __init__(self, internal_metadata_dict: JsonDict):
+        # we have to copy the dict, because it turns out that the same dict is
+        # reused. TODO: fix that
+        self._dict = dict(internal_metadata_dict)
 
-    def is_outlier(self):
-        return getattr(self, "outlier", False)
+    outlier = DictProperty("outlier")  # type: bool
+    out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
+    send_on_behalf_of = DictProperty("send_on_behalf_of")  # type: str
+    recheck_redaction = DictProperty("recheck_redaction")  # type: bool
+    soft_failed = DictProperty("soft_failed")  # type: bool
+    proactively_send = DictProperty("proactively_send")  # type: bool
+    redacted = DictProperty("redacted")  # type: bool
+    txn_id = DictProperty("txn_id")  # type: str
+    token_id = DictProperty("token_id")  # type: str
+    stream_ordering = DictProperty("stream_ordering")  # type: int
 
-    def is_out_of_band_membership(self):
+    # XXX: These are set by StreamWorkerStore._set_before_and_after.
+    # I'm pretty sure that these are never persisted to the database, so shouldn't
+    # be here
+    before = DictProperty("before")  # type: str
+    after = DictProperty("after")  # type: str
+    order = DictProperty("order")  # type: int
+
+    def get_dict(self) -> JsonDict:
+        return dict(self._dict)
+
+    def is_outlier(self) -> bool:
+        return self._dict.get("outlier", False)
+
+    def is_out_of_band_membership(self) -> bool:
         """Whether this is an out of band membership, like an invite or an invite
         rejection. This is needed as those events are marked as outliers, but
         they still need to be processed as if they're new events (e.g. updating
         invite state in the database, relaying to clients, etc).
         """
-        return getattr(self, "out_of_band_membership", False)
+        return self._dict.get("out_of_band_membership", False)
 
-    def get_send_on_behalf_of(self):
+    def get_send_on_behalf_of(self) -> Optional[str]:
         """Whether this server should send the event on behalf of another server.
         This is used by the federation "send_join" API to forward the initial join
         event for a server in the room.
 
         returns a str with the name of the server this event is sent on behalf of.
         """
-        return getattr(self, "send_on_behalf_of", None)
+        return self._dict.get("send_on_behalf_of")
 
-    def need_to_check_redaction(self):
+    def need_to_check_redaction(self) -> bool:
         """Whether the redaction event needs to be rechecked when fetching
         from the database.
 
@@ -77,9 +160,9 @@ class _EventInternalMetadata(object):
         Returns:
             bool
         """
-        return getattr(self, "recheck_redaction", False)
+        return self._dict.get("recheck_redaction", False)
 
-    def is_soft_failed(self):
+    def is_soft_failed(self) -> bool:
         """Whether the event has been soft failed.
 
         Soft failed events should be handled as usual, except:
@@ -91,7 +174,7 @@ class _EventInternalMetadata(object):
         Returns:
             bool
         """
-        return getattr(self, "soft_failed", False)
+        return self._dict.get("soft_failed", False)
 
     def should_proactively_send(self):
         """Whether the event, if ours, should be sent to other clients and
@@ -103,7 +186,7 @@ class _EventInternalMetadata(object):
         Returns:
             bool
         """
-        return getattr(self, "proactively_send", True)
+        return self._dict.get("proactively_send", True)
 
     def is_redacted(self):
         """Whether the event has been redacted.
@@ -114,82 +197,53 @@ class _EventInternalMetadata(object):
         Returns:
             bool
         """
-        return getattr(self, "redacted", False)
+        return self._dict.get("redacted", False)
 
 
-_SENTINEL = object()
+class EventBase(metaclass=abc.ABCMeta):
+    @property
+    @abc.abstractmethod
+    def format_version(self) -> int:
+        """The EventFormatVersion implemented by this event"""
+        ...
 
-
-def _event_dict_property(key, default=_SENTINEL):
-    """Creates a new property for the given key that delegates access to
-    `self._event_dict`.
-
-    The default is used if the key is missing from the `_event_dict`, if given,
-    otherwise an AttributeError will be raised.
-
-    Note: If a default is given then `hasattr` will always return true.
-    """
-
-    # We want to be able to use hasattr with the event dict properties.
-    # However, (on python3) hasattr expects AttributeError to be raised. Hence,
-    # we need to transform the KeyError into an AttributeError
-
-    def getter_raises(self):
-        try:
-            return self._event_dict[key]
-        except KeyError:
-            raise AttributeError(key)
-
-    def getter_default(self):
-        return self._event_dict.get(key, default)
-
-    def setter(self, v):
-        try:
-            self._event_dict[key] = v
-        except KeyError:
-            raise AttributeError(key)
-
-    def delete(self):
-        try:
-            del self._event_dict[key]
-        except KeyError:
-            raise AttributeError(key)
-
-    if default is _SENTINEL:
-        # No default given, so use the getter that raises
-        return property(getter_raises, setter, delete)
-    else:
-        return property(getter_default, setter, delete)
-
-
-class EventBase(object):
     def __init__(
         self,
-        event_dict,
-        signatures={},
-        unsigned={},
-        internal_metadata_dict={},
-        rejected_reason=None,
+        event_dict: JsonDict,
+        room_version: RoomVersion,
+        signatures: Dict[str, Dict[str, str]],
+        unsigned: JsonDict,
+        internal_metadata_dict: JsonDict,
+        rejected_reason: Optional[str],
     ):
+        assert room_version.event_format == self.format_version
+
+        self.room_version = room_version
         self.signatures = signatures
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
 
-        self._event_dict = event_dict
+        self._dict = event_dict
 
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
-    auth_events = _event_dict_property("auth_events")
-    depth = _event_dict_property("depth")
-    content = _event_dict_property("content")
-    hashes = _event_dict_property("hashes")
-    origin = _event_dict_property("origin")
-    origin_server_ts = _event_dict_property("origin_server_ts")
-    prev_events = _event_dict_property("prev_events")
-    redacts = _event_dict_property("redacts", None)
-    room_id = _event_dict_property("room_id")
-    sender = _event_dict_property("sender")
-    user_id = _event_dict_property("sender")
+    auth_events = DictProperty("auth_events")
+    depth = DictProperty("depth")
+    content = DictProperty("content")
+    hashes = DictProperty("hashes")
+    origin = DictProperty("origin")
+    origin_server_ts = DictProperty("origin_server_ts")
+    prev_events = DictProperty("prev_events")
+    redacts = DefaultDictProperty("redacts", None)
+    room_id = DictProperty("room_id")
+    sender = DictProperty("sender")
+    state_key = DictProperty("state_key")
+    type = DictProperty("type")
+    user_id = DictProperty("sender")
+
+    @property
+    def event_id(self) -> str:
+        raise NotImplementedError()
 
     @property
     def membership(self):
@@ -199,13 +253,13 @@ class EventBase(object):
         return hasattr(self, "state_key") and self.state_key is not None
 
     def get_dict(self) -> JsonDict:
-        d = dict(self._event_dict)
+        d = dict(self._dict)
         d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
 
         return d
 
     def get(self, key, default=None):
-        return self._event_dict.get(key, default)
+        return self._dict.get(key, default)
 
     def get_internal_metadata_dict(self):
         return self.internal_metadata.get_dict()
@@ -227,16 +281,16 @@ class EventBase(object):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
 
     def __getitem__(self, field):
-        return self._event_dict[field]
+        return self._dict[field]
 
     def __contains__(self, field):
-        return field in self._event_dict
+        return field in self._dict
 
     def items(self):
-        return list(self._event_dict.items())
+        return list(self._dict.items())
 
     def keys(self):
-        return six.iterkeys(self._event_dict)
+        return six.iterkeys(self._dict)
 
     def prev_event_ids(self):
         """Returns the list of prev event IDs. The order matches the order
@@ -260,7 +314,13 @@ class EventBase(object):
 class FrozenEvent(EventBase):
     format_version = EventFormatVersions.V1  # All events of this type are V1
 
-    def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
+    def __init__(
+        self,
+        event_dict: JsonDict,
+        room_version: RoomVersion,
+        internal_metadata_dict: JsonDict = {},
+        rejected_reason: Optional[str] = None,
+    ):
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -281,18 +341,20 @@ class FrozenEvent(EventBase):
         else:
             frozen_dict = event_dict
 
-        self.event_id = event_dict["event_id"]
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
+        self._event_id = event_dict["event_id"]
 
-        super(FrozenEvent, self).__init__(
+        super().__init__(
             frozen_dict,
+            room_version=room_version,
             signatures=signatures,
             unsigned=unsigned,
             internal_metadata_dict=internal_metadata_dict,
             rejected_reason=rejected_reason,
         )
+
+    @property
+    def event_id(self) -> str:
+        return self._event_id
 
     def __str__(self):
         return self.__repr__()
@@ -308,7 +370,13 @@ class FrozenEvent(EventBase):
 class FrozenEventV2(EventBase):
     format_version = EventFormatVersions.V2  # All events of this type are V2
 
-    def __init__(self, event_dict, internal_metadata_dict={}, rejected_reason=None):
+    def __init__(
+        self,
+        event_dict: JsonDict,
+        room_version: RoomVersion,
+        internal_metadata_dict: JsonDict = {},
+        rejected_reason: Optional[str] = None,
+    ):
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -332,12 +400,10 @@ class FrozenEventV2(EventBase):
             frozen_dict = event_dict
 
         self._event_id = None
-        self.type = event_dict["type"]
-        if "state_key" in event_dict:
-            self.state_key = event_dict["state_key"]
 
-        super(FrozenEventV2, self).__init__(
+        super().__init__(
             frozen_dict,
+            room_version=room_version,
             signatures=signatures,
             unsigned=unsigned,
             internal_metadata_dict=internal_metadata_dict,
@@ -404,28 +470,7 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
-def room_version_to_event_format(room_version):
-    """Converts a room version string to the event format
-
-    Args:
-        room_version (str)
-
-    Returns:
-        int
-
-    Raises:
-        UnsupportedRoomVersionError if the room version is unknown
-    """
-    v = KNOWN_ROOM_VERSIONS.get(room_version)
-
-    if not v:
-        # this can happen if support is withdrawn for a room version
-        raise UnsupportedRoomVersionError()
-
-    return v.event_format
-
-
-def event_type_from_format_version(format_version):
+def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
@@ -445,3 +490,14 @@ def event_type_from_format_version(format_version):
         return FrozenEventV3
     else:
         raise Exception("No event format %r" % (format_version,))
+
+
+def make_event_from_dict(
+    event_dict: JsonDict,
+    room_version: RoomVersion = RoomVersions.V1,
+    internal_metadata_dict: JsonDict = {},
+    rejected_reason: Optional[str] = None,
+) -> EventBase:
+    """Construct an EventBase from the given event dict"""
+    event_type = _event_type_from_format_version(room_version.event_format)
+    return event_type(event_dict, room_version, internal_metadata_dict, rejected_reason)

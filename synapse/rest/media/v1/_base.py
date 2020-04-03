@@ -30,6 +30,22 @@ from synapse.util.stringutils import is_ascii
 
 logger = logging.getLogger(__name__)
 
+# list all text content types that will have the charset default to UTF-8 when
+# none is given
+TEXT_CONTENT_TYPES = [
+    "text/css",
+    "text/csv",
+    "text/html",
+    "text/calendar",
+    "text/plain",
+    "text/javascript",
+    "application/json",
+    "application/ld+json",
+    "application/rtf",
+    "image/svg+xml",
+    "text/xml",
+]
+
 
 def parse_media_id(request):
     try:
@@ -96,7 +112,14 @@ def add_file_headers(request, media_type, file_size, upload_name):
     def _quote(x):
         return urllib.parse.quote(x.encode("utf-8"))
 
-    request.setHeader(b"Content-Type", media_type.encode("UTF-8"))
+    # Default to a UTF-8 charset for text content types.
+    # ex, uses UTF-8 for 'text/css' but not 'text/css; charset=UTF-16'
+    if media_type.lower() in TEXT_CONTENT_TYPES:
+        content_type = media_type + "; charset=UTF-8"
+    else:
+        content_type = media_type
+
+    request.setHeader(b"Content-Type", content_type.encode("UTF-8"))
     if upload_name:
         # RFC6266 section 4.1 [1] defines both `filename` and `filename*`.
         #
@@ -135,27 +158,25 @@ def add_file_headers(request, media_type, file_size, upload_name):
 
 # separators as defined in RFC2616. SP and HT are handled separately.
 # see _can_encode_filename_as_token.
-_FILENAME_SEPARATOR_CHARS = set(
-    (
-        "(",
-        ")",
-        "<",
-        ">",
-        "@",
-        ",",
-        ";",
-        ":",
-        "\\",
-        '"',
-        "/",
-        "[",
-        "]",
-        "?",
-        "=",
-        "{",
-        "}",
-    )
-)
+_FILENAME_SEPARATOR_CHARS = {
+    "(",
+    ")",
+    "<",
+    ">",
+    "@",
+    ",",
+    ";",
+    ":",
+    "\\",
+    '"',
+    "/",
+    "[",
+    "]",
+    "?",
+    "=",
+    "{",
+    "}",
+}
 
 
 def _can_encode_filename_as_token(x):

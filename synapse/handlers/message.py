@@ -99,7 +99,9 @@ class MessageHandler(object):
         (
             membership,
             membership_event_id,
-        ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
+        ) = yield self.auth.check_user_in_room_or_world_readable(
+            room_id, user_id, allow_departed_users=True
+        )
 
         if membership == Membership.JOIN:
             data = yield self.state.get_current_state(room_id, event_type, state_key)
@@ -158,7 +160,7 @@ class MessageHandler(object):
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
             visible_events = yield filter_events_for_client(
-                self.storage, user_id, last_events, apply_retention_policies=False
+                self.storage, user_id, last_events, filter_send_to_client=False
             )
 
             event = last_events[0]
@@ -177,7 +179,9 @@ class MessageHandler(object):
             (
                 membership,
                 membership_event_id,
-            ) = yield self.auth.check_in_room_or_world_readable(room_id, user_id)
+            ) = yield self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
+            )
 
             if membership == Membership.JOIN:
                 state_ids = yield self.store.get_filtered_current_state_ids(
@@ -216,8 +220,8 @@ class MessageHandler(object):
         if not requester.app_service:
             # We check AS auth after fetching the room membership, as it
             # requires us to pull out all joined members anyway.
-            membership, _ = yield self.auth.check_in_room_or_world_readable(
-                room_id, user_id
+            membership, _ = yield self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
             )
             if membership != Membership.JOIN:
                 raise NotImplementedError(
@@ -848,6 +852,38 @@ class EventCreationHandler(object):
                 )
 
     @defer.inlineCallbacks
+    def _validate_canonical_alias(
+        self, directory_handler, room_alias_str, expected_room_id
+    ):
+        """
+        Ensure that the given room alias points to the expected room ID.
+
+        Args:
+            directory_handler: The directory handler object.
+            room_alias_str: The room alias to check.
+            expected_room_id: The room ID that the alias should point to.
+        """
+        room_alias = RoomAlias.from_string(room_alias_str)
+        try:
+            mapping = yield directory_handler.get_association(room_alias)
+        except SynapseError as e:
+            # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
+            if e.errcode == Codes.NOT_FOUND:
+                raise SynapseError(
+                    400,
+                    "Room alias %s does not point to the room" % (room_alias_str,),
+                    Codes.BAD_ALIAS,
+                )
+            raise
+
+        if mapping["room_id"] != expected_room_id:
+            raise SynapseError(
+                400,
+                "Room alias %s does not point to the room" % (room_alias_str,),
+                Codes.BAD_ALIAS,
+            )
+
+    @defer.inlineCallbacks
     def persist_and_notify_client_event(
         self, requester, event, context, ratelimit=True, extra_users=[]
     ):
@@ -884,17 +920,45 @@ class EventCreationHandler(object):
         yield self.base_handler.maybe_kick_guest_users(event, context)
 
         if event.type == EventTypes.CanonicalAlias:
-            # Check the alias is acually valid (at this time at least)
-            room_alias_str = event.content.get("alias", None)
-            if room_alias_str:
-                room_alias = RoomAlias.from_string(room_alias_str)
-                directory_handler = self.hs.get_handlers().directory_handler
-                mapping = yield directory_handler.get_association(room_alias)
+            # Validate a newly added alias or newly added alt_aliases.
 
-                if mapping["room_id"] != event.room_id:
-                    raise SynapseError(
-                        400,
-                        "Room alias %s does not point to the room" % (room_alias_str,),
+            original_alias = None
+            original_alt_aliases = set()
+
+            original_event_id = event.unsigned.get("replaces_state")
+            if original_event_id:
+                original_event = yield self.store.get_event(original_event_id)
+
+                if original_event:
+                    original_alias = original_event.content.get("alias", None)
+                    original_alt_aliases = original_event.content.get("alt_aliases", [])
+
+            # Check the alias is currently valid (if it has changed).
+            room_alias_str = event.content.get("alias", None)
+            directory_handler = self.hs.get_handlers().directory_handler
+            if room_alias_str and room_alias_str != original_alias:
+                yield self._validate_canonical_alias(
+                    directory_handler, room_alias_str, event.room_id
+                )
+
+            # Check that alt_aliases is the proper form.
+            alt_aliases = event.content.get("alt_aliases", [])
+            if not isinstance(alt_aliases, (list, tuple)):
+                raise SynapseError(
+                    400, "The alt_aliases property must be a list.", Codes.INVALID_PARAM
+                )
+
+            # If the old version of alt_aliases is of an unknown form,
+            # completely replace it.
+            if not isinstance(original_alt_aliases, (list, tuple)):
+                original_alt_aliases = []
+
+            # Check that each alias is currently valid.
+            new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
+            if new_alt_aliases:
+                for alias_str in new_alt_aliases:
+                    yield self._validate_canonical_alias(
+                        directory_handler, alias_str, event.room_id
                     )
 
         federation_handler = self.hs.get_handlers().federation_handler
@@ -932,10 +996,9 @@ class EventCreationHandler(object):
                     # way? If we have been invited by a remote server, we need
                     # to get them to sign the event.
 
-                    returned_invite = yield federation_handler.send_invite(
-                        invitee.domain, event
+                    returned_invite = yield defer.ensureDeferred(
+                        federation_handler.send_invite(invitee.domain, event)
                     )
-
                     event.unsigned.pop("room_state", None)
 
                     # TODO: Make sure the signatures actually are correct.
@@ -1013,11 +1076,10 @@ class EventCreationHandler(object):
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
 
-    @defer.inlineCallbacks
-    def _bump_active_time(self, user):
+    async def _bump_active_time(self, user):
         try:
             presence = self.hs.get_presence_handler()
-            yield presence.bump_presence_active_time(user)
+            await presence.bump_presence_active_time(user)
         except Exception:
             logger.exception("Error bumping presence active time")
 

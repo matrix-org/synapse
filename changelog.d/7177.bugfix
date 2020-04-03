@@ -1,0 +1,1 @@
+Fix a bug which could cause outbound federation traffic to stop working if a client uploaded an incorrect e2e device signature.

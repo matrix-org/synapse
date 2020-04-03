@@ -146,7 +146,8 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             room_entry["sessions"][row["session_id"]] = {
                 "first_message_index": row["first_message_index"],
                 "forwarded_count": row["forwarded_count"],
-                "is_verified": row["is_verified"],
+                # is_verified must be returned to the client as a boolean
+                "is_verified": bool(row["is_verified"]),
                 "session_data": json.loads(row["session_data"]),
             }
 

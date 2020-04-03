@@ -176,8 +176,14 @@ endpoints matching the following regular expressions:
     ^/_matrix/federation/v1/query_auth/
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
+    ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/send/
+    ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
+
+Additionally, the following REST endpoints can be handled for GET requests:
+
+    ^/_matrix/federation/v1/groups/
 
 The above endpoints should all be routed to the federation_reader worker by the
 reverse-proxy configuration.
@@ -254,15 +260,20 @@ following regular expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
     ^/_matrix/client/versions$
     ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
+    ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/groups/.*$
 
 Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance:
 
     ^/_matrix/client/(r0|unstable)/register$
+    ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
 
 Pagination requests can also be handled, but all requests with the same path
 room must be routed to the same instance. Additionally, care must be taken to
@@ -278,8 +289,8 @@ the following regular expressions:
 
     ^/_matrix/client/(api/v1|r0|unstable)/user_directory/search$
 
-When using this worker you must also set `update_user_directory: False` in the 
-shared configuration file to stop the main synapse running background 
+When using this worker you must also set `update_user_directory: False` in the
+shared configuration file to stop the main synapse running background
 jobs related to updating the user directory.
 
 ### `synapse.app.frontend_proxy`

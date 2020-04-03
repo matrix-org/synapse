@@ -28,7 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import UserID, create_requester, get_domain_from_id
 
 from ._base import BaseHandler
 
@@ -157,6 +157,15 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
+        if not by_admin and not self.hs.config.enable_set_displayname:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            if profile.display_name:
+                raise SynapseError(
+                    400,
+                    "Changing display name is disabled on this server",
+                    Codes.FORBIDDEN,
+                )
+
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
@@ -164,6 +173,12 @@ class BaseProfileHandler(BaseHandler):
 
         if new_displayname == "":
             new_displayname = None
+
+        # If the admin changes the display name of a user, the requesting user cannot send
+        # the join event to update the displayname in the rooms.
+        # This must be done by the target user himself.
+        if by_admin:
+            requester = create_requester(target_user)
 
         yield self.store.set_profile_displayname(target_user.localpart, new_displayname)
 
@@ -212,10 +227,21 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
+        if not by_admin and not self.hs.config.enable_set_avatar_url:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            if profile.avatar_url:
+                raise SynapseError(
+                    400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
+                )
+
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
+
+        # Same like set_displayname
+        if by_admin:
+            requester = create_requester(target_user)
 
         yield self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
 

@@ -28,11 +28,14 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError
-from synapse.api.room_versions import EventFormatVersions
-from synapse.events import FrozenEvent, event_type_from_format_version  # noqa: F401
-from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.api.room_versions import (
+    KNOWN_ROOM_VERSIONS,
+    EventFormatVersions,
+    RoomVersions,
+)
+from synapse.events import make_event_from_dict
 from synapse.events.utils import prune_event
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import PreserveLoggingContext, current_context
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.database import Database
@@ -406,7 +409,7 @@ class EventsWorkerStore(SQLBaseStore):
         missing_events_ids = [e for e in event_ids if e not in event_entry_map]
 
         if missing_events_ids:
-            log_ctx = LoggingContext.current_context()
+            log_ctx = current_context()
             log_ctx.record_event_fetch(len(missing_events_ids))
 
             # Note that _get_events_from_db is also responsible for turning db rows
@@ -494,9 +497,9 @@ class EventsWorkerStore(SQLBaseStore):
         """
         with Measure(self._clock, "_fetch_event_list"):
             try:
-                events_to_fetch = set(
+                events_to_fetch = {
                     event_id for events, _ in event_list for event_id in events
-                )
+                }
 
                 row_dict = self.db.new_transaction(
                     conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
@@ -580,8 +583,49 @@ class EventsWorkerStore(SQLBaseStore):
                 # of a event format version, so it must be a V1 event.
                 format_version = EventFormatVersions.V1
 
-            original_ev = event_type_from_format_version(format_version)(
+            room_version_id = row["room_version_id"]
+
+            if not room_version_id:
+                # this should only happen for out-of-band membership events
+                if not internal_metadata.get("out_of_band_membership"):
+                    logger.warning(
+                        "Room %s for event %s is unknown", d["room_id"], event_id
+                    )
+                    continue
+
+                # take a wild stab at the room version based on the event format
+                if format_version == EventFormatVersions.V1:
+                    room_version = RoomVersions.V1
+                elif format_version == EventFormatVersions.V2:
+                    room_version = RoomVersions.V3
+                else:
+                    room_version = RoomVersions.V5
+            else:
+                room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
+                if not room_version:
+                    logger.error(
+                        "Event %s in room %s has unknown room version %s",
+                        event_id,
+                        d["room_id"],
+                        room_version_id,
+                    )
+                    continue
+
+                if room_version.event_format != format_version:
+                    logger.error(
+                        "Event %s in room %s with version %s has wrong format: "
+                        "expected %s, was %s",
+                        event_id,
+                        d["room_id"],
+                        room_version_id,
+                        room_version.event_format,
+                        format_version,
+                    )
+                    continue
+
+            original_ev = make_event_from_dict(
                 event_dict=d,
+                room_version=room_version,
                 internal_metadata_dict=internal_metadata,
                 rejected_reason=rejected_reason,
             )
@@ -661,6 +705,12 @@ class EventsWorkerStore(SQLBaseStore):
            of EventFormatVersions. 'None' means the event predates
            EventFormatVersions (so the event is format V1).
 
+         * room_version_id (str|None): The version of the room which contains the event.
+           Hopefully one of RoomVersions.
+
+           Due to historical reasons, there may be a few events in the database which
+           do not have an associated room; in this case None will be returned here.
+
          * rejected_reason (str|None): if the event was rejected, the reason
            why.
 
@@ -676,17 +726,18 @@ class EventsWorkerStore(SQLBaseStore):
         """
         event_dict = {}
         for evs in batch_iter(event_ids, 200):
-            sql = (
-                "SELECT "
-                " e.event_id, "
-                " e.internal_metadata,"
-                " e.json,"
-                " e.format_version, "
-                " rej.reason "
-                " FROM event_json as e"
-                " LEFT JOIN rejections as rej USING (event_id)"
-                " WHERE "
-            )
+            sql = """\
+                SELECT
+                  e.event_id,
+                  e.internal_metadata,
+                  e.json,
+                  e.format_version,
+                  r.room_version,
+                  rej.reason
+                FROM event_json as e
+                  LEFT JOIN rooms r USING (room_id)
+                  LEFT JOIN rejections as rej USING (event_id)
+                WHERE """
 
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "e.event_id", evs
@@ -701,7 +752,8 @@ class EventsWorkerStore(SQLBaseStore):
                     "internal_metadata": row[1],
                     "json": row[2],
                     "format_version": row[3],
-                    "rejected_reason": row[4],
+                    "room_version_id": row[4],
+                    "rejected_reason": row[5],
                     "redactions": [],
                 }
 
@@ -804,7 +856,7 @@ class EventsWorkerStore(SQLBaseStore):
             desc="have_events_in_timeline",
         )
 
-        return set(r["event_id"] for r in rows)
+        return {r["event_id"] for r in rows}
 
     @defer.inlineCallbacks
     def have_seen_events(self, event_ids):
@@ -911,3 +963,117 @@ class EventsWorkerStore(SQLBaseStore):
         complexity_v1 = round(state_events / 500, 2)
 
         return {"v1": complexity_v1}
+
+    def get_current_backfill_token(self):
+        """The current minimum token that backfilled events have reached"""
+        return -self._backfill_id_gen.get_current_token()
+
+    def get_current_events_token(self):
+        """The current maximum token that events have reached"""
+        return self._stream_id_gen.get_current_token()
+
+    def get_all_new_forward_event_rows(self, last_id, current_id, limit):
+        if last_id == current_id:
+            return defer.succeed([])
+
+        def get_all_new_forward_event_rows(txn):
+            sql = (
+                "SELECT e.stream_ordering, e.event_id, e.room_id, e.type,"
+                " state_key, redacts, relates_to_id"
+                " FROM events AS e"
+                " LEFT JOIN redactions USING (event_id)"
+                " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
+                " WHERE ? < stream_ordering AND stream_ordering <= ?"
+                " ORDER BY stream_ordering ASC"
+                " LIMIT ?"
+            )
+            txn.execute(sql, (last_id, current_id, limit))
+            new_event_updates = txn.fetchall()
+
+            if len(new_event_updates) == limit:
+                upper_bound = new_event_updates[-1][0]
+            else:
+                upper_bound = current_id
+
+            sql = (
+                "SELECT event_stream_ordering, e.event_id, e.room_id, e.type,"
+                " state_key, redacts, relates_to_id"
+                " FROM events AS e"
+                " INNER JOIN ex_outlier_stream USING (event_id)"
+                " LEFT JOIN redactions USING (event_id)"
+                " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
+                " WHERE ? < event_stream_ordering"
+                " AND event_stream_ordering <= ?"
+                " ORDER BY event_stream_ordering DESC"
+            )
+            txn.execute(sql, (last_id, upper_bound))
+            new_event_updates.extend(txn)
+
+            return new_event_updates
+
+        return self.db.runInteraction(
+            "get_all_new_forward_event_rows", get_all_new_forward_event_rows
+        )
+
+    def get_all_new_backfill_event_rows(self, last_id, current_id, limit):
+        if last_id == current_id:
+            return defer.succeed([])
+
+        def get_all_new_backfill_event_rows(txn):
+            sql = (
+                "SELECT -e.stream_ordering, e.event_id, e.room_id, e.type,"
+                " state_key, redacts, relates_to_id"
+                " FROM events AS e"
+                " LEFT JOIN redactions USING (event_id)"
+                " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
+                " WHERE ? > stream_ordering AND stream_ordering >= ?"
+                " ORDER BY stream_ordering ASC"
+                " LIMIT ?"
+            )
+            txn.execute(sql, (-last_id, -current_id, limit))
+            new_event_updates = txn.fetchall()
+
+            if len(new_event_updates) == limit:
+                upper_bound = new_event_updates[-1][0]
+            else:
+                upper_bound = current_id
+
+            sql = (
+                "SELECT -event_stream_ordering, e.event_id, e.room_id, e.type,"
+                " state_key, redacts, relates_to_id"
+                " FROM events AS e"
+                " INNER JOIN ex_outlier_stream USING (event_id)"
+                " LEFT JOIN redactions USING (event_id)"
+                " LEFT JOIN state_events USING (event_id)"
+                " LEFT JOIN event_relations USING (event_id)"
+                " WHERE ? > event_stream_ordering"
+                " AND event_stream_ordering >= ?"
+                " ORDER BY event_stream_ordering DESC"
+            )
+            txn.execute(sql, (-last_id, -upper_bound))
+            new_event_updates.extend(txn.fetchall())
+
+            return new_event_updates
+
+        return self.db.runInteraction(
+            "get_all_new_backfill_event_rows", get_all_new_backfill_event_rows
+        )
+
+    def get_all_updated_current_state_deltas(self, from_token, to_token, limit):
+        def get_all_updated_current_state_deltas_txn(txn):
+            sql = """
+                SELECT stream_id, room_id, type, state_key, event_id
+                FROM current_state_delta_stream
+                WHERE ? < stream_id AND stream_id <= ?
+                ORDER BY stream_id ASC LIMIT ?
+            """
+            txn.execute(sql, (from_token, to_token, limit))
+            return txn.fetchall()
+
+        return self.db.runInteraction(
+            "get_all_updated_current_state_deltas",
+            get_all_updated_current_state_deltas_txn,
+        )

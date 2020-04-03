@@ -49,7 +49,7 @@ def filter_events_for_client(
     events,
     is_peeking=False,
     always_include_ids=frozenset(),
-    apply_retention_policies=True,
+    filter_send_to_client=True,
 ):
     """
     Check which events a user is allowed to see. If the user can see the event but its
@@ -65,17 +65,16 @@ def filter_events_for_client(
             events
         always_include_ids (set(event_id)): set of event ids to specifically
             include (unless sender is ignored)
-        apply_retention_policies (bool): Whether to filter out events that's older than
-            allowed by the room's retention policy. Useful when this function is called
-            to e.g. check whether a user should be allowed to see the state at a given
-            event rather than to know if it should send an event to a user's client(s).
+        filter_send_to_client (bool): Whether we're checking an event that's going to be
+            sent to a client. This might not always be the case since this function can
+            also be called to check whether a user can see the state at a given point.
 
     Returns:
         Deferred[list[synapse.events.EventBase]]
     """
     # Filter out events that have been soft failed so that we don't relay them
     # to clients.
-    events = list(e for e in events if not e.internal_metadata.is_soft_failed())
+    events = [e for e in events if not e.internal_metadata.is_soft_failed()]
 
     types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
     event_id_to_state = yield storage.state.get_state_for_events(
@@ -96,8 +95,8 @@ def filter_events_for_client(
 
     erased_senders = yield storage.main.are_users_erased((e.sender for e in events))
 
-    if apply_retention_policies:
-        room_ids = set(e.room_id for e in events)
+    if filter_send_to_client:
+        room_ids = {e.room_id for e in events}
         retention_policies = {}
 
         for room_id in room_ids:
@@ -119,20 +118,36 @@ def filter_events_for_client(
 
                the original event if they can see it as normal.
         """
-        if not event.is_state() and event.sender in ignore_list:
-            return None
+        # Only run some checks if these events aren't about to be sent to clients. This is
+        # because, if this is not the case, we're probably only checking if the users can
+        # see events in the room at that point in the DAG, and that shouldn't be decided
+        # on those checks.
+        if filter_send_to_client:
+            if event.type == "org.matrix.dummy_event":
+                return None
 
-        # Don't try to apply the room's retention policy if the event is a state event, as
-        # MSC1763 states that retention is only considered for non-state events.
-        if apply_retention_policies and not event.is_state():
-            retention_policy = retention_policies[event.room_id]
-            max_lifetime = retention_policy.get("max_lifetime")
+            if not event.is_state() and event.sender in ignore_list:
+                return None
 
-            if max_lifetime is not None:
-                oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+            # Until MSC2261 has landed we can't redact malicious alias events, so for
+            # now we temporarily filter out m.room.aliases entirely to mitigate
+            # abuse, while we spec a better solution to advertising aliases
+            # on rooms.
+            if event.type == EventTypes.Aliases:
+                return None
 
-                if event.origin_server_ts < oldest_allowed_ts:
-                    return None
+            # Don't try to apply the room's retention policy if the event is a state
+            # event, as MSC1763 states that retention is only considered for non-state
+            # events.
+            if not event.is_state():
+                retention_policy = retention_policies[event.room_id]
+                max_lifetime = retention_policy.get("max_lifetime")
+
+                if max_lifetime is not None:
+                    oldest_allowed_ts = storage.main.clock.time_msec() - max_lifetime
+
+                    if event.origin_server_ts < oldest_allowed_ts:
+                        return None
 
         if event.event_id in always_include_ids:
             return event
