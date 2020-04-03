@@ -25,7 +25,6 @@ _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
 CACHE_PROPERTIES = {
     "prefix": _CACHE_PREFIX,
     "default_size_factor": float(os.environ.get(_CACHE_PREFIX, 0.5)),
-
     # Callback to ensure that all caches are the correct size, registered when the
     # configuration has been loaded.
     "ensure_correct_cache_sizing": None,
@@ -48,7 +47,9 @@ class CacheConfig(Config):
 
         Used for tests.
         """
-        CACHE_PROPERTIES["default_size_factor"] = float(os.environ.get(_CACHE_PREFIX, 0.5))
+        CACHE_PROPERTIES["default_size_factor"] = float(
+            os.environ.get(_CACHE_PREFIX, 0.5)
+        )
         CACHE_PROPERTIES["ensure_correct_cache_sizing"] = None
         _CACHES.clear()
 
@@ -86,7 +87,7 @@ class CacheConfig(Config):
         # Load cache factors from the environment, but override them with the
         # ones in the config file if they exist
         individual_factors = {
-            key[len(CACHE_PROPERTIES["prefix"]) + 1:].lower(): float(val)
+            key[len(CACHE_PROPERTIES["prefix"]) + 1 :].lower(): float(val)
             for key, val in self._environ.items()
             if key.startswith(CACHE_PROPERTIES["prefix"] + "_")
         }
