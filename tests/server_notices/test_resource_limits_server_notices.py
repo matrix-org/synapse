@@ -225,21 +225,18 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
-        hs_config = self.default_config()
-        hs_config["server_notices"] = {
+    def default_config(self):
+        c = super().default_config()
+        c["server_notices"] = {
             "system_mxid_localpart": "server",
             "system_mxid_display_name": None,
             "system_mxid_avatar_url": None,
             "room_name": "Test Server Notice Room",
         }
-
-        hs_config["limit_usage_by_mau"] = True
-        hs_config["max_mau_value"] = 5
-        hs_config["admin_contact"] = "mailto:user@test.com"
-
-        hs = self.setup_test_homeserver(config=hs_config)
-        return hs
+        c["limit_usage_by_mau"] = True
+        c["max_mau_value"] = 5
+        c["admin_contact"] = "mailto:user@test.com"
+        return c
 
     def prepare(self, reactor, clock, hs):
         self.store = self.hs.get_datastore()

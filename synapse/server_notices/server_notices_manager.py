@@ -69,7 +69,7 @@ class ServerNoticesManager(object):
             Deferred[FrozenEvent]
         """
         room_id = yield self.get_or_create_notice_room_for_user(user_id)
-        yield self.invite_user_to_notice_room(user_id, room_id)
+        yield self.maybe_invite_user_to_room(user_id, room_id)
 
         system_mxid = self._config.server_notices_mxid
         requester = create_requester(system_mxid)
@@ -167,9 +167,9 @@ class ServerNoticesManager(object):
         return room_id
 
     @defer.inlineCallbacks
-    def invite_user_to_notice_room(self, user_id: str, room_id: str):
-        """Invite the given user to the given server notices room, unless the user has
-        already joined or been invited to this room.
+    def maybe_invite_user_to_room(self, user_id: str, room_id: str):
+        """Invite the given user to the given server room, unless the user has already
+        joined or been invited to it.
 
         Args:
             user_id: The ID of the user to invite.
@@ -178,8 +178,7 @@ class ServerNoticesManager(object):
         requester = create_requester(self.server_notices_mxid)
 
         # Check whether the user has already joined or been invited to this room. If
-        # that's the case, don't invite because otherwise it would make the auth checks
-        # fail.
+        # that's the case, there is no need to re-invite them.
         joined_rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
             user_id, [Membership.INVITE, Membership.JOIN]
         )
