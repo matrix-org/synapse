@@ -80,7 +80,9 @@ class ResourceLimitsServerNotices(object):
             # In practice, not sure we can ever get here
             return
 
-        room_id = yield self._server_notices_manager.get_notice_room_for_user(user_id)
+        room_id = yield self._server_notices_manager.get_or_create_notice_room_for_user(
+            user_id
+        )
 
         if not room_id:
             logger.warning("Failed to get server notices room")
