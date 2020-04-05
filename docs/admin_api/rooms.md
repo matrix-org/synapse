@@ -26,6 +26,16 @@ The following fields are possible in the JSON response body:
     - `name` - The name of the room.
     - `canonical_alias` - The canonical (main) alias address of the room.
     - `joined_members` - How many users are currently in the room.
+    - `joined_local_members` - How many local users are currently in the room.
+    - `version` - Version of the room.
+    - `creator` - The `user_id` of the room creator..
+    - `encryption` - Algorithm of end-to-end encryption of messages.
+    - `is_federatable` -Whether users on other servers can join this room.
+    - `is_public` - If rooms is public or not on the server. Visibility in room directory.
+    - `join_rules` - The type of rules used for users wishing to join this room. One of: ["public", "knock", "invite", "private"]
+    - `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"]
+    - `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"]
+    - `state_events` - Total number of state_events of a room. Complexity of the room.
 * `offset` - The current pagination offset in rooms. This parameter should be
              used instead of `next_token` for room offset as `next_token` is
              not intended to be parsed.
@@ -60,14 +70,34 @@ Response:
       "room_id": "!OGEhHVWSdvArJzumhm:matrix.org",
       "name": "Matrix HQ",
       "canonical_alias": "#matrix:matrix.org",
-      "joined_members": 8326
+      "joined_members": 8326,
+      "joined_local_members": 2,
+      "version": "1",
+      "creator": "@foo:matrix.org",
+      "encryption": null,
+      "is_federatable": true,
+      "is_public": true,
+      "join_rules": "invite",
+      "guest_access": null,
+      "history_visibility": "shared",
+      "state_events": 93534
     },
     ... (8 hidden items) ...
     {
       "room_id": "!xYvNcQPhnkrdUmYczI:matrix.org",
       "name": "This Week In Matrix (TWIM)",
       "canonical_alias": "#twim:matrix.org",
-      "joined_members": 314
+      "joined_members": 314,
+      "joined_local_members": 20,
+      "version": "4",
+      "creator": "@foo:matrix.org",
+      "encryption": "m.megolm.v1.aes-sha2",
+      "is_federatable": true,
+      "is_public": false,
+      "join_rules": "invite",
+      "guest_access": null,
+      "history_visibility": "shared",
+      "state_events": 8345
     }
   ],
   "offset": 0,
@@ -92,7 +122,17 @@ Response:
       "room_id": "!xYvNcQPhnkrdUmYczI:matrix.org",
       "name": "This Week In Matrix (TWIM)",
       "canonical_alias": "#twim:matrix.org",
-      "joined_members": 314
+      "joined_members": 314,
+      "joined_local_members": 20,
+      "version": "4",
+      "creator": "@foo:matrix.org",
+      "encryption": "m.megolm.v1.aes-sha2",
+      "is_federatable": true,
+      "is_public": false,
+      "join_rules": "invite",
+      "guest_access": null,
+      "history_visibility": "shared",
+      "state_events": 8
     }
   ],
   "offset": 0,
@@ -117,14 +157,34 @@ Response:
       "room_id": "!OGEhHVWSdvArJzumhm:matrix.org",
       "name": "Matrix HQ",
       "canonical_alias": "#matrix:matrix.org",
-      "joined_members": 8326
+      "joined_members": 8326,
+      "joined_local_members": 2,
+      "version": "1",
+      "creator": "@foo:matrix.org",
+      "encryption": null,
+      "is_federatable": true,
+      "is_public": true,
+      "join_rules": "invite",
+      "guest_access": null,
+      "history_visibility": "shared",
+      "state_events": 93534
     },
     ... (98 hidden items) ...
     {
       "room_id": "!xYvNcQPhnkrdUmYczI:matrix.org",
       "name": "This Week In Matrix (TWIM)",
       "canonical_alias": "#twim:matrix.org",
-      "joined_members": 314
+      "joined_members": 314,
+      "joined_local_members": 20,
+      "version": "4",
+      "creator": "@foo:matrix.org",
+      "encryption": "m.megolm.v1.aes-sha2",
+      "is_federatable": true,
+      "is_public": false,
+      "join_rules": "invite",
+      "guest_access": null,
+      "history_visibility": "shared",
+      "state_events": 8345
     }
   ],
   "offset": 0,
