@@ -14,22 +14,14 @@
 # limitations under the License.
 
 import json
-import os
 import urllib.parse
-from binascii import unhexlify
 from typing import List, Optional
 
 from mock import Mock
 
-from twisted.internet.defer import Deferred
-
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.http.server import JsonResource
-from synapse.logging.context import make_deferred_yieldable
-from synapse.rest.admin import VersionServlet
 from synapse.rest.client.v1 import directory, events, login, room
-from synapse.rest.client.v2_alpha import groups
 
 from tests import unittest
 
