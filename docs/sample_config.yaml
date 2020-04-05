@@ -33,10 +33,15 @@ server_name: "SERVERNAME"
 #
 pid_file: DATADIR/homeserver.pid
 
-# The path to the web client which will be served at /_matrix/client/
-# if 'webclient' is configured under the 'listeners' configuration.
+# The absolute URL to the web client which /_matrix/client will redirect
+# to if 'webclient' is configured under the 'listeners' configuration.
 #
-#web_client_location: "/path/to/web/root"
+# This option can be also set to the filesystem path to the web client
+# which will be served at /_matrix/client/ if 'webclient' is configured
+# under the 'listeners' configuration, however this is a security risk:
+# https://github.com/matrix-org/synapse#security-note
+#
+#web_client_location: https://riot.example.com/
 
 # The public-facing base URL that clients use to access this HS
 # (not including _matrix/...). This is the same URL a user would
@@ -578,13 +583,46 @@ acme:
 
 ## Database ##
 
+# The 'database' setting defines the database that synapse uses to store all of
+# its data.
+#
+# 'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
+# 'psycopg2' (for PostgreSQL).
+#
+# 'args' gives options which are passed through to the database engine,
+# except for options starting 'cp_', which are used to configure the Twisted
+# connection pool. For a reference to valid arguments, see:
+#   * for sqlite: https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
+#   * for postgres: https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS
+#   * for the connection pool: https://twistedmatrix.com/documents/current/api/twisted.enterprise.adbapi.ConnectionPool.html#__init__
+#
+#
+# Example SQLite configuration:
+#
+#database:
+#  name: sqlite3
+#  args:
+#    database: /path/to/homeserver.db
+#
+#
+# Example Postgres configuration:
+#
+#database:
+#  name: psycopg2
+#  args:
+#    user: synapse
+#    password: secretpassword
+#    database: synapse
+#    host: localhost
+#    cp_min: 5
+#    cp_max: 10
+#
+# For more information on using Synapse with Postgres, see `docs/postgres.md`.
+#
 database:
-  # The database engine name
-  name: "sqlite3"
-  # Arguments to pass to the engine
+  name: sqlite3
   args:
-    # Path to the database
-    database: "DATADIR/homeserver.db"
+    database: DATADIR/homeserver.db
 
 # Number of events to cache in memory.
 #
@@ -839,10 +877,6 @@ media_store_path: "DATADIR/media_store"
 #
 #enable_registration_captcha: false
 
-# A secret key used to bypass the captcha test entirely.
-#
-#captcha_bypass_secret: "YOUR_SECRET_HERE"
-
 # The API endpoint to use for verifying m.login.recaptcha responses.
 #
 #recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
@@ -1057,6 +1091,29 @@ account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
+# Whether users are allowed to change their displayname after it has
+# been initially set. Useful when provisioning users based on the
+# contents of a third-party directory.
+#
+# Does not apply to server administrators. Defaults to 'true'
+#
+#enable_set_displayname: false
+
+# Whether users are allowed to change their avatar after it has been
+# initially set. Useful when provisioning users based on the contents
+# of a third-party directory.
+#
+# Does not apply to server administrators. Defaults to 'true'
+#
+#enable_set_avatar_url: false
+
+# Whether users can change the 3PIDs associated with their accounts
+# (email address and msisdn).
+#
+# Defaults to 'true'
+#
+#enable_3pid_changes: false
+
 # Users who register on this homeserver will automatically be joined
 # to these rooms
 #
@@ -1092,7 +1149,7 @@ account_threepid_delegates:
 # enabled by default, either for performance reasons or limited use.
 #
 metrics_flags:
-    # Publish synapse_federation_known_servers, a g auge of the number of
+    # Publish synapse_federation_known_servers, a gauge of the number of
     # servers this homeserver knows about, including itself. May cause
     # performance problems on large homeservers.
     #
@@ -1347,6 +1404,25 @@ saml2_config:
   #
   #grandfathered_mxid_source_attribute: upn
 
+  # Directory in which Synapse will try to find the template files below.
+  # If not set, default templates from within the Synapse package will be used.
+  #
+  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+  # If you *do* uncomment it, you will need to make sure that all the templates
+  # below are in the directory.
+  #
+  # Synapse will look for the following templates in this directory:
+  #
+  # * HTML page to display to users if something goes wrong during the
+  #   authentication process: 'saml_error.html'.
+  #
+  #   This template doesn't currently need any variable to render.
+  #
+  # You can see the default templates at:
+  # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+  #
+  #template_dir: "res/templates"
+
 
 
 # Enable CAS for registration and login.
@@ -1358,6 +1434,60 @@ saml2_config:
 #   #displayname_attribute: name
 #   #required_attributes:
 #   #    name: value
+
+
+# Additional settings to use with single-sign on systems such as SAML2 and CAS.
+#
+sso:
+    # A list of client URLs which are whitelisted so that the user does not
+    # have to confirm giving access to their account to the URL. Any client
+    # whose URL starts with an entry in the following list will not be subject
+    # to an additional confirmation step after the SSO login is completed.
+    #
+    # WARNING: An entry such as "https://my.client" is insecure, because it
+    # will also match "https://my.client.evil.site", exposing your users to
+    # phishing attacks from evil.site. To avoid this, include a slash after the
+    # hostname: "https://my.client/".
+    #
+    # If public_baseurl is set, then the login fallback page (used by clients
+    # that don't natively support the required login flows) is whitelisted in
+    # addition to any URLs in this list.
+    #
+    # By default, this list is empty.
+    #
+    #client_whitelist:
+    #  - https://riot.im/develop
+    #  - https://my.custom.client/
+
+    # Directory in which Synapse will try to find the template files below.
+    # If not set, default templates from within the Synapse package will be used.
+    #
+    # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+    # If you *do* uncomment it, you will need to make sure that all the templates
+    # below are in the directory.
+    #
+    # Synapse will look for the following templates in this directory:
+    #
+    # * HTML page for a confirmation step before redirecting back to the client
+    #   with the login token: 'sso_redirect_confirm.html'.
+    #
+    #   When rendering, this template is given three variables:
+    #     * redirect_url: the URL the user is about to be redirected to. Needs
+    #                     manual escaping (see
+    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #
+    #     * display_url: the same as `redirect_url`, but with the query
+    #                    parameters stripped. The intention is to have a
+    #                    human-readable URL to show to users, not to use it as
+    #                    the final address to redirect to. Needs manual escaping
+    #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #
+    #     * server_name: the homeserver's name.
+    #
+    # You can see the default templates at:
+    # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+    #
+    #template_dir: "res/templates"
 
 
 # The JWT needs to contain a globally unique "sub" (subject) claim.
@@ -1383,6 +1513,41 @@ password_config:
    # DO NOT CHANGE THIS AFTER INITIAL SETUP!
    #
    #pepper: "EVEN_MORE_SECRET"
+
+   # Define and enforce a password policy. Each parameter is optional.
+   # This is an implementation of MSC2000.
+   #
+   policy:
+      # Whether to enforce the password policy.
+      # Defaults to 'false'.
+      #
+      #enabled: true
+
+      # Minimum accepted length for a password.
+      # Defaults to 0.
+      #
+      #minimum_length: 15
+
+      # Whether a password must contain at least one digit.
+      # Defaults to 'false'.
+      #
+      #require_digit: true
+
+      # Whether a password must contain at least one symbol.
+      # A symbol is any character that's not a number or a letter.
+      # Defaults to 'false'.
+      #
+      #require_symbol: true
+
+      # Whether a password must contain at least one lowercase letter.
+      # Defaults to 'false'.
+      #
+      #require_lowercase: true
+
+      # Whether a password must contain at least one lowercase letter.
+      # Defaults to 'false'.
+      #
+      #require_uppercase: true
 
 
 # Configuration for sending emails from Synapse.

@@ -1,0 +1,1 @@
+Add explicit `instance_id` for USER_SYNC commands and remove implicit `conn_id` usage.

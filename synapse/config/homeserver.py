@@ -38,6 +38,7 @@ from .saml2_config import SAML2Config
 from .server import ServerConfig
 from .server_notices_config import ServerNoticesConfig
 from .spam_checker import SpamCheckerConfig
+from .sso import SSOConfig
 from .stats import StatsConfig
 from .third_party_event_rules import ThirdPartyRulesConfig
 from .tls import TlsConfig
@@ -65,6 +66,7 @@ class HomeServerConfig(RootConfig):
         KeyConfig,
         SAML2Config,
         CasConfig,
+        SSOConfig,
         JWTConfig,
         PasswordConfig,
         EmailConfig,

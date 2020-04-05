@@ -19,6 +19,9 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, LimitBlockingTypes, ServerNoticeMsgType
 from synapse.api.errors import ResourceLimitError
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, room
+from synapse.rest.client.v2_alpha import sync
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
@@ -28,7 +31,7 @@ from tests import unittest
 
 class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
-        hs_config = self.default_config("test")
+        hs_config = self.default_config()
         hs_config["server_notices"] = {
             "system_mxid_localpart": "server",
             "system_mxid_display_name": "test display name",
@@ -67,7 +70,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         # self.server_notices_mxid_avatar_url = None
         # self.server_notices_room_name = "Server Notices"
 
-        self._rlsn._server_notices_manager.get_notice_room_for_user = Mock(
+        self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
             returnValue=""
         )
         self._rlsn._store.add_tag_to_room = Mock()
@@ -215,6 +218,26 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
 
 class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def default_config(self):
+        c = super().default_config()
+        c["server_notices"] = {
+            "system_mxid_localpart": "server",
+            "system_mxid_display_name": None,
+            "system_mxid_avatar_url": None,
+            "room_name": "Test Server Notice Room",
+        }
+        c["limit_usage_by_mau"] = True
+        c["max_mau_value"] = 5
+        c["admin_contact"] = "mailto:user@test.com"
+        return c
+
     def prepare(self, reactor, clock, hs):
         self.store = self.hs.get_datastore()
         self.server_notices_sender = self.hs.get_server_notices_sender()
@@ -228,17 +251,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         if not isinstance(self._rlsn, ResourceLimitsServerNotices):
             raise Exception("Failed to find reference to ResourceLimitsServerNotices")
 
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.hs_disabled = False
-        self.hs.config.max_mau_value = 5
-        self.hs.config.server_notices_mxid = "@server:test"
-        self.hs.config.server_notices_mxid_display_name = None
-        self.hs.config.server_notices_mxid_avatar_url = None
-        self.hs.config.server_notices_room_name = "Test Server Notice Room"
-
         self.user_id = "@user_id:test"
-
-        self.hs.config.admin_contact = "mailto:user@test.com"
 
     def test_server_notice_only_sent_once(self):
         self.store.get_monthly_active_count = Mock(return_value=1000)
@@ -253,7 +266,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         # Now lets get the last load of messages in the service notice room and
         # check that there is only one server notice
         room_id = self.get_success(
-            self.server_notices_manager.get_notice_room_for_user(self.user_id)
+            self.server_notices_manager.get_or_create_notice_room_for_user(self.user_id)
         )
 
         token = self.get_success(self.event_source.get_current_token())
@@ -273,3 +286,86 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             count += 1
 
         self.assertEqual(count, 1)
+
+    def test_no_invite_without_notice(self):
+        """Tests that a user doesn't get invited to a server notices room without a
+        server notice being sent.
+
+        The scenario for this test is a single user on a server where the MAU limit
+        hasn't been reached (since it's the only user and the limit is 5), so users
+        shouldn't receive a server notice.
+        """
+        self.register_user("user", "password")
+        tok = self.login("user", "password")
+
+        request, channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
+        self.render(request)
+
+        invites = channel.json_body["rooms"]["invite"]
+        self.assertEqual(len(invites), 0, invites)
+
+    def test_invite_with_notice(self):
+        """Tests that, if the MAU limit is hit, the server notices user invites each user
+        to a room in which it has sent a notice.
+        """
+        user_id, tok, room_id = self._trigger_notice_and_join()
+
+        # Sync again to retrieve the events in the room, so we can check whether this
+        # room has a notice in it.
+        request, channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
+        self.render(request)
+
+        # Scan the events in the room to search for a message from the server notices
+        # user.
+        events = channel.json_body["rooms"]["join"][room_id]["timeline"]["events"]
+        notice_in_room = False
+        for event in events:
+            if (
+                event["type"] == EventTypes.Message
+                and event["sender"] == self.hs.config.server_notices_mxid
+            ):
+                notice_in_room = True
+
+        self.assertTrue(notice_in_room, "No server notice in room")
+
+    def _trigger_notice_and_join(self):
+        """Creates enough active users to hit the MAU limit and trigger a system notice
+        about it, then joins the system notices room with one of the users created.
+
+        Returns:
+            user_id (str): The ID of the user that joined the room.
+            tok (str): The access token of the user that joined the room.
+            room_id (str): The ID of the room that's been joined.
+        """
+        user_id = None
+        tok = None
+        invites = []
+
+        # Register as many users as the MAU limit allows.
+        for i in range(self.hs.config.max_mau_value):
+            localpart = "user%d" % i
+            user_id = self.register_user(localpart, "password")
+            tok = self.login(localpart, "password")
+
+            # Sync with the user's token to mark the user as active.
+            request, channel = self.make_request(
+                "GET", "/sync?timeout=0", access_token=tok,
+            )
+            self.render(request)
+
+            # Also retrieves the list of invites for this user. We don't care about that
+            # one except if we're processing the last user, which should have received an
+            # invite to a room with a server notice about the MAU limit being reached.
+            # We could also pick another user and sync with it, which would return an
+            # invite to a system notices room, but it doesn't matter which user we're
+            # using so we use the last one because it saves us an extra sync.
+            invites = channel.json_body["rooms"]["invite"]
+
+        # Make sure we have an invite to process.
+        self.assertEqual(len(invites), 1, invites)
+
+        # Join the room.
+        room_id = list(invites.keys())[0]
+        self.helper.join(room=room_id, user=user_id, tok=tok)
+
+        return user_id, tok, room_id

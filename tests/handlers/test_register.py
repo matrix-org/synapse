@@ -34,7 +34,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """
 
     def make_homeserver(self, reactor, clock):
-        hs_config = self.default_config("test")
+        hs_config = self.default_config()
 
         # some of the tests rely on us having a user consent version
         hs_config["user_consent"] = {

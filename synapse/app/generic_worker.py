@@ -42,7 +42,7 @@ from synapse.handlers.presence import PresenceHandler, get_interested_parties
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
-from synapse.logging.context import LoggingContext, run_in_background
+from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.slave.storage._base import BaseSlavedStore, __func__
@@ -65,12 +65,24 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.replication.tcp.client import ReplicationClientHandler
-from synapse.replication.tcp.streams._base import (
+from synapse.replication.tcp.commands import ClearUserSyncsCommand
+from synapse.replication.tcp.streams import (
+    AccountDataStream,
     DeviceListsStream,
+    GroupServerStream,
+    PresenceStream,
+    PushersStream,
+    PushRulesStream,
     ReceiptsStream,
+    TagAccountDataStream,
     ToDeviceStream,
+    TypingStream,
 )
-from synapse.replication.tcp.streams.events import EventsStreamEventRow, EventsStreamRow
+from synapse.replication.tcp.streams.events import (
+    EventsStream,
+    EventsStreamEventRow,
+    EventsStreamRow,
+)
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
@@ -113,7 +125,6 @@ from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
-from synapse.util.stringutils import random_string
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.generic_worker")
@@ -222,6 +233,7 @@ class GenericWorkerPresence(object):
         self.user_to_num_current_syncs = {}
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
+        self.instance_id = hs.get_instance_id()
 
         active_presence = self.store.take_presence_startup_info()
         self.user_to_current_state = {state.user_id: state for state in active_presence}
@@ -234,13 +246,24 @@ class GenericWorkerPresence(object):
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
 
-        self.process_id = random_string(16)
-        logger.info("Presence process_id is %r", self.process_id)
+        hs.get_reactor().addSystemEventTrigger(
+            "before",
+            "shutdown",
+            run_as_background_process,
+            "generic_presence.on_shutdown",
+            self._on_shutdown,
+        )
+
+    def _on_shutdown(self):
+        if self.hs.config.use_presence:
+            self.hs.get_tcp_replication().send_command(
+                ClearUserSyncsCommand(self.instance_id)
+            )
 
     def send_user_sync(self, user_id, is_syncing, last_sync_ms):
         if self.hs.config.use_presence:
             self.hs.get_tcp_replication().send_user_sync(
-                user_id, is_syncing, last_sync_ms
+                self.instance_id, user_id, is_syncing, last_sync_ms
             )
 
     def mark_as_coming_online(self, user_id):
@@ -389,6 +412,9 @@ class GenericWorkerTyping(object):
         for row in rows:
             self._room_serials[row.room_id] = token
             self._room_typing[row.room_id] = row.user_ids
+
+    def get_current_token(self) -> int:
+        return self._latest_room_serial
 
 
 class GenericWorkerSlavedStore(
@@ -609,7 +635,7 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
         await super(GenericWorkerReplicationHandler, self).on_rdata(
             stream_name, token, rows
         )
-        run_in_background(self.process_and_notify, stream_name, token, rows)
+        await self.process_and_notify(stream_name, token, rows)
 
     def get_streams_to_replicate(self):
         args = super(GenericWorkerReplicationHandler, self).get_streams_to_replicate()
@@ -624,9 +650,11 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
     async def process_and_notify(self, stream_name, token, rows):
         try:
             if self.send_handler:
-                self.send_handler.process_replication_rows(stream_name, token, rows)
+                await self.send_handler.process_replication_rows(
+                    stream_name, token, rows
+                )
 
-            if stream_name == "events":
+            if stream_name == EventsStream.NAME:
                 # We shouldn't get multiple rows per token for events stream, so
                 # we don't need to optimise this for multiple rows.
                 for row in rows:
@@ -649,43 +677,44 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
                     )
 
                 await self.pusher_pool.on_new_notifications(token, token)
-            elif stream_name == "push_rules":
+            elif stream_name == PushRulesStream.NAME:
                 self.notifier.on_new_event(
                     "push_rules_key", token, users=[row.user_id for row in rows]
                 )
-            elif stream_name in ("account_data", "tag_account_data"):
+            elif stream_name in (AccountDataStream.NAME, TagAccountDataStream.NAME):
                 self.notifier.on_new_event(
                     "account_data_key", token, users=[row.user_id for row in rows]
                 )
-            elif stream_name == "receipts":
+            elif stream_name == ReceiptsStream.NAME:
                 self.notifier.on_new_event(
                     "receipt_key", token, rooms=[row.room_id for row in rows]
                 )
                 await self.pusher_pool.on_new_receipts(
                     token, token, {row.room_id for row in rows}
                 )
-            elif stream_name == "typing":
+            elif stream_name == TypingStream.NAME:
                 self.typing_handler.process_replication_rows(token, rows)
                 self.notifier.on_new_event(
                     "typing_key", token, rooms=[row.room_id for row in rows]
                 )
-            elif stream_name == "to_device":
+            elif stream_name == ToDeviceStream.NAME:
                 entities = [row.entity for row in rows if row.entity.startswith("@")]
                 if entities:
                     self.notifier.on_new_event("to_device_key", token, users=entities)
-            elif stream_name == "device_lists":
+            elif stream_name == DeviceListsStream.NAME:
                 all_room_ids = set()
                 for row in rows:
-                    room_ids = await self.store.get_rooms_for_user(row.user_id)
-                    all_room_ids.update(room_ids)
+                    if row.entity.startswith("@"):
+                        room_ids = await self.store.get_rooms_for_user(row.entity)
+                        all_room_ids.update(room_ids)
                 self.notifier.on_new_event("device_list_key", token, rooms=all_room_ids)
-            elif stream_name == "presence":
+            elif stream_name == PresenceStream.NAME:
                 await self.presence_handler.process_replication_rows(token, rows)
-            elif stream_name == "receipts":
+            elif stream_name == GroupServerStream.NAME:
                 self.notifier.on_new_event(
                     "groups_key", token, users=[row.user_id for row in rows]
                 )
-            elif stream_name == "pushers":
+            elif stream_name == PushersStream.NAME:
                 for row in rows:
                     if row.deleted:
                         self.stop_pusher(row.user_id, row.app_id, row.pushkey)
@@ -755,12 +784,12 @@ class FederationSenderHandler(object):
     def stream_positions(self):
         return {"federation": self.federation_position}
 
-    def process_replication_rows(self, stream_name, token, rows):
+    async def process_replication_rows(self, stream_name, token, rows):
         # The federation stream contains things that we want to send out, e.g.
         # presence, typing, etc.
         if stream_name == "federation":
             send_queue.process_rows_for_federation(self.federation_sender, rows)
-            run_in_background(self.update_token, token)
+            await self.update_token(token)
 
         # We also need to poke the federation sender when new events happen
         elif stream_name == "events":
@@ -768,13 +797,14 @@ class FederationSenderHandler(object):
 
         # ... and when new receipts happen
         elif stream_name == ReceiptsStream.NAME:
-            run_as_background_process(
-                "process_receipts_for_federation", self._on_new_receipts, rows
-            )
+            await self._on_new_receipts(rows)
 
         # ... as well as device updates and messages
         elif stream_name == DeviceListsStream.NAME:
-            hosts = {row.destination for row in rows}
+            # The entities are either user IDs (starting with '@') whose devices
+            # have changed, or remote servers that we need to tell about
+            # changes.
+            hosts = {row.entity for row in rows if not row.entity.startswith("@")}
             for host in hosts:
                 self.federation_sender.send_device_messages(host)
 
@@ -789,7 +819,7 @@ class FederationSenderHandler(object):
     async def _on_new_receipts(self, rows):
         """
         Args:
-            rows (iterable[synapse.replication.tcp.streams.ReceiptsStreamRow]):
+            rows (Iterable[synapse.replication.tcp.streams.ReceiptsStream.ReceiptsStreamRow]):
                 new receipts to be processed
         """
         for receipt in rows:
@@ -860,6 +890,9 @@ def start(config_options):
 
         # Force the appservice to start since they will be disabled in the main config
         config.notify_appservices = True
+    else:
+        # For other worker types we force this to off.
+        config.notify_appservices = False
 
     if config.worker_app == "synapse.app.pusher":
         if config.start_pushers:
@@ -873,6 +906,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.start_pushers = True
+    else:
+        # For other worker types we force this to off.
+        config.start_pushers = False
 
     if config.worker_app == "synapse.app.user_dir":
         if config.update_user_directory:
@@ -886,6 +922,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.update_user_directory = True
+    else:
+        # For other worker types we force this to off.
+        config.update_user_directory = False
 
     if config.worker_app == "synapse.app.federation_sender":
         if config.send_federation:
@@ -899,6 +938,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.send_federation = True
+    else:
+        # For other worker types we force this to off.
+        config.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

@@ -1,0 +1,1 @@
+Remove nonfunctional `captcha_bypass_secret` option from `homeserver.yaml`.

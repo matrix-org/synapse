@@ -1,1 +1,0 @@
-Use flake8-comprehensions to enforce good hygiene of list/set/dict comprehensions.

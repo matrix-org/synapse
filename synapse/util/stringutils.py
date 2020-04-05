@@ -13,10 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import itertools
 import random
 import re
 import string
+from collections import Iterable
 
 import six
 from six import PY2, PY3
@@ -126,3 +127,21 @@ def assert_valid_client_secret(client_secret):
         raise SynapseError(
             400, "Invalid client_secret parameter", errcode=Codes.INVALID_PARAM
         )
+
+
+def shortstr(iterable: Iterable, maxitems: int = 5) -> str:
+    """If iterable has maxitems or fewer, return the stringification of a list
+    containing those items.
+
+    Otherwise, return the stringification of a a list with the first maxitems items,
+    followed by "...".
+
+    Args:
+        iterable: iterable to truncate
+        maxitems: number of items to return before truncating
+    """
+
+    items = list(itertools.islice(iterable, maxitems + 1))
+    if len(items) <= maxitems:
+        return str(items)
+    return "[" + ", ".join(repr(r) for r in items[:maxitems]) + ", ...]"

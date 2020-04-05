@@ -157,6 +157,15 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
+        if not by_admin and not self.hs.config.enable_set_displayname:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            if profile.display_name:
+                raise SynapseError(
+                    400,
+                    "Changing display name is disabled on this server",
+                    Codes.FORBIDDEN,
+                )
+
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
             raise SynapseError(
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
@@ -217,6 +226,13 @@ class BaseProfileHandler(BaseHandler):
 
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
+
+        if not by_admin and not self.hs.config.enable_set_avatar_url:
+            profile = yield self.store.get_profileinfo(target_user.localpart)
+            if profile.avatar_url:
+                raise SynapseError(
+                    400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
+                )
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
