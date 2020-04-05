@@ -132,7 +132,7 @@ def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
         return False
 
 
-def stop(pidfile, app) -> bool:
+def stop(pidfile: str, app: str) -> bool:
     """Attempts to kill a synapse worker from the pidfile.
     Args:
         pidfile: path to file containing worker's pid
@@ -140,7 +140,7 @@ def stop(pidfile, app) -> bool:
 
     Returns:
         True if the process stopped successfully
-        False if process was stopped or an error occured
+        False if process was already stopped or an error occured
     """
 
     if os.path.exists(pidfile):
@@ -159,8 +159,8 @@ def stop(pidfile, app) -> bool:
             return False
     else:
         write(
-            "No running worker found. (from '%s')\nThe process might be managed by another controller (e.g. systemd)"
-            % pidfile,
+            "No running worker of %s found (from %s)\nThe process might be managed by another controller (e.g. systemd)"
+            % (app, pidfile),
             colour=YELLOW,
         )
     return False
@@ -317,15 +317,21 @@ def main():
     action = options.action
 
     if action == "stop" or action == "restart":
-        hasStopped = False
-        for worker in workers:
-            if stop(worker.pidfile, worker.app):
-                hasStopped = True
+        has_stopped = False
+        
+        if len(workers) > 0:
+            stopped_worker_count = 0
+            for worker in workers:
+                if stop(worker.pidfile, worker.app):
+                    stopped_worker_count += 1
+            # If all the workers were stopped
+            if len(workers) == stopped_worker_count:
+                has_stopped = True
 
         if start_stop_synapse:
             if stop(pidfile, "synapse.app.homeserver"):
-                hasStopped = True
-        if not hasStopped:
+                has_stopped = True
+        if not has_stopped:
             sys.exit(1)
 
     # Wait for synapse to actually shutdown before starting it again
