@@ -3,8 +3,8 @@ Type: string
 _Description: Name of the server:
  The name that this homeserver will appear as, to clients and other
  servers via federation. This is normally the public hostname of the
- server, but can be different if you set up delegation. Please refer
- to the delegation documentation in this case:
+ server running synapse, but can be different if you set up delegation.
+ Please refer to the delegation documentation in this case:
  https://github.com/matrix-org/synapse/blob/master/docs/delegate.md.
 
 Template: matrix-synapse/report-stats
