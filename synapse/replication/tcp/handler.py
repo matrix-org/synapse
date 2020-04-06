@@ -118,9 +118,6 @@ class ReplicationCommandHandler:
         if not self._is_master:
             return
 
-        if not self._connections:
-            raise Exception("Not connected")
-
         for stream_name, stream in self._streams.items():
             current_token = stream.current_token()
             self.send_command(PositionCommand(stream_name, current_token))
