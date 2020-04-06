@@ -99,7 +99,7 @@ class CacheConfig(Config):
 
         individual_factors.update(individual_factors_config)
 
-        self.cache_factors = dict()  # type: Dict[str, float]
+        self.cache_factors = {}  # type: Dict[str, float]
 
         for cache, factor in individual_factors.items():
             if not isinstance(factor, (int, float)):
