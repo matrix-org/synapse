@@ -1,0 +1,1 @@
+Change defaults to require power level 100 for enabling encryption in a room.
