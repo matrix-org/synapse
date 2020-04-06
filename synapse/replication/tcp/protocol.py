@@ -423,13 +423,13 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
     def __init__(
         self, server_name: str, clock: Clock, handler: "ReplicationCommandHandler"
     ):
-        BaseReplicationStreamProtocol.__init__(self, clock, handler)  # Old style class
+        super().__init__(clock, handler)
 
         self.server_name = server_name
 
     def connectionMade(self):
         self.send_command(ServerCommand(self.server_name))
-        BaseReplicationStreamProtocol.connectionMade(self)
+        super().connectionMade()
 
     async def on_NAME(self, cmd):
         logger.info("[%s] Renamed to %r", self.id(), cmd.data)
@@ -448,7 +448,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         clock: Clock,
         command_handler: "ReplicationCommandHandler",
     ):
-        BaseReplicationStreamProtocol.__init__(self, clock, command_handler)
+        super().__init__(clock, command_handler)
 
         self.instance_id = hs.get_instance_id()
 
@@ -457,7 +457,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
     def connectionMade(self):
         self.send_command(NameCommand(self.client_name))
-        BaseReplicationStreamProtocol.connectionMade(self)
+        super().connectionMade()
 
         # Once we've connected subscribe to the necessary streams
         self.replicate()
