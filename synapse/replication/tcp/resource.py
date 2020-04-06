@@ -45,7 +45,6 @@ class ReplicationStreamProtocolFactory(Factory):
         self.handler = hs.get_tcp_replication()
         self.clock = hs.get_clock()
         self.server_name = hs.config.server_name
-        self.hs = hs
 
         # Ensure the replication streamer is started if we register a
         # replication server endpoint.
