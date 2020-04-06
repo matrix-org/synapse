@@ -46,8 +46,14 @@ class ReplicationStreamProtocolFactory(Factory):
         self.clock = hs.get_clock()
         self.server_name = hs.config.server_name
 
-        # Ensure the replication streamer is started if we register a
-        # replication server endpoint.
+        # If we've created a `ReplicationStreamProtocolFactory` then we're
+        # almost certainly registering a replication listener, so let's ensure
+        # that we've started a `ReplicationStreamer` instance to actually push
+        # data.
+        #
+        # (This is a bit of a weird place to do this, but the alternatives such
+        # as putting this in `HomeServer.setup()`, requires either passing the
+        # listener config again or always starting a `ReplicationStreamer`.)
         hs.get_replication_streamer()
 
     def buildProtocol(self, addr):
