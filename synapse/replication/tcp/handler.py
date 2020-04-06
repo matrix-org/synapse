@@ -315,7 +315,17 @@ class ReplicationCommandHandler:
         """
         if self._connections:
             for connection in self._connections:
-                connection.send_command(cmd)
+                try:
+                    connection.send_command(cmd)
+                except Exception:
+                    # We probably want to catch some types of exceptions here
+                    # and log them as warnings (e.g. connection gone), but I
+                    # can't find what those exception types they would be.
+                    logger.exception(
+                        "Failed to write command %s to connection %s",
+                        cmd.NAME,
+                        connection,
+                    )
         else:
             logger.warning("Dropping command as not connected: %r", cmd.NAME)
 
