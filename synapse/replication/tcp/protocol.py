@@ -72,7 +72,6 @@ from synapse.replication.tcp.commands import (
     PingCommand,
     ReplicateCommand,
     ServerCommand,
-    UserSyncCommand,
 )
 from synapse.types import Collection
 from synapse.util import Clock
@@ -454,8 +453,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
     ):
         super().__init__(clock, command_handler)
 
-        self.instance_id = hs.get_instance_id()
-
         self.client_name = client_name
         self.server_name = server_name
 
@@ -465,13 +462,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         # Once we've connected subscribe to the necessary streams
         self.replicate()
-
-        # Tell the server if we have any users currently syncing (should only
-        # happen on synchrotrons)
-        currently_syncing = self.command_handler.get_currently_syncing_users()
-        now = self.clock.time_msec()
-        for user_id in currently_syncing:
-            self.send_command(UserSyncCommand(self.instance_id, user_id, True, now))
 
     async def on_SERVER(self, cmd):
         if cmd.data != self.server_name:

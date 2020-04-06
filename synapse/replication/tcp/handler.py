@@ -65,6 +65,8 @@ class ReplicationCommandHandler:
         self._presence_handler = hs.get_presence_handler()
         self._store = hs.get_datastore()
         self._notifier = hs.get_notifier()
+        self._clock = hs.get_clock()
+        self._instance_id = hs.get_instance_id()
 
         # Set of streams that we've caught up with.
         self._streams_connected = set()  # type: Set[str]
@@ -295,6 +297,15 @@ class ReplicationCommandHandler:
         # "fully established" than the connection being established.
         if self._factory:
             self._factory.resetDelay()
+
+        # Tell the server if we have any users currently syncing (should only
+        # happen on synchrotrons)
+        currently_syncing = self.get_currently_syncing_users()
+        now = self._clock.time_msec()
+        for user_id in currently_syncing:
+            connection.send_command(
+                UserSyncCommand(self._instance_id, user_id, True, now)
+            )
 
     def lost_connection(self, connection: AbstractConnection):
         """Called when a connection is closed/lost.
