@@ -286,10 +286,15 @@ class ReplicationCommandHandler:
         """
         self._connections.append(connection)
 
-        # If we're using a ReplicationClientFactory then we reset the connection
-        # delay now. We don't reset the delay any earlier as otherwise if there
-        # is a problem during start up we'll end up tight looping connecting to
-        # the server.
+        # If we are connected to replication as a client (rather than a server)
+        # we need to reset the reconnection delay on the client factory (which
+        # is used to do exponential back off when the connection drops).
+        #
+        # Ideally we would reset the delay when we've "fully established" the
+        # connection (for some definition thereof) to stop us from tightlooping
+        # on reconnection if something fails after this point and we drop the
+        # connection. Unfortunately, we don't really have a better definition of
+        # "fully established" than the connection being established.
         if self._factory:
             self._factory.resetDelay()
 
@@ -304,13 +309,12 @@ class ReplicationCommandHandler:
     def connected(self) -> bool:
         """Do we have any replication connections open?
 
-        Used to no-op if nothing is connected.
+        Is used by e.g. `ReplicationStreamer` to no-op if nothing is connected.
         """
         return bool(self._connections)
 
     def send_command(self, cmd: Command):
-        """Send a command to master (when we get establish a connection if we
-        don't have one already.)
+        """Send a command to all connected connections.
         """
         if self._connections:
             for connection in self._connections:
