@@ -104,7 +104,7 @@ class ReplicationCommandHandler:
                 # Let's drop the row for now, on the assumption we'll receive a
                 # `POSITION` soon and we'll catch up correctly then.
                 logger.warning(
-                    "Discarding RDATA for unconnected stream %s -> ",
+                    "Discarding RDATA for unconnected stream %s -> %s",
                     stream_name,
                     cmd.token,
                 )
@@ -146,8 +146,8 @@ class ReplicationCommandHandler:
             # of connected streams.
             self._streams_connected.discard(cmd.stream_name)
 
-            # We clear the pending batches for the stream as the fetching
-            # updates below will fetch all rows in the batch.
+            # We clear the pending batches for the stream as the fetching of the
+            # missing updates below will fetch all rows in the batch.
             self._pending_batches.pop(cmd.stream_name, [])
 
             # Find where we previously streamed up to.
