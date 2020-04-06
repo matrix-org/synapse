@@ -58,6 +58,19 @@ class RoomSortOrder(Enum):
 
     ALPHABETICAL = "alphabetical"
     SIZE = "size"
+    NAME = "name"
+    CANONICAL_ALIAS = "canonical_alias"
+    JOINED_MEMBERS = "joined_members"
+    JOINED_LOCAL_MEMBERS = "joined_local_members"
+    VERSION = "version"
+    CREATOR = "creator"
+    ENCRYPTION = "encryption"
+    FEDERATABLE = "federatable"
+    PUBLIC = "public"
+    JOIN_RULES = "join_rules"
+    GUEST_ACCESS = "guest_access"
+    HISTORY_VISIBILITY = "history_visibility"
+    STATE_EVENTS = "state_events"
 
 
 class RoomWorkerStore(SQLBaseStore):
@@ -335,6 +348,45 @@ class RoomWorkerStore(SQLBaseStore):
             # Sort alphabetically
             order_by_column = "state.name"
             order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.NAME:
+            order_by_column = "state.name"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.CANONICAL_ALIAS:
+            order_by_column = "state.canonical_alias"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOINED_MEMBERS:
+            order_by_column = "curr.joined_members"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOINED_LOCAL_MEMBERS:
+            order_by_column = "curr.local_users_in_room"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.VERSION:
+            order_by_column = "rooms.room_version"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.CREATOR:
+            order_by_column = "rooms.creator"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.ENCRYPTION:
+            order_by_column = "state.encryption"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.FEDERATABLE:
+            order_by_column = "state.is_federatable"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.PUBLIC:
+            order_by_column = "rooms.is_public"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOIN_RULES:
+            order_by_column = "state.join_rules"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.GUEST_ACCESS:
+            order_by_column = "state.guest_access"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.HISTORY_VISIBILITY:
+            order_by_column = "state.history_visibility"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.STATE_EVENTS:
+            order_by_column = "curr.current_state_events"
+            order_by_asc = False
         else:
             raise StoreError(
                 500, "Incorrect value for order_by provided: %s" % order_by
@@ -397,8 +449,8 @@ class RoomWorkerStore(SQLBaseStore):
                         "version": room[8],
                         "creator": room[10],
                         "encryption": room[3],
-                        "is_federatable": room[5],
-                        "is_public": room[9],
+                        "federatable": room[5],
+                        "public": room[9],
                         "join_rules": room[7],
                         "guest_access": room[4],
                         "history_visibility": room[6],

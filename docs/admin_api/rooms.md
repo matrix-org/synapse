@@ -13,6 +13,9 @@ The following query parameters are available:
 * `order_by` - The method in which to sort the returned list of rooms. Valid values are:
   - `alphabetical` - Rooms are ordered alphabetically by room name. This is the default.
   - `size` - Rooms are ordered by the number of members. Largest to smallest.
+  - `name`, `canonical_alias`, `joined_members`, `joined_local_members`, `version`, `creator`,
+    `encryption`, `federatable`, `public`, `join_rules`, `guest_access`, `history_visibility`,
+    `state_events` - ordered by this column
 * `dir` - Direction of room order. Either `f` for forwards or `b` for backwards. Setting
           this value to `b` will reverse the above sort order. Defaults to `f`.
 * `search_term` - Filter rooms by their room name. Search term can be contained in any
@@ -30,8 +33,8 @@ The following fields are possible in the JSON response body:
     - `version` - Version of the room.
     - `creator` - The `user_id` of the room creator..
     - `encryption` - Algorithm of end-to-end encryption of messages.
-    - `is_federatable` -Whether users on other servers can join this room.
-    - `is_public` - If rooms is public or not on the server. Visibility in room directory.
+    - `federatable` -Whether users on other servers can join this room.
+    - `public` - If rooms is public or not on the server. Visibility in room directory.
     - `join_rules` - The type of rules used for users wishing to join this room. One of: ["public", "knock", "invite", "private"]
     - `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"]
     - `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"]
@@ -75,8 +78,8 @@ Response:
       "version": "1",
       "creator": "@foo:matrix.org",
       "encryption": null,
-      "is_federatable": true,
-      "is_public": true,
+      "federatable": true,
+      "public": true,
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
@@ -92,8 +95,8 @@ Response:
       "version": "4",
       "creator": "@foo:matrix.org",
       "encryption": "m.megolm.v1.aes-sha2",
-      "is_federatable": true,
-      "is_public": false,
+      "federatable": true,
+      "public": false,
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
@@ -127,8 +130,8 @@ Response:
       "version": "4",
       "creator": "@foo:matrix.org",
       "encryption": "m.megolm.v1.aes-sha2",
-      "is_federatable": true,
-      "is_public": false,
+      "federatable": true,
+      "public": false,
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
@@ -162,8 +165,8 @@ Response:
       "version": "1",
       "creator": "@foo:matrix.org",
       "encryption": null,
-      "is_federatable": true,
-      "is_public": true,
+      "federatable": true,
+      "public": true,
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",
@@ -179,8 +182,8 @@ Response:
       "version": "4",
       "creator": "@foo:matrix.org",
       "encryption": "m.megolm.v1.aes-sha2",
-      "is_federatable": true,
-      "is_public": false,
+      "federatable": true,
+      "public": false,
       "join_rules": "invite",
       "guest_access": null,
       "history_visibility": "shared",

@@ -187,6 +187,19 @@ class ListRoomRestServlet(RestServlet):
         if order_by not in (
             RoomSortOrder.ALPHABETICAL.value,
             RoomSortOrder.SIZE.value,
+            RoomSortOrder.NAME.value,
+            RoomSortOrder.CANONICAL_ALIAS.value,
+            RoomSortOrder.JOINED_MEMBERS.value,
+            RoomSortOrder.JOINED_LOCAL_MEMBERS.value,
+            RoomSortOrder.VERSION.value,
+            RoomSortOrder.CREATOR.value,
+            RoomSortOrder.ENCRYPTION.value,
+            RoomSortOrder.FEDERATABLE.value,
+            RoomSortOrder.PUBLIC.value,
+            RoomSortOrder.JOIN_RULES.value,
+            RoomSortOrder.GUEST_ACCESS.value,
+            RoomSortOrder.HISTORY_VISIBILITY.value,
+            RoomSortOrder.STATE_EVENTS.value,
         ):
             raise SynapseError(
                 400,
