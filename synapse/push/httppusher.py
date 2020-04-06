@@ -286,9 +286,12 @@ class HttpPusher(object):
         tweaks = push_rule_evaluator.tweaks_for_actions(push_action["actions"])
         badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
 
+        logger.info("BADGE COUNT: %s", badge)
+
         event = yield self.store.get_event(push_action["event_id"], allow_none=True)
         if event is None:
             return True  # It's been redacted
+        logger.info("DISPATCHING PUSH EVENT: %s, %s, %s", event, tweaks, badge)
         rejected = yield self.dispatch_push(event, tweaks, badge)
         if rejected is False:
             return False
