@@ -132,7 +132,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
     def __init__(self, clock: Clock, handler: "ReplicationCommandHandler"):
         self.clock = clock
-        self.handler = handler
+        self.command_handler = handler
 
         self.last_received_command = self.clock.time_msec()
         self.last_sent_command = 0
@@ -172,7 +172,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         # can time us out.
         self.send_command(PingCommand(self.clock.time_msec()))
 
-        self.handler.new_connection(self)
+        self.command_handler.new_connection(self)
 
     def send_ping(self):
         """Periodically sends a ping and checks if we should close the connection
@@ -260,7 +260,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             handled = True
 
         # Then call out to the handler.
-        cmd_func = getattr(self.handler, "on_%s" % (cmd.NAME,), None)
+        cmd_func = getattr(self.command_handler, "on_%s" % (cmd.NAME,), None)
         if cmd_func:
             await cmd_func(cmd)
             handled = True
@@ -395,7 +395,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.state = ConnectionStates.CLOSED
         self.pending_commands = []
 
-        self.handler.lost_connection(self)
+        self.command_handler.lost_connection(self)
 
         if self.transport:
             self.transport.unregisterProducer()
@@ -467,7 +467,7 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
 
         # Tell the server if we have any users currently syncing (should only
         # happen on synchrotrons)
-        currently_syncing = self.handler.get_currently_syncing_users()
+        currently_syncing = self.command_handler.get_currently_syncing_users()
         now = self.clock.time_msec()
         for user_id in currently_syncing:
             self.send_command(UserSyncCommand(self.instance_id, user_id, True, now))
