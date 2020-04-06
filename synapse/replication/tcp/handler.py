@@ -35,6 +35,7 @@ from synapse.replication.tcp.commands import (
     UserIpCommand,
     UserSyncCommand,
 )
+from synapse.replication.tcp.protocol import AbstractConnection
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
 from synapse.util.async_helpers import Linearizer
 
@@ -82,7 +83,7 @@ class ReplicationCommandHandler:
         self._factory = None  # type: Optional[ReplicationClientFactory]
 
         # The currently connected connections.
-        self._connections = []  # type: List[Any]
+        self._connections = []  # type: List[AbstractConnection]
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",
@@ -278,7 +279,7 @@ class ReplicationCommandHandler:
         """
         return self._presence_handler.get_currently_syncing_users()
 
-    def new_connection(self, connection):
+    def new_connection(self, connection: AbstractConnection):
         """Called when we have a new connection.
         """
         self._connections.append(connection)
@@ -295,7 +296,7 @@ class ReplicationCommandHandler:
         if self._factory:
             self._factory.resetDelay()
 
-    def lost_connection(self, connection):
+    def lost_connection(self, connection: AbstractConnection):
         """Called when a connection is closed/lost.
         """
         try:

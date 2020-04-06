@@ -46,6 +46,7 @@ indicate which side is sending, these are *not* included on the wire::
     > ERROR server stopping
     * connection closed by server *
 """
+import abc
 import fcntl
 import logging
 import struct
@@ -483,6 +484,22 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         logger.info("[%s] Subscribing to replication streams", self.id())
 
         self.send_command(ReplicateCommand())
+
+
+class AbstractConnection(abc.ABC):
+    """An interface for replication connections.
+    """
+
+    @abc.abstractmethod
+    def send_command(self, cmd: Command):
+        """Send the command down the connection
+        """
+        pass
+
+
+# This tells python that `BaseReplicationStreamProtocol` implements the
+# interface.
+AbstractConnection.register(BaseReplicationStreamProtocol)
 
 
 # The following simply registers metrics for the replication connections
