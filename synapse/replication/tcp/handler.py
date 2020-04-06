@@ -161,12 +161,17 @@ class ReplicationCommandHandler:
                 )
                 return
 
-            # Fetch all updates between then and now.
-            limited = True
-            while limited:
-                updates, current_token, limited = await stream.get_updates_since(
-                    current_token, cmd.token
-                )
+            # If the position token matches our current token then we're up to
+            # date and there's nothing to do. Otherwise, fetch all updates
+            # between then and now.
+            missing_updates = cmd.token != current_token
+            while missing_updates:
+                (
+                    updates,
+                    current_token,
+                    missing_updates,
+                ) = await stream.get_updates_since(current_token, cmd.token)
+
                 if updates:
                     await self.on_rdata(
                         cmd.stream_name,
