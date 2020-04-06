@@ -22,7 +22,7 @@ _CACHES = {}
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
 
 # Wrap all global vars into a single object to eliminate `global` calls
-CACHE_PROPERTIES: Dict[str, Union[str, float, Optional[Callable[[], None]]]] = {
+CACHE_PROPERTIES = {
     "prefix": _CACHE_PREFIX,
     "default_size_factor": float(os.environ.get(_CACHE_PREFIX, 0.5)),
     # Callback to ensure that all caches are the correct size, registered when the
@@ -35,7 +35,7 @@ def add_resizable_cache(cache_name, cache_resize_callback):
     _CACHES[cache_name.lower()] = cache_resize_callback
 
     if CACHE_PROPERTIES["ensure_correct_cache_sizing"]:
-        CACHE_PROPERTIES["ensure_correct_cache_sizing"]()
+        CACHE_PROPERTIES["ensure_correct_cache_sizing"]()  # type: ignore[operator]
 
 
 class CacheConfig(Config):
@@ -88,9 +88,9 @@ class CacheConfig(Config):
         # Load cache factors from the environment, but override them with the
         # ones in the config file if they exist
         individual_factors = {
-            key[len(CACHE_PROPERTIES["prefix"]) + 1 :].lower(): float(val)
+            key[len(CACHE_PROPERTIES["prefix"]) + 1 :].lower(): float(val)  # type: ignore[arg-type]
             for key, val in self._environ.items()
-            if key.startswith(CACHE_PROPERTIES["prefix"] + "_")
+            if key.startswith(CACHE_PROPERTIES["prefix"] + "_")  # type: ignore[operator]
         }
 
         individual_factors_config = cache_config.get("per_cache_factors", {}) or {}
@@ -115,4 +115,4 @@ class CacheConfig(Config):
                 callback(new_factor)
 
         CACHE_PROPERTIES["ensure_correct_cache_sizing"] = ensure_cache_sizes
-        CACHE_PROPERTIES["ensure_correct_cache_sizing"]()
+        CACHE_PROPERTIES["ensure_correct_cache_sizing"]()  # type: ignore[operator]
