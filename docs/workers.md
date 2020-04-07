@@ -99,7 +99,7 @@ Finally, you need to start your worker processes. This can be done with either
 `synctl` or your distribution's preferred service manager such as `systemd`. We
 recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
-<./systemd-with-workers/README.md>. To use `synctl`, see below.
+[systemd-with-workers](systemd-with-workers). To use `synctl`, see below.
 
 ### Using synctl
 
