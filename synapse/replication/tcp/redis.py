@@ -135,7 +135,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
     protocol = RedisSubscriber
 
     def __init__(self, hs):
-        super(RedisDirectTcpReplicationClientFactory, self).__init__()
+        super().__init__()
 
         self.password = hs.config.redis.redis_password
 
@@ -153,7 +153,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         self.conn_id = random_string(5)
 
     def buildProtocol(self, addr):
-        p = super(RedisDirectTcpReplicationClientFactory, self).buildProtocol(addr)
+        p = super().buildProtocol(addr)
         p.handler = self.handler
         p.redis_connection = self.redis_connection
         p.conn_id = self.conn_id
