@@ -23,7 +23,9 @@ def _stub_db_engine(**kwargs) -> BaseDatabaseEngine:
     # returns a DatabaseEngine, circumventing the abc mechanism
     # any kwargs are set as attributes on the class before instantiating it
     t = type(
-        "TestBaseDatabaseEngine", (BaseDatabaseEngine,), BaseDatabaseEngine.__dict__,
+        "TestBaseDatabaseEngine",
+        (BaseDatabaseEngine,),
+        dict(BaseDatabaseEngine.__dict__),
     )
     # defeat the abc mechanism
     t.__abstractmethods__ = set()
