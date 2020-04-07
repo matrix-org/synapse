@@ -1126,6 +1126,19 @@ class AuthHandler(BaseHandler):
             finish_request(request)
             return
 
+        self._complete_sso_login(registered_user_id, request, client_redirect_url)
+
+    def _complete_sso_login(
+        self,
+        registered_user_id: str,
+        request: SynapseRequest,
+        client_redirect_url: str,
+    ):
+        """
+        The synchronous portion of complete_sso_login.
+
+        This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
+        """
         # Create a login token
         login_token = self.macaroon_gen.generate_short_term_login_token(
             registered_user_id
