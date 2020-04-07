@@ -213,7 +213,7 @@ class ModuleApi(object):
         """
         return self._store.db.runInteraction(desc, func, *args, **kwargs)
 
-    def complete_sso_login(
+    async def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
     ):
         """Complete a SSO login by redirecting the user to a page to confirm whether they
@@ -227,6 +227,6 @@ class ModuleApi(object):
             client_redirect_url: The URL to which to offer to redirect the user (or to
                 redirect them directly if whitelisted).
         """
-        self._auth_handler.complete_sso_login(
+        await self._auth_handler.complete_sso_login(
             registered_user_id, request, client_redirect_url,
         )
