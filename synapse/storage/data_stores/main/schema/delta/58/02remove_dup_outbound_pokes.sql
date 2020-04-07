@@ -19,4 +19,4 @@
   */
 
 INSERT INTO background_updates (ordering, update_name, progress_json)
-    VALUES (5800, "remove_dup_outbound_pokes", "{}");
+    VALUES (5800, 'remove_dup_outbound_pokes', '{}');
