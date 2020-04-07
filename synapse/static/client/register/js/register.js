@@ -113,5 +113,5 @@ matrixRegistration.signUp = function() {
 
 matrixRegistration.onRegistered = function(hs_url, user_id, access_token) {
     // clobber this function
-    console.log("onRegistered - This function should be replaced to proceed.");
+    console.warn("onRegistered - This function should be replaced to proceed.");
 };
