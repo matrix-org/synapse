@@ -749,7 +749,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         KEY_COLS = ["stream_id", "destination", "user_id", "device_id"]
         last_row = progress.get(
             "last_row",
-            {"stream_id": 0, "destination": "", "user_id": "", "device_id": "",},
+            {"stream_id": 0, "destination": "", "user_id": "", "device_id": ""},
         )
 
         def _txn(txn):
