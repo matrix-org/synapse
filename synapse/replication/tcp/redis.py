@@ -20,12 +20,7 @@ import txredisapi
 
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.tcp.commands import (
-    COMMAND_MAP,
-    Command,
-    RdataCommand,
-    ReplicateCommand,
-)
+from synapse.replication.tcp.commands import COMMAND_MAP, Command, ReplicateCommand
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
@@ -134,13 +129,6 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
                 await self.redis_connection.publish(self.stream_name, encoded_string)
 
         run_as_background_process("send-cmd", _send)
-
-    def stream_update(self, stream_name, token, data):
-        """Called when a new update is available to stream to clients.
-
-        We need to check if the client is interested in the stream or not
-        """
-        self.send_command(RdataCommand(stream_name, token, data))
 
 
 class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
