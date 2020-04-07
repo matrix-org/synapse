@@ -1,7 +1,6 @@
 [Unit]
 Description=Synapse parent target
 After=network.target
-AllowIsolate=no
 
 [Install]
 WantedBy=multi-user.target
