@@ -73,9 +73,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
 
         # Mod the mod
         room_power_levels = self.helper.get_state(
-            self.room_id,
-            "m.room.power_levels",
-            tok=self.admin_access_token,
+            self.room_id, "m.room.power_levels", tok=self.admin_access_token,
         )
 
         # Update existing power levels with mod at PL50
@@ -113,14 +111,9 @@ class PowerLevelsTestCase(HomeserverTestCase):
             self.room_id,
             "m.room.server_acl",
             {
-                "allow": [
-                    "*"
-                ],
+                "allow": ["*"],
                 "allow_ip_literals": False,
-                "deny": [
-                    "*.evil.com",
-                    "evil.com"
-                ]
+                "deny": ["*.evil.com", "evil.com"],
             },
             tok=self.mod_access_token,
             expect_code=403,  # expect failure
@@ -131,14 +124,9 @@ class PowerLevelsTestCase(HomeserverTestCase):
             self.room_id,
             "m.room.server_acl",
             {
-                "allow": [
-                    "*"
-                ],
+                "allow": ["*"],
                 "allow_ip_literals": False,
-                "deny": [
-                    "*.evil.com",
-                    "evil.com"
-                ]
+                "deny": ["*.evil.com", "evil.com"],
             },
             tok=self.user_access_token,
             expect_code=403,  # expect failure
