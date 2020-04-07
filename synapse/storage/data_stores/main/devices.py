@@ -227,11 +227,11 @@ class DeviceWorkerStore(SQLBaseStore):
         # get the list of device updates that need to be sent
         sql = """
             SELECT user_id, device_id, stream_id, opentracing_context FROM device_lists_outbound_pokes
-            WHERE destination = ? AND ? < stream_id AND stream_id <= ? AND sent = ?
+            WHERE destination = ? AND ? < stream_id AND stream_id <= ?
             ORDER BY stream_id
             LIMIT ?
         """
-        txn.execute(sql, (destination, from_stream_id, now_stream_id, False, limit))
+        txn.execute(sql, (destination, from_stream_id, now_stream_id, limit))
 
         return list(txn)
 
