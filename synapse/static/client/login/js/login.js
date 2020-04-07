@@ -62,7 +62,7 @@ var show_login = function(inhibit_redirect) {
         }
 
         // Otherwise, show the SSO form
-        $("#sso_form").show();
+        $("#sso_flow").show();
     }
 
     if (matrixLogin.serverAcceptsPassword) {
