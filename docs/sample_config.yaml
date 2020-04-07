@@ -1667,7 +1667,8 @@ email:
 # Note: instances wishing to use SAML or CAS authentication should
 # use the `saml2_config` option instead.
 #
-#password_providers:
+password_providers:
+#    # Example config for an LDAP auth provider
 #    - module: "ldap_auth_provider.LdapAuthProvider"
 #      config:
 #        enabled: true

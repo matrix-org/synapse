@@ -35,7 +35,7 @@ class PasswordAuthProviderConfig(Config):
         if ldap_config.get("enabled", False):
             providers.append({"module": LDAP_PROVIDER, "config": ldap_config})
 
-        providers.extend(config.get("password_providers", []))
+        providers.extend(config.get("password_providers") or [])
         for provider in providers:
             mod_name = provider["module"]
 
@@ -62,7 +62,8 @@ class PasswordAuthProviderConfig(Config):
         # Note: instances wishing to use SAML or CAS authentication should
         # use the `saml2_config` option instead.
         #
-        #password_providers:
+        password_providers:
+        #    # Example config for an LDAP auth provider
         #    - module: "ldap_auth_provider.LdapAuthProvider"
         #      config:
         #        enabled: true
