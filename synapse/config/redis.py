@@ -13,19 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.config._base import Config, ConfigError
+from synapse.config._base import Config
+from synapse.python_dependencies import check_requirements
 
 try:
     import txredisapi
 except ImportError:
     txredisapi = None
-
-
-MISSING_REDIS = """Missing 'txredisapi' library. This is required for redis support.
-
-    Install by running:
-        pip install txredisapi
-"""
 
 
 class RedisConfig(Config):
@@ -38,8 +32,7 @@ class RedisConfig(Config):
         if not self.redis_enabled:
             return
 
-        if txredisapi is None:
-            raise ConfigError(MISSING_REDIS)
+        check_requirements("redis")
 
         self.redis_host = redis_config.get("host", "localhost")
         self.redis_port = redis_config.get("port", 6379)
