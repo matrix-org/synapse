@@ -1,5 +1,8 @@
 [Unit]
-Description=Synapse Matrix Homeserver
+Description=Synapse master
+
+# This service should be restarted when the synapse target is restarted.
+PartOf=matrix-synapse.target
 
 [Service]
 Type=notify
@@ -15,4 +18,4 @@ RestartSec=3
 SyslogIdentifier=matrix-synapse
 
 [Install]
-WantedBy=matrix.target
+WantedBy=matrix-synapse.target

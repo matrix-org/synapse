@@ -1,5 +1,5 @@
 [Unit]
-Description=Contains matrix services like synapse, bridges and bots
+Description=Synapse parent target
 After=network.target
 AllowIsolate=no
 
