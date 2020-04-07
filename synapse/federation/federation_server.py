@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Callable, Dict, List, Match, Optional, Tuple
+from typing import Any, Callable, Dict, List, Match, Optional, Tuple, Union
 
 import six
 from six import iteritems
@@ -111,7 +111,7 @@ class FederationServer(FederationBase):
         return 200, res
 
     async def on_incoming_transaction(
-        self, origin: str, transaction_data: Dict[str, Any]
+        self, origin: str, transaction_data: JsonDict
     ) -> Tuple[int, Dict[str, Any]]:
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
@@ -380,7 +380,9 @@ class FederationServer(FederationBase):
             "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
         }
 
-    async def on_pdu_request(self, origin: str, event_id: str) -> Tuple[int, str]:
+    async def on_pdu_request(
+        self, origin: str, event_id: str
+    ) -> Tuple[int, Union[JsonDict, str]]:
         pdu = await self.handler.get_persisted_pdu(origin, event_id)
 
         if pdu:
@@ -509,7 +511,7 @@ class FederationServer(FederationBase):
 
     @trace
     async def on_claim_client_keys(
-        self, origin: str, content: Dict[str, Any]
+        self, origin: str, content: JsonDict
     ) -> Dict[str, Any]:
         query = []
         for user_id, device_keys in content.get("one_time_keys", {}).items():
@@ -577,9 +579,9 @@ class FederationServer(FederationBase):
         return {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
 
     @log_function
-    def on_openid_userinfo(self, token: str) -> Optional[str]:
+    async def on_openid_userinfo(self, token: str) -> Optional[str]:
         ts_now_ms = self._clock.time_msec()
-        return self.store.get_user_id_for_open_id_token(token, ts_now_ms)
+        return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)
 
     def _transaction_from_pdus(self, pdu_list: List[EventBase]) -> Transaction:
         """Returns a new Transaction containing the given PDUs suitable for
