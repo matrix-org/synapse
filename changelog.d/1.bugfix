@@ -1,0 +1,1 @@
+The parameters in the [test_events.py](synapse/tests/rest/client/v1/test_events.py) in the prepare method were in the wrong order. This change fixes the order. Contributed by Isaiah Singletary.
