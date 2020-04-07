@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 import txredisapi
 
@@ -27,12 +28,27 @@ from synapse.replication.tcp.commands import (
 )
 from synapse.util.stringutils import random_string
 
+if TYPE_CHECKING:
+    from synapse.replication.tcp.handler import ReplicationCommandHandler
+
 logger = logging.getLogger(__name__)
 
 
 class RedisSubscriber(txredisapi.SubscriberProtocol):
     """Connection to redis subscribed to replication stream.
+
+    Parses incoming messages from redis into replication commands, and passes
+    them to `ReplicationCommandHandler`
+
+    Due to the vagaries of `txredisapi` we don't want to have a custom
+    constructor, so instead we expect the defined attributes below to be set
+    immediately after initialisation.
     """
+
+    handler = None  # type: ReplicationCommandHandler
+    stream_name = None  # type: str
+    redis_connection = None  # type: txredisapi.lazyConnection
+    conn_id = None  # type: str
 
     def connectionMade(self):
         logger.info("Connected to redis instance")
@@ -99,7 +115,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         logger.info("Lost connection to redis instance")
         self.handler.lost_connection(self)
 
-    def send_command(self, cmd):
+    def send_command(self, cmd: Command):
         """Send a command if connection has been established.
 
         Args:
@@ -113,6 +129,8 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
         async def _send():
             with PreserveLoggingContext():
+                # Note that we use the other connection as we can't send
+                # commands using the subscription connection.
                 await self.redis_connection.publish(self.stream_name, encoded_string)
 
         run_as_background_process("send-cmd", _send)
@@ -137,11 +155,16 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
     def __init__(self, hs):
         super().__init__()
 
+        # This sets the password on the RedisFactory base class (as
+        # SubscriberFactory constructor doesn't pass it through).
         self.password = hs.config.redis.redis_password
 
         self.handler = hs.get_tcp_replication()
         self.stream_name = hs.hostname
 
+        # We need two connections to redis, one for the subscription stream and
+        # one to send commands to (as you can't send further redis commands to a
+        # connection after SUBSCIBE is called).
         self.redis_connection = txredisapi.lazyConnection(
             host=hs.config.redis_host,
             port=hs.config.redis_port,
@@ -153,9 +176,15 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         self.conn_id = random_string(5)
 
     def buildProtocol(self, addr):
-        p = super().buildProtocol(addr)
+        p = super().buildProtocol(addr)  # type: RedisSubscriber
+
+        # We do this here rather than add to the constructor of `RedisSubcriber`
+        # as to do so would involve overriding `buildProtocol` entirely, however
+        # the base method does some other things than just instantiating the
+        # protocol.
         p.handler = self.handler
         p.redis_connection = self.redis_connection
         p.conn_id = self.conn_id
         p.stream_name = self.stream_name
+
         return p
