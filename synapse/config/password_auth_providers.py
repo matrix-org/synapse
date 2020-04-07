@@ -76,5 +76,5 @@ class PasswordAuthProviderConfig(Config):
         #           name: "givenName"
         #        #bind_dn:
         #        #bind_password:
-        #        #filter: "(objectClass=posixAccount)"
+        #        #filter: "(objectClass=posixAccount)"\
         """
