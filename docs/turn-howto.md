@@ -19,13 +19,25 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
 
 #### Debian installation
 
-    # apt install coturn
+1. install the debian package
+
+        apt install coturn
+
+2. prepare sqlite-DB vor coturn
+
+        mkdir -p /var/lib/turn/
+        chown turnserver:turnserver /var/lib/turn/
+
+3. enable the systemd service
+
+        systemctl enable coturn.service
+        systemctl daemon-reload
 
 #### Source installation
 
 1. Download the [latest release](https://github.com/coturn/coturn/releases/latest) from github.  Unpack it and `cd` into the directory.
 
-1.  Configure it:
+2.  Configure it:
 
         ./configure
 
@@ -34,7 +46,7 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
     > warnings about lack of database support: a database is unnecessary
     > for this purpose.
 
-1.  Build and install it:
+3.  Build and install it:
 
         make
         make install
@@ -45,7 +57,7 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
     lines, with example values, are:
 
         use-auth-secret
-        static-auth-secret=[your secret key here]
+        static-auth-secret=n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons
         realm=turn.myserver.org
 
     See `turnserver.conf` for explanations of the options. One way to generate
@@ -53,10 +65,10 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
 
         pwgen -s 64 1
 
-1.  Consider your security settings. TURN lets users request a relay which will
+2.  Consider your security settings. TURN lets users request a relay which will
     connect to arbitrary IP addresses and ports. The following configuration is
     suggested as a minimum starting point:
-    
+  
         # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
         no-tcp-relay
         
@@ -76,16 +88,29 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
     Ideally coturn should refuse to relay traffic which isn't SRTP; see
     <https://github.com/matrix-org/synapse/issues/2009>
 
-1.  Ensure your firewall allows traffic into the TURN server on the ports
+3.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (remember to allow both TCP and UDP TURN
-    traffic)
+    traffic, default port: 3478)
 
-1.  If you've configured coturn to support TLS/DTLS, generate or import your
-    private key and certificate.
+4.  If you've configured coturn to support TLS/DTLS, generate or import your
+    private key and certificate and set it in `turnsurver.conf`, for a LE certificate
+    you need:
+    
+        cert=/etc/letsencrypt/live/turn.example.org/cert.pem
+        cert=/etc/letsencrypt/live/turn.example.org/fullchain.pem
+    
+    and the private key has to be symlinked:
 
-1.  Start the turn server:
+        ln -s /etc/letsencrypt/live/turn.example.org/privkey.pem /usr/local/etc/turn_server_pkey.pem
 
-         bin/turnserver -o
+
+5.  Start (and restart) the turn server:
+
+        turnserver -o
+
+    Or if you installed the systemd service:
+    
+        systemctl start coturn.service
 
 ## synapse Setup
 
@@ -112,7 +137,7 @@ Your home server configuration file needs the following extra keys:
 
 As an example, here is the relevant section of the config file for matrix.org:
 
-    turn_uris: [ "turn:turn.matrix.org:3478?transport=udp", "turn:turn.matrix.org:3478?transport=tcp" ]
+    turn_uris: [ "turn:turn.example.org:3478?transport=udp", "turn:turn.example.org:3478?transport=tcp" ]
     turn_shared_secret: n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons
     turn_user_lifetime: 86400000
     turn_allow_guests: True
@@ -121,5 +146,15 @@ After updating the homeserver configuration, you must restart synapse:
 
     cd /where/you/run/synapse
     ./synctl restart
+
+Or in case you have installed a systemd service, you have to add a dependency on
+coturn in your service file in the `[Unit]` section:
+
+    After=coturn.service
+
+Then update systemd and restart your service with
+
+    systemctl daemon-reload
+    systemctl restart matrix-synapse.service
 
 ..and your Home Server now supports VoIP relaying!
