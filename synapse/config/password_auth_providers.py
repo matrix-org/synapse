@@ -60,7 +60,8 @@ class PasswordAuthProviderConfig(Config):
         # https://github.com/matrix-org/synapse/blob/master/docs/password_auth_providers.md
         #
         # Note: instances wishing to use SAML or CAS authentication should
-        # use the `saml2_config` option instead.
+        # instead use the `saml2_config` or `cas_config` options,
+        # respectively.
         #
         password_providers:
         #    # Example config for an LDAP auth provider
@@ -76,5 +77,5 @@ class PasswordAuthProviderConfig(Config):
         #           name: "givenName"
         #        #bind_dn:
         #        #bind_password:
-        #        #filter: "(objectClass=posixAccount)"\
+        #        #filter: "(objectClass=posixAccount)"
         """
