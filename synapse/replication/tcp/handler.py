@@ -31,7 +31,6 @@ from synapse.replication.tcp.commands import (
     RemoteServerUpCommand,
     RemovePusherCommand,
     ReplicateCommand,
-    SyncCommand,
     UserIpCommand,
     UserSyncCommand,
 )
@@ -280,9 +279,6 @@ class ReplicationCommandHandler:
             await self._replication_data_handler.on_position(cmd.stream_name, cmd.token)
 
             self._streams_connected.add(cmd.stream_name)
-
-    async def on_SYNC(self, cmd: SyncCommand):
-        pass
 
     async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
         """"Called when get a new REMOTE_SERVER_UP command."""
