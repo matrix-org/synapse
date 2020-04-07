@@ -16,7 +16,7 @@
 from mock import Mock, NonCallableMock
 
 from synapse.replication.tcp.client import (
-    ReplicationClientFactory,
+    DirectTcpReplicationClientFactory,
     ReplicationDataHandler,
 )
 from synapse.replication.tcp.handler import ReplicationCommandHandler
@@ -61,7 +61,7 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
             self.slaved_store
         )
 
-        client_factory = ReplicationClientFactory(
+        client_factory = DirectTcpReplicationClientFactory(
             self.hs, "client_name", self.replication_handler
         )
         client_factory.handler = self.replication_handler

@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, List, Optional, Set
 from prometheus_client import Counter
 
 from synapse.metrics import LaterGauge
-from synapse.replication.tcp.client import ReplicationClientFactory
+from synapse.replication.tcp.client import DirectTcpReplicationClientFactory
 from synapse.replication.tcp.commands import (
     ClearUserSyncsCommand,
     Command,
@@ -82,7 +82,7 @@ class ReplicationCommandHandler:
         self._pending_batches = {}  # type: Dict[str, List[Any]]
 
         # The factory used to create connections.
-        self._factory = None  # type: Optional[ReplicationClientFactory]
+        self._factory = None  # type: Optional[DirectTcpReplicationClientFactory]
 
         # The currently connected connections.
         self._connections = []  # type: List[AbstractConnection]
@@ -110,16 +110,18 @@ class ReplicationCommandHandler:
         using TCP.
         """
         if hs.config.redis.redis_enabled:
-            from synapse.replication.tcp.redis import RedisFactory
+            from synapse.replication.tcp.redis import (
+                RedisDirectTcpReplicationClientFactory,
+            )
 
             logger.info("Connecting to redis.")
-            self._factory = RedisFactory(hs)
+            self._factory = RedisDirectTcpReplicationClientFactory(hs)
             hs.get_reactor().connectTCP(
                 hs.config.redis.redis_host, hs.config.redis.redis_port, self._factory,
             )
         else:
             client_name = hs.config.worker_name
-            self._factory = ReplicationClientFactory(hs, client_name, self)
+            self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
             hs.get_reactor().connectTCP(host, port, self._factory)

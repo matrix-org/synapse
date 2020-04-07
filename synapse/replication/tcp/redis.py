@@ -125,7 +125,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         self.send_command(RdataCommand(stream_name, token, data))
 
 
-class RedisFactory(txredisapi.SubscriberFactory):
+class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
     """This is a reconnecting factory that connects to redis and immediately
     subscribes to a stream.
     """
@@ -135,7 +135,7 @@ class RedisFactory(txredisapi.SubscriberFactory):
     protocol = RedisSubscriber
 
     def __init__(self, hs):
-        super(RedisFactory, self).__init__()
+        super(RedisDirectTcpReplicationClientFactory, self).__init__()
 
         self.password = hs.config.redis.redis_password
 
@@ -153,7 +153,7 @@ class RedisFactory(txredisapi.SubscriberFactory):
         self.conn_id = random_string(5)
 
     def buildProtocol(self, addr):
-        p = super(RedisFactory, self).buildProtocol(addr)
+        p = super(RedisDirectTcpReplicationClientFactory, self).buildProtocol(addr)
         p.handler = self.handler
         p.redis_connection = self.redis_connection
         p.conn_id = self.conn_id
