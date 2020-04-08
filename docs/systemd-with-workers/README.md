@@ -40,7 +40,7 @@ matrix-synapse-worker@<worker_name>.service`. For each `<worker_name>`, there
 should be a corresponding configuration file
 `/etc/matrix-synapse/workers/<worker_name>.yaml`.
 1. Start all the synapse processes with `systemctl start matrix-synapse.target`.
-1. Tell systemd to start synapse on boot with `systemctl enable matrix-synapse.target`
+1. Tell systemd to start synapse on boot with `systemctl enable matrix-synapse.target`/
 
 ## Usage
 
