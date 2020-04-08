@@ -318,7 +318,7 @@ def main():
 
     if action == "stop" or action == "restart":
         has_stopped = False
-        
+
         if len(workers) > 0:
             stopped_worker_count = 0
             for worker in workers:
