@@ -159,8 +159,7 @@ class DirectoryHandler(BaseHandler):
 
         yield self._create_association(room_alias, room_id, servers, creator=user_id)
 
-    @defer.inlineCallbacks
-    def delete_association(self, requester: Requester, room_alias: RoomAlias):
+    async def delete_association(self, requester: Requester, room_alias: RoomAlias):
         """Remove an alias from the directory
 
         (this is only meant for human users; AS users should call
@@ -184,7 +183,7 @@ class DirectoryHandler(BaseHandler):
         user_id = requester.user.to_string()
 
         try:
-            can_delete = yield self._user_can_delete_alias(room_alias, user_id)
+            can_delete = await self._user_can_delete_alias(room_alias, user_id)
         except StoreError as e:
             if e.code == 404:
                 raise NotFoundError("Unknown room alias")
@@ -193,7 +192,7 @@ class DirectoryHandler(BaseHandler):
         if not can_delete:
             raise AuthError(403, "You don't have permission to delete the alias.")
 
-        can_delete = yield self.can_modify_alias(room_alias, user_id=user_id)
+        can_delete = await self.can_modify_alias(room_alias, user_id=user_id)
         if not can_delete:
             raise SynapseError(
                 400,
@@ -201,10 +200,10 @@ class DirectoryHandler(BaseHandler):
                 errcode=Codes.EXCLUSIVE,
             )
 
-        room_id = yield self._delete_association(room_alias)
+        room_id = await self._delete_association(room_alias)
 
         try:
-            yield self._update_canonical_alias(requester, user_id, room_id, room_alias)
+            await self._update_canonical_alias(requester, user_id, room_id, room_alias)
         except AuthError as e:
             logger.info("Failed to update alias events: %s", e)
 
@@ -376,8 +375,7 @@ class DirectoryHandler(BaseHandler):
         # either no interested services, or no service with an exclusive lock
         return defer.succeed(True)
 
-    @defer.inlineCallbacks
-    def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
+    async def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
         """Determine whether a user can delete an alias.
 
         One of the following must be true:
@@ -388,24 +386,23 @@ class DirectoryHandler(BaseHandler):
            for the current room.
 
         """
-        creator = yield self.store.get_room_alias_creator(alias.to_string())
+        creator = await self.store.get_room_alias_creator(alias.to_string())
 
         if creator is not None and creator == user_id:
             return True
 
         # Resolve the alias to the corresponding room.
-        room_mapping = yield self.get_association(alias)
+        room_mapping = await self.get_association(alias)
         room_id = room_mapping["room_id"]
         if not room_id:
             return False
 
-        res = yield self.auth.check_can_change_room_list(
+        res = await self.auth.check_can_change_room_list(
             room_id, UserID.from_string(user_id)
         )
         return res
 
-    @defer.inlineCallbacks
-    def edit_published_room_list(
+    async def edit_published_room_list(
         self, requester: Requester, room_id: str, visibility: str
     ):
         """Edit the entry of the room in the published room list.
@@ -433,11 +430,11 @@ class DirectoryHandler(BaseHandler):
                 403, "This user is not permitted to publish rooms to the room list"
             )
 
-        room = yield self.store.get_room(room_id)
+        room = await self.store.get_room(room_id)
         if room is None:
             raise SynapseError(400, "Unknown room")
 
-        can_change_room_list = yield self.auth.check_can_change_room_list(
+        can_change_room_list = await self.auth.check_can_change_room_list(
             room_id, requester.user
         )
         if not can_change_room_list:
@@ -449,8 +446,8 @@ class DirectoryHandler(BaseHandler):
 
         making_public = visibility == "public"
         if making_public:
-            room_aliases = yield self.store.get_aliases_for_room(room_id)
-            canonical_alias = yield self.store.get_canonical_alias_for_room(room_id)
+            room_aliases = await self.store.get_aliases_for_room(room_id)
+            canonical_alias = await self.store.get_canonical_alias_for_room(room_id)
             if canonical_alias:
                 room_aliases.append(canonical_alias)
 
@@ -462,7 +459,7 @@ class DirectoryHandler(BaseHandler):
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to publish room")
 
-        yield self.store.set_room_is_public(room_id, making_public)
+        await self.store.set_room_is_public(room_id, making_public)
 
     @defer.inlineCallbacks
     def edit_published_appservice_room_list(
