@@ -183,7 +183,7 @@ class ListRoomRestServlet(RestServlet):
         # Extract query parameters
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
-        order_by = parse_string(request, "order_by", default="alphabetical")
+        order_by = parse_string(request, "order_by", default=RoomSortOrder.NAME.value)
         if order_by not in (
             RoomSortOrder.ALPHABETICAL.value,
             RoomSortOrder.SIZE.value,

@@ -11,11 +11,21 @@ The following query parameters are available:
 * `from` - Offset in the returned list. Defaults to `0`.
 * `limit` - Maximum amount of rooms to return. Defaults to `100`.
 * `order_by` - The method in which to sort the returned list of rooms. Valid values are:
-  - `alphabetical` - Rooms are ordered alphabetically by room name. This is the default.
-  - `size` - Rooms are ordered by the number of members. Largest to smallest.
-  - `name`, `canonical_alias`, `joined_members`, `joined_local_members`, `version`, `creator`,
-    `encryption`, `federatable`, `public`, `join_rules`, `guest_access`, `history_visibility`,
-    `state_events` - ordered by this column
+  - `alphabetical` - Same like `name`. This is deprecated.
+  - `size` - Same like `joined_members`. This is deprecated.
+  - `name` - Rooms are ordered alphabetically by room name. This is the default.
+  - `canonical_alias` - Rooms are ordered alphabetically by main alias address of the room.
+  - `joined_members` - Rooms are ordered by the number of members. Largest to smallest.
+  - `joined_local_members` - Rooms are ordered by the number of local members. Largest to smallest.
+  - `version` - Rooms are ordered by room version. Largest to smallest.
+  - `creator` - Rooms are ordered alphabetically by creator of the room.
+  - `encryption` - Rooms are ordered by encryption of the room.
+  - `federatable` - Rooms are ordered by federatable option of the room.
+  - `public` - Rooms are ordered by visibility in room list.
+  - `join_rules` - Rooms are ordered alphabetically by join rules of the room.
+  - `guest_access` - Rooms are ordered by guest access option  of the room.
+  - `history_visibility` - Rooms are ordered alphabetically by visibility of history of the room.
+  - `state_events` - Rooms are ordered by number of state events. Largest to smallest.
 * `dir` - Direction of room order. Either `f` for forwards or `b` for backwards. Setting
           this value to `b` will reverse the above sort order. Defaults to `f`.
 * `search_term` - Filter rooms by their room name. Search term can be contained in any
@@ -32,8 +42,8 @@ The following fields are possible in the JSON response body:
     - `joined_local_members` - How many local users are currently in the room.
     - `version` - Version of the room.
     - `creator` - The `user_id` of the room creator..
-    - `encryption` - Algorithm of end-to-end encryption of messages.
-    - `federatable` -Whether users on other servers can join this room.
+    - `encryption` - Algorithm of end-to-end encryption of messages. Is `null` if encryption is not active.
+    - `federatable` - Whether users on other servers can join this room.
     - `public` - If rooms is public or not on the server. Visibility in room directory.
     - `join_rules` - The type of rules used for users wishing to join this room. One of: ["public", "knock", "invite", "private"]
     - `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"]

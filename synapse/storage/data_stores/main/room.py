@@ -401,10 +401,10 @@ class RoomWorkerStore(SQLBaseStore):
         # for, and another query for getting the total number of events that could be
         # returned. Thus allowing us to see if there are more events to paginate through
         info_sql = """
-            SELECT state.room_id, state.name, state.canonical_alias, state.encryption,
-              state.guest_access, state.is_federatable, state.history_visibility,
-              state.join_rules, rooms.room_version, rooms.is_public, rooms.creator,
-              curr.joined_members, curr.current_state_events, curr.local_users_in_room
+            SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members,
+              curr.local_users_in_room, rooms.room_version, rooms.creator,
+              state.encryption, state.is_federatable, rooms.is_public, state.join_rules,
+              state.guest_access, state.history_visibility, curr.current_state_events
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
             INNER JOIN rooms USING (room_id)
@@ -444,17 +444,17 @@ class RoomWorkerStore(SQLBaseStore):
                         "room_id": room[0],
                         "name": room[1],
                         "canonical_alias": room[2],
-                        "joined_members": room[11],
-                        "joined_local_members": room[13],
-                        "version": room[8],
-                        "creator": room[10],
-                        "encryption": room[3],
-                        "federatable": room[5],
+                        "joined_members": room[3],
+                        "joined_local_members": room[4],
+                        "version": room[5],
+                        "creator": room[6],
+                        "encryption": room[7],
+                        "federatable": room[8],
                         "public": room[9],
-                        "join_rules": room[7],
-                        "guest_access": room[4],
-                        "history_visibility": room[6],
-                        "state_events": room[12],
+                        "join_rules": room[10],
+                        "guest_access": room[11],
+                        "history_visibility": room[12],
+                        "state_events": room[13],
                     }
                 )
 

@@ -342,7 +342,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
             url = "/_synapse/admin/v1/rooms?from=%d&limit=%d&order_by=%s" % (
                 start,
                 limit,
-                "alphabetical",
+                "name",
             )
             request, channel = self.make_request(
                 "GET", url.encode("ascii"), access_token=self.admin_user_tok,
@@ -470,7 +470,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(test_alias, r["canonical_alias"])
 
     def test_room_list_sort_order(self):
-        """Test room list sort ordering. alphabetical versus number of members,
+        """Test room list sort ordering. alphabetical name versus number of members,
         reversing the order, etc.
         """
         # Create 3 test rooms
@@ -545,11 +545,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
             self.assertListEqual(expected_room_list, returned_order)  # order is checked
 
         # Test different sort orders, with forward and reverse directions
-        _order_test("alphabetical", [room_id_1, room_id_2, room_id_3])
-        _order_test("alphabetical", [room_id_3, room_id_2, room_id_1], reverse=True)
+        _order_test("name", [room_id_1, room_id_2, room_id_3])
+        _order_test("name", [room_id_3, room_id_2, room_id_1], reverse=True)
 
-        _order_test("size", [room_id_3, room_id_2, room_id_1])
-        _order_test("size", [room_id_1, room_id_2, room_id_3], reverse=True)
+        _order_test("joined_members", [room_id_3, room_id_2, room_id_1])
+        _order_test("joined_members", [room_id_1, room_id_2, room_id_3], reverse=True)
 
     def test_search_term(self):
         """Test that searching for a room works correctly"""
