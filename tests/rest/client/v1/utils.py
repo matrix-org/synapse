@@ -195,7 +195,7 @@ class RestHelper(object):
 
         return channel.json_body
 
-    def get_room_state(
+    def get_state(
         self,
         room_id: str,
         event_type: str,
@@ -222,7 +222,7 @@ class RestHelper(object):
             room_id, event_type, None, tok, expect_code, state_key, method="GET"
         )
 
-    def set_room_state(
+    def send_state(
         self,
         room_id: str,
         event_type: str,
