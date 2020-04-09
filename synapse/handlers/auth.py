@@ -161,10 +161,9 @@ class AuthHandler(BaseHandler):
         self._sso_auth_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
         )[0]
-        self._sso_account_deactivated_template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir,
-            ["sso_account_deactivated.html"],
-        )[0]
+        self._sso_account_deactivated_template = (
+            hs.config.sso_account_deactivated_template
+        )
 
         self._server_name = hs.config.server_name
 
@@ -1118,7 +1117,7 @@ class AuthHandler(BaseHandler):
         # flow.
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
-            html = self._sso_account_deactivated_template.render().encode("utf-8")
+            html = self._sso_account_deactivated_template.encode("utf-8")
 
             request.setResponseCode(403)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
