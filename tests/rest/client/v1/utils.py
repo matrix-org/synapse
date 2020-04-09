@@ -164,7 +164,7 @@ class RestHelper(object):
             self.hs.get_reactor(),
             method,
             path,
-            content=json.dumps(body).encode("utf8") if body else b""
+            content=json.dumps(body).encode("utf8") if body else b"",
         )
 
         render(request, self.resource, self.hs.get_reactor())

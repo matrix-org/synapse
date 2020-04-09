@@ -161,3 +161,45 @@ class PowerLevelsTestCase(HomeserverTestCase):
             tok=self.user_access_token,
             expect_code=403,  # expect failure
         )
+
+    def test_admins_can_enable_room_encryption(self):
+        # have the admin try to enable room encryption
+        self.helper.send_state(
+            self.room_id,
+            "m.room.encryption",
+            {"algorithm": "m.megolm.v1.aes-sha2"},
+            tok=self.admin_access_token,
+            expect_code=200,  # expect success
+        )
+
+    def test_admins_can_send_server_acl(self):
+        # have the admin try to send a server ACL
+        self.helper.send_state(
+            self.room_id,
+            "m.room.server_acl",
+            {
+                "allow": ["*"],
+                "allow_ip_literals": False,
+                "deny": ["*.evil.com", "evil.com"],
+            },
+            tok=self.admin_access_token,
+            expect_code=200,  # expect success
+        )
+
+    def test_admins_can_tombstone_room(self):
+        # Create another room that will serve as our "upgraded room"
+        self.upgraded_room_id = self.helper.create_room_as(
+            self.admin_user_id, tok=self.admin_access_token
+        )
+
+        # have the admin try to send a tombstone event
+        self.helper.send_state(
+            self.room_id,
+            "m.room.tombstone",
+            {
+                "body": "This room has been replaced",
+                "replacement_room": self.upgraded_room_id,
+            },
+            tok=self.admin_access_token,
+            expect_code=200,  # expect success
+        )
