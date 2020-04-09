@@ -161,6 +161,9 @@ class AuthHandler(BaseHandler):
         self._sso_auth_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
         )[0]
+        self._sso_account_deactivated_template = (
+            hs.config.sso_account_deactivated_template
+        )
 
         self._server_name = hs.config.server_name
 
@@ -644,9 +647,6 @@ class AuthHandler(BaseHandler):
         Returns:
             defer.Deferred: (unicode) canonical_user_id, or None if zero or
             multiple matches
-
-        Raises:
-            UserDeactivatedError if a user is found but is deactivated.
         """
         res = yield self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
@@ -1099,7 +1099,7 @@ class AuthHandler(BaseHandler):
         request.write(html_bytes)
         finish_request(request)
 
-    def complete_sso_login(
+    async def complete_sso_login(
         self,
         registered_user_id: str,
         request: SynapseRequest,
@@ -1112,6 +1112,32 @@ class AuthHandler(BaseHandler):
             request: The request to complete.
             client_redirect_url: The URL to which to redirect the user at the end of the
                 process.
+        """
+        # If the account has been deactivated, do not proceed with the login
+        # flow.
+        deactivated = await self.store.get_user_deactivated_status(registered_user_id)
+        if deactivated:
+            html = self._sso_account_deactivated_template.encode("utf-8")
+
+            request.setResponseCode(403)
+            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+            request.setHeader(b"Content-Length", b"%d" % (len(html),))
+            request.write(html)
+            finish_request(request)
+            return
+
+        self._complete_sso_login(registered_user_id, request, client_redirect_url)
+
+    def _complete_sso_login(
+        self,
+        registered_user_id: str,
+        request: SynapseRequest,
+        client_redirect_url: str,
+    ):
+        """
+        The synchronous portion of complete_sso_login.
+
+        This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
         """
         # Create a login token
         login_token = self.macaroon_gen.generate_short_term_login_token(
