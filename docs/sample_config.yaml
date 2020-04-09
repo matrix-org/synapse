@@ -1458,6 +1458,16 @@ saml2_config:
   #template_dir: "res/templates"
 
 
+# Enable OpenID Connect for registration and login. Uses authlib.
+#
+#oidc_config:
+#   enabled: true
+#   issuer: "https://accounts.example.com/"
+#   client_id: "provided-by-your-issuer"
+#   client_secret: "provided-by-your-issuer"
+#   scopes: ["openid"]
+
+
 
 # Enable CAS for registration and login.
 #

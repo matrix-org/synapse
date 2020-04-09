@@ -1165,12 +1165,32 @@ class MacaroonGenerator(object):
         macaroon.add_first_party_caveat("type = delete_pusher")
         return macaroon.serialize()
 
-    def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
+    def generate_oidc_session_token(
+        self,
+        state: str,
+        nonce: str,
+        client_redirect_url: str,
+        duration_in_ms: int = (60 * 60 * 1000),
+    ):
+        macaroon = self._generate_base_macaroon(None)
+        macaroon.add_first_party_caveat("type = session")
+        macaroon.add_first_party_caveat("state = %s" % (state,))
+        macaroon.add_first_party_caveat("nonce = %s" % (nonce,))
+        macaroon.add_first_party_caveat(
+            "client_redirect_url = %s" % (client_redirect_url,)
+        )
+        now = self.hs.get_clock().time_msec()
+        expiry = now + duration_in_ms
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        return macaroon.serialize()
+
+    def _generate_base_macaroon(self, user_id: Optional[str]) -> pymacaroons.Macaroon:
         macaroon = pymacaroons.Macaroon(
             location=self.hs.config.server_name,
             identifier="key",
             key=self.hs.config.macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
-        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        if user_id is not None:
+            macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon

@@ -83,6 +83,7 @@ class LoginRestServlet(RestServlet):
         self.jwt_algorithm = hs.config.jwt_algorithm
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
+        self.oidc_enabled = hs.config.oidc_enabled
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
@@ -96,6 +97,9 @@ class LoginRestServlet(RestServlet):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
+        if self.oidc_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
+            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
         if self.saml2_enabled:
             flows.append({"type": LoginRestServlet.SSO_TYPE})
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
@@ -465,6 +469,24 @@ class SAMLRedirectServlet(BaseSSORedirectServlet):
         return self._saml_handler.handle_redirect_request(client_redirect_url)
 
 
+class OIDCRedirectServlet(BaseSSORedirectServlet):
+    PATTERNS = client_patterns("/login/sso/redirect", v1=True)
+
+    def __init__(self, hs):
+        self._oidc_handler = hs.get_oidc_handler()
+
+    async def on_GET(self, request):
+        args = request.args
+        if b"redirectUrl" not in args:
+            return 400, "Redirect URL not specified for SSO auth"
+        client_redirect_url = args[b"redirectUrl"][0]
+        sso_url = await self._oidc_handler.handle_redirect_request(
+            request, client_redirect_url
+        )
+        request.redirect(sso_url)
+        finish_request(request)
+
+
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
     if hs.config.cas_enabled:
@@ -472,3 +494,5 @@ def register_servlets(hs, http_server):
         CasTicketServlet(hs).register(http_server)
     elif hs.config.saml2_enabled:
         SAMLRedirectServlet(hs).register(http_server)
+    elif hs.config.oidc_enabled:
+        OIDCRedirectServlet(hs).register(http_server)
