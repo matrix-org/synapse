@@ -806,6 +806,7 @@ class RoomCreationHandler(BaseHandler):
                     EventTypes.RoomAvatar: 50,
                     EventTypes.Tombstone: 100,
                     EventTypes.ServerACL: 100,
+                    EventTypes.RoomEncryption: 100,
                 },
                 "events_default": 0,
                 "state_default": 50,
