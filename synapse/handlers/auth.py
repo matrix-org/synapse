@@ -1114,7 +1114,8 @@ class AuthHandler(BaseHandler):
             client_redirect_url: The URL to which to redirect the user at the end of the
                 process.
         """
-        # If the password hash is None, the account has likely been deactivated
+        # If the account has been deactivated, do not proceed with the login
+        # flow.
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
             html = self._sso_account_deactivated_template.render().encode("utf-8")
