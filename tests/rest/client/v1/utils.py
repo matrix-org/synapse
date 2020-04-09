@@ -18,7 +18,7 @@
 
 import json
 import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import attr
 
@@ -147,7 +147,7 @@ class RestHelper(object):
         self,
         room_id: str,
         event_type: str,
-        body: Optional[Dict],
+        body: Optional[Dict[str, Any]],
         tok: str,
         expect_code: int = 200,
         state_key: str = "",
@@ -158,15 +158,15 @@ class RestHelper(object):
         Args:
             room_id:
             event_type: The type of state event
-            body: The body to send when publishing state. If None, the request to the
-                server will have an empty body
+            body: Body that is sent when making the request. The content of the state event.
+                If None, the request to the server will have an empty body
             tok: The access token to use
             expect_code: The HTTP code to expect in the response
             state_key:
             method: "GET" or "PUT" for reading or writing state, respectively
 
         Returns:
-            The response body from the server.
+            The response body from the server
 
         Raises:
             AssertionError: if expect_code doesn't match the HTTP code we received
@@ -184,7 +184,7 @@ class RestHelper(object):
         if body is not None:
             content = json.dumps(body).encode("utf8")
 
-        request, channel = make_request(self.hs.get_reactor(), method, path, content,)
+        request, channel = make_request(self.hs.get_reactor(), method, path, content)
 
         render(request, self.resource, self.hs.get_reactor())
 
@@ -195,12 +195,58 @@ class RestHelper(object):
 
         return channel.json_body
 
-    def get_state(self, room_id, event_type, tok, expect_code=200, state_key=""):
+    def get_room_state(
+        self,
+        room_id: str,
+        event_type: str,
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+    ):
+        """Gets some state from a room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
         return self._read_write_state(
             room_id, event_type, None, tok, expect_code, state_key, method="GET"
         )
 
-    def send_state(self, room_id, event_type, body, tok, expect_code=200, state_key=""):
+    def set_room_state(
+        self,
+        room_id: str,
+        event_type: str,
+        body: Dict[str, Any],
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+    ):
+        """Set some state in a room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            body: Body that is sent when making the request. The content of the state event.
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
         return self._read_write_state(
             room_id, event_type, body, tok, expect_code, state_key, method="PUT"
         )
