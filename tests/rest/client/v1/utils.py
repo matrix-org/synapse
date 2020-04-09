@@ -161,8 +161,12 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         request, channel = make_request(
-            self.hs.get_reactor(), method, path, json.dumps(body).encode("utf8")
+            self.hs.get_reactor(),
+            method,
+            path,
+            content=json.dumps(body).encode("utf8") if body else b""
         )
+
         render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
@@ -174,7 +178,7 @@ class RestHelper(object):
 
     def get_state(self, room_id, event_type, tok, expect_code=200, state_key=""):
         return self._read_write_state(
-            room_id, event_type, {}, tok, expect_code, state_key, method="GET"
+            room_id, event_type, None, tok, expect_code, state_key, method="GET"
         )
 
     def send_state(self, room_id, event_type, body, tok, expect_code=200, state_key=""):
