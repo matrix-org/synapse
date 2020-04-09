@@ -1,1 +1,1 @@
-Change defaults to require power level 100 for enabling encryption in a room.
+Require admin privileges to enable room encryption by default. This does not affect existing rooms.
