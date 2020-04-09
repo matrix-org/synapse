@@ -5,6 +5,8 @@ Message history can be paginated
 
 Can re-join room if re-invited
 
+/upgrade creates a new room
+
 The only membership state included in an initial sync is for all the senders in the timeline
 
 Local device key changes get to remote servers
