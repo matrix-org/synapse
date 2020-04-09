@@ -46,7 +46,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
 
         # Create a room
         self.room_id = self.helper.create_room_as(
-            self.admin_access_token, tok=self.admin_access_token
+            self.admin_user_id, tok=self.admin_access_token
         )
 
         # Invite the other users
@@ -63,7 +63,7 @@ class PowerLevelsTestCase(HomeserverTestCase):
             targ=self.user_user_id,
         )
 
-        # Join the other users
+        # Make the other users join the room
         self.helper.join(
             room=self.room_id, user=self.mod_user_id, tok=self.mod_access_token
         )
@@ -132,10 +132,10 @@ class PowerLevelsTestCase(HomeserverTestCase):
             expect_code=403,  # expect failure
         )
 
-    def test_non_admins_cannot_upgrade_room(self):
+    def test_non_admins_cannot_tombstone_room(self):
         # Create another room that will serve as our "upgraded room"
         self.upgraded_room_id = self.helper.create_room_as(
-            self.admin_access_token, tok=self.admin_access_token
+            self.admin_user_id, tok=self.admin_access_token
         )
 
         # have the mod try to send a tombstone event
