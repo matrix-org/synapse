@@ -129,7 +129,6 @@ matrixLogin.password_login = function() {
 matrixLogin.onLogin = function(response) {
     // clobber this function
     console.warn("onLogin - This function should be replaced to proceed.");
-    console.log(response);
 };
 
 var parseQsFromUrl = function(query) {
