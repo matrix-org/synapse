@@ -18,6 +18,7 @@
 
 import json
 import time
+from typing import Dict, Optional
 
 import attr
 
@@ -144,14 +145,32 @@ class RestHelper(object):
 
     def _read_write_state(
         self,
-        room_id,
-        event_type,
-        body,
-        tok,
-        expect_code=200,
-        state_key="",
-        method="GET",
-    ):
+        room_id: str,
+        event_type: str,
+        body: Optional[Dict],
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+        method: str = "GET",
+    ) -> Dict:
+        """Read or write some state from a given room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            body: The body to send when publishing state. If None, the request to the
+                server will have an empty body
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+            method: "GET" or "PUT" for reading or writing state, respectively
+
+        Returns:
+            The response body from the server.
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
         path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
             room_id,
             event_type,
@@ -165,12 +184,7 @@ class RestHelper(object):
         if body is not None:
             content = json.dumps(body).encode("utf8")
 
-        request, channel = make_request(
-            self.hs.get_reactor(),
-            method,
-            path,
-            content,
-        )
+        request, channel = make_request(self.hs.get_reactor(), method, path, content,)
 
         render(request, self.resource, self.hs.get_reactor())
 
