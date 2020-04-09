@@ -160,11 +160,16 @@ class RestHelper(object):
         if tok:
             path = path + "?access_token=%s" % tok
 
+        # Set request body if provided
+        content = b""
+        if body is not None:
+            content = json.dumps(body).encode("utf8")
+
         request, channel = make_request(
             self.hs.get_reactor(),
             method,
             path,
-            content=json.dumps(body).encode("utf8") if body else b"",
+            content,
         )
 
         render(request, self.resource, self.hs.get_reactor())
