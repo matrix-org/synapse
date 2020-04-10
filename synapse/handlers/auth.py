@@ -18,7 +18,7 @@ import logging
 import time
 import unicodedata
 import urllib.parse
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import attr
 import bcrypt  # type: ignore[import]
@@ -629,7 +629,7 @@ class AuthHandler(BaseHandler):
 
         return access_token
 
-    async def check_user_exists(self, user_id: str) -> str:
+    async def check_user_exists(self, user_id: str) -> Optional[str]:
         """
         Checks to see if a user with the given id exists. Will check case
         insensitively, but return None if there are multiple inexact matches.
@@ -691,7 +691,7 @@ class AuthHandler(BaseHandler):
 
     async def validate_login(
         self, username: str, login_submission: Dict[str, Any]
-    ) -> Tuple[str, callable]:
+    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], None]]]:
         """Authenticates the user for the /login API
 
         Also used by the user-interactive auth flow to validate
@@ -773,7 +773,7 @@ class AuthHandler(BaseHandler):
             known_login_type = True
 
             canonical_user_id = await self._check_local_password(
-                qualified_user_id, password
+                qualified_user_id, password  # type: ignore
             )
 
             if canonical_user_id:
@@ -788,7 +788,7 @@ class AuthHandler(BaseHandler):
 
     async def check_password_provider_3pid(
         self, medium: str, address: str, password: str
-    ) -> Tuple[Optional[str], Optional[callable]]:
+    ) -> Tuple[Optional[str], Optional[Callable[[Dict[str, str]], None]]]:
         """Check if a password provider is able to validate a thirdparty login
 
         Args:
@@ -1006,7 +1006,9 @@ class AuthHandler(BaseHandler):
 
         return await defer_to_thread(self.hs.get_reactor(), _do_hash)
 
-    async def validate_hash(self, password: str, stored_hash: bytes) -> bool:
+    async def validate_hash(
+        self, password: str, stored_hash: Union[bytes, str]
+    ) -> bool:
         """Validates that self.hash(password) == stored_hash.
 
         Args:
