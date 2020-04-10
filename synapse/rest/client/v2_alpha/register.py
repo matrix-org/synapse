@@ -489,7 +489,7 @@ class RegisterRestServlet(RestServlet):
             # registered a user for this session, so we could just return the
             # user here. We carry on and go through the auth checks though,
             # for paranoia.
-            registered_user_id = self.auth_handler.get_session_data(
+            registered_user_id = await self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
             )
 
@@ -588,7 +588,7 @@ class RegisterRestServlet(RestServlet):
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
-            self.auth_handler.set_session_data(
+            await self.auth_handler.set_session_data(
                 session_id, "registered_user_id", registered_user_id
             )
 
