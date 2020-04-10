@@ -294,7 +294,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
                 create_profile_with_displayname=user.localpart,
             )
         else:
-            yield self.hs.get_auth_handler().delete_access_tokens_for_user(user_id)
+            yield defer.ensureDeferred(
+                self.hs.get_auth_handler().delete_access_tokens_for_user(user_id)
+            )
 
         yield self.store.add_access_token_to_user(
             user_id=user_id, token=token, device_id=None, valid_until_ms=None

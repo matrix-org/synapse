@@ -24,8 +24,6 @@ import attr
 import bcrypt  # type: ignore[import]
 import pymacaroons
 
-from twisted.internet import defer
-
 import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -987,14 +985,14 @@ class AuthHandler(BaseHandler):
         session["last_used"] = self.hs.get_clock().time_msec()
         self.sessions[session["id"]] = session
 
-    def hash(self, password: str):
+    async def hash(self, password: str) -> str:
         """Computes a secure hash of password.
 
         Args:
             password: Password to hash.
 
         Returns:
-            Deferred(unicode): Hashed password.
+            Hashed password.
         """
 
         def _do_hash():
@@ -1006,9 +1004,9 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
-        return defer_to_thread(self.hs.get_reactor(), _do_hash)
+        return await defer_to_thread(self.hs.get_reactor(), _do_hash)
 
-    def validate_hash(self, password: str, stored_hash: bytes):
+    async def validate_hash(self, password: str, stored_hash: bytes) -> bool:
         """Validates that self.hash(password) == stored_hash.
 
         Args:
@@ -1016,7 +1014,7 @@ class AuthHandler(BaseHandler):
             stored_hash: Expected hash value.
 
         Returns:
-            Deferred(bool): Whether self.hash(password) == stored_hash.
+            Whether self.hash(password) == stored_hash.
         """
 
         def _do_validate_hash():
@@ -1032,9 +1030,9 @@ class AuthHandler(BaseHandler):
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode("ascii")
 
-            return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return await defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
-            return defer.succeed(False)
+            return False
 
     def start_sso_ui_auth(self, redirect_url: str, session_id: str) -> str:
         """

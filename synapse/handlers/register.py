@@ -166,7 +166,9 @@ class RegistrationHandler(BaseHandler):
         yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:
-            password_hash = yield self._auth_handler.hash(password)
+            password_hash = yield defer.ensureDeferred(
+                self._auth_handler.hash(password)
+            )
 
         if localpart is not None:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
