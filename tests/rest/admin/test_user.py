@@ -20,9 +20,13 @@ import urllib.parse
 
 from mock import Mock
 
+from twisted.internet import defer
+
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
+from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.rest.client.v1 import login
+from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
 
@@ -320,6 +324,62 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("Invalid user type", channel.json_body["error"])
 
+    def test_register_limit_mau(self):
+        """
+        Register user if MAU limit is reached.
+        """
+        handler = self.hs.get_registration_handler()
+        store = self.hs.get_datastore()
+
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.config.max_mau_value = 2
+        self.hs.config.mau_trial_days = 0
+
+        # Set MAU limit
+        store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+        )
+        self.get_failure(
+            # for MAU it must have an IP address used to perform the registration
+            handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
+        )
+
+        store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+        )
+        self.get_failure(
+            handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
+        )
+
+        # Register new user with admin API
+        request, channel = self.make_request("GET", self.url)
+        self.render(request)
+        nonce = channel.json_body["nonce"]
+
+        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
+        want_mac.update(
+            nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin\x00support"
+        )
+        want_mac = want_mac.hexdigest()
+
+        body = json.dumps(
+            {
+                "nonce": nonce,
+                "username": "bob",
+                "password": "abc123",
+                "admin": True,
+                "user_type": UserTypes.SUPPORT,
+                "mac": want_mac,
+            }
+        )
+        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["user_id"])
+
 
 class UsersListTestCase(unittest.HomeserverTestCase):
 
@@ -344,7 +404,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("M_MISSING_TOKEN", channel.json_body["errcode"])
+        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_all_users(self):
         """
@@ -367,6 +427,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
         login.register_servlets,
+        sync.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
@@ -418,7 +479,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(404, channel.code, msg=channel.json_body)
-        self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
+        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
     def test_create_server_admin(self):
         """
@@ -513,6 +574,115 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(False, channel.json_body["admin"])
         self.assertEqual(False, channel.json_body["is_guest"])
         self.assertEqual(False, channel.json_body["deactivated"])
+
+    def test_create_user_limit_mau_active_admin(self):
+        """
+        Check that a new regular user is created successfully if MAU limit is reached.
+        Admin user was active before creating user.
+        """
+        self.hs.config.registration_shared_secret = None
+
+        handler = self.hs.get_registration_handler()
+
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.config.max_mau_value = 2
+        self.hs.config.mau_trial_days = 0
+
+        def _do_sync_for_user(token):
+            request, channel = self.make_request("GET", "/sync", access_token=token)
+            self.render(request)
+
+            if channel.code != 200:
+                raise HttpResponseException(
+                    channel.code, channel.result["reason"], channel.result["body"]
+                ).to_synapse_error()
+
+        # Sync to set admin user to active
+        _do_sync_for_user(self.admin_user_tok)
+
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+        )
+
+        # Set MAU limit
+        self.get_failure(
+            # for MAU it must have an IP address used to perform the registration
+            handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
+        )
+
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+        )
+        self.get_failure(
+            handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
+        )
+
+        # Register new user with admin API
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps({"password": "abc123", "admin": False})
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual(False, channel.json_body["admin"])
+
+    def test_create_user_limit_mau_passiv_admin(self):
+        """
+        Check that a new regular user is created successfully if MAU limit is reached.
+        Admin user was not active before creating user and creation fails.
+        """
+        self.hs.config.registration_shared_secret = None
+
+        handler = self.hs.get_registration_handler()
+
+        self.hs.config.limit_usage_by_mau = True
+        self.hs.config.max_mau_value = 2
+        self.hs.config.mau_trial_days = 0
+
+        # Set MAU limit
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+        )
+        self.get_failure(
+            # for MAU it must have an IP address used to perform the registration
+            handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
+        )
+
+        self.store.get_monthly_active_count = Mock(
+            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+        )
+        self.get_failure(
+            handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
+        )
+
+        # Register new user with admin API
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps({"password": "abc123", "admin": False})
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(500, int(channel.result["code"]), msg=channel.result["body"])
 
     def test_set_password(self):
         """

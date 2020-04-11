@@ -125,14 +125,17 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.lots_of_users)
         )
         self.get_failure(
-            self.handler.register_user(localpart="local_part"), ResourceLimitError
+            # for MAU it must have an IP address used to perform the registration
+            self.handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
         )
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value)
         )
         self.get_failure(
-            self.handler.register_user(localpart="local_part"), ResourceLimitError
+            self.handler.register_user(localpart="local_part", address="127.0.0.1"),
+            ResourceLimitError,
         )
 
     def test_auto_create_auto_join_rooms(self):
@@ -288,10 +291,12 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         token = self.macaroon_generator.generate_access_token(user_id)
 
         if need_register:
+            # for MAU it must have an IP address used to perform the registration
             yield self.handler.register_with_store(
                 user_id=user_id,
                 password_hash=password_hash,
                 create_profile_with_displayname=user.localpart,
+                address="127.0.0.1",
             )
         else:
             yield self.hs.get_auth_handler().delete_access_tokens_for_user(user_id)

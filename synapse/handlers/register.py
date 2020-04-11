@@ -163,7 +163,9 @@ class RegistrationHandler(BaseHandler):
         """
         yield self.check_registration_ratelimit(address)
 
-        yield self.auth.check_auth_blocking(threepid=threepid)
+        # do not check_auth_blocking if the call is coming through the Admin API
+        if address:
+            yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:
             password_hash = yield self._auth_handler.hash(password)
