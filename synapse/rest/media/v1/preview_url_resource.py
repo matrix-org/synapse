@@ -86,6 +86,7 @@ class PreviewUrlResource(DirectServeResource):
         self.media_storage = media_storage
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
+        self.url_preview_accept_language = hs.config.url_preview_url_blacklist
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
@@ -315,9 +316,12 @@ class PreviewUrlResource(DirectServeResource):
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
-                logger.debug("Trying to get url '%s'", url)
+                logger.debug("Trying to get preview for url '%s'", url)
                 length, headers, uri, code = await self.client.get_file(
-                    url, output_stream=f, max_size=self.max_spider_size
+                    url,
+                    output_stream=f,
+                    max_size=self.max_spider_size,
+                    headers={"Accept Language": self.url_preview_accept_language},
                 )
             except SynapseError:
                 # Pass SynapseErrors through directly, so that the servlet
