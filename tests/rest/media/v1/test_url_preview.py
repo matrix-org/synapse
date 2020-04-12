@@ -74,7 +74,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         config["url_preview_ip_range_whitelist"] = ("1.1.1.1",)
         config["url_preview_url_blacklist"] = []
-        config["url_preview_accept_language"] = ["en-UK", "en-US;q=0.9", "fr;q=0.8", "*;q=0.7"]
+        config["url_preview_accept_language"] = [
+            "en-UK",
+            "en-US;q=0.9",
+            "fr;q=0.8",
+            "*;q=0.7",
+        ]
 
         self.storage_path = self.mktemp()
         self.media_store_path = self.mktemp()
@@ -555,5 +560,5 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 b"Accept language: fr;q=0.8\r\n"
                 b"Accept language: *;q=0.7"
             ),
-            server.data
+            server.data,
         )
