@@ -86,7 +86,7 @@ class PreviewUrlResource(DirectServeResource):
         self.media_storage = media_storage
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
-        self.url_preview_accept_language = hs.config.url_preview_url_blacklist
+        self.url_preview_accept_language = hs.config.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
