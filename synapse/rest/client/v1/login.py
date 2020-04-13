@@ -448,6 +448,7 @@ class CasTicketServlet(RestServlet):
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__()
         self.cas_server_url = hs.config.cas_server_url
+        self.cas_server_validate_url = hs.config.cas_server_validate_url
         self.cas_service_url = hs.config.cas_service_url
         self.cas_displayname_attribute = hs.config.cas_displayname_attribute
         self.cas_required_attributes = hs.config.cas_required_attributes
@@ -456,7 +457,7 @@ class CasTicketServlet(RestServlet):
 
     async def on_GET(self, request):
         client_redirect_url = parse_string(request, "redirectUrl", required=True)
-        uri = self.cas_server_url + "/proxyValidate"
+        uri = self.cas_server_validate_url
         args = {
             "ticket": parse_string(request, "ticket", required=True),
             "service": self.cas_service_url,
