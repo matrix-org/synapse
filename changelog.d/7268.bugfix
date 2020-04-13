@@ -1,0 +1,1 @@
+Reject unknown session IDs during user interactive authentication instead of silently creating a new session.
