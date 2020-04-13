@@ -1,0 +1,1 @@
+Add email notifications (`email_notif_for_new_users`) for new users when creating via the Admin API (`PUT "/_synapse/admin/v2/users/<user_id>"`).
