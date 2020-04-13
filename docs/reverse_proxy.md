@@ -42,6 +42,9 @@ the reverse proxy and the homeserver.
             location /_matrix {
                 proxy_pass http://localhost:8008;
                 proxy_set_header X-Forwarded-For $remote_addr;
+                # Nginx by default only allows file uploads up to 1M in size
+                # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
+                client_max_body_size 10M;
             }
         }
 
