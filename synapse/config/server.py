@@ -459,11 +459,11 @@ class ServerConfig(Config):
                 }
             )
 
-            unsecure_port = config.get("unsecure_port", bind_port - 400)
-            if unsecure_port:
+            insecure_port = config.get("insecure_port", bind_port - 400)
+            if insecure_port:
                 self.listeners.append(
                     {
-                        "port": unsecure_port,
+                        "port": insecure_port,
                         "bind_addresses": [bind_host],
                         "tls": False,
                         "type": "http",
@@ -515,10 +515,10 @@ class ServerConfig(Config):
     ):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
-            unsecure_port = bind_port - 400
+            insecure_port = bind_port - 400
         else:
             bind_port = 8448
-            unsecure_port = 8008
+            insecure_port = 8008
 
         pid_file = os.path.join(data_dir_path, "homeserver.pid")
 
@@ -526,7 +526,7 @@ class ServerConfig(Config):
         # default config string
         default_room_version = DEFAULT_ROOM_VERSION
         secure_listeners = []
-        unsecure_listeners = []
+        insecure_listeners = []
         private_addresses = ["::1", "127.0.0.1"]
         if listeners:
             for listener in listeners:
@@ -541,19 +541,19 @@ class ServerConfig(Config):
                     if not open_private_ports:
                         listener.setdefault("bind_addresses", private_addresses)
 
-                    unsecure_listeners.append(listener)
+                    insecure_listeners.append(listener)
 
             secure_http_bindings = indent(
                 yaml.dump(secure_listeners), " " * 10
             ).lstrip()
 
-            unsecure_http_bindings = indent(
-                yaml.dump(unsecure_listeners), " " * 10
+            insecure_http_bindings = indent(
+                yaml.dump(insecure_listeners), " " * 10
             ).lstrip()
 
-        if not unsecure_listeners:
-            unsecure_http_bindings = (
-                """- port: %(unsecure_port)s
+        if not insecure_listeners:
+            insecure_http_bindings = (
+                """- port: %(insecure_port)s
             tls: false
             type: http
             x_forwarded: true"""
@@ -561,11 +561,11 @@ class ServerConfig(Config):
             )
 
             if not open_private_ports:
-                unsecure_http_bindings += (
+                insecure_http_bindings += (
                     "\n            bind_addresses: ['::1', '127.0.0.1']"
                 )
 
-            unsecure_http_bindings += """
+            insecure_http_bindings += """
 
             resources:
               - names: [client, federation]
@@ -573,10 +573,10 @@ class ServerConfig(Config):
 
             if listeners:
                 # comment out this block
-                unsecure_http_bindings = "#" + re.sub(
+                insecure_http_bindings = "#" + re.sub(
                     "\n {10}",
                     lambda match: match.group(0) + "#",
-                    unsecure_http_bindings,
+                    insecure_http_bindings,
                 )
 
         if not secure_listeners:
@@ -790,13 +790,13 @@ class ServerConfig(Config):
           #
           %(secure_http_bindings)s
 
-          # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
+          # Insecure HTTP listener: for when matrix traffic passes through a reverse proxy
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
           # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
           #
-          %(unsecure_http_bindings)s
+          %(insecure_http_bindings)s
 
             # example additional_resources:
             #
