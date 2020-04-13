@@ -142,6 +142,7 @@ class UserRestServletV2(RestServlet):
         self.set_password_handler = hs.get_set_password_handler()
         self.deactivate_account_handler = hs.get_deactivate_account_handler()
         self.registration_handler = hs.get_registration_handler()
+        self.pusher_pool = hs.get_pusherpool()
 
     async def on_GET(self, request, user_id):
         await assert_requester_is_admin(self.auth, request)
@@ -275,6 +276,21 @@ class UserRestServletV2(RestServlet):
                     await self.auth_handler.add_threepid(
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
+                    if (
+                        self.hs.config.email_enable_notifs
+                        and self.hs.config.email_notif_for_new_users
+                    ):
+                        await self.pusher_pool.add_pusher(
+                            user_id=user_id,
+                            access_token=None,
+                            kind="email",
+                            app_id="m.email",
+                            app_display_name="Email Notifications",
+                            device_display_name=threepid["address"],
+                            pushkey=threepid["address"],
+                            lang=None,  # We don't know a user's language here
+                            data={},
+                        )
 
             if "avatar_url" in body:
                 await self.profile_handler.set_avatar_url(
