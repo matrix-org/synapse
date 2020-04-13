@@ -428,7 +428,7 @@ class BaseSSORedirectServlet(RestServlet):
 class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         super(CasRedirectServlet, self).__init__()
-        self.cas_server_url = hs.config.cas_server_url.encode("ascii")
+        self.cas_server_ticket_url = hs.config.cas_server_ticket_url.encode("ascii")
         self.cas_service_url = hs.config.cas_service_url.encode("ascii")
 
     def get_sso_url(self, client_redirect_url):
@@ -439,7 +439,7 @@ class CasRedirectServlet(BaseSSORedirectServlet):
         service_param = urllib.parse.urlencode(
             {b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)}
         ).encode("ascii")
-        return b"%s/login?%s" % (self.cas_server_url, service_param)
+        return b"%s?%s" % (self.cas_server_ticket_url, service_param)
 
 
 class CasTicketServlet(RestServlet):
