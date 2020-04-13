@@ -64,7 +64,7 @@ from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
-from synapse.replication.tcp.client import ReplicationClientHandler
+from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import (
     AccountDataStream,
@@ -603,7 +603,7 @@ class GenericWorkerServer(HomeServer):
     def remove_pusher(self, app_id, push_key, user_id):
         self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
 
-    def build_tcp_replication(self):
+    def build_replication_data_handler(self):
         return GenericWorkerReplicationHandler(self)
 
     def build_presence_handler(self):
@@ -613,7 +613,7 @@ class GenericWorkerServer(HomeServer):
         return GenericWorkerTyping(self)
 
 
-class GenericWorkerReplicationHandler(ReplicationClientHandler):
+class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
         super(GenericWorkerReplicationHandler, self).__init__(hs.get_datastore())
 
@@ -643,9 +643,6 @@ class GenericWorkerReplicationHandler(ReplicationClientHandler):
         if self.send_handler:
             args.update(self.send_handler.stream_positions())
         return args
-
-    def get_currently_syncing_users(self):
-        return self.presence_handler.get_currently_syncing_users()
 
     async def process_and_notify(self, stream_name, token, rows):
         try:

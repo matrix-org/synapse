@@ -1,0 +1,1 @@
+Fix room publish permissions not being checked on room creation.

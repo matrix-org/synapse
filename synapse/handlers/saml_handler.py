@@ -154,7 +154,7 @@ class SamlHandler:
             )
 
         else:
-            self._auth_handler.complete_sso_login(user_id, request, relay_state)
+            await self._auth_handler.complete_sso_login(user_id, request, relay_state)
 
     async def _map_saml_response_to_user(
         self, resp_bytes: str, client_redirect_url: str

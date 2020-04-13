@@ -1,0 +1,1 @@
+Remove redundant checks on `daemonize` from synctl.

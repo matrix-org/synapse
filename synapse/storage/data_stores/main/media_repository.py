@@ -367,7 +367,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             "get_url_cache_media_before", _get_url_cache_media_before_txn
         )
 
-    def delete_url_cache_media(self, media_ids):
+    async def delete_url_cache_media(self, media_ids):
         if len(media_ids) == 0:
             return
 
@@ -380,6 +380,6 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
             txn.executemany(sql, [(media_id,) for media_id in media_ids])
 
-        return self.db.runInteraction(
+        return await self.db.runInteraction(
             "delete_url_cache_media", _delete_url_cache_media_txn
         )

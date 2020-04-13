@@ -645,6 +645,13 @@ class RoomCreationHandler(BaseHandler):
                 check_membership=False,
             )
 
+        if is_public:
+            if not self.config.is_publishing_room_allowed(user_id, room_id, room_alias):
+                # Lets just return a generic message, as there may be all sorts of
+                # reasons why we said no. TODO: Allow configurable error messages
+                # per alias creation rule?
+                raise SynapseError(403, "Not allowed to publish room")
+
         preset_config = config.get(
             "preset",
             RoomCreationPreset.PRIVATE_CHAT
@@ -806,6 +813,7 @@ class RoomCreationHandler(BaseHandler):
                     EventTypes.RoomAvatar: 50,
                     EventTypes.Tombstone: 100,
                     EventTypes.ServerACL: 100,
+                    EventTypes.RoomEncryption: 100,
                 },
                 "events_default": 0,
                 "state_default": 50,

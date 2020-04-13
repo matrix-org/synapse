@@ -10,5 +10,4 @@ worker_listeners:
       resources:
           - names: [federation]
 
-worker_daemonize: false
 worker_log_config: /etc/matrix-synapse/federation-reader-log.yaml
