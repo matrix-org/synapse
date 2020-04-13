@@ -220,6 +220,8 @@ class ModuleApi(object):
         want their access token sent to `client_redirect_url`, or redirect them to that
         URL with a token directly if the URL matches with one of the whitelisted clients.
 
+        This is deprecated in favor of complete_sso_login_async.
+
         Args:
             registered_user_id: The MXID that has been registered as a previous step of
                 of this SSO login.
@@ -227,6 +229,24 @@ class ModuleApi(object):
             client_redirect_url: The URL to which to offer to redirect the user (or to
                 redirect them directly if whitelisted).
         """
-        self._auth_handler.complete_sso_login(
+        self._auth_handler._complete_sso_login(
+            registered_user_id, request, client_redirect_url,
+        )
+
+    async def complete_sso_login_async(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Complete a SSO login by redirecting the user to a page to confirm whether they
+        want their access token sent to `client_redirect_url`, or redirect them to that
+        URL with a token directly if the URL matches with one of the whitelisted clients.
+
+        Args:
+            registered_user_id: The MXID that has been registered as a previous step of
+                of this SSO login.
+            request: The request to respond to.
+            client_redirect_url: The URL to which to offer to redirect the user (or to
+                redirect them directly if whitelisted).
+        """
+        await self._auth_handler.complete_sso_login(
             registered_user_id, request, client_redirect_url,
         )

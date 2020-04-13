@@ -216,6 +216,6 @@ class CasHandler:
                     localpart=localpart, default_display_name=user_display_name
                 )
 
-            self._auth_handler.complete_sso_login(
+            await self._auth_handler.complete_sso_login(
                 registered_user_id, request, client_redirect_url
             )

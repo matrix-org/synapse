@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.12.3ubuntu1) UNRELEASED; urgency=medium
+
+  * Add information about .well-known files to Debian installation scripts.
+
+ -- Patrick Cloke <patrickc@matrix.org>  Mon, 06 Apr 2020 10:10:38 -0400
+
 matrix-synapse-py3 (1.12.3) stable; urgency=medium
 
   [ Richard van der Hoff ]

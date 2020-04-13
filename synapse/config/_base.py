@@ -468,8 +468,8 @@ class RootConfig(object):
 
         Returns: Config object, or None if --generate-config or --generate-keys was set
         """
-        config_parser = argparse.ArgumentParser(add_help=False)
-        config_parser.add_argument(
+        parser = argparse.ArgumentParser(description=description)
+        parser.add_argument(
             "-c",
             "--config-path",
             action="append",
@@ -478,7 +478,7 @@ class RootConfig(object):
             " may specify directories containing *.yaml files.",
         )
 
-        generate_group = config_parser.add_argument_group("Config generation")
+        generate_group = parser.add_argument_group("Config generation")
         generate_group.add_argument(
             "--generate-config",
             action="store_true",
@@ -526,12 +526,13 @@ class RootConfig(object):
             ),
         )
 
-        config_args, remaining_args = config_parser.parse_known_args(argv)
+        cls.invoke_all_static("add_arguments", parser)
+        config_args = parser.parse_args(argv)
 
         config_files = find_config_files(search_paths=config_args.config_path)
 
         if not config_files:
-            config_parser.error(
+            parser.error(
                 "Must supply a config file.\nA config file can be automatically"
                 ' generated using "--generate-config -H SERVER_NAME'
                 ' -c CONFIG-FILE"'
@@ -550,7 +551,7 @@ class RootConfig(object):
 
         if config_args.generate_config:
             if config_args.report_stats is None:
-                config_parser.error(
+                parser.error(
                     "Please specify either --report-stats=yes or --report-stats=no\n\n"
                     + MISSING_REPORT_STATS_SPIEL
                 )
@@ -609,15 +610,6 @@ class RootConfig(object):
                 )
                 generate_missing_configs = True
 
-        parser = argparse.ArgumentParser(
-            parents=[config_parser],
-            description=description,
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-
-        obj.invoke_all_static("add_arguments", parser)
-        args = parser.parse_args(remaining_args)
-
         config_dict = read_config_files(config_files)
         if generate_missing_configs:
             obj.generate_missing_files(config_dict, config_dir_path)
@@ -626,7 +618,7 @@ class RootConfig(object):
         obj.parse_config_dict(
             config_dict, config_dir_path=config_dir_path, data_dir_path=data_dir_path
         )
-        obj.invoke_all("read_arguments", args)
+        obj.invoke_all("read_arguments", config_args)
 
         return obj
 

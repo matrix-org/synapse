@@ -1,0 +1,1 @@
+Change log line that told user to implement onLogin/onRegister fallback js functions to a warning, instead of an info, so it's more visible.

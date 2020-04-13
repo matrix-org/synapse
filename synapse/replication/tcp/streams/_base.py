@@ -168,12 +168,13 @@ def make_http_update_function(
     async def update_function(
         from_token: int, upto_token: int, limit: int
     ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
-        return await client(
+        result = await client(
             stream_name=stream_name,
             from_token=from_token,
             upto_token=upto_token,
             limit=limit,
         )
+        return result["updates"], result["upto_token"], result["limited"]
 
     return update_function
 

@@ -17,7 +17,17 @@
 import logging
 import time
 from time import monotonic as monotonic_time
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import intern, range
@@ -1557,3 +1567,74 @@ def make_in_list_sql_clause(
         return "%s = ANY(?)" % (column,), [list(iterable)]
     else:
         return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)
+
+
+KV = TypeVar("KV")
+
+
+def make_tuple_comparison_clause(
+    database_engine: BaseDatabaseEngine, keys: List[Tuple[str, KV]]
+) -> Tuple[str, List[KV]]:
+    """Returns a tuple comparison SQL clause
+
+    Depending what the SQL engine supports, builds a SQL clause that looks like either
+    "(a, b) > (?, ?)", or "(a > ?) OR (a == ? AND b > ?)".
+
+    Args:
+        database_engine
+        keys: A set of (column, value) pairs to be compared.
+
+    Returns:
+        A tuple of SQL query and the args
+    """
+    if database_engine.supports_tuple_comparison:
+        return (
+            "(%s) > (%s)" % (",".join(k[0] for k in keys), ",".join("?" for _ in keys)),
+            [k[1] for k in keys],
+        )
+
+    # we want to build a clause
+    #    (a > ?) OR
+    #    (a == ? AND b > ?) OR
+    #    (a == ? AND b == ? AND c > ?)
+    #    ...
+    #    (a == ? AND b == ? AND ... AND z > ?)
+    #
+    # or, equivalently:
+    #
+    #  (a > ? OR (a == ? AND
+    #    (b > ? OR (b == ? AND
+    #      ...
+    #        (y > ? OR (y == ? AND
+    #          z > ?
+    #        ))
+    #      ...
+    #    ))
+    #  ))
+    #
+    # which itself is equivalent to (and apparently easier for the query optimiser):
+    #
+    #  (a >= ? AND (a > ? OR
+    #    (b >= ? AND (b > ? OR
+    #      ...
+    #        (y >= ? AND (y > ? OR
+    #          z > ?
+    #        ))
+    #      ...
+    #    ))
+    #  ))
+    #
+    #
+
+    clause = ""
+    args = []  # type: List[KV]
+    for k, v in keys[:-1]:
+        clause = clause + "(%s >= ? AND (%s > ? OR " % (k, k)
+        args.extend([v, v])
+
+    (k, v) = keys[-1]
+    clause += "%s > ?" % (k,)
+    args.append(v)
+
+    clause += "))" * (len(keys) - 1)
+    return clause, args

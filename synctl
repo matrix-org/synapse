@@ -117,7 +117,17 @@ def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
         False if there was an error starting the process
     """
 
-    args = [sys.executable, "-B", "-m", app, "-c", configfile, "-c", worker_configfile]
+    args = [
+        sys.executable,
+        "-B",
+        "-m",
+        app,
+        "-c",
+        configfile,
+        "-c",
+        worker_configfile,
+        "--daemonize",
+    ]
 
     try:
         subprocess.check_call(args)
@@ -266,9 +276,6 @@ def main():
             worker_cache_factors = (
                 worker_config.get("synctl_cache_factors") or cache_factors
             )
-            daemonize = worker_config.get("daemonize") or config.get("daemonize")
-            assert daemonize, "Main process must have daemonize set to true"
-
             # The master process doesn't support using worker_* config.
             for key in worker_config:
                 if key == "worker_app":  # But we allow worker_app
@@ -278,11 +285,6 @@ def main():
                 ), "Main process cannot use worker_* config"
         else:
             worker_pidfile = worker_config["worker_pid_file"]
-            worker_daemonize = worker_config["worker_daemonize"]
-            assert worker_daemonize, "In config %r: expected '%s' to be True" % (
-                worker_configfile,
-                "worker_daemonize",
-            )
             worker_cache_factor = worker_config.get("synctl_cache_factor")
             worker_cache_factors = worker_config.get("synctl_cache_factors", {})
         workers.append(
