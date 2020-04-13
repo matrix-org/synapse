@@ -327,16 +327,10 @@ class AuthHandler(BaseHandler):
 
         # If there's no session ID, create a new session.
         if not sid:
-            session = self._create_session()
+            session = self._create_session(
+                clientdict, (request.uri, request.method, clientdict), description
+            )
             session_id = session["id"]
-
-            session["clientdict"] = clientdict
-            session["ui_auth"] = (request.uri, request.method, clientdict)
-            session["creds"] = {}
-            # Add a human readable description to the session.
-            session["description"] = description
-
-            self._save_session(session)
 
         else:
             session = self._get_session_info(sid)
@@ -430,8 +424,6 @@ class AuthHandler(BaseHandler):
             raise LoginError(400, "", Codes.MISSING_PARAM)
 
         sess = self._get_session_info(authdict["session"])
-        if "creds" not in sess:
-            sess["creds"] = {}
         creds = sess["creds"]
 
         result = await self.checkers[stagetype].check_auth(authdict, clientip)
@@ -471,7 +463,7 @@ class AuthHandler(BaseHandler):
             value: The data to store
         """
         sess = self._get_session_info(session_id)
-        sess.setdefault("serverdict", {})[key] = value
+        sess["serverdict"][key] = value
         self._save_session(sess)
 
     def get_session_data(
@@ -486,7 +478,7 @@ class AuthHandler(BaseHandler):
             default: Value to return if the key has not been set
         """
         sess = self._get_session_info(session_id)
-        return sess.setdefault("serverdict", {}).get(key, default)
+        return sess["serverdict"].get(key, default)
 
     async def _check_auth_dict(
         self, authdict: Dict[str, Any], clientip: str
@@ -566,7 +558,12 @@ class AuthHandler(BaseHandler):
             "params": params,
         }
 
-    def _create_session(self) -> dict:
+    def _create_session(
+        self,
+        clientdict: Dict[str, Any],
+        ui_auth: Tuple[str, str, Dict[str, Any]],
+        description: str,
+    ) -> dict:
         """
         Creates a new user interactive authentication session.
 
@@ -576,7 +573,14 @@ class AuthHandler(BaseHandler):
         session_id = None
         while session_id is None or session_id in self.sessions:
             session_id = stringutils.random_string(24)
-        self.sessions[session_id] = {"id": session_id}
+        self.sessions[session_id] = {
+            "id": session_id,
+            "clientdict": clientdict,
+            "ui_auth": ui_auth,
+            "creds": {},
+            "serverdict": {},
+            "description": description,
+        }
 
         return self.sessions[session_id]
 
@@ -1058,11 +1062,8 @@ class AuthHandler(BaseHandler):
             The HTML to render.
         """
         session = self._get_session_info(session_id)
-        # Get the human readable operation of what is occurring, falling back to
-        # a generic message if it isn't available for some reason.
-        description = session.get("description", "modify your account")
         return self._sso_auth_confirm_template.render(
-            description=description, redirect_url=redirect_url,
+            description=session["description"], redirect_url=redirect_url,
         )
 
     def complete_sso_ui_auth(
@@ -1078,8 +1079,6 @@ class AuthHandler(BaseHandler):
         """
         # Mark the stage of the authentication as successful.
         sess = self._get_session_info(session_id)
-        if "creds" not in sess:
-            sess["creds"] = {}
         creds = sess["creds"]
 
         # Save the user who authenticated with SSO, this will be used to ensure
