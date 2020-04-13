@@ -324,50 +324,53 @@ class AuthHandler(BaseHandler):
             del clientdict["auth"]
             if "session" in authdict:
                 sid = authdict["session"]
-        session = self._get_session_info(sid)
 
-        if len(clientdict) > 0:
-            # This was designed to allow the client to omit the parameters
-            # and just supply the session in subsequent calls so it split
-            # auth between devices by just sharing the session, (eg. so you
-            # could continue registration from your phone having clicked the
-            # email auth link on there). It's probably too open to abuse
-            # because it lets unauthenticated clients store arbitrary objects
-            # on a homeserver.
-            # Revisit: Assuming the REST APIs do sensible validation, the data
-            # isn't arbintrary.
+        # If there's no session ID, create a new session.
+        if not sid:
+            session = self._create_session()
+            session_id = session["id"]
+
             session["clientdict"] = clientdict
-            self._save_session(session)
-        elif "clientdict" in session:
-            clientdict = session["clientdict"]
-
-        # Ensure that the queried operation does not vary between stages of
-        # the UI authentication session. This is done by generating a stable
-        # comparator based on the URI, method, and body (minus the auth dict)
-        # and storing it during the initial query. Subsequent queries ensure
-        # that this comparator has not changed.
-        comparator = (request.uri, request.method, clientdict)
-        if "ui_auth" not in session:
-            session["ui_auth"] = comparator
-            self._save_session(session)
-        elif session["ui_auth"] != comparator:
-            raise SynapseError(
-                403,
-                "Requested operation has changed during the UI authentication session.",
-            )
-
-        # Add a human readable description to the session.
-        if "description" not in session:
+            session["ui_auth"] = (request.uri, request.method, clientdict)
+            session["creds"] = {}
+            # Add a human readable description to the session.
             session["description"] = description
+
             self._save_session(session)
+
+        else:
+            session = self._get_session_info(sid)
+            session_id = sid
+
+            if not clientdict:
+                # This was designed to allow the client to omit the parameters
+                # and just supply the session in subsequent calls so it split
+                # auth between devices by just sharing the session, (eg. so you
+                # could continue registration from your phone having clicked the
+                # email auth link on there). It's probably too open to abuse
+                # because it lets unauthenticated clients store arbitrary objects
+                # on a homeserver.
+                # Revisit: Assuming the REST APIs do sensible validation, the data
+                # isn't arbitrary.
+                clientdict = session["clientdict"]
+
+            # Ensure that the queried operation does not vary between stages of
+            # the UI authentication session. This is done by generating a stable
+            # comparator based on the URI, method, and body (minus the auth dict)
+            # and storing it during the initial query. Subsequent queries ensure
+            # that this comparator has not changed.
+            comparator = (request.uri, request.method, clientdict)
+            if session["ui_auth"] != comparator:
+                raise SynapseError(
+                    403,
+                    "Requested operation has changed during the UI authentication session.",
+                )
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session)
+                self._auth_dict_for_flows(flows, session_id)
             )
 
-        if "creds" not in session:
-            session["creds"] = {}
         creds = session["creds"]
 
         # check auth type currently being presented
@@ -407,9 +410,9 @@ class AuthHandler(BaseHandler):
                     list(clientdict),
                 )
 
-                return creds, clientdict, session["id"]
+                return creds, clientdict, session_id
 
-        ret = self._auth_dict_for_flows(flows, session)
+        ret = self._auth_dict_for_flows(flows, session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
         raise InteractiveAuthIncompleteError(ret)
@@ -539,7 +542,7 @@ class AuthHandler(BaseHandler):
         }
 
     def _auth_dict_for_flows(
-        self, flows: List[List[str]], session: Dict[str, Any]
+        self, flows: List[List[str]], session_id: str,
     ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
@@ -558,27 +561,32 @@ class AuthHandler(BaseHandler):
                     params[stage] = get_params[stage]()
 
         return {
-            "session": session["id"],
+            "session": session_id,
             "flows": [{"stages": f} for f in public_flows],
             "params": params,
         }
 
-    def _get_session_info(self, session_id: Optional[str]) -> dict:
+    def _create_session(self) -> dict:
         """
-        Gets or creates a session given a session ID.
+        Creates a new user interactive authentication session.
 
         The session can be used to track data across multiple requests, e.g. for
         interactive authentication.
         """
-        if session_id not in self.sessions:
-            session_id = None
+        session_id = None
+        while session_id is None or session_id in self.sessions:
+            session_id = stringutils.random_string(24)
+        self.sessions[session_id] = {"id": session_id}
 
-        if not session_id:
-            # create a new session
-            while session_id is None or session_id in self.sessions:
-                session_id = stringutils.random_string(24)
-            self.sessions[session_id] = {"id": session_id}
+        return self.sessions[session_id]
 
+    def _get_session_info(self, session_id: str) -> dict:
+        """
+        Gets a session given a session ID.
+
+        The session can be used to track data across multiple requests, e.g. for
+        interactive authentication.
+        """
         return self.sessions[session_id]
 
     async def get_access_token_for_user_id(
