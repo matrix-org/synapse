@@ -38,6 +38,7 @@ class CasConfig(Config):
             self.cas_enabled = False
             self.cas_server_url = None
             self.cas_server_ticket_url = None
+            self.cas_server_validate_url = None
             self.cas_service_url = None
             self.cas_displayname_attribute = None
             self.cas_required_attributes = {}
