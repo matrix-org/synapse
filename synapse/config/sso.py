@@ -39,17 +39,6 @@ class SSOConfig(Config):
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
 
-        # Attempt to also whitelist the server's login fallback, since that fallback sets
-        # the redirect URL to itself (so it can process the login token then return
-        # gracefully to the client). This would make it pointless to ask the user for
-        # confirmation, since the URL the confirmation page would be showing wouldn't be
-        # the client's.
-        # public_baseurl is an optional setting, so we only add the fallback's URL to the
-        # list if it's provided (because we can't figure out what that URL is otherwise).
-        if self.public_baseurl:
-            login_fallback_url = self.public_baseurl + "_matrix/static/client/login"
-            self.sso_client_whitelist.append(login_fallback_url)
-
     def generate_config_section(self, **kwargs):
         return """\
         # Additional settings to use with single-sign on systems such as SAML2 and CAS.
@@ -64,10 +53,6 @@ class SSOConfig(Config):
             # will also match "https://my.client.evil.site", exposing your users to
             # phishing attacks from evil.site. To avoid this, include a slash after the
             # hostname: "https://my.client/".
-            #
-            # If public_baseurl is set, then the login fallback page (used by clients
-            # that don't natively support the required login flows) is whitelisted in
-            # addition to any URLs in this list.
             #
             # By default, this list is empty.
             #
