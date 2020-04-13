@@ -1,1 +1,1 @@
-Add setting to nginx reverse proxy configuration to allow larger file uploads.
+Modify suggested nginx reverse proxy configuration to match Synapse's default file upload size. Contributed by @ProCycleDev.
