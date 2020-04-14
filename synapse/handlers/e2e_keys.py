@@ -54,19 +54,23 @@ class E2eKeysHandler(object):
 
         self._edu_updater = SigningKeyEduUpdater(hs, self)
 
+        federation_registry = hs.get_federation_registry()
+
         self._is_master = hs.config.worker_app is None
         if not self._is_master:
             self._user_device_resync_client = ReplicationUserDevicesResyncRestServlet.make_client(
                 hs
             )
+        else:
+            # Only register this edu handler on master as it requires writing
+            # device updates to the db
+            #
+            # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
+            federation_registry.register_edu_handler(
+                "org.matrix.signing_key_update",
+                self._edu_updater.incoming_signing_key_update,
+            )
 
-        federation_registry = hs.get_federation_registry()
-
-        # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
-        federation_registry.register_edu_handler(
-            "org.matrix.signing_key_update",
-            self._edu_updater.incoming_signing_key_update,
-        )
         # doesn't really work as part of the generic query API, because the
         # query request requires an object POST, but we abuse the
         # "query handler" interface.
