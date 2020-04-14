@@ -173,19 +173,25 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             for event_id in initial_events
         }
 
+        # The sorted list of events whose auth chains we should walk.
+        search = []  # type: List[Tuple[int, str]]
+
         # We need to get the depth of the initial events for sorting purposes.
         sql = """
             SELECT depth, event_id FROM events
             WHERE %s
-            ORDER BY depth ASC
         """
-        clause, args = make_in_list_sql_clause(
-            txn.database_engine, "event_id", initial_events
-        )
-        txn.execute(sql % (clause,), args)
+        # the list can be huge, so let's avoid looking them all up in one massive
+        # query.
+        for batch in batch_iter(initial_events, 1000):
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "event_id", batch
+            )
+            txn.execute(sql % (clause,), args)
+            search.extend(txn)
 
-        # The sorted list of events whose auth chains we should walk.
-        search = txn.fetchall()  # type: List[Tuple[int, str]]
+        # sort by depth
+        search.sort()
 
         # Map from event to its auth events
         event_to_auth_events = {}  # type: Dict[str, Set[str]]
