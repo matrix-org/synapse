@@ -188,7 +188,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 txn.database_engine, "event_id", batch
             )
             txn.execute(sql % (clause,), args)
-            search.extend(txn)
+
+            # I think building a temporary list with fetchall is more efficient than
+            # just `search.extend(txn)`, but this is unconfirmed
+            search.extend(txn.fetchall())
 
         # sort by depth
         search.sort()
