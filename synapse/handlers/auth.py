@@ -485,7 +485,9 @@ class AuthHandler(BaseHandler):
         sess = self._get_session_info(session_id)
         return sess.setdefault("serverdict", {}).get(key, default)
 
-    async def _check_auth_dict(self, authdict: Dict[str, Any], clientip: str) -> str:
+    async def _check_auth_dict(
+        self, authdict: Dict[str, Any], clientip: str
+    ) -> Union[Dict[str, Any], str]:
         """Attempt to validate the auth dict provided by a client
 
         Args:
