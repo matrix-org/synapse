@@ -142,7 +142,12 @@ class PushRuleEvaluatorForEvent(object):
         if not body:
             return False
 
-        return _glob_matches(display_name, body, word_boundary=True)
+        # Similar to _glob_matches, but do not treat display_name as a glob.
+        r = re.escape(display_name)
+        r = _re_word_boundary(r)
+        r = re.compile(r, flags=re.IGNORECASE)
+
+        return r.search(body)
 
     def _get_value(self, dotted_key):
         return self._value_cache.get(dotted_key, None)
