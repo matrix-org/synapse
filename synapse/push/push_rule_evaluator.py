@@ -143,9 +143,12 @@ class PushRuleEvaluatorForEvent(object):
             return False
 
         # Similar to _glob_matches, but do not treat display_name as a glob.
-        r = re.escape(display_name)
-        r = _re_word_boundary(r)
-        r = re.compile(r, flags=re.IGNORECASE)
+        r = regex_cache.get((display_name, False, True), None)
+        if not r:
+            r = re.escape(display_name)
+            r = _re_word_boundary(r)
+            r = re.compile(r, flags=re.IGNORECASE)
+            regex_cache[(display_name, False, True)] = r
 
         return r.search(body)
 
@@ -153,7 +156,7 @@ class PushRuleEvaluatorForEvent(object):
         return self._value_cache.get(dotted_key, None)
 
 
-# Caches (glob, word_boundary) -> regex for push. See _glob_matches
+# Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches
 regex_cache = LruCache(50000 * CACHE_SIZE_FACTOR)
 register_cache("cache", "regex_push_cache", regex_cache)
 
@@ -172,10 +175,10 @@ def _glob_matches(glob, value, word_boundary=False):
     """
 
     try:
-        r = regex_cache.get((glob, word_boundary), None)
+        r = regex_cache.get((glob, True, word_boundary), None)
         if not r:
             r = _glob_to_re(glob, word_boundary)
-            regex_cache[(glob, word_boundary)] = r
+            regex_cache[(glob, True, word_boundary)] = r
         return r.search(value)
     except re.error:
         logger.warning("Failed to parse glob to regex: %r", glob)
