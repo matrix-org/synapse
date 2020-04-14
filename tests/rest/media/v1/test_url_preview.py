@@ -555,10 +555,10 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # of the request from Synapse
         self.assertIn(
             (
-                b"Accept language: en-UK\r\n"
-                b"Accept language: en-US;q=0.9\r\n"
-                b"Accept language: fr;q=0.8\r\n"
-                b"Accept language: *;q=0.7"
+                b"Accept-Language: en-UK\r\n"
+                b"Accept-Language: en-US;q=0.9\r\n"
+                b"Accept-Language: fr;q=0.8\r\n"
+                b"Accept-Language: *;q=0.7"
             ),
             server.data,
         )

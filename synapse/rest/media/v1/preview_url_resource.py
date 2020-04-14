@@ -321,7 +321,7 @@ class PreviewUrlResource(DirectServeResource):
                     url,
                     output_stream=f,
                     max_size=self.max_spider_size,
-                    headers={"Accept Language": self.url_preview_accept_language},
+                    headers={"Accept-Language": self.url_preview_accept_language},
                 )
             except SynapseError:
                 # Pass SynapseErrors through directly, so that the servlet
