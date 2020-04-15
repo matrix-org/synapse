@@ -86,7 +86,7 @@ class ModuleApi(object):
             Deferred[str|None]: Canonical (case-corrected) user_id, or None
                if the user is not registered.
         """
-        return self._auth_handler.check_user_exists(user_id)
+        return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
     def register(self, localpart, displayname=None, emails=[]):
@@ -196,7 +196,9 @@ class ModuleApi(object):
             yield self._hs.get_device_handler().delete_device(user_id, device_id)
         else:
             # no associated device. Just delete the access token.
-            yield self._auth_handler.delete_access_token(access_token)
+            yield defer.ensureDeferred(
+                self._auth_handler.delete_access_token(access_token)
+            )
 
     def run_db_interaction(self, desc, func, *args, **kwargs):
         """Run a function with a database connection
