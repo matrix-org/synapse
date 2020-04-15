@@ -94,13 +94,10 @@ class UIAuthStore(SQLBaseStore):
             stage_type: The completed stage type.
             identity: The identity authenticated by the stage.
         """
-        await self.db.simple_insert(
+        await self.db.simple_upsert(
             table="ui_auth_sessions_credentials",
-            values={
-                "session_id": session_id,
-                "stage_type": stage_type,
-                "identity": json.dumps(identity),
-            },
+            keyvalues={"session_id": session_id, "stage_type": stage_type},
+            values={"identity": json.dumps(identity)},
             desc="mark_stage_complete",
         )
 
