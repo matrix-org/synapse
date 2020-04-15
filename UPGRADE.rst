@@ -131,7 +131,7 @@ participating in many rooms.
    `SQLite is not recommended for use outside a test
    environment <https://github.com/matrix-org/synapse/blob/master/README.rst#using-postgresql>`_.
 
-3. Once the index has been created, the `SELECT` query in step 1 above should
+3. Once the index has been created, the ``SELECT`` query in step 1 above should
    complete quickly. It is therefore safe to upgrade to Synapse 1.12.0.
 
 4. Once Synapse 1.12.0 has successfully started and is responding to HTTP
