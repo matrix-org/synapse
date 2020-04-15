@@ -1,10 +1,14 @@
 Next version
 ============
 
-* A new template (`sso_auth_confirm.html`) was added to Synapse. If your Synapse
-  is configured to use SSO and a custom `sso_redirect_confirm_template_dir`
-  configuration then this template will need to be duplicated into that
-  directory.
+* Two new templates (`sso_auth_confirm.html` and `sso_account_deactivated.html`)
+  were added to Synapse. If your Synapse is configured to use SSO and a custom 
+  `sso_redirect_confirm_template_dir` configuration then these templates will
+  need to be duplicated into that directory.
+
+* Plugins using the `complete_sso_login` method of `synapse.module_api.ModuleApi`
+  should update to using the async/await version `complete_sso_login_async` which
+  includes additional checks. The non-async version is considered deprecated.
 
 Synapse 1.12.3 (2020-04-03)
 ===========================
