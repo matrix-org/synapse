@@ -34,11 +34,18 @@ Bugfixes
 Synapse 1.12.0 (2020-03-23)
 ===========================
 
-No significant changes since 1.12.0rc1.
-
 Debian packages and Docker images are rebuilt using the latest versions of
 dependency libraries, including Twisted 20.3.0. **Please see security advisory
 below**.
+
+Potential slow database update during upgrade
+---------------------------------------------
+
+Synapse 1.12.0 includes a database update which is run as part of the upgrade,
+and which may take some time (several hours in the case of a large
+server). Synapse will not respond to HTTP requests while this update is taking
+place. For imformation on seeing if you are affected, and workaround if you
+are, see the [upgrade notes](UPGRADE.rst#upgrading-to-v1120).
 
 Security advisory
 -----------------

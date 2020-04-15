@@ -75,6 +75,71 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.12.0
+====================
+
+This version includes a database update which is run as part of the upgrade,
+and which may take some time (several hours in the case of a large
+server). Synapse will not respond to HTTP requests while this update is taking
+place.
+
+This is only likely to be a problem in the case of a server which is
+participating in many rooms.
+
+0. As with all upgrades, it is recommended that you have a recent backup of
+   your database which can be used for recovery in the event of any problems.
+
+1. As an initial check to see if you will be affected, you can try running the
+   following query from the `psql` or `sqlite3` console. It is safe to run it
+   while Synapse is still running.
+
+   ```sql
+   SELECT MAX(q.v) FROM (
+     SELECT (
+       SELECT ej.json AS v
+       FROM state_events se INNER JOIN event_json ej USING (event_id)
+       WHERE se.room_id=rooms.room_id AND se.type='m.room.create' AND se.state_key=''
+       LIMIT 1
+     ) FROM rooms -- WHERE rooms.room_version IS NULL
+   ) q;
+   ```
+
+   This query will take about the same amount of time as the upgrade process: ie,
+   if it takes 5 minutes, then it is likely that Synapse will be unresponsive for
+   5 minutes during the upgrade.
+
+   If you consider an outage of this duration to be acceptable, no further
+   action is necessary and you can simply start Synapse 1.12.0.
+
+   If you would prefer to reduce the downtime, continue with the steps below.
+
+2. The easiest workaround for this issue is to manually
+   create a new index before upgrading. On PostgreSQL, his can be done as follows:
+
+   ```sql
+   CREATE INDEX CONCURRENTLY tmp_upgrade_1_12_0_index
+   ON state_events(room_id) WHERE type = 'm.room.create';
+   ```
+
+   The above query may take some time, but is also safe to run while Synapse is
+   running.
+
+   We assume that no SQLite users have databases large enough to be
+   affected. If you *are* affected, you can run a similar query, omitting the
+   `CONCURRENTLY` keyword. Note however that this operation may in itself cause
+   Synapse to stop running for some time. Synapse admins are reminded that
+   [SQLite is not recommended for use outside a test
+   environment](https://github.com/matrix-org/synapse/blob/master/README.rst#using-postgresql).
+
+3. Once the index has been created, the `SELECT` query in step 1 above should
+   complete quickly. It is therefore safe to upgrade to Synapse 1.12.0.
+
+4. Once Synapse 1.12.0 has successfully started and is responding to HTTP
+   requests, the temporary index can be removed:
+
+   ```sql
+   DROP INDEX tmp_upgrade_1_12_0_index;
+   ```
 
 Upgrading to v1.10.0
 ====================
