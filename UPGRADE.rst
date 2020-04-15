@@ -101,7 +101,7 @@ participating in many rooms.
           FROM state_events se INNER JOIN event_json ej USING (event_id)
           WHERE se.room_id=rooms.room_id AND se.type='m.room.create' AND se.state_key=''
           LIMIT 1
-        ) FROM rooms -- WHERE rooms.room_version IS NULL
+        ) FROM rooms WHERE rooms.room_version IS NULL
       ) q;
 
    This query will take about the same amount of time as the upgrade process: ie,
