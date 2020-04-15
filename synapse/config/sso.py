@@ -43,6 +43,12 @@ class SSOConfig(Config):
             ),
             "sso_account_deactivated_template",
         )
+        self.sso_auth_success_template = self.read_file(
+            os.path.join(
+                self.sso_redirect_confirm_template_dir, "sso_auth_success.html"
+            ),
+            "sso_auth_success_template",
+        )
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
 
