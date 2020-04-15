@@ -277,10 +277,6 @@ class AuthHandler(BaseHandler):
         Takes a dictionary sent by the client in the login / registration
         protocol and handles the User-Interactive Auth flow.
 
-        As a side effect, this function fills in the 'creds' key on the user's
-        session with a map, which maps each auth-type (str) to the relevant
-        identity authenticated by that auth-type (mostly str, but for captcha, bool).
-
         If no auth flows have been completed successfully, raises an
         InteractiveAuthIncompleteError. To handle this, you can use
         synapse.rest.client.v2_alpha._base.interactive_auth_handler as a
@@ -569,6 +565,27 @@ class AuthHandler(BaseHandler):
 
         The session can be used to track data across multiple requests, e.g. for
         interactive authentication.
+
+        Each session has the following keys:
+
+            id:
+                A unique identifier for this session. Passed back to the client
+                and returned for each stage.
+            clientdict:
+                The dictionary from the client root level, not the 'auth' key.
+            ui_auth:
+                A tuple which is checked at each stage of the authentication to
+                ensure that the asked for operation has not changed.
+            creds:
+                A map, which maps each auth-type (str) to the relevant identity
+                authenticated by that auth-type (mostly str, but for captcha, bool).
+            serverdict:
+                A map of data that is stored server-side and cannot be modified
+                by the client.
+            description:
+                A string description of the operation that the current
+                authentication is authorizing.
+
         """
         session_id = None
         while session_id is None or session_id in self.sessions:
