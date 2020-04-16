@@ -980,7 +980,7 @@ class E2eKeysHandler(object):
 
         Raises:
             NotFoundError: if the key is not found
-            SynapseError: if the user_id is invalid
+            SynapseError: if `user_id` is invalid
         """
         user = UserID.from_string(user_id)
         key = yield self.store.get_e2e_cross_signing_key(
@@ -989,6 +989,11 @@ class E2eKeysHandler(object):
 
         # If we still can't find the key, and we're looking for keys of another user,
         # then attempt to fetch the missing key from the remote user's server.
+        #
+        # We may run into this in possible edge cases where a user tries to
+        # cross-sign a remote user, but does not share any rooms with them yet.
+        # Thus, we would not have their key list yet. We fetch the key here and
+        # store it just in case.
         if (
             key is None
             and not self.is_mine(user)
