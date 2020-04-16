@@ -40,7 +40,7 @@ class OIDCConfig(Config):
 
         oidc_config = config.get("oidc_config")
 
-        if not oidc_config or not oidc_config.get("enabled", True):
+        if not oidc_config or not oidc_config.get("enabled", False):
             return
 
         try:
