@@ -16,9 +16,11 @@
 
 import logging
 import re
+from typing import Pattern
 
 from six import string_types
 
+from synapse.events import EventBase
 from synapse.types import UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -56,18 +58,18 @@ def _test_ineq_condition(condition, number):
     rhs = m.group(2)
     if not rhs.isdigit():
         return False
-    rhs = int(rhs)
+    rhs_int = int(rhs)
 
     if ineq == "" or ineq == "==":
-        return number == rhs
+        return number == rhs_int
     elif ineq == "<":
-        return number < rhs
+        return number < rhs_int
     elif ineq == ">":
-        return number > rhs
+        return number > rhs_int
     elif ineq == ">=":
-        return number >= rhs
+        return number >= rhs_int
     elif ineq == "<=":
-        return number <= rhs
+        return number <= rhs_int
     else:
         return False
 
@@ -83,7 +85,13 @@ def tweaks_for_actions(actions):
 
 
 class PushRuleEvaluatorForEvent(object):
-    def __init__(self, event, room_member_count, sender_power_level, power_levels):
+    def __init__(
+        self,
+        event: EventBase,
+        room_member_count: int,
+        sender_power_level: int,
+        power_levels: dict,
+    ):
         self._event = event
         self._room_member_count = room_member_count
         self._sender_power_level = sender_power_level
@@ -92,7 +100,7 @@ class PushRuleEvaluatorForEvent(object):
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
-    def matches(self, condition, user_id, display_name):
+    def matches(self, condition: dict, user_id: str, display_name: str) -> bool:
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
         elif condition["kind"] == "contains_display_name":
@@ -106,7 +114,7 @@ class PushRuleEvaluatorForEvent(object):
         else:
             return True
 
-    def _event_match(self, condition, user_id):
+    def _event_match(self, condition: dict, user_id: str) -> bool:
         pattern = condition.get("pattern", None)
 
         if not pattern:
@@ -134,7 +142,7 @@ class PushRuleEvaluatorForEvent(object):
 
             return _glob_matches(pattern, haystack)
 
-    def _contains_display_name(self, display_name):
+    def _contains_display_name(self, display_name: str) -> bool:
         if not display_name:
             return False
 
@@ -152,7 +160,7 @@ class PushRuleEvaluatorForEvent(object):
 
         return r.search(body)
 
-    def _get_value(self, dotted_key):
+    def _get_value(self, dotted_key: str) -> str:
         return self._value_cache.get(dotted_key, None)
 
 
@@ -161,17 +169,14 @@ regex_cache = LruCache(50000 * CACHE_SIZE_FACTOR)
 register_cache("cache", "regex_push_cache", regex_cache)
 
 
-def _glob_matches(glob, value, word_boundary=False):
+def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
     """Tests if value matches glob.
 
     Args:
-        glob (string)
-        value (string): String to test against glob.
-        word_boundary (bool): Whether to match against word boundaries or entire
+        glob
+        value: String to test against glob.
+        word_boundary: Whether to match against word boundaries or entire
             string. Defaults to False.
-
-    Returns:
-        bool
     """
 
     try:
@@ -185,16 +190,12 @@ def _glob_matches(glob, value, word_boundary=False):
         return False
 
 
-def _glob_to_re(glob, word_boundary):
+def _glob_to_re(glob: str, word_boundary: bool) -> Pattern:
     """Generates regex for a given glob.
 
     Args:
-        glob (string)
-        word_boundary (bool): Whether to match against word boundaries or entire
-            string. Defaults to False.
-
-    Returns:
-        regex object
+        glob
+        word_boundary: Whether to match against word boundaries or entire string.
     """
     if IS_GLOB.search(glob):
         r = re.escape(glob)
@@ -227,7 +228,7 @@ def _glob_to_re(glob, word_boundary):
         return re.compile(r, flags=re.IGNORECASE)
 
 
-def _re_word_boundary(r):
+def _re_word_boundary(r: str) -> str:
     """
     Adds word boundary characters to the start and end of an
     expression to require that the match occur as a whole word,
