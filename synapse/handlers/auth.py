@@ -1071,12 +1071,12 @@ class AuthHandler(BaseHandler):
         self._save_session(sess)
 
         # Render the HTML and return.
-        html = self._sso_auth_success_template.encode("utf-8")
+        html_bytes = self._sso_auth_success_template.encode("utf-8")
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html),))
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
-        request.write(html)
+        request.write(html_bytes)
         finish_request(request)
 
     async def complete_sso_login(
@@ -1097,12 +1097,12 @@ class AuthHandler(BaseHandler):
         # flow.
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
-            html = self._sso_account_deactivated_template.encode("utf-8")
+            html_bytes = self._sso_account_deactivated_template.encode("utf-8")
 
             request.setResponseCode(403)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html),))
-            request.write(html)
+            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+            request.write(html_bytes)
             finish_request(request)
             return
 
@@ -1144,7 +1144,7 @@ class AuthHandler(BaseHandler):
         # URL we redirect users to.
         redirect_url_no_params = client_redirect_url.split("?")[0]
 
-        html = self._sso_redirect_confirm_template.render(
+        html_bytes = self._sso_redirect_confirm_template.render(
             display_url=redirect_url_no_params,
             redirect_url=redirect_url,
             server_name=self._server_name,
@@ -1152,8 +1152,8 @@ class AuthHandler(BaseHandler):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html),))
-        request.write(html)
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+        request.write(html_bytes)
         finish_request(request)
 
     @staticmethod
