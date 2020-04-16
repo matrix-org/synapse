@@ -996,6 +996,15 @@ class E2eKeysHandler(object):
                     user.domain, {"device_keys": {user_id: []}}, timeout=10 * 1000
                 )
 
+                # Save these keys to the database for subsequent queries
+                for key_type, remote_user_id in remote_result.items():
+                    if remote_user_id != user_id:
+                        continue
+                    key_contents = remote_result[key_type][remote_user_id]
+                    key_type = key_type[:-5]  # Remove the "_keys" from the key type
+
+                    yield self.store.set_e2e_cross_signing_key(user_id, key_type, key_contents)
+
                 # The key_type variable passed to this function is in the form
                 # "self_signing","master" etc. Whereas the results returned from
                 # the remote server use "self_signing_keys", "master_keys" etc.
