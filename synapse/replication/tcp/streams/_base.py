@@ -21,7 +21,6 @@ from typing import Any, Awaitable, Callable, Iterable, List, Optional, Tuple
 import attr
 
 from synapse.replication.http.streams import ReplicationGetStreamUpdates
-from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +77,7 @@ class Stream(object):
         """
         self.last_token = self.current_token()
 
-    async def get_updates(self) -> Tuple[List[Tuple[Token, JsonDict]], Token, bool]:
+    async def get_updates(self) -> Tuple[List[Tuple[Token, StreamRow]], Token, bool]:
         """Gets all updates since the last time this function was called (or
         since the stream was constructed if it hadn't been called before).
 
@@ -98,7 +97,7 @@ class Stream(object):
 
     async def get_updates_since(
         self, from_token: Token, upto_token: Token, limit: int = 100
-    ) -> Tuple[List[Tuple[Token, JsonDict]], Token, bool]:
+    ) -> Tuple[List[Tuple[Token, StreamRow]], Token, bool]:
         """Like get_updates except allows specifying from when we should
         stream updates
 
@@ -165,7 +164,7 @@ def db_query_to_update_function(
 def make_http_update_function(
     hs, stream_name: str
 ) -> Callable[
-    [Token, Token, Token], Awaitable[Tuple[List[Tuple[Token, StreamRow]], Token, bool]]
+    [Token, Token, int], Awaitable[Tuple[List[Tuple[Token, StreamRow]], Token, bool]]
 ]:
     """Makes a suitable function for use as an `update_function` that queries
     the master process for updates.
