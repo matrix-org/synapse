@@ -1003,7 +1003,9 @@ class E2eKeysHandler(object):
                     key_contents = remote_result[key_type][remote_user_id]
                     key_type = key_type[:-5]  # Remove the "_keys" from the key type
 
-                    yield self.store.set_e2e_cross_signing_key(user_id, key_type, key_contents)
+                    yield self.store.set_e2e_cross_signing_key(
+                        user_id, key_type, key_contents
+                    )
 
                 # The key_type variable passed to this function is in the form
                 # "self_signing","master" etc. Whereas the results returned from
