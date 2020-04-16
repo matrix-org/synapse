@@ -15,7 +15,18 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 from prometheus_client import Counter
 
@@ -268,9 +279,14 @@ class ReplicationCommandHandler:
                     missing_updates,
                 ) = await stream.get_updates_since(current_token, cmd.token)
 
-                for token, row in updates:
+                # TODO: add some tests for this
+
+                # Some streams return multiple rows with the same stream IDs,
+                # which need to be processed in batches.
+
+                for token, rows in _batch_updates(updates):
                     await self.on_rdata(
-                        cmd.stream_name, token, [stream.parse_row(row)],
+                        cmd.stream_name, token, [stream.parse_row(row) for row in rows],
                     )
 
             # We've now caught up to position sent to us, notify handler.
@@ -402,3 +418,49 @@ class ReplicationCommandHandler:
         We need to check if the client is interested in the stream or not
         """
         self.send_command(RdataCommand(stream_name, token, data))
+
+
+UpdateToken = TypeVar("UpdateToken")
+UpdateRow = TypeVar("UpdateRow")
+
+
+def _batch_updates(
+    updates: Iterable[Tuple[UpdateToken, UpdateRow]]
+) -> Iterator[Tuple[UpdateToken, List[UpdateRow]]]:
+    """Collect stream updates with the same token together
+
+    Given a series of updates returned by Stream.get_updates_since(), collects
+    the updates which share the same stream_id together.
+
+    For example:
+
+        [(1, a), (1, b), (2, c), (3, d), (3, e)]
+
+    becomes:
+
+        [
+            (1, [a, b]),
+            (2, [c]),
+            (3, [d, e]),
+        ]
+    """
+
+    update_iter = iter(updates)
+    token, row = next(update_iter)
+
+    current_batch_token = token
+    current_batch = [row]
+
+    for token, row in update_iter:
+        if token != current_batch_token:
+            # different token to the previous row: flush the previous
+            # batch and start anew
+            yield current_batch_token, current_batch
+            current_batch_token = token
+            current_batch = []
+
+        current_batch.append(row)
+
+    # flush the final batch
+    if current_batch_token is not None:
+        yield current_batch_token, current_batch
