@@ -148,8 +148,9 @@ def db_query_to_update_function(
         updates = [(row[0], row[1:]) for row in rows]
         limited = False
         if len(updates) == limit:
-            upto_token = rows[-1][0]
+            upto_token = updates[-1][0]
             limited = True
+        assert len(updates) <= limit
 
         return updates, upto_token, limited
 
