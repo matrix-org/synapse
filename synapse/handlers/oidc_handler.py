@@ -48,6 +48,7 @@ class OidcHandler:
             response_type=hs.config.oidc_response_type,
         )
         self._provider_needs_discovery = hs.config.oidc_discover
+        self._mapping_templates = hs.config.oidc_mapping_templates
 
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
@@ -337,13 +338,19 @@ class OidcHandler:
             logger.info("Found existing mapping %s", registered_user_id)
             return registered_user_id
 
-        # TODO: make those configurable
-        localpart = userinfo.get("preferred_username")
-        if localpart is None:
-            raise Exception("No 'preferred_username' in ID token")
+        # render the localpart template, raise if empty
+        localpart = self._mapping_templates["localpart"].render(user=userinfo).strip()
+        if localpart == "":
+            raise Exception("rendered localpart is empty")
 
         localpart = map_username_to_mxid_localpart(localpart)
-        displayname = userinfo.get("given_name")
+
+        # render the display_name template, fallback to None
+        displayname = (
+            self._mapping_templates["display_name"].render(user=userinfo).strip()
+        )
+        if displayname == "":
+            displayname = None
 
         user_id = UserID(localpart, self._hostname)
         if await self._datastore.get_users_by_id_case_insensitive(user_id.to_string()):

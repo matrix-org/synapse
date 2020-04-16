@@ -1505,6 +1505,18 @@ oidc_config:
     #
     #response_type: "code"
 
+    # defines how the user info from the OIDC provider are mapped to user properties.
+    # Those are Jinja2 templates, where the userinfo object is available through the `user` variable.
+    #
+    mapping_templates:
+        # the localpart of the MXID. Defaults to '{{ user.preferred_username }}'.
+        #
+        #localpart: '{{ user.preferred_username }}'
+
+        # display name to set on first login. Defaults to '{{ user.given_name }} {{ user.last_name }}'.
+        #
+        #display_name: '{{ user.given_name }} {{ user.last_name }}'
+
 
 
 # Enable CAS for registration and login.

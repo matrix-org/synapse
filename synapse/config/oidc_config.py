@@ -13,9 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from jinja2 import Environment
+
 from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
+
+DEFAULT_DISPLAY_NAME_TEMPLATE = "{{ user.given_name }} {{ user.last_name }}"
+
+DEFAULT_LOCALPART_TEMPLATE = "{{ user.preferred_username }}"
+
+
+# Used to clear out "None" values in templates
+def jinja_finalize(thing):
+    return thing if thing is not None else ""
+
+
+env = Environment(finalize=jinja_finalize)
 
 
 class OIDCConfig(Config):
@@ -50,6 +64,33 @@ class OIDCConfig(Config):
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_response_type = oidc_config.get("response_type", "code")
+
+        templates_config = oidc_config.get("mapping_templates", {})
+
+        try:
+            localpart_template = env.from_string(
+                templates_config.get("localpart", DEFAULT_LOCALPART_TEMPLATE)
+            )
+        except Exception as e:
+            raise ConfigError(
+                "invalid jinja template for oidc_config.mapping_templates.localpart: %r"
+                % (e,)
+            )
+
+        try:
+            display_name_template = env.from_string(
+                templates_config.get("display_name", DEFAULT_DISPLAY_NAME_TEMPLATE)
+            )
+        except Exception as e:
+            raise ConfigError(
+                "invalid jinja template for oidc_config.mapping_templates.display_name: %r"
+                % (e,)
+            )
+
+        self.oidc_mapping_templates = {
+            "localpart": localpart_template,
+            "display_name": display_name_template,
+        }
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -99,4 +140,19 @@ class OIDCConfig(Config):
             # response type to use. For now, only "code" is supported. Defaults to "code".
             #
             #response_type: "code"
-        """
+
+            # defines how the user info from the OIDC provider are mapped to user properties.
+            # Those are Jinja2 templates, where the userinfo object is available through the `user` variable.
+            #
+            mapping_templates:
+                # the localpart of the MXID. Defaults to {localpart_template!r}.
+                #
+                #localpart: {localpart_template!r}
+
+                # display name to set on first login. Defaults to {display_name_template!r}.
+                #
+                #display_name: {display_name_template!r}
+        """.format(
+            display_name_template=DEFAULT_DISPLAY_NAME_TEMPLATE,
+            localpart_template=DEFAULT_LOCALPART_TEMPLATE,
+        )
