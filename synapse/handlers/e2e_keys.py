@@ -997,8 +997,8 @@ class E2eKeysHandler(object):
         if (
             key is None
             and not self.is_mine(user)
-            # We don't get "user_signing" keys from remote servers, so disallow that here
-            and desired_key_type != "user_signing"
+            # We only get "master" and "self_signing" keys from remote servers
+            and desired_key_type in ["master", "self_signing"]
         ):
             try:
                 remote_result = yield self.federation.query_user_devices(
