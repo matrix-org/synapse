@@ -1,6 +1,13 @@
 <html>
 <head>
-    <title>Authentication</title>
+    <title>Authentication Successful</title>
+    <script>
+    if (window.onAuthDone) {
+        window.onAuthDone();
+    } else if (window.opener && window.opener.postMessage) {
+        window.opener.postMessage("authDone", "*");
+    }
+    </script>
 </head>
     <body>
         <div>
