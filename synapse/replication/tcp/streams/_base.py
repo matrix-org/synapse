@@ -16,7 +16,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Any, Awaitable, Callable, List, Optional, Tuple
+from typing import Any, Awaitable, Callable, Iterable, List, Optional, Tuple
 
 import attr
 
@@ -137,7 +137,7 @@ class Stream(object):
 
 
 def db_query_to_update_function(
-    query_function: Callable[[Token, Token, int], Awaitable[List[tuple]]]
+    query_function: Callable[[Token, Token, int], Awaitable[Iterable[tuple]]]
 ) -> Callable[[Token, Token, int], Awaitable[Tuple[List[StreamRow], Token, bool]]]:
     """Wraps a db query function which returns a list of rows to make it
     suitable for use as an `update_function` for the Stream class
