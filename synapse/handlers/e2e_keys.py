@@ -973,6 +973,8 @@ class E2eKeysHandler(object):
         self, user_id, desired_key_type, from_user_id=None
     ):
         """Fetch the cross-signing public key from storage and interpret it.
+        If we cannot find the public key locally, we query the keys from the
+        homeserver they belong to, then update our local copy.
 
         Args:
             user_id (str): the user whose key should be fetched
@@ -994,11 +996,10 @@ class E2eKeysHandler(object):
 
         # If we still can't find the key, and we're looking for keys of another user,
         # then attempt to fetch the missing key from the remote user's server.
-        #
-        # We don't get "user_signing" keys from remote servers, so disallow that here
         if (
             key is None
             and not self.is_mine(user)
+            # We don't get "user_signing" keys from remote servers, so disallow that here
             and desired_key_type != "user_signing"
         ):
             try:
