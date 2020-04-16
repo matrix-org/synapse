@@ -27,7 +27,15 @@ from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
 
-from synapse.api.errors import CodeMessageException, Codes, NotFoundError, SynapseError
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    FederationDeniedError,
+    HttpResponseException,
+    NotFoundError,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import log_kv, set_tag, tag_args, trace
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
@@ -174,8 +182,8 @@ class E2eKeysHandler(object):
             """This is called when we are querying the device list of a user on
             a remote homeserver and their device list is not in the device list
             cache. If we share a room with this user and we're not querying for
-            specific user we will update the cache
-            with their device list."""
+            specific user we will update the cache with their device list.
+            """
 
             destination_query = remote_queries_not_in_cache[destination]
 
@@ -981,8 +989,37 @@ class E2eKeysHandler(object):
             user_id, key_type, from_user_id
         )
         if key is None:
-            logger.debug("no %s key found for %s", key_type, user_id)
+            # Attempt to fetch the missing key from the remote user's server
+            user = UserID.from_string(user_id)
+            try:
+                remote_result = yield self.federation.query_client_keys(
+                    user.domain, {"device_keys": {user_id: []}}, timeout=10 * 1000
+                )
+
+                # The key_type variable passed to this function is in the form
+                # "self_signing","master" etc. Whereas the results returned from
+                # the remote server use "self_signing_keys", "master_keys" etc.
+                # Translate that here.
+                remote_key_type = key_type + "_keys"
+
+                key = remote_result.get(remote_key_type, {}).get(user_id)
+            except (
+                HttpResponseException,
+                NotRetryingDestination,
+                FederationDeniedError,
+                RequestSendFailed,
+            ) as e:
+                logger.warning(
+                    "Unable to query %s for cross-signing keys of user %s: %s",
+                    user.domain,
+                    user_id,
+                    e,
+                )
+
+        if key is None:
+            logger.debug("No %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
+
         key_id, verify_key = get_verify_key_from_cross_signing_key(key)
         return key, key_id, verify_key
 
