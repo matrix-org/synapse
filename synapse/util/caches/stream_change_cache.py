@@ -126,6 +126,11 @@ class StreamChangeCache(object):
         """
         assert type(stream_pos) is int
 
+        if stream_pos in self._cache:
+            raise NotImplementedError(
+                "more than one entity changing at a stream position"
+            )
+
         if stream_pos > self._earliest_known_stream_pos:
             old_pos = self._entity_to_key.get(entity, None)
             if old_pos is not None:
