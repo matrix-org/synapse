@@ -1031,8 +1031,11 @@ class E2eKeysHandler(object):
             logger.debug("No %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
 
-        key_id, verify_key = get_verify_key_from_cross_signing_key(key)
-        return key, key_id, verify_key
+        try:
+            key_id, verify_key = get_verify_key_from_cross_signing_key(key)
+            return key, key_id, verify_key
+        except ValueError:
+            raise SynapseError(502, "Invalid %s key retrieved from remote server")
 
 
 def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
