@@ -30,10 +30,7 @@ from twisted.internet import defer
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
-    FederationDeniedError,
-    HttpResponseException,
     NotFoundError,
-    RequestSendFailed,
     SynapseError,
 )
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -1022,12 +1019,7 @@ class E2eKeysHandler(object):
                     yield self.store.set_e2e_cross_signing_key(
                         user_id, key_type, key_content
                     )
-            except (
-                HttpResponseException,
-                NotRetryingDestination,
-                FederationDeniedError,
-                RequestSendFailed,
-            ) as e:
+            except Exception as e:
                 logger.warning(
                     "Unable to query %s for cross-signing keys of user %s: %s",
                     user.domain,
