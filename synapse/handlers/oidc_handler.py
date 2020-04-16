@@ -33,12 +33,20 @@ SESSION_COOKIE_NAME = b"oidc_session"
 
 class OidcHandler:
     def __init__(self, hs):
-        self._issuer = hs.config.oidc_issuer
         self._callback_url = hs.config.oidc_callback_url
         self._scopes = hs.config.oidc_scopes
         self._client_auth = ClientAuth(
             hs.config.oidc_client_id, hs.config.oidc_client_secret
         )
+        self._provider_metadata = OpenIDProviderMetadata(
+            issuer=hs.config.oidc_issuer,
+            authorization_endpoint=hs.config.oidc_authorization_endpoint,
+            token_endpoint=hs.config.oidc_token_endpoint,
+            userinfo_endpoint=hs.config.oidc_userinfo_endpoint,
+            jwks_uri=hs.config.oidc_jwks_uri,
+            response_type=hs.config.oidc_response_type,
+        )
+        self._provider_needs_discovery = hs.config.oidc_discover
 
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
@@ -49,21 +57,65 @@ class OidcHandler:
         self._hostname = hs.hostname
         self._macaroon_secret_key = hs.config.macaroon_secret_key
 
-        self._provider_metadata = None
-
         # identifier for the external_ids table
         self._auth_provider_id = "oidc"
 
-    async def load_metadata(self):
-        if self._provider_metadata is None:
-            url = get_well_known_url(self._issuer, external=True)
+    def _validate_metadata(self):
+        m = self._provider_metadata
+        m.validate_issuer()
+        m.validate_authorization_endpoint()
+        m.validate_token_endpoint()
+
+        if "response_types_supported" in m:
+            m.validate_response_types_supported()
+
+            if m["response_type"] not in m["response_types_supported"]:
+                raise ValueError(
+                    '%r not in "response_types_supported" (%r)'
+                    % (self._response_type, m["response_types_supported"])
+                )
+
+        # If the openid scope was not requested, we need a userinfo endpoint to fetch user infos
+        if self._uses_userinfo:
+            if m.get("userinfo_endpoint") is None:
+                raise ValueError(
+                    'provider has no "userinfo_endpoint", even though it is required because the "openid" scope is not requested'
+                )
+        else:
+            # If we're not using userinfo, we need a valid jwks to validate the ID token
+            if "jwks" not in m:
+                if "jwks_uri" in m:
+                    m.validate_jwks_uri()
+                else:
+                    raise ValueError('"jwks_uri" must be set')
+
+    @property
+    def _uses_userinfo(self):
+        return (
+            "openid" not in self._scopes
+            or self._provider_metadata["response_type"] == "access"
+        )
+
+    async def load_metadata(self) -> OpenIDProviderMetadata:
+        # If we are using the OpenID Discovery documents, it needs to be loaded once
+        # FIXME: should there be a lock here?
+        if self._provider_needs_discovery:
+            url = get_well_known_url(self._provider_metadata["issuer"], external=True)
             metadata_response = await self._http_client.get_json(url)
-            # TODO: validate the provider metadatas here?
-            self._provider_metadata = OpenIDProviderMetadata(metadata_response)
+            # TODO: maybe update the other way around to let user override some values?
+            self._provider_metadata.update(metadata_response)
+            self._provider_needs_discovery = False
+
+        self._validate_metadata()
+
         return self._provider_metadata
 
     async def load_jwks(self):
         # FIXME: this should be periodically reloaded to support key rotation
+        if self._uses_userinfo:
+            # We're not using jwt signing, return an empty jwk set
+            return []
+
         metadata = await self.load_metadata()
         jwk_set = metadata.get("jwks")
         if jwk_set:
@@ -79,7 +131,6 @@ class OidcHandler:
 
     async def _exchange_code(self, code):
         metadata = await self.load_metadata()
-        metadata.validate_token_endpoint()
         token_endpoint = metadata.get("token_endpoint")
         args = {
             "grant_type": "authorization_code",
@@ -156,7 +207,6 @@ class OidcHandler:
         )
 
         metadata = await self.load_metadata()
-        metadata.validate_authorization_endpoint()
         authorization_endpoint = metadata.get("authorization_endpoint")
         response_type = metadata.get("response_type", "code")
         return prepare_grant_uri(
