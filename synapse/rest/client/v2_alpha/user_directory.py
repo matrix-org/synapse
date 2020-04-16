@@ -75,7 +75,7 @@ class UserDirectorySearchRestServlet(RestServlet):
                 self.hs.config.user_directory_defer_to_id_server,
             )
             resp = await self.http_client.post_json_get_json(url, signed_body)
-            defer.returnValue((200, resp))
+            return 200, resp
 
         limit = body.get("limit", 10)
         limit = min(limit, 50)
