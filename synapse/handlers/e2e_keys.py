@@ -985,35 +985,49 @@ class E2eKeysHandler(object):
         Raises:
             NotFoundError: if the key is not found
         """
+        user = UserID.from_string(user_id)
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
         )
-        if key is None:
+
+        if key is None and self.is_mine(user):
             # Attempt to fetch the missing key from the remote user's server
-            user = UserID.from_string(user_id)
             try:
                 remote_result = yield self.federation.query_client_keys(
                     user.domain, {"device_keys": {user_id: []}}, timeout=10 * 1000
                 )
 
-                # Save these keys to the database for subsequent queries
-                for key_type, remote_user_id in remote_result.items():
-                    if remote_user_id != user_id:
-                        continue
-                    key_contents = remote_result[key_type][remote_user_id]
-                    key_type = key_type[:-5]  # Remove the "_keys" from the key type
+                # Process the result
+                for remote_key_type, remote_user_dict in remote_result.items():
+                    # The key_type variable passed to this function is in the form
+                    # "self_signing","master" etc. whereas the results returned from
+                    # the remote server use "self_signing_keys", "master_keys" etc.
+                    # Remove the "_keys" from the key type
+                    if remote_key_type.endswith("_keys"):
+                        remote_key_type = remote_key_type[:-5]
 
-                    yield self.store.set_e2e_cross_signing_key(
-                        user_id, key_type, key_contents
-                    )
+                    # remote_user_dict is a dictionary in the form of
+                    # {
+                    #   "user_id": {
+                    #     "master_keys": ...
+                    #   },
+                    #   ...
+                    # }
 
-                # The key_type variable passed to this function is in the form
-                # "self_signing","master" etc. Whereas the results returned from
-                # the remote server use "self_signing_keys", "master_keys" etc.
-                # Translate that here.
-                remote_key_type = key_type + "_keys"
+                    # Only extract the keys that pertain to the requested user
+                    key_content_list = remote_user_dict.get(user_id, {}).values()
 
-                key = remote_result.get(remote_key_type, {}).get(user_id)
+                    for key_content in key_content_list:
+                        # If the key_type here matches the key we're requesting,
+                        # then this is the key we want to return
+                        if remote_key_type == key_type:
+                            key = key_content
+
+                        # At the same time, save the key to the database for subsequent
+                        # queries
+                        yield self.store.set_e2e_cross_signing_key(
+                            user_id, remote_key_type, key_content
+                        )
             except (
                 HttpResponseException,
                 NotRetryingDestination,
