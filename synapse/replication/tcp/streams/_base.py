@@ -94,21 +94,19 @@ class Stream(object):
     ):
         """Instantiate a Stream
 
-        current_token_function and update_function are callback which should be
+        current_token_function and update_function are callbacks which should be
         implemented by subclasses.
 
-        currrent_token_function is called to get the current token of
-        the underlying stream.
+        current_token_function is called to get the current token of the underlying
+        stream.
 
         update_function is called to get updates for this stream between a pair of
-        stream tokens. See the UpdateFunction type definition for more info
+        stream tokens. See the UpdateFunction type definition for more info.
 
         Args:
             current_token_function: callback to get the current token, as above
             update_function: callback go get stream updates, as above
-
         """
-
         self.current_token = current_token_function
         self.update_function = update_function
 
