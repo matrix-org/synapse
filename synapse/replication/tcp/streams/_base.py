@@ -49,6 +49,17 @@ StreamRow = Tuple
 #
 StreamUpdateResult = Tuple[List[Tuple[Token, StreamRow]], Token, bool]
 
+# The type of an update_function for a stream
+#
+# The arguments are:
+#
+#  * from_token: the previous stream token: the starting point for fetching the
+#    updates
+#  * to_token: the new stream token: the point to get updates up to
+#  * limit: the maximum number of rows to return
+#
+UpdateFunction = Callable[[Token, Token, int], Awaitable[StreamUpdateResult]]
+
 
 class Stream(object):
     """Base class for the streams.
@@ -79,7 +90,7 @@ class Stream(object):
     def __init__(
         self,
         current_token_function: Callable[[], Token],
-        update_function: Callable[[Token, Token, int], Awaitable[StreamUpdateResult]],
+        update_function: UpdateFunction,
     ):
         """Instantiate a Stream
 
@@ -90,12 +101,7 @@ class Stream(object):
         the underlying stream.
 
         update_function is called to get updates for this stream between a pair of
-        stream tokens. The arguments are:
-
-           * from_token: the previous stream token: the starting point for fetching the
-             updates
-           * to_token: the new stream token: the point to get updates up to
-           * limit: the maximum number of rows to return
+        stream tokens. See the UpdateFunction type definition for more info
 
         Args:
             current_token_function: callback to get the current token, as above
@@ -159,7 +165,7 @@ class Stream(object):
 
 def db_query_to_update_function(
     query_function: Callable[[Token, Token, int], Awaitable[Iterable[tuple]]]
-) -> Callable[[Token, Token, int], Awaitable[StreamUpdateResult]]:
+) -> UpdateFunction:
     """Wraps a db query function which returns a list of rows to make it
     suitable for use as an `update_function` for the Stream class
     """
@@ -178,9 +184,7 @@ def db_query_to_update_function(
     return update_function
 
 
-def make_http_update_function(
-    hs, stream_name: str
-) -> Callable[[Token, Token, Token], Awaitable[StreamUpdateResult]]:
+def make_http_update_function(hs, stream_name: str) -> UpdateFunction:
     """Makes a suitable function for use as an `update_function` that queries
     the master process for updates.
     """
