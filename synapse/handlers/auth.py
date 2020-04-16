@@ -584,12 +584,13 @@ class AuthHandler(BaseHandler):
                 by the client.
             description:
                 A string description of the operation that the current
-                authentication is authorizing.
+                authentication is authorising.
 
         """
         session_id = None
         while session_id is None or session_id in self.sessions:
             session_id = stringutils.random_string(24)
+
         self.sessions[session_id] = {
             "id": session_id,
             "clientdict": clientdict,
