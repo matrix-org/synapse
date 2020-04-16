@@ -39,6 +39,16 @@ Token = int
 #
 StreamRow = Tuple
 
+# The type returned by the update_function of a stream, as well as get_updates(),
+# get_updates_since, etc.
+#
+# It consists of a triplet `(updates, new_last_token, limited)`, where:
+#   * `updates` is a list of `(token, row)` entries.
+#   * `new_last_token` is the new position in stream.
+#   * `limited` is whether there are more updates to fetch.
+#
+StreamUpdateResult = Tuple[List[Tuple[Token, StreamRow]], Token, bool]
+
 
 class Stream(object):
     """Base class for the streams.
@@ -77,7 +87,7 @@ class Stream(object):
         """
         self.last_token = self.current_token()
 
-    async def get_updates(self) -> Tuple[List[Tuple[Token, StreamRow]], Token, bool]:
+    async def get_updates(self) -> StreamUpdateResult:
         """Gets all updates since the last time this function was called (or
         since the stream was constructed if it hadn't been called before).
 
@@ -97,7 +107,7 @@ class Stream(object):
 
     async def get_updates_since(
         self, from_token: Token, upto_token: Token, limit: int = 100
-    ) -> Tuple[List[Tuple[Token, StreamRow]], Token, bool]:
+    ) -> StreamUpdateResult:
         """Like get_updates except allows specifying from when we should
         stream updates
 
@@ -140,9 +150,7 @@ class Stream(object):
 
 def db_query_to_update_function(
     query_function: Callable[[Token, Token, int], Awaitable[Iterable[tuple]]]
-) -> Callable[
-    [Token, Token, int], Awaitable[Tuple[List[Tuple[Token, StreamRow]], Token, bool]]
-]:
+) -> Callable[[Token, Token, int], Awaitable[StreamUpdateResult]]:
     """Wraps a db query function which returns a list of rows to make it
     suitable for use as an `update_function` for the Stream class
     """
@@ -163,9 +171,7 @@ def db_query_to_update_function(
 
 def make_http_update_function(
     hs, stream_name: str
-) -> Callable[
-    [Token, Token, int], Awaitable[Tuple[List[Tuple[Token, StreamRow]], Token, bool]]
-]:
+) -> Callable[[Token, Token, Token], Awaitable[StreamUpdateResult]]:
     """Makes a suitable function for use as an `update_function` that queries
     the master process for updates.
     """
@@ -174,7 +180,7 @@ def make_http_update_function(
 
     async def update_function(
         from_token: int, upto_token: int, limit: int
-    ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
+    ) -> StreamUpdateResult:
         result = await client(
             stream_name=stream_name,
             from_token=from_token,
