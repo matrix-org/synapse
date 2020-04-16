@@ -985,6 +985,7 @@ class E2eKeysHandler(object):
 
         Raises:
             NotFoundError: if the key is not found
+            SynapseError: if the user_id is invalid
         """
         user = UserID.from_string(user_id)
         key = yield self.store.get_e2e_cross_signing_key(
