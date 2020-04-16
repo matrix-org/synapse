@@ -34,8 +34,11 @@ MAX_EVENTS_BEHIND = 500000
 # A stream position token
 Token = int
 
-# A pair of position in stream and args used to create an instance of `ROW_TYPE`.
-StreamRow = Tuple[Token, tuple]
+# The type of a stream update row, after JSON deserialisation, but before
+# parsing with Stream.parse_row (which turns it into a `ROW_TYPE`). Normally it's
+# just a row from a database query, though this is dependent on the stream in question.
+#
+StreamRow = Tuple
 
 
 class Stream(object):
@@ -50,7 +53,7 @@ class Stream(object):
     ROW_TYPE = None  # type: Any
 
     @classmethod
-    def parse_row(cls, row):
+    def parse_row(cls, row: StreamRow):
         """Parse a row received over replication
 
         By default, assumes that the row data is an array object and passes its contents
@@ -138,7 +141,9 @@ class Stream(object):
 
 def db_query_to_update_function(
     query_function: Callable[[Token, Token, int], Awaitable[Iterable[tuple]]]
-) -> Callable[[Token, Token, int], Awaitable[Tuple[List[StreamRow], Token, bool]]]:
+) -> Callable[
+    [Token, Token, int], Awaitable[Tuple[List[Tuple[Token, StreamRow]], Token, bool]]
+]:
     """Wraps a db query function which returns a list of rows to make it
     suitable for use as an `update_function` for the Stream class
     """
@@ -159,7 +164,9 @@ def db_query_to_update_function(
 
 def make_http_update_function(
     hs, stream_name: str
-) -> Callable[[Token, Token, Token], Awaitable[Tuple[List[StreamRow], Token, bool]]]:
+) -> Callable[
+    [Token, Token, Token], Awaitable[Tuple[List[Tuple[Token, StreamRow]], Token, bool]]
+]:
     """Makes a suitable function for use as an `update_function` that queries
     the master process for updates.
     """
