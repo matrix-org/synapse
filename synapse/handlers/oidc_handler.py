@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 
 import pymacaroons
@@ -22,7 +23,7 @@ from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http.server import finish_request
 from synapse.types import UserID, map_username_to_mxid_localpart
 
@@ -135,14 +136,19 @@ class OidcHandler:
         args = {
             "grant_type": "authorization_code",
             "code": code,
+            "redirect_uri": self._callback_url,
         }
         uri, headers, body = self._client_auth.prepare(
             method="POST", uri=token_endpoint, headers={}, body=""
         )
         headers = {k: [v] for (k, v) in headers.items()}
-        resp = await self._http_client.post_urlencoded_get_json(
-            uri, args, headers=headers
-        )
+
+        try:
+            resp = await self._http_client.post_urlencoded_get_json(
+                uri, args, headers=headers
+            )
+        except HttpResponseException as e:
+            resp = json.loads(e.response)
 
         if "error" not in resp:
             return resp
@@ -213,6 +219,7 @@ class OidcHandler:
             authorization_endpoint,
             client_id=self._client_auth.client_id,
             response_type=response_type,
+            redirect_uri=self._callback_url,
             scope=self._scopes,
             state=state,
             nonce=nonce,
