@@ -465,7 +465,7 @@ class ServerReplicationStreamProtocol(BaseReplicationStreamProtocol):
         self.streamer.on_remote_server_up(cmd.data)
 
     async def on_USER_IP(self, cmd):
-        self.streamer.on_user_ip(
+        await self.streamer.on_user_ip(
             cmd.user_id,
             cmd.access_token,
             cmd.ip,
