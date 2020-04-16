@@ -969,12 +969,14 @@ class E2eKeysHandler(object):
         return signature_list, failures
 
     @defer.inlineCallbacks
-    def _get_e2e_cross_signing_verify_key(self, user_id, key_type, from_user_id=None):
+    def _get_e2e_cross_signing_verify_key(
+        self, user_id, desired_key_type, from_user_id=None
+    ):
         """Fetch the cross-signing public key from storage and interpret it.
 
         Args:
             user_id (str): the user whose key should be fetched
-            key_type (str): the type of key to fetch
+            desired_key_type (str): the type of key to fetch
             from_user_id (str): the user that we are fetching the keys for.
                 This affects what signatures are fetched.
 
@@ -987,47 +989,38 @@ class E2eKeysHandler(object):
         """
         user = UserID.from_string(user_id)
         key = yield self.store.get_e2e_cross_signing_key(
-            user_id, key_type, from_user_id
+            user_id, desired_key_type, from_user_id
         )
 
-        if key is None and self.is_mine(user):
-            # Attempt to fetch the missing key from the remote user's server
+        # If we still can't find the key, and we're looking for keys of another user,
+        # then attempt to fetch the missing key from the remote user's server.
+        #
+        # We don't get "user_signing" keys from remote servers, so disallow that here
+        if (
+            key is None
+            and not self.is_mine(user)
+            and desired_key_type != "user_signing"
+        ):
             try:
-                remote_result = yield self.federation.query_client_keys(
-                    user.domain, {"device_keys": {user_id: []}}, timeout=10 * 1000
+                remote_result = yield self.federation.query_user_devices(
+                    user.domain, user_id
                 )
 
-                # Process the result
-                for remote_key_type, remote_user_dict in remote_result.items():
-                    # The key_type variable passed to this function is in the form
-                    # "self_signing","master" etc. whereas the results returned from
-                    # the remote server use "self_signing_keys", "master_keys" etc.
-                    # Remove the "_keys" from the key type
-                    if remote_key_type.endswith("_keys"):
-                        remote_key_type = remote_key_type[:-5]
+                # Process each of the retrieved cross-signing keys
+                for key_type in ["master", "self_signing"]:
+                    key_content = remote_result.get(key_type + "_key")
+                    if not key_content:
+                        continue
 
-                    # remote_user_dict is a dictionary in the form of
-                    # {
-                    #   "user_id": {
-                    #     "master_keys": ...
-                    #   },
-                    #   ...
-                    # }
+                    # If this is the desired key type, return it
+                    if key_type == desired_key_type:
+                        key = key_content
 
-                    # Only extract the keys that pertain to the requested user
-                    key_content_list = remote_user_dict.get(user_id, {}).values()
-
-                    for key_content in key_content_list:
-                        # If the key_type here matches the key we're requesting,
-                        # then this is the key we want to return
-                        if remote_key_type == key_type:
-                            key = key_content
-
-                        # At the same time, save the key to the database for subsequent
-                        # queries
-                        yield self.store.set_e2e_cross_signing_key(
-                            user_id, remote_key_type, key_content
-                        )
+                    # At the same time, store this key in the db for
+                    # subsequent queries
+                    yield self.store.set_e2e_cross_signing_key(
+                        user_id, key_type, key_content
+                    )
             except (
                 HttpResponseException,
                 NotRetryingDestination,

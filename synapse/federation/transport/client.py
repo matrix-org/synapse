@@ -406,13 +406,19 @@ class TransportLayerClient(object):
               "device_keys": {
                 "<user_id>": {
                   "<device_id>": {...}
+              } }
+              "master_keys": {
+                "<user_id>": {...}
+              } }
+              "self_signing_keys": {
+                "<user_id>": {...}
             } } }
 
         Args:
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containing the device keys.
+            A dict containing device and cross-signing keys.
         """
         path = _create_v1_path("/user/keys/query")
 
@@ -429,14 +435,16 @@ class TransportLayerClient(object):
         Response:
             {
               "stream_id": "...",
-              "devices": [ { ... } ]
+              "devices": [ { ... } ],
+              "master_key": { ... },
+              "self_signing_key: { ... }
             }
 
         Args:
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containg the device keys.
+            A dict containing device and cross-signing keys.
         """
         path = _create_v1_path("/user/devices/%s", user_id)
 
