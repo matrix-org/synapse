@@ -20,7 +20,7 @@ from synapse.push.push_rule_evaluator import PushRuleEvaluatorForEvent
 from tests import unittest
 
 
-class MockClockTestCase(unittest.TestCase):
+class PushRuleEvaluatorTestCase(unittest.TestCase):
     def setUp(self):
         event = FrozenEvent(
             {
