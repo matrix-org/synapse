@@ -446,10 +446,14 @@ def _batch_updates(
     """
 
     update_iter = iter(updates)
-    token, row = next(update_iter)
 
-    current_batch_token = token
-    current_batch = [row]
+    first_update = next(update_iter, None)
+    if first_update is None:
+        # empty input
+        return
+
+    current_batch_token = first_update[0]
+    current_batch = [first_update[1]]
 
     for token, row in update_iter:
         if token != current_batch_token:
@@ -462,5 +466,4 @@ def _batch_updates(
         current_batch.append(row)
 
     # flush the final batch
-    if current_batch_token is not None:
-        yield current_batch_token, current_batch
+    yield current_batch_token, current_batch
