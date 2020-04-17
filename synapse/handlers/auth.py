@@ -557,7 +557,7 @@ class AuthHandler(BaseHandler):
     def _create_session(
         self,
         clientdict: Dict[str, Any],
-        ui_auth: Tuple[str, str, Dict[str, Any]],
+        ui_auth: Tuple[bytes, bytes, Dict[str, Any]],
         description: str,
     ) -> dict:
         """
@@ -585,7 +585,8 @@ class AuthHandler(BaseHandler):
             description:
                 A string description of the operation that the current
                 authentication is authorising.
-
+    Returns:
+        The newly created session.
         """
         session_id = None
         while session_id is None or session_id in self.sessions:
@@ -612,7 +613,7 @@ class AuthHandler(BaseHandler):
         try:
             return self.sessions[session_id]
         except KeyError:
-            raise SynapseError(400, "Unknown session ID: %s" % session_id)
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
     async def get_access_token_for_user_id(
         self, user_id: str, device_id: Optional[str], valid_until_ms: Optional[int]
