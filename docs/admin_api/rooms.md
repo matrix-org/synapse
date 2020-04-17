@@ -19,7 +19,7 @@ The following query parameters are available:
   - `joined_local_members` - Rooms are ordered by the number of local members. Largest to smallest.
   - `version` - Rooms are ordered by room version. Largest to smallest.
   - `creator` - Rooms are ordered alphabetically by creator of the room.
-  - `encryption` - Rooms are ordered by encryption of the room.
+  - `encryption` - Rooms are ordered alphabetically by the end-to-end encryption algorithm.
   - `federatable` - Rooms are ordered by whether the room is federatable.
   - `public` - Rooms are ordered by visibility in room list.
   - `join_rules` - Rooms are ordered alphabetically by join rules of the room.
@@ -227,6 +227,16 @@ Response:
       "name": "Music Theory",
       "canonical_alias": "#musictheory:matrix.org",
       "joined_members": 127
+      "joined_local_members": 2,
+      "version": "1",
+      "creator": "@foo:matrix.org",
+      "encryption": null,
+      "federatable": true,
+      "public": true,
+      "join_rules": "invite",
+      "guest_access": null,
+      "history_visibility": "shared",
+      "state_events": 93534
     },
     ... (48 hidden items) ...
     {
@@ -234,6 +244,16 @@ Response:
       "name": "weechat-matrix",
       "canonical_alias": "#weechat-matrix:termina.org.uk",
       "joined_members": 137
+      "joined_local_members": 20,
+      "version": "4",
+      "creator": "@foo:termina.org.uk",
+      "encryption": null,
+      "federatable": true,
+      "public": true,
+      "join_rules": "invite",
+      "guest_access": null,
+      "history_visibility": "shared",
+      "state_events": 8345
     }
   ],
   "offset": 100,

@@ -473,34 +473,37 @@ class RoomTestCase(unittest.HomeserverTestCase):
         """Test room list sort ordering. alphabetical name versus number of members,
         reversing the order, etc.
         """
-        # Create 3 test rooms
-        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
-        room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
-        room_id_3 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
 
-        # Set room names in alphabetical order. room 1 -> A, 2 -> B, 3 -> C
-        self.helper.send_state(
-            room_id_1, "m.room.name", {"name": "A"}, tok=self.admin_user_tok,
-        )
-        self.helper.send_state(
-            room_id_2, "m.room.name", {"name": "B"}, tok=self.admin_user_tok,
-        )
-        self.helper.send_state(
-            room_id_3, "m.room.name", {"name": "C"}, tok=self.admin_user_tok,
-        )
+        def _set_canonical_alias(room_id: str, test_alias: str, admin_user_tok: str):
+            # Create a new alias to this room
+            url = "/_matrix/client/r0/directory/room/%s" % (
+                urllib.parse.quote(test_alias),
+            )
+            request, channel = self.make_request(
+                "PUT",
+                url.encode("ascii"),
+                {"room_id": room_id},
+                access_token=admin_user_tok,
+            )
+            self.render(request)
+            self.assertEqual(
+                200, int(channel.result["code"]), msg=channel.result["body"]
+            )
 
-        # Set room member size in the reverse order. room 1 -> 1 member, 2 -> 2, 3 -> 3
-        user_1 = self.register_user("bob1", "pass")
-        user_1_tok = self.login("bob1", "pass")
-        self.helper.join(room_id_2, user_1, tok=user_1_tok)
-
-        user_2 = self.register_user("bob2", "pass")
-        user_2_tok = self.login("bob2", "pass")
-        self.helper.join(room_id_3, user_2, tok=user_2_tok)
-
-        user_3 = self.register_user("bob3", "pass")
-        user_3_tok = self.login("bob3", "pass")
-        self.helper.join(room_id_3, user_3, tok=user_3_tok)
+            # Set this new alias as the canonical alias for this room
+            self.helper.send_state(
+                room_id,
+                "m.room.aliases",
+                {"aliases": [test_alias]},
+                tok=admin_user_tok,
+                state_key="test",
+            )
+            self.helper.send_state(
+                room_id,
+                "m.room.canonical_alias",
+                {"alias": test_alias},
+                tok=admin_user_tok,
+            )
 
         def _order_test(
             order_type: str, expected_room_list: List[str], reverse: bool = False,
@@ -544,12 +547,84 @@ class RoomTestCase(unittest.HomeserverTestCase):
             returned_order = [r["room_id"] for r in rooms]
             self.assertListEqual(expected_room_list, returned_order)  # order is checked
 
+        # Create 3 test rooms
+        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id_3 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        # Set room names in alphabetical order. room 1 -> A, 2 -> B, 3 -> C
+        self.helper.send_state(
+            room_id_1, "m.room.name", {"name": "A"}, tok=self.admin_user_tok,
+        )
+        self.helper.send_state(
+            room_id_2, "m.room.name", {"name": "B"}, tok=self.admin_user_tok,
+        )
+        self.helper.send_state(
+            room_id_3, "m.room.name", {"name": "C"}, tok=self.admin_user_tok,
+        )
+
+        # Set room canonical room aliases
+        _set_canonical_alias(room_id_1, "#A_alias:test", self.admin_user_tok)
+        _set_canonical_alias(room_id_2, "#B_alias:test", self.admin_user_tok)
+        _set_canonical_alias(room_id_3, "#C_alias:test", self.admin_user_tok)
+
+        # Set room member size in the reverse order. room 1 -> 1 member, 2 -> 2, 3 -> 3
+        user_1 = self.register_user("bob1", "pass")
+        user_1_tok = self.login("bob1", "pass")
+        self.helper.join(room_id_2, user_1, tok=user_1_tok)
+
+        user_2 = self.register_user("bob2", "pass")
+        user_2_tok = self.login("bob2", "pass")
+        self.helper.join(room_id_3, user_2, tok=user_2_tok)
+
+        user_3 = self.register_user("bob3", "pass")
+        user_3_tok = self.login("bob3", "pass")
+        self.helper.join(room_id_3, user_3, tok=user_3_tok)
+
         # Test different sort orders, with forward and reverse directions
         _order_test("name", [room_id_1, room_id_2, room_id_3])
         _order_test("name", [room_id_3, room_id_2, room_id_1], reverse=True)
 
+        _order_test("canonical_alias", [room_id_1, room_id_2, room_id_3])
+        _order_test("canonical_alias", [room_id_3, room_id_2, room_id_1], reverse=True)
+
         _order_test("joined_members", [room_id_3, room_id_2, room_id_1])
         _order_test("joined_members", [room_id_1, room_id_2, room_id_3], reverse=True)
+
+        _order_test("joined_local_members", [room_id_3, room_id_2, room_id_1])
+        _order_test(
+            "joined_local_members", [room_id_1, room_id_2, room_id_3], reverse=True
+        )
+
+        _order_test("version", [room_id_1, room_id_2, room_id_3])
+        _order_test("version", [room_id_1, room_id_2, room_id_3], reverse=True)
+
+        _order_test("creator", [room_id_1, room_id_2, room_id_3])
+        _order_test("creator", [room_id_1, room_id_2, room_id_3], reverse=True)
+
+        _order_test("encryption", [room_id_1, room_id_2, room_id_3])
+        _order_test("encryption", [room_id_1, room_id_2, room_id_3], reverse=True)
+
+        _order_test("federatable", [room_id_1, room_id_2, room_id_3])
+        _order_test("federatable", [room_id_1, room_id_2, room_id_3], reverse=True)
+
+        _order_test("public", [room_id_1, room_id_2, room_id_3])
+        # Different sort order of SQlite and PostreSQL
+        # _order_test("public", [room_id_3, room_id_2, room_id_1], reverse=True)
+
+        _order_test("join_rules", [room_id_1, room_id_2, room_id_3])
+        _order_test("join_rules", [room_id_1, room_id_2, room_id_3], reverse=True)
+
+        _order_test("guest_access", [room_id_1, room_id_2, room_id_3])
+        _order_test("guest_access", [room_id_1, room_id_2, room_id_3], reverse=True)
+
+        _order_test("history_visibility", [room_id_1, room_id_2, room_id_3])
+        _order_test(
+            "history_visibility", [room_id_1, room_id_2, room_id_3], reverse=True
+        )
+
+        _order_test("state_events", [room_id_3, room_id_2, room_id_1])
+        _order_test("state_events", [room_id_1, room_id_2, room_id_3], reverse=True)
 
     def test_search_term(self):
         """Test that searching for a room works correctly"""

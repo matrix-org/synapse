@@ -52,11 +52,14 @@ class RoomSortOrder(Enum):
     """
     Enum to define the sorting method used when returning rooms with get_rooms_paginate
 
-    ALPHABETICAL = sort rooms alphabetically by name
-    SIZE = sort rooms by membership size, highest to lowest
+    NAME = sort rooms alphabetically by name
+    JOINED_MEMBERS = sort rooms by membership size, highest to lowest
     """
 
+    # ALPHABETICAL and SIZE are deprecated.
+    # ALPHABETICAL is same as NAME.
     ALPHABETICAL = "alphabetical"
+    # SIZE is same as JOINED_MEMBERS.
     SIZE = "size"
     NAME = "name"
     CANONICAL_ALIAS = "canonical_alias"
