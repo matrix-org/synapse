@@ -424,7 +424,7 @@ class CachesStream(Stream):
         self.store = hs.get_datastore()
         super().__init__(
             hs.get_instance_name(),
-            current_token_without_instance(self.store.get_cache_stream_token),
+            self.store.get_cache_stream_token,
             self._update_function,
         )
 
