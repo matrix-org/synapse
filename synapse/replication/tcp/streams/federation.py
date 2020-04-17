@@ -15,7 +15,11 @@
 # limitations under the License.
 from collections import namedtuple
 
-from synapse.replication.tcp.streams._base import Stream, make_http_update_function
+from synapse.replication.tcp.streams._base import (
+    Stream,
+    current_token_without_instance,
+    make_http_update_function,
+)
 
 
 class FederationStream(Stream):
@@ -41,7 +45,9 @@ class FederationStream(Stream):
             # will be a real FederationSender, which has stubs for current_token and
             # get_replication_rows.)
             federation_sender = hs.get_federation_sender()
-            current_token = federation_sender.get_current_token
+            current_token = current_token_without_instance(
+                federation_sender.get_current_token
+            )
             update_function = federation_sender.get_replication_rows
 
         elif hs.should_send_federation():
@@ -58,7 +64,7 @@ class FederationStream(Stream):
         super().__init__(hs.get_instance_name(), current_token, update_function)
 
     @staticmethod
-    def _stub_current_token():
+    def _stub_current_token(instance_name: str) -> int:
         # dummy current-token method for use on workers
         return 0
 
