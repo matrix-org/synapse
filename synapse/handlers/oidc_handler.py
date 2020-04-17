@@ -120,7 +120,7 @@ class OidcHandler:
 
         metadata = await self.load_metadata()
         jwk_set = metadata.get("jwks")
-        if jwk_set:
+        if jwk_set is not None:
             return jwk_set
 
         uri = metadata.get("jwks_uri")
