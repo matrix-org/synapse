@@ -966,7 +966,7 @@ class E2eKeysHandler(object):
     def _get_e2e_cross_signing_verify_key(
         self, user_id: str, key_type: str, from_user_id: str = None
     ):
-        """Fetch or request the given cross-signing public key.
+        """Fetch locally or remotely query for a cross-signing public key.
 
         First, attempt to fetch the cross-signing public key from storage.
         If that fails, query the keys from the homeserver they belong to
