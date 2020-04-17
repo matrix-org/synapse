@@ -25,8 +25,6 @@ Each stream is defined by the following information:
     update_function:    The function that returns a list of updates between two tokens
 """
 
-from typing import Dict, Type
-
 from synapse.replication.tcp.streams._base import (
     AccountDataStream,
     BackfillStream,
@@ -67,8 +65,7 @@ STREAMS_MAP = {
         GroupServerStream,
         UserSignatureStream,
     )
-}  # type: Dict[str, Type[Stream]]
-
+}
 
 __all__ = [
     "STREAMS_MAP",
