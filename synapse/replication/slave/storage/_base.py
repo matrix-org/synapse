@@ -55,7 +55,7 @@ class BaseSlavedStore(CacheInvalidationWorkerStore):
         else:
             return 0
 
-    def process_replication_rows(self, stream_name, token, rows):
+    def process_replication_rows(self, instance_name, stream_name, token, rows):
         if stream_name == "caches":
             if self._cache_id_gen:
                 self._cache_id_gen.advance(token)

@@ -348,7 +348,9 @@ class ReplicationCommandHandler:
                     )
 
             # We've now caught up to position sent to us, notify handler.
-            await self._replication_data_handler.on_position(cmd.stream_name, cmd.token)
+            await self._replication_data_handler.on_position(
+                cmd.stream_name, cmd.instance_name, cmd.token
+            )
 
             self._streams_connected.add(cmd.stream_name)
 
