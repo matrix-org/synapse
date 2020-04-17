@@ -16,7 +16,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 from six import iteritems
 
@@ -24,6 +24,7 @@ import attr
 from canonicaljson import encode_canonical_json, json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
+from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
@@ -986,17 +987,21 @@ class E2eKeysHandler(object):
             SynapseError: if `user_id` is invalid
         """
         user = UserID.from_string(user_id)
+        key_id = None
+        verify_key = None
+
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
         )
 
-        # If we still can't find the key, and we're looking for keys of another user
-        # then attempt to fetch the missing key from the remote user's server.
+        # If we couldn't find the key locally, and we're looking for keys of
+        # another user then attempt to fetch the missing key from the remote
+        # user's server.
         #
         # We may run into this in possible edge cases where a user tries to
         # cross-sign a remote user, but does not share any rooms with them yet.
-        # Thus, we would not have their key list yet. We fetch the key here and
-        # store it just in case.
+        # Thus, we would not have their key list yet. We fetch the key here,
+        # store it and notify clients of new, associated device IDs.
         if (
             key is None
             and not self.is_mine(user)
@@ -1011,22 +1016,24 @@ class E2eKeysHandler(object):
             logger.debug("No %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
 
-        try:
-            key_id, verify_key = get_verify_key_from_cross_signing_key(key)
-        except ValueError as e:
-            logger.debug(
-                "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
-            )
-            raise SynapseError(
-                502, "Invalid %s key retrieved from remote server", key_type
-            )
+        # If we retrieved the keys remotely, these values will already be set
+        if key_id is None or verify_key is None:
+            try:
+                key_id, verify_key = get_verify_key_from_cross_signing_key(key)
+            except ValueError as e:
+                logger.debug(
+                    "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
+                )
+                raise SynapseError(
+                    502, "Invalid %s key retrieved from remote server", key_type
+                )
 
         return key, key_id, verify_key
 
     @defer.inlineCallbacks
     def _retrieve_cross_signing_keys_for_remote_user(
         self, user: UserID, desired_key_type: str,
-    ) -> Optional[Dict]:
+    ) -> Tuple[Optional[Dict], Optional[str], Optional[VerifyKey]]:
         """Queries cross-signing keys for a remote user and saves them to the database
 
         Only the key specified by `key_type` will be returned, while all retrieved keys
@@ -1037,7 +1044,8 @@ class E2eKeysHandler(object):
             desired_key_type: The type of key to receive. One of "master", "self_signing"
 
         Returns:
-            The retrieved key content, or None if the key could not be retrieved
+            A tuple of the retrieved key content, the key's ID and the matching VerifyKey.
+            If the key cannot be retrieved, all values in the tuple will instead be None.
         """
         try:
             remote_result = yield self.federation.query_user_devices(
@@ -1054,15 +1062,14 @@ class E2eKeysHandler(object):
             return None
 
         # Process each of the retrieved cross-signing keys
-        key = None
+        final_key = None
+        final_key_id = None
+        final_verify_key = None
+        device_ids = []
         for key_type in ["master", "self_signing"]:
             key_content = remote_result.get(key_type + "_key")
             if not key_content:
                 continue
-
-            # If this is the desired key type, return it
-            if key_type == desired_key_type:
-                key = key_content
 
             # At the same time, store this key in the db for
             # subsequent queries
@@ -1070,7 +1077,34 @@ class E2eKeysHandler(object):
                 user.to_string(), key_type, key_content
             )
 
-        return key
+            # Note down the device ID attached to this key
+            try:
+                # verify_key is a VerifyKey from signedjson, which uses
+                # .version to denote the portion of the key ID after the
+                # algorithm and colon, which is the device ID
+                key_id, verify_key = get_verify_key_from_cross_signing_key(key_content)
+            except ValueError as e:
+                logger.debug(
+                    "Invalid %s key retrieved: %s - %s %s",
+                    key_type,
+                    key_content,
+                    type(e),
+                    e,
+                )
+                continue
+            device_ids.append(verify_key.version)
+
+            # If this is the desired key type, save it and it's ID/VerifyKey
+            if key_type == desired_key_type:
+                final_key = key_content
+                final_verify_key = verify_key
+                final_key_id = key_id
+
+        # Notify clients that new devices for this user have been discovered
+        if device_ids:
+            yield self.device_handler.notify_device_update(user.to_string(), device_ids)
+
+        return final_key, final_key_id, final_verify_key
 
 
 def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
