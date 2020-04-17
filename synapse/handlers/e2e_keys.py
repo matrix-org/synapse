@@ -962,7 +962,7 @@ class E2eKeysHandler(object):
 
     @defer.inlineCallbacks
     def _get_e2e_cross_signing_verify_key(
-        self, user_id: str, desired_key_type: str, from_user_id:str = None
+        self, user_id: str, desired_key_type: str, from_user_id: str = None
     ):
         """Fetch or request the given cross-signing public key.
 
@@ -989,8 +989,7 @@ class E2eKeysHandler(object):
             user_id, desired_key_type, from_user_id
         )
 
-
-        # If we still can't find the key, and we're looking for keys of another user,
+        # If we still can't find the key, and we're looking for keys of another user
         # then attempt to fetch the missing key from the remote user's server.
         #
         # We may run into this in possible edge cases where a user tries to
@@ -1043,7 +1042,11 @@ class E2eKeysHandler(object):
             key_id, verify_key = get_verify_key_from_cross_signing_key(key)
         except ValueError as e:
             logger.debug(
-                "Invalid %s key retrieved: %s - %s %s", desired_key_type, key, type(e), e
+                "Invalid %s key retrieved: %s - %s %s",
+                desired_key_type,
+                key,
+                type(e),
+                e,
             )
             raise SynapseError(
                 502, "Invalid %s key retrieved from remote server", desired_key_type
