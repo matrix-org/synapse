@@ -224,12 +224,11 @@ class ContentRepositoryConfig(Config):
         #
         #media_storage_providers:
         #  - module: file_system
-        #    # Whether to write new local files.
+        #    # Whether to store newly uploaded local files
         #    store_local: false
-        #    # Whether to write new remote media
+        #    # Whether to store newly downloaded remote files
         #    store_remote: false
-        #    # Whether to block upload requests waiting for write to this
-        #    # provider to complete
+        #    # Whether to wait for successful storage for local uploads
         #    store_synchronous: false
         #    config:
         #       directory: /mnt/some/other/directory
