@@ -126,6 +126,21 @@ class StreamChangeCache(object):
         """
         assert type(stream_pos) is int
 
+        # sanity-check that we are not going to overwrite existing data.
+        current = self._cache.get(stream_pos)
+        if current is not None:
+            if current != entity:
+                logger.error(
+                    "Stream %s: %s has already changed at %s",
+                    self.name,
+                    current,
+                    stream_pos,
+                )
+                raise NotImplementedError(
+                    "more than one entity changing at a stream position"
+                )
+            return
+
         if stream_pos > self._earliest_known_stream_pos:
             old_pos = self._entity_to_key.get(entity, None)
             if old_pos is not None:

@@ -1,0 +1,1 @@
+Add a sanity-check in the StreamChangeCache to check that important data is not being overwritten.
