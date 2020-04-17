@@ -28,18 +28,26 @@ class StreamChangeCacheTests(unittest.TestCase):
         cache.entity_has_changed("user@foo.com", 6)
         cache.entity_has_changed("bar@baz.net", 7)
 
+        # also test multiple things changing on the same stream ID
+        cache.entity_has_changed("user2@foo.com", 8)
+        cache.entity_has_changed("bar2@baz.net", 8)
+
         # If it's been changed after that stream position, return True
         self.assertTrue(cache.has_entity_changed("user@foo.com", 4))
         self.assertTrue(cache.has_entity_changed("bar@baz.net", 4))
+        self.assertTrue(cache.has_entity_changed("bar2@baz.net", 4))
+        self.assertTrue(cache.has_entity_changed("user2@foo.com", 4))
 
         # If it's been changed at that stream position, return False
         self.assertFalse(cache.has_entity_changed("user@foo.com", 6))
+        self.assertFalse(cache.has_entity_changed("user2@foo.com", 8))
 
         # If there's no changes after that stream position, return False
         self.assertFalse(cache.has_entity_changed("user@foo.com", 7))
+        self.assertFalse(cache.has_entity_changed("user2@foo.com", 9))
 
         # If the entity does not exist, return False.
-        self.assertFalse(cache.has_entity_changed("not@here.website", 7))
+        self.assertFalse(cache.has_entity_changed("not@here.website", 9))
 
         # If we request before the stream cache's earliest known position,
         # return True, whether it's a known entity or not.
@@ -89,17 +97,51 @@ class StreamChangeCacheTests(unittest.TestCase):
 
         cache.entity_has_changed("user@foo.com", 2)
         cache.entity_has_changed("bar@baz.net", 3)
+        cache.entity_has_changed("anotheruser@foo.com", 3)
         cache.entity_has_changed("user@elsewhere.org", 4)
 
-        self.assertEqual(
-            cache.get_all_entities_changed(1),
-            ["user@foo.com", "bar@baz.net", "user@elsewhere.org"],
-        )
-        self.assertEqual(
-            cache.get_all_entities_changed(2), ["bar@baz.net", "user@elsewhere.org"]
-        )
+        r = cache.get_all_entities_changed(1)
+
+        # either of these are valid
+        ok1 = [
+            "user@foo.com",
+            "bar@baz.net",
+            "anotheruser@foo.com",
+            "user@elsewhere.org",
+        ]
+        ok2 = [
+            "user@foo.com",
+            "anotheruser@foo.com",
+            "bar@baz.net",
+            "user@elsewhere.org",
+        ]
+        self.assertTrue(r == ok1 or r == ok2)
+
+        r = cache.get_all_entities_changed(2)
+        self.assertTrue(r == ok1[1:] or r == ok2[1:])
+
         self.assertEqual(cache.get_all_entities_changed(3), ["user@elsewhere.org"])
         self.assertEqual(cache.get_all_entities_changed(0), None)
+
+        # ... later, things gest more updates
+        cache.entity_has_changed("user@foo.com", 5)
+        cache.entity_has_changed("bar@baz.net", 5)
+        cache.entity_has_changed("anotheruser@foo.com", 6)
+
+        ok1 = [
+            "user@elsewhere.org",
+            "user@foo.com",
+            "bar@baz.net",
+            "anotheruser@foo.com",
+        ]
+        ok2 = [
+            "user@elsewhere.org",
+            "bar@baz.net",
+            "user@foo.com",
+            "anotheruser@foo.com",
+        ]
+        r = cache.get_all_entities_changed(3)
+        self.assertTrue(r == ok1 or r == ok2)
 
     def test_has_any_entity_changed(self):
         """
