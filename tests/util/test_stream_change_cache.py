@@ -83,7 +83,7 @@ class StreamChangeCacheTests(unittest.TestCase):
             {"bar@baz.net", "user@elsewhere.org"}, set(cache._entity_to_key)
         )
         self.assertEqual(
-            cache.get_all_entities_changed(2), ["user@elsewhere.org", "bar@baz.net",],
+            cache.get_all_entities_changed(2), ["user@elsewhere.org", "bar@baz.net"],
         )
         self.assertIsNone(cache.get_all_entities_changed(1))
 
