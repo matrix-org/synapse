@@ -16,7 +16,6 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional, Tuple
 
 from six import iteritems
 
@@ -24,7 +23,6 @@ import attr
 from canonicaljson import encode_canonical_json, json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
-from signedjson.types import VerifyKey
 from unpaddedbase64 import decode_base64
 
 from twisted.internet import defer
@@ -1018,9 +1016,11 @@ class E2eKeysHandler(object):
             # We only get "master" and "self_signing" keys from remote servers
             and key_type in ["master", "self_signing"]
         ):
-            key, key_id, verify_key = yield self._retrieve_cross_signing_keys_for_remote_user(
-                user, key_type
-            )
+            (
+                key,
+                key_id,
+                verify_key,
+            ) = yield self._retrieve_cross_signing_keys_for_remote_user(user, key_type)
 
         if key is None:
             logger.debug("No %s key found for %s", key_type, user_id)
