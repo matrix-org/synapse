@@ -989,6 +989,7 @@ class E2eKeysHandler(object):
             user_id, desired_key_type, from_user_id
         )
 
+
         # If we still can't find the key, and we're looking for keys of another user,
         # then attempt to fetch the missing key from the remote user's server.
         #
@@ -996,19 +997,30 @@ class E2eKeysHandler(object):
         # cross-sign a remote user, but does not share any rooms with them yet.
         # Thus, we would not have their key list yet. We fetch the key here and
         # store it just in case.
+        supported_remote_key_types = ["master", "self_signing"]
         if (
             key is None
             and not self.is_mine(user)
             # We only get "master" and "self_signing" keys from remote servers
-            and desired_key_type in ["master", "self_signing"]
+            and desired_key_type in supported_remote_key_types
         ):
+            remote_result = None
             try:
                 remote_result = yield self.federation.query_user_devices(
                     user.domain, user_id
                 )
+            except Exception as e:
+                logger.warning(
+                    "Unable to query %s for cross-signing keys of user %s: %s %s",
+                    user.domain,
+                    user_id,
+                    type(e),
+                    e,
+                )
 
+            if remote_result is not None:
                 # Process each of the retrieved cross-signing keys
-                for key_type in ["master", "self_signing"]:
+                for key_type in supported_remote_key_types:
                     key_content = remote_result.get(key_type + "_key")
                     if not key_content:
                         continue
@@ -1022,14 +1034,6 @@ class E2eKeysHandler(object):
                     yield self.store.set_e2e_cross_signing_key(
                         user_id, key_type, key_content
                     )
-            except Exception as e:
-                logger.warning(
-                    "Unable to query %s for cross-signing keys of user %s: %s %s",
-                    user.domain,
-                    user_id,
-                    type(e),
-                    e,
-                )
 
         if key is None:
             logger.debug("No %s key found for %s", desired_key_type, user_id)
