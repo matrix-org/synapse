@@ -609,7 +609,10 @@ class AuthHandler(BaseHandler):
         The session can be used to track data across multiple requests, e.g. for
         interactive authentication.
         """
-        return self.sessions[session_id]
+        try:
+            return self.sessions[session_id]
+        except KeyError:
+            raise SynapseError(400, "Unknown session ID: %s" % session_id)
 
     async def get_access_token_for_user_id(
         self, user_id: str, device_id: Optional[str], valid_until_ms: Optional[int]
