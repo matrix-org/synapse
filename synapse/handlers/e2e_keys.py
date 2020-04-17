@@ -962,16 +962,18 @@ class E2eKeysHandler(object):
 
     @defer.inlineCallbacks
     def _get_e2e_cross_signing_verify_key(
-        self, user_id, desired_key_type, from_user_id=None
+        self, user_id: str, desired_key_type: str, from_user_id:str = None
     ):
-        """Fetch the cross-signing public key from storage and interpret it.
-        If we cannot find the public key locally, we query the keys from the
-        homeserver they belong to, then update our local copy.
+        """Fetch or request the given cross-signing public key.
+
+        First, attempt to fetch the cross-signing public key from storage.
+        If that fails, query the keys from the homeserver they belong to
+        and update our local copy.
 
         Args:
-            user_id (str): the user whose key should be fetched
-            desired_key_type (str): the type of key to fetch
-            from_user_id (str): the user that we are fetching the keys for.
+            user_id: the user whose key should be fetched
+            desired_key_type: the type of key to fetch
+            from_user_id: the user that we are fetching the keys for.
                 This affects what signatures are fetched.
 
         Returns:
@@ -1022,21 +1024,28 @@ class E2eKeysHandler(object):
                     )
             except Exception as e:
                 logger.warning(
-                    "Unable to query %s for cross-signing keys of user %s: %s",
+                    "Unable to query %s for cross-signing keys of user %s: %s %s",
                     user.domain,
                     user_id,
+                    type(e),
                     e,
                 )
 
         if key is None:
-            logger.debug("No %s key found for %s", key_type, user_id)
-            raise NotFoundError("No %s key found for %s" % (key_type, user_id))
+            logger.debug("No %s key found for %s", desired_key_type, user_id)
+            raise NotFoundError("No %s key found for %s" % (desired_key_type, user_id))
 
         try:
             key_id, verify_key = get_verify_key_from_cross_signing_key(key)
-            return key, key_id, verify_key
-        except ValueError:
-            raise SynapseError(502, "Invalid %s key retrieved from remote server")
+        except ValueError as e:
+            logger.debug(
+                "Invalid %s key retrieved: %s - %s %s", desired_key_type, key, type(e), e
+            )
+            raise SynapseError(
+                502, "Invalid %s key retrieved from remote server", desired_key_type
+            )
+
+        return key, key_id, verify_key
 
 
 def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
