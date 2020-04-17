@@ -51,6 +51,10 @@ class StreamChangeCache:
         # map from stream id to the entity which changed at that stream id.
         self._cache = SortedDict()  # type: SortedDict[int, EntityType]
 
+        # the earliest stream_pos for which we can reliably answer
+        # get_all_entities_changed. In other words, one less than the earliest
+        # stream_pos for which we know _cache is valid.
+        #
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
         self.metrics = caches.register_cache("cache", self.name, self._cache)

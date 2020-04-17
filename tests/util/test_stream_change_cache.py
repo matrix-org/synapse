@@ -47,7 +47,7 @@ class StreamChangeCacheTests(unittest.TestCase):
         self.assertTrue(cache.has_entity_changed("not@here.website", 0))
 
     @patch("synapse.util.caches.CACHE_SIZE_FACTOR", 1.0)
-    def test_has_entity_changed_pops_off_start(self):
+    def test_entity_has_changed_pops_off_start(self):
         """
         StreamChangeCache.entity_has_changed will respect the max size and
         purge the oldest items upon reaching that max size.
@@ -64,11 +64,20 @@ class StreamChangeCacheTests(unittest.TestCase):
         # The oldest item has been popped off
         self.assertTrue("user@foo.com" not in cache._entity_to_key)
 
+        self.assertEqual(
+            cache.get_all_entities_changed(2), ["bar@baz.net", "user@elsewhere.org"],
+        )
+        self.assertIsNone(cache.get_all_entities_changed(1))
+
         # If we update an existing entity, it keeps the two existing entities
         cache.entity_has_changed("bar@baz.net", 5)
         self.assertEqual(
             {"bar@baz.net", "user@elsewhere.org"}, set(cache._entity_to_key)
         )
+        self.assertEqual(
+            cache.get_all_entities_changed(2), ["user@elsewhere.org", "bar@baz.net",],
+        )
+        self.assertIsNone(cache.get_all_entities_changed(1))
 
     def test_get_all_entities_changed(self):
         """
