@@ -289,10 +289,14 @@ class AuthHandler(BaseHandler):
             if "session" in authdict:
                 sid = authdict["session"]
 
+        # Convert the URI and method to strings.
+        uri = request.uri.decode("utf-8")
+        method = request.uri.decode("utf-8")
+
         # If there's no session ID, create a new session.
         if not sid:
             session_id = await self.store.create_session(
-                clientdict, request.uri, request.method, description
+                clientdict, uri, method, description
             )
 
         else:
@@ -316,7 +320,7 @@ class AuthHandler(BaseHandler):
             # comparator based on the URI, method, and body (minus the auth dict)
             # and storing it during the initial query. Subsequent queries ensure
             # that this comparator has not changed.
-            comparator = (request.uri, request.method, clientdict)
+            comparator = (uri, method, clientdict)
             if (session["uri"], session["method"], session["clientdict"]) != comparator:
                 raise SynapseError(
                     403,

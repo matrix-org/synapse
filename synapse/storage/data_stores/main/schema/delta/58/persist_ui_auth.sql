@@ -15,7 +15,7 @@
 
 CREATE TABLE IF NOT EXISTS ui_auth_sessions(
     session_id TEXT NOT NULL,  -- The session ID passed to the client.
-    last_used BIGINT UNSIGNED NOT NULL,  -- The last time this session was seen.
+    last_used BIGINT NOT NULL,  -- The last time this session was seen.
     serverdict TEXT NOT NULL,  -- A JSON dictionary of arbitrary data added by Synapse.
     clientdict TEXT NOT NULL,  -- A JSON dictionary of arbitrary data from the client.
     uri TEXT NOT NULL,  -- The URI the UI authentication session is using.
