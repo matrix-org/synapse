@@ -14,6 +14,7 @@
 # limitations under the License.
 import json
 import logging
+from typing import Dict, List, Optional
 
 import pymacaroons
 from authlib.common.security import generate_token
@@ -22,6 +23,7 @@ from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
+from jinja2 import Template
 
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http.server import finish_request
@@ -34,8 +36,8 @@ SESSION_COOKIE_NAME = b"oidc_session"
 
 class OidcHandler:
     def __init__(self, hs):
-        self._callback_url = hs.config.oidc_callback_url
-        self._scopes = hs.config.oidc_scopes
+        self._callback_url: str = hs.config.oidc_callback_url
+        self._scopes: List[str] = hs.config.oidc_scopes
         self._client_auth = ClientAuth(
             hs.config.oidc_client_id, hs.config.oidc_client_secret
         )
@@ -45,10 +47,10 @@ class OidcHandler:
             token_endpoint=hs.config.oidc_token_endpoint,
             userinfo_endpoint=hs.config.oidc_userinfo_endpoint,
             jwks_uri=hs.config.oidc_jwks_uri,
-            response_type=hs.config.oidc_response_type,
         )
-        self._provider_needs_discovery = hs.config.oidc_discover
-        self._mapping_templates = hs.config.oidc_mapping_templates
+        self._response_type = hs.config.oidc_response_type
+        self._provider_needs_discovery: bool = hs.config.oidc_discover
+        self._mapping_templates: Dict[str, Template] = hs.config.oidc_mapping_templates
 
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
@@ -56,7 +58,7 @@ class OidcHandler:
         self._datastore = hs.get_datastore()
         self._macaroon_generator = hs.get_macaroon_generator()
         self._clock = hs.get_clock()
-        self._hostname = hs.hostname
+        self._hostname: str = hs.hostname
         self._macaroon_secret_key = hs.config.macaroon_secret_key
 
         # identifier for the external_ids table
@@ -71,7 +73,7 @@ class OidcHandler:
         if "response_types_supported" in m:
             m.validate_response_types_supported()
 
-            if m["response_type"] not in m["response_types_supported"]:
+            if self._response_type not in m["response_types_supported"]:
                 raise ValueError(
                     '%r not in "response_types_supported" (%r)'
                     % (self._response_type, m["response_types_supported"])
@@ -92,11 +94,8 @@ class OidcHandler:
                     raise ValueError('"jwks_uri" must be set')
 
     @property
-    def _uses_userinfo(self):
-        return (
-            "openid" not in self._scopes
-            or self._provider_metadata["response_type"] == "access"
-        )
+    def _uses_userinfo(self) -> bool:
+        return "openid" not in self._scopes or self._response_type == "token"
 
     async def load_metadata(self) -> OpenIDProviderMetadata:
         # If we are using the OpenID Discovery documents, it needs to be loaded once
@@ -112,11 +111,11 @@ class OidcHandler:
 
         return self._provider_metadata
 
-    async def load_jwks(self):
+    async def load_jwks(self) -> Dict[str, List[Dict[str, str]]]:
         # FIXME: this should be periodically reloaded to support key rotation
         if self._uses_userinfo:
             # We're not using jwt signing, return an empty jwk set
-            return []
+            return {"keys": []}
 
         metadata = await self.load_metadata()
         jwk_set = metadata.get("jwks")
@@ -131,7 +130,7 @@ class OidcHandler:
         self._provider_metadata["jwks"] = jwk_set
         return jwk_set
 
-    async def _exchange_code(self, code):
+    async def _exchange_code(self, code: str) -> Dict[str, str]:
         metadata = await self.load_metadata()
         token_endpoint = metadata.get("token_endpoint")
         args = {
@@ -158,7 +157,7 @@ class OidcHandler:
         description = resp.get("error_description", error)
         raise SynapseError(400, "{}: {}".format(error, description))
 
-    async def _parse_id_token(self, token, nonce):
+    async def _parse_id_token(self, token: Dict[str, str], nonce: str) -> UserInfo:
         """Return an instance of UserInfo from token's ``id_token``."""
         metadata = await self.load_metadata()
         claims_params = {
@@ -187,23 +186,23 @@ class OidcHandler:
         claims.validate(leeway=120)  # allows 2 min of clock skew
         return UserInfo(claims)
 
-    async def handle_redirect_request(self, request, client_redirect_url):
+    async def handle_redirect_request(self, request, client_redirect_url: bytes) -> str:
         """Handle an incoming request to /login/sso/redirect
 
         Args:
+            request (SynapseRequest)
             client_redirect_url (bytes): the URL that we should redirect the
                 client to when everything is done
 
         Returns:
-            bytes: URL to redirect to
+            str: URL to redirect to
         """
 
         state = generate_token()
         nonce = generate_token()
-        client_redirect_url = client_redirect_url.decode()
 
         cookie = self._macaroon_generator.generate_oidc_session_token(
-            state=state, nonce=nonce, client_redirect_url=client_redirect_url,
+            state=state, nonce=nonce, client_redirect_url=client_redirect_url.decode(),
         )
         request.addCookie(
             SESSION_COOKIE_NAME,
@@ -289,29 +288,25 @@ class OidcHandler:
         try:
             user_id = await self._map_userinfo_to_user(userinfo)
         except Exception as e:
-            # If decoding the response or mapping it to a user failed, then log the
-            # error and tell the user that something went wrong.
+            # TODO: show nicer errors
             logger.error(e)
 
             request.setResponseCode(400)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(
-                b"Content-Length", b"%d" % (len(self._error_html_content),)
-            )
-            request.write(self._error_html_content.encode("utf8"))
+            request.setHeader(b"Content-Type", b"text/plain; charset=utf-8")
+            request.write(str(e))
             finish_request(request)
             return
 
         self._auth_handler.complete_sso_login(user_id, request, client_redirect_url)
 
-    def _get_value_from_macaroon(self, macaroon, key):
+    def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str):
         prefix = key + " = "
         for caveat in macaroon.caveats:
             if caveat.caveat_id.startswith(prefix):
                 return caveat.caveat_id[len(prefix) :]
         raise Exception("No %s caveat in macaroon" % (key,))
 
-    def _verify_expiry(self, caveat):
+    def _verify_expiry(self, caveat: str):
         prefix = "time < "
         if not caveat.startswith(prefix):
             return False
@@ -319,7 +314,7 @@ class OidcHandler:
         now = self._clock.time_msec()
         return now < expiry
 
-    async def _map_userinfo_to_user(self, userinfo: UserInfo):
+    async def _map_userinfo_to_user(self, userinfo: UserInfo) -> str:
         remote_user_id = userinfo.get("sub")
         if remote_user_id is None:
             raise Exception("Failed to extract subject from OIDC response")
@@ -346,7 +341,7 @@ class OidcHandler:
         localpart = map_username_to_mxid_localpart(localpart)
 
         # render the display_name template, fallback to None
-        displayname = (
+        displayname: Optional[str] = (
             self._mapping_templates["display_name"].render(user=userinfo).strip()
         )
         if displayname == "":
@@ -355,7 +350,7 @@ class OidcHandler:
         user_id = UserID(localpart, self._hostname)
         if await self._datastore.get_users_by_id_case_insensitive(user_id.to_string()):
             # This mxid is taken
-            raise Exception("mxid '{}' is already taken".format(UserID.to_string()))
+            raise Exception("mxid '{}' is already taken".format(user_id.to_string()))
 
         registered_user_id = await self._registration_handler.register_user(
             localpart=localpart, default_display_name=displayname,
