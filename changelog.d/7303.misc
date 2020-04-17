@@ -1,0 +1,1 @@
+Fix StreamChangeCache to work with multiple entities changing on the same stream id.
