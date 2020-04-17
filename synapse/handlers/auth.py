@@ -51,31 +51,6 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-SUCCESS_TEMPLATE = """
-<html>
-<head>
-<title>Success!</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-if (window.onAuthDone) {
-    window.onAuthDone();
-} else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
-}
-</script>
-</head>
-<body>
-    <div>
-        <p>Thank you</p>
-        <p>You may now close this window and return to the application</p>
-    </div>
-</body>
-</html>
-"""
-
-
 class AuthHandler(BaseHandler):
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
@@ -159,6 +134,11 @@ class AuthHandler(BaseHandler):
         self._sso_auth_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
         )[0]
+        # The following template is shown after a successful user interactive
+        # authentication session. It tells the user they can close the window.
+        self._sso_auth_success_template = hs.config.sso_auth_success_template
+        # The following template is shown during the SSO authentication process if
+        # the account is deactivated.
         self._sso_account_deactivated_template = (
             hs.config.sso_account_deactivated_template
         )
@@ -1080,7 +1060,7 @@ class AuthHandler(BaseHandler):
         self._save_session(sess)
 
         # Render the HTML and return.
-        html_bytes = SUCCESS_TEMPLATE.encode("utf8")
+        html_bytes = self._sso_auth_success_template.encode("utf-8")
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
         request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
@@ -1106,12 +1086,12 @@ class AuthHandler(BaseHandler):
         # flow.
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
-            html = self._sso_account_deactivated_template.encode("utf-8")
+            html_bytes = self._sso_account_deactivated_template.encode("utf-8")
 
             request.setResponseCode(403)
             request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html),))
-            request.write(html)
+            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+            request.write(html_bytes)
             finish_request(request)
             return
 
@@ -1153,7 +1133,7 @@ class AuthHandler(BaseHandler):
         # URL we redirect users to.
         redirect_url_no_params = client_redirect_url.split("?")[0]
 
-        html = self._sso_redirect_confirm_template.render(
+        html_bytes = self._sso_redirect_confirm_template.render(
             display_url=redirect_url_no_params,
             redirect_url=redirect_url,
             server_name=self._server_name,
@@ -1161,8 +1141,8 @@ class AuthHandler(BaseHandler):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html),))
-        request.write(html)
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+        request.write(html_bytes)
         finish_request(request)
 
     @staticmethod
