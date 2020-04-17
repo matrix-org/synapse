@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Collection, Dict, Iterable, Mapping, Optional, Set
 
 from six import integer_types
 
@@ -23,8 +24,11 @@ from synapse.util import caches
 
 logger = logging.getLogger(__name__)
 
+# for now, assume all entities in the cache are strings
+EntityType = str
 
-class StreamChangeCache(object):
+
+class StreamChangeCache:
     """Keeps track of the stream positions of the latest change in a set of entities.
 
     Typically the entity will be a room or user id.
@@ -34,10 +38,19 @@ class StreamChangeCache(object):
     old then the cache will simply return all given entities.
     """
 
-    def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache=None):
+    def __init__(
+        self,
+        name: str,
+        current_stream_pos: int,
+        max_size=10000,
+        prefilled_cache: Optional[Mapping[EntityType, int]] = None,
+    ):
         self._max_size = int(max_size * caches.CACHE_SIZE_FACTOR)
-        self._entity_to_key = {}
-        self._cache = SortedDict()
+        self._entity_to_key = {}  # type: Dict[EntityType, int]
+
+        # map from stream id to the entity which changed at that stream id.
+        self._cache = SortedDict()  # type: SortedDict[int, EntityType]
+
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
         self.metrics = caches.register_cache("cache", self.name, self._cache)
@@ -46,7 +59,7 @@ class StreamChangeCache(object):
             for entity, stream_pos in prefilled_cache.items():
                 self.entity_has_changed(entity, stream_pos)
 
-    def has_entity_changed(self, entity, stream_pos):
+    def has_entity_changed(self, entity: EntityType, stream_pos: int) -> bool:
         """Returns True if the entity may have been updated since stream_pos
         """
         assert type(stream_pos) in integer_types
@@ -67,7 +80,9 @@ class StreamChangeCache(object):
         self.metrics.inc_hits()
         return False
 
-    def get_entities_changed(self, entities, stream_pos):
+    def get_entities_changed(
+        self, entities: Iterable[EntityType], stream_pos: int
+    ) -> Set[EntityType]:
         """
         Returns subset of entities that have had new things since the given
         position.  Entities unknown to the cache will be returned.  If the
@@ -90,7 +105,7 @@ class StreamChangeCache(object):
 
         return result
 
-    def has_any_entity_changed(self, stream_pos):
+    def has_any_entity_changed(self, stream_pos: int) -> bool:
         """Returns if any entity has changed
         """
         assert type(stream_pos) is int
@@ -106,7 +121,9 @@ class StreamChangeCache(object):
             self.metrics.inc_misses()
             return True
 
-    def get_all_entities_changed(self, stream_pos):
+    def get_all_entities_changed(
+        self, stream_pos: int
+    ) -> Optional[Collection[EntityType]]:
         """Returns all entites that have had new things since the given
         position. If the position is too old it will return None.
         """
@@ -120,7 +137,7 @@ class StreamChangeCache(object):
         else:
             return None
 
-    def entity_has_changed(self, entity, stream_pos):
+    def entity_has_changed(self, entity: EntityType, stream_pos: int) -> None:
         """Informs the cache that the entity has been changed at the given
         position.
         """
@@ -141,7 +158,7 @@ class StreamChangeCache(object):
                 )
                 self._entity_to_key.pop(r, None)
 
-    def get_max_pos_of_last_change(self, entity):
+    def get_max_pos_of_last_change(self, entity: EntityType) -> int:
         """Returns an upper bound of the stream id of the last change to an
         entity.
         """
