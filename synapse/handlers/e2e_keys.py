@@ -987,12 +987,22 @@ class E2eKeysHandler(object):
             SynapseError: if `user_id` is invalid
         """
         user = UserID.from_string(user_id)
+
         key_id = None
         verify_key = None
-
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
         )
+        if key is not None:
+            try:
+                key_id, verify_key = get_verify_key_from_cross_signing_key(key)
+            except ValueError as e:
+                logger.warning(
+                    "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
+                )
+                raise SynapseError(
+                    502, "Invalid %s key retrieved from database" % (key_type,)
+                )
 
         # If we couldn't find the key locally, and we're looking for keys of
         # another user then attempt to fetch the missing key from the remote
@@ -1008,7 +1018,7 @@ class E2eKeysHandler(object):
             # We only get "master" and "self_signing" keys from remote servers
             and key_type in ["master", "self_signing"]
         ):
-            key = yield self._retrieve_cross_signing_keys_for_remote_user(
+            key, key_id, verify_key = yield self._retrieve_cross_signing_keys_for_remote_user(
                 user, key_type
             )
 
@@ -1016,24 +1026,12 @@ class E2eKeysHandler(object):
             logger.debug("No %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
 
-        # If we retrieved the keys remotely, these values will already be set
-        if key_id is None or verify_key is None:
-            try:
-                key_id, verify_key = get_verify_key_from_cross_signing_key(key)
-            except ValueError as e:
-                logger.debug(
-                    "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
-                )
-                raise SynapseError(
-                    502, "Invalid %s key retrieved from remote server", key_type
-                )
-
         return key, key_id, verify_key
 
     @defer.inlineCallbacks
     def _retrieve_cross_signing_keys_for_remote_user(
         self, user: UserID, desired_key_type: str,
-    ) -> Tuple[Optional[Dict], Optional[str], Optional[VerifyKey]]:
+    ):
         """Queries cross-signing keys for a remote user and saves them to the database
 
         Only the key specified by `key_type` will be returned, while all retrieved keys
@@ -1044,7 +1042,8 @@ class E2eKeysHandler(object):
             desired_key_type: The type of key to receive. One of "master", "self_signing"
 
         Returns:
-            A tuple of the retrieved key content, the key's ID and the matching VerifyKey.
+            Deferred[Tuple[Optional[Dict], Optional[str], Optional[VerifyKey]]]: A tuple
+            of the retrieved key content, the key's ID and the matching VerifyKey.
             If the key cannot be retrieved, all values in the tuple will instead be None.
         """
         try:
@@ -1059,7 +1058,7 @@ class E2eKeysHandler(object):
                 type(e),
                 e,
             )
-            return None
+            return None, None, None
 
         # Process each of the retrieved cross-signing keys
         final_key = None
@@ -1084,8 +1083,9 @@ class E2eKeysHandler(object):
                 # algorithm and colon, which is the device ID
                 key_id, verify_key = get_verify_key_from_cross_signing_key(key_content)
             except ValueError as e:
-                logger.debug(
-                    "Invalid %s key retrieved: %s - %s %s",
+                logger.warning(
+                    "Invalid %s key retrieved from remote %s: %s - %s %s",
+                    user.domain,
                     key_type,
                     key_content,
                     type(e),
@@ -1094,7 +1094,7 @@ class E2eKeysHandler(object):
                 continue
             device_ids.append(verify_key.version)
 
-            # If this is the desired key type, save it and it's ID/VerifyKey
+            # If this is the desired key type, save it and its ID/VerifyKey
             if key_type == desired_key_type:
                 final_key = key_content
                 final_verify_key = verify_key
