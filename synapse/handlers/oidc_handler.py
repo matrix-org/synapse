@@ -348,9 +348,9 @@ class OidcHandler:
         localpart = map_username_to_mxid_localpart(localpart)
 
         # render the display_name template, fallback to None
-        displayname: Optional[str] = (
+        displayname = (
             self._mapping_templates["display_name"].render(user=userinfo).strip()
-        )
+        )  # Optional[str]
         if displayname == "":
             displayname = None
 
