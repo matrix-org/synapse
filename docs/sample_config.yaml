@@ -1505,6 +1505,12 @@ oidc_config:
     #
     #response_type: "code"
 
+    # skip metadata verification. Defaults to false.
+    # Use this if you are connecting to a provider that is not OpenID Connect compliant.
+    # Avoid this in production.
+    #
+    #skip_verification: false
+
     # defines how the user info from the OIDC provider are mapped to user properties.
     # Those are Jinja2 templates, where the userinfo object is available through the `user` variable.
     #

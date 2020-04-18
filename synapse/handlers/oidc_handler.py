@@ -36,21 +36,24 @@ SESSION_COOKIE_NAME = b"oidc_session"
 
 class OidcHandler:
     def __init__(self, hs):
-        self._callback_url: str = hs.config.oidc_callback_url
-        self._scopes: List[str] = hs.config.oidc_scopes
+        self._callback_url = hs.config.oidc_callback_url  # type: str
+        self._scopes = hs.config.oidc_scopes  # type: List[str]
         self._client_auth = ClientAuth(
             hs.config.oidc_client_id, hs.config.oidc_client_secret
-        )
+        )  # type: ClientAuth
+        self._response_type = hs.config.oidc_response_type  # type: str
         self._provider_metadata = OpenIDProviderMetadata(
             issuer=hs.config.oidc_issuer,
             authorization_endpoint=hs.config.oidc_authorization_endpoint,
             token_endpoint=hs.config.oidc_token_endpoint,
             userinfo_endpoint=hs.config.oidc_userinfo_endpoint,
             jwks_uri=hs.config.oidc_jwks_uri,
-        )
-        self._response_type = hs.config.oidc_response_type
-        self._provider_needs_discovery: bool = hs.config.oidc_discover
-        self._mapping_templates: Dict[str, Template] = hs.config.oidc_mapping_templates
+        )  # type: OpenIDProviderMetadata
+        self._provider_needs_discovery = hs.config.oidc_discover  # type: bool
+        self._mapping_templates = (
+            hs.config.oidc_mapping_templates
+        )  # type: Dict[str, Template]
+        self._skip_verification = hs.config.oidc_skip_verification  # type: bool
 
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
@@ -58,13 +61,17 @@ class OidcHandler:
         self._datastore = hs.get_datastore()
         self._macaroon_generator = hs.get_macaroon_generator()
         self._clock = hs.get_clock()
-        self._hostname: str = hs.hostname
+        self._hostname = hs.hostname  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
 
         # identifier for the external_ids table
         self._auth_provider_id = "oidc"
 
     def _validate_metadata(self):
+        # Skip verification to allow non-compliant providers (e.g. issuers not running on a secure origin)
+        if self._skip_verification is True:
+            return
+
         m = self._provider_metadata
         m.validate_issuer()
         m.validate_authorization_endpoint()

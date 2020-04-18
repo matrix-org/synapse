@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from contextlib import contextmanager
 from urllib.parse import parse_qs, urlparse
 
 from mock import Mock
@@ -79,6 +80,22 @@ async def get_json(url):
         return get_metadata()
     elif url == JWKS_URI:
         return get_jwks()
+
+
+@contextmanager
+def metadata_edit(handler, values):
+    # Temporarily edits the provider metadata
+    meta = handler._provider_metadata
+    saved = {}
+
+    for (key, value) in values.items():
+        saved[key] = meta[key]
+        meta[key] = value
+
+    yield
+
+    for (key, value) in values.items():
+        meta[key] = saved[key]
 
 
 class OidcHandlerTestCase(HomeserverTestCase):
@@ -148,6 +165,62 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.reset_mock()
         yield defer.ensureDeferred(self.handler.load_jwks())
         self.http_client.get_json.assert_not_called()
+
+    @override_config({"oidc_config": COMMON_CONFIG})
+    def test_validate_config(self):
+        h = self.handler
+
+        # Default test config does not throw
+        h._validate_metadata()
+
+        with metadata_edit(h, {"issuer": None}):
+            self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
+
+        with metadata_edit(h, {"issuer": "http://insecure/"}):
+            self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
+
+        with metadata_edit(h, {"issuer": "https://invalid/?because=query"}):
+            self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
+
+        with metadata_edit(h, {"authorization_endpoint": None}):
+            self.assertRaisesRegex(
+                ValueError, "authorization_endpoint", h._validate_metadata
+            )
+
+        with metadata_edit(h, {"authorization_endpoint": "http://insecure/auth"}):
+            self.assertRaisesRegex(
+                ValueError, "authorization_endpoint", h._validate_metadata
+            )
+
+        with metadata_edit(h, {"token_endpoint": None}):
+            self.assertRaisesRegex(ValueError, "token_endpoint", h._validate_metadata)
+
+        with metadata_edit(h, {"token_endpoint": "http://insecure/token"}):
+            self.assertRaisesRegex(ValueError, "token_endpoint", h._validate_metadata)
+
+        with metadata_edit(h, {"jwks_uri": None}):
+            self.assertRaisesRegex(ValueError, "jwks_uri", h._validate_metadata)
+
+        with metadata_edit(h, {"jwks_uri": "http://insecure/jwks.json"}):
+            self.assertRaisesRegex(ValueError, "jwks_uri", h._validate_metadata)
+
+        # Tests for configs that the userinfo endpoint
+        self.assertFalse(h._uses_userinfo)
+        h._scopes = []  # do not request the openid scope
+        self.assertTrue(h._uses_userinfo)
+        self.assertRaisesRegex(ValueError, "userinfo_endpoint", h._validate_metadata)
+
+        with metadata_edit(
+            h, {"userinfo_endpoint": USERINFO_ENDPOINT, "jwks_uri": None}
+        ):
+            # Shouldn't raise with a valid userinfo, even without
+            h._validate_metadata()
+
+    @override_config({"oidc_config": {"skip_verification": True}})
+    def test_skip_verification(self):
+        with metadata_edit(self.handler, {"issuer": "http://insecure"}):
+            # This should not throw
+            self.handler._validate_metadata()
 
     @defer.inlineCallbacks
     def test_redirect_request(self):
