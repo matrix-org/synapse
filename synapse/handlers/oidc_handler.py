@@ -14,7 +14,7 @@
 # limitations under the License.
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import pymacaroons
 from authlib.common.security import generate_token
@@ -41,7 +41,7 @@ class OidcHandler:
         self._client_auth = ClientAuth(
             hs.config.oidc_client_id, hs.config.oidc_client_secret
         )  # type: ClientAuth
-        self._response_type = hs.config.oidc_response_type  # type: str
+        self._subject_claim = hs.config.oidc_subject_claim
         self._provider_metadata = OpenIDProviderMetadata(
             issuer=hs.config.oidc_issuer,
             authorization_endpoint=hs.config.oidc_authorization_endpoint,
@@ -80,10 +80,10 @@ class OidcHandler:
         if "response_types_supported" in m:
             m.validate_response_types_supported()
 
-            if self._response_type not in m["response_types_supported"]:
+            if "code" not in m["response_types_supported"]:
                 raise ValueError(
-                    '%r not in "response_types_supported" (%r)'
-                    % (self._response_type, m["response_types_supported"])
+                    '"code" not in "response_types_supported" (%r)'
+                    % (m["response_types_supported"],)
                 )
 
         # If the openid scope was not requested, we need a userinfo endpoint to fetch user infos
@@ -102,7 +102,8 @@ class OidcHandler:
 
     @property
     def _uses_userinfo(self) -> bool:
-        return "openid" not in self._scopes or self._response_type == "token"
+        # Maybe that should be user-configurable and not infered?
+        return "openid" not in self._scopes
 
     async def load_metadata(self) -> OpenIDProviderMetadata:
         # If we are using the OpenID Discovery documents, it needs to be loaded once
@@ -145,10 +146,13 @@ class OidcHandler:
             "code": code,
             "redirect_uri": self._callback_url,
         }
+
+        # TODO: support client_secret_post
         uri, headers, body = self._client_auth.prepare(
             method="POST", uri=token_endpoint, headers={}, body=""
         )
         headers = {k: [v] for (k, v) in headers.items()}
+        headers["Accept"] = ["application/json"]
 
         try:
             resp = await self._http_client.post_urlencoded_get_json(
@@ -163,6 +167,20 @@ class OidcHandler:
         error = resp["error"]
         description = resp.get("error_description", error)
         raise SynapseError(400, "{}: {}".format(error, description))
+
+    async def _fetch_userinfo(self, token: Dict[str, str]) -> UserInfo:
+        metadata = await self.load_metadata()
+
+        resp = await self._http_client.get_json(
+            metadata["userinfo_endpoint"],
+            headers={
+                "Authorization": ["Bearer {}".format(token["access_token"])],
+                "Accept": ["application/json"],
+            },
+        )
+        logger.info(resp)
+
+        return UserInfo(resp)
 
     async def _parse_id_token(self, token: Dict[str, str], nonce: str) -> UserInfo:
         """Return an instance of UserInfo from token's ``id_token``."""
@@ -221,11 +239,10 @@ class OidcHandler:
 
         metadata = await self.load_metadata()
         authorization_endpoint = metadata.get("authorization_endpoint")
-        response_type = metadata.get("response_type", "code")
         return prepare_grant_uri(
             authorization_endpoint,
             client_id=self._client_auth.client_id,
-            response_type=response_type,
+            response_type="code",
             redirect_uri=self._callback_url,
             scope=self._scopes,
             state=state,
@@ -282,15 +299,14 @@ class OidcHandler:
             macaroon, "client_redirect_url"
         )
 
-        # TODO: support other flows?
+        # TODO: error handling if the code is not present
         code = request.args[b"code"][0]
         token = await self._exchange_code(code)
 
-        if "id_token" not in token:
-            # TODO: fetch user infos using the userinfo endpoint when the id_token is not present
-            raise SynapseError(400, "OP did not return id_token")
-
-        userinfo = await self._parse_id_token(token, nonce=nonce)
+        if self._uses_userinfo:
+            userinfo = await self._fetch_userinfo(token)
+        else:
+            userinfo = await self._parse_id_token(token, nonce=nonce)
 
         try:
             user_id = await self._map_userinfo_to_user(userinfo)
@@ -322,7 +338,7 @@ class OidcHandler:
         return now < expiry
 
     async def _map_userinfo_to_user(self, userinfo: UserInfo) -> str:
-        remote_user_id = userinfo.get("sub")
+        remote_user_id = userinfo.get(self._subject_claim)
         if remote_user_id is None:
             raise Exception("Failed to extract subject from OIDC response")
 

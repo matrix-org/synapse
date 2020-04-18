@@ -63,7 +63,7 @@ class OIDCConfig(Config):
         self.oidc_token_endpoint = oidc_config.get("token_endpoint")
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
-        self.oidc_response_type = oidc_config.get("response_type", "code")
+        self.oidc_subject_claim = oidc_config.get("subject_claim", "sub")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
 
         templates_config = oidc_config.get("mapping_templates", {})
@@ -138,15 +138,16 @@ class OIDCConfig(Config):
             #
             #jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
 
-            # response type to use. For now, only "code" is supported. Defaults to "code".
-            #
-            #response_type: "code"
-
             # skip metadata verification. Defaults to false.
             # Use this if you are connecting to a provider that is not OpenID Connect compliant.
             # Avoid this in production.
             #
             #skip_verification: false
+
+            # name of the claim containing a unique identifier for the user.
+            # OpenID Connect compliant providers should provide a `sub` claim for that.
+            #
+            #subject_claim: "sub"
 
             # defines how the user info from the OIDC provider are mapped to user properties.
             # Those are Jinja2 templates, where the userinfo object is available through the `user` variable.
