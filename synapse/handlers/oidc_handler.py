@@ -15,6 +15,7 @@
 import json
 import logging
 from typing import Dict, List
+from urllib.parse import parse_qsl
 
 import pymacaroons
 from authlib.common.security import generate_token
@@ -39,7 +40,9 @@ class OidcHandler:
         self._callback_url = hs.config.oidc_callback_url  # type: str
         self._scopes = hs.config.oidc_scopes  # type: List[str]
         self._client_auth = ClientAuth(
-            hs.config.oidc_client_id, hs.config.oidc_client_secret
+            hs.config.oidc_client_id,
+            hs.config.oidc_client_secret,
+            hs.config.oidc_client_auth_method,
         )  # type: ClientAuth
         self._subject_claim = hs.config.oidc_subject_claim
         self._provider_metadata = OpenIDProviderMetadata(
@@ -147,11 +150,12 @@ class OidcHandler:
             "redirect_uri": self._callback_url,
         }
 
-        # TODO: support client_secret_post
         uri, headers, body = self._client_auth.prepare(
             method="POST", uri=token_endpoint, headers={}, body=""
         )
         headers = {k: [v] for (k, v) in headers.items()}
+        qs = parse_qsl(body, keep_blank_values=True)
+        args.update(qs)
 
         try:
             resp = await self._http_client.post_urlencoded_get_json(
@@ -174,7 +178,6 @@ class OidcHandler:
             metadata["userinfo_endpoint"],
             headers={"Authorization": ["Bearer {}".format(token["access_token"])]},
         )
-        logger.info(resp)
 
         return UserInfo(resp)
 

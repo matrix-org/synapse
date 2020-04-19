@@ -58,6 +58,9 @@ class OIDCConfig(Config):
         self.oidc_issuer = oidc_config["issuer"]
         self.oidc_client_id = oidc_config["client_id"]
         self.oidc_client_secret = oidc_config["client_secret"]
+        self.oidc_client_auth_method = oidc_config.get(
+            "client_auth_method", "client_auth_basic"
+        )
         self.oidc_scopes = oidc_config.get("scopes", ["openid"])
         self.oidc_authorization_endpoint = oidc_config.get("authorization_endpoint")
         self.oidc_token_endpoint = oidc_config.get("token_endpoint")
@@ -117,6 +120,11 @@ class OIDCConfig(Config):
             # oauth2 client secret to use. Required.
             #
             #client_secret: "provided-by-your-issuer"
+
+            # auth method to use when exchanging the token.
+            # Valid values are "client_secret_basic" (default), "client_secret_post" and "none".
+            #
+            #client_auth_method: "client_auth_basic"
 
             # list of scopes to ask. This should include the "openid" scope. Defaults to ["openid"].
             #
