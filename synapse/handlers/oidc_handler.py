@@ -152,7 +152,6 @@ class OidcHandler:
             method="POST", uri=token_endpoint, headers={}, body=""
         )
         headers = {k: [v] for (k, v) in headers.items()}
-        headers["Accept"] = ["application/json"]
 
         try:
             resp = await self._http_client.post_urlencoded_get_json(
@@ -173,10 +172,7 @@ class OidcHandler:
 
         resp = await self._http_client.get_json(
             metadata["userinfo_endpoint"],
-            headers={
-                "Authorization": ["Bearer {}".format(token["access_token"])],
-                "Accept": ["application/json"],
-            },
+            headers={"Authorization": ["Bearer {}".format(token["access_token"])]},
         )
         logger.info(resp)
 

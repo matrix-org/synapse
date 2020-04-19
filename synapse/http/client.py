@@ -359,6 +359,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/x-www-form-urlencoded"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -399,6 +400,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/json"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -434,6 +436,10 @@ class SimpleHttpClient(object):
 
             ValueError: if the response was not JSON
         """
+        actual_headers = {b"Accept": [b"application/json"]}
+        if headers:
+            actual_headers.update(headers)
+
         body = yield self.get_raw(uri, args, headers=headers)
         return json.loads(body)
 
@@ -467,6 +473,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/json"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
