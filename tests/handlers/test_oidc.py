@@ -161,10 +161,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
         self.assertEqual(jwks, {"keys": []})
 
-        # subsequent calls should be cached
+        # subsequent calls should be cached…
         self.http_client.reset_mock()
         yield defer.ensureDeferred(self.handler.load_jwks())
         self.http_client.get_json.assert_not_called()
+
+        # …unless forced
+        self.http_client.reset_mock()
+        yield defer.ensureDeferred(self.handler.load_jwks(force=True))
+        self.http_client.get_json.assert_called_once_with(JWKS_URI)
 
     @override_config({"oidc_config": COMMON_CONFIG})
     def test_validate_config(self):

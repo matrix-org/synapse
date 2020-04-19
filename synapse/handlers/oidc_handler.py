@@ -122,15 +122,14 @@ class OidcHandler:
 
         return self._provider_metadata
 
-    async def load_jwks(self) -> Dict[str, List[Dict[str, str]]]:
-        # FIXME: this should be periodically reloaded to support key rotation
+    async def load_jwks(self, force=False) -> Dict[str, List[Dict[str, str]]]:
         if self._uses_userinfo:
             # We're not using jwt signing, return an empty jwk set
             return {"keys": []}
 
         metadata = await self.load_metadata()
         jwk_set = metadata.get("jwks")
-        if jwk_set is not None:
+        if jwk_set is not None and not force:
             return jwk_set
 
         uri = metadata.get("jwks_uri")
@@ -198,14 +197,28 @@ class OidcHandler:
 
         jwt = JsonWebToken(alg_values)
 
+        claim_options = {"iss": {"values": [metadata["issuer"]]}}
+
+        # Try to decode the keys in cache first, then retry by forcing the keys
+        # to be reloaded
         jwk_set = await self.load_jwks()
-        claims = jwt.decode(
-            token["id_token"],
-            key=jwk_set,
-            claims_cls=claims_cls,
-            claims_options={"iss": {"values": [metadata["issuer"]]}},
-            claims_params=claims_params,
-        )
+        try:
+            claims = jwt.decode(
+                token["id_token"],
+                key=jwk_set,
+                claims_cls=claims_cls,
+                claims_options=claim_options,
+                claims_params=claims_params,
+            )
+        except ValueError:
+            jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
+            claims = jwt.decode(
+                token["id_token"],
+                key=jwk_set,
+                claims_cls=claims_cls,
+                claims_options=claim_options,
+                claims_params=claims_params,
+            )
 
         claims.validate(leeway=120)  # allows 2 min of clock skew
         return UserInfo(claims)
