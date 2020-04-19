@@ -1501,15 +1501,16 @@ oidc_config:
     #
     #jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
 
-    # response type to use. For now, only "code" is supported. Defaults to "code".
-    #
-    #response_type: "code"
-
     # skip metadata verification. Defaults to false.
     # Use this if you are connecting to a provider that is not OpenID Connect compliant.
     # Avoid this in production.
     #
     #skip_verification: false
+
+    # name of the claim containing a unique identifier for the user.
+    # OpenID Connect compliant providers should provide a `sub` claim for that.
+    #
+    #subject_claim: "sub"
 
     # defines how the user info from the OIDC provider are mapped to user properties.
     # Those are Jinja2 templates, where the userinfo object is available through the `user` variable.
