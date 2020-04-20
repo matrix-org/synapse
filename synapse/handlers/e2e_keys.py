@@ -1068,7 +1068,7 @@ class E2eKeysHandler(object):
         final_verify_key = None
         device_ids = []
         for key_type in ["master", "self_signing"]:
-            logger.info("***Processing retrieved key type: %s, id: %s", key_type, key_id)
+            logger.info("***Processing retrieved key type: %s, id: %s", key_type)
             key_content = remote_result.get(key_type + "_key")
             logger.info("***Got key_content: %s", key_content)
             if not key_content:
