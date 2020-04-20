@@ -257,10 +257,6 @@ class AuthHandler(BaseHandler):
         Takes a dictionary sent by the client in the login / registration
         protocol and handles the User-Interactive Auth flow.
 
-        As a side effect, this function fills in the 'creds' key on the user's
-        session with a map, which maps each auth-type (str) to the relevant
-        identity authenticated by that auth-type (mostly str, but for captcha, bool).
-
         If no auth flows have been completed successfully, raises an
         InteractiveAuthIncompleteError. To handle this, you can use
         synapse.rest.client.v2_alpha._base.interactive_auth_handler as a
@@ -304,50 +300,47 @@ class AuthHandler(BaseHandler):
             del clientdict["auth"]
             if "session" in authdict:
                 sid = authdict["session"]
-        session = self._get_session_info(sid)
 
-        if len(clientdict) > 0:
-            # This was designed to allow the client to omit the parameters
-            # and just supply the session in subsequent calls so it split
-            # auth between devices by just sharing the session, (eg. so you
-            # could continue registration from your phone having clicked the
-            # email auth link on there). It's probably too open to abuse
-            # because it lets unauthenticated clients store arbitrary objects
-            # on a homeserver.
-            # Revisit: Assuming the REST APIs do sensible validation, the data
-            # isn't arbintrary.
-            session["clientdict"] = clientdict
-            self._save_session(session)
-        elif "clientdict" in session:
-            clientdict = session["clientdict"]
-
-        # Ensure that the queried operation does not vary between stages of
-        # the UI authentication session. This is done by generating a stable
-        # comparator based on the URI, method, and body (minus the auth dict)
-        # and storing it during the initial query. Subsequent queries ensure
-        # that this comparator has not changed.
-        comparator = (request.uri, request.method, clientdict)
-        if "ui_auth" not in session:
-            session["ui_auth"] = comparator
-            self._save_session(session)
-        elif session["ui_auth"] != comparator:
-            raise SynapseError(
-                403,
-                "Requested operation has changed during the UI authentication session.",
+        # If there's no session ID, create a new session.
+        if not sid:
+            session = self._create_session(
+                clientdict, (request.uri, request.method, clientdict), description
             )
+            session_id = session["id"]
 
-        # Add a human readable description to the session.
-        if "description" not in session:
-            session["description"] = description
-            self._save_session(session)
+        else:
+            session = self._get_session_info(sid)
+            session_id = sid
+
+            if not clientdict:
+                # This was designed to allow the client to omit the parameters
+                # and just supply the session in subsequent calls so it split
+                # auth between devices by just sharing the session, (eg. so you
+                # could continue registration from your phone having clicked the
+                # email auth link on there). It's probably too open to abuse
+                # because it lets unauthenticated clients store arbitrary objects
+                # on a homeserver.
+                # Revisit: Assuming the REST APIs do sensible validation, the data
+                # isn't arbitrary.
+                clientdict = session["clientdict"]
+
+            # Ensure that the queried operation does not vary between stages of
+            # the UI authentication session. This is done by generating a stable
+            # comparator based on the URI, method, and body (minus the auth dict)
+            # and storing it during the initial query. Subsequent queries ensure
+            # that this comparator has not changed.
+            comparator = (request.uri, request.method, clientdict)
+            if session["ui_auth"] != comparator:
+                raise SynapseError(
+                    403,
+                    "Requested operation has changed during the UI authentication session.",
+                )
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session)
+                self._auth_dict_for_flows(flows, session_id)
             )
 
-        if "creds" not in session:
-            session["creds"] = {}
         creds = session["creds"]
 
         # check auth type currently being presented
@@ -387,9 +380,9 @@ class AuthHandler(BaseHandler):
                     list(clientdict),
                 )
 
-                return creds, clientdict, session["id"]
+                return creds, clientdict, session_id
 
-        ret = self._auth_dict_for_flows(flows, session)
+        ret = self._auth_dict_for_flows(flows, session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
         raise InteractiveAuthIncompleteError(ret)
@@ -407,8 +400,6 @@ class AuthHandler(BaseHandler):
             raise LoginError(400, "", Codes.MISSING_PARAM)
 
         sess = self._get_session_info(authdict["session"])
-        if "creds" not in sess:
-            sess["creds"] = {}
         creds = sess["creds"]
 
         result = await self.checkers[stagetype].check_auth(authdict, clientip)
@@ -448,7 +439,7 @@ class AuthHandler(BaseHandler):
             value: The data to store
         """
         sess = self._get_session_info(session_id)
-        sess.setdefault("serverdict", {})[key] = value
+        sess["serverdict"][key] = value
         self._save_session(sess)
 
     def get_session_data(
@@ -463,7 +454,7 @@ class AuthHandler(BaseHandler):
             default: Value to return if the key has not been set
         """
         sess = self._get_session_info(session_id)
-        return sess.setdefault("serverdict", {}).get(key, default)
+        return sess["serverdict"].get(key, default)
 
     async def _check_auth_dict(
         self, authdict: Dict[str, Any], clientip: str
@@ -519,7 +510,7 @@ class AuthHandler(BaseHandler):
         }
 
     def _auth_dict_for_flows(
-        self, flows: List[List[str]], session: Dict[str, Any]
+        self, flows: List[List[str]], session_id: str,
     ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
@@ -538,28 +529,71 @@ class AuthHandler(BaseHandler):
                     params[stage] = get_params[stage]()
 
         return {
-            "session": session["id"],
+            "session": session_id,
             "flows": [{"stages": f} for f in public_flows],
             "params": params,
         }
 
-    def _get_session_info(self, session_id: Optional[str]) -> dict:
+    def _create_session(
+        self,
+        clientdict: Dict[str, Any],
+        ui_auth: Tuple[bytes, bytes, Dict[str, Any]],
+        description: str,
+    ) -> dict:
         """
-        Gets or creates a session given a session ID.
+        Creates a new user interactive authentication session.
+
+        The session can be used to track data across multiple requests, e.g. for
+        interactive authentication.
+
+        Each session has the following keys:
+
+            id:
+                A unique identifier for this session. Passed back to the client
+                and returned for each stage.
+            clientdict:
+                The dictionary from the client root level, not the 'auth' key.
+            ui_auth:
+                A tuple which is checked at each stage of the authentication to
+                ensure that the asked for operation has not changed.
+            creds:
+                A map, which maps each auth-type (str) to the relevant identity
+                authenticated by that auth-type (mostly str, but for captcha, bool).
+            serverdict:
+                A map of data that is stored server-side and cannot be modified
+                by the client.
+            description:
+                A string description of the operation that the current
+                authentication is authorising.
+    Returns:
+        The newly created session.
+        """
+        session_id = None
+        while session_id is None or session_id in self.sessions:
+            session_id = stringutils.random_string(24)
+
+        self.sessions[session_id] = {
+            "id": session_id,
+            "clientdict": clientdict,
+            "ui_auth": ui_auth,
+            "creds": {},
+            "serverdict": {},
+            "description": description,
+        }
+
+        return self.sessions[session_id]
+
+    def _get_session_info(self, session_id: str) -> dict:
+        """
+        Gets a session given a session ID.
 
         The session can be used to track data across multiple requests, e.g. for
         interactive authentication.
         """
-        if session_id not in self.sessions:
-            session_id = None
-
-        if not session_id:
-            # create a new session
-            while session_id is None or session_id in self.sessions:
-                session_id = stringutils.random_string(24)
-            self.sessions[session_id] = {"id": session_id}
-
-        return self.sessions[session_id]
+        try:
+            return self.sessions[session_id]
+        except KeyError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
     async def get_access_token_for_user_id(
         self, user_id: str, device_id: Optional[str], valid_until_ms: Optional[int]
@@ -1030,11 +1064,8 @@ class AuthHandler(BaseHandler):
             The HTML to render.
         """
         session = self._get_session_info(session_id)
-        # Get the human readable operation of what is occurring, falling back to
-        # a generic message if it isn't available for some reason.
-        description = session.get("description", "modify your account")
         return self._sso_auth_confirm_template.render(
-            description=description, redirect_url=redirect_url,
+            description=session["description"], redirect_url=redirect_url,
         )
 
     def complete_sso_ui_auth(
@@ -1050,8 +1081,6 @@ class AuthHandler(BaseHandler):
         """
         # Mark the stage of the authentication as successful.
         sess = self._get_session_info(session_id)
-        if "creds" not in sess:
-            sess["creds"] = {}
         creds = sess["creds"]
 
         # Save the user who authenticated with SSO, this will be used to ensure
