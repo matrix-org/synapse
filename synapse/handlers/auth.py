@@ -51,6 +51,8 @@ logger = logging.getLogger(__name__)
 
 
 class AuthHandler(BaseHandler):
+    SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
+
     def __init__(self, hs):
         """
         Args:
@@ -106,6 +108,9 @@ class AuthHandler(BaseHandler):
         self._failed_uia_attempts_ratelimiter = Ratelimiter()
 
         self._clock = self.hs.get_clock()
+
+        # Expire old UI auth sessions after a period of time.
+        self._clock.looping_call(self.expire_old_sessions, 5 * 60 * 1000)
 
         # Load the SSO HTML templates.
 
@@ -437,6 +442,16 @@ class AuthHandler(BaseHandler):
             default: Value to return if the key has not been set
         """
         return await self.store.get_session_data(session_id, key, default)
+
+    def expire_old_sessions(self):
+        """
+        Invalidate any user interactive authentication sessions that have expired.
+        """
+        now = self._clock.time_msec()
+
+        expiration_time = now - self.SESSION_EXPIRE_MS
+
+        self.store.delete_old_sessions(expiration_time)
 
     async def _check_auth_dict(
         self, authdict: Dict[str, Any], clientip: str
