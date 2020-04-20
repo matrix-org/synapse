@@ -1,1 +1,1 @@
-Fix an edge-case where it was not possible to cross-sign a user which did not share a room with any user on your homeserver. The bug only affected Synapse deployments in worker mode.
+Fix a bug with cross-signing devices of users on other homeservers while in worker mode.
