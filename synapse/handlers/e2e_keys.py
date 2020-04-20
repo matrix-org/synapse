@@ -987,9 +987,6 @@ class E2eKeysHandler(object):
             SynapseError: if `user_id` is invalid
         """
         user = UserID.from_string(user_id)
-        key_id = None
-        verify_key = None
-
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
         )
@@ -1016,17 +1013,15 @@ class E2eKeysHandler(object):
             logger.debug("No %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
 
-        # If we retrieved the keys remotely, these values will already be set
-        if key_id is None or verify_key is None:
-            try:
-                key_id, verify_key = get_verify_key_from_cross_signing_key(key)
-            except ValueError as e:
-                logger.debug(
-                    "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
-                )
-                raise SynapseError(
-                    502, "Invalid %s key retrieved from remote server", key_type
-                )
+        try:
+            key_id, verify_key = get_verify_key_from_cross_signing_key(key)
+        except ValueError as e:
+            logger.debug(
+                "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
+            )
+            raise SynapseError(
+                502, "Invalid %s key retrieved from remote server", key_type
+            )
 
         return key, key_id, verify_key
 
@@ -1094,7 +1089,7 @@ class E2eKeysHandler(object):
                 continue
             device_ids.append(verify_key.version)
 
-            # If this is the desired key type, save it and it's ID/VerifyKey
+            # If this is the desired key type, save it and its ID/VerifyKey
             if key_type == desired_key_type:
                 final_key = key_content
                 final_verify_key = verify_key
