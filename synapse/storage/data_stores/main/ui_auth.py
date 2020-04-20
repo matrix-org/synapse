@@ -46,7 +46,6 @@ class UIAuthStore(SQLBaseStore):
                 "method": method,
                 "description": description,
                 "serverdict": "{}",
-                # TODO Keep this up-to-date.
                 "last_used": self.hs.get_clock().time_msec(),
             },
         )
@@ -128,11 +127,34 @@ class UIAuthStore(SQLBaseStore):
             stage_type: The completed stage type.
             identity: The identity authenticated by the stage.
         """
-        await self.db.simple_upsert(
+        self.db.runInteraction(
+            "mark_stage_complete",
+            self._mark_stage_completed,
+            session_id,
+            stage_type,
+            identity,
+        )
+
+    def _mark_stage_completed(
+        self,
+        txn,
+        session_id: str,
+        stage_type: str,
+        identity: Union[str, bool, Dict[str, any]],
+    ):
+        # Add (or update) the results of the current stage to the database.
+        self.db.simple_upsert_txn(
+            txn,
             table="ui_auth_sessions_credentials",
             keyvalues={"session_id": session_id, "stage_type": stage_type},
             values={"identity": json.dumps(identity)},
-            desc="mark_stage_complete",
+        )
+        # Mark the session as still in use.
+        self.db.simple_update_one_txn(
+            txn,
+            table="ui_auth_sessions",
+            keyvalues={"session_id": session_id},
+            updatevalues={"last_used": self.hs.get_clock().time_msec()},
         )
 
     async def get_completed_stages(
@@ -170,21 +192,36 @@ class UIAuthStore(SQLBaseStore):
             key: The key to store the data under
             value: The data to store
         """
-        result = await self.db.simple_select_one(
+        return self.db.runInteraction(
+            "set_session_data", self._set_session_data, session_id, key, value
+        )
+
+    def _set_session_data(self, txn, session_id: str, key: str, value: Any):
+        # Get the current value.
+        result = self.db.simple_select_one_txn(
+            txn,
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             retcols=("serverdict",),
-            desc="set_server_data_select",
         )
 
+        # Update it and add it back to the database.
         serverdict = json.loads(result["serverdict"])
         serverdict[key] = value
 
-        await self.db.simple_update_one(
+        self.db.simple_update_one_txn(
+            txn,
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             updatevalues={"serverdict": json.dumps(serverdict)},
-            desc="set_server_data_update",
+        )
+
+        # Mark the session as still in use.
+        self.db.simple_update_one_txn(
+            txn,
+            table="ui_auth_sessions",
+            keyvalues={"session_id": session_id},
+            updatevalues={"last_used": self.hs.get_clock().time_msec()},
         )
 
     async def get_session_data(
