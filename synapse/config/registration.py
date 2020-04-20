@@ -119,7 +119,21 @@ class RegistrationConfig(Config):
         )
         account_threepid_delegates = config.get("account_threepid_delegates") or {}
         self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        if (
+            self.account_threepid_delegate_email
+            and not self.account_threepid_delegate_email.startswith("http")
+        ):
+            raise ConfigError(
+                "account_threepid_delegates.email must begin with http:// or https://"
+            )
         self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+        if (
+            self.account_threepid_delegate_msisdn
+            and not self.account_threepid_delegate_msisdn.startswith("http")
+        ):
+            raise ConfigError(
+                "account_threepid_delegates.msisdn must begin with http:// or https://"
+            )
         if self.account_threepid_delegate_msisdn and not self.public_baseurl:
             raise ConfigError(
                 "The configuration option `public_baseurl` is required if "

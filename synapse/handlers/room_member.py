@@ -75,7 +75,6 @@ class RoomMemberHandler(object):
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.server_notices_mxid
-        self.rewrite_identity_server_urls = self.config.rewrite_identity_server_urls
         self._enable_lookup = hs.config.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
         self.ratelimiter = Ratelimiter()
