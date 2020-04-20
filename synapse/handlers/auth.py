@@ -41,6 +41,7 @@ from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.http.server import finish_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
 from synapse.push.mailer import load_jinja2_templates
 from synapse.types import Requester, UserID
@@ -110,7 +111,12 @@ class AuthHandler(BaseHandler):
         self._clock = self.hs.get_clock()
 
         # Expire old UI auth sessions after a period of time.
-        self._clock.looping_call(self.expire_old_sessions, 5 * 60 * 1000)
+        self._clock.looping_call(
+            lambda: run_as_background_process(
+                "expire_old_sessions", self.expire_old_sessions
+            ),
+            5 * 60 * 1000,
+        )
 
         # Load the SSO HTML templates.
 
@@ -448,9 +454,7 @@ class AuthHandler(BaseHandler):
         Invalidate any user interactive authentication sessions that have expired.
         """
         now = self._clock.time_msec()
-
         expiration_time = now - self.SESSION_EXPIRE_MS
-
         self.store.delete_old_sessions(expiration_time)
 
     async def _check_auth_dict(
