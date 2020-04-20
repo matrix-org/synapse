@@ -248,32 +248,32 @@ class SAML2Config(Config):
           #    remote:
           #      - url: https://our_idp/metadata.xml
           #
-          #    # By default, the user has to go to our login page first. If you'd like
-          #    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-          #    # 'service.sp' section:
-          #    #
-          #    #service:
-          #    #  sp:
-          #    #    allow_unsolicited: true
+          #  # By default, the user has to go to our login page first. If you'd like
+          #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+          #  # 'service.sp' section:
+          #  #
+          #  #service:
+          #  #  sp:
+          #  #    allow_unsolicited: true
           #
-          #    # The examples below are just used to generate our metadata xml, and you
-          #    # may well not need them, depending on your setup. Alternatively you
-          #    # may need a whole lot more detail - see the pysaml2 docs!
+          #  # The examples below are just used to generate our metadata xml, and you
+          #  # may well not need them, depending on your setup. Alternatively you
+          #  # may need a whole lot more detail - see the pysaml2 docs!
           #
-          #    description: ["My awesome SP", "en"]
-          #    name: ["Test SP", "en"]
+          #  description: ["My awesome SP", "en"]
+          #  name: ["Test SP", "en"]
           #
-          #    organization:
-          #      name: Example com
-          #      display_name:
-          #        - ["Example co", "en"]
-          #      url: "http://example.com"
+          #  organization:
+          #    name: Example com
+          #    display_name:
+          #      - ["Example co", "en"]
+          #    url: "http://example.com"
           #
-          #    contact_person:
-          #      - given_name: Bob
-          #        sur_name: "the Sysadmin"
-          #        email_address": ["admin@example.com"]
-          #        contact_type": technical
+          #  contact_person:
+          #    - given_name: Bob
+          #      sur_name: "the Sysadmin"
+          #      email_address": ["admin@example.com"]
+          #      contact_type": technical
 
           # Instead of putting the config inline as above, you can specify a
           # separate pysaml2 configuration file:
