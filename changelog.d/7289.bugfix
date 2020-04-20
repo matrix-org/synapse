@@ -1,1 +1,1 @@
-Fix a bug with cross-signing devices of users on other homeservers while in worker mode.
+Fix a bug with cross-signing devices with remote users when they did not share a room with any user on the local homeserver.
