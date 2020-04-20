@@ -880,6 +880,7 @@ class E2eKeysHandler(object):
 
         try:
             # get our user-signing key to verify the signatures
+            logger.info("***Getting the user_signing")
             (
                 user_signing_key,
                 user_signing_key_id,
@@ -903,6 +904,7 @@ class E2eKeysHandler(object):
             try:
                 # get the target user's master key, to make sure it matches
                 # what was sent
+                logger.info("***Getting the master")
                 (
                     master_key,
                     master_key_id,
@@ -985,7 +987,7 @@ class E2eKeysHandler(object):
             SynapseError: if `user_id` is invalid
         """
         user = UserID.from_string(user_id)
-        logger.info("***Trying to get key for %s from storage...", user_id)
+        logger.info("***Trying to get a %s key for %s from storage...", key_type, user_id)
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
         )
@@ -1027,6 +1029,7 @@ class E2eKeysHandler(object):
                 502, "Invalid %s key retrieved from remote server" % (key_type,)
             )
 
+        logger.info("***Finally returning %s - %s - %s")
         return key, key_id, verify_key
 
     @defer.inlineCallbacks
