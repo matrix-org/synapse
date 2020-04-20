@@ -985,7 +985,7 @@ class AuthHandler(BaseHandler):
         else:
             return False
 
-    def start_sso_ui_auth(self, redirect_url: str, session_id: str) -> str:
+    async def start_sso_ui_auth(self, redirect_url: str, session_id: str) -> str:
         """
         Get the HTML for the SSO redirect confirmation page.
 
@@ -996,7 +996,7 @@ class AuthHandler(BaseHandler):
         Returns:
             The HTML to render.
         """
-        session = self.store.get_session(session_id)
+        session = await self.store.get_session(session_id)
         return self._sso_auth_confirm_template.render(
             description=session["description"], redirect_url=redirect_url,
         )
