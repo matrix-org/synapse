@@ -1029,7 +1029,7 @@ class E2eKeysHandler(object):
                 502, "Invalid %s key retrieved from remote server" % (key_type,)
             )
 
-        logger.info("***Finally returning %s - %s - %s")
+        logger.info("***Finally returning %s - %s - %s", key, key_id, verify_key)
         return key, key_id, verify_key
 
     @defer.inlineCallbacks
