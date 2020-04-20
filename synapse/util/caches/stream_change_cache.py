@@ -169,6 +169,7 @@ class StreamChangeCache:
                 del self._entity_to_key[entity]
 
     def get_max_pos_of_last_change(self, entity: EntityType) -> int:
+
         """Returns an upper bound of the stream id of the last change to an
         entity.
         """
