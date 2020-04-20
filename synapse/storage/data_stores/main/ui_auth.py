@@ -133,7 +133,7 @@ class UIAuthStore(SQLBaseStore):
             stage_type: The completed stage type.
             identity: The identity authenticated by the stage.
         """
-        self.db.runInteraction(
+        await self.db.runInteraction(
             "mark_stage_complete",
             self._mark_stage_completed,
             session_id,
@@ -198,7 +198,7 @@ class UIAuthStore(SQLBaseStore):
             key: The key to store the data under
             value: The data to store
         """
-        return self.db.runInteraction(
+        await self.db.runInteraction(
             "set_session_data", self._set_session_data, session_id, key, value
         )
 

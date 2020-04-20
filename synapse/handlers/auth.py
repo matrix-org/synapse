@@ -449,13 +449,13 @@ class AuthHandler(BaseHandler):
         """
         return await self.store.get_session_data(session_id, key, default)
 
-    def expire_old_sessions(self):
+    async def expire_old_sessions(self):
         """
         Invalidate any user interactive authentication sessions that have expired.
         """
         now = self._clock.time_msec()
         expiration_time = now - self.SESSION_EXPIRE_MS
-        self.store.delete_old_sessions(expiration_time)
+        await self.store.delete_old_sessions(expiration_time)
 
     async def _check_auth_dict(
         self, authdict: Dict[str, Any], clientip: str
