@@ -1005,22 +1005,22 @@ class E2eKeysHandler(object):
             # We only get "master" and "self_signing" keys from remote servers
             and key_type in ["master", "self_signing"]
         ):
-            key = yield self._retrieve_cross_signing_keys_for_remote_user(
+            key, key_id, verify_key = yield self._retrieve_cross_signing_keys_for_remote_user(
                 user, key_type
             )
 
         if key is None:
-            logger.debug("No %s key found for %s", key_type, user_id)
+            logger.warning("No %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
 
         try:
             key_id, verify_key = get_verify_key_from_cross_signing_key(key)
         except ValueError as e:
-            logger.debug(
+            logger.warning(
                 "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
             )
             raise SynapseError(
-                502, "Invalid %s key retrieved from remote server", key_type
+                502, "Invalid %s key retrieved from remote server" % (key_type,)
             )
 
         return key, key_id, verify_key
@@ -1028,7 +1028,7 @@ class E2eKeysHandler(object):
     @defer.inlineCallbacks
     def _retrieve_cross_signing_keys_for_remote_user(
         self, user: UserID, desired_key_type: str,
-    ) -> Tuple[Optional[Dict], Optional[str], Optional[VerifyKey]]:
+    ):
         """Queries cross-signing keys for a remote user and saves them to the database
 
         Only the key specified by `key_type` will be returned, while all retrieved keys
@@ -1039,7 +1039,8 @@ class E2eKeysHandler(object):
             desired_key_type: The type of key to receive. One of "master", "self_signing"
 
         Returns:
-            A tuple of the retrieved key content, the key's ID and the matching VerifyKey.
+            Deferred[Tuple[Optional[Dict], Optional[str], Optional[VerifyKey]]]: A tuple
+            of the retrieved key content, the key's ID and the matching VerifyKey.
             If the key cannot be retrieved, all values in the tuple will instead be None.
         """
         try:
@@ -1054,7 +1055,7 @@ class E2eKeysHandler(object):
                 type(e),
                 e,
             )
-            return None
+            return None, None, None
 
         # Process each of the retrieved cross-signing keys
         final_key = None
@@ -1079,7 +1080,7 @@ class E2eKeysHandler(object):
                 # algorithm and colon, which is the device ID
                 key_id, verify_key = get_verify_key_from_cross_signing_key(key_content)
             except ValueError as e:
-                logger.debug(
+                logger.warning(
                     "Invalid %s key retrieved: %s - %s %s",
                     key_type,
                     key_content,
