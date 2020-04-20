@@ -985,9 +985,11 @@ class E2eKeysHandler(object):
             SynapseError: if `user_id` is invalid
         """
         user = UserID.from_string(user_id)
+        logger.info("***Trying to get key for %s from storage...", user_id)
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
         )
+        logger.info("***Well, we got this: %s", key)
 
         # If we couldn't find the key locally, and we're looking for keys of
         # another user then attempt to fetch the missing key from the remote
@@ -997,12 +999,14 @@ class E2eKeysHandler(object):
         # cross-sign a remote user, but does not share any rooms with them yet.
         # Thus, we would not have their key list yet. We fetch the key here,
         # store it and notify clients of new, associated device IDs.
+        logger.info("***Checking if we'll do our thingy")
         if (
             key is None
             and not self.is_mine(user)
             # We only get "master" and "self_signing" keys from remote servers
             and key_type in ["master", "self_signing"]
         ):
+            logger.info("***Doing our thingy")
             (
                 key,
                 key_id,
@@ -1047,6 +1051,7 @@ class E2eKeysHandler(object):
             remote_result = yield self.federation.query_user_devices(
                 user.domain, user.to_string()
             )
+            logger.info("***Got our remote_result: %s", remote_result)
         except Exception as e:
             logger.warning(
                 "Unable to query %s for cross-signing keys of user %s: %s %s",
@@ -1063,7 +1068,9 @@ class E2eKeysHandler(object):
         final_verify_key = None
         device_ids = []
         for key_type in ["master", "self_signing"]:
+            logger.info("***Processing retrieved key type: %s, id: %s", key_type, key_id)
             key_content = remote_result.get(key_type + "_key")
+            logger.info("***Got key_content: %s", key_content)
             if not key_content:
                 continue
 
@@ -1072,6 +1079,7 @@ class E2eKeysHandler(object):
             yield self.store.set_e2e_cross_signing_key(
                 user.to_string(), key_type, key_content
             )
+            logger.info("***Stored key")
 
             # Note down the device ID attached to this key
             try:
@@ -1079,6 +1087,7 @@ class E2eKeysHandler(object):
                 # .version to denote the portion of the key ID after the
                 # algorithm and colon, which is the device ID
                 key_id, verify_key = get_verify_key_from_cross_signing_key(key_content)
+                logger.info("***Verified key: %s - %s", key_id, verify_key)
             except ValueError as e:
                 logger.warning(
                     "Invalid %s key retrieved: %s - %s %s",
@@ -1088,18 +1097,22 @@ class E2eKeysHandler(object):
                     e,
                 )
                 continue
+            logger.info("***Appending device id: %s - %s", verify_key, verify_key.version)
             device_ids.append(verify_key.version)
 
             # If this is the desired key type, save it and its ID/VerifyKey
             if key_type == desired_key_type:
+                logger.info("***We found our desired key type, %s!", key_type)
                 final_key = key_content
                 final_verify_key = verify_key
                 final_key_id = key_id
 
         # Notify clients that new devices for this user have been discovered
         if device_ids:
+            logger.info("***Updating clients with devices: %s", device_ids)
             yield self.device_handler.notify_device_update(user.to_string(), device_ids)
 
+        logger.info("***Returning %s - %s - %s", final_key, final_key_id, final_verify_key)
         return final_key, final_key_id, final_verify_key
 
 
