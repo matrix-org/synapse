@@ -34,23 +34,29 @@ class UIAuthStore(SQLBaseStore):
         The session can be used to track data across multiple requests, e.g. for
         interactive authentication.
         """
-        # TODO How to generate the session ID.
-        session_id = stringutils.random_string(24)
+        # autogen a session ID and try to create it. We may clash, so just
+        # try a few times till one goes through, giving up eventually.
+        attempts = 0
+        while attempts < 5:
+            session_id = stringutils.random_string(24)
 
-        await self.db.simple_insert(
-            table="ui_auth_sessions",
-            values={
-                "session_id": session_id,
-                "clientdict": json.dumps(clientdict),
-                "uri": uri,
-                "method": method,
-                "description": description,
-                "serverdict": "{}",
-                "last_used": self.hs.get_clock().time_msec(),
-            },
-        )
-
-        return session_id
+            try:
+                await self.db.simple_insert(
+                    table="ui_auth_sessions",
+                    values={
+                        "session_id": session_id,
+                        "clientdict": json.dumps(clientdict),
+                        "uri": uri,
+                        "method": method,
+                        "description": description,
+                        "serverdict": "{}",
+                        "last_used": self.hs.get_clock().time_msec(),
+                    },
+                )
+                return session_id
+            except self.db.engine.module.IntegrityError:
+                attempts += 1
+        raise StoreError(500, "Couldn't generate a session ID.")
 
     async def get_session(self, session_id: str):
         """Retrieve a UI auth session.
