@@ -252,9 +252,12 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # note: python3.5 mock does not have the .called_once() method
         calls = req.addCookie.call_args_list
         self.assertEqual(len(calls), 1)  # called once
-        self.assertEqual(calls[0].args[0], COOKIE_NAME)
-        self.assertEqual(calls[0].kwargs["path"], COOKIE_PATH)
-        cookie = calls[0].args[1]
+        # For some reason, call.args does not work with python3.5
+        args = calls[0][0]
+        kwargs = calls[0][1]
+        self.assertEqual(args[0], COOKIE_NAME)
+        self.assertEqual(kwargs["path"], COOKIE_PATH)
+        cookie = args[1]
 
         macaroon = pymacaroons.Macaroon.deserialize(cookie)
         state = self.handler._get_value_from_macaroon(macaroon, "state")
