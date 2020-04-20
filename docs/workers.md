@@ -268,6 +268,8 @@ Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
     ^/_matrix/client/(api/v1|r0|unstable)/groups/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/user/[^/]*/account_data/
+    ^/_matrix/client/(api/v1|r0|unstable)/user/[^/]*/rooms/[^/]*/account_data/
 
 Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance:
