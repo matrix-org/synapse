@@ -38,7 +38,11 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.handlers.presence import PresenceHandler, get_interested_parties
+from synapse.handlers.presence import (
+    AbstractPresenceHandler,
+    PresenceHandler,
+    get_interested_parties,
+)
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
@@ -224,7 +228,7 @@ class KeyUploadServlet(RestServlet):
 UPDATE_SYNCING_USERS_MS = 10 * 1000
 
 
-class GenericWorkerPresence(object):
+class GenericWorkerPresence(AbstractPresenceHandler):
     def __init__(self, hs):
         self.hs = hs
         self.is_mine_id = hs.is_mine_id

@@ -97,7 +97,9 @@ class HomeServer(object):
         pass
     def get_notifier(self) -> synapse.notifier.Notifier:
         pass
-    def get_presence_handler(self) -> synapse.handlers.presence.PresenceHandler:
+    def get_presence_handler(
+        self,
+    ) -> synapse.handlers.presence.AbstractPresenceHandler:
         pass
     def get_clock(self) -> synapse.util.Clock:
         pass
