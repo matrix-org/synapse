@@ -123,7 +123,7 @@ class UIAuthStore(SQLBaseStore):
         self,
         session_id: str,
         stage_type: str,
-        identity: Union[str, bool, Dict[str, any]],
+        identity: Union[str, bool, Dict[str, Any]],
     ):
         """
         Mark a session stage as completed.
@@ -146,7 +146,7 @@ class UIAuthStore(SQLBaseStore):
         txn,
         session_id: str,
         stage_type: str,
-        identity: Union[str, bool, Dict[str, any]],
+        identity: Union[str, bool, Dict[str, Any]],
     ):
         # Add (or update) the results of the current stage to the database.
         self.db.simple_upsert_txn(
