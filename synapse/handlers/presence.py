@@ -129,10 +129,15 @@ class BasePresenceHandler(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_currently_syncing_users(self) -> Set[str]:
-        """Get the set of user ids that are currently syncing on this HS.
+    def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
+        """Get the set of syncing users on this worker, to send to the presence handler
+
+        This is called when a replication connection is established. It should return
+        a list of user ids, which are then sent as USER_SYNC commands to inform the
+        process handling presence about those users.
+
         Returns:
-            set(str): A set of user_id strings.
+            A set of user_id strings.
         """
 
     async def get_state(self, target_user: UserID) -> UserPresenceState:
@@ -443,10 +448,18 @@ class PresenceHandler(BasePresenceHandler):
 
         timers_fired_counter.inc(len(states))
 
+        syncing_user_ids = {
+            user_id
+            for user_id, count in self.user_to_num_current_syncs.items()
+            if count
+        }
+        for user_ids in self.external_process_to_current_syncs.values():
+            syncing_user_ids.update(user_ids)
+
         changes = handle_timeouts(
             states,
             is_mine_fn=self.is_mine_id,
-            syncing_user_ids=self.get_currently_syncing_users(),
+            syncing_user_ids=syncing_user_ids,
             now=now,
         )
 
@@ -544,22 +557,9 @@ class PresenceHandler(BasePresenceHandler):
 
         return _user_syncing()
 
-    def get_currently_syncing_users(self):
-        """Get the set of user ids that are currently syncing on this HS.
-        Returns:
-            set(str): A set of user_id strings.
-        """
-        if self.hs.config.use_presence:
-            syncing_user_ids = {
-                user_id
-                for user_id, count in self.user_to_num_current_syncs.items()
-                if count
-            }
-            for user_ids in self.external_process_to_current_syncs.values():
-                syncing_user_ids.update(user_ids)
-            return syncing_user_ids
-        else:
-            return set()
+    def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
+        # since we are the process handling presence, there is nothing to do here.
+        return []
 
     async def update_external_syncs_row(
         self, process_id, user_id, is_syncing, sync_time_msec

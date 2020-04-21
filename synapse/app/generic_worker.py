@@ -386,12 +386,12 @@ class GenericWorkerPresence(BasePresenceHandler):
         stream_id = token
         yield self.notify_from_replication(states, stream_id)
 
-    def get_currently_syncing_users(self) -> Set[str]:
-        return {
+    def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
+        return [
             user_id
             for user_id, count in self._user_to_num_current_syncs.items()
             if count > 0
-        }
+        ]
 
 
 class GenericWorkerTyping(object):
