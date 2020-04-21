@@ -14,7 +14,7 @@
 # limitations under the License.
 import json
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from urllib.parse import parse_qsl
 
 import pymacaroons
@@ -28,11 +28,25 @@ from jinja2 import Template
 
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http.server import finish_request
+from synapse.push.mailer import load_jinja2_templates
 from synapse.types import UserID, map_username_to_mxid_localpart
 
 logger = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = b"oidc_session"
+
+
+class OidcError(Exception):
+    error = "unknown"
+    error_description = None
+
+    def __init__(self, error=None, error_description=None):
+        self.error = error or self.error
+        self.error_description = error_description or self.error_description
+
+
+class MappingException(Exception):
+    pass
 
 
 class OidcHandler:
@@ -66,9 +80,25 @@ class OidcHandler:
         self._clock = hs.get_clock()
         self._hostname = hs.hostname  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
+        self._error_template = load_jinja2_templates(
+            hs.config.oidc_template_dir, ["oidc_error.html"]
+        )[0]
 
         # identifier for the external_ids table
         self._auth_provider_id = "oidc"
+
+    def _render_error(
+        self, request, error: str, error_description: Optional[str] = None
+    ):
+        html_bytes = self._error_template.render(
+            error=error, error_description=error_description
+        ).encode("utf-8")
+
+        request.setResponseCode(400)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%i" % len(html_bytes))
+        request.write(html_bytes)
+        finish_request(request)
 
     def _validate_metadata(self):
         # Skip verification to allow non-compliant providers (e.g. issuers not running on a secure origin)
@@ -157,6 +187,7 @@ class OidcHandler:
         args.update(qs)
 
         try:
+            logger.info("uri=%r, args=%r, headers=%r" % (uri, args, headers))
             resp = await self._http_client.post_urlencoded_get_json(
                 uri, args, headers=headers
             )
@@ -168,7 +199,7 @@ class OidcHandler:
 
         error = resp["error"]
         description = resp.get("error_description", error)
-        raise SynapseError(400, "{}: {}".format(error, description))
+        raise OidcError(error, description)
 
     async def _fetch_userinfo(self, token: Dict[str, str]) -> UserInfo:
         metadata = await self.load_metadata()
@@ -272,11 +303,11 @@ class OidcHandler:
             Deferred[none]: Completes once we have handled the request.
         """
 
-        # TODO: show them nicely
         if b"error" in request.args:
-            error = request.args[b"error"][0]
-            description = request.args.get(b"error_description", [error])[0]
-            raise SynapseError(400, "{}: {}".format(error, description))
+            error = request.args[b"error"][0].decode()
+            description = request.args.get(b"error_description", [b""])[0].decode()
+            self._render_error(request, error, description)
+            return
 
         session = request.getCookie(SESSION_COOKIE_NAME)
         # Remove the cookie
@@ -288,7 +319,12 @@ class OidcHandler:
             httpOnly=True,
         )
         if session is None:
-            raise SynapseError(400, "No session cookie found")
+            self._render_error(request, "invalid_session", "No session cookie found")
+            return
+
+        if b"state" not in request.args:
+            self._render_error(request, "invalid_request", "State parameter is missing")
+            return
 
         state = request.args[b"state"][0].decode()
 
@@ -304,32 +340,45 @@ class OidcHandler:
         v.satisfy_general(lambda c: c.startswith("nonce = "))
         v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
 
-        v.verify(macaroon, self._macaroon_secret_key)
+        try:
+            v.verify(macaroon, self._macaroon_secret_key)
+        except Exception as e:
+            self._render_error("invalid_session", str(e))
+            return
 
         nonce = self._get_value_from_macaroon(macaroon, "nonce")
         client_redirect_url = self._get_value_from_macaroon(
             macaroon, "client_redirect_url"
         )
 
-        # TODO: error handling if the code is not present
+        if b"code" not in request.args:
+            self._render_error(request, "invalid_request", "Code parameter is missing")
+            return
+
         code = request.args[b"code"][0]
-        token = await self._exchange_code(code)
+        try:
+            token = await self._exchange_code(code)
+        except OidcError as e:
+            self._render_error(request, e.error, e.error_description)
+            return
 
         if self._uses_userinfo:
-            userinfo = await self._fetch_userinfo(token)
+            try:
+                userinfo = await self._fetch_userinfo(token)
+            except Exception as e:
+                self._render_error(request, "fetch_error", str(e))
+                return
         else:
-            userinfo = await self._parse_id_token(token, nonce=nonce)
+            try:
+                userinfo = await self._parse_id_token(token, nonce=nonce)
+            except Exception as e:
+                self._render_error(request, "invalid_token", str(e))
+                return
 
         try:
             user_id = await self._map_userinfo_to_user(userinfo)
-        except Exception as e:
-            # TODO: show nicer errors
-            logger.error(e)
-
-            request.setResponseCode(400)
-            request.setHeader(b"Content-Type", b"text/plain; charset=utf-8")
-            request.write(str(e))
-            finish_request(request)
+        except MappingException as e:
+            self._render_error(request, "mapping_error", str(e))
             return
 
         self._auth_handler.complete_sso_login(user_id, request, client_redirect_url)
