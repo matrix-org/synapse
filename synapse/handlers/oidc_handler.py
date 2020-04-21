@@ -25,6 +25,7 @@ from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
 from jinja2 import Template
+from pymacaroons.exceptions import MacaroonDeserializationException
 
 from synapse.api.errors import HttpResponseException
 from synapse.http.server import finish_request
@@ -318,7 +319,7 @@ class OidcHandler:
             httpOnly=True,
         )
         if session is None:
-            self._render_error(request, "invalid_session", "No session cookie found")
+            self._render_error(request, "missing_session", "No session cookie found")
             return
 
         if b"state" not in request.args:
@@ -328,7 +329,11 @@ class OidcHandler:
         state = request.args[b"state"][0].decode()
 
         # FIXME: macaroon verification should be refactored somewhere else
-        macaroon = pymacaroons.Macaroon.deserialize(session)
+        try:
+            macaroon = pymacaroons.Macaroon.deserialize(session)
+        except MacaroonDeserializationException as e:
+            self._render_error(request, "invalid_session", str(e))
+            return
 
         v = pymacaroons.Verifier()
 
@@ -342,7 +347,7 @@ class OidcHandler:
         try:
             v.verify(macaroon, self._macaroon_secret_key)
         except Exception as e:
-            self._render_error("invalid_session", str(e))
+            self._render_error(request, "mismatching_session", str(e))
             return
 
         nonce = self._get_value_from_macaroon(macaroon, "nonce")
@@ -354,7 +359,7 @@ class OidcHandler:
             self._render_error(request, "invalid_request", "Code parameter is missing")
             return
 
-        code = request.args[b"code"][0]
+        code = request.args[b"code"][0].decode()
         try:
             token = await self._exchange_code(code)
         except OidcError as e:
@@ -387,7 +392,7 @@ class OidcHandler:
         for caveat in macaroon.caveats:
             if caveat.caveat_id.startswith(prefix):
                 return caveat.caveat_id[len(prefix) :]
-        raise Exception("No %s caveat in macaroon" % (key,))
+        raise MappingException("No %s caveat in macaroon" % (key,))
 
     def _verify_expiry(self, caveat: str):
         prefix = "time < "
@@ -400,7 +405,7 @@ class OidcHandler:
     async def _map_userinfo_to_user(self, userinfo: UserInfo) -> str:
         remote_user_id = userinfo.get(self._subject_claim)
         if remote_user_id is None:
-            raise Exception("Failed to extract subject from OIDC response")
+            raise MappingException("Failed to extract subject from OIDC response")
 
         logger.info(
             "Looking for existing mapping for user %s:%s",
@@ -419,7 +424,7 @@ class OidcHandler:
         # render the localpart template, raise if empty
         localpart = self._mapping_templates["localpart"].render(user=userinfo).strip()
         if localpart == "":
-            raise Exception("rendered localpart is empty")
+            raise MappingException("rendered localpart is empty")
 
         localpart = map_username_to_mxid_localpart(localpart)
 
@@ -433,7 +438,9 @@ class OidcHandler:
         user_id = UserID(localpart, self._hostname)
         if await self._datastore.get_users_by_id_case_insensitive(user_id.to_string()):
             # This mxid is taken
-            raise Exception("mxid '{}' is already taken".format(user_id.to_string()))
+            raise MappingException(
+                "mxid '{}' is already taken".format(user_id.to_string())
+            )
 
         registered_user_id = await self._registration_handler.register_user(
             localpart=localpart, default_display_name=displayname,

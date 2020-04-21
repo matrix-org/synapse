@@ -16,13 +16,14 @@
 from contextlib import contextmanager
 from urllib.parse import parse_qs, urlparse
 
-from mock import Mock
+from mock import AsyncMock, Mock
 
 import pymacaroons
 
 from twisted.internet import defer
 
-from synapse.handlers.oidc_handler import OidcHandler
+from synapse.handlers.oidc_handler import OidcError, OidcHandler
+from synapse.types import UserID
 
 from tests.unittest import HomeserverTestCase, override_config
 
@@ -123,6 +124,12 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler = OidcHandler(hs)
 
         return hs
+
+    def assertRenderedError(self, error, error_description=None):
+        args = self.handler._render_error.call_args[0]
+        self.assertEqual(args[1], error)
+        if error_description is not None:
+            self.assertEqual(args[2], error_description)
 
     def test_config(self):
         self.assertEqual(self.handler._callback_url, CALLBACK_URL)
@@ -269,3 +276,126 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(params["state"], [state])
         self.assertEqual(params["nonce"], [nonce])
         self.assertEqual(redirect, "http://client/redirect")
+
+    @defer.inlineCallbacks
+    def test_callback_error(self):
+        self.handler._render_error = Mock()
+        request = Mock(args={})
+        request.args[b"error"] = [b"invalid_client"]
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.handler._render_error.assert_called_once_with(
+            request, "invalid_client", ""
+        )
+
+        request.args[b"error_description"] = [b"some description"]
+        self.handler._render_error.reset_mock()
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.handler._render_error.assert_called_once_with(
+            request, "invalid_client", "some description"
+        )
+
+    @defer.inlineCallbacks
+    def test_callback(self):
+        token = {
+            "type": "bearer",
+            "id_token": "id_token",
+            "access_token": "access_token",
+        }
+        userinfo = {
+            "sub": "foo",
+            "preferred_username": "bar",
+        }
+        user_id = UserID("foo", "domain.org")
+        self.handler._exchange_code = AsyncMock(return_value=token)
+        self.handler._parse_id_token = AsyncMock(return_value=userinfo)
+        self.handler._map_userinfo_to_user = AsyncMock(return_value=user_id)
+        self.handler._auth_handler.complete_sso_login = Mock()
+        request = Mock(spec=["args", "getCookie", "addCookie"])
+
+        code = "code"
+        state = "state"
+        nonce = "nonce"
+        client_redirect_url = "http://client/redirect"
+        session = self.handler._macaroon_generator.generate_oidc_session_token(
+            state=state, nonce=nonce, client_redirect_url=client_redirect_url,
+        )
+        request.getCookie.return_value = session
+
+        request.args = {}
+        request.args[b"code"] = [code.encode("utf-8")]
+        request.args[b"state"] = [state.encode("utf-8")]
+
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+
+        self.handler._auth_handler.complete_sso_login.assert_called_once_with(
+            user_id, request, client_redirect_url,
+        )
+
+        self.handler._exchange_code.assert_called_once_with(code)
+        self.handler._parse_id_token.assert_called_once_with(token, nonce=nonce)
+        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo)
+
+    @defer.inlineCallbacks
+    def test_callback_session(self):
+        self.handler._render_error = Mock(return_value=None)
+        request = Mock(spec=["args", "getCookie", "addCookie"])
+
+        # Missing cookie
+        request.args = {}
+        request.getCookie.return_value = None
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("missing_session", "No session cookie found")
+        self.handler._render_error.reset_mock()
+
+        # Invalid cookie
+        request.args = {}
+        request.args[b"state"] = [b"state"]
+        request.getCookie.return_value = "session"
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("invalid_session")
+        self.handler._render_error.reset_mock()
+
+        # Mismatching session
+        session = self.handler._macaroon_generator.generate_oidc_session_token(
+            state="state", nonce="nonce", client_redirect_url="http://client/redirect",
+        )
+        request.args = {}
+        request.args[b"state"] = [b"mismatching state"]
+        request.getCookie.return_value = session
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("mismatching_session")
+        self.handler._render_error.reset_mock()
+
+        # Valid session
+        request.args = {}
+        request.args[b"state"] = [b"state"]
+        request.getCookie.return_value = session
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("invalid_request")
+        self.handler._render_error.reset_mock()
+
+    @override_config({"oidc_config": {"client_auth_method": "client_secret_post"}})
+    @defer.inlineCallbacks
+    def test_exchange_code(self):
+        token = {"type": "bearer"}
+        self.http_client.post_urlencoded_get_json = AsyncMock(return_value=token)
+        code = "code"
+        ret = yield defer.ensureDeferred(self.handler._exchange_code(code))
+        uri, args = self.http_client.post_urlencoded_get_json.call_args[0]
+
+        self.assertEqual(ret, token)
+        self.assertEqual(uri, TOKEN_ENDPOINT)
+        self.assertEqual(args["grant_type"], "authorization_code")
+        self.assertEqual(args["code"], code)
+        self.assertEqual(args["client_id"], CLIENT_ID)
+        self.assertEqual(args["client_secret"], CLIENT_SECRET)
+        self.assertEqual(args["redirect_uri"], CALLBACK_URL)
+
+        # Test error handling
+        self.http_client.post_urlencoded_get_json = AsyncMock(
+            return_value={"error": "foo", "error_description": "bar"}
+        )
+        with self.assertRaises(OidcError) as exc:
+            yield defer.ensureDeferred(self.handler._exchange_code(code))
+        self.assertEqual(exc.exception.error, "foo")
+        self.assertEqual(exc.exception.error_description, "bar")
