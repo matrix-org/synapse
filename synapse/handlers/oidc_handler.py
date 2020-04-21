@@ -26,7 +26,7 @@ from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
 from jinja2 import Template
 
-from synapse.api.errors import HttpResponseException, SynapseError
+from synapse.api.errors import HttpResponseException
 from synapse.http.server import finish_request
 from synapse.push.mailer import load_jinja2_templates
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -187,7 +187,6 @@ class OidcHandler:
         args.update(qs)
 
         try:
-            logger.info("uri=%r, args=%r, headers=%r" % (uri, args, headers))
             resp = await self._http_client.post_urlencoded_get_json(
                 uri, args, headers=headers
             )
