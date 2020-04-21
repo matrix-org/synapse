@@ -793,29 +793,6 @@ class ThreepidBindRestServlet(RestServlet):
 
         return 200, {}
 
-        if self.hs.config.shadow_server:
-            shadow_user = UserID(
-                requester.user.localpart, self.hs.config.shadow_server.get("hs")
-            )
-            threepid = {
-                "medium": validation_session["medium"],
-                "address": validation_session["address"],
-                "validated_at": validation_session["validated_at"],
-            }
-            self.shadow_3pid({"threepid": threepid}, shadow_user.to_string())
-
-    @defer.inlineCallbacks
-    def shadow_3pid(self, body, user_id):
-        # TODO: retries
-        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
-        as_token = self.hs.config.shadow_server.get("as_token")
-
-        yield self.http_client.post_json_get_json(
-            "%s/_matrix/client/r0/account/3pid?access_token=%s&user_id=%s"
-            % (shadow_hs_url, as_token, user_id),
-            body,
-        )
-
 
 class ThreepidUnbindRestServlet(RestServlet):
     PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
