@@ -1,1 +1,0 @@
-Fix a bug with cross-signing devices of users on other homeservers while in worker mode.
