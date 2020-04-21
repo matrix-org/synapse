@@ -81,7 +81,7 @@ class EventRestServlet(RestServlet):
         self._event_serializer = hs.get_event_client_serializer()
 
     async def on_GET(self, request, event_id):
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         event = await self.event_handler.get_event(requester.user, None, event_id)
 
         time_now = self.clock.time_msec()

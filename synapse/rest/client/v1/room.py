@@ -442,7 +442,7 @@ class RoomMemberListRestServlet(RestServlet):
 
     async def on_GET(self, request, room_id):
         # TODO support Pagination stream API (limit/tokens)
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         handler = self.message_handler
 
         # request the state as of a given event, as identified by a stream token,
