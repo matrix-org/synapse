@@ -111,12 +111,13 @@ class AuthHandler(BaseHandler):
         self._clock = self.hs.get_clock()
 
         # Expire old UI auth sessions after a period of time.
-        self._clock.looping_call(
-            run_as_background_process,
-            5 * 60 * 1000,
-            "expire_old_sessions",
-            self.expire_old_sessions,
-        )
+        if hs.config.worker_name is None:
+            self._clock.looping_call(
+                run_as_background_process,
+                5 * 60 * 1000,
+                "expire_old_sessions",
+                self.expire_old_sessions,
+            )
 
         # Load the SSO HTML templates.
 
