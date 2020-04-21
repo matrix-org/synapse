@@ -1065,7 +1065,7 @@ class E2eKeysHandler(object):
                 logger.warning(
                     "Invalid %s key retrieved, missing user_id field: %s",
                     key_type,
-                    key_content
+                    key_content,
                 )
                 continue
             if user.to_string() != key_content["user_id"]:
@@ -1109,7 +1109,9 @@ class E2eKeysHandler(object):
 
         # Notify clients that new devices for this user have been discovered
         if retrieved_device_ids:
-            yield self.device_handler.notify_device_update(user.to_string(), retrieved_device_ids)
+            yield self.device_handler.notify_device_update(
+                user.to_string(), retrieved_device_ids
+            )
 
         return desired_key, desired_key_id, desired_verify_key
 
