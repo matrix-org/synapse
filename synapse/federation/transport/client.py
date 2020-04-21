@@ -407,12 +407,12 @@ class TransportLayerClient(object):
                 "<user_id>": {
                   "<device_id>": {...}
               } }
-              "master_keys": {
+              "master_key": {
                 "<user_id>": {...}
               } }
-              "self_signing_keys": {
+              "self_signing_key": {
                 "<user_id>": {...}
-            } } }
+            } }
 
         Args:
             destination(str): The server to query.
@@ -436,9 +436,22 @@ class TransportLayerClient(object):
             {
               "stream_id": "...",
               "devices": [ { ... } ],
-              "master_key": { ... },
-              "self_signing_key: { ... }
-            }
+              "master_key": {
+                "user_id": "<user_id>",
+                "usage": [...],
+                "keys": {...},
+                "signatures": {
+                  "<user_id>": {...}
+                }
+              },
+              "self_signing_key": {
+                "user_id": "<user_id>",
+                "usage": [...],
+                "keys": {...},
+                "signatures": {
+                  "<user_id>": {...}
+                }
+            } }
 
         Args:
             destination(str): The server to query.
