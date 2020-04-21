@@ -989,39 +989,32 @@ class E2eKeysHandler(object):
             user_id, key_type, from_user_id
         )
 
+        if key:
+            # We found a copy of this key in our database. Decode and return it
+            key_id, verify_key = get_verify_key_from_cross_signing_key(key)
+            return key, key_id, verify_key
+
         # If we couldn't find the key locally, and we're looking for keys of
         # another user then attempt to fetch the missing key from the remote
         # user's server.
         #
         # We may run into this in possible edge cases where a user tries to
         # cross-sign a remote user, but does not share any rooms with them yet.
-        # Thus, we would not have their key list yet. We fetch the key here,
+        # Thus, we would not have their key list yet. We instead fetch the key,
         # store it and notify clients of new, associated device IDs.
-        if (
-            key is None
-            and not self.is_mine(user)
-            # We only get "master" and "self_signing" keys from remote servers
-            and key_type in ["master", "self_signing"]
-        ):
-            (
-                key,
-                key_id,
-                verify_key,
-            ) = yield self._retrieve_cross_signing_keys_for_remote_user(user, key_type)
+        if self.is_mine(user) or key_type not in ["master", "self_signing"]:
+            # Note that master and self_signing keys are the only cross-signing keys we
+            # can request over federation
+            return
+
+        (
+            key,
+            key_id,
+            verify_key,
+        ) = yield self._retrieve_cross_signing_keys_for_remote_user(user, key_type)
 
         if key is None:
-            logger.warning("No %s key found for %s", key_type, user_id)
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
-
-        try:
-            key_id, verify_key = get_verify_key_from_cross_signing_key(key)
-        except ValueError as e:
-            logger.warning(
-                "Invalid %s key retrieved: %s - %s %s", key_type, key, type(e), e,
-            )
-            raise SynapseError(
-                502, "Invalid %s key retrieved from remote server" % (key_type,)
-            )
 
         return key, key_id, verify_key
 
