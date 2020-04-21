@@ -29,7 +29,7 @@ namespaces:
   rooms: [] # List of room ids we're interested in
 ```
 
-`exclusive`: If enabled registrations of users in that namespace are only allowed for the application service  
-`group_id`: All users of this application service are dynamically registered for this group to e.g. use it as flair
+`exclusive`: If enabled, only this application service is allowed to register users in that namespace
+`group_id`: All users of this application service are dynamically joined to this group. This is useful for e.g user organisation or flairs.
 
 See the [spec](https://matrix.org/docs/spec/application_service/unstable.html) for further details on how application services work.
