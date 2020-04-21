@@ -1051,22 +1051,33 @@ class E2eKeysHandler(object):
             return None, None, None
 
         # Process each of the retrieved cross-signing keys
-        final_key = None
-        final_key_id = None
-        final_verify_key = None
-        device_ids = []
+        desired_key = None
+        desired_key_id = None
+        desired_verify_key = None
+        retrieved_device_ids = []
         for key_type in ["master", "self_signing"]:
             key_content = remote_result.get(key_type + "_key")
             if not key_content:
                 continue
 
-            # At the same time, store this key in the db for
-            # subsequent queries
-            yield self.store.set_e2e_cross_signing_key(
-                user.to_string(), key_type, key_content
-            )
+            # Ensure these keys belong to the correct user
+            if "user_id" not in key_content:
+                logger.warning(
+                    "Invalid %s key retrieved, missing user_id field: %s",
+                    key_type,
+                    key_content
+                )
+                continue
+            if user.to_string() != key_content["user_id"]:
+                logger.warning(
+                    "Found %s key of user %s when querying for keys of user %s",
+                    key_type,
+                    key_content["user_id"],
+                    user.to_string(),
+                )
+                continue
 
-            # Note down the device ID attached to this key
+            # Validate the key contents
             try:
                 # verify_key is a VerifyKey from signedjson, which uses
                 # .version to denote the portion of the key ID after the
@@ -1081,19 +1092,26 @@ class E2eKeysHandler(object):
                     e,
                 )
                 continue
-            device_ids.append(verify_key.version)
+
+            # Note down the device ID attached to this key
+            retrieved_device_ids.append(verify_key.version)
 
             # If this is the desired key type, save it and its ID/VerifyKey
             if key_type == desired_key_type:
-                final_key = key_content
-                final_verify_key = verify_key
-                final_key_id = key_id
+                desired_key = key_content
+                desired_verify_key = verify_key
+                desired_key_id = key_id
+
+            # At the same time, store this key in the db for subsequent queries
+            yield self.store.set_e2e_cross_signing_key(
+                user.to_string(), key_type, key_content
+            )
 
         # Notify clients that new devices for this user have been discovered
-        if device_ids:
-            yield self.device_handler.notify_device_update(user.to_string(), device_ids)
+        if retrieved_device_ids:
+            yield self.device_handler.notify_device_update(user.to_string(), retrieved_device_ids)
 
-        return final_key, final_key_id, final_verify_key
+        return desired_key, desired_key_id, desired_verify_key
 
 
 def _check_cross_signing_key(key, user_id, key_type, signing_key=None):
