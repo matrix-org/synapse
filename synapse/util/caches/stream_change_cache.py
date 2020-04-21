@@ -126,6 +126,9 @@ class StreamChangeCache(object):
         """
         assert type(stream_pos) is int
 
+        # FIXME: add a sanity check here that we are not overwriting existing
+        # data in self._cache
+
         if stream_pos > self._earliest_known_stream_pos:
             old_pos = self._entity_to_key.get(entity, None)
             if old_pos is not None:

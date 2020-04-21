@@ -1,0 +1,1 @@
+Improve typing annotations in `synapse.replication.tcp.streams.Stream`.

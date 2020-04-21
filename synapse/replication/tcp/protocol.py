@@ -201,15 +201,23 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
                 )
                 self.send_error("ping timeout")
 
-    def lineReceived(self, line):
+    def lineReceived(self, line: bytes):
         """Called when we've received a line
         """
         if line.strip() == "":
             # Ignore blank lines
             return
 
-        line = line.decode("utf-8")
-        cmd_name, rest_of_line = line.split(" ", 1)
+        linestr = line.decode("utf-8")
+
+        # split at the first " ", handling one-word commands
+        idx = linestr.index(" ")
+        if idx >= 0:
+            cmd_name = linestr[:idx]
+            rest_of_line = linestr[idx + 1 :]
+        else:
+            cmd_name = linestr
+            rest_of_line = ""
 
         if cmd_name not in self.VALID_INBOUND_COMMANDS:
             logger.error("[%s] invalid command %s", self.id(), cmd_name)

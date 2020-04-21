@@ -735,12 +735,11 @@ media_store_path: "DATADIR/media_store"
 #
 #media_storage_providers:
 #  - module: file_system
-#    # Whether to write new local files.
+#    # Whether to store newly uploaded local files
 #    store_local: false
-#    # Whether to write new remote media
+#    # Whether to store newly downloaded remote files
 #    store_remote: false
-#    # Whether to block upload requests waiting for write to this
-#    # provider to complete
+#    # Whether to wait for successful storage for local uploads
 #    store_synchronous: false
 #    config:
 #       directory: /mnt/some/other/directory
@@ -858,6 +857,31 @@ media_store_path: "DATADIR/media_store"
 # The largest allowed URL preview spidering size in bytes
 #
 #max_spider_size: 10M
+
+# A list of values for the Accept-Language HTTP header used when
+# downloading webpages during URL preview generation. This allows
+# Synapse to specify the preferred languages that URL previews should
+# be in when communicating with remote servers.
+#
+# Each value is a IETF language tag; a 2-3 letter identifier for a
+# language, optionally followed by subtags separated by '-', specifying
+# a country or region variant.
+#
+# Multiple values can be provided, and a weight can be added to each by
+# using quality value syntax (;q=). '*' translates to any language.
+#
+# Defaults to "en".
+#
+# Example:
+#
+# url_preview_accept_language:
+#   - en-UK
+#   - en-US;q=0.9
+#   - fr;q=0.8
+#   - *;q=0.7
+#
+url_preview_accept_language:
+#   - en
 
 
 ## Captcha ##
@@ -1315,32 +1339,32 @@ saml2_config:
   #    remote:
   #      - url: https://our_idp/metadata.xml
   #
-  #    # By default, the user has to go to our login page first. If you'd like
-  #    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-  #    # 'service.sp' section:
-  #    #
-  #    #service:
-  #    #  sp:
-  #    #    allow_unsolicited: true
+  #  # By default, the user has to go to our login page first. If you'd like
+  #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+  #  # 'service.sp' section:
+  #  #
+  #  #service:
+  #  #  sp:
+  #  #    allow_unsolicited: true
   #
-  #    # The examples below are just used to generate our metadata xml, and you
-  #    # may well not need them, depending on your setup. Alternatively you
-  #    # may need a whole lot more detail - see the pysaml2 docs!
+  #  # The examples below are just used to generate our metadata xml, and you
+  #  # may well not need them, depending on your setup. Alternatively you
+  #  # may need a whole lot more detail - see the pysaml2 docs!
   #
-  #    description: ["My awesome SP", "en"]
-  #    name: ["Test SP", "en"]
+  #  description: ["My awesome SP", "en"]
+  #  name: ["Test SP", "en"]
   #
-  #    organization:
-  #      name: Example com
-  #      display_name:
-  #        - ["Example co", "en"]
-  #      url: "http://example.com"
+  #  organization:
+  #    name: Example com
+  #    display_name:
+  #      - ["Example co", "en"]
+  #    url: "http://example.com"
   #
-  #    contact_person:
-  #      - given_name: Bob
-  #        sur_name: "the Sysadmin"
-  #        email_address": ["admin@example.com"]
-  #        contact_type": technical
+  #  contact_person:
+  #    - given_name: Bob
+  #      sur_name: "the Sysadmin"
+  #      email_address": ["admin@example.com"]
+  #      contact_type": technical
 
   # Instead of putting the config inline as above, you can specify a
   # separate pysaml2 configuration file:
@@ -1657,7 +1681,19 @@ email:
   #template_dir: "res/templates"
 
 
-#password_providers:
+# Password providers allow homeserver administrators to integrate
+# their Synapse installation with existing authentication methods
+# ex. LDAP, external tokens, etc.
+#
+# For more information and known implementations, please see
+# https://github.com/matrix-org/synapse/blob/master/docs/password_auth_providers.md
+#
+# Note: instances wishing to use SAML or CAS authentication should
+# instead use the `saml2_config` or `cas_config` options,
+# respectively.
+#
+password_providers:
+#    # Example config for an LDAP auth provider
 #    - module: "ldap_auth_provider.LdapAuthProvider"
 #      config:
 #        enabled: true
