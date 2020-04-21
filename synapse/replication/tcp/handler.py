@@ -115,9 +115,27 @@ class ReplicationCommandHandler:
             from synapse.replication.tcp.redis import (
                 RedisDirectTcpReplicationClientFactory,
             )
+            import txredisapi
 
             logger.info("Connecting to redis.")
-            self._factory = RedisDirectTcpReplicationClientFactory(hs)
+
+            # We need two connections to redis, one for the subscription stream and
+            # one to send commands to (as you can't send further redis commands to a
+            # connection after SUBSCRIBE is called).
+
+            # First create the connection for sending commands.
+            outbound_redis_connection = txredisapi.lazyConnection(
+                host=hs.config.redis_host,
+                port=hs.config.redis_port,
+                dbid=hs.config.redis_dbid,
+                password=hs.config.redis.redis_password,
+                reconnect=True,
+            )
+
+            # Now create the factory/connection for the subscription stream.
+            self._factory = RedisDirectTcpReplicationClientFactory(
+                hs, outbound_redis_connection
+            )
             hs.get_reactor().connectTCP(
                 hs.config.redis.redis_host, hs.config.redis.redis_port, self._factory,
             )

@@ -43,7 +43,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
     handler = None  # type: ReplicationCommandHandler
     stream_name = None  # type: str
-    redis_connection = None  # type: txredisapi.lazyConnection
+    outbound_redis_connection = None  # type: txredisapi.lazyConnection
     conn_id = None  # type: str
 
     def connectionMade(self):
@@ -127,7 +127,9 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
             with PreserveLoggingContext():
                 # Note that we use the other connection as we can't send
                 # commands using the subscription connection.
-                await self.redis_connection.publish(self.stream_name, encoded_string)
+                await self.outbound_redis_connection.publish(
+                    self.stream_name, encoded_string
+                )
 
         run_as_background_process("send-cmd", _send)
 
@@ -141,7 +143,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
     continueTrying = True
     protocol = RedisSubscriber
 
-    def __init__(self, hs):
+    def __init__(self, hs, outbound_redis_connection: txredisapi.lazyConnection):
         super().__init__()
 
         # This sets the password on the RedisFactory base class (as
@@ -151,16 +153,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         self.handler = hs.get_tcp_replication()
         self.stream_name = hs.hostname
 
-        # We need two connections to redis, one for the subscription stream and
-        # one to send commands to (as you can't send further redis commands to a
-        # connection after SUBSCRIBE is called).
-        self.redis_connection = txredisapi.lazyConnection(
-            host=hs.config.redis_host,
-            port=hs.config.redis_port,
-            dbid=hs.config.redis_dbid,
-            password=hs.config.redis.redis_password,
-            reconnect=True,
-        )
+        self.outbound_redis_connection = outbound_redis_connection
 
         self.conn_id = random_string(5)
 
@@ -172,7 +165,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         # the base method does some other things than just instantiating the
         # protocol.
         p.handler = self.handler
-        p.redis_connection = self.redis_connection
+        p.outbound_redis_connection = self.outbound_redis_connection
         p.conn_id = self.conn_id
         p.stream_name = self.stream_name
 
