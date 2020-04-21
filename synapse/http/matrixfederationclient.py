@@ -434,7 +434,6 @@ class MatrixFederationHttpClient(object):
                         logger.info("Failed to send request: %s", e)
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
-
                     incoming_responses_counter.labels(method_bytes, response.code).inc()
 
                     set_tag(tags.HTTP_STATUS_CODE, response.code)
