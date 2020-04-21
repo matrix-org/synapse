@@ -17,6 +17,7 @@
 import contextlib
 import logging
 import sys
+from typing import Iterable
 
 from twisted.internet import defer, reactor
 from twisted.web.resource import NoResource
@@ -38,18 +39,14 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.handlers.presence import (
-    AbstractPresenceHandler,
-    PresenceHandler,
-    get_interested_parties,
-)
+from synapse.handlers.presence import BasePresenceHandler, get_interested_parties
 from synapse.http.server import JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.slave.storage._base import BaseSlavedStore, __func__
+from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
 from synapse.replication.slave.storage.client_ips import SlavedClientIpStore
@@ -228,19 +225,15 @@ class KeyUploadServlet(RestServlet):
 UPDATE_SYNCING_USERS_MS = 10 * 1000
 
 
-class GenericWorkerPresence(AbstractPresenceHandler):
+class GenericWorkerPresence(BasePresenceHandler):
     def __init__(self, hs):
+        super().__init__(hs)
         self.hs = hs
         self.is_mine_id = hs.is_mine_id
         self.http_client = hs.get_simple_http_client()
-        self.store = hs.get_datastore()
         self.user_to_num_current_syncs = {}
-        self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.instance_id = hs.get_instance_id()
-
-        active_presence = self.store.take_presence_startup_info()
-        self.user_to_current_state = {state.user_id: state for state in active_presence}
 
         # user_id -> last_sync_ms. Lists the users that have stopped syncing
         # but we haven't notified the master of that yet
@@ -306,10 +299,6 @@ class GenericWorkerPresence(AbstractPresenceHandler):
     def set_state(self, user, state, ignore_status_msg=False):
         # TODO Hows this supposed to work?
         return defer.succeed(None)
-
-    get_states = __func__(PresenceHandler.get_states)
-    get_state = __func__(PresenceHandler.get_state)
-    current_state_for_users = __func__(PresenceHandler.current_state_for_users)
 
     def user_syncing(self, user_id, affect_presence):
         if affect_presence:

@@ -100,12 +100,19 @@ EXTERNAL_PROCESS_EXPIRY = 5 * 60 * 1000
 assert LAST_ACTIVE_GRANULARITY < IDLE_TIMER
 
 
-class AbstractPresenceHandler(abc.ABC):
-    """The base interface for things implementing PresenceHandler"""
+class BasePresenceHandler(abc.ABC):
+    """Parts of the PresenceHandler that are shared between workers and master"""
+
+    def __init__(self, hs: "synapse.server.HomeServer"):
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+
+        active_presence = self.store.take_presence_startup_info()
+        self.user_to_current_state = {state.user_id: state for state in active_presence}
 
     @abc.abstractmethod
     async def user_syncing(
-        self, user_id: str, affect_presence: bool = True
+        self, user_id: str, affect_presence: bool
     ) -> ContextManager[None]:
         """Returns a context manager that should surround any stream requests
         from the user.
@@ -128,7 +135,23 @@ class AbstractPresenceHandler(abc.ABC):
             set(str): A set of user_id strings.
         """
 
-    @abc.abstractmethod
+    async def get_state(self, target_user: UserID) -> UserPresenceState:
+        results = await self.get_states([target_user.to_string()])
+        return results[0]
+
+    async def get_states(
+        self, target_user_ids: Iterable[str]
+    ) -> List[UserPresenceState]:
+        """Get the presence state for users."""
+
+        updates_d = await self.current_state_for_users(target_user_ids)
+        updates = list(updates_d.values())
+
+        for user_id in set(target_user_ids) - {u.user_id for u in updates}:
+            updates.append(UserPresenceState.default(user_id))
+
+        return updates
+
     async def current_state_for_users(
         self, user_ids: Iterable[str]
     ) -> Dict[str, UserPresenceState]:
@@ -137,23 +160,27 @@ class AbstractPresenceHandler(abc.ABC):
         Returns:
             dict: `user_id` -> `UserPresenceState`
         """
+        states = {
+            user_id: self.user_to_current_state.get(user_id, None)
+            for user_id in user_ids
+        }
 
-    @abc.abstractmethod
-    async def get_state(self, target_user: UserID) -> UserPresenceState:
-        ...
+        missing = [user_id for user_id, state in iteritems(states) if not state]
+        if missing:
+            # There are things not in our in memory cache. Lets pull them out of
+            # the database.
+            res = await self.store.get_presence_for_users(missing)
+            states.update(res)
 
-    @abc.abstractmethod
-    async def get_states(
-        self, target_user_ids: Iterable[str]
-    ) -> List[UserPresenceState]:
-        """Get the presence state for users.
+            missing = [user_id for user_id, state in iteritems(states) if not state]
+            if missing:
+                new = {
+                    user_id: UserPresenceState.default(user_id) for user_id in missing
+                }
+                states.update(new)
+                self.user_to_current_state.update(new)
 
-        Args:
-            target_user_ids (list)
-
-        Returns:
-            list
-        """
+        return states
 
     @abc.abstractmethod
     async def set_state(
@@ -162,13 +189,12 @@ class AbstractPresenceHandler(abc.ABC):
         """Set the presence state of the user. """
 
 
-class PresenceHandler(AbstractPresenceHandler):
+class PresenceHandler(BasePresenceHandler):
     def __init__(self, hs: "synapse.server.HomeServer"):
+        super().__init__(hs)
         self.hs = hs
         self.is_mine_id = hs.is_mine_id
         self.server_name = hs.hostname
-        self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
         self.wheel_timer = WheelTimer()
         self.notifier = hs.get_notifier()
         self.federation = hs.get_federation_sender()
@@ -178,13 +204,6 @@ class PresenceHandler(AbstractPresenceHandler):
 
         federation_registry.register_edu_handler("m.presence", self.incoming_presence)
 
-        active_presence = self.store.take_presence_startup_info()
-
-        # A dictionary of the current state of users. This is prefilled with
-        # non-offline presence from the DB. We should fetch from the DB if
-        # we can't find a users presence in here.
-        self.user_to_current_state = {state.user_id: state for state in active_presence}
-
         LaterGauge(
             "synapse_handlers_presence_user_to_current_state_size",
             "",
@@ -193,7 +212,7 @@ class PresenceHandler(AbstractPresenceHandler):
         )
 
         now = self.clock.time_msec()
-        for state in active_presence:
+        for state in self.user_to_current_state.values():
             self.wheel_timer.insert(
                 now=now, obj=state.user_id, then=state.last_active_ts + IDLE_TIMER
             )
@@ -617,34 +636,6 @@ class PresenceHandler(AbstractPresenceHandler):
         res = await self.current_state_for_users([user_id])
         return res[user_id]
 
-    async def current_state_for_users(self, user_ids):
-        """Get the current presence state for multiple users.
-
-        Returns:
-            dict: `user_id` -> `UserPresenceState`
-        """
-        states = {
-            user_id: self.user_to_current_state.get(user_id, None)
-            for user_id in user_ids
-        }
-
-        missing = [user_id for user_id, state in iteritems(states) if not state]
-        if missing:
-            # There are things not in our in memory cache. Lets pull them out of
-            # the database.
-            res = await self.store.get_presence_for_users(missing)
-            states.update(res)
-
-            missing = [user_id for user_id, state in iteritems(states) if not state]
-            if missing:
-                new = {
-                    user_id: UserPresenceState.default(user_id) for user_id in missing
-                }
-                states.update(new)
-                self.user_to_current_state.update(new)
-
-        return states
-
     async def _persist_and_notify(self, states):
         """Persist states in the database, poke the notifier and send to
         interested remote servers
@@ -731,23 +722,6 @@ class PresenceHandler(AbstractPresenceHandler):
         if updates:
             federation_presence_counter.inc(len(updates))
             await self._update_states(updates)
-
-    async def get_state(self, target_user: UserID) -> UserPresenceState:
-        results = await self.get_states([target_user.to_string()])
-        return results[0]
-
-    async def get_states(
-        self, target_user_ids: Iterable[str]
-    ) -> List[UserPresenceState]:
-        """Get the presence state for users."""
-
-        updates = await self.current_state_for_users(target_user_ids)
-        updates = list(updates.values())
-
-        for user_id in set(target_user_ids) - {u.user_id for u in updates}:
-            updates.append(UserPresenceState.default(user_id))
-
-        return updates
 
     async def set_state(self, target_user, state, ignore_status_msg=False):
         """Set the presence state of the user.
@@ -935,7 +909,7 @@ class PresenceHandler(AbstractPresenceHandler):
             user_ids = await self.state.get_current_users_in_room(room_id)
             user_ids = list(filter(self.is_mine_id, user_ids))
 
-            states = await self.current_state_for_users(user_ids)
+            states_d = await self.current_state_for_users(user_ids)
 
             # Filter out old presence, i.e. offline presence states where
             # the user hasn't been active for a week. We can change this
@@ -945,7 +919,7 @@ class PresenceHandler(AbstractPresenceHandler):
             now = self.clock.time_msec()
             states = [
                 state
-                for state in states.values()
+                for state in states_d.values()
                 if state.state != PresenceState.OFFLINE
                 or now - state.last_active_ts < 7 * 24 * 60 * 60 * 1000
                 or state.status_msg is not None
