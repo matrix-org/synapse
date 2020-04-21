@@ -62,7 +62,7 @@ class OIDCConfig(Config):
         self.oidc_client_id = oidc_config["client_id"]
         self.oidc_client_secret = oidc_config["client_secret"]
         self.oidc_client_auth_method = oidc_config.get(
-            "client_auth_method", "client_auth_basic"
+            "client_auth_method", "client_secret_basic"
         )
         self.oidc_scopes = oidc_config.get("scopes", ["openid"])
         self.oidc_authorization_endpoint = oidc_config.get("authorization_endpoint")
