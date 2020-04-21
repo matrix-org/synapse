@@ -114,7 +114,7 @@ class EmailConfig(Config):
                 # account_threepid_delegate_email is expected to. Presume https
                 self.account_threepid_delegate_email = (
                     "https://" + first_trusted_identity_server
-                )
+                )  # type: str
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
