@@ -1529,6 +1529,27 @@ oidc_config:
         #
         #display_name: '{{ user.given_name }} {{ user.last_name }}'
 
+    # Directory in which Synapse will try to find the template files below.
+    # If not set, default templates from within the Synapse package will be used.
+    #
+    # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+    # If you *do* uncomment it, you will need to make sure that all the templates
+    # below are in the directory.
+    #
+    # Synapse will look for the following templates in this directory:
+    #
+    # * HTML page to display to users if something goes wrong during the
+    #   authentication process: 'oidc_error.html'.
+    #
+    #   When rendering, this template is given two variables:
+    #     * error: the technical name of the error
+    #     * error_description: a human-readable message for the error
+    #
+    # You can see the default templates at:
+    # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+    #
+    #template_dir: "res/templates"
+
 
 
 # Enable CAS for registration and login.
