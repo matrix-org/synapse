@@ -58,7 +58,7 @@ class UIAuthStore(SQLBaseStore):
                 attempts += 1
         raise StoreError(500, "Couldn't generate a session ID.")
 
-    async def get_session(self, session_id: str):
+    async def get_session(self, session_id: str) -> Dict[str, Any]:
         """Retrieve a UI auth session.
 
         Args:
@@ -232,7 +232,7 @@ class UIAuthStore(SQLBaseStore):
 
     async def get_session_data(
         self, session_id: str, key: str, default: Optional[Any] = None
-    ):
+    ) -> Any:
         """
         Retrieve data stored with set_session_data
 
