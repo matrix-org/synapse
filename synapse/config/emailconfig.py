@@ -108,9 +108,12 @@ class EmailConfig(Config):
             if self.trusted_third_party_id_servers:
                 # XXX: It's a little confusing that account_threepid_delegate_email is modified
                 # both in RegistrationConfig and here. We should factor this bit out
-                self.account_threepid_delegate_email = self.trusted_third_party_id_servers[
-                    0
-                ]  # type: Optional[str]
+
+                first_trusted_identity_server = self.trusted_third_party_id_servers[0]
+
+                # This config option does not contain a scheme whereas
+                # account_threepid_delegate_email is expected to. Presume https
+                self.account_threepid_delegate_email = "https://" + first_trusted_identity_server
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
