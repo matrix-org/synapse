@@ -19,6 +19,8 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from prometheus_client import Counter
 
+from twisted.internet.protocol import ReconnectingClientFactory
+
 from synapse.metrics import LaterGauge
 from synapse.replication.tcp.client import DirectTcpReplicationClientFactory
 from synapse.replication.tcp.commands import (
@@ -82,7 +84,7 @@ class ReplicationCommandHandler:
         self._pending_batches = {}  # type: Dict[str, List[Any]]
 
         # The factory used to create connections.
-        self._factory = None  # type: Optional[DirectTcpReplicationClientFactory]
+        self._factory = None  # type: Optional[ReconnectingClientFactory]
 
         # The currently connected connections.
         self._connections = []  # type: List[AbstractConnection]

@@ -21,6 +21,7 @@ import txredisapi
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.commands import COMMAND_MAP, Command, ReplicateCommand
+from synapse.replication.tcp.protocol import AbstractConnection
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
@@ -152,7 +153,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
 
         # We need two connections to redis, one for the subscription stream and
         # one to send commands to (as you can't send further redis commands to a
-        # connection after SUBSCIBE is called).
+        # connection after SUBSCRIBE is called).
         self.redis_connection = txredisapi.lazyConnection(
             host=hs.config.redis_host,
             port=hs.config.redis_port,
@@ -176,3 +177,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         p.stream_name = self.stream_name
 
         return p
+
+
+# This tells python that `RedisSubscriber` implements the interface.
+AbstractConnection.register(RedisSubscriber)

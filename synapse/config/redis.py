@@ -16,11 +16,6 @@
 from synapse.config._base import Config
 from synapse.python_dependencies import check_requirements
 
-try:
-    import txredisapi
-except ImportError:
-    txredisapi = None
-
 
 class RedisConfig(Config):
     section = "redis"
