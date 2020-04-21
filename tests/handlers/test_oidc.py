@@ -16,7 +16,7 @@
 from contextlib import contextmanager
 from urllib.parse import parse_qs, urlparse
 
-from mock import AsyncMock, Mock
+from mock import Mock
 
 import pymacaroons
 
@@ -54,6 +54,14 @@ COMMON_CONFIG = {
 # between the callback & redirect handlers.
 COOKIE_NAME = b"oidc_session"
 COOKIE_PATH = "/_synapse/oidc"
+
+
+def simple_async_mock(return_value):
+    # AsyncMock is not available in python3.5, this mimics part of its behaviour
+    async def cb(*args, **kwargs):
+        return return_value
+
+    return Mock(side_effect=cb)
 
 
 def get_jwks():
@@ -306,9 +314,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "preferred_username": "bar",
         }
         user_id = UserID("foo", "domain.org")
-        self.handler._exchange_code = AsyncMock(return_value=token)
-        self.handler._parse_id_token = AsyncMock(return_value=userinfo)
-        self.handler._map_userinfo_to_user = AsyncMock(return_value=user_id)
+        self.handler._exchange_code = simple_async_mock(return_value=token)
+        self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
+        self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
         self.handler._auth_handler.complete_sso_login = Mock()
         request = Mock(spec=["args", "getCookie", "addCookie"])
 
@@ -378,7 +386,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @defer.inlineCallbacks
     def test_exchange_code(self):
         token = {"type": "bearer"}
-        self.http_client.post_urlencoded_get_json = AsyncMock(return_value=token)
+        self.http_client.post_urlencoded_get_json = simple_async_mock(
+            return_value=token
+        )
         code = "code"
         ret = yield defer.ensureDeferred(self.handler._exchange_code(code))
         uri, args = self.http_client.post_urlencoded_get_json.call_args[0]
@@ -392,7 +402,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertEqual(args["redirect_uri"], CALLBACK_URL)
 
         # Test error handling
-        self.http_client.post_urlencoded_get_json = AsyncMock(
+        self.http_client.post_urlencoded_get_json = simple_async_mock(
             return_value={"error": "foo", "error_description": "bar"}
         )
         with self.assertRaises(OidcError) as exc:
