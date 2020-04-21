@@ -264,3 +264,34 @@ Response:
 
 Once the `next_token` parameter is no longer present, we know we've reached the
 end of the list.
+
+# DRAFT: Room Details API
+
+The Room Details admin API allows server admins to get all details of a room,
+including a list of all room members.
+
+This API is still a draft and details might change!
+
+## Usage
+
+A standard request:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>
+
+{}
+```
+
+Response:
+
+```
+{
+  "room_id": "!OGEhHVWSdvArJzumhm:matrix.org",
+  "name": "Matrix HQ",
+  "canonical_alias": "#matrix:matrix.org",
+  "join_rules": "invite",
+  "guest_access": "can_join",
+  "topic": "A room topic",
+  "members": ["@foo:matrix.org", "@bar:matrix.org"]
+}
+```

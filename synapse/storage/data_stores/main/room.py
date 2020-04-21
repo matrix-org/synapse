@@ -98,6 +98,52 @@ class RoomWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
+    def get_room_stats_state(self, room_id):
+        """Retrieve room stats state.
+
+        Args:
+            room_id (str): The ID of the room to retrieve.
+        Returns:
+            A dict containing the room information, or None if the room is unknown.
+        """
+        return self.db.simple_select_one(
+            table="room_stats_state",
+            keyvalues={"room_id": room_id},
+            retcols=(
+                "room_id",
+                "name",
+                "canonical_alias",
+                "encryption",
+                "is_federatable",
+                "join_rules",
+                "guest_access",
+                "history_visibility" "topic",
+            ),
+            desc="get_room_stats_state",
+            allow_none=True,
+        )
+
+    def get_room_stats_current(self, room_id):
+        """Retrieve current room stats.
+
+        Args:
+            room_id (str): The ID of the room to retrieve.
+        Returns:
+            A dict containing the room information, or None if the room is unknown.
+        """
+        return self.db.simple_select_one(
+            table="room_stats_state",
+            keyvalues={"room_id": room_id},
+            retcols=(
+                "room_id",
+                "joined_members",
+                "local_users_in_room",
+                "current_state_events",
+            ),
+            desc="get_room_stats_current",
+            allow_none=True,
+        )
+
     def get_public_room_ids(self):
         return self.db.simple_select_onecol(
             table="rooms",

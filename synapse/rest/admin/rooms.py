@@ -169,7 +169,7 @@ class ListRoomRestServlet(RestServlet):
     in a dictionary containing room information. Supports pagination.
     """
 
-    PATTERNS = admin_patterns("/rooms")
+    PATTERNS = admin_patterns("/rooms$")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -251,6 +251,43 @@ class ListRoomRestServlet(RestServlet):
                 response["prev_batch"] = 0
 
         return 200, response
+
+
+class RoomRestServlet(RestServlet):
+    """Get room details.
+    This needs user to have administrator access in Synapse.
+    TODO: Return power level for each user
+    TODO: Add on_POST to allow room creation without joining the room
+
+    GET /_synapse/admin/v1/rooms/<room_id>
+
+    returns:
+        200 OK with users if success otherwise an error.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        ret = await self.store.get_room_stats_state(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        stats_curr = await self.store.get_room_stats_current(room_id)
+        if stats_curr:
+            ret.update(stats_curr)
+
+        members = await self.store.get_users_in_room(room_id)
+        ret["members"] = members if members else []
+
+        return 200, ret
 
 
 class JoinRoomAliasServlet(RestServlet):
