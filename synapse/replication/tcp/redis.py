@@ -20,7 +20,11 @@ import txredisapi
 
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.tcp.commands import COMMAND_MAP, Command, ReplicateCommand
+from synapse.replication.tcp.commands import (
+    Command,
+    ReplicateCommand,
+    parse_command_from_line,
+)
 from synapse.replication.tcp.protocol import AbstractConnection
 from synapse.util.stringutils import random_string
 
@@ -61,18 +65,11 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
             # Ignore blank lines
             return
 
-        line = message
-        cmd_name, rest_of_line = line.split(" ", 1)
-
-        cmd_cls = COMMAND_MAP[cmd_name]
         try:
-            cmd = cmd_cls.from_line(rest_of_line)
+            cmd = parse_command_from_line(message)
         except Exception:
             logger.exception(
-                "[%s] failed to parse line %r: %r",
-                self.conn_id(),
-                cmd_name,
-                rest_of_line,
+                "[%s] failed to parse line: %r", self.conn_id, message,
             )
             return
 
