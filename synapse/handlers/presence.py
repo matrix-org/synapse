@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +25,7 @@ The methods that define policy are:
 
 import logging
 from contextlib import contextmanager
-from typing import Dict, List, Set
+from typing import Dict, Iterable, List, Set
 
 from six import iteritems, itervalues
 
@@ -669,21 +670,14 @@ class PresenceHandler(object):
             federation_presence_counter.inc(len(updates))
             await self._update_states(updates)
 
-    async def get_state(self, target_user, as_event=False):
-        results = await self.get_states([target_user.to_string()], as_event=as_event)
-
+    async def get_state(self, target_user: UserID) -> UserPresenceState:
+        results = await self.get_states([target_user.to_string()])
         return results[0]
 
-    async def get_states(self, target_user_ids, as_event=False):
-        """Get the presence state for users.
-
-        Args:
-            target_user_ids (list)
-            as_event (bool): Whether to format it as a client event or not.
-
-        Returns:
-            list
-        """
+    async def get_states(
+        self, target_user_ids: Iterable[str]
+    ) -> List[UserPresenceState]:
+        """Get the presence state for users."""
 
         updates = await self.current_state_for_users(target_user_ids)
         updates = list(updates.values())
@@ -691,17 +685,7 @@ class PresenceHandler(object):
         for user_id in set(target_user_ids) - {u.user_id for u in updates}:
             updates.append(UserPresenceState.default(user_id))
 
-        now = self.clock.time_msec()
-        if as_event:
-            return [
-                {
-                    "type": "m.presence",
-                    "content": format_user_presence_state(state, now),
-                }
-                for state in updates
-            ]
-        else:
-            return updates
+        return updates
 
     async def set_state(self, target_user, state, ignore_status_msg=False):
         """Set the presence state of the user.

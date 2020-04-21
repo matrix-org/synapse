@@ -97,6 +97,8 @@ class EventTypes(object):
 
     Retention = "m.room.retention"
 
+    Presence = "m.presence"
+
 
 class RejectedReason(object):
     AUTH_ERROR = "auth_error"
