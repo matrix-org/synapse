@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class RedisSubscriber(txredisapi.SubscriberProtocol):
+class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     """Connection to redis subscribed to replication stream.
 
     Parses incoming messages from redis into replication commands, and passes
@@ -43,7 +43,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
 
     handler = None  # type: ReplicationCommandHandler
     stream_name = None  # type: str
-    outbound_redis_connection = None  # type: txredisapi.lazyConnection
+    outbound_redis_connection = None  # type: txredisapi.RedisProtocol
     conn_id = None  # type: str
 
     def connectionMade(self):
@@ -67,12 +67,12 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
         cmd_cls = COMMAND_MAP[cmd_name]
         try:
             cmd = cmd_cls.from_line(rest_of_line)
-        except Exception as e:
+        except Exception:
             logger.exception(
-                "[%s] failed to parse line %r: %r", self.id(), cmd_name, rest_of_line
-            )
-            self.send_error(
-                "failed to parse line for  %r: %r (%r):" % (cmd_name, e, rest_of_line)
+                "[%s] failed to parse line %r: %r",
+                self.conn_id(),
+                cmd_name,
+                rest_of_line,
             )
             return
 
@@ -143,7 +143,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
     continueTrying = True
     protocol = RedisSubscriber
 
-    def __init__(self, hs, outbound_redis_connection: txredisapi.lazyConnection):
+    def __init__(self, hs, outbound_redis_connection: txredisapi.RedisProtocol):
         super().__init__()
 
         # This sets the password on the RedisFactory base class (as
@@ -170,7 +170,3 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         p.stream_name = self.stream_name
 
         return p
-
-
-# This tells python that `RedisSubscriber` implements the interface.
-AbstractConnection.register(RedisSubscriber)
