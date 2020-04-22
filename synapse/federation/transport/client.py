@@ -399,20 +399,24 @@ class TransportLayerClient(object):
             {
               "device_keys": {
                 "<user_id>": ["<device_id>"]
-            } }
+              }
+            }
 
         Response:
             {
               "device_keys": {
                 "<user_id>": {
                   "<device_id>": {...}
-              } },
+                }
+              },
               "master_key": {
                 "<user_id>": {...}
-              } },
+                }
+              },
               "self_signing_key": {
                 "<user_id>": {...}
-            } }
+              }
+            }
 
         Args:
             destination(str): The server to query.
@@ -442,7 +446,8 @@ class TransportLayerClient(object):
                 "keys": {...},
                 "signatures": {
                   "<user_id>": {...}
-              } },
+              }
+            },
               "self_signing_key": {
                 "user_id": "<user_id>",
                 "usage": [...],
@@ -450,7 +455,8 @@ class TransportLayerClient(object):
                 "signatures": {
                   "<user_id>": {...}
                 }
-            } }
+              }
+            }
 
         Args:
             destination(str): The server to query.
@@ -474,8 +480,10 @@ class TransportLayerClient(object):
             {
               "one_time_keys": {
                 "<user_id>": {
-                    "<device_id>": "<algorithm>"
-            } } }
+                  "<device_id>": "<algorithm>"
+                }
+              }
+            }
 
         Response:
             {
@@ -483,7 +491,10 @@ class TransportLayerClient(object):
                 "<user_id>": {
                   "<device_id>": {
                     "<algorithm>:<key_id>": "<key_base64>"
-            } } } }
+                  }
+                }
+              }
+            }
 
         Args:
             destination(str): The server to query.
