@@ -446,8 +446,8 @@ class TransportLayerClient(object):
                 "keys": {...},
                 "signatures": {
                   "<user_id>": {...}
-              }
-            },
+                }
+              },
               "self_signing_key": {
                 "user_id": "<user_id>",
                 "usage": [...],
