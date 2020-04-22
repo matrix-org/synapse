@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict, Iterable, List, Mapping, Optional, Set
 
 from six import integer_types
 
@@ -23,8 +24,11 @@ from synapse.util import caches
 
 logger = logging.getLogger(__name__)
 
+# for now, assume all entities in the cache are strings
+EntityType = str
 
-class StreamChangeCache(object):
+
+class StreamChangeCache:
     """Keeps track of the stream positions of the latest change in a set of entities.
 
     Typically the entity will be a room or user id.
@@ -34,10 +38,23 @@ class StreamChangeCache(object):
     old then the cache will simply return all given entities.
     """
 
-    def __init__(self, name, current_stream_pos, max_size=10000, prefilled_cache=None):
+    def __init__(
+        self,
+        name: str,
+        current_stream_pos: int,
+        max_size=10000,
+        prefilled_cache: Optional[Mapping[EntityType, int]] = None,
+    ):
         self._max_size = int(max_size * caches.CACHE_SIZE_FACTOR)
-        self._entity_to_key = {}
-        self._cache = SortedDict()
+        self._entity_to_key = {}  # type: Dict[EntityType, int]
+
+        # map from stream id to the a set of entities which changed at that stream id.
+        self._cache = SortedDict()  # type: SortedDict[int, Set[EntityType]]
+
+        # the earliest stream_pos for which we can reliably answer
+        # get_all_entities_changed. In other words, one less than the earliest
+        # stream_pos for which we know _cache is valid.
+        #
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
         self.metrics = caches.register_cache("cache", self.name, self._cache)
@@ -46,7 +63,7 @@ class StreamChangeCache(object):
             for entity, stream_pos in prefilled_cache.items():
                 self.entity_has_changed(entity, stream_pos)
 
-    def has_entity_changed(self, entity, stream_pos):
+    def has_entity_changed(self, entity: EntityType, stream_pos: int) -> bool:
         """Returns True if the entity may have been updated since stream_pos
         """
         assert type(stream_pos) in integer_types
@@ -67,22 +84,17 @@ class StreamChangeCache(object):
         self.metrics.inc_hits()
         return False
 
-    def get_entities_changed(self, entities, stream_pos):
+    def get_entities_changed(
+        self, entities: Iterable[EntityType], stream_pos: int
+    ) -> Set[EntityType]:
         """
         Returns subset of entities that have had new things since the given
         position.  Entities unknown to the cache will be returned.  If the
         position is too old it will just return the given list.
         """
-        assert type(stream_pos) is int
-
-        if stream_pos >= self._earliest_known_stream_pos:
-            changed_entities = {
-                self._cache[k]
-                for k in self._cache.islice(start=self._cache.bisect_right(stream_pos))
-            }
-
-            result = changed_entities.intersection(entities)
-
+        changed_entities = self.get_all_entities_changed(stream_pos)
+        if changed_entities is not None:
+            result = set(changed_entities).intersection(entities)
             self.metrics.inc_hits()
         else:
             result = set(entities)
@@ -90,13 +102,13 @@ class StreamChangeCache(object):
 
         return result
 
-    def has_any_entity_changed(self, stream_pos):
+    def has_any_entity_changed(self, stream_pos: int) -> bool:
         """Returns if any entity has changed
         """
         assert type(stream_pos) is int
 
         if not self._cache:
-            # If we have no cache, nothing can have changed.
+            # If the cache is empty, nothing can have changed.
             return False
 
         if stream_pos >= self._earliest_known_stream_pos:
@@ -106,45 +118,58 @@ class StreamChangeCache(object):
             self.metrics.inc_misses()
             return True
 
-    def get_all_entities_changed(self, stream_pos):
-        """Returns all entites that have had new things since the given
+    def get_all_entities_changed(self, stream_pos: int) -> Optional[List[EntityType]]:
+        """Returns all entities that have had new things since the given
         position. If the position is too old it will return None.
+
+        Returns the entities in the order that they were changed.
         """
         assert type(stream_pos) is int
 
-        if stream_pos >= self._earliest_known_stream_pos:
-            return [
-                self._cache[k]
-                for k in self._cache.islice(start=self._cache.bisect_right(stream_pos))
-            ]
-        else:
+        if stream_pos < self._earliest_known_stream_pos:
             return None
 
-    def entity_has_changed(self, entity, stream_pos):
+        changed_entities = []  # type: List[EntityType]
+
+        for k in self._cache.islice(start=self._cache.bisect_right(stream_pos)):
+            changed_entities.extend(self._cache[k])
+        return changed_entities
+
+    def entity_has_changed(self, entity: EntityType, stream_pos: int) -> None:
         """Informs the cache that the entity has been changed at the given
         position.
         """
         assert type(stream_pos) is int
 
-        # FIXME: add a sanity check here that we are not overwriting existing
-        # data in self._cache
+        if stream_pos <= self._earliest_known_stream_pos:
+            return
 
-        if stream_pos > self._earliest_known_stream_pos:
-            old_pos = self._entity_to_key.get(entity, None)
-            if old_pos is not None:
-                stream_pos = max(stream_pos, old_pos)
-                self._cache.pop(old_pos, None)
-            self._cache[stream_pos] = entity
-            self._entity_to_key[entity] = stream_pos
+        old_pos = self._entity_to_key.get(entity, None)
+        if old_pos is not None:
+            if old_pos >= stream_pos:
+                # nothing to do
+                return
+            e = self._cache[old_pos]
+            e.remove(entity)
+            if not e:
+                # cache at this point is now empty
+                del self._cache[old_pos]
 
-            while len(self._cache) > self._max_size:
-                k, r = self._cache.popitem(0)
-                self._earliest_known_stream_pos = max(
-                    k, self._earliest_known_stream_pos
-                )
-                self._entity_to_key.pop(r, None)
+        e1 = self._cache.get(stream_pos)
+        if e1 is None:
+            e1 = self._cache[stream_pos] = set()
+        e1.add(entity)
+        self._entity_to_key[entity] = stream_pos
 
-    def get_max_pos_of_last_change(self, entity):
+        # if the cache is too big, remove entries
+        while len(self._cache) > self._max_size:
+            k, r = self._cache.popitem(0)
+            self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
+            for entity in r:
+                del self._entity_to_key[entity]
+
+    def get_max_pos_of_last_change(self, entity: EntityType) -> int:
+
         """Returns an upper bound of the stream id of the last change to an
         entity.
         """
