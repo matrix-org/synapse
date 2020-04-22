@@ -307,13 +307,12 @@ class AuthHandler(BaseHandler):
 
         # If there's no session ID, create a new session.
         if not sid:
-            session_id = await self.store.create_ui_auth_session(
+            session = await self.store.create_ui_auth_session(
                 clientdict, uri, method, description
             )
 
         else:
             session = await self.store.get_ui_auth_session(sid)
-            session_id = sid
 
             if not clientdict:
                 # This was designed to allow the client to omit the parameters
@@ -325,7 +324,7 @@ class AuthHandler(BaseHandler):
                 # on a homeserver.
                 # Revisit: Assuming the REST APIs do sensible validation, the data
                 # isn't arbitrary.
-                clientdict = session["clientdict"]
+                clientdict = session.clientdict
 
             # Ensure that the queried operation does not vary between stages of
             # the UI authentication session. This is done by generating a stable
@@ -333,7 +332,7 @@ class AuthHandler(BaseHandler):
             # and storing it during the initial query. Subsequent queries ensure
             # that this comparator has not changed.
             comparator = (uri, method, clientdict)
-            if (session["uri"], session["method"], session["clientdict"]) != comparator:
+            if (session.uri, session.method, session.clientdict) != comparator:
                 raise SynapseError(
                     403,
                     "Requested operation has changed during the UI authentication session.",
@@ -341,7 +340,7 @@ class AuthHandler(BaseHandler):
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session_id)
+                self._auth_dict_for_flows(flows, session.session_id)
             )
 
         # check auth type currently being presented
@@ -352,7 +351,7 @@ class AuthHandler(BaseHandler):
                 result = await self._check_auth_dict(authdict, clientip)
                 if result:
                     await self.store.mark_ui_auth_stage_complete(
-                        session_id, login_type, result
+                        session.session_id, login_type, result
                     )
             except LoginError as e:
                 if login_type == LoginType.EMAIL_IDENTITY:
@@ -369,7 +368,7 @@ class AuthHandler(BaseHandler):
                 # so that the client can have another go.
                 errordict = e.error_dict()
 
-        creds = await self.store.get_completed_ui_auth_stages(session_id)
+        creds = await self.store.get_completed_ui_auth_stages(session.session_id)
         for f in flows:
             if len(set(f) - set(creds)) == 0:
                 # it's very useful to know what args are stored, but this can
@@ -383,9 +382,9 @@ class AuthHandler(BaseHandler):
                     list(clientdict),
                 )
 
-                return creds, clientdict, session_id
+                return creds, clientdict, session.session_id
 
-        ret = self._auth_dict_for_flows(flows, session_id)
+        ret = self._auth_dict_for_flows(flows, session.session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
         raise InteractiveAuthIncompleteError(ret)
@@ -1003,7 +1002,7 @@ class AuthHandler(BaseHandler):
         """
         session = await self.store.get_ui_auth_session(session_id)
         return self._sso_auth_confirm_template.render(
-            description=session["description"], redirect_url=redirect_url,
+            description=session.description, redirect_url=redirect_url,
         )
 
     async def complete_sso_ui_auth(

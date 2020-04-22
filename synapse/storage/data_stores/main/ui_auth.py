@@ -15,10 +15,27 @@
 import json
 from typing import Any, Dict, Optional, Union
 
+import attr
+
 import synapse.util.stringutils as stringutils
 from synapse.api.errors import StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore
 from synapse.types import JsonDict
+
+
+@attr.s
+class UIAuthSessionData:
+    session_id = attr.ib(type=str)
+    # The dictionary from the client root level, not the 'auth' key.
+    clientdict = attr.ib(type=JsonDict)
+    # The URI and method the session was intiatied with, these are checked at
+    # each stage of the authentication to ensure that the asked for operation
+    # has not changed.
+    uri = attr.ib(type=str)
+    method = attr.ib(type=str)
+    # A string description of the operation that the current authentication is
+    # authorising.
+    description = attr.ib(type=str)
 
 
 class UIAuthStore(SQLBaseStore):
@@ -28,7 +45,7 @@ class UIAuthStore(SQLBaseStore):
 
     async def create_ui_auth_session(
         self, clientdict: JsonDict, uri: str, method: str, description: str,
-    ) -> str:
+    ) -> UIAuthSessionData:
         """
         Creates a new user interactive authentication session.
 
@@ -39,7 +56,7 @@ class UIAuthStore(SQLBaseStore):
             clientdict:
                 The dictionary from the client root level, not the 'auth' key.
             uri:
-                The URI this session was initiated from, this is checked at each
+                The URI this session was initiated with, this is checked at each
                 stage of the authentication to ensure that the asked for
                 operation has not changed.
             method:
@@ -51,7 +68,7 @@ class UIAuthStore(SQLBaseStore):
                 authentication is authorising.
 
         Returns:
-            The created session ID.
+            The newly created session.
 
         """
         # The clientdict gets stored as JSON.
@@ -77,12 +94,14 @@ class UIAuthStore(SQLBaseStore):
                     },
                     desc="create_ui_auth_session",
                 )
-                return session_id
+                return UIAuthSessionData(
+                    session_id, clientdict, uri, method, description
+                )
             except self.db.engine.module.IntegrityError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a session ID.")
 
-    async def get_ui_auth_session(self, session_id: str) -> Dict[str, Any]:
+    async def get_ui_auth_session(self, session_id: str) -> UIAuthSessionData:
         """Retrieve a UI auth session.
 
         Args:
@@ -104,7 +123,7 @@ class UIAuthStore(SQLBaseStore):
 
         result["clientdict"] = json.loads(result["clientdict"])
 
-        return result
+        return UIAuthSessionData(session_id, **result)
 
     def delete_old_ui_auth_sessions(self, expiration_time: int):
         """
