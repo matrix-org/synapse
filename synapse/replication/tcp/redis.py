@@ -27,8 +27,8 @@ from synapse.replication.tcp.commands import (
 )
 from synapse.replication.tcp.protocol import (
     AbstractConnection,
-    tcp_inbound_commands,
-    tcp_outbound_commands,
+    tcp_inbound_commands_counter,
+    tcp_outbound_commands_counter,
 )
 
 if TYPE_CHECKING:
@@ -85,7 +85,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
 
         # We use "redis" as the name here as we don't have 1:1 connections to
         # remote instances.
-        tcp_inbound_commands.labels(cmd.NAME, "redis").inc()
+        tcp_inbound_commands_counter.labels(cmd.NAME, "redis").inc()
 
         # Now lets try and call on_<CMD_NAME> function
         run_as_background_process(
@@ -136,7 +136,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
 
         # We use "redis" as the name here as we don't have 1:1 connections to
         # remote instances.
-        tcp_outbound_commands.labels(cmd.NAME, "redis").inc()
+        tcp_outbound_commands_counter.labels(cmd.NAME, "redis").inc()
 
         async def _send():
             with PreserveLoggingContext():

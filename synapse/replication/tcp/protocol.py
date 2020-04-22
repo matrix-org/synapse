@@ -83,12 +83,16 @@ connection_close_counter = Counter(
     "synapse_replication_tcp_protocol_close_reason", "", ["reason_type"]
 )
 
-tcp_inbound_commands = Counter(
-    "synapse_replication_tcp_protocol_inbound_commands", "", ["command", "name"],
+tcp_inbound_commands_counter = Counter(
+    "synapse_replication_tcp_protocol_inbound_commands",
+    "Number of commands received from replication",
+    ["command", "name"],
 )
 
-tcp_outbound_commands = Counter(
-    "synapse_replication_tcp_protocol_outbound_commands", "", ["command", "name"],
+tcp_outbound_commands_counter = Counter(
+    "synapse_replication_tcp_protocol_outbound_commands",
+    "Number of commands sent to replication",
+    ["command", "name"],
 )
 
 # A list of all connected protocols. This allows us to send metrics about the
@@ -226,7 +230,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         self.last_received_command = self.clock.time_msec()
 
-        tcp_inbound_commands.labels(cmd.NAME, self.name).inc()
+        tcp_inbound_commands_counter.labels(cmd.NAME, self.name).inc()
 
         # Now lets try and call on_<CMD_NAME> function
         run_as_background_process(
@@ -292,7 +296,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             self._queue_command(cmd)
             return
 
-        tcp_outbound_commands.labels(cmd.NAME, self.name).inc()
+        tcp_outbound_commands_counter.labels(cmd.NAME, self.name).inc()
 
         string = "%s %s" % (cmd.NAME, cmd.to_line())
         if "\n" in string:
