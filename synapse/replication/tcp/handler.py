@@ -337,13 +337,6 @@ class ReplicationCommandHandler:
         if self._is_master:
             self._notifier.notify_remote_server_up(cmd.data)
 
-    def get_currently_syncing_users(self):
-        """Get the list of currently syncing users (if any). This is called
-        when a connection has been established and we need to send the
-        currently syncing users.
-        """
-        return self._presence_handler.get_currently_syncing_users()
-
     def new_connection(self, connection: AbstractConnection):
         """Called when we have a new connection.
         """
@@ -361,9 +354,11 @@ class ReplicationCommandHandler:
         if self._factory:
             self._factory.resetDelay()
 
-        # Tell the server if we have any users currently syncing (should only
-        # happen on synchrotrons)
-        currently_syncing = self.get_currently_syncing_users()
+        # Tell the other end if we have any users currently syncing.
+        currently_syncing = (
+            self._presence_handler.get_currently_syncing_users_for_replication()
+        )
+
         now = self._clock.time_msec()
         for user_id in currently_syncing:
             connection.send_command(
