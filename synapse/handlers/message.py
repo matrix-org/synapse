@@ -495,12 +495,14 @@ class EventCreationHandler(object):
                 try:
                     if "displayname" not in content:
                         content["displayname"] = yield profile.get_displayname(target)
+                        logger.info("Adding displayname to membership event")
                     if "avatar_url" not in content:
                         content["avatar_url"] = yield profile.get_avatar_url(target)
                 except Exception as e:
                     logger.info(
                         "Failed to get profile information for %r: %s", target, e
                     )
+                logger.info("Membership event content: %s", content)
 
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
         if require_consent and not is_exempt:

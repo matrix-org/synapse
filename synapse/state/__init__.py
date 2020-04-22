@@ -136,6 +136,8 @@ class StateHandler(object):
         ret = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
         state = ret.state
 
+        logger.info("state at %s: %s", latest_event_ids, state)
+
         if event_type:
             event_id = state.get((event_type, state_key))
             event = None
@@ -380,6 +382,8 @@ class StateHandler(object):
         state_groups_ids = yield self.state_store.get_state_groups_ids(
             room_id, event_ids
         )
+
+        logger.info("state groups at %s: %s", event_ids, state_groups_ids)
 
         if len(state_groups_ids) == 0:
             return _StateCacheEntry(state={}, state_group=None)
