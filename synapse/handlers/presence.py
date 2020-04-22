@@ -130,14 +130,14 @@ class BasePresenceHandler(abc.ABC):
 
     @abc.abstractmethod
     def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
-        """Get the set of syncing users on this worker, to send to the presence handler
+        """Get an iterable of syncing users on this worker, to send to the presence handler
 
         This is called when a replication connection is established. It should return
         a list of user ids, which are then sent as USER_SYNC commands to inform the
         process handling presence about those users.
 
         Returns:
-            A set of user_id strings.
+            An iterable of user_id strings.
         """
 
     async def get_state(self, target_user: UserID) -> UserPresenceState:
