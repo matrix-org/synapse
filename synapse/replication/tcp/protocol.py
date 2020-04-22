@@ -85,13 +85,13 @@ connection_close_counter = Counter(
 
 tcp_inbound_commands_counter = Counter(
     "synapse_replication_tcp_protocol_inbound_commands",
-    "Number of commands received from replication",
+    "Number of commands received from replication, by command and name of process connected to",
     ["command", "name"],
 )
 
 tcp_outbound_commands_counter = Counter(
     "synapse_replication_tcp_protocol_outbound_commands",
-    "Number of commands sent to replication",
+    "Number of commands sent to replication, by command and name of process connected to",
     ["command", "name"],
 )
 
