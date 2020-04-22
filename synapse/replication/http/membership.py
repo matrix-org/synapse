@@ -201,6 +201,8 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         else:
             raise Exception("Unrecognized change: %r", change)
 
+        self.store.get_latest_event_ids_in_room.invalidate((room_id,))
+
         return 200, {}
 
 
