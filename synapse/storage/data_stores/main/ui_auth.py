@@ -38,7 +38,7 @@ class UIAuthSessionData:
     description = attr.ib(type=str)
 
 
-class UIAuthStore(SQLBaseStore):
+class UIAuthWorkerStore(SQLBaseStore):
     """
     Manage user interactive authentication sessions.
     """
@@ -124,45 +124,6 @@ class UIAuthStore(SQLBaseStore):
         result["clientdict"] = json.loads(result["clientdict"])
 
         return UIAuthSessionData(session_id, **result)
-
-    def delete_old_ui_auth_sessions(self, expiration_time: int):
-        """
-        Remove sessions which were last used earlier than the expiration time.
-
-        Args:
-            expiration_time: The latest time that is still considered valid.
-                This is an epoch time in milliseconds.
-
-        """
-        return self.db.runInteraction(
-            "delete_old_ui_auth_sessions",
-            self._delete_old_ui_auth_sessions,
-            expiration_time,
-        )
-
-    def _delete_old_ui_auth_sessions(self, txn, expiration_time: int):
-        # Get the expired sessions.
-        sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
-        txn.execute(sql, [expiration_time])
-        session_ids = [r[0] for r in txn.fetchall()]
-
-        # Delete the corresponding completed credentials.
-        self.db.simple_delete_many_txn(
-            txn,
-            table="ui_auth_sessions_credentials",
-            column="session_id",
-            iterable=session_ids,
-            keyvalues={},
-        )
-
-        # Finally, delete the sessions.
-        self.db.simple_delete_many_txn(
-            txn,
-            table="ui_auth_sessions",
-            column="session_id",
-            iterable=session_ids,
-            keyvalues={},
-        )
 
     async def mark_ui_auth_stage_complete(
         self, session_id: str, stage_type: str, result: Union[str, bool, JsonDict],
@@ -290,3 +251,44 @@ class UIAuthStore(SQLBaseStore):
         serverdict = json.loads(result["serverdict"])
 
         return serverdict.get(key, default)
+
+
+class UIAuthStore(UIAuthWorkerStore):
+    def delete_old_ui_auth_sessions(self, expiration_time: int):
+        """
+        Remove sessions which were last used earlier than the expiration time.
+
+        Args:
+            expiration_time: The latest time that is still considered valid.
+                This is an epoch time in milliseconds.
+
+        """
+        return self.db.runInteraction(
+            "delete_old_ui_auth_sessions",
+            self._delete_old_ui_auth_sessions,
+            expiration_time,
+        )
+
+    def _delete_old_ui_auth_sessions(self, txn, expiration_time: int):
+        # Get the expired sessions.
+        sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
+        txn.execute(sql, [expiration_time])
+        session_ids = [r[0] for r in txn.fetchall()]
+
+        # Delete the corresponding completed credentials.
+        self.db.simple_delete_many_txn(
+            txn,
+            table="ui_auth_sessions_credentials",
+            column="session_id",
+            iterable=session_ids,
+            keyvalues={},
+        )
+
+        # Finally, delete the sessions.
+        self.db.simple_delete_many_txn(
+            txn,
+            table="ui_auth_sessions",
+            column="session_id",
+            iterable=session_ids,
+            keyvalues={},
+        )
