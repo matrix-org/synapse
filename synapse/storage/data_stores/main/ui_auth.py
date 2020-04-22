@@ -165,7 +165,7 @@ class UIAuthStore(SQLBaseStore):
         )
 
     async def mark_ui_auth_stage_complete(
-        self, session_id: str, stage_type: str, identity: Union[str, bool, JsonDict],
+        self, session_id: str, stage_type: str, result: Union[str, bool, JsonDict],
     ):
         """
         Mark a session stage as completed.
@@ -173,22 +173,18 @@ class UIAuthStore(SQLBaseStore):
         Args:
             session_id: The ID of the corresponding session.
             stage_type: The completed stage type.
-            identity: The identity authenticated by the stage.
+            result: The result of the stage verification.
         """
         await self.db.runInteraction(
             "mark_ui_auth_stage_complete",
             self._mark_ui_auth_stage_complete,
             session_id,
             stage_type,
-            identity,
+            result,
         )
 
     def _mark_ui_auth_stage_complete(
-        self,
-        txn,
-        session_id: str,
-        stage_type: str,
-        identity: Union[str, bool, JsonDict],
+        self, txn, session_id: str, stage_type: str, result: Union[str, bool, JsonDict],
     ):
         try:
             # Get the session to ensure it exists.
@@ -206,7 +202,7 @@ class UIAuthStore(SQLBaseStore):
             txn,
             table="ui_auth_sessions_credentials",
             keyvalues={"session_id": session_id, "stage_type": stage_type},
-            values={"identity": json.dumps(identity)},
+            values={"result": json.dumps(result)},
         )
 
     async def get_completed_ui_auth_stages(
@@ -218,8 +214,8 @@ class UIAuthStore(SQLBaseStore):
         Args:
             session_id: The ID of the session.
         Returns:
-            The completed stages mapped to the relevant identity authenticated
-            by that auth-type (mostly str, but for captcha, bool).
+            The completed stages mapped to the result of the verification of
+            that auth-type.
         Raises:
             StoreError: if the session is not found.
         """
@@ -227,10 +223,10 @@ class UIAuthStore(SQLBaseStore):
         for row in await self.db.simple_select_list(
             table="ui_auth_sessions_credentials",
             keyvalues={"session_id": session_id},
-            retcols=("stage_type", "identity"),
+            retcols=("stage_type", "result"),
             desc="get_completed_ui_auth_stages",
         ):
-            results[row["stage_type"]] = json.loads(row["identity"])
+            results[row["stage_type"]] = json.loads(row["result"])
 
         return results
 
