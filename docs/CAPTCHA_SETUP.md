@@ -10,6 +10,8 @@ Requires a site/secret key pair from:
 
 Must be a reCAPTCHA v2 key using the "I'm not a robot" Checkbox option
 
+**NOTE**: If you're planning on allowing registration from within the Riot Desktop client and you want to leave "Verify the origin of reCAPTCHA solutions" checked, you need to add `vector` to your domains, i.e. Domains: `matrix.mydomain.com` and `vector` (yes, without the `.im`).
+
 ## Setting ReCaptcha Keys
 
 The keys are a config option on the home server config. If they are not
