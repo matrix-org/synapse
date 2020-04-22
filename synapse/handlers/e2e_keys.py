@@ -1005,7 +1005,7 @@ class E2eKeysHandler(object):
         if self.is_mine(user) or key_type not in ["master", "self_signing"]:
             # Note that master and self_signing keys are the only cross-signing keys we
             # can request over federation
-            return
+            raise NotFoundError("No %s key found for %s" % (key_type, user_id))
 
         (
             key,
@@ -1109,6 +1109,7 @@ class E2eKeysHandler(object):
 
         # Notify clients that new devices for this user have been discovered
         if retrieved_device_ids:
+            # XXX is this necessary?
             yield self.device_handler.notify_device_update(
                 user.to_string(), retrieved_device_ids
             )

@@ -406,10 +406,10 @@ class TransportLayerClient(object):
               "device_keys": {
                 "<user_id>": {
                   "<device_id>": {...}
-              } }
+              } },
               "master_key": {
                 "<user_id>": {...}
-              } }
+              } },
               "self_signing_key": {
                 "<user_id>": {...}
             } }
@@ -442,8 +442,7 @@ class TransportLayerClient(object):
                 "keys": {...},
                 "signatures": {
                   "<user_id>": {...}
-                }
-              },
+              } },
               "self_signing_key": {
                 "user_id": "<user_id>",
                 "usage": [...],
@@ -490,7 +489,7 @@ class TransportLayerClient(object):
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containg the one-time keys.
+            A dict containing the one-time keys.
         """
 
         path = _create_v1_path("/user/keys/claim")
