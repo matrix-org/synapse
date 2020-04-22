@@ -31,8 +31,27 @@ class UIAuthStore(SQLBaseStore):
         """
         Creates a new user interactive authentication session.
 
-        The session can be used to track data across multiple requests, e.g. for
-        interactive authentication.
+        The session can be used to track the stages necessary to authenticate a
+        user across multiple HTTP requests.
+
+        Args:
+            clientdict:
+                The dictionary from the client root level, not the 'auth' key.
+            uri:
+                The URI this session was initiated from, this is checked at each
+                stage of the authentication to ensure that the asked for
+                operation has not changed.
+            method:
+                The method this session was initiated with, this is checked at each
+                stage of the authentication to ensure that the asked for
+                operation has not changed.
+            description:
+                A string description of the operation that the current
+                authentication is authorising.
+
+        Returns:
+            The created session ID.
+
         """
         # autogen a session ID and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
@@ -64,7 +83,7 @@ class UIAuthStore(SQLBaseStore):
         Args:
             session_id: The ID of the session.
         Returns:
-            defer.Deferred for a dict containing the device information.
+            A dict containing the device information.
         Raises:
             SynapseError: if the session is not found.
         """
@@ -172,7 +191,8 @@ class UIAuthStore(SQLBaseStore):
         Args:
             session_id: The ID of the session.
         Returns:
-            The completed stages mapped to the user which completed that stage.
+            The completed stages mapped to the relevant identity authenticated
+            by that auth-type (mostly str, but for captcha, bool).
         Raises:
             StoreError: if the session is not found.
         """
