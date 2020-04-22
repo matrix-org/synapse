@@ -957,7 +957,8 @@ def start(config_options):
 
     hs.setup()
 
-    # Ensure the replication streamer is always started.
+    # Ensure the replication streamer is always started in case we write to any
+    # streams. Will no-op if no streams can be written to by this worker.
     hs.get_replication_streamer()
 
     reactor.addSystemEventTrigger(
