@@ -90,7 +90,7 @@ class UIAuthStore(SQLBaseStore):
                         "method": method,
                         "description": description,
                         "serverdict": "{}",
-                        "last_used": self.hs.get_clock().time_msec(),
+                        "creation_time": self.hs.get_clock().time_msec(),
                     },
                     desc="create_ui_auth_session",
                 )
@@ -142,7 +142,7 @@ class UIAuthStore(SQLBaseStore):
 
     def _delete_old_ui_auth_sessions(self, txn, expiration_time: int):
         # Get the expired sessions.
-        sql = "SELECT session_id FROM ui_auth_sessions WHERE last_used <= ?"
+        sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
         txn.execute(sql, [expiration_time])
         session_ids = [r[0] for r in txn.fetchall()]
 
@@ -208,13 +208,6 @@ class UIAuthStore(SQLBaseStore):
             keyvalues={"session_id": session_id, "stage_type": stage_type},
             values={"identity": json.dumps(identity)},
         )
-        # Mark the session as still in use.
-        self.db.simple_update_one_txn(
-            txn,
-            table="ui_auth_sessions",
-            keyvalues={"session_id": session_id},
-            updatevalues={"last_used": self.hs.get_clock().time_msec()},
-        )
 
     async def get_completed_ui_auth_stages(
         self, session_id: str
@@ -278,14 +271,6 @@ class UIAuthStore(SQLBaseStore):
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             updatevalues={"serverdict": json.dumps(serverdict)},
-        )
-
-        # Mark the session as still in use.
-        self.db.simple_update_one_txn(
-            txn,
-            table="ui_auth_sessions",
-            keyvalues={"session_id": session_id},
-            updatevalues={"last_used": self.hs.get_clock().time_msec()},
         )
 
     async def get_ui_auth_session_data(
