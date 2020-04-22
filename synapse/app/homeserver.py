@@ -298,7 +298,6 @@ class SynapseHomeServer(HomeServer):
                 )
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
-
             elif listener["type"] == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warning(

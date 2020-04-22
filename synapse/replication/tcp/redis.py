@@ -29,6 +29,7 @@ from synapse.replication.tcp.protocol import AbstractConnection
 
 if TYPE_CHECKING:
     from synapse.replication.tcp.handler import ReplicationCommandHandler
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,13 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     Due to the vagaries of `txredisapi` we don't want to have a custom
     constructor, so instead we expect the defined attributes below to be set
     immediately after initialisation.
+
+    Attributes:
+        handler: The command handler to handle incoming commands.
+        stream_name: The *redis* stream name to subscribe to (not anything to
+            do with Synapse replication streams).
+        outbound_redis_connection: The connection to redis to use to send
+            commands.
     """
 
     handler = None  # type: ReplicationCommandHandler
@@ -132,13 +140,22 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
 class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
     """This is a reconnecting factory that connects to redis and immediately
     subscribes to a stream.
+
+    Args:
+        hs
+        outbound_redis_connection: A connection to redis that will be used to
+            send outbound commands (this is seperate to the redis connection
+            used to subscribe).
     """
 
     maxDelay = 5
     continueTrying = True
     protocol = RedisSubscriber
 
-    def __init__(self, hs, outbound_redis_connection: txredisapi.RedisProtocol):
+    def __init__(
+        self, hs: "HomeServer", outbound_redis_connection: txredisapi.RedisProtocol
+    ):
+
         super().__init__()
 
         # This sets the password on the RedisFactory base class (as

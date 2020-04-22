@@ -127,7 +127,12 @@ class ReplicationCommandHandler:
             )
             import txredisapi
 
-            logger.info("Connecting to redis.")
+            logger.info(
+                "Connecting to redis (host=%r port=%r DBID=%r)",
+                hs.config.redis_host,
+                hs.config.redis_port,
+                hs.config.redis_dbid,
+            )
 
             # We need two connections to redis, one for the subscription stream and
             # one to send commands to (as you can't send further redis commands to a
