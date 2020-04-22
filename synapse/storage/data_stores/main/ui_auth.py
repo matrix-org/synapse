@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional, Union
 import synapse.util.stringutils as stringutils
 from synapse.api.errors import StoreError, SynapseError
 from synapse.storage._base import SQLBaseStore
+from synapse.types import JsonDict
 
 
 class UIAuthStore(SQLBaseStore):
@@ -26,7 +27,7 @@ class UIAuthStore(SQLBaseStore):
     """
 
     async def create_ui_auth_session(
-        self, clientdict: Dict[str, Any], uri: str, method: str, description: str,
+        self, clientdict: JsonDict, uri: str, method: str, description: str,
     ) -> str:
         """
         Creates a new user interactive authentication session.
@@ -145,10 +146,7 @@ class UIAuthStore(SQLBaseStore):
         )
 
     async def mark_ui_auth_stage_complete(
-        self,
-        session_id: str,
-        stage_type: str,
-        identity: Union[str, bool, Dict[str, Any]],
+        self, session_id: str, stage_type: str, identity: Union[str, bool, JsonDict],
     ):
         """
         Mark a session stage as completed.
@@ -171,7 +169,7 @@ class UIAuthStore(SQLBaseStore):
         txn,
         session_id: str,
         stage_type: str,
-        identity: Union[str, bool, Dict[str, Any]],
+        identity: Union[str, bool, JsonDict],
     ):
         # Add (or update) the results of the current stage to the database.
         self.db.simple_upsert_txn(
@@ -190,7 +188,7 @@ class UIAuthStore(SQLBaseStore):
 
     async def get_completed_ui_auth_stages(
         self, session_id: str
-    ) -> Dict[str, Union[str, bool, Dict[str, Any]]]:
+    ) -> Dict[str, Union[str, bool, JsonDict]]:
         """
         Retrieve the completed stages of a UI authentication session.
 
