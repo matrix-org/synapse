@@ -462,7 +462,7 @@ def parse_command_from_line(line: str) -> Command:
     Line should already be stripped of whitespace and be checked if blank.
     """
 
-    idx = line.index(" ")
+    idx = line.find(" ")
     if idx >= 0:
         cmd_name = line[:idx]
         rest_of_line = line[idx + 1 :]
