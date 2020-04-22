@@ -1,0 +1,1 @@
+Ensure caches for getting the latest state events of a room are invalidated when membership in a room changes.
