@@ -190,6 +190,17 @@ class UIAuthStore(SQLBaseStore):
         stage_type: str,
         identity: Union[str, bool, JsonDict],
     ):
+        try:
+            # Get the session to ensure it exists.
+            self.db.simple_select_one_txn(
+                txn,
+                table="ui_auth_sessions",
+                keyvalues={"session_id": session_id},
+                retcols=("session_id",),
+            )
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: %s" % session_id)
+
         # Add (or update) the results of the current stage to the database.
         self.db.simple_upsert_txn(
             txn,

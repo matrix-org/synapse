@@ -181,3 +181,42 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(channel.code, 403)
+
+    def test_complete_operation_unknown_session(self):
+        """
+        Attempting to mark an invalid session as complete should error.
+        """
+
+        # Make the initial request to register. (Later on a different password
+        # will be used.)
+        request, channel = self.make_request(
+            "POST",
+            "register",
+            {"username": "user", "type": "m.login.password", "password": "bar"},
+        )
+        self.render(request)
+
+        # Returns a 401 as per the spec
+        self.assertEqual(request.code, 401)
+        # Grab the session
+        session = channel.json_body["session"]
+        # Assert our configured public key is being given
+        self.assertEqual(
+            channel.json_body["params"]["m.login.recaptcha"]["public_key"], "brokencake"
+        )
+
+        request, channel = self.make_request(
+            "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        invalid_session = session + "invalid"
+        request, channel = self.make_request(
+            "POST",
+            "auth/m.login.recaptcha/fallback/web?session="
+            + invalid_session
+            + "&g-recaptcha-response=a",
+        )
+        self.render(request)
+        self.assertEqual(request.code, 400)
