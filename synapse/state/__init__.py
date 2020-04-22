@@ -131,6 +131,7 @@ class StateHandler(object):
         if not latest_event_ids:
             latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
 
+        logger.info("latest events in %s: %s", room_id, latest_event_ids)
         logger.debug("calling resolve_state_groups from get_current_state")
         ret = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
         state = ret.state
