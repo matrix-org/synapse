@@ -122,8 +122,8 @@ class BasePresenceHandler(abc.ABC):
         when users disconnect/reconnect.
 
         Args:
-            user_id (str)
-            affect_presence (bool): If false this function will be a no-op.
+            user_id: the user that is starting a sync
+            affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
         """
