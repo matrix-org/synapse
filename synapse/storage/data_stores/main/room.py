@@ -57,9 +57,9 @@ class RoomSortOrder(Enum):
     """
 
     # ALPHABETICAL and SIZE are deprecated.
-    # ALPHABETICAL is same as NAME.
+    # ALPHABETICAL is the same as NAME.
     ALPHABETICAL = "alphabetical"
-    # SIZE is same as JOINED_MEMBERS.
+    # SIZE is the same as JOINED_MEMBERS.
     SIZE = "size"
     NAME = "name"
     CANONICAL_ALIAS = "canonical_alias"
@@ -345,10 +345,11 @@ class RoomWorkerStore(SQLBaseStore):
 
         # Set ordering
         if RoomSortOrder(order_by) == RoomSortOrder.SIZE:
+            # Deprecated in favour of RoomSortOrder.JOINED_MEMBERS
             order_by_column = "curr.joined_members"
             order_by_asc = False
         elif RoomSortOrder(order_by) == RoomSortOrder.ALPHABETICAL:
-            # Sort alphabetically
+            # Deprecated in favour of RoomSortOrder.NAME
             order_by_column = "state.name"
             order_by_asc = True
         elif RoomSortOrder(order_by) == RoomSortOrder.NAME:
