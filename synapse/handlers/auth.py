@@ -116,7 +116,7 @@ class AuthHandler(BaseHandler):
                 run_as_background_process,
                 5 * 60 * 1000,
                 "expire_old_sessions",
-                self.expire_old_sessions,
+                self._expire_old_sessions,
             )
 
         # Load the SSO HTML templates.
@@ -307,12 +307,12 @@ class AuthHandler(BaseHandler):
 
         # If there's no session ID, create a new session.
         if not sid:
-            session_id = await self.store.create_session(
+            session_id = await self.store.create_ui_auth_session(
                 clientdict, uri, method, description
             )
 
         else:
-            session = await self.store.get_session(sid)
+            session = await self.store.get_ui_auth_session(sid)
             session_id = sid
 
             if not clientdict:
@@ -351,7 +351,9 @@ class AuthHandler(BaseHandler):
             try:
                 result = await self._check_auth_dict(authdict, clientip)
                 if result:
-                    await self.store.mark_stage_complete(session_id, login_type, result)
+                    await self.store.mark_ui_auth_stage_complete(
+                        session_id, login_type, result
+                    )
             except LoginError as e:
                 if login_type == LoginType.EMAIL_IDENTITY:
                     # riot used to have a bug where it would request a new
@@ -367,7 +369,7 @@ class AuthHandler(BaseHandler):
                 # so that the client can have another go.
                 errordict = e.error_dict()
 
-        creds = await self.store.get_completed_stages(session_id)
+        creds = await self.store.get_completed_ui_auth_stages(session_id)
         for f in flows:
             if len(set(f) - set(creds)) == 0:
                 # it's very useful to know what args are stored, but this can
@@ -402,7 +404,9 @@ class AuthHandler(BaseHandler):
 
         result = await self.checkers[stagetype].check_auth(authdict, clientip)
         if result:
-            await self.store.mark_stage_complete(authdict["session"], stagetype, result)
+            await self.store.mark_ui_auth_stage_complete(
+                authdict["session"], stagetype, result
+            )
             return True
         return False
 
@@ -435,7 +439,7 @@ class AuthHandler(BaseHandler):
             key: The key to store the data under
             value: The data to store
         """
-        await self.store.set_session_data(session_id, key, value)
+        await self.store.set_ui_auth_session_data(session_id, key, value)
 
     async def get_session_data(
         self, session_id: str, key: str, default: Optional[Any] = None
@@ -448,15 +452,15 @@ class AuthHandler(BaseHandler):
             key: The key to store the data under
             default: Value to return if the key has not been set
         """
-        return await self.store.get_session_data(session_id, key, default)
+        return await self.store.get_ui_auth_session_data(session_id, key, default)
 
-    async def expire_old_sessions(self):
+    async def _expire_old_sessions(self):
         """
         Invalidate any user interactive authentication sessions that have expired.
         """
         now = self._clock.time_msec()
         expiration_time = now - self.SESSION_EXPIRE_MS
-        await self.store.delete_old_sessions(expiration_time)
+        await self.store.delete_old_ui_auth_sessions(expiration_time)
 
     async def _check_auth_dict(
         self, authdict: Dict[str, Any], clientip: str
@@ -997,7 +1001,7 @@ class AuthHandler(BaseHandler):
         Returns:
             The HTML to render.
         """
-        session = await self.store.get_session(session_id)
+        session = await self.store.get_ui_auth_session(session_id)
         return self._sso_auth_confirm_template.render(
             description=session["description"], redirect_url=redirect_url,
         )
@@ -1016,7 +1020,7 @@ class AuthHandler(BaseHandler):
         # Mark the stage of the authentication as successful.
         # Save the user who authenticated with SSO, this will be used to ensure
         # that the account be modified is also the person who logged in.
-        await self.store.mark_stage_complete(
+        await self.store.mark_ui_auth_stage_complete(
             session_id, LoginType.SSO, registered_user_id
         )
 

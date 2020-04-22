@@ -25,7 +25,7 @@ class UIAuthStore(SQLBaseStore):
     Manage user interactive authentication sessions.
     """
 
-    async def create_session(
+    async def create_ui_auth_session(
         self, clientdict: Dict[str, Any], uri: str, method: str, description: str,
     ) -> str:
         """
@@ -71,13 +71,14 @@ class UIAuthStore(SQLBaseStore):
                         "serverdict": "{}",
                         "last_used": self.hs.get_clock().time_msec(),
                     },
+                    desc="create_ui_auth_session",
                 )
                 return session_id
             except self.db.engine.module.IntegrityError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a session ID.")
 
-    async def get_session(self, session_id: str) -> Dict[str, Any]:
+    async def get_ui_auth_session(self, session_id: str) -> Dict[str, Any]:
         """Retrieve a UI auth session.
 
         Args:
@@ -92,7 +93,7 @@ class UIAuthStore(SQLBaseStore):
                 table="ui_auth_sessions",
                 keyvalues={"session_id": session_id},
                 retcols=("clientdict", "uri", "method", "description"),
-                desc="get_session",
+                desc="get_ui_auth_session",
             )
         except StoreError:
             raise SynapseError(400, "Unknown session ID: %s" % session_id)
@@ -101,7 +102,7 @@ class UIAuthStore(SQLBaseStore):
 
         return result
 
-    def delete_old_sessions(self, expiration_time: int):
+    def delete_old_ui_auth_sessions(self, expiration_time: int):
         """
         Remove sessions which were last used earlier than the expiration time.
 
@@ -111,10 +112,12 @@ class UIAuthStore(SQLBaseStore):
 
         """
         return self.db.runInteraction(
-            "delete_sessions", self._delete_old_sessions, expiration_time
+            "delete_old_ui_auth_sessions",
+            self._delete_old_ui_auth_sessions,
+            expiration_time,
         )
 
-    def _delete_old_sessions(self, txn, expiration_time: int):
+    def _delete_old_ui_auth_sessions(self, txn, expiration_time: int):
         # Get the expired sessions.
         sql = "SELECT session_id FROM ui_auth_sessions WHERE last_used <= ?"
         txn.execute(sql, [expiration_time])
@@ -138,7 +141,7 @@ class UIAuthStore(SQLBaseStore):
             keyvalues={},
         )
 
-    async def mark_stage_complete(
+    async def mark_ui_auth_stage_complete(
         self,
         session_id: str,
         stage_type: str,
@@ -153,14 +156,14 @@ class UIAuthStore(SQLBaseStore):
             identity: The identity authenticated by the stage.
         """
         await self.db.runInteraction(
-            "mark_stage_complete",
-            self._mark_stage_completed,
+            "mark_ui_auth_stage_complete",
+            self._mark_ui_auth_stage_complete,
             session_id,
             stage_type,
             identity,
         )
 
-    def _mark_stage_completed(
+    def _mark_ui_auth_stage_complete(
         self,
         txn,
         session_id: str,
@@ -182,7 +185,7 @@ class UIAuthStore(SQLBaseStore):
             updatevalues={"last_used": self.hs.get_clock().time_msec()},
         )
 
-    async def get_completed_stages(
+    async def get_completed_ui_auth_stages(
         self, session_id: str
     ) -> Dict[str, Union[str, bool, Dict[str, Any]]]:
         """
@@ -201,13 +204,13 @@ class UIAuthStore(SQLBaseStore):
             table="ui_auth_sessions_credentials",
             keyvalues={"session_id": session_id},
             retcols=("stage_type", "identity"),
-            desc="get_completed_stages",
+            desc="get_completed_ui_auth_stages",
         ):
             results[row["stage_type"]] = json.loads(row["identity"])
 
         return results
 
-    async def set_session_data(self, session_id: str, key: str, value: Any):
+    async def set_ui_auth_session_data(self, session_id: str, key: str, value: Any):
         """
         Store a key-value pair into the sessions data associated with this
         request. This data is stored server-side and cannot be modified by
@@ -219,10 +222,14 @@ class UIAuthStore(SQLBaseStore):
             value: The data to store
         """
         await self.db.runInteraction(
-            "set_session_data", self._set_session_data, session_id, key, value
+            "set_ui_auth_session_data",
+            self._set_ui_auth_session_data,
+            session_id,
+            key,
+            value,
         )
 
-    def _set_session_data(self, txn, session_id: str, key: str, value: Any):
+    def _set_ui_auth_session_data(self, txn, session_id: str, key: str, value: Any):
         # Get the current value.
         result = self.db.simple_select_one_txn(
             txn,
@@ -250,7 +257,7 @@ class UIAuthStore(SQLBaseStore):
             updatevalues={"last_used": self.hs.get_clock().time_msec()},
         )
 
-    async def get_session_data(
+    async def get_ui_auth_session_data(
         self, session_id: str, key: str, default: Optional[Any] = None
     ) -> Any:
         """
@@ -265,7 +272,7 @@ class UIAuthStore(SQLBaseStore):
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             retcols=("serverdict",),
-            desc="get_server_data",
+            desc="get_ui_auth_session_data",
         )
 
         serverdict = json.loads(result["serverdict"])
