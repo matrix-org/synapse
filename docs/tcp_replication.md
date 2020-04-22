@@ -192,7 +192,8 @@ client (C):
 
 #### REPLICATE (C)
 
-Asks the server for the current position of all streams.
+Asks the server for the current position of all streams. Note that the command must end with
+a single space to pass the argument parsing.
 
 #### USER_SYNC (C)
 
