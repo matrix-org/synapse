@@ -5,7 +5,7 @@ Features
 --------
 
 - Always send users their own device updates. ([\#7160](https://github.com/matrix-org/synapse/issues/7160))
-- Add support for handling GET requests for account_data on a worker. ([\#7311](https://github.com/matrix-org/synapse/issues/7311))
+- Add support for handling GET requests for `account_data` on a worker. ([\#7311](https://github.com/matrix-org/synapse/issues/7311))
 
 
 Bugfixes
