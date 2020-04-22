@@ -104,8 +104,18 @@ class MessageHandler(object):
         )
 
         if membership == Membership.JOIN:
+            logger.info(
+                "Fetching current state %s/%s/%s", room_id, event_type, state_key
+            )
             data = yield self.state.get_current_state(room_id, event_type, state_key)
         elif membership == Membership.LEAVE:
+            logger.info(
+                "Fetching historical state %s/%s/%s at %s",
+                room_id,
+                event_type,
+                state_key,
+                membership_event_id,
+            )
             key = (event_type, state_key)
             room_state = yield self.state_store.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
