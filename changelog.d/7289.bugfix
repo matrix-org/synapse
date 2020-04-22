@@ -1,1 +1,0 @@
-Fix a bug with cross-signing devices belonging to remote users who did not share a room with any user on the local homeserver.
