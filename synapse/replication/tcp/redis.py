@@ -26,7 +26,6 @@ from synapse.replication.tcp.commands import (
     parse_command_from_line,
 )
 from synapse.replication.tcp.protocol import AbstractConnection
-from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.replication.tcp.handler import ReplicationCommandHandler
@@ -48,7 +47,6 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     handler = None  # type: ReplicationCommandHandler
     stream_name = None  # type: str
     outbound_redis_connection = None  # type: txredisapi.RedisProtocol
-    conn_id = None  # type: str
 
     def connectionMade(self):
         logger.info("Connected to redis instance")
@@ -69,7 +67,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
             cmd = parse_command_from_line(message)
         except Exception:
             logger.exception(
-                "[%s] failed to parse line: %r", self.conn_id, message,
+                "[%s] failed to parse line: %r", message,
             )
             return
 
@@ -152,8 +150,6 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
 
         self.outbound_redis_connection = outbound_redis_connection
 
-        self.conn_id = random_string(5)
-
     def buildProtocol(self, addr):
         p = super().buildProtocol(addr)  # type: RedisSubscriber
 
@@ -163,7 +159,6 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         # protocol.
         p.handler = self.handler
         p.outbound_redis_connection = self.outbound_redis_connection
-        p.conn_id = self.conn_id
         p.stream_name = self.stream_name
 
         return p
