@@ -53,6 +53,9 @@ class UIAuthStore(SQLBaseStore):
             The created session ID.
 
         """
+        # The clientdict gets stored as JSON.
+        clientdict_json = json.dumps(clientdict)
+
         # autogen a session ID and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
         attempts = 0
@@ -64,7 +67,7 @@ class UIAuthStore(SQLBaseStore):
                     table="ui_auth_sessions",
                     values={
                         "session_id": session_id,
-                        "clientdict": json.dumps(clientdict),
+                        "clientdict": clientdict_json,
                         "uri": uri,
                         "method": method,
                         "description": description,
