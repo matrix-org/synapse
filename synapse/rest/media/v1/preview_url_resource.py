@@ -402,7 +402,7 @@ class PreviewUrlResource(DirectServeResource):
 
         now = self.clock.time_msec()
 
-        logger.info("Running url preview cache expiry")
+        logger.debug("Running url preview cache expiry")
 
         if not (await self.store.db.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
@@ -435,6 +435,8 @@ class PreviewUrlResource(DirectServeResource):
 
         if removed_media:
             logger.info("Deleted %d entries from url cache", len(removed_media))
+        else:
+            logger.debug("No entries removed from url cache")
 
         # Now we delete old images associated with the url cache.
         # These may be cached for a bit on the client (i.e., they
@@ -481,7 +483,10 @@ class PreviewUrlResource(DirectServeResource):
 
         await self.store.delete_url_cache_media(removed_media)
 
-        logger.info("Deleted %d media from url cache", len(removed_media))
+        if removed_media:
+            logger.info("Deleted %d media from url cache", len(removed_media))
+        else:
+            logger.debug("No media removed from url cache")
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):
