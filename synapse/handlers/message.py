@@ -104,18 +104,8 @@ class MessageHandler(object):
         )
 
         if membership == Membership.JOIN:
-            logger.info(
-                "Fetching current state %s/%s/%s", room_id, event_type, state_key
-            )
             data = yield self.state.get_current_state(room_id, event_type, state_key)
         elif membership == Membership.LEAVE:
-            logger.info(
-                "Fetching historical state %s/%s/%s at %s",
-                room_id,
-                event_type,
-                state_key,
-                membership_event_id,
-            )
             key = (event_type, state_key)
             room_state = yield self.state_store.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
@@ -495,14 +485,12 @@ class EventCreationHandler(object):
                 try:
                     if "displayname" not in content:
                         content["displayname"] = yield profile.get_displayname(target)
-                        logger.info("Adding displayname to membership event")
                     if "avatar_url" not in content:
                         content["avatar_url"] = yield profile.get_avatar_url(target)
                 except Exception as e:
                     logger.info(
                         "Failed to get profile information for %r: %s", target, e
                     )
-                logger.info("Membership event content: %s", content)
 
         is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
         if require_consent and not is_exempt:
