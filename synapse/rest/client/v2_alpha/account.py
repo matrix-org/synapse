@@ -775,7 +775,7 @@ class ThreepidAddRestServlet(RestServlet):
             "%s/_matrix/client/r0/account/3pid?access_token=%s&user_id=%s"
             % (shadow_hs_url, as_token, user_id),
             body,
-            )
+        )
 
 
 class ThreepidBindRestServlet(RestServlet):
