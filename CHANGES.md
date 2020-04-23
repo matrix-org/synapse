@@ -11,6 +11,13 @@ Next version
   should update to using the async/await version `complete_sso_login_async` which
   includes additional checks. The non-async version is considered deprecated.
 
+
+Synapse 1.12.4 (2020-04-23)
+===========================
+
+No significant changes.
+
+
 Synapse 1.12.4rc1 (2020-04-22)
 ==============================
 
