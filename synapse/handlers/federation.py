@@ -1765,7 +1765,9 @@ class FederationHandler(BaseHandler):
         return events
 
     @log_function
-    async def get_persisted_pdu(self, origin: str, event_id: str) -> Optional[EventBase]:
+    async def get_persisted_pdu(
+        self, origin: str, event_id: str
+    ) -> Optional[EventBase]:
         """Get an event from the database for the given server.
 
         Args:
