@@ -41,6 +41,22 @@ to 8448.
 With .well-known delegation, federating servers will check for a valid TLS
 certificate for the delegated hostname (in our example: `synapse.example.com`).
 
+The URL `https://<server_name>/.well-known/matrix/client` is used by clients to lookup your homeserver
+
+In our example, this would mean that URL `https://example.com/.well-known/matrix/client`
+should return:
+
+```json
+{
+    "m.homeserver": {
+        "base_url": "https://synapse.example.com"
+    }
+}
+```
+This url is accesed from a Browser and you need to allow cross site access via HTTP header
+ `Access-Control-Allow-Origin: *`
+ 
+
 ## SRV DNS record delegation
 
 It is also possible to do delegation using a SRV DNS record. However, that is
