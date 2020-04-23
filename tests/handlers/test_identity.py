@@ -35,12 +35,13 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.address = "test@test"
         self.is_server_name = "testis"
-        self.rewritten_is_url = "int.testis"
+        self.is_server_url = "https://testis"
+        self.rewritten_is_url = "https://int.testis"
 
         config = self.default_config()
         config["trusted_third_party_id_servers"] = [self.is_server_name]
         config["rewrite_identity_server_urls"] = {
-            self.is_server_name: self.rewritten_is_url
+            self.is_server_url: self.rewritten_is_url
         }
 
         mock_http_client = Mock(spec=["get_json", "post_json_get_json"])
@@ -98,7 +99,7 @@ class ThreepidISRewrittenURLTestCase(unittest.HomeserverTestCase):
 
         # Check that the request was done against the rewritten server name.
         post_json_get_json.assert_called_once_with(
-            "https://%s/_matrix/identity/api/v1/3pid/bind" % self.rewritten_is_url,
+            "%s/_matrix/identity/api/v1/3pid/bind" % (self.rewritten_is_url,),
             {
                 "sid": creds["sid"],
                 "client_secret": creds["client_secret"],

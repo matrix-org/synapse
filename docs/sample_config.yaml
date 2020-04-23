@@ -1221,6 +1221,13 @@ account_threepid_delegates:
 #
 #autocreate_auto_join_rooms: true
 
+# Rewrite identity server URLs with a map from one URL to another. Applies to URLs
+# provided by clients (which have https:// prepended) and those specified
+# in `account_threepid_delegates`. URLs should not feature a trailing slash.
+#
+#rewrite_identity_server_urls:
+#   "https://somewhere.example.com": "https://somewhereelse.example.com"
+
 
 ## Metrics ###
 

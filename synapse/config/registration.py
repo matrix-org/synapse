@@ -163,8 +163,8 @@ class RegistrationConfig(Config):
 
         self.shadow_server = config.get("shadow_server", None)
         self.rewrite_identity_server_urls = config.get(
-            "rewrite_identity_server_urls", {}
-        )
+            "rewrite_identity_server_urls"
+        ) or {}
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
@@ -432,6 +432,13 @@ class RegistrationConfig(Config):
         # users cannot be auto-joined since they do not exist.
         #
         #autocreate_auto_join_rooms: true
+
+        # Rewrite identity server URLs with a map from one URL to another. Applies to URLs
+        # provided by clients (which have https:// prepended) and those specified
+        # in `account_threepid_delegates`. URLs should not feature a trailing slash.
+        #
+        #rewrite_identity_server_urls:
+        #   "https://somewhere.example.com": "https://somewhereelse.example.com"
         """
             % locals()
         )
