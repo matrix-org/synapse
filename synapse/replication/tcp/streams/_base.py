@@ -193,10 +193,7 @@ def make_http_update_function(hs, stream_name: str) -> UpdateFunction:
         from_token: int, upto_token: int, limit: int
     ) -> StreamUpdateResult:
         result = await client(
-            stream_name=stream_name,
-            from_token=from_token,
-            upto_token=upto_token,
-            limit=limit,
+            stream_name=stream_name, from_token=from_token, upto_token=upto_token,
         )
         return result["updates"], result["upto_token"], result["limited"]
 
