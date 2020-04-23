@@ -89,7 +89,7 @@ class ModuleApi(object):
         return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, emails=[]):
+    def register(self, localpart, displayname=None):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Also returns an access token for the new user.
@@ -101,7 +101,6 @@ class ModuleApi(object):
         Args:
             localpart (str): The localpart of the new user.
             displayname (str|None): The displayname of the new user.
-            emails (List[str]): Emails to bind to the new user.
 
         Returns:
             Deferred[tuple[str, str]]: a 2-tuple of (user_id, access_token)
@@ -109,11 +108,11 @@ class ModuleApi(object):
         logger.warning(
             "Using deprecated ModuleApi.register which creates a dummy user device."
         )
-        user_id = yield self.register_user(localpart, displayname, emails)
+        user_id = yield self.register_user(localpart, displayname)
         _, access_token = yield self.register_device(user_id)
         return user_id, access_token
 
-    def register_user(self, localpart, displayname=None, emails=[]):
+    def register_user(self, localpart, displayname=None):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Args:
@@ -129,7 +128,7 @@ class ModuleApi(object):
             Deferred[str]: user_id
         """
         return self._hs.get_registration_handler().register_user(
-            localpart=localpart, default_display_name=displayname, bind_emails=emails
+            localpart=localpart, default_display_name=displayname
         )
 
     def register_device(self, user_id, device_id=None, initial_display_name=None):

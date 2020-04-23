@@ -140,7 +140,6 @@ class RegistrationHandler(BaseHandler):
         user_type=None,
         default_display_name=None,
         address=None,
-        bind_emails=[],
     ):
         """Registers a new client on the server.
 
@@ -250,19 +249,6 @@ class RegistrationHandler(BaseHandler):
                 "Skipping auto-join for %s because consent is required at registration",
                 user_id,
             )
-
-        # Bind any specified emails to this account
-        current_time = self.hs.get_clock().time_msec()
-        for email in bind_emails:
-            # generate threepid dict
-            threepid_dict = {
-                "medium": "email",
-                "address": email,
-                "validated_at": current_time,
-            }
-
-            # Bind email to new account
-            yield self._register_email_threepid(user_id, threepid_dict, None)
 
         return user_id
 
