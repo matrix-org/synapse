@@ -722,6 +722,7 @@ class ThreepidAddRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
+        self.http_client = hs.get_simple_http_client()
 
     @interactive_auth_handler
     async def on_POST(self, request):
@@ -763,6 +764,18 @@ class ThreepidAddRestServlet(RestServlet):
         raise SynapseError(
             400, "No validated 3pid session found", Codes.THREEPID_AUTH_FAILED
         )
+
+    @defer.inlineCallbacks
+    def shadow_3pid(self, body, user_id):
+        # TODO: retries
+        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
+        as_token = self.hs.config.shadow_server.get("as_token")
+
+        yield self.http_client.post_json_get_json(
+            "%s/_matrix/client/r0/account/3pid?access_token=%s&user_id=%s"
+            % (shadow_hs_url, as_token, user_id),
+            body,
+            )
 
 
 class ThreepidBindRestServlet(RestServlet):
