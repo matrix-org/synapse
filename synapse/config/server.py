@@ -507,17 +507,6 @@ class ServerConfig(Config):
 
         self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
 
-        # Inhibits the /requestToken endpoints from returning an error that might leak
-        # information about whether an e-mail address is in use or not on this
-        # homeserver, and instead return a 200 with a fake sid if this kind of error is
-        # met, without sending anything.
-        # This is a compromise between sending an email, which could be a spam vector,
-        # and letting the client know which email address is bound to an account and
-        # which one isn't.
-        self.request_token_inhibit_3pid_errors = config.get(
-            "request_token_inhibit_3pid_errors", False,
-        )
-
     def has_tls_listener(self) -> bool:
         return any(l["tls"] for l in self.listeners)
 
@@ -978,16 +967,6 @@ class ServerConfig(Config):
           #  - shortest_max_lifetime: 3d
           #    longest_max_lifetime: 1y
           #    interval: 1d
-
-        # Inhibits the /requestToken endpoints from returning an error that might leak
-        # information about whether an e-mail address is in use or not on this
-        # homeserver.
-        # Note that for some endpoints the error situation is the e-mail already being
-        # used, and for others the error is entering the e-mail being unused.
-        # If this option is enabled, instead of returning an error, these endpoints will
-        # act as if no error happened and return a fake session ID ('sid') to clients.
-        #
-        #request_token_inhibit_3pid_errors: true
         """
             % locals()
         )

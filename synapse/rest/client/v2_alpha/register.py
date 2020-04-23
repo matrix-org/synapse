@@ -49,7 +49,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
-from synapse.util.stringutils import assert_valid_client_secret, random_string
+from synapse.util.stringutils import assert_valid_client_secret
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -135,11 +135,6 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
-            if self.hs.config.request_token_inhibit_3pid_errors:
-                # Make the client think the operation succeeded. See the rationale in the
-                # comments for request_token_inhibit_3pid_errors.
-                return 200, {"sid": random_string(16)}
-
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -207,11 +202,6 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
-            if self.hs.config.request_token_inhibit_3pid_errors:
-                # Make the client think the operation succeeded. See the rationale in the
-                # comments for request_token_inhibit_3pid_errors.
-                return 200, {"sid": random_string(16)}
-
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
