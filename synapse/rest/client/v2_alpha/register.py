@@ -592,7 +592,7 @@ class RegisterRestServlet(RestServlet):
                         desired_display_name = address
                     else:
                         # Custom mapping between email address and display name
-                        desired_display_name = self._map_email_to_displayname(address)
+                        desired_display_name = _map_email_to_displayname(address)
                 elif (
                     self.hs.config.register_mxid_from_3pid == "msisdn"
                     and LoginType.MSISDN in auth_result
