@@ -272,7 +272,7 @@ class RegistrationHandler(BaseHandler):
             }
 
             # Bind email to new account
-            yield self._register_email_threepid(user_id, threepid_dict, None)
+            yield self.register_email_threepid(user_id, threepid_dict, None)
 
         # Prevent the new user from showing up in the user directory if the server
         # mandates it.
@@ -371,7 +371,7 @@ class RegistrationHandler(BaseHandler):
 
         password_hash = ""
         if password:
-            password_hash = yield self.auth_handler().hash(password)
+            password_hash = yield self._auth_handler().hash(password)
 
         display_name = display_name or user.localpart
 
@@ -644,7 +644,7 @@ class RegistrationHandler(BaseHandler):
             ):
                 yield self.store.upsert_monthly_active_user(user_id)
 
-            yield self._register_email_threepid(user_id, threepid, access_token)
+            yield self.register_email_threepid(user_id, threepid, access_token)
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]
@@ -667,7 +667,7 @@ class RegistrationHandler(BaseHandler):
         yield self.post_consent_actions(user_id)
 
     @defer.inlineCallbacks
-    def _register_email_threepid(self, user_id, threepid, token):
+    def register_email_threepid(self, user_id, threepid, token):
         """Add an email address as a 3pid identifier
 
         Also adds an email pusher for the email address, if configured in the
