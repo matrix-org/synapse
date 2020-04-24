@@ -343,7 +343,7 @@ class FederationHandler(BaseHandler):
                     ours = await self.state_store.get_state_groups_ids(room_id, seen)
 
                     # state_maps is a list of mappings from (type, state_key) to event_id
-                    state_maps = list(ours.values())  # type: list[StateMap[str]]
+                    state_maps = list(ours.values())  # type: List[StateMap[str]]
 
                     # we don't need this any more, let's delete it.
                     del ours
@@ -1694,7 +1694,7 @@ class FederationHandler(BaseHandler):
 
         return None
 
-    async def get_state_for_pdu(self, room_id, event_id):
+    async def get_state_for_pdu(self, room_id: str, event_id: str) -> List[EventBase]:
         """Returns the state at the event. i.e. not including said event.
         """
 
@@ -1723,7 +1723,7 @@ class FederationHandler(BaseHandler):
         else:
             return []
 
-    async def get_state_ids_for_pdu(self, room_id, event_id):
+    async def get_state_ids_for_pdu(self, room_id: str, event_id: str) -> List[str]:
         """Returns the state at the event. i.e. not including said event.
         """
         event = await self.store.get_event(
@@ -1750,7 +1750,9 @@ class FederationHandler(BaseHandler):
             return []
 
     @log_function
-    async def on_backfill_request(self, origin, room_id, pdu_list, limit):
+    async def on_backfill_request(
+        self, origin: str, room_id: str, pdu_list: List[str], limit: int
+    ) -> List[EventBase]:
         in_room = await self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
@@ -2394,7 +2396,7 @@ class FederationHandler(BaseHandler):
         """
         # exclude the state key of the new event from the current_state in the context.
         if event.is_state():
-            event_key = (event.type, event.state_key)
+            event_key = (event.type, event.state_key)  # type: Optional[Tuple[str, str]]
         else:
             event_key = None
         state_updates = {
