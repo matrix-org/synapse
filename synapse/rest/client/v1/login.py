@@ -28,7 +28,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.http.site import SynapseRequest
+from synapse.push.mailer import load_jinja2_templates
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -548,6 +548,16 @@ class SSOAuthHandler(object):
         self._registration_handler = hs.get_registration_handler()
         self._macaroon_gen = hs.get_macaroon_generator()
 
+        # Load the redirect page HTML template
+        self._template = load_jinja2_templates(
+            hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
+        )[0]
+
+        self._server_name = hs.config.server_name
+
+        # cast to tuple for use with str.startswith
+        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
+
     async def on_successful_auth(
         self, username, request, client_redirect_url, user_display_name=None
     ):
@@ -580,36 +590,9 @@ class SSOAuthHandler(object):
                 localpart=localpart, default_display_name=user_display_name
             )
 
-        self.complete_sso_login(registered_user_id, request, client_redirect_url)
-
-    def complete_sso_login(
-        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
-    ):
-        """Having figured out a mxid for this user, complete the HTTP request
-
-        Args:
-            registered_user_id:
-            request:
-            client_redirect_url:
-        """
-
-        login_token = self._macaroon_gen.generate_short_term_login_token(
-            registered_user_id
+        self._auth_handler.complete_sso_login(
+            registered_user_id, request, client_redirect_url
         )
-        redirect_url = self._add_login_token_to_redirect_url(
-            client_redirect_url, login_token
-        )
-        # Load page
-        request.redirect(redirect_url)
-        finish_request(request)
-
-    @staticmethod
-    def _add_login_token_to_redirect_url(url, token):
-        url_parts = list(urllib.parse.urlparse(url))
-        query = dict(urllib.parse.parse_qsl(url_parts[4]))
-        query.update({"loginToken": token})
-        url_parts[4] = urllib.parse.urlencode(query)
-        return urllib.parse.urlunparse(url_parts)
 
 
 def register_servlets(hs, http_server):

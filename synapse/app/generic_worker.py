@@ -98,6 +98,10 @@ from synapse.rest.client.v1.voip import VoipRestServlet
 from synapse.rest.client.v2_alpha import groups, sync, user_directory
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
+from synapse.rest.client.v2_alpha.account_data import (
+    AccountDataServlet,
+    RoomAccountDataServlet,
+)
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
@@ -475,6 +479,8 @@ class GenericWorkerServer(HomeServer):
                     ProfileDisplaynameRestServlet(self).register(resource)
                     ProfileRestServlet(self).register(resource)
                     KeyUploadServlet(self).register(resource)
+                    AccountDataServlet(self).register(resource)
+                    RoomAccountDataServlet(self).register(resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
@@ -494,20 +500,26 @@ class GenericWorkerServer(HomeServer):
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":
-                    media_repo = self.get_media_repository_resource()
+                    if self.config.can_load_media_repo:
+                        media_repo = self.get_media_repository_resource()
 
-                    # We need to serve the admin servlets for media on the
-                    # worker.
-                    admin_resource = JsonResource(self, canonical_json=False)
-                    register_servlets_for_media_repo(self, admin_resource)
+                        # We need to serve the admin servlets for media on the
+                        # worker.
+                        admin_resource = JsonResource(self, canonical_json=False)
+                        register_servlets_for_media_repo(self, admin_resource)
 
-                    resources.update(
-                        {
-                            MEDIA_PREFIX: media_repo,
-                            LEGACY_MEDIA_PREFIX: media_repo,
-                            "/_synapse/admin": admin_resource,
-                        }
-                    )
+                        resources.update(
+                            {
+                                MEDIA_PREFIX: media_repo,
+                                LEGACY_MEDIA_PREFIX: media_repo,
+                                "/_synapse/admin": admin_resource,
+                            }
+                        )
+                    else:
+                        logger.warning(
+                            "A 'media' listener is configured but the media"
+                            " repository is disabled. Ignoring."
+                        )
 
                 if name == "openid" and "federation" not in res["names"]:
                     # Only load the openid resource separately if federation resource
@@ -854,6 +866,9 @@ def start(config_options):
 
         # Force the appservice to start since they will be disabled in the main config
         config.notify_appservices = True
+    else:
+        # For other worker types we force this to off.
+        config.notify_appservices = False
 
     if config.worker_app == "synapse.app.pusher":
         if config.start_pushers:
@@ -867,6 +882,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.start_pushers = True
+    else:
+        # For other worker types we force this to off.
+        config.start_pushers = False
 
     if config.worker_app == "synapse.app.user_dir":
         if config.update_user_directory:
@@ -880,6 +898,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.update_user_directory = True
+    else:
+        # For other worker types we force this to off.
+        config.update_user_directory = False
 
     if config.worker_app == "synapse.app.federation_sender":
         if config.send_federation:
@@ -893,6 +914,9 @@ def start(config_options):
 
         # Force the pushers to start since they will be disabled in the main config
         config.send_federation = True
+    else:
+        # For other worker types we force this to off.
+        config.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

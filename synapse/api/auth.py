@@ -539,7 +539,7 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_can_change_room_list(self, room_id: str, user: UserID):
-        """Check if the user is allowed to edit the room's entry in the
+        """Determine whether the user is allowed to edit the room's entry in the
         published room list.
 
         Args:
@@ -570,12 +570,7 @@ class Auth(object):
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
-        if user_level < send_level:
-            raise AuthError(
-                403,
-                "This server requires you to be a moderator in the room to"
-                " edit its room list entry",
-            )
+        return user_level >= send_level
 
     @staticmethod
     def has_access_token(request):

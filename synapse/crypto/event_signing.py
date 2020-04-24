@@ -140,7 +140,7 @@ def compute_event_signature(
     Returns:
         a dictionary in the same format of an event's signatures field.
     """
-    redact_json = prune_event_dict(event_dict)
+    redact_json = prune_event_dict(room_version, event_dict)
     redact_json.pop("age_ts", None)
     redact_json.pop("unsigned", None)
     if logger.isEnabledFor(logging.DEBUG):

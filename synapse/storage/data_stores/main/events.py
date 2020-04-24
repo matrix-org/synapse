@@ -1168,7 +1168,11 @@ class EventsStore(
                 and original_event.internal_metadata.is_redacted()
             ):
                 # Redaction was allowed
-                pruned_json = encode_json(prune_event_dict(original_event.get_dict()))
+                pruned_json = encode_json(
+                    prune_event_dict(
+                        original_event.room_version, original_event.get_dict()
+                    )
+                )
             else:
                 # Redaction wasn't allowed
                 pruned_json = None
@@ -1929,7 +1933,9 @@ class EventsStore(
                 return
 
             # Prune the event's dict then convert it to JSON.
-            pruned_json = encode_json(prune_event_dict(event.get_dict()))
+            pruned_json = encode_json(
+                prune_event_dict(event.room_version, event.get_dict())
+            )
 
             # Update the event_json table to replace the event's JSON with the pruned
             # JSON.
