@@ -56,6 +56,7 @@ class ExpiringCache(object):
         self._cache_name = cache_name
 
         self._original_max_size = max_len
+        self._max_size = max_len
 
         self._clock = clock
 
@@ -86,7 +87,7 @@ class ExpiringCache(object):
 
     def evict(self):
         # Evict if there are now too many items
-        while self.max_size and len(self) > self.max_size:
+        while self._max_size and len(self) > self._max_size:
             _key, value = self._cache.popitem(last=False)
             if self.iterable:
                 self.metrics.inc_evictions(len(value.value))
@@ -183,8 +184,8 @@ class ExpiringCache(object):
             bool: Whether the cache changed size or not.
         """
         new_size = int(self._original_max_size * factor)
-        if new_size != self.max_size:
-            self.max_size = new_size
+        if new_size != self._max_size:
+            self._max_size = new_size
             self.evict()
             return True
         return False

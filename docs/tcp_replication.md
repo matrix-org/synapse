@@ -196,7 +196,7 @@ Asks the server for the current position of all streams.
 
 #### USER_SYNC (C)
 
-   A user has started or stopped syncing
+   A user has started or stopped syncing on this process.
 
 #### CLEAR_USER_SYNC (C)
 
@@ -215,10 +215,6 @@ Asks the server for the current position of all streams.
 #### INVALIDATE_CACHE (C)
 
    Inform the server a cache should be invalidated
-
-#### SYNC (S, C)
-
-   Used exclusively in tests
 
 ### REMOTE_SERVER_UP (S, C)
 

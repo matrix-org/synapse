@@ -77,13 +77,13 @@ class CacheConfig(Config):
         cache_config = config.get("caches", {})
 
         self.global_factor = cache_config.get(
-            "global_factor", CACHE_PROPERTIES["default_cache_size_factor"]
+            "global_factor", CACHE_PROPERTIES["default_size_factor"]
         )
         if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
 
         # Set the global one so that it's reflected in new caches
-        CACHE_PROPERTIES["default_cache_size_factor"] = self.global_factor
+        CACHE_PROPERTIES["default_size_factor"] = self.global_factor
 
         # Load cache factors from the environment, but override them with the
         # ones in the config file if they exist

@@ -1,0 +1,1 @@
+Fix a sql query introduced in Synapse 1.12.0 which could cause large amounts of logging to the postgres slow-query log.

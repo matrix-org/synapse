@@ -24,7 +24,6 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         self.reconnect()
 
         # make the client subscribe to the receipts stream
-        self.replicate_stream()
         self.test_handler.streams.add("receipts")
 
         # tell the master to send a new receipt

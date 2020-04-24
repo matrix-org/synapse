@@ -52,24 +52,20 @@ synapse process.)
 
 You then create a set of configs for the various worker processes.  These
 should be worker configuration files, and should be stored in a dedicated
-subdirectory, to allow synctl to manipulate them. An additional configuration
-for the master synapse process will need to be created because the process will
-not be started automatically. That configuration should look like this:
-
-    worker_app: synapse.app.homeserver
-    daemonize: true
+subdirectory, to allow synctl to manipulate them.
 
 Each worker configuration file inherits the configuration of the main homeserver
 configuration file.  You can then override configuration specific to that worker,
 e.g. the HTTP listener that it provides (if any); logging configuration; etc.
 You should minimise the number of overrides though to maintain a usable config.
 
-You must specify the type of worker application (`worker_app`). The currently
-available worker applications are listed below. You must also specify the
-replication endpoints that it's talking to on the main synapse process.
-`worker_replication_host` should specify the host of the main synapse,
-`worker_replication_port` should point to the TCP replication listener port and
-`worker_replication_http_port` should point to the HTTP replication port.
+In the config file for each worker, you must specify the type of worker
+application (`worker_app`). The currently available worker applications are
+listed below. You must also specify the replication endpoints that it's talking
+to on the main synapse process.  `worker_replication_host` should specify the
+host of the main synapse, `worker_replication_port` should point to the TCP
+replication listener port and `worker_replication_http_port` should point to
+the HTTP replication port.
 
 Currently, the `event_creator` and `federation_reader` workers require specifying
 `worker_replication_http_port`.
@@ -90,8 +86,6 @@ For instance:
          - names:
            - client
 
-    worker_daemonize: True
-    worker_pid_file: /home/matrix/synapse/synchrotron.pid
     worker_log_config: /home/matrix/synapse/config/synchrotron_log_config.yaml
 
 ...is a full configuration for a synchrotron worker instance, which will expose a
@@ -101,7 +95,31 @@ by the main synapse.
 Obviously you should configure your reverse-proxy to route the relevant
 endpoints to the worker (`localhost:8083` in the above example).
 
-Finally, to actually run your worker-based synapse, you must pass synctl the -a
+Finally, you need to start your worker processes. This can be done with either
+`synctl` or your distribution's preferred service manager such as `systemd`. We
+recommend the use of `systemd` where available: for information on setting up
+`systemd` to start synapse workers, see
+[systemd-with-workers](systemd-with-workers). To use `synctl`, see below.
+
+### Using synctl
+
+If you want to use `synctl` to manage your synapse processes, you will need to
+create an an additional configuration file for the master synapse process. That
+configuration should look like this:
+
+```yaml
+worker_app: synapse.app.homeserver
+```
+
+Additionally, each worker app must be configured with the name of a "pid file",
+to which it will write its process ID when it starts. For example, for a
+synchrotron, you might write:
+
+```yaml
+worker_pid_file: /home/matrix/synapse/synchrotron.pid
+```
+
+Finally, to actually run your worker-based synapse, you must pass synctl the `-a`
 commandline option to tell it to operate on all the worker configurations found
 in the given directory, e.g.:
 
@@ -268,6 +286,8 @@ Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
     ^/_matrix/client/(api/v1|r0|unstable)/groups/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/user/[^/]*/account_data/
+    ^/_matrix/client/(api/v1|r0|unstable)/user/[^/]*/rooms/[^/]*/account_data/
 
 Additionally, the following REST endpoints can be handled, but all requests must
 be routed to the same instance:

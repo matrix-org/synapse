@@ -632,7 +632,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             event_map[event_id] = original_ev
 
-        # finally, we can decide whether each one nededs redacting, and build
+        # finally, we can decide whether each one needs redacting, and build
         # the cache entries.
         result_map = {}
         for event_id, original_ev in event_map.items():

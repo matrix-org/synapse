@@ -1639,7 +1639,7 @@ class SyncHandler(object):
         )
 
         # We loop through all room ids, even if there are no new events, in case
-        # there are non room events taht we need to notify about.
+        # there are non room events that we need to notify about.
         for room_id in sync_result_builder.joined_room_ids:
             room_entry = room_to_events.get(room_id, None)
 

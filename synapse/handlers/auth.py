@@ -18,13 +18,11 @@ import logging
 import time
 import unicodedata
 import urllib.parse
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import attr
 import bcrypt  # type: ignore[import]
 import pymacaroons
-
-from twisted.internet import defer
 
 import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
@@ -51,31 +49,6 @@ from synapse.util.caches.expiringcache import ExpiringCache
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
-
-
-SUCCESS_TEMPLATE = """
-<html>
-<head>
-<title>Success!</title>
-<meta name='viewport' content='width=device-width, initial-scale=1,
-    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
-<script>
-if (window.onAuthDone) {
-    window.onAuthDone();
-} else if (window.opener && window.opener.postMessage) {
-     window.opener.postMessage("authDone", "*");
-}
-</script>
-</head>
-<body>
-    <div>
-        <p>Thank you</p>
-        <p>You may now close this window and return to the application</p>
-    </div>
-</body>
-</html>
-"""
 
 
 class AuthHandler(BaseHandler):
@@ -116,7 +89,7 @@ class AuthHandler(BaseHandler):
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
-        self._saml2_enabled = hs.config.saml2_enabled
+        self._sso_enabled = hs.config.saml2_enabled or hs.config.cas_enabled
 
         # we keep this as a list despite the O(N^2) implication so that we can
         # keep PASSWORD first and avoid confusing clients which pick the first
@@ -136,7 +109,7 @@ class AuthHandler(BaseHandler):
         # necessarily identical. Login types have SSO (and other login types)
         # added in the rest layer, see synapse.rest.client.v1.login.LoginRestServerlet.on_GET.
         ui_auth_types = login_types.copy()
-        if self._saml2_enabled:
+        if self._sso_enabled:
             ui_auth_types.append(LoginType.SSO)
         self._supported_ui_auth_types = ui_auth_types
 
@@ -161,21 +134,28 @@ class AuthHandler(BaseHandler):
         self._sso_auth_confirm_template = load_jinja2_templates(
             hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
         )[0]
+        # The following template is shown after a successful user interactive
+        # authentication session. It tells the user they can close the window.
+        self._sso_auth_success_template = hs.config.sso_auth_success_template
+        # The following template is shown during the SSO authentication process if
+        # the account is deactivated.
+        self._sso_account_deactivated_template = (
+            hs.config.sso_account_deactivated_template
+        )
 
         self._server_name = hs.config.server_name
 
         # cast to tuple for use with str.startswith
         self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
 
-    @defer.inlineCallbacks
-    def validate_user_via_ui_auth(
+    async def validate_user_via_ui_auth(
         self,
         requester: Requester,
         request: SynapseRequest,
         request_body: Dict[str, Any],
         clientip: str,
         description: str,
-    ):
+    ) -> dict:
         """
         Checks that the user is who they claim to be, via a UI auth.
 
@@ -196,7 +176,7 @@ class AuthHandler(BaseHandler):
                          describes the operation happening on their account.
 
         Returns:
-            defer.Deferred[dict]: the parameters for this request (which may
+            The parameters for this request (which may
                 have been given only in a previous call).
 
         Raises:
@@ -226,7 +206,7 @@ class AuthHandler(BaseHandler):
         flows = [[login_type] for login_type in self._supported_ui_auth_types]
 
         try:
-            result, params, _ = yield self.check_auth(
+            result, params, _ = await self.check_auth(
                 flows, request, request_body, clientip, description
             )
         except LoginError:
@@ -265,22 +245,17 @@ class AuthHandler(BaseHandler):
         """
         return self.checkers.keys()
 
-    @defer.inlineCallbacks
-    def check_auth(
+    async def check_auth(
         self,
         flows: List[List[str]],
         request: SynapseRequest,
         clientdict: Dict[str, Any],
         clientip: str,
         description: str,
-    ):
+    ) -> Tuple[dict, dict, str]:
         """
         Takes a dictionary sent by the client in the login / registration
         protocol and handles the User-Interactive Auth flow.
-
-        As a side effect, this function fills in the 'creds' key on the user's
-        session with a map, which maps each auth-type (str) to the relevant
-        identity authenticated by that auth-type (mostly str, but for captcha, bool).
 
         If no auth flows have been completed successfully, raises an
         InteractiveAuthIncompleteError. To handle this, you can use
@@ -303,8 +278,7 @@ class AuthHandler(BaseHandler):
                          describes the operation happening on their account.
 
         Returns:
-            defer.Deferred[dict, dict, str]: a deferred tuple of
-                (creds, params, session_id).
+            A tuple of (creds, params, session_id).
 
                 'creds' contains the authenticated credentials of each stage.
 
@@ -326,50 +300,47 @@ class AuthHandler(BaseHandler):
             del clientdict["auth"]
             if "session" in authdict:
                 sid = authdict["session"]
-        session = self._get_session_info(sid)
 
-        if len(clientdict) > 0:
-            # This was designed to allow the client to omit the parameters
-            # and just supply the session in subsequent calls so it split
-            # auth between devices by just sharing the session, (eg. so you
-            # could continue registration from your phone having clicked the
-            # email auth link on there). It's probably too open to abuse
-            # because it lets unauthenticated clients store arbitrary objects
-            # on a homeserver.
-            # Revisit: Assuming the REST APIs do sensible validation, the data
-            # isn't arbintrary.
-            session["clientdict"] = clientdict
-            self._save_session(session)
-        elif "clientdict" in session:
-            clientdict = session["clientdict"]
-
-        # Ensure that the queried operation does not vary between stages of
-        # the UI authentication session. This is done by generating a stable
-        # comparator based on the URI, method, and body (minus the auth dict)
-        # and storing it during the initial query. Subsequent queries ensure
-        # that this comparator has not changed.
-        comparator = (request.uri, request.method, clientdict)
-        if "ui_auth" not in session:
-            session["ui_auth"] = comparator
-            self._save_session(session)
-        elif session["ui_auth"] != comparator:
-            raise SynapseError(
-                403,
-                "Requested operation has changed during the UI authentication session.",
+        # If there's no session ID, create a new session.
+        if not sid:
+            session = self._create_session(
+                clientdict, (request.uri, request.method, clientdict), description
             )
+            session_id = session["id"]
 
-        # Add a human readable description to the session.
-        if "description" not in session:
-            session["description"] = description
-            self._save_session(session)
+        else:
+            session = self._get_session_info(sid)
+            session_id = sid
+
+            if not clientdict:
+                # This was designed to allow the client to omit the parameters
+                # and just supply the session in subsequent calls so it split
+                # auth between devices by just sharing the session, (eg. so you
+                # could continue registration from your phone having clicked the
+                # email auth link on there). It's probably too open to abuse
+                # because it lets unauthenticated clients store arbitrary objects
+                # on a homeserver.
+                # Revisit: Assuming the REST APIs do sensible validation, the data
+                # isn't arbitrary.
+                clientdict = session["clientdict"]
+
+            # Ensure that the queried operation does not vary between stages of
+            # the UI authentication session. This is done by generating a stable
+            # comparator based on the URI, method, and body (minus the auth dict)
+            # and storing it during the initial query. Subsequent queries ensure
+            # that this comparator has not changed.
+            comparator = (request.uri, request.method, clientdict)
+            if session["ui_auth"] != comparator:
+                raise SynapseError(
+                    403,
+                    "Requested operation has changed during the UI authentication session.",
+                )
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session)
+                self._auth_dict_for_flows(flows, session_id)
             )
 
-        if "creds" not in session:
-            session["creds"] = {}
         creds = session["creds"]
 
         # check auth type currently being presented
@@ -377,7 +348,7 @@ class AuthHandler(BaseHandler):
         if "type" in authdict:
             login_type = authdict["type"]  # type: str
             try:
-                result = yield self._check_auth_dict(authdict, clientip)
+                result = await self._check_auth_dict(authdict, clientip)
                 if result:
                     creds[login_type] = result
                     self._save_session(session)
@@ -409,15 +380,16 @@ class AuthHandler(BaseHandler):
                     list(clientdict),
                 )
 
-                return creds, clientdict, session["id"]
+                return creds, clientdict, session_id
 
-        ret = self._auth_dict_for_flows(flows, session)
+        ret = self._auth_dict_for_flows(flows, session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
         raise InteractiveAuthIncompleteError(ret)
 
-    @defer.inlineCallbacks
-    def add_oob_auth(self, stagetype: str, authdict: Dict[str, Any], clientip: str):
+    async def add_oob_auth(
+        self, stagetype: str, authdict: Dict[str, Any], clientip: str
+    ) -> bool:
         """
         Adds the result of out-of-band authentication into an existing auth
         session. Currently used for adding the result of fallback auth.
@@ -428,11 +400,9 @@ class AuthHandler(BaseHandler):
             raise LoginError(400, "", Codes.MISSING_PARAM)
 
         sess = self._get_session_info(authdict["session"])
-        if "creds" not in sess:
-            sess["creds"] = {}
         creds = sess["creds"]
 
-        result = yield self.checkers[stagetype].check_auth(authdict, clientip)
+        result = await self.checkers[stagetype].check_auth(authdict, clientip)
         if result:
             creds[stagetype] = result
             self._save_session(sess)
@@ -469,7 +439,7 @@ class AuthHandler(BaseHandler):
             value: The data to store
         """
         sess = self._get_session_info(session_id)
-        sess.setdefault("serverdict", {})[key] = value
+        sess["serverdict"][key] = value
         self._save_session(sess)
 
     def get_session_data(
@@ -484,10 +454,11 @@ class AuthHandler(BaseHandler):
             default: Value to return if the key has not been set
         """
         sess = self._get_session_info(session_id)
-        return sess.setdefault("serverdict", {}).get(key, default)
+        return sess["serverdict"].get(key, default)
 
-    @defer.inlineCallbacks
-    def _check_auth_dict(self, authdict: Dict[str, Any], clientip: str):
+    async def _check_auth_dict(
+        self, authdict: Dict[str, Any], clientip: str
+    ) -> Union[Dict[str, Any], str]:
         """Attempt to validate the auth dict provided by a client
 
         Args:
@@ -495,7 +466,7 @@ class AuthHandler(BaseHandler):
             clientip: IP address of the client
 
         Returns:
-            Deferred: result of the stage verification.
+            Result of the stage verification.
 
         Raises:
             StoreError if there was a problem accessing the database
@@ -505,7 +476,7 @@ class AuthHandler(BaseHandler):
         login_type = authdict["type"]
         checker = self.checkers.get(login_type)
         if checker is not None:
-            res = yield checker.check_auth(authdict, clientip=clientip)
+            res = await checker.check_auth(authdict, clientip=clientip)
             return res
 
         # build a v1-login-style dict out of the authdict and fall back to the
@@ -515,7 +486,7 @@ class AuthHandler(BaseHandler):
         if user_id is None:
             raise SynapseError(400, "", Codes.MISSING_PARAM)
 
-        (canonical_id, callback) = yield self.validate_login(user_id, authdict)
+        (canonical_id, callback) = await self.validate_login(user_id, authdict)
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
@@ -539,7 +510,7 @@ class AuthHandler(BaseHandler):
         }
 
     def _auth_dict_for_flows(
-        self, flows: List[List[str]], session: Dict[str, Any]
+        self, flows: List[List[str]], session_id: str,
     ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
@@ -558,31 +529,73 @@ class AuthHandler(BaseHandler):
                     params[stage] = get_params[stage]()
 
         return {
-            "session": session["id"],
+            "session": session_id,
             "flows": [{"stages": f} for f in public_flows],
             "params": params,
         }
 
-    def _get_session_info(self, session_id: Optional[str]) -> dict:
+    def _create_session(
+        self,
+        clientdict: Dict[str, Any],
+        ui_auth: Tuple[bytes, bytes, Dict[str, Any]],
+        description: str,
+    ) -> dict:
         """
-        Gets or creates a session given a session ID.
+        Creates a new user interactive authentication session.
+
+        The session can be used to track data across multiple requests, e.g. for
+        interactive authentication.
+
+        Each session has the following keys:
+
+            id:
+                A unique identifier for this session. Passed back to the client
+                and returned for each stage.
+            clientdict:
+                The dictionary from the client root level, not the 'auth' key.
+            ui_auth:
+                A tuple which is checked at each stage of the authentication to
+                ensure that the asked for operation has not changed.
+            creds:
+                A map, which maps each auth-type (str) to the relevant identity
+                authenticated by that auth-type (mostly str, but for captcha, bool).
+            serverdict:
+                A map of data that is stored server-side and cannot be modified
+                by the client.
+            description:
+                A string description of the operation that the current
+                authentication is authorising.
+    Returns:
+        The newly created session.
+        """
+        session_id = None
+        while session_id is None or session_id in self.sessions:
+            session_id = stringutils.random_string(24)
+
+        self.sessions[session_id] = {
+            "id": session_id,
+            "clientdict": clientdict,
+            "ui_auth": ui_auth,
+            "creds": {},
+            "serverdict": {},
+            "description": description,
+        }
+
+        return self.sessions[session_id]
+
+    def _get_session_info(self, session_id: str) -> dict:
+        """
+        Gets a session given a session ID.
 
         The session can be used to track data across multiple requests, e.g. for
         interactive authentication.
         """
-        if session_id not in self.sessions:
-            session_id = None
+        try:
+            return self.sessions[session_id]
+        except KeyError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
-        if not session_id:
-            # create a new session
-            while session_id is None or session_id in self.sessions:
-                session_id = stringutils.random_string(24)
-            self.sessions[session_id] = {"id": session_id}
-
-        return self.sessions[session_id]
-
-    @defer.inlineCallbacks
-    def get_access_token_for_user_id(
+    async def get_access_token_for_user_id(
         self, user_id: str, device_id: Optional[str], valid_until_ms: Optional[int]
     ):
         """
@@ -612,10 +625,10 @@ class AuthHandler(BaseHandler):
             )
         logger.info("Logging in user %s on device %s%s", user_id, device_id, fmt_expiry)
 
-        yield self.auth.check_auth_blocking(user_id)
+        await self.auth.check_auth_blocking(user_id)
 
         access_token = self.macaroon_gen.generate_access_token(user_id)
-        yield self.store.add_access_token_to_user(
+        await self.store.add_access_token_to_user(
             user_id, access_token, device_id, valid_until_ms
         )
 
@@ -625,15 +638,14 @@ class AuthHandler(BaseHandler):
         # device, so we double-check it here.
         if device_id is not None:
             try:
-                yield self.store.get_device(user_id, device_id)
+                await self.store.get_device(user_id, device_id)
             except StoreError:
-                yield self.store.delete_access_token(access_token)
+                await self.store.delete_access_token(access_token)
                 raise StoreError(400, "Login raced against device deletion")
 
         return access_token
 
-    @defer.inlineCallbacks
-    def check_user_exists(self, user_id: str):
+    async def check_user_exists(self, user_id: str) -> Optional[str]:
         """
         Checks to see if a user with the given id exists. Will check case
         insensitively, but return None if there are multiple inexact matches.
@@ -642,28 +654,25 @@ class AuthHandler(BaseHandler):
             user_id: complete @user:id
 
         Returns:
-            defer.Deferred: (unicode) canonical_user_id, or None if zero or
-            multiple matches
-
-        Raises:
-            UserDeactivatedError if a user is found but is deactivated.
+            The canonical_user_id, or None if zero or multiple matches
         """
-        res = yield self._find_user_id_and_pwd_hash(user_id)
+        res = await self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
             return res[0]
         return None
 
-    @defer.inlineCallbacks
-    def _find_user_id_and_pwd_hash(self, user_id: str):
+    async def _find_user_id_and_pwd_hash(
+        self, user_id: str
+    ) -> Optional[Tuple[str, str]]:
         """Checks to see if a user with the given id exists. Will check case
         insensitively, but will return None if there are multiple inexact
         matches.
 
         Returns:
-            tuple: A 2-tuple of `(canonical_user_id, password_hash)`
-            None: if there is not exactly one match
+            A 2-tuple of `(canonical_user_id, password_hash)` or `None`
+            if there is not exactly one match
         """
-        user_infos = yield self.store.get_users_by_id_case_insensitive(user_id)
+        user_infos = await self.store.get_users_by_id_case_insensitive(user_id)
 
         result = None
         if not user_infos:
@@ -696,8 +705,9 @@ class AuthHandler(BaseHandler):
         """
         return self._supported_login_types
 
-    @defer.inlineCallbacks
-    def validate_login(self, username: str, login_submission: Dict[str, Any]):
+    async def validate_login(
+        self, username: str, login_submission: Dict[str, Any]
+    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], None]]]:
         """Authenticates the user for the /login API
 
         Also used by the user-interactive auth flow to validate
@@ -708,7 +718,7 @@ class AuthHandler(BaseHandler):
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
         Returns:
-            Deferred[str, func]: canonical user id, and optional callback
+            A tuple of the canonical user id, and optional callback
                 to be called once the access token and device id are issued
         Raises:
             StoreError if there was a problem accessing the database
@@ -737,7 +747,7 @@ class AuthHandler(BaseHandler):
         for provider in self.password_providers:
             if hasattr(provider, "check_password") and login_type == LoginType.PASSWORD:
                 known_login_type = True
-                is_valid = yield provider.check_password(qualified_user_id, password)
+                is_valid = await provider.check_password(qualified_user_id, password)
                 if is_valid:
                     return qualified_user_id, None
 
@@ -769,7 +779,7 @@ class AuthHandler(BaseHandler):
                     % (login_type, missing_fields),
                 )
 
-            result = yield provider.check_auth(username, login_type, login_dict)
+            result = await provider.check_auth(username, login_type, login_dict)
             if result:
                 if isinstance(result, str):
                     result = (result, None)
@@ -778,8 +788,8 @@ class AuthHandler(BaseHandler):
         if login_type == LoginType.PASSWORD and self.hs.config.password_localdb_enabled:
             known_login_type = True
 
-            canonical_user_id = yield self._check_local_password(
-                qualified_user_id, password
+            canonical_user_id = await self._check_local_password(
+                qualified_user_id, password  # type: ignore
             )
 
             if canonical_user_id:
@@ -792,8 +802,9 @@ class AuthHandler(BaseHandler):
         # login, it turns all LoginErrors into a 401 anyway.
         raise LoginError(403, "Invalid password", errcode=Codes.FORBIDDEN)
 
-    @defer.inlineCallbacks
-    def check_password_provider_3pid(self, medium: str, address: str, password: str):
+    async def check_password_provider_3pid(
+        self, medium: str, address: str, password: str
+    ) -> Tuple[Optional[str], Optional[Callable[[Dict[str, str]], None]]]:
         """Check if a password provider is able to validate a thirdparty login
 
         Args:
@@ -802,9 +813,8 @@ class AuthHandler(BaseHandler):
             password: The password of the user.
 
         Returns:
-            Deferred[(str|None, func|None)]: A tuple of `(user_id,
-            callback)`. If authentication is successful, `user_id` is a `str`
-            containing the authenticated, canonical user ID. `callback` is
+            A tuple of `(user_id, callback)`. If authentication is successful,
+            `user_id`is the authenticated, canonical user ID. `callback` is
             then either a function to be later run after the server has
             completed login/registration, or `None`. If authentication was
             unsuccessful, `user_id` and `callback` are both `None`.
@@ -816,7 +826,7 @@ class AuthHandler(BaseHandler):
                 # success, to a str (which is the user_id) or a tuple of
                 # (user_id, callback_func), where callback_func should be run
                 # after we've finished everything else
-                result = yield provider.check_3pid_auth(medium, address, password)
+                result = await provider.check_3pid_auth(medium, address, password)
                 if result:
                     # Check if the return value is a str or a tuple
                     if isinstance(result, str):
@@ -826,8 +836,7 @@ class AuthHandler(BaseHandler):
 
         return None, None
 
-    @defer.inlineCallbacks
-    def _check_local_password(self, user_id: str, password: str):
+    async def _check_local_password(self, user_id: str, password: str) -> Optional[str]:
         """Authenticate a user against the local password database.
 
         user_id is checked case insensitively, but will return None if there are
@@ -837,28 +846,26 @@ class AuthHandler(BaseHandler):
             user_id: complete @user:id
             password: the provided password
         Returns:
-            Deferred[unicode] the canonical_user_id, or Deferred[None] if
-                unknown user/bad password
+            The canonical_user_id, or None if unknown user/bad password
         """
-        lookupres = yield self._find_user_id_and_pwd_hash(user_id)
+        lookupres = await self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
             return None
         (user_id, password_hash) = lookupres
 
         # If the password hash is None, the account has likely been deactivated
         if not password_hash:
-            deactivated = yield self.store.get_user_deactivated_status(user_id)
+            deactivated = await self.store.get_user_deactivated_status(user_id)
             if deactivated:
                 raise UserDeactivatedError("This account has been deactivated")
 
-        result = yield self.validate_hash(password, password_hash)
+        result = await self.validate_hash(password, password_hash)
         if not result:
             logger.warning("Failed password login for user %s", user_id)
             return None
         return user_id
 
-    @defer.inlineCallbacks
-    def validate_short_term_login_token_and_get_user_id(self, login_token: str):
+    async def validate_short_term_login_token_and_get_user_id(self, login_token: str):
         auth_api = self.hs.get_auth()
         user_id = None
         try:
@@ -868,26 +875,23 @@ class AuthHandler(BaseHandler):
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
 
-        yield self.auth.check_auth_blocking(user_id)
+        await self.auth.check_auth_blocking(user_id)
         return user_id
 
-    @defer.inlineCallbacks
-    def delete_access_token(self, access_token: str):
+    async def delete_access_token(self, access_token: str):
         """Invalidate a single access token
 
         Args:
             access_token: access token to be deleted
 
-        Returns:
-            Deferred
         """
-        user_info = yield self.auth.get_user_by_access_token(access_token)
-        yield self.store.delete_access_token(access_token)
+        user_info = await self.auth.get_user_by_access_token(access_token)
+        await self.store.delete_access_token(access_token)
 
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
             if hasattr(provider, "on_logged_out"):
-                yield provider.on_logged_out(
+                await provider.on_logged_out(
                     user_id=str(user_info["user"]),
                     device_id=user_info["device_id"],
                     access_token=access_token,
@@ -895,12 +899,11 @@ class AuthHandler(BaseHandler):
 
         # delete pushers associated with this access token
         if user_info["token_id"] is not None:
-            yield self.hs.get_pusherpool().remove_pushers_by_access_token(
+            await self.hs.get_pusherpool().remove_pushers_by_access_token(
                 str(user_info["user"]), (user_info["token_id"],)
             )
 
-    @defer.inlineCallbacks
-    def delete_access_tokens_for_user(
+    async def delete_access_tokens_for_user(
         self,
         user_id: str,
         except_token_id: Optional[str] = None,
@@ -914,10 +917,8 @@ class AuthHandler(BaseHandler):
             device_id:  ID of device the tokens are associated with.
                 If None, tokens associated with any device (or no device) will
                 be deleted
-        Returns:
-            Deferred
         """
-        tokens_and_devices = yield self.store.user_delete_access_tokens(
+        tokens_and_devices = await self.store.user_delete_access_tokens(
             user_id, except_token_id=except_token_id, device_id=device_id
         )
 
@@ -925,17 +926,18 @@ class AuthHandler(BaseHandler):
         for provider in self.password_providers:
             if hasattr(provider, "on_logged_out"):
                 for token, token_id, device_id in tokens_and_devices:
-                    yield provider.on_logged_out(
+                    await provider.on_logged_out(
                         user_id=user_id, device_id=device_id, access_token=token
                     )
 
         # delete pushers associated with the access tokens
-        yield self.hs.get_pusherpool().remove_pushers_by_access_token(
+        await self.hs.get_pusherpool().remove_pushers_by_access_token(
             user_id, (token_id for _, token_id, _ in tokens_and_devices)
         )
 
-    @defer.inlineCallbacks
-    def add_threepid(self, user_id: str, medium: str, address: str, validated_at: int):
+    async def add_threepid(
+        self, user_id: str, medium: str, address: str, validated_at: int
+    ):
         # check if medium has a valid value
         if medium not in ["email", "msisdn"]:
             raise SynapseError(
@@ -956,14 +958,13 @@ class AuthHandler(BaseHandler):
         if medium == "email":
             address = address.lower()
 
-        yield self.store.user_add_threepid(
+        await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
         )
 
-    @defer.inlineCallbacks
-    def delete_threepid(
+    async def delete_threepid(
         self, user_id: str, medium: str, address: str, id_server: Optional[str] = None
-    ):
+    ) -> bool:
         """Attempts to unbind the 3pid on the identity servers and deletes it
         from the local database.
 
@@ -976,7 +977,7 @@ class AuthHandler(BaseHandler):
                 identity server specified when binding (if known).
 
         Returns:
-            Deferred[bool]: Returns True if successfully unbound the 3pid on
+            Returns True if successfully unbound the 3pid on
             the identity server, False if identity server doesn't support the
             unbind API.
         """
@@ -986,11 +987,11 @@ class AuthHandler(BaseHandler):
             address = address.lower()
 
         identity_handler = self.hs.get_handlers().identity_handler
-        result = yield identity_handler.try_unbind_threepid(
+        result = await identity_handler.try_unbind_threepid(
             user_id, {"medium": medium, "address": address, "id_server": id_server}
         )
 
-        yield self.store.user_delete_threepid(user_id, medium, address)
+        await self.store.user_delete_threepid(user_id, medium, address)
         return result
 
     def _save_session(self, session: Dict[str, Any]) -> None:
@@ -1000,14 +1001,14 @@ class AuthHandler(BaseHandler):
         session["last_used"] = self.hs.get_clock().time_msec()
         self.sessions[session["id"]] = session
 
-    def hash(self, password: str):
+    async def hash(self, password: str) -> str:
         """Computes a secure hash of password.
 
         Args:
             password: Password to hash.
 
         Returns:
-            Deferred(unicode): Hashed password.
+            Hashed password.
         """
 
         def _do_hash():
@@ -1019,9 +1020,11 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
-        return defer_to_thread(self.hs.get_reactor(), _do_hash)
+        return await defer_to_thread(self.hs.get_reactor(), _do_hash)
 
-    def validate_hash(self, password: str, stored_hash: bytes):
+    async def validate_hash(
+        self, password: str, stored_hash: Union[bytes, str]
+    ) -> bool:
         """Validates that self.hash(password) == stored_hash.
 
         Args:
@@ -1029,7 +1032,7 @@ class AuthHandler(BaseHandler):
             stored_hash: Expected hash value.
 
         Returns:
-            Deferred(bool): Whether self.hash(password) == stored_hash.
+            Whether self.hash(password) == stored_hash.
         """
 
         def _do_validate_hash():
@@ -1045,9 +1048,9 @@ class AuthHandler(BaseHandler):
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode("ascii")
 
-            return defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return await defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
         else:
-            return defer.succeed(False)
+            return False
 
     def start_sso_ui_auth(self, redirect_url: str, session_id: str) -> str:
         """
@@ -1061,11 +1064,8 @@ class AuthHandler(BaseHandler):
             The HTML to render.
         """
         session = self._get_session_info(session_id)
-        # Get the human readable operation of what is occurring, falling back to
-        # a generic message if it isn't available for some reason.
-        description = session.get("description", "modify your account")
         return self._sso_auth_confirm_template.render(
-            description=description, redirect_url=redirect_url,
+            description=session["description"], redirect_url=redirect_url,
         )
 
     def complete_sso_ui_auth(
@@ -1081,8 +1081,6 @@ class AuthHandler(BaseHandler):
         """
         # Mark the stage of the authentication as successful.
         sess = self._get_session_info(session_id)
-        if "creds" not in sess:
-            sess["creds"] = {}
         creds = sess["creds"]
 
         # Save the user who authenticated with SSO, this will be used to ensure
@@ -1091,7 +1089,7 @@ class AuthHandler(BaseHandler):
         self._save_session(sess)
 
         # Render the HTML and return.
-        html_bytes = SUCCESS_TEMPLATE.encode("utf8")
+        html_bytes = self._sso_auth_success_template.encode("utf-8")
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
         request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
@@ -1099,7 +1097,7 @@ class AuthHandler(BaseHandler):
         request.write(html_bytes)
         finish_request(request)
 
-    def complete_sso_login(
+    async def complete_sso_login(
         self,
         registered_user_id: str,
         request: SynapseRequest,
@@ -1112,6 +1110,32 @@ class AuthHandler(BaseHandler):
             request: The request to complete.
             client_redirect_url: The URL to which to redirect the user at the end of the
                 process.
+        """
+        # If the account has been deactivated, do not proceed with the login
+        # flow.
+        deactivated = await self.store.get_user_deactivated_status(registered_user_id)
+        if deactivated:
+            html_bytes = self._sso_account_deactivated_template.encode("utf-8")
+
+            request.setResponseCode(403)
+            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+            request.write(html_bytes)
+            finish_request(request)
+            return
+
+        self._complete_sso_login(registered_user_id, request, client_redirect_url)
+
+    def _complete_sso_login(
+        self,
+        registered_user_id: str,
+        request: SynapseRequest,
+        client_redirect_url: str,
+    ):
+        """
+        The synchronous portion of complete_sso_login.
+
+        This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
         """
         # Create a login token
         login_token = self.macaroon_gen.generate_short_term_login_token(
@@ -1138,7 +1162,7 @@ class AuthHandler(BaseHandler):
         # URL we redirect users to.
         redirect_url_no_params = client_redirect_url.split("?")[0]
 
-        html = self._sso_redirect_confirm_template.render(
+        html_bytes = self._sso_redirect_confirm_template.render(
             display_url=redirect_url_no_params,
             redirect_url=redirect_url,
             server_name=self._server_name,
@@ -1146,8 +1170,8 @@ class AuthHandler(BaseHandler):
 
         request.setResponseCode(200)
         request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html),))
-        request.write(html)
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+        request.write(html_bytes)
         finish_request(request)
 
     @staticmethod

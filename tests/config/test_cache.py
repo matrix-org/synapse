@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.config._base import Config, RootConfig
-from synapse.config.cache import CacheConfig, add_resizable_cache
+from synapse.config.cache import CacheConfig, add_resizable_cache, _CACHES, CACHE_PROPERTIES
 from synapse.util.caches.lrucache import LruCache
 
 from tests.unittest import TestCase
@@ -72,13 +72,13 @@ class CacheConfigTests(TestCase):
         """
         cache = LruCache(100)
         add_resizable_cache("foo", cache.set_cache_factor)
-        self.assertEqual(cache.max_size, 50)
+        self.assertEqual(cache._max_size, 50)
 
         config = {"caches": {"per_cache_factors": {"foo": 3}}}
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        self.assertEqual(cache.max_size, 300)
+        self.assertEqual(cache._max_size, 300)
 
     def test_individual_instantiated_after_config_load(self):
         """
@@ -92,7 +92,7 @@ class CacheConfigTests(TestCase):
 
         cache = LruCache(100)
         add_resizable_cache("foo", cache.set_cache_factor)
-        self.assertEqual(cache.max_size, 200)
+        self.assertEqual(cache._max_size, 200)
 
     def test_global_instantiated_before_config_load(self):
         """
@@ -102,13 +102,13 @@ class CacheConfigTests(TestCase):
         """
         cache = LruCache(100)
         add_resizable_cache("foo", cache.set_cache_factor)
-        self.assertEqual(cache.max_size, 50)
+        self.assertEqual(cache._max_size, 50)
 
         config = {"caches": {"global_factor": 4}}
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        self.assertEqual(cache.max_size, 400)
+        self.assertEqual(cache._max_size, 400)
 
     def test_global_instantiated_after_config_load(self):
         """
@@ -122,4 +122,4 @@ class CacheConfigTests(TestCase):
 
         cache = LruCache(100)
         add_resizable_cache("foo", cache.set_cache_factor)
-        self.assertEqual(cache.max_size, 150)
+        self.assertEqual(cache._max_size, 150)

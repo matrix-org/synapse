@@ -1,10 +1,39 @@
 Next version
 ============
 
-* A new template (`sso_auth_confirm.html`) was added to Synapse. If your Synapse
-  is configured to use SSO and a custom `sso_redirect_confirm_template_dir`
-  configuration then this template will need to be duplicated into that
-  directory.
+* New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
+ `sso_account_deactivated.html`) were added to Synapse. If your Synapse is
+ configured to use SSO and a custom  `sso_redirect_confirm_template_dir`
+ configuration then these templates will need to be duplicated into that
+ directory.
+
+* Plugins using the `complete_sso_login` method of `synapse.module_api.ModuleApi`
+  should update to using the async/await version `complete_sso_login_async` which
+  includes additional checks. The non-async version is considered deprecated.
+
+
+Synapse 1.12.4 (2020-04-23)
+===========================
+
+No significant changes.
+
+
+Synapse 1.12.4rc1 (2020-04-22)
+==============================
+
+Features
+--------
+
+- Always send users their own device updates. ([\#7160](https://github.com/matrix-org/synapse/issues/7160))
+- Add support for handling GET requests for `account_data` on a worker. ([\#7311](https://github.com/matrix-org/synapse/issues/7311))
+
+
+Bugfixes
+--------
+
+- Fix a bug that prevented cross-signing with users on worker-mode synapses. ([\#7255](https://github.com/matrix-org/synapse/issues/7255))
+- Do not treat display names as globs in push rules. ([\#7271](https://github.com/matrix-org/synapse/issues/7271))
+- Fix a bug with cross-signing devices belonging to remote users who did not share a room with any user on the local homeserver. ([\#7289](https://github.com/matrix-org/synapse/issues/7289))
 
 Synapse 1.12.3 (2020-04-03)
 ===========================
@@ -15,13 +44,9 @@ correctly fix the issue with building the Debian packages. ([\#7212](https://git
 Synapse 1.12.2 (2020-04-02)
 ===========================
 
-This release works around [an
-issue](https://github.com/matrix-org/synapse/issues/7208) with building the
-debian packages.
+This release works around [an issue](https://github.com/matrix-org/synapse/issues/7208) with building the debian packages.
 
 No other significant changes since 1.12.1.
-
->>>>>>> master
 
 Synapse 1.12.1 (2020-04-02)
 ===========================
@@ -42,11 +67,18 @@ Bugfixes
 Synapse 1.12.0 (2020-03-23)
 ===========================
 
-No significant changes since 1.12.0rc1.
-
 Debian packages and Docker images are rebuilt using the latest versions of
 dependency libraries, including Twisted 20.3.0. **Please see security advisory
 below**.
+
+Potential slow database update during upgrade
+---------------------------------------------
+
+Synapse 1.12.0 includes a database update which is run as part of the upgrade,
+and which may take some time (several hours in the case of a large
+server). Synapse will not respond to HTTP requests while this update is taking
+place. For imformation on seeing if you are affected, and workaround if you
+are, see the [upgrade notes](UPGRADE.rst#upgrading-to-v1120).
 
 Security advisory
 -----------------
