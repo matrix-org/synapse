@@ -14,16 +14,16 @@ example flow would be (where '>' indicates master to worker and
 '<' worker to master flows):
 
     > SERVER example.com
-    < REPLICATE events 53
+    < REPLICATE
+    > POSITION events 53
     > RDATA events 54 ["$foo1:bar.com", ...]
     > RDATA events 55 ["$foo4:bar.com", ...]
 
-The example shows the server accepting a new connection and sending its
-identity with the `SERVER` command, followed by the client asking to
-subscribe to the `events` stream from the token `53`. The server then
-periodically sends `RDATA` commands which have the format
-`RDATA <stream_name> <token> <row>`, where the format of `<row>` is
-defined by the individual streams.
+The example shows the server accepting a new connection and sending its identity
+with the `SERVER` command, followed by the client server to respond with the
+position of all streams. The server then periodically sends `RDATA` commands
+which have the format `RDATA <stream_name> <token> <row>`, where the format of
+`<row>` is defined by the individual streams.
 
 Error reporting happens by either the client or server sending an ERROR
 command, and usually the connection will be closed.
@@ -32,9 +32,6 @@ Since the protocol is a simple line based, its possible to manually
 connect to the server using a tool like netcat. A few things should be
 noted when manually using the protocol:
 
--   When subscribing to a stream using `REPLICATE`, the special token
-    `NOW` can be used to get all future updates. The special stream name
-    `ALL` can be used with `NOW` to subscribe to all available streams.
 -   The federation stream is only available if federation sending has
     been disabled on the main process.
 -   The server will only time connections out that have sent a `PING`
@@ -91,9 +88,7 @@ The client:
 -   Sends a `NAME` command, allowing the server to associate a human
     friendly name with the connection. This is optional.
 -   Sends a `PING` as above
--   For each stream the client wishes to subscribe to it sends a
-    `REPLICATE` with the `stream_name` and token it wants to subscribe
-    from.
+-   Sends a `REPLICATE` to get the current position of all streams.
 -   On receipt of a `SERVER` command, checks that the server name
     matches the expected server name.
 
@@ -140,9 +135,7 @@ the wire:
     > PING 1490197665618
     < NAME synapse.app.appservice
     < PING 1490197665618
-    < REPLICATE events 1
-    < REPLICATE backfill 1
-    < REPLICATE caches 1
+    < REPLICATE
     > POSITION events 1
     > POSITION backfill 1
     > POSITION caches 1
@@ -181,9 +174,9 @@ client (C):
 
 #### POSITION (S)
 
-   The position of the stream has been updated. Sent to the client
-    after all missing updates for a stream have been sent to the client
-    and they're now up to date.
+   On receipt of a POSITION command clients should check if they have missed any
+   updates, and if so then fetch them out of band. Sent in response to a
+   REPLICATE command (but can happen at any time).
 
 #### ERROR (S, C)
 
@@ -199,24 +192,17 @@ client (C):
 
 #### REPLICATE (C)
 
-Asks the server to replicate a given stream. The syntax is:
-
-```
-    REPLICATE <stream_name> <token>
-```
-
-Where `<token>` may be either:
- * a numeric stream_id to stream updates since (exclusive)
- * `NOW` to stream all subsequent updates.
-
-The `<stream_name>` is the name of a replication stream to subscribe
-to (see [here](../synapse/replication/tcp/streams/_base.py) for a list
-of streams). It can also be `ALL` to subscribe to all known streams,
-in which case the `<token>` must be set to `NOW`.
+Asks the server for the current position of all streams.
 
 #### USER_SYNC (C)
 
-   A user has started or stopped syncing
+   A user has started or stopped syncing on this process.
+
+#### CLEAR_USER_SYNC (C)
+
+   The server should clear all associated user sync data from the worker.
+
+   This is used when a worker is shutting down.
 
 #### FEDERATION_ACK (C)
 
@@ -229,10 +215,6 @@ in which case the `<token>` must be set to `NOW`.
 #### INVALIDATE_CACHE (C)
 
    Inform the server a cache should be invalidated
-
-#### SYNC (S, C)
-
-   Used exclusively in tests
 
 ### REMOTE_SERVER_UP (S, C)
 

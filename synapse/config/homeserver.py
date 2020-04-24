@@ -31,6 +31,7 @@ from .password import PasswordConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
 from .ratelimiting import RatelimitConfig
+from .redis import RedisConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
 from .room_directory import RoomDirectoryConfig
@@ -82,4 +83,5 @@ class HomeServerConfig(RootConfig):
         RoomDirectoryConfig,
         ThirdPartyRulesConfig,
         TracerConfig,
+        RedisConfig,
     ]

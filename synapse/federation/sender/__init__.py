@@ -517,4 +517,13 @@ class FederationSender(object):
         self._get_per_destination_queue(destination).attempt_new_transaction()
 
     def get_current_token(self) -> int:
+        # Dummy implementation for case where federation sender isn't offloaded
+        # to a worker.
         return 0
+
+    async def get_replication_rows(
+        self, from_token, to_token, limit, federation_ack=None
+    ):
+        # Dummy implementation for case where federation sender isn't offloaded
+        # to a worker.
+        return []

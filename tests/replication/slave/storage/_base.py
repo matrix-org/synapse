@@ -16,9 +16,10 @@
 from mock import Mock, NonCallableMock
 
 from synapse.replication.tcp.client import (
-    ReplicationClientFactory,
-    ReplicationClientHandler,
+    DirectTcpReplicationClientFactory,
+    ReplicationDataHandler,
 )
+from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.storage.database import make_conn
 
@@ -51,15 +52,19 @@ class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
         self.event_id = 0
 
         server_factory = ReplicationStreamProtocolFactory(self.hs)
-        self.streamer = server_factory.streamer
+        self.streamer = hs.get_replication_streamer()
 
-        handler_factory = Mock()
-        self.replication_handler = ReplicationClientHandler(self.slaved_store)
-        self.replication_handler.factory = handler_factory
+        # We now do some gut wrenching so that we have a client that is based
+        # off of the slave store rather than the main store.
+        self.replication_handler = ReplicationCommandHandler(self.hs)
+        self.replication_handler._replication_data_handler = ReplicationDataHandler(
+            self.slaved_store
+        )
 
-        client_factory = ReplicationClientFactory(
+        client_factory = DirectTcpReplicationClientFactory(
             self.hs, "client_name", self.replication_handler
         )
+        client_factory.handler = self.replication_handler
 
         server = server_factory.buildProtocol(None)
         client = client_factory.buildProtocol(None)

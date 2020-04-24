@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Any, Dict, Optional
 
 from six import iteritems
 
@@ -106,22 +107,22 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def _get_public_room_list(
         self,
-        limit=None,
-        since_token=None,
-        search_filter=None,
-        network_tuple=EMPTY_THIRD_PARTY_ID,
-        from_federation=False,
-    ):
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        network_tuple: ThirdPartyInstanceID = EMPTY_THIRD_PARTY_ID,
+        from_federation: bool = False,
+    ) -> Dict[str, Any]:
         """Generate a public room list.
         Args:
-            limit (int|None): Maximum amount of rooms to return.
-            since_token (str|None)
-            search_filter (dict|None): Dictionary to filter rooms by.
-            network_tuple (ThirdPartyInstanceID): Which public list to use.
+            limit: Maximum amount of rooms to return.
+            since_token:
+            search_filter: Dictionary to filter rooms by.
+            network_tuple: Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
-            from_federation (bool): Whether this request originated from a
+            from_federation: Whether this request originated from a
                 federating server or a client. Used for room filtering.
         """
 
