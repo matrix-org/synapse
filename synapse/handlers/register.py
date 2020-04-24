@@ -619,7 +619,13 @@ class RegistrationHandler(BaseHandler):
         return (device_id, access_token)
 
     @defer.inlineCallbacks
-    def post_registration_actions(self, user_id, auth_result, access_token):
+    def post_registration_actions(
+        self,
+        user_id,
+        auth_result,
+        access_token,
+        bind_threepid_creds=None,
+    ):
         """A user has completed registration
 
         Args:
@@ -628,6 +634,10 @@ class RegistrationHandler(BaseHandler):
                 registered user.
             access_token (str|None): The access token of the newly logged in
                 device, or None if `inhibit_login` enabled.
+            bind_threepid_creds (dict|None): A dictionary containing validated
+                client_secret, sid, and possibly an id_access_token. If set,
+                will attempt to bind the matching 3pid to the identity server
+                specified by self.config.account_threepid_delegate_email
         """
         if self.hs.config.worker_app:
             yield self._post_registration_client(
@@ -645,6 +655,22 @@ class RegistrationHandler(BaseHandler):
                 yield self.store.upsert_monthly_active_user(user_id)
 
             yield self.register_email_threepid(user_id, threepid, access_token)
+
+            if bind_threepid_creds:
+                # We've been requested to bind a threepid to an identity server
+                # This should only be set if we're using an identity server as an
+                # account_threepid_delegate for email
+                logger.debug(
+                    "Binding email to %s on id_server %s",
+                    user_id, self.hs.config.account_threepid_delegate_email,
+                )
+                yield self.identity_handler.bind_threepid(
+                    bind_threepid_creds["client_secret"],
+                    bind_threepid_creds["sid"],
+                    user_id,
+                    self.hs.config.account_threepid_delegate_email,
+                    bind_threepid_creds.get("id_access_token"),
+                )
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]

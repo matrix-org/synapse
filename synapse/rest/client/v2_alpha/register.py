@@ -697,10 +697,21 @@ class RegisterRestServlet(RestServlet):
         )
 
         if registered:
+            # If we're delegating email sending to a separate server,
+            # bind the new user's email address (if provided) to it
+            threepid_creds = None
+            if (
+                self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE
+                and LoginType.EMAIL_IDENTITY in auth_result
+            ):
+                logger.debug("Extracting 'threepid_creds' dict from %s", params)
+                threepid_creds = params["threepid_creds"]
+
             await self.registration_handler.post_registration_actions(
                 user_id=registered_user_id,
                 auth_result=auth_result,
                 access_token=return_dict.get("access_token"),
+                threepid_creds=threepid_creds,
             )
 
         return 200, return_dict
