@@ -80,7 +80,7 @@ class CacheConfig(Config):
 
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
-        self.cache_factors = dict()  # type: Dict[str, float]
+        self.cache_factors = {}  # type: Dict[str, float]
 
         cache_config = config.get("caches", {})
 
