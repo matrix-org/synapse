@@ -14,8 +14,8 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Iterable, List, Mapping, Optional, Set
 import math
+from typing import Dict, Iterable, List, Mapping, Optional, Set
 
 from six import integer_types
 

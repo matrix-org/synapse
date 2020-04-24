@@ -16,8 +16,8 @@
 import threading
 from functools import wraps
 
-from synapse.util.caches.treecache import TreeCache
 from synapse.config import cache as cache_config
+from synapse.util.caches.treecache import TreeCache
 
 
 def enumerate_leaves(node, depth):
@@ -79,7 +79,7 @@ class LruCache(object):
 
         # Save the original max size, and apply the default size factor.
         self._original_max_size = max_size
-        self.max_size = int(max_size * cache_config.CACHE_PROPERTIES["default_size_factor"])
+        self.max_size = int(max_size * cache_config.properties.default_size_factor)
 
         list_root = _Node(None, None, None, None)
         list_root.next_node = list_root

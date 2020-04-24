@@ -30,7 +30,8 @@ class TestConfig(RootConfig):
 
 class CacheConfigTests(TestCase):
     def setUp(self):
-        CacheConfig._reset()
+        # Reset caches before each test
+        TestConfig().caches.reset()
 
     def test_individual_caches_from_environ(self):
         """
@@ -71,6 +72,7 @@ class CacheConfigTests(TestCase):
         is loaded.
         """
         cache = LruCache(100)
+
         add_resizable_cache("foo", cache.set_cache_factor)
         self.assertEqual(cache.max_size, 50)
 
