@@ -440,7 +440,6 @@ class RegistrationHandler(BaseHandler):
                 "display_name": display_name,
                 "username": localpart,
                 "password": params.get("password"),
-                "bind_email": params.get("bind_email"),
                 "bind_msisdn": params.get("bind_msisdn"),
                 "device_id": params.get("device_id"),
                 "initial_device_display_name": params.get(

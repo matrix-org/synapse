@@ -733,13 +733,13 @@ class RegisterRestServlet(RestServlet):
         if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
             threepid = auth_result[LoginType.EMAIL_IDENTITY]
             await self.registration_handler.register_email_threepid(
-                user_id, threepid, result["access_token"], body.get("bind_email")
+                user_id, threepid, result["access_token"]
             )
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]
             await self.registration_handler.register_msisdn_threepid(
-                user_id, threepid, result["access_token"], body.get("bind_msisdn")
+                user_id, threepid, result["access_token"]
             )
 
         return result
