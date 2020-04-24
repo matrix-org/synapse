@@ -20,6 +20,7 @@ from six import iteritems, itervalues
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util.caches import register_cache
+from synapse.config import cache as cache_config
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ class ExpiringCache(object):
         self._cache_name = cache_name
 
         self._original_max_size = max_len
-        self._max_size = max_len
+        self._max_size = int(max_len * cache_config.CACHE_PROPERTIES["default_size_factor"])
 
         self._clock = clock
 

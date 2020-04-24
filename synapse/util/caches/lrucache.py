@@ -17,6 +17,7 @@ import threading
 from functools import wraps
 
 from synapse.util.caches.treecache import TreeCache
+from synapse.config import cache as cache_config
 
 
 def enumerate_leaves(node, depth):
@@ -78,7 +79,7 @@ class LruCache(object):
 
         # Save the original max size, and apply the default size factor.
         self._original_max_size = max_size
-        self._max_size = int(max_size)
+        self.max_size = int(max_size * cache_config.CACHE_PROPERTIES["default_size_factor"])
 
         list_root = _Node(None, None, None, None)
         list_root.next_node = list_root
@@ -87,7 +88,7 @@ class LruCache(object):
         lock = threading.Lock()
 
         def evict():
-            while cache_len() > self._max_size:
+            while cache_len() > self.max_size:
                 todelete = list_root.prev_node
                 evicted_len = delete_node(todelete)
                 cache.pop(todelete.key, None)
@@ -283,8 +284,8 @@ class LruCache(object):
             bool: Whether the cache changed size or not.
         """
         new_size = int(self._original_max_size * factor)
-        if new_size != self._max_size:
-            self._max_size = new_size
+        if new_size != self.max_size:
+            self.max_size = new_size
             self._on_resize()
             return True
         return False
