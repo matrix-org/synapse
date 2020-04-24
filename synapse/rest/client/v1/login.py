@@ -97,12 +97,7 @@ class LoginRestServlet(RestServlet):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-        if self.oidc_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
-            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
-        if self.saml2_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
-            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
+
         if self.cas_enabled:
             flows.append({"type": LoginRestServlet.SSO_TYPE})
 
@@ -118,6 +113,11 @@ class LoginRestServlet(RestServlet):
             # fall back to the fallback API if they don't understand one of the
             # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
+        elif self.saml2_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
+            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
+        elif self.oidc_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
 
         flows.extend(
             ({"type": t} for t in self.auth_handler.get_supported_login_types())
@@ -469,7 +469,9 @@ class SAMLRedirectServlet(BaseSSORedirectServlet):
         return self._saml_handler.handle_redirect_request(client_redirect_url)
 
 
-class OIDCRedirectServlet(BaseSSORedirectServlet):
+class OIDCRedirectServlet(RestServlet):
+    """Implementation for /login/sso/redirect for the OIDC login flow."""
+
     PATTERNS = client_patterns("/login/sso/redirect", v1=True)
 
     def __init__(self, hs):
@@ -480,11 +482,7 @@ class OIDCRedirectServlet(BaseSSORedirectServlet):
         if b"redirectUrl" not in args:
             return 400, "Redirect URL not specified for SSO auth"
         client_redirect_url = args[b"redirectUrl"][0]
-        sso_url = await self._oidc_handler.handle_redirect_request(
-            request, client_redirect_url
-        )
-        request.redirect(sso_url)
-        finish_request(request)
+        await self._oidc_handler.handle_redirect_request(request, client_redirect_url)
 
 
 def register_servlets(hs, http_server):

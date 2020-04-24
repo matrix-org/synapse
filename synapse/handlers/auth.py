@@ -1171,7 +1171,26 @@ class MacaroonGenerator(object):
         nonce: str,
         client_redirect_url: str,
         duration_in_ms: int = (60 * 60 * 1000),
-    ):
+    ) -> str:
+        """Generates a signed token storing data about an OIDC session.
+
+        When Synapse initiates an authorization flow, it creates a random state
+        and a random nonce. Those parameters are given to the provider and
+        should be verified when the client comes back from the provider.
+        It is also used to store the client_redirect_url, which is used to
+        complete the SSO login flow.
+
+        Args:
+            state (str): The ``state`` parameter passed to the OIDC provider.
+            nonce (str): The ``nonce`` parameter passed to the OIDC provider.
+            client_redirect_url (str): The URL the client gave when it
+                initiated the flow.
+            duration_in_ms (int): An optional duration for the token in milliseconds.
+                Defaults to an hour.
+
+        Returns:
+            str: A signed macaroon token with the session informations.
+        """
         macaroon = self._generate_base_macaroon(None)
         macaroon.add_first_party_caveat("type = session")
         macaroon.add_first_party_caveat("state = %s" % (state,))

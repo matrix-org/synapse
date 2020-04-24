@@ -244,10 +244,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     @defer.inlineCallbacks
     def test_redirect_request(self):
-        req = Mock(spec=["addCookie"])
-        url = yield defer.ensureDeferred(
+        req = Mock(spec=["addCookie", "redirect", "finish"])
+        yield defer.ensureDeferred(
             self.handler.handle_redirect_request(req, b"http://client/redirect")
         )
+        url = req.redirect.call_args[0][0]
         url = urlparse(url)
         auth_endpoint = urlparse(AUTHORIZATION_ENDPOINT)
 

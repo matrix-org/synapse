@@ -30,6 +30,7 @@ from pymacaroons.exceptions import MacaroonDeserializationException
 from synapse.api.errors import HttpResponseException
 from synapse.http.server import finish_request
 from synapse.push.mailer import load_jinja2_templates
+from synapse.server import HomeServer
 from synapse.types import UserID, map_username_to_mxid_localpart
 
 logger = logging.getLogger(__name__)
@@ -38,20 +39,24 @@ SESSION_COOKIE_NAME = b"oidc_session"
 
 
 class OidcError(Exception):
-    error = "unknown"
-    error_description = None
+    """Used to catch errors when calling the token_endpoint
+    """
 
-    def __init__(self, error=None, error_description=None):
-        self.error = error or self.error
-        self.error_description = error_description or self.error_description
+    def __init__(self, error, error_description=None):
+        self.error = error
+        self.error_description = error_description
 
 
 class MappingException(Exception):
-    pass
+    """Used to catch errors when mapping the UserInfo object
+    """
 
 
 class OidcHandler:
-    def __init__(self, hs):
+    """Handles requests related to the OpenID Connect login flow.
+    """
+
+    def __init__(self, hs: HomeServer):
         self._callback_url = hs.config.oidc_callback_url  # type: str
         self._scopes = hs.config.oidc_scopes  # type: List[str]
         self._client_auth = ClientAuth(
@@ -90,7 +95,20 @@ class OidcHandler:
 
     def _render_error(
         self, request, error: str, error_description: Optional[str] = None
-    ):
+    ) -> None:
+        """Renders the error template and respond with it.
+
+        This is used to show errors to the user. The template of this page can
+        be found under ``synapse/res/templates/oidc_error.html``.
+
+        Args:
+            request (SynapseRequest): The incoming request from the browser.
+                We'll respond with an HTML page describing the error.
+            error (str): A technical identifier for this error. Those include
+                well-known OAuth2/OIDC error types like invalid_request or
+                access_denied.
+            error_description (str): A human-readable description of the error.
+        """
         html_bytes = self._error_template.render(
             error=error, error_description=error_description
         ).encode("utf-8")
@@ -102,6 +120,20 @@ class OidcHandler:
         finish_request(request)
 
     def _validate_metadata(self):
+        """Verifies the provider metadata.
+
+        This checks the validity of the currently loaded provider. Not
+        everything is checked, only:
+
+          - ``issuer``
+          - ``authorization_endpoint``
+          - ``token_endpoint``
+          - ``response_types_supported`` (checks if "code" is in it)
+          - ``jwks_uri``
+
+        Raises:
+            ValueError: if something in the provider is not valid
+        """
         # Skip verification to allow non-compliant providers (e.g. issuers not running on a secure origin)
         if self._skip_verification is True:
             return
@@ -136,10 +168,29 @@ class OidcHandler:
 
     @property
     def _uses_userinfo(self) -> bool:
-        # Maybe that should be user-configurable and not infered?
+        """Returns True if the ``userinfo_endpoint`` should be used.
+
+        This is based on the requested scopes: if the scopes include
+        ``openid``, the provider should give use an ID token containing the
+        user informations. If not, we should fetch them using the
+        ``access_token`` with the ``userinfo_endpoint``.
+        """
+
+        # Maybe that should be user-configurable and not inferred?
         return "openid" not in self._scopes
 
     async def load_metadata(self) -> OpenIDProviderMetadata:
+        """Load and validate the provider metadata.
+
+        The values metadatas are discovered if ``oidc_config.discovery`` is
+        ``True`` and then cached.
+
+        Raises:
+            ValueError: if something in the provider is not valid
+
+        Returns:
+            OpenIDProviderMetadata: The providers metadata.
+        """
         # If we are using the OpenID Discovery documents, it needs to be loaded once
         # FIXME: should there be a lock here?
         if self._provider_needs_discovery:
@@ -154,6 +205,33 @@ class OidcHandler:
         return self._provider_metadata
 
     async def load_jwks(self, force=False) -> Dict[str, List[Dict[str, str]]]:
+        """Load the JSON Web Key Set used to sign ID tokens.
+
+        If we're not using the ``userinfo_endpoint``, user infos are extracted
+        from the ID token, which is a JWT signed by keys given by the provider.
+        The keys are then cached.
+
+        Args:
+            force (bool): Force reloading the keys.
+
+        Returns:
+            dict: The key set
+
+            Looks like this::
+
+                {
+                    'keys': [
+                        {
+                            'kid': 'abcdef',
+                            'kty': 'RSA',
+                            'alg': 'RS256',
+                            'use': 'sig',
+                            'e': 'XXXX',
+                            'n': 'XXXX',
+                        }
+                    ]
+                }
+        """
         if self._uses_userinfo:
             # We're not using jwt signing, return an empty jwk set
             return {"keys": []}
@@ -172,6 +250,31 @@ class OidcHandler:
         return jwk_set
 
     async def _exchange_code(self, code: str) -> Dict[str, str]:
+        """Exchange an authorization code for a token.
+
+        This calls the ``token_endpoint`` with the authorization code we
+        received in the callback to exchange it for a token. The call uses the
+        ``ClientAuth`` to authenticate with the client with its ID and secret.
+
+        Args:
+            code (str): The autorization code we got from the callback.
+
+        Returns:
+            dict: contains various tokens.
+
+            May look like this::
+
+                {
+                    'token_type': 'bearer',
+                    'access_token': 'abcdef',
+                    'expires_in': 3599,
+                    'id_token': 'ghijkl',
+                    'refresh_token': 'mnopqr',
+                }
+
+        Raises:
+            OidcError: when the ``token_endpoint`` returned an error.
+        """
         metadata = await self.load_metadata()
         token_endpoint = metadata.get("token_endpoint")
         args = {
@@ -202,6 +305,15 @@ class OidcHandler:
         raise OidcError(error, description)
 
     async def _fetch_userinfo(self, token: Dict[str, str]) -> UserInfo:
+        """Fetch user informations from the ``userinfo_endpoint``.
+
+        Args:
+            token (dict): the token given by the ``token_endpoint``.
+                Must include an ``access_token`` field.
+
+        Returns:
+            UserInfo: an object representing the user.
+        """
         metadata = await self.load_metadata()
 
         resp = await self._http_client.get_json(
@@ -212,13 +324,26 @@ class OidcHandler:
         return UserInfo(resp)
 
     async def _parse_id_token(self, token: Dict[str, str], nonce: str) -> UserInfo:
-        """Return an instance of UserInfo from token's ``id_token``."""
+        """Return an instance of UserInfo from token's ``id_token``.
+
+        Args:
+            token (dict): the token given by the ``token_endpoint``.
+                Must include an ``id_token`` field.
+            nonce (str): the nonce value originally sent in the initial
+                authorization request. This value should match the one inside
+                the token.
+
+        Returns:
+            UserInfo: an object representing the user.
+        """
         metadata = await self.load_metadata()
         claims_params = {
             "nonce": nonce,
             "client_id": self._client_auth.client_id,
         }
         if "access_token" in token:
+            # If we got an `access_token`, there should be an `at_hash` claim
+            # in the `id_token` that we can check against.
             claims_params["access_token"] = token["access_token"]
             claims_cls = CodeIDToken
         else:
@@ -254,16 +379,32 @@ class OidcHandler:
         claims.validate(leeway=120)  # allows 2 min of clock skew
         return UserInfo(claims)
 
-    async def handle_redirect_request(self, request, client_redirect_url: bytes) -> str:
+    async def handle_redirect_request(
+        self, request, client_redirect_url: bytes
+    ) -> None:
         """Handle an incoming request to /login/sso/redirect
 
+        It redirects the browser to the authorization endpoint with a few
+        parameters:
+
+          - ``client_id``: the client ID set in ``oidc_config.client_id``
+          - ``response_type``: ``code``
+          - ``redirect_uri``: the callback URL ; ``{base url}/_synapse/oidc/callback``
+          - ``scope``: the list of scopes set in ``oidc_config.scopes``
+          - ``state``: a random string
+          - ``nonce``: a random string
+
+        In addition to redirecting the client, we are setting a cookie with
+        a signed macaroon token containing the state, the nonce and the
+        client_redirect_url params. Those are then checked when the client
+        comes back from the provider.
+
+
         Args:
-            request (SynapseRequest)
+            request (SynapseRequest): the incoming request from the browser.
+                We'll respond to it with a redirect and a cookie.
             client_redirect_url (bytes): the URL that we should redirect the
                 client to when everything is done
-
-        Returns:
-            str: URL to redirect to
         """
 
         state = generate_token()
@@ -282,7 +423,7 @@ class OidcHandler:
 
         metadata = await self.load_metadata()
         authorization_endpoint = metadata.get("authorization_endpoint")
-        return prepare_grant_uri(
+        uri = prepare_grant_uri(
             authorization_endpoint,
             client_id=self._client_auth.client_id,
             response_type="code",
@@ -291,26 +432,53 @@ class OidcHandler:
             state=state,
             nonce=nonce,
         )
+        request.redirect(uri)
+        finish_request(request)
 
-    async def handle_oidc_callback(self, request):
+    async def handle_oidc_callback(self, request) -> None:
         """Handle an incoming request to /_synapse/oidc/callback
 
-        Args:
-            request (SynapseRequest): the incoming request from the browser. We'll
-                respond to it with a redirect.
+        Since we might want to display OIDC-related errors in a user-friendly
+        way, we don't raise SynapseError from here. Instead, we call
+        ``self._render_error`` which displays an HTML page for the error.
 
-        Returns:
-            Deferred[none]: Completes once we have handled the request.
+        Most of the OpenID Connect logic happens here:
+
+          - first, we check if there was any error returned by the provider and
+            display it
+          - then we fetch the session cookie, decode and verify it
+          - the ``state`` query parameter should match with the one stored in the
+            session cookie
+          - once we known this session is legit, exchange the code with the
+            provider using the ``token_endpoint`` (see ``_exchange_code``)
+          - once we have the token, use it to either extract the UserInfo from
+            the ``id_token`` (``_parse_id_token``), or use the ``access_token``
+            to fetch UserInfo from the ``userinfo_endpoint``
+            (``_fetch_userinfo``)
+          - map those UserInfo to a Matrix user (``_map_userinfo_to_user``) and
+            finish the login
+
+        Args:
+            request (SynapseRequest): the incoming request from the browser.
         """
 
+        # The provider might redirect with an error.
+        # In that case, just display it as-is.
         if b"error" in request.args:
             error = request.args[b"error"][0].decode()
             description = request.args.get(b"error_description", [b""])[0].decode()
             self._render_error(request, error, description)
             return
 
+        # Fetch the session cookie
         session = request.getCookie(SESSION_COOKIE_NAME)
-        # Remove the cookie
+        if session is None:
+            self._render_error(request, "missing_session", "No session cookie found")
+            return
+
+        # Remove the cookie. There is a good chance that if the callback failed
+        # once, it will fail next time and the code will already be exchanged.
+        # Removing it early avoids spamming the provider with token requests.
         request.addCookie(
             SESSION_COOKIE_NAME,
             b"",
@@ -318,16 +486,15 @@ class OidcHandler:
             expires="Thu, Jan 01 1970 00:00:00 UTC",
             httpOnly=True,
         )
-        if session is None:
-            self._render_error(request, "missing_session", "No session cookie found")
-            return
 
+        # Check for the state query parameter
         if b"state" not in request.args:
             self._render_error(request, "invalid_request", "State parameter is missing")
             return
 
         state = request.args[b"state"][0].decode()
 
+        # Deserialize the session token and verify it.
         # FIXME: macaroon verification should be refactored somewhere else
         try:
             macaroon = pymacaroons.Macaroon.deserialize(session)
@@ -350,11 +517,13 @@ class OidcHandler:
             self._render_error(request, "mismatching_session", str(e))
             return
 
+        # Extract the `nonce` and `client_redirect_url` from the token
         nonce = self._get_value_from_macaroon(macaroon, "nonce")
         client_redirect_url = self._get_value_from_macaroon(
             macaroon, "client_redirect_url"
         )
 
+        # Exchange the code with the provider
         if b"code" not in request.args:
             self._render_error(request, "invalid_request", "Code parameter is missing")
             return
@@ -366,6 +535,8 @@ class OidcHandler:
             self._render_error(request, e.error, e.error_description)
             return
 
+        # Now that we have a token, get the userinfo, either by decoding the
+        # `id_token` or by fetching the `userinfo_endpoint`.
         if self._uses_userinfo:
             try:
                 userinfo = await self._fetch_userinfo(token)
@@ -379,20 +550,34 @@ class OidcHandler:
                 self._render_error(request, "invalid_token", str(e))
                 return
 
+        # Call the mapper to register/login the user
         try:
             user_id = await self._map_userinfo_to_user(userinfo)
         except MappingException as e:
             self._render_error(request, "mapping_error", str(e))
             return
 
+        # and finally complete the login
         self._auth_handler.complete_sso_login(user_id, request, client_redirect_url)
 
     def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str):
+        """Extracts a caveat value from a macaroon token.
+
+        Args:
+            macaroon (pymacaroons.Macaroon): the token
+            key (str): the key of the caveat to extract
+
+        Returns:
+            str: the extracted value
+
+        Raises:
+            Exception: if the caveat was not in the macaroon
+        """
         prefix = key + " = "
         for caveat in macaroon.caveats:
             if caveat.caveat_id.startswith(prefix):
                 return caveat.caveat_id[len(prefix) :]
-        raise MappingException("No %s caveat in macaroon" % (key,))
+        raise Exception("No %s caveat in macaroon" % (key,))
 
     def _verify_expiry(self, caveat: str):
         prefix = "time < "
@@ -403,6 +588,26 @@ class OidcHandler:
         return now < expiry
 
     async def _map_userinfo_to_user(self, userinfo: UserInfo) -> str:
+        """Maps a UserInfo object to a mxid.
+
+        UserInfo should have a claim that uniquely identifies users. This claim
+        is usually `sub`, but can be configured with `oidc_config.subject_claim`.
+        It is then used as an `external_id`.
+
+        If we don't find the user that way, we should register the user,
+        mapping the localpart and the display name from the UserInfo.
+
+        If a user already exists with the mxid we've mapped, raise an exception.
+
+        Args:
+            userinfo (UserInfo): an object representing the user
+
+        Raises:
+            MappingException: if there was an error while mapping some properties
+
+        Returns:
+            str: the mxid of the user
+        """
         remote_user_id = userinfo.get(self._subject_claim)
         if remote_user_id is None:
             raise MappingException("Failed to extract subject from OIDC response")
@@ -442,6 +647,8 @@ class OidcHandler:
                 "mxid '{}' is already taken".format(user_id.to_string())
             )
 
+        # It's the first time this user is logging in and the mapped mxid was
+        # not taken, register the user
         registered_user_id = await self._registration_handler.register_user(
             localpart=localpart, default_display_name=displayname,
         )
