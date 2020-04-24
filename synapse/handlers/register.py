@@ -663,11 +663,22 @@ class RegistrationHandler(BaseHandler):
                     "Binding email to %s on id_server %s",
                     user_id, self.hs.config.account_threepid_delegate_email,
                 )
+
+                # Remove the protocol scheme before handling to `bind_threepid`
+                # `bind_threepid` will add https:// to it, so this restricts
+                # account_threepid_delegate.email to https:// addresses only
+                # We assume this is always the case for dinsic however.
+                if self.hs.config.account_threepid_delegate_email.startswith("https://"):
+                    id_server = self.hs.config.account_threepid_delegate_email[8:]
+                else:
+                    # Must start with http:// instead
+                    id_server = self.hs.config.account_threepid_delegate_email[7:]
+
                 yield self.identity_handler.bind_threepid(
                     bind_threepid_creds["client_secret"],
                     bind_threepid_creds["sid"],
                     user_id,
-                    self.hs.config.account_threepid_delegate_email,
+                    id_server,
                     bind_threepid_creds.get("id_access_token"),
                 )
 
