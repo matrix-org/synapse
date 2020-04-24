@@ -623,7 +623,6 @@ class RegistrationHandler(BaseHandler):
         user_id,
         auth_result,
         access_token,
-        bind_threepid_creds=None,
     ):
         """A user has completed registration
 
@@ -633,10 +632,6 @@ class RegistrationHandler(BaseHandler):
                 registered user.
             access_token (str|None): The access token of the newly logged in
                 device, or None if `inhibit_login` enabled.
-            bind_threepid_creds (dict|None): A dictionary containing validated
-                client_secret, sid, and possibly an id_access_token. If set,
-                will attempt to bind the matching 3pid to the identity server
-                specified by self.config.account_threepid_delegate_email
         """
         if self.hs.config.worker_app:
             yield self._post_registration_client(
@@ -655,14 +650,13 @@ class RegistrationHandler(BaseHandler):
 
             yield self.register_email_threepid(user_id, threepid, access_token)
 
-            if bind_threepid_creds:
-                # We've been requested to bind a threepid to an identity server
-                # This should only be set if we're using an identity server as an
-                # account_threepid_delegate for email
+            if self.hs.config.account_threepid_delegate_email:
+                # Bind the 3PID to the identity server
                 logger.debug(
                     "Binding email to %s on id_server %s",
                     user_id, self.hs.config.account_threepid_delegate_email,
                 )
+                threepid_creds = threepid["threepid_creds"]
 
                 # Remove the protocol scheme before handling to `bind_threepid`
                 # `bind_threepid` will add https:// to it, so this restricts
@@ -675,11 +669,11 @@ class RegistrationHandler(BaseHandler):
                     id_server = self.hs.config.account_threepid_delegate_email[7:]
 
                 yield self.identity_handler.bind_threepid(
-                    bind_threepid_creds["client_secret"],
-                    bind_threepid_creds["sid"],
+                    threepid_creds["client_secret"],
+                    threepid_creds["sid"],
                     user_id,
                     id_server,
-                    bind_threepid_creds.get("id_access_token"),
+                    threepid_creds.get("id_access_token"),
                 )
 
         if auth_result and LoginType.MSISDN in auth_result:
