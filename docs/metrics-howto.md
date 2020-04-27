@@ -66,9 +66,8 @@ To monitor a Synapse installation using
 [workers](https://github.com/matrix-org/synapse/blob/master/docs/workers.md),
 every worker needs to be monitored independently, in addition to
 the main homeserver process. This is because workers don't send
-their metrics to the main homeserver process, and therefore
-expose their own metrics themselves (if they are configured to
-do so).
+their metrics to the main homeserver process, but expose them
+directly (if they are configured to do so).
 
 To allow collecting metrics from a worker, you need to add a
 `metrics` listener to its configuration, by adding the following
@@ -80,8 +79,9 @@ under `worker_listeners`:
    port: 9101
 ```
 
-Feel free to change the `bind_address` and `port` parameters
-as long as the resulting listener can be reached by prometheus.
+The `bind_address` and `port` parameters should be set so that
+the resulting listener can be reached by prometheus, and they
+don't clash with an existing worker.
 With this example, the worker's metrics would then be available
 on `http://127.0.0.1:9101`.
 
