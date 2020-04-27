@@ -25,7 +25,7 @@ def _safe_int(s: str) -> int:
     per RFC 7159.
     """
     res = int(s)
-    if -2 ** 53 < res < 2 ** 53:
+    if -(2 ** 53) < res < 2 ** 53:
         return res
     raise ValueError("Invalid int literal: %s" % s)
 
