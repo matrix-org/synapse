@@ -176,16 +176,30 @@ class EventsStream(Stream):
             from_token, upper_limit, target_row_count
         )  # type: List[Tuple]
 
-        # again, if we've hit the limit there, we'll need to limit the other sources
-        assert len(state_rows) < target_row_count
+        assert len(state_rows) <= target_row_count
+
+        # there can be more than one row per stream_id in that table, so if we hit
+        # the limit there, we'll need to truncate the results so that we have a complete
+        # set of changes for all the stream IDs we include.
         if len(state_rows) == target_row_count:
             assert state_rows[-1][0] <= upper_limit
-            upper_limit = state_rows[-1][0]
-            limited = True
+            upper_limit = state_rows[-1][0] - 1
 
-            # FIXME: is it a given that there is only one row per stream_id in the
-            # state_deltas table (so that we can be sure that we have got all of the
-            # rows for upper_limit)?
+            # search for the point to truncate the list
+            for idx in range(len(state_rows) - 1, 0, -1):
+                if state_rows[idx - 1][0] <= upper_limit:
+                    state_rows = state_rows[:idx]
+                    break
+            else:
+                # bother. We didn't get a full set of changes for even a single
+                # stream id. let's run the query again, without a row limit, but for
+                # just one stream id.
+                upper_limit += 1
+                state_rows = await self._store.get_all_updated_current_state_deltas(
+                    from_token, upper_limit, limit=None
+                )
+
+            limited = True
 
         # finally, fetch the ex-outliers rows. We assume there are few enough of these
         # not to bother with the limit.

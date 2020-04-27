@@ -1084,15 +1084,23 @@ class EventsWorkerStore(SQLBaseStore):
             "get_all_new_backfill_event_rows", get_all_new_backfill_event_rows
         )
 
-    def get_all_updated_current_state_deltas(self, from_token, to_token, limit):
+    def get_all_updated_current_state_deltas(
+        self, from_token: int, to_token: int, limit: Optional[int]
+    ):
         def get_all_updated_current_state_deltas_txn(txn):
             sql = """
                 SELECT stream_id, room_id, type, state_key, event_id
                 FROM current_state_delta_stream
                 WHERE ? < stream_id AND stream_id <= ?
-                ORDER BY stream_id ASC LIMIT ?
+                ORDER BY stream_id ASC
             """
-            txn.execute(sql, (from_token, to_token, limit))
+            params = [from_token, to_token]
+
+            if limit is not None:
+                sql += "LIMIT ?"
+                params.append(limit)
+
+            txn.execute(sql, params)
             return txn.fetchall()
 
         return self.db.runInteraction(
