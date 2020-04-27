@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mock import Mock
+
 from synapse.handlers.typing import RoomMember
 from synapse.replication.http import streams
 from synapse.replication.tcp.streams import TypingStream
@@ -26,6 +28,9 @@ class TypingStreamTestCase(BaseStreamTestCase):
         streams.register_servlets,
     ]
 
+    def _build_replication_data_handler(self):
+        return Mock(wraps=super()._build_replication_data_handler())
+
     def test_typing(self):
         typing = self.hs.get_typing_handler()
 
@@ -33,8 +38,8 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
         self.reconnect()
 
-        # make the client subscribe to the receipts stream
-        self.test_handler.streams.add("typing")
+        # make the client subscribe to the typing stream
+        self.test_handler.stream_positions.update({"typing": 0})
 
         typing._push_update(member=RoomMember(room_id, USER_ID), typing=True)
 
@@ -75,6 +80,6 @@ class TypingStreamTestCase(BaseStreamTestCase):
         stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
-        row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
+        row = rdata_rows[0]
         self.assertEqual(room_id, row.room_id)
         self.assertEqual([], row.user_ids)
