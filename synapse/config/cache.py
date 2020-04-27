@@ -60,7 +60,9 @@ class CacheConfig(Config):
     @staticmethod
     def reset():
         """Resets the caches to their defaults. Used for tests."""
-        properties.default_factor_size = float(os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE))
+        properties.default_factor_size = float(
+            os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
+        )
         properties.resize_all_caches_func = None
         _CACHES.clear()
 
@@ -82,7 +84,9 @@ class CacheConfig(Config):
         """
 
     def read_config(self, config, **kwargs):
-        self.event_cache_size = self.parse_size(config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE))
+        self.event_cache_size = self.parse_size(
+            config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
+        )
         self.cache_factors = {}  # type: Dict[str, float]
 
         cache_config = config.get("caches", {})
