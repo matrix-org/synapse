@@ -19,7 +19,7 @@ from typing import Optional
 
 from six import iteritems, itervalues, string_types
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
 from twisted.internet.defer import succeed
@@ -51,6 +51,7 @@ from synapse.storage.state import StateFilter
 from synapse.types import Collection, RoomAlias, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
+from synapse.util.json import safe_loads
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -813,7 +814,7 @@ class EventCreationHandler(object):
         # Ensure that we can round trip before trying to persist in db
         try:
             dump = frozendict_json_encoder.encode(event.content)
-            json.loads(dump)
+            safe_loads(dump)
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
             raise

@@ -22,9 +22,9 @@ from typing import Dict, List
 from six import iteritems
 from six.moves import http_client
 
-from canonicaljson import json
-
 from twisted.web import http
+
+from synapse.util.json import safe_loads
 
 logger = logging.getLogger(__name__)
 
@@ -575,7 +575,7 @@ class HttpResponseException(CodeMessageException):
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
         try:
-            j = json.loads(self.response)
+            j = safe_loads(self.response)
         except ValueError:
             j = {}
 

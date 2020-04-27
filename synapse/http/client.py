@@ -21,7 +21,7 @@ from six import raise_from, text_type
 from six.moves import urllib
 
 import treq
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 from netaddr import IPAddress
 from prometheus_client import Counter
 from zope.interface import implementer, provider
@@ -50,6 +50,7 @@ from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.caches import CACHE_SIZE_FACTOR
+from synapse.util.json import safe_loads
 
 logger = logging.getLogger(__name__)
 
@@ -370,7 +371,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return safe_loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -410,7 +411,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return safe_loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -435,7 +436,7 @@ class SimpleHttpClient(object):
             ValueError: if the response was not JSON
         """
         body = yield self.get_raw(uri, args, headers=headers)
-        return json.loads(body)
+        return safe_loads(body)
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}, headers=None):
@@ -478,7 +479,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return safe_loads(body)
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 

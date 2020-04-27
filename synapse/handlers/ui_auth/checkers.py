@@ -14,14 +14,13 @@
 # limitations under the License.
 import logging
 
-from canonicaljson import json
-
 from twisted.internet import defer
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.util.json import safe_loads
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +116,7 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
         except PartialDownloadError as pde:
             # Twisted is silly
             data = pde.response
-            resp_body = json.loads(data)
+            resp_body = safe_loads(data)
 
         if "success" in resp_body:
             # Note that we do NOT check the hostname here: we explicitly

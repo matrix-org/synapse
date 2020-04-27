@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import logging
 import random
 import time
@@ -27,6 +26,7 @@ from twisted.web.http import stringToDatetime
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
 from synapse.util.caches.ttlcache import TTLCache
+from synapse.util.json import safe_loads
 from synapse.util.metrics import Measure
 
 # period to cache .well-known results for by default
@@ -174,7 +174,7 @@ class WellKnownResolver(object):
             if response.code != 200:
                 raise Exception("Non-200 response %s" % (response.code,))
 
-            parsed_body = json.loads(body.decode("utf-8"))
+            parsed_body = safe_loads(body.decode("utf-8"))
             logger.info("Response from .well-known: %s", parsed_body)
 
             result = parsed_body["m.server"].encode("ascii")

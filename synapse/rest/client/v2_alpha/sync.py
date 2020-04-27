@@ -16,8 +16,6 @@
 import itertools
 import logging
 
-from canonicaljson import json
-
 from synapse.api.constants import PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION, FilterCollection
@@ -29,6 +27,7 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.types import StreamToken
+from synapse.util.json import safe_loads
 
 from ._base import client_patterns, set_timeline_upper_limit
 
@@ -125,7 +124,7 @@ class SyncRestServlet(RestServlet):
             filter_collection = DEFAULT_FILTER_COLLECTION
         elif filter_id.startswith("{"):
             try:
-                filter_object = json.loads(filter_id)
+                filter_object = safe_loads(filter_id)
                 set_timeline_upper_limit(
                     filter_object, self.hs.config.filter_timeline_limit
                 )

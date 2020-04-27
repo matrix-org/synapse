@@ -17,9 +17,8 @@
 
 import logging
 
-from canonicaljson import json
-
 from synapse.api.errors import Codes, SynapseError
+from synapse.util.json import safe_loads
 
 logger = logging.getLogger(__name__)
 
@@ -214,16 +213,8 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     if not content_bytes and allow_empty_body:
         return None
 
-    # Decode to Unicode so that simplejson will return Unicode strings on
-    # Python 2
     try:
-        content_unicode = content_bytes.decode("utf8")
-    except UnicodeDecodeError:
-        logger.warning("Unable to decode UTF-8")
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
-
-    try:
-        content = json.loads(content_unicode)
+        content = safe_loads(content_bytes)
     except Exception as e:
         logger.warning("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)

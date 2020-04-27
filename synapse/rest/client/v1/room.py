@@ -21,8 +21,6 @@ from typing import List, Optional
 
 from six.moves.urllib import parse as urlparse
 
-from canonicaljson import json
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
@@ -46,6 +44,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.util.json import safe_loads
 
 MYPY = False
 if MYPY:
@@ -517,7 +516,7 @@ class RoomMessageListRestServlet(RestServlet):
         filter_bytes = parse_string(request, b"filter", encoding=None)
         if filter_bytes:
             filter_json = urlparse.unquote(filter_bytes.decode("UTF-8"))
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(safe_loads(filter_json))  # type: Optional[Filter]
             if (
                 event_filter
                 and event_filter.filter_json.get("event_format", "client")
@@ -629,7 +628,7 @@ class RoomEventContextServlet(RestServlet):
         filter_bytes = parse_string(request, "filter")
         if filter_bytes:
             filter_json = urlparse.unquote(filter_bytes)
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(safe_loads(filter_json))  # type: Optional[Filter]
         else:
             event_filter = None
 
