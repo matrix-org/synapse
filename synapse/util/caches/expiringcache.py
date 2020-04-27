@@ -57,7 +57,7 @@ class ExpiringCache(object):
         self._cache_name = cache_name
 
         self._original_max_size = max_len
-        self._max_size = int(max_len * cache_config.properties.default_size_factor)
+        self._max_size = int(max_len * cache_config.properties.default_factor_size)
 
         self._clock = clock
 

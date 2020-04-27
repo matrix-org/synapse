@@ -21,13 +21,15 @@ from ._base import Config, ConfigError
 # The prefix for all cache factor-related environment variables
 _CACHES = {}
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
+_DEFAULT_FACTOR_SIZE = 0.5
+_DEFAULT_EVENT_CACHE_SIZE = "10K"
 
 
 class CacheProperties(object):
     def __init__(self):
-        # The default size factor for all caches
-        self.default_size_factor = 0.5
-        self.resize_all_caches = None
+        # The default factor size for all caches
+        self.default_factor_size = _DEFAULT_FACTOR_SIZE
+        self.resize_all_caches_func = None
 
 
 properties = CacheProperties()
@@ -43,11 +45,12 @@ def add_resizable_cache(cache_name: str, cache_resize_callback: Callable):
     """
     _CACHES[cache_name.lower()] = cache_resize_callback
 
-    # Ensure all loaded caches are resized
+    # Ensure all loaded caches are sized appropriately
+    #
     # This method should only run once the config has been read,
-    # as it uses variables from it
-    if properties.resize_all_caches:
-        properties.resize_all_caches()
+    # as it uses values read from it
+    if properties.resize_all_caches_func:
+        properties.resize_all_caches_func()
 
 
 class CacheConfig(Config):
@@ -57,8 +60,8 @@ class CacheConfig(Config):
     @staticmethod
     def reset():
         """Resets the caches to their defaults. Used for tests."""
-        properties.default_size_factor = float(os.environ.get(_CACHE_PREFIX, 0.5))
-        properties.resize_all_caches = None
+        properties.default_factor_size = float(os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE))
+        properties.resize_all_caches_func = None
         _CACHES.clear()
 
     def generate_config_section(self, **kwargs):
@@ -79,19 +82,18 @@ class CacheConfig(Config):
         """
 
     def read_config(self, config, **kwargs):
-        self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
+        self.event_cache_size = self.parse_size(config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE))
         self.cache_factors = {}  # type: Dict[str, float]
 
         cache_config = config.get("caches", {})
-
         self.global_factor = cache_config.get(
-            "global_factor", properties.default_size_factor
+            "global_factor", properties.default_factor_size
         )
         if not isinstance(self.global_factor, (int, float)):
             raise ConfigError("caches.global_factor must be a number.")
 
         # Set the global one so that it's reflected in new caches
-        properties.default_size_factor = self.global_factor
+        properties.default_factor_size = self.global_factor
 
         # Load cache factors from the environment, but override them with the
         # ones in the config file if they exist
@@ -113,8 +115,11 @@ class CacheConfig(Config):
             self.cache_factors[cache.lower()] = factor
 
         # Resize all caches (if necessary) with the new factors we've loaded
-        properties.resize_all_caches = self.resize_all_caches
         self.resize_all_caches()
+
+        # Store this function so that it can be called from other classes without
+        # needing an instance of Config
+        properties.resize_all_caches_func = self.resize_all_caches
 
     def resize_all_caches(self):
         """Ensure all cache sizes are up to date

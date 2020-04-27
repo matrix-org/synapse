@@ -240,7 +240,9 @@ class SimpleHttpClient(object):
         # tends to do so in batches, so we need to allow the pool to keep
         # lots of idle connections around.
         pool = HTTPConnectionPool(self.reactor)
-        # XXX: Why does this use the cache factor????
+        # XXX: The justification for using the cache factor here is that larger instances
+        # will need both more cache and more connections.
+        # Still, this should probably be a separate dial
         pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 

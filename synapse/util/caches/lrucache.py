@@ -79,7 +79,7 @@ class LruCache(object):
 
         # Save the original max size, and apply the default size factor.
         self._original_max_size = max_size
-        self.max_size = int(max_size * cache_config.properties.default_size_factor)
+        self.max_size = int(max_size * cache_config.properties.default_factor_size)
 
         list_root = _Node(None, None, None, None)
         list_root.next_node = list_root
