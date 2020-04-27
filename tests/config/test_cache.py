@@ -73,7 +73,7 @@ class CacheConfigTests(TestCase):
         """
         cache = LruCache(100)
 
-        add_resizable_cache("foo", cache.set_cache_factor)
+        add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 50)
 
         config = {"caches": {"per_cache_factors": {"foo": 3}}}
@@ -93,7 +93,7 @@ class CacheConfigTests(TestCase):
         t.read_config(config, config_dir_path="", data_dir_path="")
 
         cache = LruCache(100)
-        add_resizable_cache("foo", cache.set_cache_factor)
+        add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 200)
 
     def test_global_instantiated_before_config_load(self):
@@ -103,7 +103,7 @@ class CacheConfigTests(TestCase):
         default cache size once the config is loaded.
         """
         cache = LruCache(100)
-        add_resizable_cache("foo", cache.set_cache_factor)
+        add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 50)
 
         config = {"caches": {"global_factor": 4}}
@@ -123,5 +123,5 @@ class CacheConfigTests(TestCase):
         t.read_config(config, config_dir_path="", data_dir_path="")
 
         cache = LruCache(100)
-        add_resizable_cache("foo", cache.set_cache_factor)
+        add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 150)
