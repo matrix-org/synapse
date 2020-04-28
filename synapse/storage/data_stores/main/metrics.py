@@ -56,8 +56,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         hs.get_clock().looping_call(read_forward_extremities, 60 * 60 * 1000)
 
-    @defer.inlineCallbacks
-    def _read_forward_extremities(self):
+    async def _read_forward_extremities(self):
         def fetch(txn):
             txn.execute(
                 """
@@ -67,7 +66,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             )
             return txn.fetchall()
 
-        res = yield self.db.runInteraction("read_forward_extremities", fetch)
+        res = await self.db.runInteraction("read_forward_extremities", fetch)
         self._current_forward_extremities_amount = Counter([x[0] for x in res])
 
     @defer.inlineCallbacks
