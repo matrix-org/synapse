@@ -818,7 +818,7 @@ class EventCreationHandler(object):
 
         # Ensure the data is spec compliant JSON.
         if room_version.strict_canonicaljson:
-            validate_canonicaljson(event.content)
+            validate_canonicaljson(event.get_pdu_json())
 
         # Ensure that we can round trip before trying to persist in db
         try:

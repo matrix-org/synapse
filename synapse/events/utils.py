@@ -465,7 +465,6 @@ def validate_canonicaljson(value: Any):
     """
     if isinstance(value, int):
         if value <= -(2 ** 53) or 2 ** 53 <= value:
-            print(value)
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 
     elif isinstance(value, float):
