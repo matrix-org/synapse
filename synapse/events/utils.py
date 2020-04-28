@@ -472,7 +472,7 @@ def validate_canonicaljson(value: Any):
         # Note that Infinity, -Infinity, and NaN are also considered floats.
         raise SynapseError(400, "Bad JSON value: float", Codes.BAD_JSON)
 
-    elif isinstance(value, dict):
+    elif isinstance(value, (dict, frozendict)):
         for v in value.values():
             validate_canonicaljson(v)
 
