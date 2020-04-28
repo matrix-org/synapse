@@ -957,14 +957,13 @@ class FederationClient(FederationBase):
 
         return signed_events
 
-    @defer.inlineCallbacks
-    def forward_third_party_invite(self, destinations, room_id, event_dict):
+    async def forward_third_party_invite(self, destinations, room_id, event_dict):
         for destination in destinations:
             if destination == self.server_name:
                 continue
 
             try:
-                yield self.transport_layer.exchange_third_party_invite(
+                await self.transport_layer.exchange_third_party_invite(
                     destination=destination, room_id=room_id, event_dict=event_dict
                 )
                 return None

@@ -27,8 +27,10 @@ class MessageAcceptTests(unittest.TestCase):
         user_id = UserID("us", "test")
         our_user = Requester(user_id, None, False, None, None)
         room_creator = self.homeserver.get_room_creation_handler()
-        room = room_creator.create_room(
-            our_user, room_creator.PRESETS_DICT["public_chat"], ratelimit=False
+        room = ensureDeferred(
+            room_creator.create_room(
+                our_user, room_creator.PRESETS_DICT["public_chat"], ratelimit=False
+            )
         )
         self.reactor.advance(0.1)
         self.room_id = self.successResultOf(room)["room_id"]

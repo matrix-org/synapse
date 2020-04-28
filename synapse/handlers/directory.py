@@ -295,15 +295,14 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND,
             )
 
-    @defer.inlineCallbacks
-    def _update_canonical_alias(
+    async def _update_canonical_alias(
         self, requester: Requester, user_id: str, room_id: str, room_alias: RoomAlias
     ):
         """
         Send an updated canonical alias event if the removed alias was set as
         the canonical alias or listed in the alt_aliases field.
         """
-        alias_event = yield self.state.get_current_state(
+        alias_event = await self.state.get_current_state(
             room_id, EventTypes.CanonicalAlias, ""
         )
 
@@ -334,7 +333,7 @@ class DirectoryHandler(BaseHandler):
                 del content["alt_aliases"]
 
         if send_update:
-            yield self.event_creation_handler.create_and_send_nonmember_event(
+            await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.CanonicalAlias,
