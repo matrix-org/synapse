@@ -48,6 +48,7 @@ from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
 from .media_repository import MediaRepositoryStore
+from .metrics import ServerMetricsStore
 from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore, UserPresenceState
@@ -117,6 +118,7 @@ class DataStore(
     RelationsStore,
     UIAuthStore,
     CacheInvalidationWorkerStore,
+    ServerMetricsStore,
 ):
     def __init__(self, database: Database, db_conn, hs):
         self.hs = hs
