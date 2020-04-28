@@ -133,7 +133,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         channel.requestFactory = request_factory
         channel.site = self.site
 
-        # Connect client to server nad vice versa.
+        # Connect client to server and vice versa.
         client_to_server_transport = FakeTransport(
             channel, self.reactor, client_protocol
         )

@@ -21,7 +21,7 @@ from tests.replication.tcp.streams._base import BaseStreamTestCase
 USER_ID = "@feeling:blue"
 
 
-class TypinStreamTestCase(BaseStreamTestCase):
+class TypingStreamTestCase(BaseStreamTestCase):
     servlets = [
         streams.register_servlets,
     ]
