@@ -28,7 +28,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
 
     The API looks like:
 
-        GET /_synapse/replication/get_repl_stream_updates/events?from_token=0&to_token=10&limit=100
+        GET /_synapse/replication/get_repl_stream_updates/<stream name>?from_token=0&to_token=10
 
         200 OK
 
@@ -37,6 +37,9 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
             upto_token: 10,
             limited: False,
         }
+
+    If there are more rows than can sensibly be returned in one lump, `limited` will be
+    set to true, and the caller should call again with a new `from_token`.
 
     """
 
@@ -52,8 +55,8 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         self.streams = hs.get_replication_streamer().get_streams()
 
     @staticmethod
-    def _serialize_payload(stream_name, from_token, upto_token, limit):
-        return {"from_token": from_token, "upto_token": upto_token, "limit": limit}
+    def _serialize_payload(stream_name, from_token, upto_token):
+        return {"from_token": from_token, "upto_token": upto_token}
 
     async def _handle_request(self, request, stream_name):
         stream = self.streams.get(stream_name)
@@ -62,10 +65,9 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
 
         from_token = parse_integer(request, "from_token", required=True)
         upto_token = parse_integer(request, "upto_token", required=True)
-        limit = parse_integer(request, "limit", required=True)
 
         updates, upto_token, limited = await stream.get_updates_since(
-            from_token, upto_token, limit
+            from_token, upto_token
         )
 
         return (
