@@ -34,6 +34,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
 from .cache import CacheInvalidationWorkerStore
+from .censor_events import CensorEventsStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
@@ -116,6 +117,7 @@ class DataStore(
     MonthlyActiveUsersStore,
     StatsStore,
     RelationsStore,
+    CensorEventsStore,
     UIAuthStore,
     CacheInvalidationWorkerStore,
     ServerMetricsStore,

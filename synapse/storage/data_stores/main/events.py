@@ -34,9 +34,7 @@ from synapse.api.constants import EventContentFields, EventTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
-from synapse.events.utils import prune_event_dict
 from synapse.logging.utils import log_function
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import make_in_list_sql_clause
 from synapse.storage.data_stores.main.event_federation import EventFederationStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
@@ -98,14 +96,6 @@ class EventsStore(
 ):
     def __init__(self, database: Database, db_conn, hs):
         super(EventsStore, self).__init__(database, db_conn, hs)
-
-        def _censor_redactions():
-            return run_as_background_process(
-                "_censor_redactions", self._censor_redactions
-            )
-
-        if self.hs.config.redaction_retention_period is not None:
-            hs.get_clock().looping_call(_censor_redactions, 5 * 60 * 1000)
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
         self.is_mine_id = hs.is_mine_id
@@ -1069,109 +1059,6 @@ class EventsStore(
             },
         )
 
-    async def _censor_redactions(self):
-        """Censors all redactions older than the configured period that haven't
-        been censored yet.
-
-        By censor we mean update the event_json table with the redacted event.
-        """
-
-        if self.hs.config.redaction_retention_period is None:
-            return
-
-        if not (
-            await self.db.updates.has_completed_background_update(
-                "redactions_have_censored_ts_idx"
-            )
-        ):
-            # We don't want to run this until the appropriate index has been
-            # created.
-            return
-
-        before_ts = self._clock.time_msec() - self.hs.config.redaction_retention_period
-
-        # We fetch all redactions that:
-        #   1. point to an event we have,
-        #   2. has a received_ts from before the cut off, and
-        #   3. we haven't yet censored.
-        #
-        # This is limited to 100 events to ensure that we don't try and do too
-        # much at once. We'll get called again so this should eventually catch
-        # up.
-        sql = """
-            SELECT redactions.event_id, redacts FROM redactions
-            LEFT JOIN events AS original_event ON (
-                redacts = original_event.event_id
-            )
-            WHERE NOT have_censored
-            AND redactions.received_ts <= ?
-            ORDER BY redactions.received_ts ASC
-            LIMIT ?
-        """
-
-        rows = await self.db.execute(
-            "_censor_redactions_fetch", None, sql, before_ts, 100
-        )
-
-        updates = []
-
-        for redaction_id, event_id in rows:
-            redaction_event = await self.get_event(redaction_id, allow_none=True)
-            original_event = await self.get_event(
-                event_id, allow_rejected=True, allow_none=True
-            )
-
-            # The SQL above ensures that we have both the redaction and
-            # original event, so if the `get_event` calls return None it
-            # means that the redaction wasn't allowed. Either way we know that
-            # the result won't change so we mark the fact that we've checked.
-            if (
-                redaction_event
-                and original_event
-                and original_event.internal_metadata.is_redacted()
-            ):
-                # Redaction was allowed
-                pruned_json = encode_json(
-                    prune_event_dict(
-                        original_event.room_version, original_event.get_dict()
-                    )
-                )
-            else:
-                # Redaction wasn't allowed
-                pruned_json = None
-
-            updates.append((redaction_id, event_id, pruned_json))
-
-        def _update_censor_txn(txn):
-            for redaction_id, event_id, pruned_json in updates:
-                if pruned_json:
-                    self._censor_event_txn(txn, event_id, pruned_json)
-
-                self.db.simple_update_one_txn(
-                    txn,
-                    table="redactions",
-                    keyvalues={"event_id": redaction_id},
-                    updatevalues={"have_censored": True},
-                )
-
-        await self.db.runInteraction("_update_censor_txn", _update_censor_txn)
-
-    def _censor_event_txn(self, txn, event_id, pruned_json):
-        """Censor an event by replacing its JSON in the event_json table with the
-        provided pruned JSON.
-
-        Args:
-            txn (LoggingTransaction): The database transaction.
-            event_id (str): The ID of the event to censor.
-            pruned_json (str): The pruned JSON
-        """
-        self.db.simple_update_one_txn(
-            txn,
-            table="event_json",
-            keyvalues={"event_id": event_id},
-            updatevalues={"json": pruned_json},
-        )
-
     def insert_labels_for_event_txn(
         self, txn, event_id, labels, room_id, topological_ordering
     ):
@@ -1211,63 +1098,4 @@ class EventsStore(
             txn=txn,
             table="event_expiry",
             values={"event_id": event_id, "expiry_ts": expiry_ts},
-        )
-
-    @defer.inlineCallbacks
-    def expire_event(self, event_id):
-        """Retrieve and expire an event that has expired, and delete its associated
-        expiry timestamp. If the event can't be retrieved, delete its associated
-        timestamp so we don't try to expire it again in the future.
-
-        Args:
-             event_id (str): The ID of the event to delete.
-        """
-        # Try to retrieve the event's content from the database or the event cache.
-        event = yield self.get_event(event_id)
-
-        def delete_expired_event_txn(txn):
-            # Delete the expiry timestamp associated with this event from the database.
-            self._delete_event_expiry_txn(txn, event_id)
-
-            if not event:
-                # If we can't find the event, log a warning and delete the expiry date
-                # from the database so that we don't try to expire it again in the
-                # future.
-                logger.warning(
-                    "Can't expire event %s because we don't have it.", event_id
-                )
-                return
-
-            # Prune the event's dict then convert it to JSON.
-            pruned_json = encode_json(
-                prune_event_dict(event.room_version, event.get_dict())
-            )
-
-            # Update the event_json table to replace the event's JSON with the pruned
-            # JSON.
-            self._censor_event_txn(txn, event.event_id, pruned_json)
-
-            # We need to invalidate the event cache entry for this event because we
-            # changed its content in the database. We can't call
-            # self._invalidate_cache_and_stream because self.get_event_cache isn't of the
-            # right type.
-            txn.call_after(self._get_event_cache.invalidate, (event.event_id,))
-            # Send that invalidation to replication so that other workers also invalidate
-            # the event cache.
-            self._send_invalidation_to_replication(
-                txn, "_get_event_cache", (event.event_id,)
-            )
-
-        yield self.db.runInteraction("delete_expired_event", delete_expired_event_txn)
-
-    def _delete_event_expiry_txn(self, txn, event_id):
-        """Delete the expiry timestamp associated with an event ID without deleting the
-        actual event.
-
-        Args:
-            txn (LoggingTransaction): The transaction to use to perform the deletion.
-            event_id (str): The event ID to delete the associated expiry timestamp of.
-        """
-        return self.db.simple_delete_txn(
-            txn=txn, table="event_expiry", keyvalues={"event_id": event_id}
         )
