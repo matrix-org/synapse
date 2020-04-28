@@ -360,6 +360,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(3, len(channel.json_body["users"]))
+        self.assertEqual(3, channel.json_body["total"])
 
 
 class UserRestTestCase(unittest.HomeserverTestCase):
@@ -434,6 +435,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
                 "admin": True,
                 "displayname": "Bob's name",
                 "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+                "avatar_url": None,
             }
         )
 
