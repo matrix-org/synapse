@@ -92,7 +92,7 @@ A JSON body is returned with the following shape:
                 "admin": 0,
                 "user_type": null,
                 "deactivated": 0,
-                "displayname": <User One>,
+                "displayname": "<User One>",
                 "avatar_url": null
             }, {
                 "name": "<user_id2>",
@@ -101,7 +101,7 @@ A JSON body is returned with the following shape:
                 "admin": 1,
                 "user_type": null,
                 "deactivated": 0,
-                "displayname": <User Two>,
+                "displayname": "<User Two>",
                 "avatar_url": "<avatar_url>"
             }
         ],
