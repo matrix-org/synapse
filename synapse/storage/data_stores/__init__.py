@@ -15,6 +15,7 @@
 
 import logging
 
+from synapse.storage.data_stores.main.events import PersistEventsStore
 from synapse.storage.data_stores.state import StateGroupDataStore
 from synapse.storage.database import Database, make_conn
 from synapse.storage.engines import create_engine
@@ -39,6 +40,7 @@ class DataStores(object):
         self.databases = []
         self.main = None
         self.state = None
+        self.persist_events = None
 
         for database_config in hs.config.database.databases:
             db_name = database_config.name
@@ -63,6 +65,13 @@ class DataStores(object):
                         raise Exception("'main' data store already configured")
 
                     self.main = main_store_class(database, db_conn, hs)
+
+                    # If we're on a process that can persist events (currently
+                    # master), also instansiate a `PersistEventsStore`
+                    if hs.config.worker.worker_app is None:
+                        self.persist_events = PersistEventsStore(
+                            hs, database, self.main
+                        )
 
                 if "state" in database_config.data_stores:
                     logger.info("Starting 'state' data store")

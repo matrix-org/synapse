@@ -43,7 +43,6 @@ from .e2e_room_keys import EndToEndRoomKeyStore
 from .end_to_end_keys import EndToEndKeyStore
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
-from .events import EventsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
@@ -91,7 +90,6 @@ class DataStore(
     StateStore,
     SignatureStore,
     ApplicationServiceStore,
-    EventsStore,
     PurgeEventsStore,
     EventFederationStore,
     MediaRepositoryStore,

@@ -19,12 +19,13 @@ import itertools
 import logging
 from collections import OrderedDict, namedtuple
 from functools import wraps
-from typing import Dict, Iterable, List, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
 import six
 from six import integer_types, iteritems, text_type
 from six.moves import range
 
+import attr
 from canonicaljson import json
 from prometheus_client import Counter
 
@@ -43,15 +44,16 @@ from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.logging.utils import log_function
 from synapse.storage._base import make_in_list_sql_clause
-from synapse.storage.data_stores.main.event_federation import EventFederationStore
-from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.data_stores.main.search import SearchEntry
-from synapse.storage.data_stores.main.state import StateGroupWorkerStore
 from synapse.storage.database import Database, LoggingTransaction
-from synapse.storage.persist_events import DeltaState
+from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.iterutils import batch_iter
+
+if TYPE_CHECKING:
+    from synapse.storage.data_stores.main import DataStore
+    from synapse.server import HomeServer
 
 # py2 sqlite has buffer hardcoded as only binary type, so we must use it,
 # despite being deprecated and removed in favor of memoryview
@@ -104,16 +106,45 @@ def _retry_on_integrity_error(func):
     return f
 
 
-# inherits from EventFederationStore so that we can call _update_backward_extremities
-# and _handle_mult_prev_events (though arguably those could both be moved in here)
-class EventsStore(
-    StateGroupWorkerStore, EventFederationStore, EventsWorkerStore,
-):
-    def __init__(self, database: Database, db_conn, hs):
-        super(EventsStore, self).__init__(database, db_conn, hs)
+@attr.s(slots=True)
+class DeltaState:
+    """Deltas to use to update the `current_state_events` table.
+
+    Attributes:
+        to_delete: List of type/state_keys to delete from current state
+        to_insert: Map of state to upsert into current state
+        no_longer_in_room: The server is not longer in the room, so the room
+            should e.g. be removed from `current_state_events` table.
+    """
+
+    to_delete = attr.ib(type=List[Tuple[str, str]])
+    to_insert = attr.ib(type=StateMap[str])
+    no_longer_in_room = attr.ib(type=bool, default=False)
+
+
+class PersistEventsStore:
+    """T
+    """
+
+    def __init__(self, hs: "HomeServer", db: Database, main_data_store: "DataStore"):
+        self.hs = hs
+        self.db = db
+        self.store = main_data_store
+        self.database_engine = db.engine
+        self._clock = hs.get_clock()
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
         self.is_mine_id = hs.is_mine_id
+
+        # Ideally we'd move these ID gens here, unfortunately some other ID
+        # generators are chained off them so doing so is a bit of a PITA.
+        self._backfill_id_gen = self.store._backfill_id_gen  # type: StreamIdGenerator
+        self._stream_id_gen = self.store._stream_id_gen  # type: StreamIdGenerator
+
+        # This should only exist on master for now
+        assert (
+            hs.config.worker.worker_app is None
+        ), "Can only instantiate PersistEventsStore on master"
 
     @_retry_on_integrity_error
     @defer.inlineCallbacks
@@ -205,10 +236,10 @@ class EventsStore(
                 event_counter.labels(event.type, origin_type, origin_entity).inc()
 
             for room_id, new_state in iteritems(current_state_for_room):
-                self.get_current_state_ids.prefill((room_id,), new_state)
+                self.store.get_current_state_ids.prefill((room_id,), new_state)
 
             for room_id, latest_event_ids in iteritems(new_forward_extremeties):
-                self.get_latest_event_ids_in_room.prefill(
+                self.store.get_latest_event_ids_in_room.prefill(
                     (room_id,), list(latest_event_ids)
                 )
 
@@ -554,7 +585,7 @@ class EventsStore(
                 )
 
             txn.call_after(
-                self._curr_state_delta_stream_cache.entity_has_changed,
+                self.store._curr_state_delta_stream_cache.entity_has_changed,
                 room_id,
                 stream_id,
             )
@@ -574,10 +605,13 @@ class EventsStore(
 
             for member in members_changed:
                 txn.call_after(
-                    self.get_rooms_for_user_with_stream_ordering.invalidate, (member,)
+                    self.store.get_rooms_for_user_with_stream_ordering.invalidate,
+                    (member,),
                 )
 
-            self._invalidate_state_caches_and_stream(txn, room_id, members_changed)
+            self.store._invalidate_state_caches_and_stream(
+                txn, room_id, members_changed
+            )
 
     def _upsert_room_version_txn(self, txn: LoggingTransaction, room_id: str):
         """Update the room version in the database based off current state
@@ -615,7 +649,9 @@ class EventsStore(
             self.db.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
-            txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
+            txn.call_after(
+                self.store.get_latest_event_ids_in_room.invalidate, (room_id,)
+            )
 
         self.db.simple_insert_many_txn(
             txn,
@@ -681,10 +717,10 @@ class EventsStore(
         depth_updates = {}
         for event, context in events_and_contexts:
             # Remove the any existing cache entries for the event_ids
-            txn.call_after(self._invalidate_get_event_cache, event.event_id)
+            txn.call_after(self.store._invalidate_get_event_cache, event.event_id)
             if not backfilled:
                 txn.call_after(
-                    self._events_stream_cache.entity_has_changed,
+                    self.store._events_stream_cache.entity_has_changed,
                     event.room_id,
                     event.internal_metadata.stream_ordering,
                 )
@@ -1056,13 +1092,15 @@ class EventsStore(
 
         def prefill():
             for cache_entry in to_prefill:
-                self._get_event_cache.prefill((cache_entry[0].event_id,), cache_entry)
+                self.store._get_event_cache.prefill(
+                    (cache_entry[0].event_id,), cache_entry
+                )
 
         txn.call_after(prefill)
 
     def _store_redaction(self, txn, event):
         # invalidate the cache for the redacted event
-        txn.call_after(self._invalidate_get_event_cache, event.redacts)
+        txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
 
         self.db.simple_insert_txn(
             txn,
@@ -1157,12 +1195,13 @@ class EventsStore(
 
         for event in events:
             txn.call_after(
-                self._membership_stream_cache.entity_has_changed,
+                self.store._membership_stream_cache.entity_has_changed,
                 event.state_key,
                 event.internal_metadata.stream_ordering,
             )
             txn.call_after(
-                self.get_invited_rooms_for_local_user.invalidate, (event.state_key,)
+                self.store.get_invited_rooms_for_local_user.invalidate,
+                (event.state_key,),
             )
 
             # We update the local_invites table only if the event is "current",
@@ -1173,7 +1212,7 @@ class EventsStore(
                 not event.internal_metadata.is_outlier()
                 or event.internal_metadata.is_out_of_band_membership()
             )
-            is_mine = self.hs.is_mine_id(event.state_key)
+            is_mine = self.is_mine_id(event.state_key)
             if is_new_state and is_mine:
                 if event.membership == Membership.INVITE:
                     self.db.simple_insert_txn(
@@ -1264,13 +1303,13 @@ class EventsStore(
             },
         )
 
-        txn.call_after(self.get_relations_for_event.invalidate_many, (parent_id,))
+        txn.call_after(self.store.get_relations_for_event.invalidate_many, (parent_id,))
         txn.call_after(
-            self.get_aggregation_groups_for_event.invalidate_many, (parent_id,)
+            self.store.get_aggregation_groups_for_event.invalidate_many, (parent_id,)
         )
 
         if rel_type == RelationTypes.REPLACE:
-            txn.call_after(self.get_applicable_edit.invalidate, (parent_id,))
+            txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
     def _handle_redaction(self, txn, redacted_event_id):
         """Handles receiving a redaction and checking whether we need to remove
@@ -1328,8 +1367,8 @@ class EventsStore(
                 },
             )
 
-            self._invalidate_cache_and_stream(
-                txn, self.get_retention_policy_for_room, (event.room_id,)
+            self.store._invalidate_cache_and_stream(
+                txn, self.store.get_retention_policy_for_room, (event.room_id,)
             )
 
     def store_event_search_txn(self, txn, event, key, value):
@@ -1341,7 +1380,7 @@ class EventsStore(
             key (str):
             value (str):
         """
-        self.store_search_entries_txn(
+        self.store.store_search_entries_txn(
             txn,
             (
                 SearchEntry(
@@ -1407,7 +1446,7 @@ class EventsStore(
 
             for uid in user_ids:
                 txn.call_after(
-                    self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                    self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
                     (event.room_id, uid),
                 )
 
@@ -1421,7 +1460,7 @@ class EventsStore(
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
         # Sad that we have to blow away the cache for the whole room here
         txn.call_after(
-            self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+            self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
             (room_id,),
         )
         txn.execute(
@@ -1467,11 +1506,13 @@ class EventsStore(
 
         for event_id, state_group_id in iteritems(state_groups):
             txn.call_after(
-                self._get_state_group_for_event.prefill, (event_id,), state_group_id
+                self.store._get_state_group_for_event.prefill,
+                (event_id,),
+                state_group_id,
             )
 
     def _update_min_depth_for_room_txn(self, txn, room_id, depth):
-        min_depth = self._get_min_depth_interaction(txn, room_id)
+        min_depth = self.store._get_min_depth_interaction(txn, room_id)
 
         if min_depth is not None and depth >= min_depth:
             return
