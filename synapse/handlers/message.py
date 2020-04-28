@@ -42,8 +42,8 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
+from synapse.events.utils import validate_canonicaljson
 from synapse.events.validator import EventValidator
-from synapse.federation.federation_base import _check_strict_canonicaljson
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -818,7 +818,7 @@ class EventCreationHandler(object):
 
         # Ensure the data is spec compliant JSON.
         if room_version.strict_canonicaljson:
-            _check_strict_canonicaljson(event.content)
+            validate_canonicaljson(event.content)
 
         # Ensure that we can round trip before trying to persist in db
         try:
