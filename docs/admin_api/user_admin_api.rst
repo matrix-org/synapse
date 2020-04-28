@@ -81,7 +81,7 @@ It returns a JSON body like the following:
                 "user_type": null,
                 "deactivated": 0,
                 "displayname": <User Two>,
-                "avatar_url": "https://example.com/user_id2"
+                "avatar_url": "<avatar_url>"
             }
         ],
         "next_token": "100",
