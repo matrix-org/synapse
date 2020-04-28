@@ -58,7 +58,12 @@ class RoomVersion(object):
     enforce_key_validity = attr.ib()  # bool
 
     # bool: before MSC2261/MSC2432, m.room.aliases had special auth rules and redaction rules
-    special_case_aliases_auth = attr.ib(type=bool, default=False)
+    special_case_aliases_auth = attr.ib(type=bool)
+    # Strictly enforce canonicaljson, do not allow:
+    # * Integers outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
+    # * Floats
+    # * NaN, Infinity, -Infinity
+    strict_canonicaljson = attr.ib(type=bool)
 
 
 class RoomVersions(object):
@@ -69,6 +74,7 @@ class RoomVersions(object):
         StateResolutionVersions.V1,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        strict_canonicaljson=False,
     )
     V2 = RoomVersion(
         "2",
@@ -77,6 +83,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        strict_canonicaljson=False,
     )
     V3 = RoomVersion(
         "3",
@@ -85,6 +92,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        strict_canonicaljson=False,
     )
     V4 = RoomVersion(
         "4",
@@ -93,6 +101,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        strict_canonicaljson=False,
     )
     V5 = RoomVersion(
         "5",
@@ -101,6 +110,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=True,
+        strict_canonicaljson=False,
     )
     MSC2432_DEV = RoomVersion(
         "org.matrix.msc2432",
@@ -109,6 +119,16 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
+        strict_canonicaljson=False,
+    )
+    STRICT_CANONICALJSON = RoomVersion(
+        "org.matrix.strict_canonicaljson",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=True,
+        strict_canonicaljson=True,
     )
 
 
@@ -121,5 +141,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V4,
         RoomVersions.V5,
         RoomVersions.MSC2432_DEV,
+        RoomVersions.STRICT_CANONICALJSON,
     )
 }  # type: Dict[str, RoomVersion]
