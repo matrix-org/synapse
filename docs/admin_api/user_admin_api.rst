@@ -73,8 +73,8 @@ maximum number of items to return in this call. Defaults to ``100``.
 The parameter ``user_id`` is optional and filters to only users with user IDs
 that contain this value.
 
-The parameter ``guests`` is optional and if ``true`` will **exclude** guest users.
-Defaults to ``false`` to include guest users.
+The parameter ``guests`` is optional and if ``false`` will **exclude** guest users.
+Defaults to ``true`` to include guest users.
 
 The parameter ``deactivated`` is optional and if ``true`` will **include** deactivated users.
 Defaults to ``false`` to exclude deactivated users.
