@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 from collections import namedtuple
-from typing import Iterable, List
+from typing import Any, Iterable, List
 
 import six
 
@@ -275,6 +275,39 @@ def _is_invite_via_3pid(event: EventBase) -> bool:
     )
 
 
+def _check_strict_canonicaljson(data: Any):
+    """
+    Ensure that the JSON object is valid according to the rules of canonical JSON.
+
+    See the appendix section 3.1: Canonical JSON.
+
+    This rejects JSON that has:
+    * An integer outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
+    * Floats
+    * NaN, Infinity, -Infinity
+    """
+    if isinstance(data, int):
+        if data <= -(2 ** 53) or 2 ** 53 <= data:
+            print(data)
+            raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
+
+    elif isinstance(data, float):
+        # Note that Infinity, -Infinity, and NaN are also considered floats.
+        raise SynapseError(400, "Bad JSON value: float", Codes.BAD_JSON)
+
+    elif isinstance(data, dict):
+        for v in data.values():
+            _check_strict_canonicaljson(v)
+
+    elif isinstance(data, (list, tuple)):
+        for i in data:
+            _check_strict_canonicaljson(i)
+
+    elif not isinstance(data, (bool, str)) and data is not None:
+        # Other potential JSON values (bool, None, str) are safe.
+        raise SynapseError(400, "Unknown JSON value", Codes.BAD_JSON)
+
+
 def event_from_pdu_json(
     pdu_json: JsonDict, room_version: RoomVersion, outlier: bool = False
 ) -> EventBase:
@@ -301,6 +334,10 @@ def event_from_pdu_json(
         raise SynapseError(400, "Depth too small", Codes.BAD_JSON)
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
+
+    # Validate that the JSON conforms to the specification.
+    if room_version.strict_canonicaljson:
+        _check_strict_canonicaljson(pdu_json)
 
     event = make_event_from_dict(pdu_json, room_version)
     event.internal_metadata.outlier = outlier
