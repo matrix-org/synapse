@@ -25,6 +25,7 @@ import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
+from synapse.events.builder import EventBuilderFactory
 
 class HomeServer(object):
     @property
@@ -122,4 +123,8 @@ class HomeServer(object):
     def get_instance_id(self) -> str:
         pass
     def get_instance_name(self) -> str:
+        pass
+    def get_event_builder_factory(self) -> EventBuilderFactory:
+        pass
+    def get_storage(self) -> synapse.storage.Storage:
         pass

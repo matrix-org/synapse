@@ -170,22 +170,16 @@ class EventsStream(Stream):
             limited = False
             upper_limit = current_token
 
-        # next up is the state delta table
-
-        state_rows = await self._store.get_all_updated_current_state_deltas(
+        # next up is the state delta table.
+        (
+            state_rows,
+            upper_limit,
+            state_rows_limited,
+        ) = await self._store.get_all_updated_current_state_deltas(
             from_token, upper_limit, target_row_count
-        )  # type: List[Tuple]
+        )
 
-        # again, if we've hit the limit there, we'll need to limit the other sources
-        assert len(state_rows) < target_row_count
-        if len(state_rows) == target_row_count:
-            assert state_rows[-1][0] <= upper_limit
-            upper_limit = state_rows[-1][0]
-            limited = True
-
-            # FIXME: is it a given that there is only one row per stream_id in the
-            # state_deltas table (so that we can be sure that we have got all of the
-            # rows for upper_limit)?
+        limited = limited or state_rows_limited
 
         # finally, fetch the ex-outliers rows. We assume there are few enough of these
         # not to bother with the limit.

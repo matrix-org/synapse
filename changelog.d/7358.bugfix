@@ -1,0 +1,1 @@
+Fix a bug where event updates might not be sent over replication to worker processes after the stream falls behind.
