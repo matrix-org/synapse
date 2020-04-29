@@ -481,12 +481,13 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return {"state": "invite", "user_profile": user_profile}
 
-    @defer.inlineCallbacks
-    def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
+    async def remove_user_from_group(
+        self, group_id, user_id, requester_user_id, content
+    ):
         """Remove a user from a group
         """
         if user_id == requester_user_id:
-            token = yield self.store.register_user_group_membership(
+            token = await self.store.register_user_group_membership(
                 group_id, user_id, membership="leave"
             )
             self.notifier.on_new_event("groups_key", token, users=[user_id])
@@ -495,13 +496,13 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             # retry if the group server is currently down.
 
         if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.remove_user_from_group(
+            res = await self.groups_server_handler.remove_user_from_group(
                 group_id, user_id, requester_user_id, content
             )
         else:
             content["requester_user_id"] = requester_user_id
             try:
-                res = yield self.transport_client.remove_user_from_group(
+                res = await self.transport_client.remove_user_from_group(
                     get_domain_from_id(group_id),
                     group_id,
                     requester_user_id,

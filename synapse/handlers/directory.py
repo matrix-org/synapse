@@ -86,8 +86,7 @@ class DirectoryHandler(BaseHandler):
             room_alias, room_id, servers, creator=creator
         )
 
-    @defer.inlineCallbacks
-    def create_association(
+    async def create_association(
         self,
         requester: Requester,
         room_alias: RoomAlias,
@@ -129,10 +128,10 @@ class DirectoryHandler(BaseHandler):
         else:
             # Server admins are not subject to the same constraints as normal
             # users when creating an alias (e.g. being in the room).
-            is_admin = yield self.auth.is_server_admin(requester.user)
+            is_admin = await self.auth.is_server_admin(requester.user)
 
             if (self.require_membership and check_membership) and not is_admin:
-                rooms_for_user = yield self.store.get_rooms_for_user(user_id)
+                rooms_for_user = await self.store.get_rooms_for_user(user_id)
                 if room_id not in rooms_for_user:
                     raise AuthError(
                         403, "You must be in the room to create an alias for it"
@@ -149,7 +148,7 @@ class DirectoryHandler(BaseHandler):
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to create alias")
 
-            can_create = yield self.can_modify_alias(room_alias, user_id=user_id)
+            can_create = await self.can_modify_alias(room_alias, user_id=user_id)
             if not can_create:
                 raise AuthError(
                     400,
@@ -157,7 +156,7 @@ class DirectoryHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE,
                 )
 
-        yield self._create_association(room_alias, room_id, servers, creator=user_id)
+        await self._create_association(room_alias, room_id, servers, creator=user_id)
 
     async def delete_association(self, requester: Requester, room_alias: RoomAlias):
         """Remove an alias from the directory
