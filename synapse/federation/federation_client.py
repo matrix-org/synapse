@@ -889,7 +889,7 @@ class FederationClient(FederationBase):
         search_filter: Optional[Dict] = None,
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ):
         """Get the list of public rooms from a remote homeserver
 
         Args:
@@ -903,8 +903,8 @@ class FederationClient(FederationBase):
                 party instance
 
         Returns:
-            The response from the remote server, or None if `remote_server` is the same as the
-            local server_name
+            Deferred[Dict[str, Any]]: The response from the remote server, or None if
+            `remote_server` is the same as the local server_name
 
         Raises:
             HttpResponseException: There was an exception returned from the remote server

@@ -22,13 +22,13 @@ from six.moves import urllib
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.api.urls import (
     FEDERATION_UNSTABLE_PREFIX,
     FEDERATION_V1_PREFIX,
     FEDERATION_V2_PREFIX,
 )
 from synapse.logging.utils import log_function
-from synapse.api.errors import Codes, HttpResponseException, SynapseError
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +333,7 @@ class TransportLayerClient(object):
         search_filter: Optional[Dict] = None,
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ):
         """Get the list of public rooms from a remote homeserver
 
         See synapse.federation.federation_client.FederationClient.get_public_rooms for
@@ -361,7 +361,8 @@ class TransportLayerClient(object):
                 if e.code == 403:
                     raise SynapseError(
                         403,
-                        "You are not allowed to view the public rooms list of %s" % (remote_server,),
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
                         errcode=Codes.FORBIDDEN,
                     )
                 raise
@@ -386,7 +387,8 @@ class TransportLayerClient(object):
                 if e.code == 403:
                     raise SynapseError(
                         403,
-                        "You are not allowed to view the public rooms list of %s" % (remote_server,),
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
                         errcode=Codes.FORBIDDEN,
                     )
                 raise
