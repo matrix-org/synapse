@@ -138,13 +138,13 @@ class UIAuthWorkerStore(SQLBaseStore):
         """
         await self.db.runInteraction(
             "mark_ui_auth_stage_complete",
-            self._mark_ui_auth_stage_complete,
+            self._mark_ui_auth_stage_complete_txn,
             session_id,
             stage_type,
             result,
         )
 
-    def _mark_ui_auth_stage_complete(
+    def _mark_ui_auth_stage_complete_txn(
         self, txn, session_id: str, stage_type: str, result: Union[str, bool, JsonDict],
     ):
         try:
@@ -204,13 +204,13 @@ class UIAuthWorkerStore(SQLBaseStore):
         """
         await self.db.runInteraction(
             "set_ui_auth_session_data",
-            self._set_ui_auth_session_data,
+            self._set_ui_auth_session_data_txn,
             session_id,
             key,
             value,
         )
 
-    def _set_ui_auth_session_data(self, txn, session_id: str, key: str, value: Any):
+    def _set_ui_auth_session_data_txn(self, txn, session_id: str, key: str, value: Any):
         # Get the current value.
         result = self.db.simple_select_one_txn(
             txn,
@@ -265,11 +265,11 @@ class UIAuthStore(UIAuthWorkerStore):
         """
         return self.db.runInteraction(
             "delete_old_ui_auth_sessions",
-            self._delete_old_ui_auth_sessions,
+            self._delete_old_ui_auth_sessions_txn,
             expiration_time,
         )
 
-    def _delete_old_ui_auth_sessions(self, txn, expiration_time: int):
+    def _delete_old_ui_auth_sessions_txn(self, txn, expiration_time: int):
         # Get the expired sessions.
         sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
         txn.execute(sql, [expiration_time])
