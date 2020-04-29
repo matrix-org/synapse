@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional, Union
 import attr
 
 import synapse.util.stringutils as stringutils
-from synapse.api.errors import StoreError, SynapseError
+from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.types import JsonDict
 
@@ -66,10 +66,10 @@ class UIAuthWorkerStore(SQLBaseStore):
             description:
                 A string description of the operation that the current
                 authentication is authorising.
-
         Returns:
             The newly created session.
-
+        Raise:
+            StoreError if a unique session ID cannot be generated.
         """
         # The clientdict gets stored as JSON.
         clientdict_json = json.dumps(clientdict)
@@ -109,17 +109,14 @@ class UIAuthWorkerStore(SQLBaseStore):
         Returns:
             A dict containing the device information.
         Raises:
-            SynapseError: if the session is not found.
+            StoreError if the session is not found.
         """
-        try:
-            result = await self.db.simple_select_one(
-                table="ui_auth_sessions",
-                keyvalues={"session_id": session_id},
-                retcols=("clientdict", "uri", "method", "description"),
-                desc="get_ui_auth_session",
-            )
-        except StoreError:
-            raise SynapseError(400, "Unknown session ID: %s" % session_id)
+        result = await self.db.simple_select_one(
+            table="ui_auth_sessions",
+            keyvalues={"session_id": session_id},
+            retcols=("clientdict", "uri", "method", "description"),
+            desc="get_ui_auth_session",
+        )
 
         result["clientdict"] = json.loads(result["clientdict"])
 
@@ -136,7 +133,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             stage_type: The completed stage type.
             result: The result of the stage verification.
         Raises:
-            SynapseError if the session cannot be found.
+            StoreError if the session cannot be found.
         """
         await self.db.runInteraction(
             "mark_ui_auth_stage_complete",
@@ -149,16 +146,13 @@ class UIAuthWorkerStore(SQLBaseStore):
     def _mark_ui_auth_stage_complete_txn(
         self, txn, session_id: str, stage_type: str, result: Union[str, bool, JsonDict],
     ):
-        try:
-            # Get the session to ensure it exists.
-            self.db.simple_select_one_txn(
-                txn,
-                table="ui_auth_sessions",
-                keyvalues={"session_id": session_id},
-                retcols=("session_id",),
-            )
-        except StoreError:
-            raise SynapseError(400, "Unknown session ID: %s" % session_id)
+        # Get the session to ensure it exists.
+        self.db.simple_select_one_txn(
+            txn,
+            table="ui_auth_sessions",
+            keyvalues={"session_id": session_id},
+            retcols=("session_id",),
+        )
 
         # Add (or update) the results of the current stage to the database.
         self.db.simple_upsert_txn(

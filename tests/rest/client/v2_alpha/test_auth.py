@@ -219,4 +219,4 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
             + "&g-recaptcha-response=a",
         )
         self.render(request)
-        self.assertEqual(request.code, 400)
+        self.assertEqual(request.code, 404)
