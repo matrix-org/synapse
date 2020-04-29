@@ -340,17 +340,14 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.hs.config.max_mau_value + 1)
         )
         self.get_failure(
-            # for MAU it must have an IP address used to perform the registration
-            handler.register_user(localpart="local_part", address="127.0.0.1"),
-            ResourceLimitError,
+            handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value + 1)
         )
         self.get_failure(
-            handler.register_user(localpart="local_part", address="127.0.0.1"),
-            ResourceLimitError,
+            handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         # Register new user with admin API
@@ -606,17 +603,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Set MAU limit
         self.get_failure(
-            # for MAU it must have an IP address used to perform the registration
-            handler.register_user(localpart="local_part", address="127.0.0.1"),
-            ResourceLimitError,
+            handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value + 1)
         )
         self.get_failure(
-            handler.register_user(localpart="local_part", address="127.0.0.1"),
-            ResourceLimitError,
+            handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         # Register new user with admin API
@@ -655,17 +649,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             return_value=defer.succeed(self.hs.config.max_mau_value + 1)
         )
         self.get_failure(
-            # for MAU it must have an IP address used to perform the registration
-            handler.register_user(localpart="local_part", address="127.0.0.1"),
-            ResourceLimitError,
+            handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(self.hs.config.max_mau_value + 1)
         )
         self.get_failure(
-            handler.register_user(localpart="local_part", address="127.0.0.1"),
-            ResourceLimitError,
+            handler.register_user(localpart="local_part"), ResourceLimitError
         )
 
         # Register new user with admin API
