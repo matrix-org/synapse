@@ -889,7 +889,7 @@ class FederationClient(FederationBase):
         search_filter: Optional[Dict] = None,
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """Get the list of public rooms from a remote homeserver
 
         Args:
@@ -912,9 +912,6 @@ class FederationClient(FederationBase):
                 requests over federation
 
         """
-        if remote_server == self.server_name:
-            return
-
         return self.transport_layer.get_public_rooms(
             remote_server,
             limit,
