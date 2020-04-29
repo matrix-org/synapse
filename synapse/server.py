@@ -234,8 +234,8 @@ class HomeServer(object):
         self._listening_services = []
         self.start_time = None
 
-        self.instance_id = random_string(5)
-        self.instance_name = config.worker_name or "master"
+        self._instance_id = random_string(5)
+        self._instance_name = config.worker_name or "master"
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
@@ -255,7 +255,7 @@ class HomeServer(object):
         This is used to distinguish running instances in worker-based
         deployments.
         """
-        return self.instance_id
+        return self._instance_id
 
     def get_instance_name(self) -> str:
         """A unique name for this synapse process.
@@ -263,7 +263,7 @@ class HomeServer(object):
         Used to identify the process over replication and in config. Does not
         change over restarts.
         """
-        return self.instance_name
+        return self._instance_name
 
     def setup(self):
         logger.info("Setting up.")

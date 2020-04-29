@@ -25,7 +25,7 @@ position of all streams. The server then periodically sends `RDATA` commands
 which have the format `RDATA <stream_name> <instance_name> <token> <row>`, where
 the format of `<row>` is defined by the individual streams. The
 `<instance_name>` is the name of the Synapse process that generated the data
-(e.g. usually "master").
+(usually "master").
 
 Error reporting happens by either the client or server sending an ERROR
 command, and usually the connection will be closed.

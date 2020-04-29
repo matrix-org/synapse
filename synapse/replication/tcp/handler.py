@@ -156,7 +156,7 @@ class ReplicationCommandHandler:
                 hs.config.redis.redis_host, hs.config.redis.redis_port, self._factory,
             )
         else:
-            client_name = hs.config.worker_name
+            client_name = hs.get_instance_name()
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
