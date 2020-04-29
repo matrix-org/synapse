@@ -122,6 +122,8 @@ class HomeServer(object):
         pass
     def get_instance_id(self) -> str:
         pass
+    def get_instance_name(self) -> str:
+        pass
     def get_event_builder_factory(self) -> EventBuilderFactory:
         pass
     def get_storage(self) -> synapse.storage.Storage:

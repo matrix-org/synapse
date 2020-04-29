@@ -79,6 +79,7 @@ class ReplicationCommandHandler:
         self._notifier = hs.get_notifier()
         self._clock = hs.get_clock()
         self._instance_id = hs.get_instance_id()
+        self._instance_name = hs.get_instance_name()
 
         # Set of streams that we've caught up with.
         self._streams_connected = set()  # type: Set[str]
@@ -156,7 +157,7 @@ class ReplicationCommandHandler:
                 hs.config.redis.redis_host, hs.config.redis.redis_port, self._factory,
             )
         else:
-            client_name = hs.config.worker_name
+            client_name = hs.get_instance_name()
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
@@ -170,7 +171,9 @@ class ReplicationCommandHandler:
 
         for stream_name, stream in self._streams.items():
             current_token = stream.current_token()
-            self.send_command(PositionCommand(stream_name, current_token))
+            self.send_command(
+                PositionCommand(stream_name, self._instance_name, current_token)
+            )
 
     async def on_USER_SYNC(self, conn: AbstractConnection, cmd: UserSyncCommand):
         user_sync_counter.inc()
@@ -235,6 +238,10 @@ class ReplicationCommandHandler:
             await self._server_notices_sender.on_user_ip(cmd.user_id)
 
     async def on_RDATA(self, conn: AbstractConnection, cmd: RdataCommand):
+        if cmd.instance_name == self._instance_name:
+            # Ignore RDATA that are just our own echoes
+            return
+
         stream_name = cmd.stream_name
         inbound_rdata_count.labels(stream_name).inc()
 
@@ -286,6 +293,10 @@ class ReplicationCommandHandler:
         await self._replication_data_handler.on_rdata(stream_name, token, rows)
 
     async def on_POSITION(self, conn: AbstractConnection, cmd: PositionCommand):
+        if cmd.instance_name == self._instance_name:
+            # Ignore POSITION that are just our own echoes
+            return
+
         stream = self._streams.get(cmd.stream_name)
         if not stream:
             logger.error("Got POSITION for unknown stream: %s", cmd.stream_name)
@@ -485,7 +496,7 @@ class ReplicationCommandHandler:
 
         We need to check if the client is interested in the stream or not
         """
-        self.send_command(RdataCommand(stream_name, token, data))
+        self.send_command(RdataCommand(stream_name, self._instance_name, token, data))
 
 
 UpdateToken = TypeVar("UpdateToken")
