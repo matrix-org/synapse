@@ -284,15 +284,14 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
     set_group_join_policy = _create_rerouter("set_group_join_policy")
 
-    @defer.inlineCallbacks
-    def create_group(self, group_id, user_id, content):
+    async def create_group(self, group_id, user_id, content):
         """Create a group
         """
 
         logger.info("Asking to create group with ID: %r", group_id)
 
         if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.create_group(
+            res = await self.groups_server_handler.create_group(
                 group_id, user_id, content
             )
             local_attestation = None
@@ -301,10 +300,10 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content["attestation"] = local_attestation
 
-            content["user_profile"] = yield self.profile_handler.get_profile(user_id)
+            content["user_profile"] = await self.profile_handler.get_profile(user_id)
 
             try:
-                res = yield self.transport_client.create_group(
+                res = await self.transport_client.create_group(
                     get_domain_from_id(group_id), group_id, user_id, content
                 )
             except HttpResponseException as e:
@@ -313,7 +312,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
                 raise SynapseError(502, "Failed to contact group server")
 
             remote_attestation = res["attestation"]
-            yield self.attestations.verify_attestation(
+            await self.attestations.verify_attestation(
                 remote_attestation,
                 group_id=group_id,
                 user_id=user_id,
@@ -321,7 +320,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             )
 
         is_publicised = content.get("publicise", False)
-        token = yield self.store.register_user_group_membership(
+        token = await self.store.register_user_group_membership(
             group_id,
             user_id,
             membership="join",

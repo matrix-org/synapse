@@ -787,9 +787,8 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    @defer.inlineCallbacks
-    def create_group(self, group_id, requester_user_id, content):
-        group = yield self.check_group_is_ours(group_id, requester_user_id)
+    async def create_group(self, group_id, requester_user_id, content):
+        group = await self.check_group_is_ours(group_id, requester_user_id)
 
         logger.info("Attempting to create group with ID: %r", group_id)
 
@@ -799,7 +798,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         if group:
             raise SynapseError(400, "Group already exists")
 
-        is_admin = yield self.auth.is_server_admin(
+        is_admin = await self.auth.is_server_admin(
             UserID.from_string(requester_user_id)
         )
         if not is_admin:
@@ -822,7 +821,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         long_description = profile.get("long_description")
         user_profile = content.get("user_profile", {})
 
-        yield self.store.create_group(
+        await self.store.create_group(
             group_id,
             requester_user_id,
             name=name,
@@ -834,7 +833,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         if not self.hs.is_mine_id(requester_user_id):
             remote_attestation = content["attestation"]
 
-            yield self.attestations.verify_attestation(
+            await self.attestations.verify_attestation(
                 remote_attestation, user_id=requester_user_id, group_id=group_id
             )
 
@@ -845,7 +844,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             local_attestation = None
             remote_attestation = None
 
-        yield self.store.add_user_to_group(
+        await self.store.add_user_to_group(
             group_id,
             requester_user_id,
             is_admin=True,
@@ -855,7 +854,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         )
 
         if not self.hs.is_mine_id(requester_user_id):
-            yield self.store.add_remote_profile_cache(
+            await self.store.add_remote_profile_cache(
                 requester_user_id,
                 displayname=user_profile.get("displayname"),
                 avatar_url=user_profile.get("avatar_url"),
