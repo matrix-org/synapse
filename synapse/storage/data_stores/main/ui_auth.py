@@ -143,7 +143,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             await self.db.simple_upsert(
                 table="ui_auth_sessions_credentials",
                 keyvalues={"session_id": session_id, "stage_type": stage_type},
-                values={"result": json.dumps(result),},
+                values={"result": json.dumps(result)},
                 desc="mark_ui_auth_stage_complete",
             )
         except self.db.engine.module.IntegrityError:
