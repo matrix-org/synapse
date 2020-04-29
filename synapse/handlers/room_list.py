@@ -89,7 +89,11 @@ class RoomListHandler(BaseHandler):
             logger.info("Bypassing cache as search request.")
 
             return self._get_public_room_list(
-                limit, since_token, search_filter, network_tuple=network_tuple
+                limit,
+                since_token,
+                search_filter,
+                network_tuple=network_tuple,
+                from_federation=from_federation,
             )
 
         key = (limit, since_token, network_tuple)
