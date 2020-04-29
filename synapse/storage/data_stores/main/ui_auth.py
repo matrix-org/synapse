@@ -135,6 +135,8 @@ class UIAuthWorkerStore(SQLBaseStore):
             session_id: The ID of the corresponding session.
             stage_type: The completed stage type.
             result: The result of the stage verification.
+        Raises:
+            SynapseError if the session cannot be found.
         """
         await self.db.runInteraction(
             "mark_ui_auth_stage_complete",
@@ -177,8 +179,6 @@ class UIAuthWorkerStore(SQLBaseStore):
         Returns:
             The completed stages mapped to the result of the verification of
             that auth-type.
-        Raises:
-            StoreError: if the session is not found.
         """
         results = {}
         for row in await self.db.simple_select_list(
@@ -201,6 +201,8 @@ class UIAuthWorkerStore(SQLBaseStore):
             session_id: The ID of this session as returned from check_auth
             key: The key to store the data under
             value: The data to store
+        Raises:
+            StoreError if the session cannot be found.
         """
         await self.db.runInteraction(
             "set_ui_auth_session_data",
@@ -240,6 +242,8 @@ class UIAuthWorkerStore(SQLBaseStore):
             session_id: The ID of this session as returned from check_auth
             key: The key to store the data under
             default: Value to return if the key has not been set
+        Raises:
+            StoreError if the session cannot be found.
         """
         result = await self.db.simple_select_one(
             table="ui_auth_sessions",
