@@ -28,6 +28,7 @@ from synapse.api.urls import (
     FEDERATION_V2_PREFIX,
 )
 from synapse.logging.utils import log_function
+from synapse.api.errors import Codes, HttpResponseException, SynapseError
 
 logger = logging.getLogger(__name__)
 
@@ -347,9 +348,18 @@ class TransportLayerClient(object):
 
             data["filter"] = search_filter
 
-            response = yield self.client.post_json(
-                destination=remote_server, path=path, data=data, ignore_backoff=True
-            )
+            try:
+                response = yield self.client.post_json(
+                    destination=remote_server, path=path, data=data, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "The public room list of %s is private" % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                    )
+                raise
         else:
             path = _create_v1_path("/publicRooms")
 
@@ -363,9 +373,18 @@ class TransportLayerClient(object):
             if since_token:
                 args["since"] = [since_token]
 
-            response = yield self.client.get_json(
-                destination=remote_server, path=path, args=args, ignore_backoff=True
-            )
+            try:
+                response = yield self.client.get_json(
+                    destination=remote_server, path=path, args=args, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "The public room list of %s is private" % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                        )
+                raise
 
         return response
 
