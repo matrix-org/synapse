@@ -136,14 +136,14 @@ class UIAuthWorkerStore(SQLBaseStore):
             StoreError if the session cannot be found.
         """
         # Add (or update) the results of the current stage to the database.
+        #
+        # Note that we need to allow for the same stage to complete multiple
+        # times here so that registration is idempotent.
         try:
-            await self.db.simple_insert(
+            await self.db.simple_upsert(
                 table="ui_auth_sessions_credentials",
-                values={
-                    "session_id": session_id,
-                    "stage_type": stage_type,
-                    "result": json.dumps(result),
-                },
+                keyvalues={"session_id": session_id, "stage_type": stage_type},
+                values={"result": json.dumps(result),},
                 desc="mark_ui_auth_stage_complete",
             )
         except self.db.engine.module.IntegrityError:
