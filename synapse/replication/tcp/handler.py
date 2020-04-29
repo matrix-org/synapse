@@ -229,6 +229,10 @@ class ReplicationCommandHandler:
             await self._server_notices_sender.on_user_ip(cmd.user_id)
 
     async def on_RDATA(self, cmd: RdataCommand):
+        if cmd.instance_name == self._instance_name:
+            # Ignore RDATA that are just our own echoes
+            return
+
         stream_name = cmd.stream_name
         inbound_rdata_count.labels(stream_name).inc()
 
@@ -280,6 +284,10 @@ class ReplicationCommandHandler:
         await self._replication_data_handler.on_rdata(stream_name, token, rows)
 
     async def on_POSITION(self, cmd: PositionCommand):
+        if cmd.instance_name == self._instance_name:
+            # Ignore RDATA that are just our own echoes
+            return
+
         stream = self._streams.get(cmd.stream_name)
         if not stream:
             logger.error("Got POSITION for unknown stream: %s", cmd.stream_name)
