@@ -28,7 +28,7 @@ class UIAuthSessionData:
     session_id = attr.ib(type=str)
     # The dictionary from the client root level, not the 'auth' key.
     clientdict = attr.ib(type=JsonDict)
-    # The URI and method the session was intiatied with, these are checked at
+    # The URI and method the session was intiatied with. These are checked at
     # each stage of the authentication to ensure that the asked for operation
     # has not changed.
     uri = attr.ib(type=str)
