@@ -1111,11 +1111,9 @@ class EventsWorkerStore(SQLBaseStore):
                 SELECT stream_id, room_id, type, state_key, event_id
                 FROM current_state_delta_stream
                 WHERE ? < stream_id AND stream_id <= ?
-                ORDER BY stream_id ASC
-                LIMIT ?
+                ORDER BY stream_id ASC LIMIT ?
             """
-            params = [from_token, to_token, target_row_count]
-            txn.execute(sql, params)
+            txn.execute(sql, (from_token, to_token, target_row_count))
             return txn.fetchall()
 
         def get_deltas_for_stream_id_txn(txn, stream_id):
