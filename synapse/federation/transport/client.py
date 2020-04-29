@@ -361,7 +361,7 @@ class TransportLayerClient(object):
                 if e.code == 403:
                     raise SynapseError(
                         403,
-                        "The public room list of %s is private" % (remote_server,),
+                        "You are not allowed to view the public rooms list of %s" % (remote_server,),
                         errcode=Codes.FORBIDDEN,
                     )
                 raise
@@ -386,9 +386,9 @@ class TransportLayerClient(object):
                 if e.code == 403:
                     raise SynapseError(
                         403,
-                        "The public room list of %s is private" % (remote_server,),
+                        "You are not allowed to view the public rooms list of %s" % (remote_server,),
                         errcode=Codes.FORBIDDEN,
-                        )
+                    )
                 raise
 
         return response
