@@ -260,7 +260,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         # Then call out to the handler.
         cmd_func = getattr(self.command_handler, "on_%s" % (cmd.NAME,), None)
         if cmd_func:
-            await cmd_func(cmd)
+            await cmd_func(self, cmd)
             handled = True
 
         if not handled:
