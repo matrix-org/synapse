@@ -39,7 +39,7 @@ class RestHelper(object):
     resource = attr.ib()
     auth_user_id = attr.ib()
 
-    def create_room_as(self, room_creator, is_public=True, tok=None):
+    def create_room_as(self, room_creator=None, is_public=True, tok=None):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"

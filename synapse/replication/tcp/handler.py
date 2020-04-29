@@ -87,7 +87,9 @@ class ReplicationCommandHandler:
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
         }  # type: Dict[str, Stream]
 
-        self._position_linearizer = Linearizer("replication_position")
+        self._position_linearizer = Linearizer(
+            "replication_position", clock=self._clock
+        )
 
         # Map of stream to batched updates. See RdataCommand for info on how
         # batching works.
