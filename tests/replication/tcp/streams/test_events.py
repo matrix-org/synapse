@@ -43,7 +43,6 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.user_tok = self.login("u1", "pass")
 
         self.reconnect()
-        self.test_handler.stream_positions["events"] = 0
 
         self.room_id = self.helper.create_room_as(tok=self.user_tok)
         self.test_handler.received_rdata_rows.clear()
