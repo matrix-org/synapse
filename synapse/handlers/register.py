@@ -141,6 +141,7 @@ class RegistrationHandler(BaseHandler):
         default_display_name=None,
         address=None,
         bind_emails=[],
+        by_admin=False,
     ):
         """Registers a new client on the server.
 
@@ -156,6 +157,7 @@ class RegistrationHandler(BaseHandler):
               will be set to this. Defaults to 'localpart'.
             address (str|None): the IP address used to perform the registration.
             bind_emails (List[str]): list of emails to bind to this account.
+            by_admin (bool): Whether this registration was made by an administrator.
         Returns:
             Deferred[str]: user_id
         Raises:
@@ -164,7 +166,7 @@ class RegistrationHandler(BaseHandler):
         yield self.check_registration_ratelimit(address)
 
         # do not check_auth_blocking if the call is coming through the Admin API
-        if address:
+        if not by_admin:
             yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:

@@ -1,1 +1,1 @@
-Create user with admin API if MAU limit is reached.
+Allow new users to be registered via the admin API even if the monthly active user limit has been reached.
