@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from six.moves import urllib
 
@@ -327,13 +327,18 @@ class TransportLayerClient(object):
     @log_function
     def get_public_rooms(
         self,
-        remote_server,
-        limit,
-        since_token,
-        search_filter=None,
-        include_all_networks=False,
-        third_party_instance_id=None,
-    ):
+        remote_server: str,
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        include_all_networks: bool = False,
+        third_party_instance_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get the list of public rooms from a remote homeserver
+
+        See synapse.federation.federation_client.FederationClient.get_public_rooms for
+        more information.
+        """
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
             path = _create_v1_path("/publicRooms")
