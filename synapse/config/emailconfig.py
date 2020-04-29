@@ -21,6 +21,7 @@ from __future__ import print_function
 import email.utils
 import os
 from enum import Enum
+from typing import Optional
 
 import pkg_resources
 
@@ -110,11 +111,11 @@ class EmailConfig(Config):
 
                 first_trusted_identity_server = self.trusted_third_party_id_servers[0]
 
-                # This config option does not contain a scheme whereas
+                # trusted_third_party_id_servers does not contain a scheme whereas
                 # account_threepid_delegate_email is expected to. Presume https
                 self.account_threepid_delegate_email = (
                     "https://" + first_trusted_identity_server
-                )  # type: str
+                )  # type: Optional[str]
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
