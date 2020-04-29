@@ -211,11 +211,12 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(request.code, 200)
 
-        invalid_session = session + "invalid"
+        # Attempt to complete an unknown session, which should return an error.
+        unknown_session = session + "unknown"
         request, channel = self.make_request(
             "POST",
             "auth/m.login.recaptcha/fallback/web?session="
-            + invalid_session
+            + unknown_session
             + "&g-recaptcha-response=a",
         )
         self.render(request)

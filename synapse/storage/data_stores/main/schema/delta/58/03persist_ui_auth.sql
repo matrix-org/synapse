@@ -30,5 +30,7 @@ CREATE TABLE IF NOT EXISTS ui_auth_sessions_credentials(
     session_id TEXT NOT NULL,  -- The corresponding UI Auth session.
     stage_type TEXT NOT NULL,  -- The stage type.
     result TEXT NOT NULL,  -- The result of the stage verification, stored as JSON.
-    UNIQUE (session_id, stage_type)
+    UNIQUE (session_id, stage_type),
+    FOREIGN KEY (session_id)
+        REFERENCES ui_auth_sessions (session_id)
 );

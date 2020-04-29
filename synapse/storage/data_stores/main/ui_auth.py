@@ -135,32 +135,19 @@ class UIAuthWorkerStore(SQLBaseStore):
         Raises:
             StoreError if the session cannot be found.
         """
-        await self.db.runInteraction(
-            "mark_ui_auth_stage_complete",
-            self._mark_ui_auth_stage_complete_txn,
-            session_id,
-            stage_type,
-            result,
-        )
-
-    def _mark_ui_auth_stage_complete_txn(
-        self, txn, session_id: str, stage_type: str, result: Union[str, bool, JsonDict],
-    ):
-        # Get the session to ensure it exists.
-        self.db.simple_select_one_txn(
-            txn,
-            table="ui_auth_sessions",
-            keyvalues={"session_id": session_id},
-            retcols=("session_id",),
-        )
-
         # Add (or update) the results of the current stage to the database.
-        self.db.simple_upsert_txn(
-            txn,
-            table="ui_auth_sessions_credentials",
-            keyvalues={"session_id": session_id, "stage_type": stage_type},
-            values={"result": json.dumps(result)},
-        )
+        try:
+            await self.db.simple_insert(
+                table="ui_auth_sessions_credentials",
+                values={
+                    "session_id": session_id,
+                    "stage_type": stage_type,
+                    "result": json.dumps(result),
+                },
+                desc="mark_ui_auth_stage_complete",
+            )
+        except self.db.engine.module.IntegrityError:
+            raise StoreError(404, "Unknown session ID: %s" % (session_id,))
 
     async def get_completed_ui_auth_stages(
         self, session_id: str
