@@ -197,7 +197,7 @@ class ResourceLimitsServerNotices(object):
             room_id(str): The room id of the server notices room
 
         Returns:
-            Deferred[bool|List]:
+            Deferred[Tuple[bool|List]]:
             bool: Is the room currently blocked
             list: The list of pinned events that are unrelated to limit blocking
             This list can be used as a convenience in the case where the block
