@@ -1,0 +1,1 @@
+Fix a bug which could cause messages not to be sent over federation, when state events with state keys matching user IDs (such as custom user statuses) were received statuses.
