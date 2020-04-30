@@ -312,7 +312,10 @@ class AuthHandler(BaseHandler):
             )
 
         else:
-            session = await self.store.get_ui_auth_session(sid)
+            try:
+                session = await self.store.get_ui_auth_session(sid)
+            except StoreError:
+                raise SynapseError(400, "Unknown session ID: %s" % (sid,))
 
             if not clientdict:
                 # This was designed to allow the client to omit the parameters
@@ -438,7 +441,10 @@ class AuthHandler(BaseHandler):
             key: The key to store the data under
             value: The data to store
         """
-        await self.store.set_ui_auth_session_data(session_id, key, value)
+        try:
+            await self.store.set_ui_auth_session_data(session_id, key, value)
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
     async def get_session_data(
         self, session_id: str, key: str, default: Optional[Any] = None
@@ -451,7 +457,10 @@ class AuthHandler(BaseHandler):
             key: The key to store the data under
             default: Value to return if the key has not been set
         """
-        return await self.store.get_ui_auth_session_data(session_id, key, default)
+        try:
+            return await self.store.get_ui_auth_session_data(session_id, key, default)
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
     async def _expire_old_sessions(self):
         """
@@ -1000,7 +1009,10 @@ class AuthHandler(BaseHandler):
         Returns:
             The HTML to render.
         """
-        session = await self.store.get_ui_auth_session(session_id)
+        try:
+            session = await self.store.get_ui_auth_session(session_id)
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
         return self._sso_auth_confirm_template.render(
             description=session.description, redirect_url=redirect_url,
         )
