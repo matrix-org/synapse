@@ -123,10 +123,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
-        if not check_3pid_allowed(self.hs, "email", email):
+        if not await check_3pid_allowed(self.hs, "email", email):
             raise SynapseError(
                 403,
-                "Your email domain is not authorized to register on this server",
+                "You currently can't create an account with this email address",
                 Codes.THREEPID_DENIED,
             )
 
@@ -190,7 +190,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
 
         msisdn = phone_number_to_msisdn(country, phone_number)
 
-        if not check_3pid_allowed(self.hs, "msisdn", msisdn):
+        if not await check_3pid_allowed(self.hs, "msisdn", msisdn):
             raise SynapseError(
                 403,
                 "Phone numbers are not authorized to register on this server",
@@ -514,7 +514,7 @@ class RegisterRestServlet(RestServlet):
                     medium = auth_result[login_type]["medium"]
                     address = auth_result[login_type]["address"]
 
-                    if not check_3pid_allowed(self.hs, medium, address):
+                    if not await check_3pid_allowed(self.hs, medium, address):
                         raise SynapseError(
                             403,
                             "Third party identifiers (email/phone numbers)"

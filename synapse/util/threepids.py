@@ -19,7 +19,7 @@ import re
 logger = logging.getLogger(__name__)
 
 
-def check_3pid_allowed(hs, medium, address):
+async def check_3pid_allowed(hs, medium, address):
     """Checks whether a given format of 3PID is allowed to be used on this HS
 
     Args:
@@ -30,6 +30,32 @@ def check_3pid_allowed(hs, medium, address):
     Returns:
         bool: whether the 3PID medium/address is allowed to be added to this HS
     """
+
+    if hs.config.check_is_for_allowed_local_3pids:
+        data = await hs.get_simple_http_client().get_json(
+            "https://%s%s" % (
+                hs.config.check_is_for_allowed_local_3pids,
+                "/_matrix/identity/api/v1/internal-info"
+            ),
+            {'medium': medium, 'address': address}
+        )
+
+        # Check for invalid response
+        if 'hs' not in data and 'shadow_hs' not in data:
+            return False
+
+        # Check if this user is intended to register for this homeserver
+        if (
+            data.get('hs') != hs.config.server_name
+            and data.get('shadow_hs') != hs.config.server_name
+        ):
+            return False
+
+        if data.get('requires_invite', False) and not data.get('invited', False):
+            # Requires an invite but hasn't been invited
+            return False
+
+        return True
 
     if hs.config.allowed_local_3pids:
         for constraint in hs.config.allowed_local_3pids:

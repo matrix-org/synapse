@@ -99,6 +99,9 @@ class RegistrationConfig(Config):
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
+        self.check_is_for_allowed_local_3pids = config.get(
+            "check_is_for_allowed_local_3pids", None
+        )
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
         self.registration_shared_secret = config.get("registration_shared_secret")
 
@@ -246,6 +249,11 @@ class RegistrationConfig(Config):
 
         # Mandate that users are only allowed to associate certain formats of
         # 3PIDs with accounts on this server.
+        #
+        # Use an Identity Server to establish which 3PIDs are allowed to register?
+        # Overrides allowed_local_3pids below.
+        #
+        #check_is_for_allowed_local_3pids: matrix.org
         #
         #allowed_local_3pids:
         #  - medium: email
