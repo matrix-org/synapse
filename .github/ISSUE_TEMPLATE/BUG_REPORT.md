@@ -10,6 +10,8 @@ please ask in **#synapse:matrix.org** (using a matrix.org account if necessary)
 
 <!--
 
+If you want to report a security issue, please see https://matrix.org/security-disclosure-policy/
+
 This is a bug report template. By following the instructions below and
 filling out the sections with your information, you will help the us to get all
 the necessary data to fix your issue.
