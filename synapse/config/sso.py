@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
 from typing import Any, Dict
 
 import pkg_resources
@@ -36,6 +37,18 @@ class SSOConfig(Config):
             template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
 
         self.sso_redirect_confirm_template_dir = template_dir
+        self.sso_account_deactivated_template = self.read_file(
+            os.path.join(
+                self.sso_redirect_confirm_template_dir, "sso_account_deactivated.html"
+            ),
+            "sso_account_deactivated_template",
+        )
+        self.sso_auth_success_template = self.read_file(
+            os.path.join(
+                self.sso_redirect_confirm_template_dir, "sso_auth_success.html"
+            ),
+            "sso_auth_success_template",
+        )
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
 
@@ -99,6 +112,30 @@ class SSOConfig(Config):
             #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
             #
             #     * server_name: the homeserver's name.
+            #
+            # * HTML page which notifies the user that they are authenticating to confirm
+            #   an operation on their account during the user interactive authentication
+            #   process: 'sso_auth_confirm.html'.
+            #
+            #   When rendering, this template is given the following variables:
+            #     * redirect_url: the URL the user is about to be redirected to. Needs
+            #                     manual escaping (see
+            #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #
+            #     * description: the operation which the user is being asked to confirm
+            #
+            # * HTML page shown after a successful user interactive authentication session:
+            #   'sso_auth_success.html'.
+            #
+            #   Note that this page must include the JavaScript which notifies of a successful authentication
+            #   (see https://matrix.org/docs/spec/client_server/r0.6.0#fallback).
+            #
+            #   This template has no additional variables.
+            #
+            # * HTML page shown during single sign-on if a deactivated user (according to Synapse's database)
+            #   attempts to login: 'sso_account_deactivated.html'.
+            #
+            #   This template has no additional variables.
             #
             # You can see the default templates at:
             # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates

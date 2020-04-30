@@ -17,7 +17,7 @@ var submitPassword = function(user, pwd) {
     };
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
         matrixLogin.onLogin(response);
-    }).error(errorFunc);
+    }).fail(errorFunc);
 };
 
 var submitToken = function(loginToken) {
@@ -29,7 +29,7 @@ var submitToken = function(loginToken) {
     };
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
         matrixLogin.onLogin(response);
-    }).error(errorFunc);
+    }).fail(errorFunc);
 };
 
 var errorFunc = function(err) {
@@ -105,7 +105,7 @@ var fetch_info = function(cb) {
         }
 
         cb();
-    }).error(errorFunc);
+    }).fail(errorFunc);
 }
 
 matrixLogin.onLoad = function() {
@@ -128,8 +128,7 @@ matrixLogin.password_login = function() {
 
 matrixLogin.onLogin = function(response) {
     // clobber this function
-    console.log("onLogin - This function should be replaced to proceed.");
-    console.log(response);
+    console.warn("onLogin - This function should be replaced to proceed.");
 };
 
 var parseQsFromUrl = function(query) {

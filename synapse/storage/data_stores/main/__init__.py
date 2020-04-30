@@ -503,7 +503,8 @@ class DataStore(
         self, start, limit, name=None, guests=True, deactivated=False
     ):
         """Function to retrieve a paginated list of users from
-        users list. This will return a json list of users.
+        users list. This will return a json list of users and the
+        total number of users matching the filter criteria.
 
         Args:
             start (int): start number to begin the query from
@@ -512,35 +513,44 @@ class DataStore(
             guests (bool): whether to in include guest users
             deactivated (bool): whether to include deactivated users
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            defer.Deferred: resolves to list[dict[str, Any]], int
         """
-        name_filter = {}
-        if name:
-            name_filter["name"] = "%" + name + "%"
 
-        attr_filter = {}
-        if not guests:
-            attr_filter["is_guest"] = 0
-        if not deactivated:
-            attr_filter["deactivated"] = 0
+        def get_users_paginate_txn(txn):
+            filters = []
+            args = []
 
-        return self.db.simple_select_list_paginate(
-            desc="get_users_paginate",
-            table="users",
-            orderby="name",
-            start=start,
-            limit=limit,
-            filters=name_filter,
-            keyvalues=attr_filter,
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "user_type",
-                "deactivated",
-            ],
-        )
+            if name:
+                filters.append("name LIKE ?")
+                args.append("%" + name + "%")
+
+            if not guests:
+                filters.append("is_guest = 0")
+
+            if not deactivated:
+                filters.append("deactivated = 0")
+
+            where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
+
+            sql = "SELECT COUNT(*) as total_users FROM users %s" % (where_clause)
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            args = [self.hs.config.server_name] + args + [limit, start]
+            sql = """
+                SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url
+                FROM users as u
+                LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                {}
+                ORDER BY u.name LIMIT ? OFFSET ?
+                """.format(
+                where_clause
+            )
+            txn.execute(sql, args)
+            users = self.db.cursor_to_dict(txn)
+            return users, count
+
+        return self.db.runInteraction("get_users_paginate_txn", get_users_paginate_txn)
 
     def search_users(self, term):
         """Function to search users list for one or more users with

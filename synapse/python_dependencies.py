@@ -98,6 +98,7 @@ CONDITIONAL_REQUIREMENTS = {
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
+    "redis": ["txredisapi>=1.4.7"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]

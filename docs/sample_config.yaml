@@ -414,6 +414,16 @@ retention:
   #    longest_max_lifetime: 1y
   #    interval: 1d
 
+# Inhibits the /requestToken endpoints from returning an error that might leak
+# information about whether an e-mail address is in use or not on this
+# homeserver.
+# Note that for some endpoints the error situation is the e-mail already being
+# used, and for others the error is entering the e-mail being unused.
+# If this option is enabled, instead of returning an error, these endpoints will
+# act as if no error happened and return a fake session ID ('sid') to clients.
+#
+#request_token_inhibit_3pid_errors: true
+
 
 ## TLS ##
 
@@ -735,12 +745,11 @@ media_store_path: "DATADIR/media_store"
 #
 #media_storage_providers:
 #  - module: file_system
-#    # Whether to write new local files.
+#    # Whether to store newly uploaded local files
 #    store_local: false
-#    # Whether to write new remote media
+#    # Whether to store newly downloaded remote files
 #    store_remote: false
-#    # Whether to block upload requests waiting for write to this
-#    # provider to complete
+#    # Whether to wait for successful storage for local uploads
 #    store_synchronous: false
 #    config:
 #       directory: /mnt/some/other/directory
@@ -858,6 +867,31 @@ media_store_path: "DATADIR/media_store"
 # The largest allowed URL preview spidering size in bytes
 #
 #max_spider_size: 10M
+
+# A list of values for the Accept-Language HTTP header used when
+# downloading webpages during URL preview generation. This allows
+# Synapse to specify the preferred languages that URL previews should
+# be in when communicating with remote servers.
+#
+# Each value is a IETF language tag; a 2-3 letter identifier for a
+# language, optionally followed by subtags separated by '-', specifying
+# a country or region variant.
+#
+# Multiple values can be provided, and a weight can be added to each by
+# using quality value syntax (;q=). '*' translates to any language.
+#
+# Defaults to "en".
+#
+# Example:
+#
+# url_preview_accept_language:
+#   - en-UK
+#   - en-US;q=0.9
+#   - fr;q=0.8
+#   - *;q=0.7
+#
+url_preview_accept_language:
+#   - en
 
 
 ## Captcha ##
@@ -1315,32 +1349,32 @@ saml2_config:
   #    remote:
   #      - url: https://our_idp/metadata.xml
   #
-  #    # By default, the user has to go to our login page first. If you'd like
-  #    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-  #    # 'service.sp' section:
-  #    #
-  #    #service:
-  #    #  sp:
-  #    #    allow_unsolicited: true
+  #  # By default, the user has to go to our login page first. If you'd like
+  #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+  #  # 'service.sp' section:
+  #  #
+  #  #service:
+  #  #  sp:
+  #  #    allow_unsolicited: true
   #
-  #    # The examples below are just used to generate our metadata xml, and you
-  #    # may well not need them, depending on your setup. Alternatively you
-  #    # may need a whole lot more detail - see the pysaml2 docs!
+  #  # The examples below are just used to generate our metadata xml, and you
+  #  # may well not need them, depending on your setup. Alternatively you
+  #  # may need a whole lot more detail - see the pysaml2 docs!
   #
-  #    description: ["My awesome SP", "en"]
-  #    name: ["Test SP", "en"]
+  #  description: ["My awesome SP", "en"]
+  #  name: ["Test SP", "en"]
   #
-  #    organization:
-  #      name: Example com
-  #      display_name:
-  #        - ["Example co", "en"]
-  #      url: "http://example.com"
+  #  organization:
+  #    name: Example com
+  #    display_name:
+  #      - ["Example co", "en"]
+  #    url: "http://example.com"
   #
-  #    contact_person:
-  #      - given_name: Bob
-  #        sur_name: "the Sysadmin"
-  #        email_address": ["admin@example.com"]
-  #        contact_type": technical
+  #  contact_person:
+  #    - given_name: Bob
+  #      sur_name: "the Sysadmin"
+  #      email_address": ["admin@example.com"]
+  #      contact_type": technical
 
   # Instead of putting the config inline as above, you can specify a
   # separate pysaml2 configuration file:
@@ -1483,6 +1517,30 @@ sso:
     #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
     #
     #     * server_name: the homeserver's name.
+    #
+    # * HTML page which notifies the user that they are authenticating to confirm
+    #   an operation on their account during the user interactive authentication
+    #   process: 'sso_auth_confirm.html'.
+    #
+    #   When rendering, this template is given the following variables:
+    #     * redirect_url: the URL the user is about to be redirected to. Needs
+    #                     manual escaping (see
+    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #
+    #     * description: the operation which the user is being asked to confirm
+    #
+    # * HTML page shown after a successful user interactive authentication session:
+    #   'sso_auth_success.html'.
+    #
+    #   Note that this page must include the JavaScript which notifies of a successful authentication
+    #   (see https://matrix.org/docs/spec/client_server/r0.6.0#fallback).
+    #
+    #   This template has no additional variables.
+    #
+    # * HTML page shown during single sign-on if a deactivated user (according to Synapse's database)
+    #   attempts to login: 'sso_account_deactivated.html'.
+    #
+    #   This template has no additional variables.
     #
     # You can see the default templates at:
     # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates

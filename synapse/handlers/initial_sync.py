@@ -381,10 +381,16 @@ class InitialSyncHandler(BaseHandler):
                 return []
 
             states = await presence_handler.get_states(
-                [m.user_id for m in room_members], as_event=True
+                [m.user_id for m in room_members]
             )
 
-            return states
+            return [
+                {
+                    "type": EventTypes.Presence,
+                    "content": format_user_presence_state(s, time_now),
+                }
+                for s in states
+            ]
 
         async def get_receipts():
             receipts = await self.store.get_linearized_receipts_for_room(

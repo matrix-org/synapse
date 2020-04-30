@@ -18,7 +18,7 @@
 """Utilities for interacting with Identity Servers"""
 
 import logging
-import urllib
+import urllib.parse
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes

@@ -166,7 +166,9 @@ class RegistrationHandler(BaseHandler):
         yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:
-            password_hash = yield self._auth_handler.hash(password)
+            password_hash = yield defer.ensureDeferred(
+                self._auth_handler.hash(password)
+            )
 
         if localpart is not None:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
@@ -537,8 +539,10 @@ class RegistrationHandler(BaseHandler):
                 user_id, ["guest = true"]
             )
         else:
-            access_token = yield self._auth_handler.get_access_token_for_user_id(
-                user_id, device_id=device_id, valid_until_ms=valid_until_ms
+            access_token = yield defer.ensureDeferred(
+                self._auth_handler.get_access_token_for_user_id(
+                    user_id, device_id=device_id, valid_until_ms=valid_until_ms
+                )
             )
 
         return (device_id, access_token)
@@ -612,8 +616,13 @@ class RegistrationHandler(BaseHandler):
             logger.info("Can't add incomplete 3pid")
             return
 
-        yield self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        yield defer.ensureDeferred(
+            self._auth_handler.add_threepid(
+                user_id,
+                threepid["medium"],
+                threepid["address"],
+                threepid["validated_at"],
+            )
         )
 
         # And we add an email pusher for them by default, but only
@@ -665,6 +674,11 @@ class RegistrationHandler(BaseHandler):
                 return None
             raise
 
-        yield self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        yield defer.ensureDeferred(
+            self._auth_handler.add_threepid(
+                user_id,
+                threepid["medium"],
+                threepid["address"],
+                threepid["validated_at"],
+            )
         )

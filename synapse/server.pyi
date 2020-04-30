@@ -25,6 +25,7 @@ import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
+from synapse.events.builder import EventBuilderFactory
 
 class HomeServer(object):
     @property
@@ -97,7 +98,7 @@ class HomeServer(object):
         pass
     def get_notifier(self) -> synapse.notifier.Notifier:
         pass
-    def get_presence_handler(self) -> synapse.handlers.presence.PresenceHandler:
+    def get_presence_handler(self) -> synapse.handlers.presence.BasePresenceHandler:
         pass
     def get_clock(self) -> synapse.util.Clock:
         pass
@@ -120,4 +121,10 @@ class HomeServer(object):
     def is_mine_id(self, domain_id: str) -> bool:
         pass
     def get_instance_id(self) -> str:
+        pass
+    def get_instance_name(self) -> str:
+        pass
+    def get_event_builder_factory(self) -> EventBuilderFactory:
+        pass
+    def get_storage(self) -> synapse.storage.Storage:
         pass
