@@ -41,10 +41,11 @@ class FederationStream(Stream):
 
     def __init__(self, hs):
         if hs.config.worker_app is None:
-            # master process: get updates from the FederationRemoteSendQueue
+            # master process: get updates from the FederationRemoteSendQueue.
+            # (if the master is configured to send federation itself, federation_sender
+            # will be a real FederationSender, which has stubs for current_token and
+            # get_replication_rows.)
             federation_sender = hs.get_federation_sender()
-            assert isinstance(federation_sender, FederationRemoteSendQueue)
-
             current_token = federation_sender.get_current_token
             update_function = db_query_to_update_function(
                 federation_sender.get_replication_rows
