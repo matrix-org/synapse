@@ -1,1 +1,1 @@
-Prevent non-federating rooms from appearing in responses to `POST /publicRoom` when a filter was included.
+Prevent non-federating rooms from appearing in responses to federated `POST /publicRoom` requests when a filter was included.
