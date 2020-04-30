@@ -16,7 +16,6 @@
 from collections import namedtuple
 
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.sender import FederationSender
 from synapse.replication.tcp.streams._base import (
     Stream,
     db_query_to_update_function,
