@@ -28,7 +28,9 @@ _DEFAULT_EVENT_CACHE_SIZE = "10K"
 class CacheProperties(object):
     def __init__(self):
         # The default factor size for all caches
-        self.default_factor_size = _DEFAULT_FACTOR_SIZE
+        self.default_factor_size = float(
+            os.environ.get(_CACHE_PREFIX, _DEFAULT_FACTOR_SIZE)
+        )
         self.resize_all_caches_func = None
 
 
