@@ -992,9 +992,7 @@ class EventCreationHandler(object):
                     # way? If we have been invited by a remote server, we need
                     # to get them to sign the event.
 
-                    returned_invite = await defer.ensureDeferred(
-                        federation_handler.send_invite(invitee.domain, event)
-                    )
+                    returned_invite = await federation_handler.send_invite(invitee.domain, event)
                     event.unsigned.pop("room_state", None)
 
                     # TODO: Make sure the signatures actually are correct.
