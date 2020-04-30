@@ -27,6 +27,17 @@ class InstanceLocationConfig:
     port = attr.ib(type=int)
 
 
+@attr.s
+class WriterLocations:
+    """Specifies the instances that write various streams.
+
+    Attributes:
+        events: The instance that writes to the event and backfill streams.
+    """
+
+    events = attr.ib(default="master", type=str)
+
+
 class WorkerConfig(Config):
     """The workers are processes run separately to the main synapse process.
     They have their own pid_file and listener configuration. They use the
@@ -87,6 +98,10 @@ class WorkerConfig(Config):
         self.instance_map = {
             name: InstanceLocationConfig(**c) for name, c in instance_map.items()
         }
+
+        # Map from type of streams to source, c.f. WriterLocations.
+        writers = config.get("writers", {}) or {}
+        self.writers = WriterLocations(**writers)
 
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in
