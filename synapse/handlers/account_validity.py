@@ -90,8 +90,10 @@ class AccountValidityHandler(object):
 
             self.clock.looping_call(send_emails, 30 * 60 * 1000)
 
-        # Check every hour to remove expired users from the user directory
-        self.clock.looping_call(self._mark_expired_users_as_inactive, 60 * 60 * 1000)
+        # If account_validity is enabled,check every hour to remove expired users from
+        # the user directory
+        if self._account_validity.enabled:
+            self.clock.looping_call(self._mark_expired_users_as_inactive, 60 * 60 * 1000)
 
     async def _send_renewal_emails(self):
         """Gets the list of users whose account is expiring in the amount of time
