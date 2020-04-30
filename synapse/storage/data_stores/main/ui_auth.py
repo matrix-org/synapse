@@ -68,7 +68,7 @@ class UIAuthWorkerStore(SQLBaseStore):
                 authentication is authorising.
         Returns:
             The newly created session.
-        Raise:
+        Raises:
             StoreError if a unique session ID cannot be generated.
         """
         # The clientdict gets stored as JSON.
