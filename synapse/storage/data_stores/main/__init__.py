@@ -511,7 +511,7 @@ class DataStore(
         Args:
             start (int): start number to begin the query from
             limit (int): number of rows to retrieve
-            name (string): filter for user names
+            name (string): search for user_id or display name
             guests (bool): whether to in include guest users
             deactivated (bool): whether to include deactivated users
         Returns:
@@ -520,11 +520,11 @@ class DataStore(
 
         def get_users_paginate_txn(txn):
             filters = []
-            args = []
+            args = [self.hs.config.server_name]
 
             if name:
-                filters.append("name LIKE ?")
-                args.append("%" + name + "%")
+                filters.append("(name LIKE ? OR displayname LIKE ?)")
+                args.extend(["%" + name + "%:%", "%" + name + "%"])
 
             if not guests:
                 filters.append("is_guest = 0")
@@ -534,22 +534,26 @@ class DataStore(
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
-            sql = "SELECT COUNT(*) as total_users FROM users %s" % (where_clause)
-            txn.execute(sql, args)
-            count = txn.fetchone()[0]
-
-            args = [self.hs.config.server_name] + args + [limit, start]
-            sql = """
-                SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url
+            sql_base = """
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
                 {}
-                ORDER BY u.name LIMIT ? OFFSET ?
                 """.format(
                 where_clause
             )
+            sql = "SELECT COUNT(*) as total_users " + sql_base
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            sql = (
+                "SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url "
+                + sql_base
+                + " ORDER BY u.name LIMIT ? OFFSET ?"
+            )
+            args += [limit, start]
             txn.execute(sql, args)
             users = self.db.cursor_to_dict(txn)
+
             return users, count
 
         return self.db.runInteraction("get_users_paginate_txn", get_users_paginate_txn)
