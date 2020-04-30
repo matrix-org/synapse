@@ -303,7 +303,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             content["user_profile"] = await self.profile_handler.get_profile(user_id)
 
             try:
-                res = await self.transport_client.create_group(
+                res = await self.groups_server_handler.create_group(
                     get_domain_from_id(group_id), group_id, user_id, content
                 )
             except HttpResponseException as e:
