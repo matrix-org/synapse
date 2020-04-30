@@ -15,7 +15,13 @@
 # limitations under the License.
 from collections import namedtuple
 
-from synapse.replication.tcp.streams._base import Stream, db_query_to_update_function
+from synapse.federation.send_queue import FederationRemoteSendQueue
+from synapse.federation.sender import FederationSender
+from synapse.replication.tcp.streams._base import (
+    Stream,
+    db_query_to_update_function,
+    make_http_update_function,
+)
 
 
 class FederationStream(Stream):
@@ -35,18 +41,17 @@ class FederationStream(Stream):
     ROW_TYPE = FederationStreamRow
 
     def __init__(self, hs):
-        # Not all synapse instances will have a federation sender instance,
-        # whether that's a `FederationSender` or a `FederationRemoteSendQueue`,
-        # so we stub the stream out when that is the case.
-        if hs.config.worker_app is None or hs.should_send_federation():
+        if hs.config.worker_app is None:
             federation_sender = hs.get_federation_sender()
+            assert isinstance(federation_sender, FederationRemoteSendQueue)
             current_token = federation_sender.get_current_token
             update_function = db_query_to_update_function(
                 federation_sender.get_replication_rows
             )
         else:
+            # Query master process
             current_token = lambda: 0
-            update_function = self._stub_update_function
+            update_function = make_http_update_function(hs, self.NAME)
 
         super().__init__(current_token, update_function)
 
