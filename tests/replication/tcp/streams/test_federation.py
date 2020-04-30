@@ -68,7 +68,7 @@ class FederationStreamTestCase(BaseStreamTestCase):
 
         self.assertEqual(received_rows, [])
 
-        # additional updates shoudl be transferred without an HTTP hit
+        # additional updates should be transferred without an HTTP hit
         fed_sender.build_and_send_edu("testdest", "m.test1", {"c": "d"})
         self.reactor.advance(0)
         # there should be no http hit

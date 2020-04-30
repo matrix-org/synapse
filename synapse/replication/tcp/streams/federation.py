@@ -41,18 +41,30 @@ class FederationStream(Stream):
 
     def __init__(self, hs):
         if hs.config.worker_app is None:
+            # master process: get updates from the FederationRemoteSendQueue
             federation_sender = hs.get_federation_sender()
             assert isinstance(federation_sender, FederationRemoteSendQueue)
+
             current_token = federation_sender.get_current_token
             update_function = db_query_to_update_function(
                 federation_sender.get_replication_rows
             )
-        else:
-            # Query master process
-            current_token = lambda: 0
+        elif hs.should_send_federation():
+            # federation sender: Query master process
             update_function = make_http_update_function(hs, self.NAME)
+            current_token = self._stub_current_token
+        else:
+            # other worker: stub out the update function (we're not interested in
+            # any updates so when we get a POSITION we do nothing)
+            update_function = self._stub_update_function
+            current_token = self._stub_current_token
 
         super().__init__(current_token, update_function)
+
+    @staticmethod
+    def _stub_current_token():
+        # dummy current-token method for use on workers
+        return 0
 
     @staticmethod
     async def _stub_update_function(from_token, upto_token, limit):
