@@ -16,6 +16,7 @@
 import abc
 import logging
 import re
+from inspect import signature
 from typing import Dict, List, Tuple
 
 from six import raise_from
@@ -92,6 +93,16 @@ class ReplicationEndpoint(object):
             self.response_cache = ResponseCache(
                 hs, "repl." + self.NAME, timeout_ms=30 * 60 * 1000
             )
+
+        # We reserve `instance_name` as a parameter to sending requests, so we
+        # assert here that sub classes don't try and use the name.
+        assert (
+            "instance_name" not in self.PATH_ARGS
+        ), "`instance_name` is a reserved paramater name"
+        assert (
+            "instance_name"
+            not in signature(self.__class__._serialize_payload).parameters
+        ), "`instance_name` is a reserved paramater name"
 
         assert self.METHOD in ("PUT", "POST", "GET")
 
