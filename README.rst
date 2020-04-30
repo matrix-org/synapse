@@ -1,3 +1,11 @@
+================
+Synapse |shield|
+================
+
+.. |shield| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
+  :alt: (get support on #synapse:matrix.org)
+  :target: https://matrix.to/#/#synapse:matrix.org
+
 .. contents::
 
 Introduction

@@ -4,11 +4,11 @@ about: Create a report to help us improve
 
 ---
 
+**THIS IS NOT A SUPPORT CHANNEL!**
+**IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**,
+please ask in **#synapse:matrix.org** (using a matrix.org account if necessary)
+
 <!--
-
-**IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**:
-You will likely get better support more quickly if you ask in ** #synapse:matrix.org ** ;)
-
 
 This is a bug report template. By following the instructions below and
 filling out the sections with your information, you will help the us to get all
