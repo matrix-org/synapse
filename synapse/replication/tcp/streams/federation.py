@@ -15,11 +15,7 @@
 # limitations under the License.
 from collections import namedtuple
 
-from synapse.replication.tcp.streams._base import (
-    Stream,
-    db_query_to_update_function,
-    make_http_update_function,
-)
+from synapse.replication.tcp.streams._base import Stream, make_http_update_function
 
 
 class FederationStream(Stream):
@@ -46,13 +42,13 @@ class FederationStream(Stream):
             # get_replication_rows.)
             federation_sender = hs.get_federation_sender()
             current_token = federation_sender.get_current_token
-            update_function = db_query_to_update_function(
-                federation_sender.get_replication_rows
-            )
+            update_function = federation_sender.get_replication_rows
+
         elif hs.should_send_federation():
             # federation sender: Query master process
             update_function = make_http_update_function(hs, self.NAME)
             current_token = self._stub_current_token
+
         else:
             # other worker: stub out the update function (we're not interested in
             # any updates so when we get a POSITION we do nothing)
