@@ -15,6 +15,7 @@
 
 import threading
 from functools import wraps
+from typing import Callable, Optional, Type, Union
 
 from synapse.config import cache as cache_config
 from synapse.util.caches.treecache import TreeCache
@@ -52,18 +53,18 @@ class LruCache(object):
 
     def __init__(
         self,
-        max_size,
-        keylen=1,
-        cache_type=dict,
-        size_callback=None,
-        evicted_callback=None,
-        apply_cache_factor_from_config=True,
+        max_size: int,
+        keylen: int = 1,
+        cache_type: Type[Union[dict, TreeCache]] = dict,
+        size_callback: Optional[Callable] = None,
+        evicted_callback: Optional[Callable] = None,
+        apply_cache_factor_from_config: bool = True,
     ):
         """
         Args:
-            max_size (int):
+            max_size: The maximum amount of entries the cache can hold
 
-            keylen (int):
+            keylen: The length of the tuple used as the cache key
 
             cache_type (type):
                 type of underlying cache to be used. Typically one of dict
@@ -76,7 +77,7 @@ class LruCache(object):
                 entry
 
             apply_cache_factor_from_config (bool): If true, `max_size` will be
-                multiplied by a cache factor derived from the homeserver config.
+                multiplied by a cache factor derived from the homeserver config
         """
         cache = cache_type()
         self.cache = cache  # Used for introspection.

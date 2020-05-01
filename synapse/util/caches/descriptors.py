@@ -90,13 +90,27 @@ class Cache(object):
 
     def __init__(
         self,
-        name,
-        max_entries=1000,
-        keylen=1,
-        tree=False,
-        iterable=False,
-        apply_cache_factor_from_config=True,
+        name: str,
+        max_entries: int = 1000,
+        keylen: int = 1,
+        tree: bool = False,
+        iterable: bool = False,
+        apply_cache_factor_from_config: bool = True,
     ):
+        """
+        Args:
+            name: The name of the cache
+            max_entries: Maximum amount of entries that the cache will hold
+            keylen: The length of the tuple used as the cache key
+            tree: Use a TreeCache instead of a dict as the underlying cache type
+            iterable: If True, count each item in the cached object as an entry,
+                rather than each cached object
+            apply_cache_factor_from_config: Whether cache factors specified in the
+                config file affect `max_entries`
+
+        Returns:
+            Cache
+        """
         cache_type = TreeCache if tree else dict
         self._pending_deferred_cache = cache_type()
 
