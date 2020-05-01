@@ -13,19 +13,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import heapq
 import logging
 from collections import namedtuple
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Awaitable,
-    Callable,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
 import attr
 
@@ -65,6 +57,7 @@ StreamUpdateResult = Tuple[List[Tuple[Token, StreamRow]], Token, bool]
 #
 # The arguments are:
 #
+#  * instance_name: the writer of the stream
 #  * from_token: the previous stream token: the starting point for fetching the
 #    updates
 #  * to_token: the new stream token: the point to get updates up to
@@ -74,7 +67,7 @@ StreamUpdateResult = Tuple[List[Tuple[Token, StreamRow]], Token, bool]
 # If there are more updates available, it should set `limited` in the result, and
 # it will be called again to get the next batch.
 #
-UpdateFunction = Callable[[Token, Token, int], Awaitable[StreamUpdateResult]]
+UpdateFunction = Callable[[str, Token, Token, int], Awaitable[StreamUpdateResult]]
 
 
 class Stream(object):
@@ -105,6 +98,7 @@ class Stream(object):
 
     def __init__(
         self,
+        local_instance_name: str,
         current_token_function: Callable[[], Token],
         update_function: UpdateFunction,
     ):
@@ -120,9 +114,11 @@ class Stream(object):
         stream tokens. See the UpdateFunction type definition for more info.
 
         Args:
+            local_instance_name: The instance name of the current process
             current_token_function: callback to get the current token, as above
             update_function: callback go get stream updates, as above
         """
+        self.local_instance_name = local_instance_name
         self.current_token = current_token_function
         self.update_function = update_function
 
@@ -147,14 +143,14 @@ class Stream(object):
         """
         current_token = self.current_token()
         updates, current_token, limited = await self.get_updates_since(
-            self.last_token, current_token
+            self.local_instance_name, self.last_token, current_token
         )
         self.last_token = current_token
 
         return updates, current_token, limited
 
     async def get_updates_since(
-        self, from_token: Token, upto_token: Token
+        self, instance_name: str, from_token: Token, upto_token: Token
     ) -> StreamUpdateResult:
         """Like get_updates except allows specifying from when we should
         stream updates
@@ -172,26 +168,25 @@ class Stream(object):
             return [], upto_token, False
 
         updates, upto_token, limited = await self.update_function(
-            from_token, upto_token, _STREAM_UPDATE_TARGET_ROW_COUNT,
+            instance_name, from_token, upto_token, _STREAM_UPDATE_TARGET_ROW_COUNT,
         )
         return updates, upto_token, limited
 
 
 def db_query_to_update_function(
-    query_function: Callable[[Token, Token, int], Awaitable[Iterable[tuple]]]
+    query_function: Callable[[Token, Token, int], Awaitable[List[tuple]]]
 ) -> UpdateFunction:
     """Wraps a db query function which returns a list of rows to make it
     suitable for use as an `update_function` for the Stream class
     """
 
-    async def update_function(from_token, upto_token, limit):
+    async def update_function(instance_name, from_token, upto_token, limit):
         rows = await query_function(from_token, upto_token, limit)
         updates = [(row[0], row[1:]) for row in rows]
         limited = False
-        if len(updates) == limit:
+        if len(updates) >= limit:
             upto_token = updates[-1][0]
             limited = True
-        assert len(updates) <= limit
 
         return updates, upto_token, limited
 
@@ -206,10 +201,13 @@ def make_http_update_function(hs, stream_name: str) -> UpdateFunction:
     client = ReplicationGetStreamUpdates.make_client(hs)
 
     async def update_function(
-        from_token: int, upto_token: int, limit: int
+        instance_name: str, from_token: int, upto_token: int, limit: int
     ) -> StreamUpdateResult:
         result = await client(
-            stream_name=stream_name, from_token=from_token, upto_token=upto_token,
+            instance_name=instance_name,
+            stream_name=stream_name,
+            from_token=from_token,
+            upto_token=upto_token,
         )
         return result["updates"], result["upto_token"], result["limited"]
 
@@ -239,6 +237,7 @@ class BackfillStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_current_backfill_token,
             db_query_to_update_function(store.get_all_new_backfill_event_rows),
         )
@@ -274,7 +273,9 @@ class PresenceStream(Stream):
             # Query master process
             update_function = make_http_update_function(hs, self.NAME)
 
-        super().__init__(store.get_current_presence_token, update_function)
+        super().__init__(
+            hs.get_instance_name(), store.get_current_presence_token, update_function
+        )
 
 
 class TypingStream(Stream):
@@ -297,7 +298,9 @@ class TypingStream(Stream):
             # Query master process
             update_function = make_http_update_function(hs, self.NAME)
 
-        super().__init__(typing_handler.get_current_token, update_function)
+        super().__init__(
+            hs.get_instance_name(), typing_handler.get_current_token, update_function
+        )
 
 
 class ReceiptsStream(Stream):
@@ -318,6 +321,7 @@ class ReceiptsStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_max_receipt_stream_id,
             db_query_to_update_function(store.get_all_updated_receipts),
         )
@@ -335,14 +339,16 @@ class PushRulesStream(Stream):
     def __init__(self, hs):
         self.store = hs.get_datastore()
         super(PushRulesStream, self).__init__(
-            self._current_token, self._update_function
+            hs.get_instance_name(), self._current_token, self._update_function
         )
 
     def _current_token(self) -> int:
         push_rules_token, _ = self.store.get_push_rules_stream_token()
         return push_rules_token
 
-    async def _update_function(self, from_token: Token, to_token: Token, limit: int):
+    async def _update_function(
+        self, instance_name: str, from_token: Token, to_token: Token, limit: int
+    ):
         rows = await self.store.get_all_push_rule_updates(from_token, to_token, limit)
 
         limited = False
@@ -369,6 +375,7 @@ class PushersStream(Stream):
         store = hs.get_datastore()
 
         super().__init__(
+            hs.get_instance_name(),
             store.get_pushers_stream_token,
             db_query_to_update_function(store.get_all_updated_pushers_rows),
         )
@@ -400,6 +407,7 @@ class CachesStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_cache_stream_token,
             db_query_to_update_function(store.get_all_updated_caches),
         )
@@ -425,6 +433,7 @@ class PublicRoomsStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_current_public_room_stream_id,
             db_query_to_update_function(store.get_all_new_public_rooms),
         )
@@ -445,6 +454,7 @@ class DeviceListsStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_device_stream_token,
             db_query_to_update_function(store.get_all_device_list_changes_for_remotes),
         )
@@ -462,6 +472,7 @@ class ToDeviceStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_to_device_stream_token,
             db_query_to_update_function(store.get_all_new_device_messages),
         )
@@ -481,6 +492,7 @@ class TagAccountDataStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_max_account_data_stream_id,
             db_query_to_update_function(store.get_all_updated_tags),
         )
@@ -501,11 +513,13 @@ class AccountDataStream(Stream):
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.store = hs.get_datastore()
         super().__init__(
-            self.store.get_max_account_data_stream_id, self._update_function,
+            hs.get_instance_name(),
+            self.store.get_max_account_data_stream_id,
+            self._update_function,
         )
 
     async def _update_function(
-        self, from_token: int, to_token: int, limit: int
+        self, instance_name: str, from_token: int, to_token: int, limit: int
     ) -> StreamUpdateResult:
         limited = False
         global_results = await self.store.get_updated_global_account_data(
@@ -555,6 +569,7 @@ class GroupServerStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_group_stream_token,
             db_query_to_update_function(store.get_all_groups_changes),
         )
@@ -572,6 +587,7 @@ class UserSignatureStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
         super().__init__(
+            hs.get_instance_name(),
             store.get_device_stream_token,
             db_query_to_update_function(
                 store.get_all_user_signature_changes_for_remotes

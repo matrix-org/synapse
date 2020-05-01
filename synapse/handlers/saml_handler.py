@@ -149,7 +149,7 @@ class SamlHandler:
 
         # Complete the interactive auth session or the login.
         if current_session and current_session.ui_auth_session_id:
-            self._auth_handler.complete_sso_ui_auth(
+            await self._auth_handler.complete_sso_ui_auth(
                 user_id, current_session.ui_auth_session_id, request
             )
 
