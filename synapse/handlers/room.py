@@ -917,7 +917,7 @@ class RoomContextHandler(object):
         if not event:
             return None
 
-        filtered = await (filter_evts([event]))
+        filtered = await filter_evts([event])
         if not filtered:
             raise AuthError(403, "You don't have permission to access that event.")
 
