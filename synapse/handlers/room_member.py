@@ -205,16 +205,12 @@ class RoomMemberHandler(object):
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
-                d = self._user_joined_room(target, room_id)
-                if d:
-                    await d
+                await self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:
-                    d = self._user_left_room(target, room_id)
-                    if d:
-                        await d
+                    await self._user_left_room(target, room_id)
 
         return event
 
@@ -947,9 +943,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         await self.federation_handler.do_invite_join(
             remote_room_hosts, room_id, user.to_string(), content
         )
-        d = self._user_joined_room(user, room_id)
-        if d:
-            await d
+        await self._user_joined_room(user, room_id)
 
         # Check the room we just joined wasn't too large, if we didn't fetch the
         # complexity of it before.
@@ -1005,12 +999,12 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     def _user_joined_room(self, target, room_id):
         """Implements RoomMemberHandler._user_joined_room
         """
-        return user_joined_room(self.distributor, target, room_id)
+        return defer.succeed(user_joined_room(self.distributor, target, room_id))
 
     def _user_left_room(self, target, room_id):
         """Implements RoomMemberHandler._user_left_room
         """
-        return user_left_room(self.distributor, target, room_id)
+        return defer.succeed(user_left_room(self.distributor, target, room_id))
 
     @defer.inlineCallbacks
     def forget(self, user, room_id):
