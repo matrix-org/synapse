@@ -88,9 +88,9 @@ Thanks for using Matrix!
 Support
 =======
 
-If you need support installing or managing Synapse, please join
+For support installing or managing Synapse, please join
 [`#synapse:matrix.org`](https://matrix.to/#/#synapse:matrix.org) (from a matrix.org
-account if necessary) and ask your questions there. We do not use GitHub issues for
+account if necessary) and ask questions there. We do not use GitHub issues for
 support requests, only for bug reports and feature requests.
 
 
