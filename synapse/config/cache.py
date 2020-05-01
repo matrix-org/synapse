@@ -74,6 +74,12 @@ class CacheConfig(Config):
 
         # Caching can be configured through the following options.
         #
+
+        # The number of events to cache in memory. Not affected by the
+        # caches.global_factor.
+        #
+        #event_cache_size: 10K
+
         caches:
            # Controls the global cache factor. This can be overridden by the
            # "SYNAPSE_CACHE_FACTOR" environment variable.

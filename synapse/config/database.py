@@ -68,10 +68,6 @@ database:
   name: sqlite3
   args:
     database: %(database_path)s
-
-# Number of events to cache in memory.
-#
-#event_cache_size: 10K
 """
 
 
