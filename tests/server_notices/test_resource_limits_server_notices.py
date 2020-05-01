@@ -67,7 +67,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
             return_value=defer.succeed("!something:localhost")
         )
         self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
-        self._rlsn._store.get_tags_for_room = Mock(return_value={})
+        self._rlsn._store.get_tags_for_room = Mock(return_value=defer.succeed({}))
         self.hs.config.admin_contact = "mailto:user@test.com"
 
     def test_maybe_send_server_notice_to_user_flag_off(self):
