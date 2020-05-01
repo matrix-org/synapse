@@ -93,7 +93,7 @@ class CacheConfig(Config):
         )
         self.cache_factors = {}  # type: Dict[str, float]
 
-        cache_config = config.get("caches", {})
+        cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get(
             "global_factor", properties.default_factor_size
         )
