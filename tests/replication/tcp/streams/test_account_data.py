@@ -22,10 +22,6 @@ from tests.replication.tcp.streams._base import BaseStreamTestCase
 
 
 class AccountDataStreamTestCase(BaseStreamTestCase):
-    def prepare(self, reactor, clock, hs):
-        super().prepare(reactor, clock, hs)
-        self.test_handler.stream_positions["account_data"] = 0
-
     def test_update_function_room_account_data_limit(self):
         """Test replication with many room account data updates
         """

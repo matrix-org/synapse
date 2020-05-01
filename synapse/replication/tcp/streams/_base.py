@@ -22,7 +22,6 @@ from typing import (
     Any,
     Awaitable,
     Callable,
-    Iterable,
     List,
     Optional,
     Tuple,
