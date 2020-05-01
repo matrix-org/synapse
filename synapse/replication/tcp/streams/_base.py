@@ -177,10 +177,9 @@ def db_query_to_update_function(
         rows = await query_function(from_token, upto_token, limit)
         updates = [(row[0], row[1:]) for row in rows]
         limited = False
-        if len(updates) == limit:
+        if len(updates) >= limit:
             upto_token = updates[-1][0]
             limited = True
-        assert len(updates) <= limit
 
         return updates, upto_token, limited
 

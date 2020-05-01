@@ -66,6 +66,7 @@ from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
 from .transactions import TransactionStore
+from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
 
@@ -112,6 +113,7 @@ class DataStore(
     StatsStore,
     RelationsStore,
     CacheInvalidationStore,
+    UIAuthStore,
 ):
     def __init__(self, database: Database, db_conn, hs):
         self.hs = hs

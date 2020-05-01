@@ -127,6 +127,7 @@ from synapse.storage.data_stores.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.data_stores.main.presence import UserPresenceState
+from synapse.storage.data_stores.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
@@ -439,6 +440,7 @@ class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
     UserDirectoryStore,
+    UIAuthWorkerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedReceiptsStore,
