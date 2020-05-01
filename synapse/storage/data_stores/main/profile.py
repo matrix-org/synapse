@@ -21,6 +21,7 @@ from synapse.api.errors import StoreError
 from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.roommember import ProfileInfo
+from synapse.util.caches.descriptors import cached
 
 BATCH_SIZE = 100
 
@@ -46,6 +47,7 @@ class ProfileWorkerStore(SQLBaseStore):
             avatar_url=profile["avatar_url"], display_name=profile["displayname"]
         )
 
+    @cached(max_entries=5000)
     def get_profile_displayname(self, user_localpart):
         return self.db.simple_select_one_onecol(
             table="profiles",
@@ -54,6 +56,7 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_profile_displayname",
         )
 
+    @cached(max_entries=5000)
     def get_profile_avatar_url(self, user_localpart):
         return self.db.simple_select_one_onecol(
             table="profiles",
