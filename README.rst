@@ -85,6 +85,15 @@ Thanks for using Matrix!
 [1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`_.
 
 
+Support
+=======
+
+If you need support installing or managing Synapse, please join
+[`#synapse:matrix.org`](https://matrix.to/#/#synapse:matrix.org) (from a matrix.org
+account if necessary) and ask your questions there. We do not use GitHub issues for
+support requests, only for bug reports and feature requests.
+
+
 Synapse Installation
 ====================
 
