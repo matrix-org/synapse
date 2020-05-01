@@ -38,9 +38,6 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
         self.reconnect()
 
-        # make the client subscribe to the typing stream
-        self.test_handler.stream_positions.update({"typing": 0})
-
         typing._push_update(member=RoomMember(room_id, USER_ID), typing=True)
 
         self.reactor.advance(0)

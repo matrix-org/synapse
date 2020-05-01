@@ -31,9 +31,6 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
     def test_receipt(self):
         self.reconnect()
 
-        # make the client subscribe to the receipts stream
-        self.test_handler.stream_positions.update({"receipts": 0})
-
         # tell the master to send a new receipt
         self.get_success(
             self.hs.get_datastore().insert_receipt(
