@@ -55,25 +55,18 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._store.user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(1000)
         )
-        self._send_notice = self._rlsn._server_notices_manager.send_notice
-        self._rlsn._server_notices_manager.send_notice = Mock()
-        self._rlsn._state.get_current_state = Mock(return_value=defer.succeed(None))
-        self._rlsn._store.get_events = Mock(return_value=defer.succeed({}))
-
+        self._rlsn._server_notices_manager.send_notice = Mock(
+            return_value=defer.succeed(Mock())
+        )
         self._send_notice = self._rlsn._server_notices_manager.send_notice
 
         self.hs.config.limit_usage_by_mau = True
         self.user_id = "@user_id:test"
 
-        # self.server_notices_mxid = "@server:test"
-        # self.server_notices_mxid_display_name = None
-        # self.server_notices_mxid_avatar_url = None
-        # self.server_notices_room_name = "Server Notices"
-
         self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
-            returnValue=""
+            return_value=defer.succeed("!something:localhost")
         )
-        self._rlsn._store.add_tag_to_room = Mock()
+        self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
         self._rlsn._store.get_tags_for_room = Mock(return_value={})
         self.hs.config.admin_contact = "mailto:user@test.com"
 
@@ -95,14 +88,13 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
     def test_maybe_send_server_notice_to_user_remove_blocked_notice(self):
         """Test when user has blocked notice, but should have it removed"""
 
-        self._rlsn._auth.check_auth_blocking = Mock()
+        self._rlsn._auth.check_auth_blocking = Mock(return_value=defer.succeed(None))
         mock_event = Mock(
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
         self._rlsn._store.get_events = Mock(
             return_value=defer.succeed({"123": mock_event})
         )
-
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
         # Would be better to check the content, but once == remove blocking event
         self._send_notice.assert_called_once()
@@ -112,7 +104,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user has blocked notice, but notice ought to be there (NOOP)
         """
         self._rlsn._auth.check_auth_blocking = Mock(
-            side_effect=ResourceLimitError(403, "foo")
+            return_value=defer.succeed(None), side_effect=ResourceLimitError(403, "foo")
         )
 
         mock_event = Mock(
@@ -121,6 +113,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._store.get_events = Mock(
             return_value=defer.succeed({"123": mock_event})
         )
+
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
         self._send_notice.assert_not_called()
@@ -129,9 +122,8 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, but should have one
         """
-
         self._rlsn._auth.check_auth_blocking = Mock(
-            side_effect=ResourceLimitError(403, "foo")
+            return_value=defer.succeed(None), side_effect=ResourceLimitError(403, "foo")
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
@@ -142,7 +134,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         Test when user does not have blocked notice, nor should they (NOOP)
         """
-        self._rlsn._auth.check_auth_blocking = Mock()
+        self._rlsn._auth.check_auth_blocking = Mock(return_value=defer.succeed(None))
 
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
@@ -153,7 +145,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         Test when user is not part of the MAU cohort - this should not ever
         happen - but ...
         """
-        self._rlsn._auth.check_auth_blocking = Mock()
+        self._rlsn._auth.check_auth_blocking = Mock(return_value=defer.succeed(None))
         self._rlsn._store.user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(None)
         )
@@ -167,24 +159,28 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         an alert message is not sent into the room
         """
         self.hs.config.mau_limit_alerting = False
+
         self._rlsn._auth.check_auth_blocking = Mock(
+            return_value=defer.succeed(None),
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
-            )
+            ),
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
-        self.assertTrue(self._send_notice.call_count == 0)
+        self.assertEqual(self._send_notice.call_count, 0)
 
     def test_check_hs_disabled_unaffected_by_mau_alert_suppression(self):
         """
         Test that when a server is disabled, that MAU limit alerting is ignored.
         """
         self.hs.config.mau_limit_alerting = False
+
         self._rlsn._auth.check_auth_blocking = Mock(
+            return_value=defer.succeed(None),
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.HS_DISABLED
-            )
+            ),
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
@@ -198,10 +194,12 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         """
         self.hs.config.mau_limit_alerting = False
         self._rlsn._auth.check_auth_blocking = Mock(
+            return_value=defer.succeed(None),
             side_effect=ResourceLimitError(
                 403, "foo", limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER
-            )
+            ),
         )
+
         self._rlsn._server_notices_manager.__is_room_currently_blocked = Mock(
             return_value=defer.succeed((True, []))
         )
@@ -256,7 +254,9 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
     def test_server_notice_only_sent_once(self):
         self.store.get_monthly_active_count = Mock(return_value=1000)
 
-        self.store.user_last_seen_monthly_active = Mock(return_value=1000)
+        self.store.user_last_seen_monthly_active = Mock(
+            return_value=defer.succeed(1000)
+        )
 
         # Call the function multiple times to ensure we only send the notice once
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))

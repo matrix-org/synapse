@@ -118,11 +118,17 @@ class EventsStream(Stream):
     def __init__(self, hs):
         self._store = hs.get_datastore()
         super().__init__(
-            self._store.get_current_events_token, self._update_function,
+            hs.get_instance_name(),
+            self._store.get_current_events_token,
+            self._update_function,
         )
 
     async def _update_function(
-        self, from_token: Token, current_token: Token, target_row_count: int
+        self,
+        instance_name: str,
+        from_token: Token,
+        current_token: Token,
+        target_row_count: int,
     ) -> StreamUpdateResult:
 
         # the events stream merges together three separate sources:
