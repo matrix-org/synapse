@@ -55,6 +55,17 @@ class RoomStoreTestCase(unittest.TestCase):
             (yield self.store.get_room(self.room.to_string())),
         )
 
+    @defer.inlineCallbacks
+    def test_get_room_with_stats(self):
+        self.assertDictContainsSubset(
+            {
+                "room_id": self.room.to_string(),
+                "creator": self.u_creator.to_string(),
+                "public": True,
+            },
+            (yield self.store.get_room_with_stats(self.room.to_string())),
+        )
+
 
 class RoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks

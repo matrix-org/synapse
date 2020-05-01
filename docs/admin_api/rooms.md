@@ -272,6 +272,24 @@ including a list of all room members.
 
 This API is still a draft and details might change!
 
+The following fields are possible in the JSON response body:
+
+* `room_id` - The ID of the room.
+* `name` - The name of the room.
+* `canonical_alias` - The canonical (main) alias address of the room.
+* `joined_members` - How many users are currently in the room.
+* `joined_local_members` - How many local users are currently in the room.
+* `version` - The version of the room as a string.
+* `creator` - The `user_id` of the room creator.
+* `encryption` - Algorithm of end-to-end encryption of messages. Is `null` if encryption is not active.
+* `federatable` - Whether users on other servers can join this room.
+* `public` - Whether the room is visible in room directory.
+* `join_rules` - The type of rules used for users wishing to join this room. One of: ["public", "knock", "invite", "private"].
+* `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"].
+* `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
+* `state_events` - Total number of state_events of a room. Complexity of the room.
+* `members` - An array of user ids.
+
 ## Usage
 
 A standard request:
@@ -286,12 +304,20 @@ Response:
 
 ```
 {
-  "room_id": "!OGEhHVWSdvArJzumhm:matrix.org",
-  "name": "Matrix HQ",
-  "canonical_alias": "#matrix:matrix.org",
+  "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
+  "name": "Music Theory",
+  "canonical_alias": "#musictheory:matrix.org",
+  "joined_members": 127
+  "joined_local_members": 2,
+  "version": "1",
+  "creator": "@foo:matrix.org",
+  "encryption": null,
+  "federatable": true,
+  "public": true,
   "join_rules": "invite",
-  "guest_access": "can_join",
-  "topic": "A room topic",
+  "guest_access": null,
+  "history_visibility": "shared",
+  "state_events": 93534
   "members": ["@foo:matrix.org", "@bar:matrix.org"]
 }
 ```

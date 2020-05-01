@@ -98,52 +98,34 @@ class RoomWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
-    def get_room_stats_state(self, room_id):
-        """Retrieve room stats state.
+    def get_room_with_stats(self, room_id: str):
+        """Retrieve room with statistics.
 
         Args:
-            room_id (str): The ID of the room to retrieve.
+            room_id: The ID of the room to retrieve.
         Returns:
             A dict containing the room information, or None if the room is unknown.
         """
-        return self.db.simple_select_one(
-            table="room_stats_state",
-            keyvalues={"room_id": room_id},
-            retcols=(
-                "room_id",
-                "name",
-                "canonical_alias",
-                "encryption",
-                "is_federatable",
-                "join_rules",
-                "guest_access",
-                "history_visibility",
-                "topic",
-            ),
-            desc="get_room_stats_state",
-            allow_none=True,
-        )
 
-    def get_room_stats_current(self, room_id):
-        """Retrieve current room stats.
+        def get_room_with_stats_txn(txn, room_id):
+            sql = """
+                SELECT room_id, state.name, state.canonical_alias, curr.joined_members,
+                  curr.local_users_in_room AS joined_local_members, rooms.room_version AS version,
+                  rooms.creator, state.encryption, state.is_federatable AS federatable,
+                  rooms.is_public AS public, state.join_rules, state.guest_access,
+                  state.history_visibility, curr.current_state_events AS state_events
+                FROM rooms
+                LEFT JOIN room_stats_state state USING (room_id)
+                LEFT JOIN room_stats_current curr USING (room_id)
+                WHERE room_id = ?
+                """
+            txn.execute(sql, [room_id])
+            res = self.db.cursor_to_dict(txn)[0]
+            res["federatable"] = bool(res["federatable"])
+            res["public"] = bool(res["public"])
+            return res
 
-        Args:
-            room_id (str): The ID of the room to retrieve.
-        Returns:
-            A dict containing the room information, or None if the room is unknown.
-        """
-        return self.db.simple_select_one(
-            table="room_stats_state",
-            keyvalues={"room_id": room_id},
-            retcols=(
-                "room_id",
-                "joined_members",
-                "local_users_in_room",
-                "current_state_events",
-            ),
-            desc="get_room_stats_current",
-            allow_none=True,
-        )
+        return self.db.runInteraction("get_room_with_stats", get_room_with_stats_txn, room_id)
 
     def get_public_room_ids(self):
         return self.db.simple_select_onecol(

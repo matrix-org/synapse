@@ -256,14 +256,8 @@ class ListRoomRestServlet(RestServlet):
 class RoomRestServlet(RestServlet):
     """Get room details.
 
-    This needs the requesting user to have administrator access in Synapse.
     TODO: Return power level for each user
     TODO: Add on_POST to allow room creation without joining the room
-
-    GET /_synapse/admin/v1/rooms/<room_id>
-
-    returns:
-        200 OK with users if success otherwise an error.
     """
 
     PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
@@ -277,16 +271,12 @@ class RoomRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        ret = await self.store.get_room_stats_state(room_id)
+        ret = await self.store.get_room_with_stats(room_id)
         if not ret:
             raise NotFoundError("Room not found")
 
-        stats_curr = await self.store.get_room_stats_current(room_id)
-        if stats_curr:
-            ret.update(stats_curr)
-
         members = await self.store.get_users_in_room(room_id)
-        ret["members"] = members if members else []
+        ret["members"] = members
 
         return 200, ret
 
