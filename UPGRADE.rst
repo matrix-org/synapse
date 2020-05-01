@@ -75,6 +75,37 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.13.0
+====================
+
+Incorrect database migration in old synapse versions
+----------------------------------------------------
+
+A bug was introduced in Synapse 1.4.0 which could cause the room directory to
+be incomplete or empty if Synapse was upgraded directly from v1.2.1 or earlier,
+to versions between v1.4.0 and v1.12.x.
+
+This will *not* be a problem for Synapse installations which were:
+ * created at v1.4.0 or later,
+ * upgraded via v1.3.x, or
+ * upgraded straight from v1.2.1 or earlier to v1.13.0 or later.
+
+If completeness of the room directory is a concern, installations which are
+affected can be repaired as follows:
+
+1. Run the following sql from a `psql` or `sqlite3` console:
+
+   .. code:: sql
+
+     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+        ('populate_stats_process_rooms', '{}', 'current_state_events_membership');
+
+     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+        ('populate_stats_process_users', '{}', 'populate_stats_process_rooms');
+
+2. Restart synapse.
+
+
 Upgrading to v1.12.0
 ====================
 
