@@ -506,7 +506,7 @@ class FederationSender(object):
 
     @staticmethod
     async def get_replication_rows(
-        from_token: int, to_token: int, target_row_count: int
+        instance_name: str, from_token: int, to_token: int, target_row_count: int
     ) -> Tuple[List[Tuple[int, Tuple]], int, bool]:
         # Dummy implementation for case where federation sender isn't offloaded
         # to a worker.

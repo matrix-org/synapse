@@ -20,12 +20,6 @@ from tests.replication.tcp.streams._base import BaseStreamTestCase
 
 
 class FederationStreamTestCase(BaseStreamTestCase):
-    def prepare(self, reactor, clock, hs):
-        super().prepare(reactor, clock, hs)
-
-        self.test_handler.stream_positions["federation"] = 0
-        self.test_handler.received_rdata_rows.clear()
-
     def _get_worker_hs_config(self) -> dict:
         # enable federation sending on the worker
         config = super()._get_worker_hs_config()

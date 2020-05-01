@@ -255,11 +255,12 @@ class FederationRemoteSendQueue(object):
         self._clear_queue_before_pos(token)
 
     async def get_replication_rows(
-        self, from_token: int, to_token: int, target_row_count: int
+        self, instance_name: str, from_token: int, to_token: int, target_row_count: int
     ) -> Tuple[List[Tuple[int, Tuple]], int, bool]:
         """Get rows to be sent over federation between the two tokens
 
         Args:
+            instance_name: the name of the current process
             from_token: the previous stream token: the starting point for fetching the
                 updates
             to_token: the new stream token: the point to get updates up to
