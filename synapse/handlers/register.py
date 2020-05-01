@@ -157,7 +157,8 @@ class RegistrationHandler(BaseHandler):
               will be set to this. Defaults to 'localpart'.
             address (str|None): the IP address used to perform the registration.
             bind_emails (List[str]): list of emails to bind to this account.
-            by_admin (bool): Whether this registration was made by an administrator.
+            by_admin (bool): True if this registration is being made via the
+              admin api, otherwise False.
         Returns:
             Deferred[str]: user_id
         Raises:

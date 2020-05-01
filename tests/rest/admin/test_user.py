@@ -324,28 +324,23 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("Invalid user type", channel.json_body["error"])
 
-    def test_register_limit_mau(self):
+    def test_register_mau_limit_reached(self):
         """
-        Register user if MAU limit is reached.
+        Register user with Admin API if MAU limit is reached.
         """
         handler = self.hs.get_registration_handler()
         store = self.hs.get_datastore()
 
+        # Configure MAU limit
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 2
         self.hs.config.mau_trial_days = 0
 
-        # Set MAU limit
+        # Set monthly active users to the limit
         store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+            return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        self.get_failure(
-            handler.register_user(localpart="local_part"), ResourceLimitError
-        )
-
-        store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
-        )
+        # The registration of a new user fails due to the limit
         self.get_failure(
             handler.register_user(localpart="local_part"), ResourceLimitError
         )
@@ -572,7 +567,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(False, channel.json_body["is_guest"])
         self.assertEqual(False, channel.json_body["deactivated"])
 
-    def test_create_user_limit_mau_active_admin(self):
+    def test_create_user_mau_limit_reached_active_admin(self):
         """
         Check that a new regular user is created successfully if MAU limit is reached.
         Admin user was active before creating user.
@@ -581,34 +576,28 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         handler = self.hs.get_registration_handler()
 
+        # Configure MAU limit
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 2
         self.hs.config.mau_trial_days = 0
 
-        def _do_sync_for_user(token):
-            request, channel = self.make_request("GET", "/sync", access_token=token)
-            self.render(request)
-
-            if channel.code != 200:
-                raise HttpResponseException(
-                    channel.code, channel.result["reason"], channel.result["body"]
-                ).to_synapse_error()
-
         # Sync to set admin user to active
-        _do_sync_for_user(self.admin_user_tok)
+        # before limit of monthly active users is reached
+        request, channel = self.make_request(
+            "GET", "/sync", access_token=self.admin_user_tok
+        )
+        self.render(request)
 
+        if channel.code != 200:
+            raise HttpResponseException(
+                channel.code, channel.result["reason"], channel.result["body"]
+            ).to_synapse_error()
+
+        # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+            return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-
-        # Set MAU limit
-        self.get_failure(
-            handler.register_user(localpart="local_part"), ResourceLimitError
-        )
-
-        self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
-        )
+        # The registration of a new user fails due to the limit
         self.get_failure(
             handler.register_user(localpart="local_part"), ResourceLimitError
         )
@@ -631,30 +620,25 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["admin"])
 
-    def test_create_user_limit_mau_passiv_admin(self):
+    def test_create_user_mau_limit_reached_passiv_admin(self):
         """
-        Check that a new regular user is created successfully if MAU limit is reached.
+        Try to create a new regular user if MAU limit is reached.
         Admin user was not active before creating user and creation fails.
         """
         self.hs.config.registration_shared_secret = None
 
         handler = self.hs.get_registration_handler()
 
+        # Configure MAU limit
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.max_mau_value = 2
         self.hs.config.mau_trial_days = 0
 
-        # Set MAU limit
+        # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
+            return_value=defer.succeed(self.hs.config.max_mau_value)
         )
-        self.get_failure(
-            handler.register_user(localpart="local_part"), ResourceLimitError
-        )
-
-        self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value + 1)
-        )
+        # The registration of a new user fails due to the limit
         self.get_failure(
             handler.register_user(localpart="local_part"), ResourceLimitError
         )
