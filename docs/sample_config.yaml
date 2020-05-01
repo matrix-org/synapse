@@ -1980,13 +1980,17 @@ opentracing:
 # Caching can be configured through the following options.
 #
 caches:
-   # Controls the global cache factor. This overrides the "SYNAPSE_CACHE_FACTOR"
-   # environment variable.
+   # Controls the global cache factor. This can be overridden by the
+   # "SYNAPSE_CACHE_FACTOR" environment variable.
    #
    # global_factor: 0.5
 
-   # A dictionary of cache name to cache factor for that
-   # individual cache.
+   # A dictionary of cache name to cache factor for that individual
+   # cache. This can be overridden by environment variables
+   # comprised of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in
+   # capital letters and underscores.
+   #
+   # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2
    #
    # per_cache_factors:
    #   get_users_who_share_room_with_user: 2
