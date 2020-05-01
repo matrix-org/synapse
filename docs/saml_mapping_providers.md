@@ -52,6 +52,8 @@ A custom mapping provider must specify the following methods:
        * `mxid_localpart` - Required. The mxid localpart of the new user.
        * `displayname` - The displayname of the new user. If not provided, will default to
                          the value of `mxid_localpart`.
+       * `emails` - A list of emails for the new user. If not provided, will
+                    default to an empty list.
 * `parse_config(config)`
     - This method should have the `@staticmethod` decoration.
     - Arguments:
