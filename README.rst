@@ -88,10 +88,12 @@ Thanks for using Matrix!
 Support
 =======
 
-For support installing or managing Synapse, please join
-`#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_ (from a matrix.org
+For support installing or managing Synapse, please join |room|_ (from a matrix.org
 account if necessary) and ask questions there. We do not use GitHub issues for
 support requests, only for bug reports and feature requests.
+
+.. |room| replace:: ``room``
+.. _room: https://matrix.to/#/#synapse:matrix.org
 
 
 Synapse Installation
