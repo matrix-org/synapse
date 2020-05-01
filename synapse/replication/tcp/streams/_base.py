@@ -17,7 +17,17 @@
 import heapq
 import logging
 from collections import namedtuple
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 import attr
 
@@ -41,7 +51,7 @@ Token = int
 # parsing with Stream.parse_row (which turns it into a `ROW_TYPE`). Normally it's
 # just a row from a database query, though this is dependent on the stream in question.
 #
-StreamRow = Tuple
+StreamRow = TypeVar("StreamRow", bound=Tuple)
 
 # The type returned by the update_function of a stream, as well as get_updates(),
 # get_updates_since, etc.
@@ -544,16 +554,19 @@ class AccountDataStream(Stream):
 
         # convert the global results to the right format, and limit them to the to_token
         # at the same time
-        global_results = (
+        global_rows = (
             (stream_id, (user_id, None, account_data_type))
             for stream_id, user_id, account_data_type in global_results
             if stream_id <= to_token
         )
 
-        room_results = ((stream_id, rest) for stream_id, *rest in room_results)
+        room_rows = (
+            (stream_id, (user_id, room_id, account_data_type))
+            for stream_id, user_id, room_id, account_data_type in room_results
+        )
 
         # we need to return a sorted list, so merge them together.
-        updates = list(heapq.merge(room_results, global_results))
+        updates = list(heapq.merge(room_rows, global_rows))
         return updates, to_token, limited
 
 

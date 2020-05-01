@@ -178,7 +178,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
     async def get_updated_global_account_data(
         self, last_id: int, current_id: int, limit: int
-    ) -> List[Tuple]:
+    ) -> List[Tuple[int, str, str]]:
         """Get the global account_data that has changed, for the account_data stream
 
         Args:
@@ -208,7 +208,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
     async def get_updated_room_account_data(
         self, last_id: int, current_id: int, limit: int
-    ) -> List[Tuple]:
+    ) -> List[Tuple[int, str, str, str]]:
         """Get the global account_data that has changed, for the account_data stream
 
         Args:

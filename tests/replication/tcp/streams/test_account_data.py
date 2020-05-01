@@ -12,9 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
-
-from twisted.internet import defer
 
 from synapse.replication.tcp.streams._base import (
     _STREAM_UPDATE_TARGET_ROW_COUNT,
