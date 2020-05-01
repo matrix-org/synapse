@@ -255,7 +255,8 @@ class ListRoomRestServlet(RestServlet):
 
 class RoomRestServlet(RestServlet):
     """Get room details.
-    This needs user to have administrator access in Synapse.
+
+    This needs the requesting user to have administrator access in Synapse.
     TODO: Return power level for each user
     TODO: Add on_POST to allow room creation without joining the room
 
