@@ -49,8 +49,8 @@ class CacheConfigTests(TestCase):
 
     def test_config_overrides_environ(self):
         """
-        Individual cache factors defined in config will take precedence over
-        ones in the environment.
+        Individual cache factors defined in the environment will take precedence
+        over those in the config.
         """
         config = {"caches": {"per_cache_factors": {"foo": 2, "bar": 3}}}
         t = TestConfig()
@@ -62,7 +62,7 @@ class CacheConfigTests(TestCase):
 
         self.assertEqual(
             dict(t.caches.cache_factors),
-            {"foo": 2.0, "bar": 3.0, "something_or_other": 2.0},
+            {"foo": 1.0, "bar": 3.0, "something_or_other": 2.0},
         )
 
     def test_individual_instantiated_before_config_load(self):

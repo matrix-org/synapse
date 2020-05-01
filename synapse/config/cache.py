@@ -103,20 +103,12 @@ class CacheConfig(Config):
         # Set the global one so that it's reflected in new caches
         properties.default_factor_size = self.global_factor
 
-        # Load cache factors from the config, but override them with the
-        # environment if they exist
+        # Load cache factors from the config
         individual_factors = cache_config.get("per_cache_factors", {}) or {}
         if not isinstance(individual_factors, dict):
             raise ConfigError("caches.per_cache_factors must be a dictionary")
 
-        for cache, factor in individual_factors.items():
-            if not isinstance(factor, (int, float)):
-                raise ConfigError(
-                    "caches.per_cache_factors.%s must be a number" % (cache.lower(),)
-                )
-            self.cache_factors[cache.lower()] = factor
-
-        # Override with environment
+        # Override factors from environment if necessary
         individual_factors.update(
             {
                 key[len(_CACHE_PREFIX) + 1 :].lower(): float(val)
@@ -124,6 +116,13 @@ class CacheConfig(Config):
                 if key.startswith(_CACHE_PREFIX + "_")
             }
         )
+
+        for cache, factor in individual_factors.items():
+            if not isinstance(factor, (int, float)):
+                raise ConfigError(
+                    "caches.per_cache_factors.%s must be a number" % (cache.lower(),)
+                )
+            self.cache_factors[cache.lower()] = factor
 
         # Resize all caches (if necessary) with the new factors we've loaded
         self.resize_all_caches()
