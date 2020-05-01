@@ -127,6 +127,7 @@ from synapse.storage.data_stores.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.data_stores.main.presence import UserPresenceState
+from synapse.storage.data_stores.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
@@ -439,6 +440,7 @@ class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
     UserDirectoryStore,
+    UIAuthWorkerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedReceiptsStore,
@@ -960,17 +962,22 @@ def start(config_options):
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    ss = GenericWorkerServer(
+    hs = GenericWorkerServer(
         config.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )
 
-    setup_logging(ss, config, use_worker_options=True)
+    setup_logging(hs, config, use_worker_options=True)
 
-    ss.setup()
+    hs.setup()
+
+    # Ensure the replication streamer is always started in case we write to any
+    # streams. Will no-op if no streams can be written to by this worker.
+    hs.get_replication_streamer()
+
     reactor.addSystemEventTrigger(
-        "before", "startup", _base.start, ss, config.worker_listeners
+        "before", "startup", _base.start, hs, config.worker_listeners
     )
 
     _base.start_worker_reactor("synapse-generic-worker", config)

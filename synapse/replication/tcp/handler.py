@@ -79,6 +79,7 @@ class ReplicationCommandHandler:
         self._notifier = hs.get_notifier()
         self._clock = hs.get_clock()
         self._instance_id = hs.get_instance_id()
+        self._instance_name = hs.get_instance_name()
 
         # Set of streams that we've caught up with.
         self._streams_connected = set()  # type: Set[str]
@@ -87,7 +88,9 @@ class ReplicationCommandHandler:
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
         }  # type: Dict[str, Stream]
 
-        self._position_linearizer = Linearizer("replication_position")
+        self._position_linearizer = Linearizer(
+            "replication_position", clock=self._clock
+        )
 
         # Map of stream to batched updates. See RdataCommand for info on how
         # batching works.
@@ -115,7 +118,6 @@ class ReplicationCommandHandler:
         self._server_notices_sender = None
         if self._is_master:
             self._server_notices_sender = hs.get_server_notices_sender()
-            self._notifier.add_remote_server_up_callback(self.send_remote_server_up)
 
     def start_replication(self, hs):
         """Helper method to start a replication connection to the remote server
@@ -155,13 +157,13 @@ class ReplicationCommandHandler:
                 hs.config.redis.redis_host, hs.config.redis.redis_port, self._factory,
             )
         else:
-            client_name = hs.config.worker_name
+            client_name = hs.get_instance_name()
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
             hs.get_reactor().connectTCP(host, port, self._factory)
 
-    async def on_REPLICATE(self, cmd: ReplicateCommand):
+    async def on_REPLICATE(self, conn: AbstractConnection, cmd: ReplicateCommand):
         # We only want to announce positions by the writer of the streams.
         # Currently this is just the master process.
         if not self._is_master:
@@ -169,9 +171,11 @@ class ReplicationCommandHandler:
 
         for stream_name, stream in self._streams.items():
             current_token = stream.current_token()
-            self.send_command(PositionCommand(stream_name, current_token))
+            self.send_command(
+                PositionCommand(stream_name, self._instance_name, current_token)
+            )
 
-    async def on_USER_SYNC(self, cmd: UserSyncCommand):
+    async def on_USER_SYNC(self, conn: AbstractConnection, cmd: UserSyncCommand):
         user_sync_counter.inc()
 
         if self._is_master:
@@ -179,17 +183,23 @@ class ReplicationCommandHandler:
                 cmd.instance_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
             )
 
-    async def on_CLEAR_USER_SYNC(self, cmd: ClearUserSyncsCommand):
+    async def on_CLEAR_USER_SYNC(
+        self, conn: AbstractConnection, cmd: ClearUserSyncsCommand
+    ):
         if self._is_master:
             await self._presence_handler.update_external_syncs_clear(cmd.instance_id)
 
-    async def on_FEDERATION_ACK(self, cmd: FederationAckCommand):
+    async def on_FEDERATION_ACK(
+        self, conn: AbstractConnection, cmd: FederationAckCommand
+    ):
         federation_ack_counter.inc()
 
         if self._federation_sender:
             self._federation_sender.federation_ack(cmd.token)
 
-    async def on_REMOVE_PUSHER(self, cmd: RemovePusherCommand):
+    async def on_REMOVE_PUSHER(
+        self, conn: AbstractConnection, cmd: RemovePusherCommand
+    ):
         remove_pusher_counter.inc()
 
         if self._is_master:
@@ -199,7 +209,9 @@ class ReplicationCommandHandler:
 
             self._notifier.on_new_replication_data()
 
-    async def on_INVALIDATE_CACHE(self, cmd: InvalidateCacheCommand):
+    async def on_INVALIDATE_CACHE(
+        self, conn: AbstractConnection, cmd: InvalidateCacheCommand
+    ):
         invalidate_cache_counter.inc()
 
         if self._is_master:
@@ -209,7 +221,7 @@ class ReplicationCommandHandler:
                 cmd.cache_func, tuple(cmd.keys)
             )
 
-    async def on_USER_IP(self, cmd: UserIpCommand):
+    async def on_USER_IP(self, conn: AbstractConnection, cmd: UserIpCommand):
         user_ip_cache_counter.inc()
 
         if self._is_master:
@@ -225,7 +237,11 @@ class ReplicationCommandHandler:
         if self._server_notices_sender:
             await self._server_notices_sender.on_user_ip(cmd.user_id)
 
-    async def on_RDATA(self, cmd: RdataCommand):
+    async def on_RDATA(self, conn: AbstractConnection, cmd: RdataCommand):
+        if cmd.instance_name == self._instance_name:
+            # Ignore RDATA that are just our own echoes
+            return
+
         stream_name = cmd.stream_name
         inbound_rdata_count.labels(stream_name).inc()
 
@@ -276,7 +292,11 @@ class ReplicationCommandHandler:
         logger.debug("Received rdata %s -> %s", stream_name, token)
         await self._replication_data_handler.on_rdata(stream_name, token, rows)
 
-    async def on_POSITION(self, cmd: PositionCommand):
+    async def on_POSITION(self, conn: AbstractConnection, cmd: PositionCommand):
+        if cmd.instance_name == self._instance_name:
+            # Ignore POSITION that are just our own echoes
+            return
+
         stream = self._streams.get(cmd.stream_name)
         if not stream:
             logger.error("Got POSITION for unknown stream: %s", cmd.stream_name)
@@ -330,12 +350,30 @@ class ReplicationCommandHandler:
 
             self._streams_connected.add(cmd.stream_name)
 
-    async def on_REMOTE_SERVER_UP(self, cmd: RemoteServerUpCommand):
+    async def on_REMOTE_SERVER_UP(
+        self, conn: AbstractConnection, cmd: RemoteServerUpCommand
+    ):
         """"Called when get a new REMOTE_SERVER_UP command."""
         self._replication_data_handler.on_remote_server_up(cmd.data)
 
-        if self._is_master:
-            self._notifier.notify_remote_server_up(cmd.data)
+        self._notifier.notify_remote_server_up(cmd.data)
+
+        # We relay to all other connections to ensure every instance gets the
+        # notification.
+        #
+        # When configured to use redis we'll always only have one connection and
+        # so this is a no-op (all instances will have already received the same
+        # REMOTE_SERVER_UP command).
+        #
+        # For direct TCP connections this will relay to all other connections
+        # connected to us. When on master this will correctly fan out to all
+        # other direct TCP clients and on workers there'll only be the one
+        # connection to master.
+        #
+        # (The logic here should also be sound if we have a mix of Redis and
+        # direct TCP connections so long as there is only one traffic route
+        # between two instances, but that is not currently supported).
+        self.send_command(cmd, ignore_conn=conn)
 
     def new_connection(self, connection: AbstractConnection):
         """Called when we have a new connection.
@@ -380,11 +418,21 @@ class ReplicationCommandHandler:
         """
         return bool(self._connections)
 
-    def send_command(self, cmd: Command):
+    def send_command(
+        self, cmd: Command, ignore_conn: Optional[AbstractConnection] = None
+    ):
         """Send a command to all connected connections.
+
+        Args:
+            cmd
+            ignore_conn: If set don't send command to the given connection.
+                Used when relaying commands from one connection to all others.
         """
         if self._connections:
             for connection in self._connections:
+                if connection == ignore_conn:
+                    continue
+
                 try:
                     connection.send_command(cmd)
                 except Exception:
@@ -448,7 +496,7 @@ class ReplicationCommandHandler:
 
         We need to check if the client is interested in the stream or not
         """
-        self.send_command(RdataCommand(stream_name, token, data))
+        self.send_command(RdataCommand(stream_name, self._instance_name, token, data))
 
 
 UpdateToken = TypeVar("UpdateToken")

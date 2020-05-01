@@ -220,12 +220,6 @@ class Notifier(object):
         """
         self.replication_callbacks.append(cb)
 
-    def add_remote_server_up_callback(self, cb: Callable[[str], None]):
-        """Add a callback that will be called when synapse detects a server
-        has been
-        """
-        self.remote_server_up_callbacks.append(cb)
-
     def on_new_room_event(
         self, event, room_stream_id, max_room_stream_id, extra_users=[]
     ):
@@ -544,6 +538,3 @@ class Notifier(object):
         # circular dependencies.
         if self.federation_sender:
             self.federation_sender.wake_destination(server)
-
-        for cb in self.remote_server_up_callbacks:
-            cb(server)
