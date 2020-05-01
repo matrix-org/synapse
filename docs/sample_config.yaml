@@ -1990,4 +1990,3 @@ caches:
    #
    # per_cache_factors:
    #   get_users_who_share_room_with_user: 2
-
