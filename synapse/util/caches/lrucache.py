@@ -57,6 +57,7 @@ class LruCache(object):
         cache_type=dict,
         size_callback=None,
         evicted_callback=None,
+        apply_cache_factor_from_config=True,
     ):
         """
         Args:
@@ -73,13 +74,22 @@ class LruCache(object):
             evicted_callback (func(int)|None):
                 if not None, called on eviction with the size of the evicted
                 entry
+
+            apply_cache_factor_from_config (bool): If true, `max_size` will be
+                multiplied by a cache factor derived from the homeserver config.
         """
         cache = cache_type()
         self.cache = cache  # Used for introspection.
 
         # Save the original max size, and apply the default size factor.
         self._original_max_size = max_size
-        self.max_size = int(max_size * cache_config.properties.default_factor_size)
+        # We previously didn't apply the cache factor here, and as such some caches were
+        # not affected by the global cache factor. Add an option here to disable applying
+        # the cache factor when a cache is created
+        if apply_cache_factor_from_config:
+            self.max_size = int(max_size * cache_config.properties.default_factor_size)
+        else:
+            self.max_size = int(max_size)
 
         list_root = _Node(None, None, None, None)
         list_root.next_node = list_root

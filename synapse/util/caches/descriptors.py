@@ -88,7 +88,15 @@ class Cache(object):
         "_pending_deferred_cache",
     )
 
-    def __init__(self, name, max_entries=1000, keylen=1, tree=False, iterable=False):
+    def __init__(
+        self,
+        name,
+        max_entries=1000,
+        keylen=1,
+        tree=False,
+        iterable=False,
+        apply_cache_factor_from_config=True,
+    ):
         cache_type = TreeCache if tree else dict
         self._pending_deferred_cache = cache_type()
 
@@ -98,6 +106,7 @@ class Cache(object):
             cache_type=cache_type,
             size_callback=(lambda d: len(d)) if iterable else None,
             evicted_callback=self._on_evicted,
+            apply_cache_factor_from_config=apply_cache_factor_from_config,
         )
 
         self.name = name

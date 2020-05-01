@@ -52,11 +52,11 @@ class ExpiringCache(object):
                 an item on access. Defaults to False.
             iterable (bool): If true, the size is calculated by summing the
                 sizes of all entries, rather than the number of entries.
-
         """
         self._cache_name = cache_name
 
         self._original_max_size = max_len
+
         self._max_size = int(max_len * cache_config.properties.default_factor_size)
 
         self._clock = clock
