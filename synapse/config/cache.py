@@ -70,19 +70,21 @@ class CacheConfig(Config):
 
     def generate_config_section(self, **kwargs):
         return """\
-        # Cache configuration
+        ## Cache Configuration ##
+
+        # Caching can be configured through the following options.
         #
-        # 'global_factor' controls the global cache factor. This overrides the
-        # "SYNAPSE_CACHE_FACTOR" environment variable.
-        #
-        # 'per_cache_factors' is a dictionary of cache name to cache factor for that
-        # individual cache.
-        #
-        #caches:
-        #  global_factor: 0.5
-        #  per_cache_factors:
-        #    get_users_who_share_room_with_user: 2
-        #
+        caches:
+           # Controls the global cache factor. This overrides the "SYNAPSE_CACHE_FACTOR"
+           # environment variable.
+           #
+           # global_factor: 0.5
+
+           # A dictionary of cache name to cache factor for that
+           # individual cache.
+           #
+           # per_cache_factors:
+           #   get_users_who_share_room_with_user: 2
         """
 
     def read_config(self, config, **kwargs):
