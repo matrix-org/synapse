@@ -287,6 +287,7 @@ class ReplicationCommandHandler:
 
         Args:
             stream_name: name of the replication stream for this batch of rows
+            instance_name: the instance that wrote the rows.
             token: stream token for this batch of rows
             rows: a list of Stream.ROW_TYPE objects as returned by
                 Stream.parse_row.
