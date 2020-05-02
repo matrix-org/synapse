@@ -26,7 +26,7 @@ from prometheus_client import Counter
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.filtering import FilterCollection
 from synapse.events import EventBase
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import current_context
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
@@ -301,7 +301,7 @@ class SyncHandler(object):
         else:
             sync_type = "incremental_sync"
 
-        context = LoggingContext.current_context()
+        context = current_context()
         if context:
             context.tag = sync_type
 
@@ -1143,9 +1143,14 @@ class SyncHandler(object):
                 user_id
             )
 
+            tracked_users = set(users_who_share_room)
+
+            # Always tell the user about their own devices
+            tracked_users.add(user_id)
+
             # Step 1a, check for changes in devices of users we share a room with
             users_that_have_changed = await self.store.get_users_whose_devices_changed(
-                since_token.device_list_key, users_who_share_room
+                since_token.device_list_key, tracked_users
             )
 
             # Step 1b, check for newly joined rooms
@@ -1634,7 +1639,7 @@ class SyncHandler(object):
         )
 
         # We loop through all room ids, even if there are no new events, in case
-        # there are non room events taht we need to notify about.
+        # there are non room events that we need to notify about.
         for room_id in sync_result_builder.joined_room_ids:
             room_entry = room_to_events.get(room_id, None)
 

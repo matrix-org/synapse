@@ -27,6 +27,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
+    HttpResponseException,
     InvalidClientCredentialsError,
     SynapseError,
 )
@@ -189,12 +190,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         content = parse_json_object_from_request(request)
 
-        if event_type == EventTypes.Aliases:
-            # MSC2260
-            raise SynapseError(
-                400, "Cannot send m.room.aliases events via /rooms/{room_id}/state"
-            )
-
         event_dict = {
             "type": event_type,
             "content": content,
@@ -241,12 +236,6 @@ class RoomSendEventRestServlet(TransactionRestServlet):
     async def on_POST(self, request, room_id, event_type, txn_id=None):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         content = parse_json_object_from_request(request)
-
-        if event_type == EventTypes.Aliases:
-            # MSC2260
-            raise SynapseError(
-                400, "Cannot send m.room.aliases events via /rooms/{room_id}/send"
-            )
 
         event_dict = {
             "type": event_type,
@@ -376,10 +365,13 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server:
-            data = await handler.get_remote_public_room_list(
-                server, limit=limit, since_token=since_token
-            )
+        if server and server != self.hs.config.server_name:
+            try:
+                data = await handler.get_remote_public_room_list(
+                    server, limit=limit, since_token=since_token
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit, since_token=since_token
@@ -416,15 +408,18 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server:
-            data = await handler.get_remote_public_room_list(
-                server,
-                limit=limit,
-                since_token=since_token,
-                search_filter=search_filter,
-                include_all_networks=include_all_networks,
-                third_party_instance_id=third_party_instance_id,
-            )
+        if server and server != self.hs.config.server_name:
+            try:
+                data = await handler.get_remote_public_room_list(
+                    server,
+                    limit=limit,
+                    since_token=since_token,
+                    search_filter=search_filter,
+                    include_all_networks=include_all_networks,
+                    third_party_instance_id=third_party_instance_id,
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit,

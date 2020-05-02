@@ -86,7 +86,7 @@ class MetricsConfig(Config):
         # enabled by default, either for performance reasons or limited use.
         #
         metrics_flags:
-            # Publish synapse_federation_known_servers, a g auge of the number of
+            # Publish synapse_federation_known_servers, a gauge of the number of
             # servers this homeserver knows about, including itself. May cause
             # performance problems on large homeservers.
             #

@@ -1,14 +1,14 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the matrix-synapse package.
+# This file is distributed under the same license as the matrix-synapse-py3 package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: matrix-synapse\n"
-"Report-Msgid-Bugs-To: matrix-synapse@packages.debian.org\n"
-"POT-Creation-Date: 2017-02-21 07:51+0000\n"
+"Project-Id-Version: matrix-synapse-py3\n"
+"Report-Msgid-Bugs-To: matrix-synapse-py3@packages.debian.org\n"
+"POT-Creation-Date: 2020-04-06 16:39-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -28,7 +28,10 @@ msgstr ""
 #: ../templates:1001
 msgid ""
 "The name that this homeserver will appear as, to clients and other servers "
-"via federation. This name should match the SRV record published in DNS."
+"via federation. This is normally the public hostname of the server running "
+"synapse, but can be different if you set up delegation. Please refer to the "
+"delegation documentation in this case: https://github.com/matrix-org/synapse/"
+"blob/master/docs/delegate.md."
 msgstr ""
 
 #. Type: boolean

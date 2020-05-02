@@ -303,3 +303,45 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.pump()
 
         self.store.upsert_monthly_active_user.assert_not_called()
+
+    def test_get_monthly_active_count_by_service(self):
+        appservice1_user1 = "@appservice1_user1:example.com"
+        appservice1_user2 = "@appservice1_user2:example.com"
+
+        appservice2_user1 = "@appservice2_user1:example.com"
+        native_user1 = "@native_user1:example.com"
+
+        service1 = "service1"
+        service2 = "service2"
+        native = "native"
+
+        self.store.register_user(
+            user_id=appservice1_user1, password_hash=None, appservice_id=service1
+        )
+        self.store.register_user(
+            user_id=appservice1_user2, password_hash=None, appservice_id=service1
+        )
+        self.store.register_user(
+            user_id=appservice2_user1, password_hash=None, appservice_id=service2
+        )
+        self.store.register_user(user_id=native_user1, password_hash=None)
+        self.pump()
+
+        count = self.store.get_monthly_active_count_by_service()
+        self.assertEqual({}, self.get_success(count))
+
+        self.store.upsert_monthly_active_user(native_user1)
+        self.store.upsert_monthly_active_user(appservice1_user1)
+        self.store.upsert_monthly_active_user(appservice1_user2)
+        self.store.upsert_monthly_active_user(appservice2_user1)
+        self.pump()
+
+        count = self.store.get_monthly_active_count()
+        self.assertEqual(4, self.get_success(count))
+
+        count = self.store.get_monthly_active_count_by_service()
+        result = self.get_success(count)
+
+        self.assertEqual(2, result[service1])
+        self.assertEqual(1, result[service2])
+        self.assertEqual(1, result[native])
