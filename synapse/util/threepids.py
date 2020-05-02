@@ -16,6 +16,8 @@
 import logging
 import re
 
+from synapse.api.errors import SynapseError
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,3 +50,23 @@ def check_3pid_allowed(hs, medium, address):
         return True
 
     return False
+
+
+def canonicalise_email(address) -> str:
+    """'Canonicalise' email address
+    Case folding of local part of email address and lowercase domain part
+    See MSC2265, https://github.com/matrix-org/matrix-doc/pull/2265
+
+    Args:
+        address (str): email address within that medium (e.g. "wotan@matrix.org")
+    Returns:
+        (str) The canonical form of the email address
+    Raises:
+        SynapseError if the number could not be parsed.
+    """
+
+    try:
+        address = address.split("@")
+        return address[0].casefold() + "@" + address[1].lower()
+    except IndexError:
+        raise SynapseError(400, "Unable to parse email address")

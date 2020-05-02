@@ -31,7 +31,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret
-from synapse.util.threepids import check_3pid_allowed
+from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -84,10 +84,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        # For emails, transform the address to lowercase.
-        # We store all email addreses as lowercase in the DB.
-        # (See add_threepid in synapse/handlers/auth.py)
-        email = body["email"].lower()
+        email = canonicalise_email(body["email"])
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -251,10 +248,7 @@ class PasswordRestServlet(RestServlet):
                 if "medium" not in threepid or "address" not in threepid:
                     raise SynapseError(500, "Malformed threepid")
                 if threepid["medium"] == "email":
-                    # For emails, transform the address to lowercase.
-                    # We store all email addreses as lowercase in the DB.
-                    # (See add_threepid in synapse/handlers/auth.py)
-                    threepid["address"] = threepid["address"].lower()
+                    threepid["address"] = canonicalise_email(threepid["address"])
                 # if using email, we must know about the email they're authing with!
                 threepid_user_id = await self.datastore.get_user_id_by_threepid(
                     threepid["medium"], threepid["address"]
@@ -362,10 +356,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        # For emails, transform the address to lowercase.
-        # We store all email addreses as lowercase in the DB.
-        # (See add_threepid in synapse/handlers/auth.py)
-        email = body["email"].lower()
+        email = canonicalise_email(body["email"])
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -376,9 +367,7 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existing_user_id = await self.store.get_user_id_by_threepid(
-            "email", email
-        )
+        existing_user_id = await self.store.get_user_id_by_threepid("email", email)
 
         if existing_user_id is not None:
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)

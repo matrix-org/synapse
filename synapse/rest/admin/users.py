@@ -36,6 +36,7 @@ from synapse.rest.admin._base import (
     historical_admin_path_patterns,
 )
 from synapse.types import UserID
+from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,8 @@ class UserRestServletV2(RestServlet):
                 # add new threepids to user
                 current_time = self.hs.get_clock().time_msec()
                 for threepid in body["threepids"]:
+                    if threepid["medium"] == "email":
+                        threepid["address"] = canonicalise_email(threepid["address"])
                     await self.auth_handler.add_threepid(
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
@@ -271,6 +274,8 @@ class UserRestServletV2(RestServlet):
 
                 current_time = self.hs.get_clock().time_msec()
                 for threepid in body["threepids"]:
+                    if threepid["medium"] == "email":
+                        threepid["address"] = canonicalise_email(threepid["address"])
                     await self.auth_handler.add_threepid(
                         user_id, threepid["medium"], threepid["address"], current_time
                     )

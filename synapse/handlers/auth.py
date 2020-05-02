@@ -42,6 +42,7 @@ from synapse.logging.context import defer_to_thread
 from synapse.module_api import ModuleApi
 from synapse.types import UserID
 from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.util.threepids import canonicalise_email
 
 from ._base import BaseHandler
 
@@ -824,17 +825,8 @@ class AuthHandler(BaseHandler):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        # 'Canonicalise' email addresses down to lower case.
-        # We've now moving towards the homeserver being the entity that
-        # is responsible for validating threepids used for resetting passwords
-        # on accounts, so in future Synapse will gain knowledge of specific
-        # types (mediums) of threepid. For now, we still use the existing
-        # infrastructure, but this is the start of synapse gaining knowledge
-        # of specific types of threepid (and fixes the fact that checking
-        # for the presence of an email address during password reset was
-        # case sensitive).
         if medium == "email":
-            address = address.lower()
+            address = canonicalise_email(address)
 
         yield self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
@@ -860,9 +852,8 @@ class AuthHandler(BaseHandler):
             unbind API.
         """
 
-        # 'Canonicalise' email addresses as per above
         if medium == "email":
-            address = address.lower()
+            address = canonicalise_email(address)
 
         identity_handler = self.hs.get_handlers().identity_handler
         result = yield identity_handler.try_unbind_threepid(

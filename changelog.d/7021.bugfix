@@ -1,0 +1,1 @@
+Fix inconsistent handling of upper and lower cases of email addresses that is use only case folding (MSC2265).

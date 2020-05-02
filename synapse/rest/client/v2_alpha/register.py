@@ -50,7 +50,7 @@ from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret
-from synapse.util.threepids import check_3pid_allowed
+from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -119,10 +119,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        # For emails, transform the address to lowercase.
-        # We store all email addreses as lowercase in the DB.
-        # (See add_threepid in synapse/handlers/auth.py)
-        email = body["email"].lower()
+        email = canonicalise_email(body["email"])
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -555,10 +552,12 @@ class RegisterRestServlet(RestServlet):
                 for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
                     if login_type in auth_result:
                         medium = auth_result[login_type]["medium"]
-                        # For emails, transform the address to lowercase.
-                        # We store all email addreses as lowercase in the DB.
-                        # (See add_threepid in synapse/handlers/auth.py)
-                        address = auth_result[login_type]["address"].lower()
+                        if medium == "email":
+                            address = canonicalise_email(
+                                auth_result[login_type]["address"]
+                            )
+                        else:
+                            address = auth_result[login_type]["address"]
 
                         existing_user_id = await self.store.get_user_id_by_threepid(
                             medium, address

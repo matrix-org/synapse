@@ -33,6 +33,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID, map_username_to_mxid_localpart
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
 
@@ -197,10 +198,7 @@ class LoginRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid thirdparty identifier")
 
             if medium == "email":
-                # For emails, transform the address to lowercase.
-                # We store all email addreses as lowercase in the DB.
-                # (See add_threepid in synapse/handlers/auth.py)
-                address = address.lower()
+                address = canonicalise_email(address)
 
             # We also apply account rate limiting using the 3PID as a key, as
             # otherwise using 3PID bypasses the ratelimiting based on user ID.
