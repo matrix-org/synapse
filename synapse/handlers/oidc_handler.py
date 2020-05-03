@@ -31,6 +31,7 @@ from typing_extensions import TypedDict
 from synapse.api.errors import HttpResponseException
 from synapse.config import ConfigError
 from synapse.http.server import finish_request
+from synapse.http.site import SynapseRequest
 from synapse.push.mailer import load_jinja2_templates
 from synapse.server import HomeServer
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -259,16 +260,22 @@ class OidcHandler:
             # We're not using jwt signing, return an empty jwk set
             return {"keys": []}
 
+        # First check if the JWKS are loaded in the provider metadata.
+        # It can happen either if the provider gives its JWKS in the discovery
+        # document directly or if it was already loaded once.
         metadata = await self.load_metadata()
         jwk_set = metadata.get("jwks")
         if jwk_set is not None and not force:
             return jwk_set
 
+        # Loading the JWKS using the `jwks_uri` metadata
         uri = metadata.get("jwks_uri")
         if not uri:
             raise RuntimeError('Missing "jwks_uri" in metadata')
 
         jwk_set = await self._http_client.get_json(uri)
+
+        # Caching the JWKS in the provider's metadata
         self._provider_metadata["jwks"] = jwk_set
         return jwk_set
 
@@ -402,7 +409,7 @@ class OidcHandler:
         return UserInfo(claims)
 
     async def handle_redirect_request(
-        self, request, client_redirect_url: bytes
+        self, request: SynapseRequest, client_redirect_url: bytes
     ) -> None:
         """Handle an incoming request to /login/sso/redirect
 
@@ -441,6 +448,7 @@ class OidcHandler:
             path="/_synapse/oidc",
             max_age="3600",
             httpOnly=True,
+            sameSite="lax",
         )
 
         metadata = await self.load_metadata()
@@ -507,6 +515,7 @@ class OidcHandler:
             path="/_synapse/oidc",
             expires="Thu, Jan 01 1970 00:00:00 UTC",
             httpOnly=True,
+            sameSite="lax",
         )
 
         # Check for the state query parameter
