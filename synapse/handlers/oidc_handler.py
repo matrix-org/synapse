@@ -111,7 +111,7 @@ class OidcHandler:
         self._hostname = hs.hostname  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._error_template = load_jinja2_templates(
-            hs.config.oidc_template_dir, ["oidc_error.html"]
+            hs.config.sso_template_dir, ["oidc_error.html"]
         )[0]
 
         # identifier for the external_ids table

@@ -13,10 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os.path
-
-import pkg_resources
-
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
@@ -87,12 +83,6 @@ class OIDCConfig(Config):
                 "user_mapping_provider.module is missing required "
                 "methods: %s" % (", ".join(missing_methods),)
             )
-
-        template_dir = oidc_config.get("template_dir")
-        if template_dir is None:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
-
-        self.oidc_template_dir = os.path.abspath(template_dir)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -182,28 +172,6 @@ class OIDCConfig(Config):
                 # Jinja2 template for the display name to set on first login. Optional.
                 #
                 #display_name: "{{ user.given_name }} {{ user.last_name }}"
-
-
-            # Directory in which Synapse will try to find the template files below.
-            # If not set, default templates from within the Synapse package will be used.
-            #
-            # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-            # If you *do* uncomment it, you will need to make sure that all the templates
-            # below are in the directory.
-            #
-            # Synapse will look for the following templates in this directory:
-            #
-            # * HTML page to display to users if something goes wrong during the
-            #   authentication process: 'oidc_error.html'.
-            #
-            #   When rendering, this template is given two variables:
-            #     * error: the technical name of the error
-            #     * error_description: a human-readable message for the error
-            #
-            # You can see the default templates at:
-            # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-            #
-            #template_dir: "res/templates"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
