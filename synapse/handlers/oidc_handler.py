@@ -795,7 +795,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
                 % (e,)
             )
 
-        display_name_template: Optional[Template] = None
+        display_name_template = None  # type: Optional[Template]
         if "display_name_template" in config:
             try:
                 display_name_template = env.from_string(config["display_name_template"])
@@ -817,7 +817,7 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
     def map_user_attributes(self, userinfo: UserInfo) -> UserAttribute:
         localpart = self._config["localpart_template"].render(user=userinfo).strip()
 
-        display_name: Optional[str] = None
+        display_name = None  # type: Optional[str]
         if self._config["display_name_template"] is not None:
             display_name = (
                 self._config["display_name_template"].render(user=userinfo).strip()
