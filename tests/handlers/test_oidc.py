@@ -13,19 +13,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from contextlib import contextmanager
 from urllib.parse import parse_qs, urlparse
 
 from mock import Mock
 
+import attr
 import pymacaroons
 
 from twisted.internet import defer
+from twisted.python.failure import Failure
+from twisted.web._newclient import ResponseDone
 
 from synapse.handlers.oidc_handler import OidcError, OidcHandler, OidcMappingProvider
 from synapse.types import UserID
 
 from tests.unittest import HomeserverTestCase, override_config
+
+
+@attr.s
+class FakeResponse(object):
+    code = attr.ib()
+    body = attr.ib()
+    phrase = attr.ib()
+
+    def deliverBody(self, protocol):
+        protocol.dataReceived(self.body)
+        protocol.connectionLost(Failure(ResponseDone()))
+
 
 # These are a few constants that are used as config parameters in the tests.
 ISSUER = "https://issuer/"
@@ -58,7 +74,7 @@ COOKIE_PATH = "/_synapse/oidc"
 MockedMappingProvider = Mock(OidcMappingProvider)
 
 
-def simple_async_mock(return_value):
+def simple_async_mock(return_value=None):
     # AsyncMock is not available in python3.5, this mimics part of its behaviour
     async def cb(*args, **kwargs):
         return return_value
@@ -114,6 +130,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         self.http_client = Mock(spec=["get_json"])
         self.http_client.get_json.side_effect = get_json
+        self.http_client.user_agent = "Synapse Test"
 
         config = self.default_config()
         config["public_baseurl"] = BASE_URL
@@ -323,7 +340,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._exchange_code = simple_async_mock(return_value=token)
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
-        self.handler._auth_handler.complete_sso_login = Mock()
+        self.handler._auth_handler.complete_sso_login = simple_async_mock()
         request = Mock(spec=["args", "getCookie", "addCookie"])
 
         code = "code"
@@ -392,24 +409,32 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @defer.inlineCallbacks
     def test_exchange_code(self):
         token = {"type": "bearer"}
-        self.http_client.post_urlencoded_get_json = simple_async_mock(
-            return_value=token
+        token_json = json.dumps(token).encode("utf-8")
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(code=200, phrase=b"OK", body=token_json)
         )
         code = "code"
         ret = yield defer.ensureDeferred(self.handler._exchange_code(code))
-        uri, args = self.http_client.post_urlencoded_get_json.call_args[0]
+        kwargs = self.http_client.request.call_args[1]
 
         self.assertEqual(ret, token)
-        self.assertEqual(uri, TOKEN_ENDPOINT)
-        self.assertEqual(args["grant_type"], "authorization_code")
-        self.assertEqual(args["code"], code)
-        self.assertEqual(args["client_id"], CLIENT_ID)
-        self.assertEqual(args["client_secret"], CLIENT_SECRET)
-        self.assertEqual(args["redirect_uri"], CALLBACK_URL)
+        self.assertEqual(kwargs["method"], "POST")
+        self.assertEqual(kwargs["uri"], TOKEN_ENDPOINT)
+
+        args = parse_qs(kwargs["data"].decode("utf-8"))
+        self.assertEqual(args["grant_type"], ["authorization_code"])
+        self.assertEqual(args["code"], [code])
+        self.assertEqual(args["client_id"], [CLIENT_ID])
+        self.assertEqual(args["client_secret"], [CLIENT_SECRET])
+        self.assertEqual(args["redirect_uri"], [CALLBACK_URL])
 
         # Test error handling
-        self.http_client.post_urlencoded_get_json = simple_async_mock(
-            return_value={"error": "foo", "error_description": "bar"}
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(
+                code=400,
+                phrase=b"Bad Request",
+                body=b'{"error": "foo", "error_description": "bar"}',
+            )
         )
         with self.assertRaises(OidcError) as exc:
             yield defer.ensureDeferred(self.handler._exchange_code(code))

@@ -15,7 +15,7 @@
 import json
 import logging
 from typing import Dict, Generic, List, Optional, TypeVar
-from urllib.parse import parse_qsl
+from urllib.parse import urlencode
 
 import pymacaroons
 from authlib.common.security import generate_token
@@ -28,7 +28,8 @@ from jinja2 import Environment, Template
 from pymacaroons.exceptions import MacaroonDeserializationException
 from typing_extensions import TypedDict
 
-from synapse.api.errors import HttpResponseException
+from twisted.web.client import readBody
+
 from synapse.config import ConfigError
 from synapse.http.server import finish_request
 from synapse.http.site import SynapseRequest
@@ -307,25 +308,33 @@ class OidcHandler:
         """
         metadata = await self.load_metadata()
         token_endpoint = metadata.get("token_endpoint")
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": self._http_client.user_agent,
+            "Accept": "application/json",
+        }
+
         args = {
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": self._callback_url,
         }
+        body = urlencode(args, True)
 
+        # Fill the body/headers with credentials
         uri, headers, body = self._client_auth.prepare(
-            method="POST", uri=token_endpoint, headers={}, body=""
+            method="POST", uri=token_endpoint, headers=headers, body=body
         )
         headers = {k: [v] for (k, v) in headers.items()}
-        qs = parse_qsl(body, keep_blank_values=True)
-        args.update(qs)
 
-        try:
-            resp = await self._http_client.post_urlencoded_get_json(
-                uri, args, headers=headers
-            )
-        except HttpResponseException as e:
-            resp = json.loads(e.response)
+        # Do the actual request
+        # We're not using the SimpleHttpClient util methods as we don't want
+        # to check the HTTP status code and we do the body encoding ourself.
+        response = await self._http_client.request(
+            method="POST", uri=uri, data=body.encode("utf-8"), headers=headers,
+        )
+        body = await readBody(response)
+        resp = json.loads(body)
 
         if "error" not in resp:
             return resp
@@ -589,7 +598,9 @@ class OidcHandler:
             return
 
         # and finally complete the login
-        self._auth_handler.complete_sso_login(user_id, request, client_redirect_url)
+        await self._auth_handler.complete_sso_login(
+            user_id, request, client_redirect_url
+        )
 
     def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str) -> str:
         """Extracts a caveat value from a macaroon token.
