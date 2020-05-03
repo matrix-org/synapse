@@ -1,21 +1,38 @@
 version: 2
 jobs:
   dockerhubuploadrelease:
-    machine: true
+    docker:
+    - image: docker:git
     steps:
       - checkout
-      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_TAG} -t matrixdotorg/synapse:${CIRCLE_TAG}-py3 .
-      - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}
-      - run: docker push matrixdotorg/synapse:${CIRCLE_TAG}-py3
+      - setup_remote_docker:
+           version: 18.09.3
+       - run: apk add --no-cache curl
+       - run: mkdir -vp ~/.docker/cli-plugins/ ~/dockercache
+       - run: curl --silent -L "https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
+       - run: chmod a+x ~/.docker/cli-plugins/docker-buildx
+       - run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+       - run: docker context create old-style
+       - run: docker buildx create old-style --use
+       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+       - run: docker buildx build  -f docker/Dockerfile --push --platform linux/arm64/v8,linux/amd64 --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:${CIRCLE_TAG} -t matrixdotorg/synapse:${CIRCLE_TAG}-py3 .
+
   dockerhubuploadlatest:
-    machine: true
+    docker:
+    - image: docker:git
     steps:
       - checkout
-      - run: docker build -f docker/Dockerfile --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:latest -t matrixdotorg/synapse:latest-py3 .
-      - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
-      - run: docker push matrixdotorg/synapse:latest
-      - run: docker push matrixdotorg/synapse:latest-py3
+      - setup_remote_docker:
+           version: 18.09.3
+       - run: apk add --no-cache curl
+       - run: mkdir -vp ~/.docker/cli-plugins/ ~/dockercache
+       - run: curl --silent -L "https://github.com/docker/buildx/releases/download/v0.4.1/buildx-v0.4.1.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
+       - run: chmod a+x ~/.docker/cli-plugins/docker-buildx
+       - run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+       - run: docker context create old-style
+       - run: docker buildx create old-style --use
+       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+       - run: docker buildx build  -f docker/Dockerfile --push --platform linux/arm64/v8,linux/amd64 --label gitsha1=${CIRCLE_SHA1} -t matrixdotorg/synapse:latest -t matrixdotorg/synapse:latest-py3 .
 
 workflows:
   version: 2
