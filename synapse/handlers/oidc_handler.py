@@ -39,7 +39,8 @@ logger = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = b"oidc_session"
 
-#: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and OpenID.Core sec 3.1.3.3.
+#: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
+#: OpenID.Core sec 3.1.3.3.
 Token = TypedDict(
     "Token",
     {
@@ -51,6 +52,13 @@ Token = TypedDict(
         "scope": Optional[str],
     },
 )
+
+#: A JWK, as per RFC7517 sec 4. The type could be more precise than that, but
+#: there is no real point of doing this in our case.
+JWK = Dict[str, str]
+
+#: A JWK Set, as per RFC7517 sec 5.
+JWKS = TypedDict("JWKS", {"keys": List[JWK]})
 
 
 class OidcError(Exception):
@@ -117,12 +125,12 @@ class OidcHandler:
         be found under ``synapse/res/templates/oidc_error.html``.
 
         Args:
-            request (SynapseRequest): The incoming request from the browser.
+            request: The incoming request from the browser.
                 We'll respond with an HTML page describing the error.
-            error (str): A technical identifier for this error. Those include
+            error: A technical identifier for this error. Those include
                 well-known OAuth2/OIDC error types like invalid_request or
                 access_denied.
-            error_description (str): A human-readable description of the error.
+            error_description: A human-readable description of the error.
         """
         html_bytes = self._error_template.render(
             error=error, error_description=error_description
@@ -204,7 +212,7 @@ class OidcHandler:
             ValueError: if something in the provider is not valid
 
         Returns:
-            OpenIDProviderMetadata: The providers metadata.
+            The provider's metadata.
         """
         # If we are using the OpenID Discovery documents, it needs to be loaded once
         # FIXME: should there be a lock here?
@@ -219,7 +227,7 @@ class OidcHandler:
 
         return self._provider_metadata
 
-    async def load_jwks(self, force=False) -> Dict[str, List[Dict[str, str]]]:
+    async def load_jwks(self, force=False) -> JWKS:
         """Load the JSON Web Key Set used to sign ID tokens.
 
         If we're not using the ``userinfo_endpoint``, user infos are extracted
@@ -227,10 +235,10 @@ class OidcHandler:
         The keys are then cached.
 
         Args:
-            force (bool): Force reloading the keys.
+            force: Force reloading the keys.
 
         Returns:
-            dict: The key set
+            The key set
 
             Looks like this::
 
@@ -272,7 +280,7 @@ class OidcHandler:
         ``ClientAuth`` to authenticate with the client with its ID and secret.
 
         Args:
-            code (str): The autorization code we got from the callback.
+            code: The autorization code we got from the callback.
 
         Returns:
             dict: contains various tokens.
@@ -323,7 +331,7 @@ class OidcHandler:
         """Fetch user informations from the ``userinfo_endpoint``.
 
         Args:
-            token (dict): the token given by the ``token_endpoint``.
+            token: the token given by the ``token_endpoint``.
                 Must include an ``access_token`` field.
 
         Returns:
@@ -342,14 +350,13 @@ class OidcHandler:
         """Return an instance of UserInfo from token's ``id_token``.
 
         Args:
-            token (dict): the token given by the ``token_endpoint``.
+            token: the token given by the ``token_endpoint``.
                 Must include an ``id_token`` field.
-            nonce (str): the nonce value originally sent in the initial
-                authorization request. This value should match the one inside
-                the token.
+            nonce: the nonce value originally sent in the initial authorization
+                request. This value should match the one inside the token.
 
         Returns:
-            UserInfo: an object representing the user.
+            An object representing the user.
         """
         metadata = await self.load_metadata()
         claims_params = {
@@ -416,10 +423,10 @@ class OidcHandler:
 
 
         Args:
-            request (SynapseRequest): the incoming request from the browser.
+            request: the incoming request from the browser.
                 We'll respond to it with a redirect and a cookie.
-            client_redirect_url (bytes): the URL that we should redirect the
-                client to when everything is done
+            client_redirect_url: the URL that we should redirect the client to
+                when everything is done
         """
 
         state = generate_token()
@@ -474,7 +481,7 @@ class OidcHandler:
             finish the login
 
         Args:
-            request (SynapseRequest): the incoming request from the browser.
+            request: the incoming request from the browser.
         """
 
         # The provider might redirect with an error.
@@ -575,15 +582,15 @@ class OidcHandler:
         # and finally complete the login
         self._auth_handler.complete_sso_login(user_id, request, client_redirect_url)
 
-    def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str):
+    def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str) -> str:
         """Extracts a caveat value from a macaroon token.
 
         Args:
-            macaroon (pymacaroons.Macaroon): the token
-            key (str): the key of the caveat to extract
+            macaroon: the token
+            key: the key of the caveat to extract
 
         Returns:
-            str: the extracted value
+            The extracted value
 
         Raises:
             Exception: if the caveat was not in the macaroon
@@ -594,7 +601,7 @@ class OidcHandler:
                 return caveat.caveat_id[len(prefix) :]
         raise Exception("No %s caveat in macaroon" % (key,))
 
-    def _verify_expiry(self, caveat: str):
+    def _verify_expiry(self, caveat: str) -> bool:
         prefix = "time < "
         if not caveat.startswith(prefix):
             return False
@@ -615,13 +622,13 @@ class OidcHandler:
         If a user already exists with the mxid we've mapped, raise an exception.
 
         Args:
-            userinfo (UserInfo): an object representing the user
+            userinfo: an object representing the user
 
         Raises:
             MappingException: if there was an error while mapping some properties
 
         Returns:
-            str: the mxid of the user
+            The mxid of the user
         """
         try:
             remote_user_id = self._user_mapping_provider.get_remote_user_id(userinfo)
