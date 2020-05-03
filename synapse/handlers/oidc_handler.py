@@ -328,13 +328,13 @@ class OidcHandler:
         headers = {k: [v] for (k, v) in headers.items()}
 
         # Do the actual request
-        # We're not using the SimpleHttpClient util methods as we don't want
-        # to check the HTTP status code and we do the body encoding ourself.
+        # We're not using the SimpleHttpClient util methods as we don't want to
+        # check the HTTP status code and we do the body encoding ourself.
         response = await self._http_client.request(
             method="POST", uri=uri, data=body.encode("utf-8"), headers=headers,
         )
         body = await readBody(response)
-        resp = json.loads(body)
+        resp = json.loads(body.decode("utf-8"))
 
         if "error" not in resp:
             return resp
