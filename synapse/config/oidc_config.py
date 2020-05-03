@@ -16,23 +16,13 @@
 import os.path
 
 import pkg_resources
-from jinja2 import Environment
 
 from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
 
-DEFAULT_DISPLAY_NAME_TEMPLATE = "{{ user.given_name }} {{ user.last_name }}"
-
-DEFAULT_LOCALPART_TEMPLATE = "{{ user.preferred_username }}"
-
-
-# Used to clear out "None" values in templates
-def jinja_finalize(thing):
-    return thing if thing is not None else ""
-
-
-env = Environment(finalize=jinja_finalize)
+DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingProvider"
 
 
 class OIDCConfig(Config):
@@ -72,32 +62,31 @@ class OIDCConfig(Config):
         self.oidc_subject_claim = oidc_config.get("subject_claim", "sub")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
 
-        templates_config = oidc_config.get("mapping_templates", {})
+        ump_config = oidc_config.get("user_mapping_provider", {})
+        ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
+        ump_config.setdefault("config", {})
 
-        try:
-            localpart_template = env.from_string(
-                templates_config.get("localpart", DEFAULT_LOCALPART_TEMPLATE)
-            )
-        except Exception as e:
+        (
+            self.oidc_user_mapping_provider_class,
+            self.oidc_user_mapping_provider_config,
+        ) = load_module(ump_config)
+
+        # Ensure loaded user mapping module has defined all necessary methods
+        required_methods = [
+            "get_remote_user_id",
+            "map_user_attributes",
+        ]
+        missing_methods = [
+            method
+            for method in required_methods
+            if not hasattr(self.oidc_user_mapping_provider_class, method)
+        ]
+        if missing_methods:
             raise ConfigError(
-                "invalid jinja template for oidc_config.mapping_templates.localpart: %r"
-                % (e,)
+                "Class specified by oidc_config."
+                "user_mapping_provider.module is missing required "
+                "methods: %s" % (", ".join(missing_methods),)
             )
-
-        try:
-            display_name_template = env.from_string(
-                templates_config.get("display_name", DEFAULT_DISPLAY_NAME_TEMPLATE)
-            )
-        except Exception as e:
-            raise ConfigError(
-                "invalid jinja template for oidc_config.mapping_templates.display_name: %r"
-                % (e,)
-            )
-
-        self.oidc_mapping_templates = {
-            "localpart": localpart_template,
-            "display_name": display_name_template,
-        }
 
         template_dir = oidc_config.get("template_dir")
         if template_dir is None:
@@ -161,22 +150,39 @@ class OIDCConfig(Config):
             #
             #skip_verification: false
 
-            # name of the claim containing a unique identifier for the user.
-            # OpenID Connect compliant providers should provide a `sub` claim for that.
-            #
-            #subject_claim: "sub"
 
-            # defines how the user info from the OIDC provider are mapped to user properties.
-            # Those are Jinja2 templates, where the userinfo object is available through the `user` variable.
+            # An external module can be provided here as a custom solution to mapping
+            # attributes returned from a OIDC provider onto a matrix user.
             #
-            mapping_templates:
-                # the localpart of the MXID. Defaults to {localpart_template!r}.
-                #
-                #localpart: {localpart_template!r}
+            user_mapping_provider:
+              # The custom module's class. Uncomment to use a custom module.
+              # Default is {mapping_provider!r}.
+              #
+              #module: mapping_provider.OidcMappingProvider
 
-                # display name to set on first login. Defaults to {display_name_template!r}.
+              # Custom configuration values for the module. Below options are intended
+              # for the built-in provider, they should be changed if using a custom
+              # module. This section will be passed as a Python dictionary to the
+              # module's `parse_config` method.
+              #
+              # Bellow is the config of the default mapping provider, based on Jinja2
+              # templates. Those templates are used to render user attributes, where the
+              # userinfo object is available through the `user` variable.
+              #
+              config:
+                # name of the claim containing a unique identifier for the user.
+                # Defaults to `sub`, which OpenID Connect compliant providers should provide.
                 #
-                #display_name: {display_name_template!r}
+                #subject_claim: "sub"
+
+                # Jinja2 template for the localpart of the MXID
+                #
+                localpart: "{{ user.preferred_username }}"
+
+                # Jinja2 template for the display name to set on first login. Optional.
+                #
+                #display_name: "{{ user.given_name }} {{ user.last_name }}"
+
 
             # Directory in which Synapse will try to find the template files below.
             # If not set, default templates from within the Synapse package will be used.
@@ -199,6 +205,5 @@ class OIDCConfig(Config):
             #
             #template_dir: "res/templates"
         """.format(
-            display_name_template=DEFAULT_DISPLAY_NAME_TEMPLATE,
-            localpart_template=DEFAULT_LOCALPART_TEMPLATE,
+            mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )

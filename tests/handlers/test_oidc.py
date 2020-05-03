@@ -22,7 +22,7 @@ import pymacaroons
 
 from twisted.internet import defer
 
-from synapse.handlers.oidc_handler import OidcError, OidcHandler
+from synapse.handlers.oidc_handler import OidcError, OidcHandler, OidcMappingProvider
 from synapse.types import UserID
 
 from tests.unittest import HomeserverTestCase, override_config
@@ -54,6 +54,8 @@ COMMON_CONFIG = {
 # between the callback & redirect handlers.
 COOKIE_NAME = b"oidc_session"
 COOKIE_PATH = "/_synapse/oidc"
+
+MockedMappingProvider = Mock(OidcMappingProvider)
 
 
 def simple_async_mock(return_value):
@@ -121,6 +123,9 @@ class OidcHandlerTestCase(HomeserverTestCase):
         oidc_config["client_secret"] = CLIENT_SECRET
         oidc_config["issuer"] = ISSUER
         oidc_config["scopes"] = SCOPES
+        oidc_config["user_mapping_provider"] = {
+            "module": __name__ + ".MockedMappingProvider"
+        }
         config["oidc_config"] = oidc_config
 
         hs = self.setup_test_homeserver(

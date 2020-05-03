@@ -14,7 +14,7 @@
 # limitations under the License.
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, Generic, List, Optional, TypeVar
 from urllib.parse import parse_qsl
 
 import pymacaroons
@@ -24,10 +24,12 @@ from authlib.oauth2.auth import ClientAuth
 from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
-from jinja2 import Template
+from jinja2 import Environment, Template
 from pymacaroons.exceptions import MacaroonDeserializationException
+from typing_extensions import TypedDict
 
 from synapse.api.errors import HttpResponseException
+from synapse.config import ConfigError
 from synapse.http.server import finish_request
 from synapse.push.mailer import load_jinja2_templates
 from synapse.server import HomeServer
@@ -36,6 +38,19 @@ from synapse.types import UserID, map_username_to_mxid_localpart
 logger = logging.getLogger(__name__)
 
 SESSION_COOKIE_NAME = b"oidc_session"
+
+#: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and OpenID.Core sec 3.1.3.3.
+Token = TypedDict(
+    "Token",
+    {
+        "access_token": str,
+        "token_type": str,
+        "id_token": Optional[str],
+        "refresh_token": Optional[str],
+        "expires_in": int,
+        "scope": Optional[str],
+    },
+)
 
 
 class OidcError(Exception):
@@ -73,9 +88,9 @@ class OidcHandler:
             jwks_uri=hs.config.oidc_jwks_uri,
         )  # type: OpenIDProviderMetadata
         self._provider_needs_discovery = hs.config.oidc_discover  # type: bool
-        self._mapping_templates = (
-            hs.config.oidc_mapping_templates
-        )  # type: Dict[str, Template]
+        self._user_mapping_provider = hs.config.oidc_user_mapping_provider_class(
+            hs.config.oidc_user_mapping_provider_config
+        )  # type: OidcMappingProvider
         self._skip_verification = hs.config.oidc_skip_verification  # type: bool
 
         self._http_client = hs.get_proxied_http_client()
@@ -249,7 +264,7 @@ class OidcHandler:
         self._provider_metadata["jwks"] = jwk_set
         return jwk_set
 
-    async def _exchange_code(self, code: str) -> Dict[str, str]:
+    async def _exchange_code(self, code: str) -> Token:
         """Exchange an authorization code for a token.
 
         This calls the ``token_endpoint`` with the authorization code we
@@ -304,7 +319,7 @@ class OidcHandler:
         description = resp.get("error_description", error)
         raise OidcError(error, description)
 
-    async def _fetch_userinfo(self, token: Dict[str, str]) -> UserInfo:
+    async def _fetch_userinfo(self, token: Token) -> UserInfo:
         """Fetch user informations from the ``userinfo_endpoint``.
 
         Args:
@@ -323,7 +338,7 @@ class OidcHandler:
 
         return UserInfo(resp)
 
-    async def _parse_id_token(self, token: Dict[str, str], nonce: str) -> UserInfo:
+    async def _parse_id_token(self, token: Token, nonce: str) -> UserInfo:
         """Return an instance of UserInfo from token's ``id_token``.
 
         Args:
@@ -608,9 +623,12 @@ class OidcHandler:
         Returns:
             str: the mxid of the user
         """
-        remote_user_id = userinfo.get(self._subject_claim)
-        if remote_user_id is None:
-            raise MappingException("Failed to extract subject from OIDC response")
+        try:
+            remote_user_id = self._user_mapping_provider.get_remote_user_id(userinfo)
+        except Exception as e:
+            raise MappingException(
+                "Failed to extract subject from OIDC response: %s" % (e,)
+            )
 
         logger.info(
             "Looking for existing mapping for user %s:%s",
@@ -626,19 +644,22 @@ class OidcHandler:
             logger.info("Found existing mapping %s", registered_user_id)
             return registered_user_id
 
-        # render the localpart template, raise if empty
-        localpart = self._mapping_templates["localpart"].render(user=userinfo).strip()
-        if localpart == "":
-            raise MappingException("rendered localpart is empty")
+        try:
+            attributes = self._user_mapping_provider.map_user_attributes(userinfo)
+        except Exception as e:
+            raise MappingException(
+                "Could not extract user attributes from OIDC response: %s"
+                % (e.message,)
+            )
 
-        localpart = map_username_to_mxid_localpart(localpart)
+        logger.debug(
+            "Retrieved user attributes from user mapping provider: %r", attributes
+        )
 
-        # render the display_name template, fallback to None
-        displayname = (
-            self._mapping_templates["display_name"].render(user=userinfo).strip()
-        )  # Optional[str]
-        if displayname == "":
-            displayname = None
+        if attributes["localpart"] == "":
+            raise MappingException("localpart is empty")
+
+        localpart = map_username_to_mxid_localpart(attributes["localpart"])
 
         user_id = UserID(localpart, self._hostname)
         if await self._datastore.get_users_by_id_case_insensitive(user_id.to_string()):
@@ -650,10 +671,143 @@ class OidcHandler:
         # It's the first time this user is logging in and the mapped mxid was
         # not taken, register the user
         registered_user_id = await self._registration_handler.register_user(
-            localpart=localpart, default_display_name=displayname,
+            localpart=localpart, default_display_name=attributes["display_name"],
         )
 
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
         )
         return registered_user_id
+
+
+UserAttribute = TypedDict(
+    "UserAttribute", {"localpart": str, "display_name": Optional[str]}
+)
+C = TypeVar("C")
+
+
+class OidcMappingProvider(Generic[C]):
+    """A mapping provider maps a UserInfo object to user attributes.
+
+    It should provide the API described by this class.
+    """
+
+    def __init__(self, config: C):
+        """
+        Args:
+            config: A custom config object from this module, parsed by ``parse_config()``
+        """
+        pass
+
+    @staticmethod
+    def parse_config(config: dict) -> C:
+        """Parse the dict provided by the homeserver's config
+
+        Args:
+            config: A dictionary containing configuration options for this provider
+
+        Returns:
+            A custom config object for this module
+        """
+        raise NotImplementedError()
+
+    def get_remote_user_id(self, userinfo: UserInfo) -> str:
+        """Get a unique user ID for this user.
+
+        Usually, in an OIDC-compliant scenario, it should be the ``sub`` claim from the UserInfo object.
+
+        Args:
+            userinfo: An object representing the user given by the OIDC provider
+
+        Returns:
+            A unique user ID
+        """
+        raise NotImplementedError()
+
+    def map_user_attributes(self, userinfo: UserInfo) -> UserAttribute:
+        """Map a ``UserInfo`` objects into user attributes.
+
+        Args:
+            userinfo: An object representing the user given by the OIDC provider
+
+        Returns:
+            A dict containing the ``localpart`` and (optionally) the ``display_name``
+        """
+        raise NotImplementedError()
+
+
+# Used to clear out "None" values in templates
+def jinja_finalize(thing):
+    return thing if thing is not None else ""
+
+
+env = Environment(finalize=jinja_finalize)
+
+JinjaOidcMappingConfig = TypedDict(
+    "JinjaOidcMappingConfig",
+    {
+        "subject_claim": str,
+        "localpart_template": Template,
+        "display_name_template": Optional[Template],
+    },
+)
+
+
+class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
+    """An implementation of a mapping provider based on Jinja templates.
+
+    This is the default mapping provider.
+    """
+
+    def __init__(self, config: JinjaOidcMappingConfig):
+        self._config = config
+
+    @staticmethod
+    def parse_config(config: dict) -> JinjaOidcMappingConfig:
+        subject_claim = config.get("subject_claim", "sub")
+
+        if "localpart_template" not in config:
+            raise ConfigError(
+                "missing key: oidc_config.user_mapping_provider.config.localpart_template"
+            )
+
+        try:
+            localpart_template = env.from_string(config["localpart_template"])
+        except Exception as e:
+            raise ConfigError(
+                "invalid jinja template for oidc_config.user_mapping_provider.config.localpart_template: %r"
+                % (e,)
+            )
+
+        display_name_template: Optional[Template] = None
+        if "display_name_template" in config:
+            try:
+                display_name_template = env.from_string(config["display_name_template"])
+            except Exception as e:
+                raise ConfigError(
+                    "invalid jinja template for oidc_config.user_mapping_provider.config.display_name_template: %r"
+                    % (e,)
+                )
+
+        return JinjaOidcMappingConfig(
+            subject_claim=subject_claim,
+            localpart_template=localpart_template,
+            display_name_template=display_name_template,
+        )
+
+    def get_remote_user_id(self, userinfo: UserInfo) -> str:
+        return userinfo[self._config["subject_claim"]]
+
+    def map_user_attributes(self, userinfo: UserInfo) -> UserAttribute:
+        localpart = self._config["localpart_template"].render(user=userinfo).strip()
+
+        display_name: Optional[str] = None
+        if self._config["display_name_template"] is not None:
+            display_name = (
+                self._config["display_name_template"].render(user=userinfo).strip()
+            )
+
+            if display_name == "":
+                display_name = None
+
+        return UserAttribute(localpart=localpart, display_name=display_name)

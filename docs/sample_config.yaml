@@ -1512,22 +1512,39 @@ oidc_config:
     #
     #skip_verification: false
 
-    # name of the claim containing a unique identifier for the user.
-    # OpenID Connect compliant providers should provide a `sub` claim for that.
-    #
-    #subject_claim: "sub"
 
-    # defines how the user info from the OIDC provider are mapped to user properties.
-    # Those are Jinja2 templates, where the userinfo object is available through the `user` variable.
+    # An external module can be provided here as a custom solution to mapping
+    # attributes returned from a OIDC provider onto a matrix user.
     #
-    mapping_templates:
-        # the localpart of the MXID. Defaults to '{{ user.preferred_username }}'.
-        #
-        #localpart: '{{ user.preferred_username }}'
+    user_mapping_provider:
+      # The custom module's class. Uncomment to use a custom module.
+      # Default is 'synapse.handlers.oidc_handler.JinjaOidcMappingProvider'.
+      #
+      #module: mapping_provider.OidcMappingProvider
 
-        # display name to set on first login. Defaults to '{{ user.given_name }} {{ user.last_name }}'.
+      # Custom configuration values for the module. Below options are intended
+      # for the built-in provider, they should be changed if using a custom
+      # module. This section will be passed as a Python dictionary to the
+      # module's `parse_config` method.
+      #
+      # Bellow is the config of the default mapping provider, based on Jinja2
+      # templates. Those templates are used to render user attributes, where the
+      # userinfo object is available through the `user` variable.
+      #
+      config:
+        # name of the claim containing a unique identifier for the user.
+        # Defaults to `sub`, which OpenID Connect compliant providers should provide.
         #
-        #display_name: '{{ user.given_name }} {{ user.last_name }}'
+        #subject_claim: "sub"
+
+        # Jinja2 template for the localpart of the MXID
+        #
+        localpart: "{ user.preferred_username }"
+
+        # Jinja2 template for the display name to set on first login. Optional.
+        #
+        #display_name: "{ user.given_name } { user.last_name }"
+
 
     # Directory in which Synapse will try to find the template files below.
     # If not set, default templates from within the Synapse package will be used.
