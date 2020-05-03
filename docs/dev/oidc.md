@@ -53,9 +53,10 @@ oidc_config:
    scopes:
      - openid
      - profile
-   mapping_templates:
-     localpart: '{{ user.name }}'
-     display_name: '{{ user.name|capitalize }}'
+   user_mapping_provider:
+     config:
+       localpart: '{{ user.name }}'
+       display_name: '{{ user.name|capitalize }}'
 ```
 
 ### [Auth0][auth0]
@@ -95,9 +96,10 @@ oidc_config:
    scopes:
      - openid
      - profile
-   mapping_templates:
-     localpart: '{{ user.preferred_username }}'
-     display_name: '{{ user.name }}'
+   user_mapping_provider:
+     config:
+       localpart: '{{ user.preferred_username }}'
+       display_name: '{{ user.name }}'
 ```
 
 ### GitHub
@@ -122,9 +124,10 @@ oidc_config:
    subject_claim: 'id'
    scopes:
      - read:user
-   mapping_templates:
-     localpart: '{{ user.login }}'
-     display_name: '{{ user.name }}'
+   user_mapping_provider:
+     config:
+       localpart: '{{ user.login }}'
+       display_name: '{{ user.name }}'
 ```
 
 ### Google
@@ -143,7 +146,8 @@ oidc_config:
    scopes:
      - openid
      - profile
-   mapping_templates:
-     localpart: '{{ user.given_name|lower }}'
-     display_name: '{{ user.name }}'
+   user_mapping_provider:
+     config:
+       localpart: '{{ user.given_name|lower }}'
+       display_name: '{{ user.name }}'
 ```
