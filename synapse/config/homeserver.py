@@ -55,6 +55,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ServerConfig,
         TlsConfig,
+        CacheConfig,
         DatabaseConfig,
         LoggingConfig,
         RatelimitConfig,
@@ -85,5 +86,4 @@ class HomeServerConfig(RootConfig):
         ThirdPartyRulesConfig,
         TracerConfig,
         RedisConfig,
-        CacheConfig,
     ]

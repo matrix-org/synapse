@@ -70,31 +70,41 @@ class CacheConfig(Config):
 
     def generate_config_section(self, **kwargs):
         return """\
-        ## Cache Configuration ##
+        ## Caching ##
 
         # Caching can be configured through the following options.
         #
+        # A cache 'factor' is a multiplier that can be applied to each of
+        # Synapse's caches in order to increase or decrease the maximum
+        # number of entries that can be stored.
 
-        # The number of events to cache in memory. Not affected by the
+        # The number of events to cache in memory. Not affected by
         # caches.global_factor.
         #
         #event_cache_size: 10K
 
         caches:
-           # Controls the global cache factor. This can be overridden by the
-           # "SYNAPSE_CACHE_FACTOR" environment variable.
+           # Controls the global cache factor, which is the default cache factor
+           # for all caches if a specific factor for that cache is not otherwise
+           # set.
            #
-           # global_factor: 0.5
+           # This can also be set by the "SYNAPSE_CACHE_FACTOR" environment
+           # variable. Setting by environment variable takes priority over
+           # setting through the config file.
+           #
+           #global_factor: 0.5
 
            # A dictionary of cache name to cache factor for that individual
-           # cache. This can be overridden by environment variables
-           # comprised of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in
-           # capital letters and underscores.
+           # cache. Overrides the global cache factor for a given cache.
            #
+           # These can also be set through environment variables comprised
+           # of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in capital
+           # letters and underscores. Setting by environment variable
+           # takes priority over setting through the config file.
            # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2
            #
-           # per_cache_factors:
-           #   get_users_who_share_room_with_user: 2
+           per_cache_factors:
+             #get_users_who_share_room_with_user: 2
         """
 
     def read_config(self, config, **kwargs):
@@ -114,7 +124,7 @@ class CacheConfig(Config):
         properties.default_factor_size = self.global_factor
 
         # Load cache factors from the config
-        individual_factors = cache_config.get("per_cache_factors", {}) or {}
+        individual_factors = cache_config.get("per_cache_factors") or {}
         if not isinstance(individual_factors, dict):
             raise ConfigError("caches.per_cache_factors must be a dictionary")
 
