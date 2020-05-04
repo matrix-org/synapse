@@ -35,18 +35,19 @@ exclude .dockerignore
 exclude test_postgresql.sh
 exclude .editorconfig
 exclude sytest-blacklist
+exclude mypy.ini
+exclude .codecov.yml
+exclude .coveragerc
 
 include pyproject.toml
 recursive-include changelog.d *
 
 prune .buildkite
 prune .circleci
-prune .codecov.yml
-prune .coveragerc
 prune .github
 prune debian
 prune demo/etc
 prune docker
-prune mypy.ini
 prune snap
 prune stubs
+prune contrib
