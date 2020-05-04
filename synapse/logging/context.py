@@ -27,8 +27,8 @@ import inspect
 import logging
 import threading
 import types
-from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 import warnings
+from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 
 from typing_extensions import Literal
 
@@ -299,9 +299,10 @@ class LoggingContext(object):
             LoggingContext: the current logging context
         """
         warnings.warn(
-            'synapse.logging.context.LoggingContext.current_context() is deprecated '
-            'in favor of synapse.logging.context.current_context().',
-            PendingDeprecationWarning, stacklevel=2,
+            "synapse.logging.context.LoggingContext.current_context() is deprecated "
+            "in favor of synapse.logging.context.current_context().",
+            PendingDeprecationWarning,
+            stacklevel=2,
         )
         return current_context()
 
@@ -320,9 +321,10 @@ class LoggingContext(object):
             The context that was previously active
         """
         warnings.warn(
-            'synapse.logging.context.LoggingContext.set_current_context() is deprecated '
-            'in favor of synapse.logging.context.set_current_context().',
-            PendingDeprecationWarning, stacklevel=2,
+            "synapse.logging.context.LoggingContext.set_current_context() is deprecated "
+            "in favor of synapse.logging.context.set_current_context().",
+            PendingDeprecationWarning,
+            stacklevel=2,
         )
         return set_current_context(context)
 
