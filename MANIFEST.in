@@ -30,14 +30,14 @@ recursive-include synapse/static *.gif
 recursive-include synapse/static *.html
 recursive-include synapse/static *.js
 
-exclude Dockerfile
-exclude .dockerignore
-exclude test_postgresql.sh
-exclude .editorconfig
-exclude sytest-blacklist
-exclude mypy.ini
 exclude .codecov.yml
 exclude .coveragerc
+exclude .dockerignore
+exclude .editorconfig
+exclude Dockerfile
+exclude mypy.ini
+exclude sytest-blacklist
+exclude test_postgresql.sh
 
 include pyproject.toml
 recursive-include changelog.d *
@@ -45,9 +45,9 @@ recursive-include changelog.d *
 prune .buildkite
 prune .circleci
 prune .github
+prune contrib
 prune debian
 prune demo/etc
 prune docker
 prune snap
 prune stubs
-prune contrib
