@@ -132,7 +132,7 @@ class DatabaseConfig(Config):
         database_path = config.get("database_path")
 
         if multi_database_config and database_config:
-            raise ConfigError("Can't specify both 'database' and 'datbases' in config")
+            raise ConfigError("Can't specify both 'database' and 'databases' in config")
 
         if multi_database_config:
             if database_path:

@@ -85,6 +85,7 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
             prepare_database(db_conn, self, config=None)
 
         db_conn.create_function("rank", 1, _rank)
+        db_conn.execute("PRAGMA foreign_keys = ON;")
 
     def is_deadlock(self, error):
         return False

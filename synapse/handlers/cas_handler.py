@@ -206,7 +206,7 @@ class CasHandler:
         registered_user_id = await self._auth_handler.check_user_exists(user_id)
 
         if session:
-            self._auth_handler.complete_sso_ui_auth(
+            await self._auth_handler.complete_sso_ui_auth(
                 registered_user_id, session, request,
             )
 
