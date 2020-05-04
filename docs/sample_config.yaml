@@ -613,7 +613,9 @@ caches:
    # variable. Setting by environment variable takes priority over
    # setting through the config file.
    #
-   #global_factor: 0.5
+   # Defaults to 0.5, which will half the size of all caches.
+   #
+   #global_factor: 1.0
 
    # A dictionary of cache name to cache factor for that individual
    # cache. Overrides the global cache factor for a given cache.
@@ -622,10 +624,10 @@ caches:
    # of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in capital
    # letters and underscores. Setting by environment variable
    # takes priority over setting through the config file.
-   # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2
+   # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
    #
    per_cache_factors:
-     #get_users_who_share_room_with_user: 2
+     #get_users_who_share_room_with_user: 2.0
 
 
 ## Database ##
