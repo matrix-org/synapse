@@ -287,6 +287,18 @@ class LoggingContext(object):
             return str(self.request)
         return "%s@%x" % (self.name, id(self))
 
+    @classmethod
+    def current_context(cls) -> LoggingContextOrSentinel:
+        """Get the current logging context from thread local storage
+
+        This exists for backwards compatibility. ``current_context()`` should be
+        called directly.
+
+        Returns:
+            LoggingContext: the current logging context
+        """
+        return current_context()
+
     def __enter__(self) -> "LoggingContext":
         """Enters this logging context into thread local storage"""
         old_context = set_current_context(self)
