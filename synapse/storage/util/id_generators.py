@@ -20,7 +20,7 @@ from typing import Dict, Set, Tuple
 
 from typing_extensions import Deque
 
-from synapse.storage.database import Database
+from synapse.storage.database import Database, LoggingTransaction
 
 
 class IdGenerator(object):
@@ -253,7 +253,7 @@ class MultiWriterIdGenerator:
         self, db_conn, table: str, instance_column: str, id_column: str
     ) -> Dict[str, int]:
         sql = """
-            select %(instance)s, MAX(%(id)s) FROM %(table)s
+            SELECT %(instance)s, MAX(%(id)s) FROM %(table)s
             GROUP BY %(instance)s
         """ % {
             "instance": instance_column,
@@ -284,8 +284,9 @@ class MultiWriterIdGenerator:
         """
         next_id = await self._db.runInteraction("_load_next_id", self._load_next_id_txn)
 
-        # Assert the fetched ID is actually greater than what we think it is.
-        # If not, then the sequence and table have got out of sync somehow.
+        # Assert the fetched ID is actually greater than what we currently
+        # believe the ID to be. If not, then the sequence and table have got
+        # out of sync somehow.
         assert self.get_current_token() < next_id
 
         with self._lock:
@@ -296,18 +297,11 @@ class MultiWriterIdGenerator:
             try:
                 yield next_id
             finally:
-                with self._lock:
-                    self._unfinished_ids.discard(next_id)
-
-                    if all(c > next_id for c in self._unfinished_ids):
-                        curr = self._current_positions.get(self._instance_name, 0)
-                        self._current_positions[self._instance_name] = max(
-                            curr, next_id
-                        )
+                self._mark_id_as_finished(next_id)
 
         return manager()
 
-    def get_next_txn(self, txn):
+    def get_next_txn(self, txn: LoggingTransaction):
         """
         Usage:
 
@@ -317,22 +311,27 @@ class MultiWriterIdGenerator:
 
         next_id = self._load_next_id_txn(txn)
 
-        def _on_end_txn():
-            with self._lock:
-                self._unfinished_ids.discard(next_id)
-
-                # Figure out if its safe to advance the position.
-                if all(c > next_id for c in self._unfinished_ids):
-                    curr = self._current_positions.get(self._instance_name, 0)
-                    self._current_positions[self._instance_name] = max(curr, next_id)
-
         with self._lock:
             self._unfinished_ids.add(next_id)
 
-        txn.call_after(_on_end_txn)
-        txn.call_on_exception(_on_end_txn)
+        txn.call_after(self._mark_id_as_finished, next_id)
+        txn.call_on_exception(self._mark_id_as_finished, next_id)
 
         return next_id
+
+    def _mark_id_as_finished(self, next_id: int):
+        """The ID has finished being processed so we should advance the
+        current poistion if possible.
+        """
+
+        with self._lock:
+            self._unfinished_ids.discard(next_id)
+
+            # Figure out if its safe to advance the position by checking there
+            # aren't any lower allocated IDs that are yet to finish.
+            if all(c > next_id for c in self._unfinished_ids):
+                curr = self._current_positions.get(self._instance_name, 0)
+                self._current_positions[self._instance_name] = max(curr, next_id)
 
     def get_current_token(self, instance_name: str = None) -> int:
         """Gets the current position of a named writer (defaults to current

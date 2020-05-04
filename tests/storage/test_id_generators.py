@@ -68,12 +68,20 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.get_success(self.db.runInteraction("test_single_instance", _insert))
 
     def test_empty(self):
+        """Test an ID generator against an empty database gives sensible
+        current positions.
+        """
+
         id_gen = self._create_id_generator()
 
         # The table is empty so we expect an empty map for positions
         self.assertEqual(id_gen.get_positions(), {})
 
     def test_single_instance(self):
+        """Test that reads and writes from a single process are handled
+        correctly.
+        """
+
         # Prefill table with 7 rows written by 'master'
         self._insert_rows("master", 7)
 
@@ -98,6 +106,9 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen.get_current_token("master"), 8)
 
     def test_multi_instance(self):
+        """Test that reads and writes from multiple processes are handled
+        correctly.
+        """
         self._insert_rows("first", 3)
         self._insert_rows("second", 4)
 
@@ -106,7 +117,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.assertEqual(first_id_gen.get_positions(), {"first": 3, "second": 7})
         self.assertEqual(first_id_gen.get_current_token("first"), 3)
-        self.assertEqual(first_id_gen.get_current_token("first"), 3)
+        self.assertEqual(first_id_gen.get_current_token("second"), 7)
 
         # Try allocating a new ID gen and check that we only see position
         # advanced after we leave the context manager.
@@ -146,6 +157,9 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(second_id_gen.get_positions(), {"first": 8, "second": 9})
 
     def test_get_next_txn(self):
+        """Test that the `get_next_txn` function works correctly.
+        """
+
         # Prefill table with 7 rows written by 'master'
         self._insert_rows("master", 7)
 
