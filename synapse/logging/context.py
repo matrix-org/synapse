@@ -299,6 +299,22 @@ class LoggingContext(object):
         """
         return current_context()
 
+    @classmethod
+    def set_current_context(
+        cls, context: LoggingContextOrSentinel
+    ) -> LoggingContextOrSentinel:
+        """Set the current logging context in thread local storage
+
+        This exists for backwards compatibility. ``set_current_context()`` should be
+        called directly.
+
+        Args:
+            context(LoggingContext): The context to activate.
+        Returns:
+            The context that was previously active
+        """
+        return set_current_context(context)
+
     def __enter__(self) -> "LoggingContext":
         """Enters this logging context into thread local storage"""
         old_context = set_current_context(self)
