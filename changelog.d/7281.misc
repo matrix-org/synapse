@@ -1,1 +1,1 @@
-Add MultiWriterIdGenerator.
+Add MultiWriterIdGenerator to support multiple concurrent writers of streams.
