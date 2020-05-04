@@ -976,25 +976,12 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     ):
         """Implements RoomMemberHandler._remote_reject_invite
         """
-        fed_handler = self.federation_handler
-        try:
-            ret = yield defer.ensureDeferred(
-                fed_handler.do_remotely_reject_invite(
-                    remote_room_hosts, room_id, target.to_string(), content=content,
-                )
+        ret = yield defer.ensureDeferred(
+            self.federation_handler.do_remotely_reject_invite(
+                remote_room_hosts, room_id, target.to_string(), content=content,
             )
-            return ret
-        except Exception as e:
-            # if we were unable to reject the exception, just mark
-            # it as rejected on our end and plough ahead.
-            #
-            # The 'except' clause is very broad, but we need to
-            # capture everything from DNS failures upwards
-            #
-            logger.warning("Failed to reject invite: %s", e)
-
-            yield self.store.locally_reject_invite(target.to_string(), room_id)
-            return {}
+        )
+        return ret if ret else {}
 
     def _user_joined_room(self, target, room_id):
         """Implements RoomMemberHandler._user_joined_room

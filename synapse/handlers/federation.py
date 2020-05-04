@@ -1547,7 +1547,7 @@ class FederationHandler(BaseHandler):
 
     async def do_remotely_reject_invite(
         self, target_hosts: Iterable[str], room_id: str, user_id: str, content: JsonDict
-    ) -> EventBase:
+    ) -> Optional[EventBase]:
         origin, event, room_version = await self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
@@ -1564,12 +1564,26 @@ class FederationHandler(BaseHandler):
         except ValueError:
             pass
 
-        await self.federation_client.send_leave(target_hosts, event)
+        try:
+            await self.federation_client.send_leave(target_hosts, event)
+            return event
+        except Exception as e:
+            # if we were unable to reject the exception, just mark
+            # it as rejected on our end and plough ahead.
+            #
+            # The 'except' clause is very broad, but we need to
+            # capture everything from DNS failures upwards
+            #
+            logger.warning("Failed to reject invite: %s", e)
 
-        context = await self.state_handler.compute_event_context(event)
-        await self.persist_events_and_notify([(event, context)])
-
-        return event
+            await self.store.locally_reject_invite(user_id, room_id)
+            return None
+        finally:
+            # This block will always run before returning, and will return with
+            # whatever value was returned in the try/except blocks
+            # (it will not, for example, be over-written by None)
+            context = await self.state_handler.compute_event_context(event)
+            await self.persist_events_and_notify([(event, context)])
 
     async def _make_and_verify_event(
         self,

@@ -135,24 +135,10 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
 
         logger.info("remote_reject_invite: %s out of room: %s", user_id, room_id)
 
-        try:
-            event = await self.federation_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, user_id, event_content,
-            )
-            ret = event.get_pdu_json()
-        except Exception as e:
-            # if we were unable to reject the exception, just mark
-            # it as rejected on our end and plough ahead.
-            #
-            # The 'except' clause is very broad, but we need to
-            # capture everything from DNS failures upwards
-            #
-            logger.warning("Failed to reject invite: %s", e)
-
-            await self.store.locally_reject_invite(user_id, room_id)
-            ret = {}
-
-        return 200, ret
+        event = await self.federation_handler.do_remotely_reject_invite(
+            remote_room_hosts, room_id, user_id, event_content,
+        )
+        return 200, event.get_pdu_json() if event else 200, {}
 
 
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
