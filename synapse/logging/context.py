@@ -28,6 +28,7 @@ import logging
 import threading
 import types
 from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
+import warnings
 
 from typing_extensions import Literal
 
@@ -297,6 +298,11 @@ class LoggingContext(object):
         Returns:
             LoggingContext: the current logging context
         """
+        warnings.warn(
+            'synapse.logging.context.LoggingContext.current_context() is deprecated '
+            'in favor of synapse.logging.context.current_context().',
+            PendingDeprecationWarning, stacklevel=2,
+        )
         return current_context()
 
     @classmethod
@@ -313,6 +319,11 @@ class LoggingContext(object):
         Returns:
             The context that was previously active
         """
+        warnings.warn(
+            'synapse.logging.context.LoggingContext.set_current_context() is deprecated '
+            'in favor of synapse.logging.context.set_current_context().',
+            PendingDeprecationWarning, stacklevel=2,
+        )
         return set_current_context(context)
 
     def __enter__(self) -> "LoggingContext":
