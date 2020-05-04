@@ -74,6 +74,9 @@ class VersionsRestServlet(RestServlet):
                     #"org.matrix.e2e_cross_signing": True,
                     # Implements additional endpoints as described in MSC2432
                     "org.matrix.msc2432": True,
+                    # Tchap does not currently assume this rule for r0.5.0
+                    # XXX: Remove this when it does
+                    "m.lazy_load_members": True,
                 },
             },
         )
