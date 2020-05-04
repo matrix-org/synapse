@@ -61,6 +61,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     outbound_redis_connection = None  # type: txredisapi.RedisProtocol
 
     def connectionMade(self):
+        super().connectionMade()
         logger.info("Connected to redis instance")
         self.subscribe(self.stream_name)
         self.send_command(ReplicateCommand())
@@ -119,6 +120,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
             logger.warning("Unhandled command: %r", cmd)
 
     def connectionLost(self, reason):
+        super().connectionLost(reason)
         logger.info("Lost connection to redis instance")
         self.handler.lost_connection(self)
 
@@ -189,5 +191,6 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         p.handler = self.handler
         p.outbound_redis_connection = self.outbound_redis_connection
         p.stream_name = self.stream_name
+        p.password = self.password
 
         return p
