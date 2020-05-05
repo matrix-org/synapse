@@ -996,7 +996,7 @@ class ServerConfig(Config):
         # act as if no error happened and return a fake session ID ('sid') to clients.
         #
         #request_token_inhibit_3pid_errors: true
-        
+
         # Number of forward extremities in a room at which Synapse will send a dummy
         # events.
         # This is to prevent forward extremities from building up in the room, which
