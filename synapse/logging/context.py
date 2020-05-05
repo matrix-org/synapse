@@ -245,6 +245,7 @@ class LoggingContext(object):
         "name",
         "parent_context",
         "_resource_usage",
+        "_prev_resource_usage",
         "usage_start",
         "main_thread",
         "finished",
@@ -259,6 +260,7 @@ class LoggingContext(object):
 
         # track the resources used by this context so far
         self._resource_usage = ContextResourceUsage()
+        self._prev_resource_usage = None  # type: Optional[ContextResourceUsage]
 
         # The thread resource usage when the logcontext became active. None
         # if the context is not currently active.
@@ -434,12 +436,18 @@ class LoggingContext(object):
             self._resource_usage.ru_utime += utime_delta
             self._resource_usage.ru_stime += stime_delta
 
-            # if we have a parent, pass our CPU usage stats on
+            # if we have a parent, pass the change in our usage stats on.
             if self.parent_context:
-                self.parent_context._resource_usage += self._resource_usage
+                if self._prev_resource_usage:
+                    delta_resource_usage = (
+                        self._resource_usage - self._prev_resource_usage
+                    )
+                else:
+                    delta_resource_usage = self._resource_usage
+                self.parent_context._resource_usage += delta_resource_usage
 
-                # reset them in case we get entered again
-                self._resource_usage.reset()
+                # Store the current usage for future deltas.
+                self._prev_resource_usage = self._resource_usage.copy()
         finally:
             self.usage_start = None
 
