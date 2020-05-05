@@ -997,8 +997,8 @@ class ServerConfig(Config):
         #
         #request_token_inhibit_3pid_errors: true
         
-        # Number of forward extremities in a room at which Synapse will start sending
-        # dummy events.
+        # Number of forward extremities in a room at which Synapse will send a dummy
+        # events.
         # This is to prevent forward extremities from building up in the room, which
         # could lead to poor performance.
         # The default value is 10.
