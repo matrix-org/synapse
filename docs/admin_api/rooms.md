@@ -288,7 +288,6 @@ The following fields are possible in the JSON response body:
 * `guest_access` - Whether guests can join the room. One of: ["can_join", "forbidden"].
 * `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
 * `state_events` - Total number of state_events of a room. Complexity of the room.
-* `members` - An array of user ids.
 
 ## Usage
 
@@ -318,6 +317,5 @@ Response:
   "guest_access": null,
   "history_visibility": "shared",
   "state_events": 93534
-  "members": ["@foo:matrix.org", "@bar:matrix.org"]
 }
 ```

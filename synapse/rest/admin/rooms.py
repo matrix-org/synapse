@@ -275,9 +275,6 @@ class RoomRestServlet(RestServlet):
         if not ret:
             raise NotFoundError("Room not found")
 
-        members = await self.store.get_users_in_room(room_id)
-        ret["members"] = members
-
         return 200, ret
 
 
