@@ -506,9 +506,7 @@ class ServerConfig(Config):
         )
 
         # The number of forward extremities in a room needed to send a dummy event.
-        self.dummy_event_threshold = config.get(
-            "dummy_event_threshold", 10,
-        )
+        self.dummy_event_threshold = config.get("dummy_event_threshold", 10)
 
         self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
 
