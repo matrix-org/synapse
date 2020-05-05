@@ -71,6 +71,11 @@ class OidcError(Exception):
         self.error = error
         self.error_description = error_description
 
+    def __str__(self):
+        if self.error_description:
+            return "{}: {}".format(self.error, self.error_description)
+        return self.error
+
 
 class MappingException(Exception):
     """Used to catch errors when mapping the UserInfo object
@@ -334,6 +339,11 @@ class OidcHandler:
             method="POST", uri=uri, data=body.encode("utf-8"), headers=headers,
         )
 
+        # This is used in multiple error messages bellow
+        status = "{code} {phrase}".format(
+            code=response.code, phrase=response.phrase.decode("utf-8")
+        )
+
         if response.code >= 500:
             # In case of a server error, we should first try to decode the body
             # and check for an error field. If not, we respond with a generic
@@ -348,9 +358,9 @@ class OidcHandler:
                 error = "server_error"
                 description = (
                     (
-                        'Authorization server responded with a "{code} {phrase}" error '
+                        'Authorization server responded with a "{status}" error '
                         "while exchanging the authorization code."
-                    ).format(code=response.code, phrase=response.phrase),
+                    ).format(status=status),
                 )
 
             raise OidcError(error, description)
@@ -368,9 +378,9 @@ class OidcHandler:
             if response.code < 400:
                 logger.warning(
                     "Invalid response from the authorization server: "
-                    "responded with a '{code} {phrase}' "
+                    'responded with a "{status}" '
                     "but body has an error field: {error!r}".format(
-                        code=response.code, phrase=response.phrase, error=resp["error"]
+                        status=status, error=resp["error"]
                     )
                 )
 
@@ -382,12 +392,14 @@ class OidcHandler:
         # only throw on a 4xx code.
         if response.code >= 400:
             description = (
-                'Authorization server responded with a "{code} {phrase}" error'
+                'Authorization server responded with a "{status}" error '
                 'but did not include an "error" field in its response.'.format(
-                    code=response.code, phrase=response.phrase
+                    status=status
                 )
             )
             logger.warning(description)
+            # Body was still valid JSON. Might be useful to log it for debugging.
+            logger.warning("Code exchange response: {resp!r}".format(resp=resp))
             raise OidcError("server_error", description)
 
         return resp
@@ -555,12 +567,21 @@ class OidcHandler:
         if b"error" in request.args:
             error = request.args[b"error"][0].decode()
             description = request.args.get(b"error_description", [b""])[0].decode()
+
+            # Most of the errors returned by the provider could be due by
+            # either the provider misbehaving or Synapse being misconfigured.
+            # The only exception of that is "access_denied", where the user
+            # probably cancelled the login flow. In other cases, log those errors.
+            if error != "access_denied":
+                logger.error("Error from the OIDC provider: %s %s", error, description)
+
             self._render_error(request, error, description)
             return
 
         # Fetch the session cookie
         session = request.getCookie(SESSION_COOKIE_NAME)
         if session is None:
+            logger.info("No session cookie found")
             self._render_error(request, "missing_session", "No session cookie found")
             return
 
@@ -578,6 +599,7 @@ class OidcHandler:
 
         # Check for the state query parameter
         if b"state" not in request.args:
+            logger.info("State parameter is missing")
             self._render_error(request, "invalid_request", "State parameter is missing")
             return
 
@@ -588,6 +610,7 @@ class OidcHandler:
         try:
             macaroon = pymacaroons.Macaroon.deserialize(session)
         except MacaroonDeserializationException as e:
+            logger.exception("Invalid session")
             self._render_error(request, "invalid_session", str(e))
             return
 
@@ -603,6 +626,7 @@ class OidcHandler:
         try:
             v.verify(macaroon, self._macaroon_secret_key)
         except Exception as e:
+            logger.exception("Could not verify session")
             self._render_error(request, "mismatching_session", str(e))
             return
 
@@ -614,28 +638,35 @@ class OidcHandler:
 
         # Exchange the code with the provider
         if b"code" not in request.args:
+            logger.info("Code parameter is missing")
             self._render_error(request, "invalid_request", "Code parameter is missing")
             return
 
+        logger.info("Exchanging code")
         code = request.args[b"code"][0].decode()
         try:
             token = await self._exchange_code(code)
         except OidcError as e:
+            logger.exception("Could not exchange code")
             self._render_error(request, e.error, e.error_description)
             return
 
         # Now that we have a token, get the userinfo, either by decoding the
         # `id_token` or by fetching the `userinfo_endpoint`.
         if self._uses_userinfo:
+            logger.info("Fetching userinfo")
             try:
                 userinfo = await self._fetch_userinfo(token)
             except Exception as e:
+                logger.exception("Could not fetch userinfo")
                 self._render_error(request, "fetch_error", str(e))
                 return
         else:
+            logger.info("Extracting userinfo from id_token")
             try:
                 userinfo = await self._parse_id_token(token, nonce=nonce)
             except Exception as e:
+                logger.exception("Invalid id_token")
                 self._render_error(request, "invalid_token", str(e))
                 return
 
@@ -643,6 +674,7 @@ class OidcHandler:
         try:
             user_id = await self._map_userinfo_to_user(userinfo)
         except MappingException as e:
+            logger.exception("Could not map user")
             self._render_error(request, "mapping_error", str(e))
             return
 
@@ -724,8 +756,7 @@ class OidcHandler:
             attributes = self._user_mapping_provider.map_user_attributes(userinfo)
         except Exception as e:
             raise MappingException(
-                "Could not extract user attributes from OIDC response: %s"
-                % (e.message,)
+                "Could not extract user attributes from OIDC response: " + str(e)
             )
 
         logger.debug(

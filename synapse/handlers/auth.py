@@ -1181,15 +1181,15 @@ class MacaroonGenerator(object):
         complete the SSO login flow.
 
         Args:
-            state (str): The ``state`` parameter passed to the OIDC provider.
-            nonce (str): The ``nonce`` parameter passed to the OIDC provider.
-            client_redirect_url (str): The URL the client gave when it
-                initiated the flow.
-            duration_in_ms (int): An optional duration for the token in milliseconds.
+            state: The ``state`` parameter passed to the OIDC provider.
+            nonce: The ``nonce`` parameter passed to the OIDC provider.
+            client_redirect_url: The URL the client gave when it initiated the
+                flow.
+            duration_in_ms: An optional duration for the token in milliseconds.
                 Defaults to an hour.
 
         Returns:
-            str: A signed macaroon token with the session informations.
+            A signed macaroon token with the session informations.
         """
         macaroon = self._generate_base_macaroon(None)
         macaroon.add_first_party_caveat("type = session")
