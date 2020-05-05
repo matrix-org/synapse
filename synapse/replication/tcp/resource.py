@@ -80,7 +80,7 @@ class ReplicationStreamer(object):
             for stream in STREAMS_MAP.values():
                 if stream == FederationStream and hs.config.send_federation:
                     # We only support federation stream if federation sending
-                    # hase been disabled on the master.
+                    # has been disabled on the master.
                     continue
 
                 self.streams.append(stream(hs))
