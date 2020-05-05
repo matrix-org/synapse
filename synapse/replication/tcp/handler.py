@@ -262,7 +262,7 @@ class ReplicationCommandHandler:
                 # `POSITION` command yet, and so we may have missed some rows.
                 # Let's drop the row for now, on the assumption we'll receive a
                 # `POSITION` soon and we'll catch up correctly then.
-                logger.warning(
+                logger.debug(
                     "Discarding RDATA for unconnected stream %s -> %s",
                     stream_name,
                     cmd.token,
