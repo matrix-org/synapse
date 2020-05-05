@@ -281,6 +281,21 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 ValueError, "response_types_supported", h._validate_metadata
             )
 
+        with metadata_edit(
+            h, {"token_endpoint_auth_methods_supported": ["client_secret_basic"]}
+        ):
+            # should not throw, as client_secret_basic is the default auth method
+            h._validate_metadata()
+
+        with metadata_edit(
+            h, {"token_endpoint_auth_methods_supported": ["client_secret_post"]}
+        ):
+            self.assertRaisesRegex(
+                ValueError,
+                "token_endpoint_auth_methods_supported",
+                h._validate_metadata,
+            )
+
         # Tests for configs that the userinfo endpoint
         self.assertFalse(h._uses_userinfo)
         h._scopes = []  # do not request the openid scope

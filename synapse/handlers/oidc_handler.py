@@ -94,6 +94,7 @@ class OidcHandler:
             hs.config.oidc_client_secret,
             hs.config.oidc_client_auth_method,
         )  # type: ClientAuth
+        self._client_auth_method = hs.config.oidc_client_auth_method  # type: str
         self._subject_claim = hs.config.oidc_subject_claim
         self._provider_metadata = OpenIDProviderMetadata(
             issuer=hs.config.oidc_issuer,
@@ -172,6 +173,19 @@ class OidcHandler:
         m.validate_issuer()
         m.validate_authorization_endpoint()
         m.validate_token_endpoint()
+
+        if "token_endpoint_auth_methods_supported" in m:
+            m.validate_token_endpoint_auth_methods_supported()
+            if (
+                self._client_auth_method
+                not in m["token_endpoint_auth_methods_supported"]
+            ):
+                raise ValueError(
+                    '"{auth_method}" not in "token_endpoint_auth_methods_supported" ({supported!r})'.format(
+                        auth_method=self._client_auth_method,
+                        supported=m["token_endpoint_auth_methods_supported"],
+                    )
+                )
 
         if "response_types_supported" in m:
             m.validate_response_types_supported()
