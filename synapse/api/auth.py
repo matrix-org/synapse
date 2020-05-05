@@ -78,6 +78,16 @@ class Auth(object):
         register_cache("cache", "token_cache", self.token_cache)
 
         self._account_validity = hs.config.account_validity
+        self._track_appservice_user_ips = self.hs.config.track_appservice_user_ips
+        self._macaroon_secret_key = self.hs.config.macaroon_secret_key
+        self._server_notices_mxid = self.hs.config.server_notices_mxid
+        self._hs_disabled = self.hs.config.hs_disabled
+        self._limit_usage_by_mau = self.hs.config.limit_usage_by_mau
+        self._hs_disabled_message = self.hs.config.hs_disabled_message
+        self._admin_contact = self.hs.config.admin_contact
+        self._limit_usage_by_mau = self.hs.config.limit_usage_by_mau
+        self._mau_limits_reserved_threepids = self.hs.config.mau_limits_reserved_threepids
+        self._max_mau_value = self.hs.config.max_mau_value
 
     @defer.inlineCallbacks
     def check_from_context(self, room_version: str, event, context, do_sig_check=True):
@@ -191,7 +201,7 @@ class Auth(object):
                 opentracing.set_tag("authenticated_entity", user_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
-                if ip_addr and self.hs.config.track_appservice_user_ips:
+                if ip_addr and self._track_appservice_user_ips:
                     yield self.store.insert_client_ip(
                         user_id=user_id,
                         access_token=access_token,
@@ -454,7 +464,7 @@ class Auth(object):
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        v.verify(macaroon, self._macaroon_secret_key)
 
     def _verify_expiry(self, caveat):
         prefix = "time < "
@@ -685,20 +695,20 @@ class Auth(object):
         # Never fail an auth check for the server notices users or support user
         # This can be a problem where event creation is prohibited due to blocking
         if user_id is not None:
-            if user_id == self.hs.config.server_notices_mxid:
+            if user_id == self._server_notices_mxid:
                 return
             if (yield self.store.is_support_user(user_id)):
                 return
 
-        if self.hs.config.hs_disabled:
+        if self._hs_disabled:
             raise ResourceLimitError(
                 403,
-                self.hs.config.hs_disabled_message,
+                self._hs_disabled_message,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                admin_contact=self.hs.config.admin_contact,
+                admin_contact=self._admin_contact,
                 limit_type=LimitBlockingTypes.HS_DISABLED,
             )
-        if self.hs.config.limit_usage_by_mau is True:
+        if self._limit_usage_by_mau is True:
             assert not (user_id and threepid)
 
             # If the user is already part of the MAU cohort or a trial user
@@ -714,7 +724,7 @@ class Auth(object):
                 # If the user does not exist yet, but is signing up with a
                 # reserved threepid then pass auth check
                 if is_threepid_reserved(
-                    self.hs.config.mau_limits_reserved_threepids, threepid
+                    self._mau_limits_reserved_threepids, threepid
                 ):
                     return
             elif user_type == UserTypes.SUPPORT:
@@ -723,11 +733,11 @@ class Auth(object):
                 return
             # Else if there is no room in the MAU bucket, bail
             current_mau = yield self.store.get_monthly_active_count()
-            if current_mau >= self.hs.config.max_mau_value:
+            if current_mau >= self._max_mau_value:
                 raise ResourceLimitError(
                     403,
                     "Monthly Active User Limit Exceeded",
-                    admin_contact=self.hs.config.admin_contact,
+                    admin_contact=self._admin_contact,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                     limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
                 )
