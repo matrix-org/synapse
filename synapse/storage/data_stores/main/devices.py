@@ -541,8 +541,8 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # Get set of users who *may* have changed. Users not in the returned
         # list have definitely not changed.
-        to_check = list(
-            self._device_list_stream_cache.get_entities_changed(user_ids, from_key)
+        to_check = self._device_list_stream_cache.get_entities_changed(
+            user_ids, from_key
         )
 
         if not to_check:

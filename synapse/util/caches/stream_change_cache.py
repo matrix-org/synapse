@@ -14,12 +14,13 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Iterable, List, Mapping, Optional, Set
+from typing import Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 from six import integer_types
 
 from sortedcontainers import SortedDict
 
+from synapse.types import Collection
 from synapse.util import caches
 
 logger = logging.getLogger(__name__)
@@ -85,8 +86,8 @@ class StreamChangeCache:
         return False
 
     def get_entities_changed(
-        self, entities: Iterable[EntityType], stream_pos: int
-    ) -> Set[EntityType]:
+        self, entities: Collection[EntityType], stream_pos: int
+    ) -> Union[Set[EntityType], FrozenSet[EntityType]]:
         """
         Returns subset of entities that have had new things since the given
         position.  Entities unknown to the cache will be returned.  If the
@@ -94,7 +95,17 @@ class StreamChangeCache:
         """
         changed_entities = self.get_all_entities_changed(stream_pos)
         if changed_entities is not None:
-            result = set(changed_entities).intersection(entities)
+            # We now do an intersection, trying to do so in the most efficient
+            # way possible (some of these sets are *large*). First check in the
+            # given iterable is already set that we can reuse, otherwise we
+            # create a set of the *smallest* of the two iterables and call
+            # `intersection(..)` on it (this can be twice as fast as the reverse).
+            if isinstance(entities, (set, frozenset)):
+                result = entities.intersection(changed_entities)
+            elif len(changed_entities) < len(entities):
+                result = set(changed_entities).intersection(entities)
+            else:
+                result = set(entities).intersection(changed_entities)
             self.metrics.inc_hits()
         else:
             result = set(entities)
