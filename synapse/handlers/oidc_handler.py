@@ -291,7 +291,7 @@ class OidcHandler:
             code: The autorization code we got from the callback.
 
         Returns:
-            dict: contains various tokens.
+            A dict containing various tokens.
 
             May look like this::
 
@@ -333,15 +333,64 @@ class OidcHandler:
         response = await self._http_client.request(
             method="POST", uri=uri, data=body.encode("utf-8"), headers=headers,
         )
-        body = await readBody(response)
-        resp = json.loads(body.decode("utf-8"))
 
-        if "error" not in resp:
-            return resp
+        if response.code >= 500:
+            # In case of a server error, we should first try to decode the body
+            # and check for an error field. If not, we respond with a generic
+            # error message.
+            try:
+                resp_body = await readBody(response)
+                resp = json.loads(resp_body.decode("utf-8"))
+                error = resp["error"]
+                description = resp.get("error_description", error)
+            except (ValueError, KeyError):
+                # Catch ValueError for the JSON decoding and KeyError for the "error" field
+                error = "server_error"
+                description = (
+                    (
+                        'Authorization server responded with a "{code} {phrase}" error '
+                        "while exchanging the authorization code."
+                    ).format(code=response.code, phrase=response.phrase),
+                )
 
-        error = resp["error"]
-        description = resp.get("error_description", error)
-        raise OidcError(error, description)
+            raise OidcError(error, description)
+
+        # Since it is a not a 5xx code, body should be a valid JSON. It will
+        # raise if not.
+        resp_body = await readBody(response)
+        resp = json.loads(resp_body.decode("utf-8"))
+
+        if "error" in resp:
+            error = resp["error"]
+            # In case the authorization server responded with an error field,
+            # it should be a 4xx code. If not, warn about it but don't do
+            # anything special and report the original error message.
+            if response.code < 400:
+                logger.warning(
+                    "Invalid response from the authorization server: "
+                    "responded with a '{code} {phrase}' "
+                    "but body has an error field: {error!r}".format(
+                        code=response.code, phrase=response.phrase, error=resp["error"]
+                    )
+                )
+
+            description = resp.get("error_description", error)
+            raise OidcError(error, description)
+
+        # Now, this should not be an error. According to RFC6749 sec 5.1, it
+        # should be a 200 code. We're a bit more flexible than that, and will
+        # only throw on a 4xx code.
+        if response.code >= 400:
+            description = (
+                'Authorization server responded with a "{code} {phrase}" error'
+                'but did not include an "error" field in its response.'.format(
+                    code=response.code, phrase=response.phrase
+                )
+            )
+            logger.warning(description)
+            raise OidcError("server_error", description)
+
+        return resp
 
     async def _fetch_userinfo(self, token: Token) -> UserInfo:
         """Fetch user informations from the ``userinfo_endpoint``.

@@ -440,3 +440,43 @@ class OidcHandlerTestCase(HomeserverTestCase):
             yield defer.ensureDeferred(self.handler._exchange_code(code))
         self.assertEqual(exc.exception.error, "foo")
         self.assertEqual(exc.exception.error_description, "bar")
+
+        # Internal server error with no JSON body
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(
+                code=500, phrase=b"Internal Server Error", body=b"Not JSON",
+            )
+        )
+        with self.assertRaises(OidcError) as exc:
+            yield defer.ensureDeferred(self.handler._exchange_code(code))
+        self.assertEqual(exc.exception.error, "server_error")
+
+        # Internal server error with JSON body
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(
+                code=500,
+                phrase=b"Internal Server Error",
+                body=b'{"error": "internal_server_error"}',
+            )
+        )
+        with self.assertRaises(OidcError) as exc:
+            yield defer.ensureDeferred(self.handler._exchange_code(code))
+        self.assertEqual(exc.exception.error, "internal_server_error")
+
+        # 4xx error without "error" field
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(code=400, phrase=b"Bad request", body=b"{}",)
+        )
+        with self.assertRaises(OidcError) as exc:
+            yield defer.ensureDeferred(self.handler._exchange_code(code))
+        self.assertEqual(exc.exception.error, "server_error")
+
+        # 2xx error with "error" field
+        self.http_client.request = simple_async_mock(
+            return_value=FakeResponse(
+                code=200, phrase=b"OK", body=b'{"error": "some_error"}',
+            )
+        )
+        with self.assertRaises(OidcError) as exc:
+            yield defer.ensureDeferred(self.handler._exchange_code(code))
+        self.assertEqual(exc.exception.error, "some_error")
