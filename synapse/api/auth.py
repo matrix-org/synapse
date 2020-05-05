@@ -86,7 +86,9 @@ class Auth(object):
         self._hs_disabled_message = self.hs.config.hs_disabled_message
         self._admin_contact = self.hs.config.admin_contact
         self._limit_usage_by_mau = self.hs.config.limit_usage_by_mau
-        self._mau_limits_reserved_threepids = self.hs.config.mau_limits_reserved_threepids
+        self._mau_limits_reserved_threepids = (
+            self.hs.config.mau_limits_reserved_threepids
+        )
         self._max_mau_value = self.hs.config.max_mau_value
 
     @defer.inlineCallbacks
@@ -723,9 +725,7 @@ class Auth(object):
             elif threepid:
                 # If the user does not exist yet, but is signing up with a
                 # reserved threepid then pass auth check
-                if is_threepid_reserved(
-                    self._mau_limits_reserved_threepids, threepid
-                ):
+                if is_threepid_reserved(self._mau_limits_reserved_threepids, threepid):
                     return
             elif user_type == UserTypes.SUPPORT:
                 # If the user does not exist yet and is of type "support",
