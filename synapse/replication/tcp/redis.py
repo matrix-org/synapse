@@ -144,7 +144,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         Args:
             cmd (Command)
         """
-        run_as_background_process("send-cmd", self._send_command, cmd)
+        run_as_background_process("send-cmd", self._async_send_command, cmd)
 
     async def _async_send_command(self, cmd: Command):
         """Encode a replication command and send it over our outbound connection"""
