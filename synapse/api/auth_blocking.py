@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +18,8 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.constants import LimitBlockingTypes, UserTypes
-from synapse.api.errors import (
-    Codes,
-    ResourceLimitError,
-)
+from synapse.api.errors import Codes, ResourceLimitError
 from synapse.config.server import is_threepid_reserved
-from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
-from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
 

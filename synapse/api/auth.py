@@ -15,7 +15,6 @@
 
 import logging
 from typing import Optional
-from synapse.api.auth_blocking import AuthBlocking
 
 from six import itervalues
 
@@ -27,16 +26,15 @@ from twisted.internet import defer
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, LimitBlockingTypes, Membership, UserTypes
+from synapse.api.auth_blocking import AuthBlocking
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
-    ResourceLimitError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.config.server import is_threepid_reserved
 from synapse.events import EventBase
 from synapse.types import StateMap, UserID
 from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
