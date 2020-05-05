@@ -1,1 +1,1 @@
-Speed up fetching device lists changes in sync.
+Speed up fetching device lists changes when handling `/sync` requests.
