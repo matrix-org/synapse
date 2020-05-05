@@ -9,7 +9,7 @@ of doing so is that it means that you can expose the default https port
 (443) to Matrix clients without needing to run Synapse with root
 privileges.
 
-> **NOTE**: Your reverse proxy must not `canonicalise` or `normalise`
+**NOTE**: Your reverse proxy must not `canonicalise` or `normalise`
 the requested URI in any way (for example, by decoding `%xx` escapes).
 Beware that Apache *will* canonicalise URIs unless you specifify
 `nocanon`.
@@ -18,7 +18,7 @@ When setting up a reverse proxy, remember that Matrix clients and other
 Matrix servers do not necessarily need to connect to your server via the
 same server name or port. Indeed, clients will use port 443 by default,
 whereas servers default to port 8448. Where these are different, we
-refer to the 'client port' and the \'federation port\'. See [the Matrix
+refer to the 'client port' and the 'federation port'. See [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names)
 for more details of the algorithm used for federation connections, and
 [delegate.md](<delegate.md>) for instructions on setting up delegation.
@@ -28,9 +28,9 @@ Let's assume that we expect clients to connect to our server at
 `https://example.com:8448`.  The following sections detail the configuration of
 the reverse proxy and the homeserver.
 
-## Webserver configuration examples
+## Reverse-proxy configuration examples
 
-> **NOTE**: You only need one of these.
+**NOTE**: You only need one of these.
 
 ### nginx
 
