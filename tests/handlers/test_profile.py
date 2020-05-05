@@ -82,18 +82,26 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_name(self):
-        yield self.handler.set_displayname(
-            self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+        yield defer.ensureDeferred(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+            )
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
             "Frank Jr.",
         )
 
         # Set displayname again
-        yield self.handler.set_displayname(
-            self.frank, synapse.types.create_requester(self.frank), "Frank"
+        yield defer.ensureDeferred(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.frank), "Frank"
+            )
         )
 
         self.assertEquals(
@@ -112,16 +120,20 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         # Setting displayname a second time is forbidden
-        d = self.handler.set_displayname(
-            self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+        d = defer.ensureDeferred(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
+            )
         )
 
         yield self.assertFailure(d, SynapseError)
 
     @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
-        d = self.handler.set_displayname(
-            self.frank, synapse.types.create_requester(self.bob), "Frank Jr."
+        d = defer.ensureDeferred(
+            self.handler.set_displayname(
+                self.frank, synapse.types.create_requester(self.bob), "Frank Jr."
+            )
         )
 
         yield self.assertFailure(d, AuthError)
@@ -165,10 +177,12 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_set_my_avatar(self):
-        yield self.handler.set_avatar_url(
-            self.frank,
-            synapse.types.create_requester(self.frank),
-            "http://my.server/pic.gif",
+        yield defer.ensureDeferred(
+            self.handler.set_avatar_url(
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "http://my.server/pic.gif",
+            )
         )
 
         self.assertEquals(
@@ -177,10 +191,12 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         # Set avatar again
-        yield self.handler.set_avatar_url(
-            self.frank,
-            synapse.types.create_requester(self.frank),
-            "http://my.server/me.png",
+        yield defer.ensureDeferred(
+            self.handler.set_avatar_url(
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "http://my.server/me.png",
+            )
         )
 
         self.assertEquals(
@@ -203,10 +219,12 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         # Set avatar a second time is forbidden
-        d = self.handler.set_avatar_url(
-            self.frank,
-            synapse.types.create_requester(self.frank),
-            "http://my.server/pic.gif",
+        d = defer.ensureDeferred(
+            self.handler.set_avatar_url(
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "http://my.server/pic.gif",
+            )
         )
 
         yield self.assertFailure(d, SynapseError)

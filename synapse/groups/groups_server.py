@@ -748,17 +748,18 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         raise NotImplementedError()
 
-    @defer.inlineCallbacks
-    def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
+    async def remove_user_from_group(
+        self, group_id, user_id, requester_user_id, content
+    ):
         """Remove a user from the group; either a user is leaving or an admin
         kicked them.
         """
 
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
+        await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         is_kick = False
         if requester_user_id != user_id:
-            is_admin = yield self.store.is_user_admin_in_group(
+            is_admin = await self.store.is_user_admin_in_group(
                 group_id, requester_user_id
             )
             if not is_admin:
@@ -766,30 +767,29 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
             is_kick = True
 
-        yield self.store.remove_user_from_group(group_id, user_id)
+        await self.store.remove_user_from_group(group_id, user_id)
 
         if is_kick:
             if self.hs.is_mine_id(user_id):
                 groups_local = self.hs.get_groups_local_handler()
-                yield groups_local.user_removed_from_group(group_id, user_id, {})
+                await groups_local.user_removed_from_group(group_id, user_id, {})
             else:
-                yield self.transport_client.remove_user_from_group_notification(
+                await self.transport_client.remove_user_from_group_notification(
                     get_domain_from_id(user_id), group_id, user_id, {}
                 )
 
         if not self.hs.is_mine_id(user_id):
-            yield self.store.maybe_delete_remote_profile_cache(user_id)
+            await self.store.maybe_delete_remote_profile_cache(user_id)
 
         # Delete group if the last user has left
-        users = yield self.store.get_users_in_group(group_id, include_private=True)
+        users = await self.store.get_users_in_group(group_id, include_private=True)
         if not users:
-            yield self.store.delete_group(group_id)
+            await self.store.delete_group(group_id)
 
         return {}
 
-    @defer.inlineCallbacks
-    def create_group(self, group_id, requester_user_id, content):
-        group = yield self.check_group_is_ours(group_id, requester_user_id)
+    async def create_group(self, group_id, requester_user_id, content):
+        group = await self.check_group_is_ours(group_id, requester_user_id)
 
         logger.info("Attempting to create group with ID: %r", group_id)
 
@@ -799,7 +799,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         if group:
             raise SynapseError(400, "Group already exists")
 
-        is_admin = yield self.auth.is_server_admin(
+        is_admin = await self.auth.is_server_admin(
             UserID.from_string(requester_user_id)
         )
         if not is_admin:
@@ -822,7 +822,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         long_description = profile.get("long_description")
         user_profile = content.get("user_profile", {})
 
-        yield self.store.create_group(
+        await self.store.create_group(
             group_id,
             requester_user_id,
             name=name,
@@ -834,7 +834,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         if not self.hs.is_mine_id(requester_user_id):
             remote_attestation = content["attestation"]
 
-            yield self.attestations.verify_attestation(
+            await self.attestations.verify_attestation(
                 remote_attestation, user_id=requester_user_id, group_id=group_id
             )
 
@@ -845,7 +845,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             local_attestation = None
             remote_attestation = None
 
-        yield self.store.add_user_to_group(
+        await self.store.add_user_to_group(
             group_id,
             requester_user_id,
             is_admin=True,
@@ -855,7 +855,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         )
 
         if not self.hs.is_mine_id(requester_user_id):
-            yield self.store.add_remote_profile_cache(
+            await self.store.add_remote_profile_cache(
                 requester_user_id,
                 displayname=user_profile.get("displayname"),
                 avatar_url=user_profile.get("avatar_url"),
@@ -863,8 +863,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {"group_id": group_id}
 
-    @defer.inlineCallbacks
-    def delete_group(self, group_id, requester_user_id):
+    async def delete_group(self, group_id, requester_user_id):
         """Deletes a group, kicking out all current members.
 
         Only group admins or server admins can call this request
@@ -877,14 +876,14 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             Deferred
         """
 
-        yield self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
+        await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         # Only server admins or group admins can delete groups.
 
-        is_admin = yield self.store.is_user_admin_in_group(group_id, requester_user_id)
+        is_admin = await self.store.is_user_admin_in_group(group_id, requester_user_id)
 
         if not is_admin:
-            is_admin = yield self.auth.is_server_admin(
+            is_admin = await self.auth.is_server_admin(
                 UserID.from_string(requester_user_id)
             )
 
@@ -892,18 +891,17 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             raise SynapseError(403, "User is not an admin")
 
         # Before deleting the group lets kick everyone out of it
-        users = yield self.store.get_users_in_group(group_id, include_private=True)
+        users = await self.store.get_users_in_group(group_id, include_private=True)
 
-        @defer.inlineCallbacks
-        def _kick_user_from_group(user_id):
+        async def _kick_user_from_group(user_id):
             if self.hs.is_mine_id(user_id):
                 groups_local = self.hs.get_groups_local_handler()
-                yield groups_local.user_removed_from_group(group_id, user_id, {})
+                await groups_local.user_removed_from_group(group_id, user_id, {})
             else:
-                yield self.transport_client.remove_user_from_group_notification(
+                await self.transport_client.remove_user_from_group_notification(
                     get_domain_from_id(user_id), group_id, user_id, {}
                 )
-                yield self.store.maybe_delete_remote_profile_cache(user_id)
+                await self.store.maybe_delete_remote_profile_cache(user_id)
 
         # We kick users out in the order of:
         #   1. Non-admins
@@ -922,11 +920,11 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             else:
                 non_admins.append(u["user_id"])
 
-        yield concurrently_execute(_kick_user_from_group, non_admins, 10)
-        yield concurrently_execute(_kick_user_from_group, admins, 10)
-        yield _kick_user_from_group(requester_user_id)
+        await concurrently_execute(_kick_user_from_group, non_admins, 10)
+        await concurrently_execute(_kick_user_from_group, admins, 10)
+        await _kick_user_from_group(requester_user_id)
 
-        yield self.store.delete_group(group_id)
+        await self.store.delete_group(group_id)
 
 
 def _parse_join_policy_from_contents(content):

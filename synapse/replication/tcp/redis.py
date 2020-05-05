@@ -68,6 +68,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
 
     def connectionMade(self):
         logger.info("Connected to redis")
+        super().connectionMade()
         run_as_background_process("subscribe-replication", self._send_subscribe)
         self.handler.new_connection(self)
 
@@ -136,6 +137,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
 
     def connectionLost(self, reason):
         logger.info("Lost connection to redis")
+        super().connectionLost(reason)
         self.handler.lost_connection(self)
 
     def send_command(self, cmd: Command):
@@ -203,5 +205,6 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
         p.handler = self.handler
         p.outbound_redis_connection = self.outbound_redis_connection
         p.stream_name = self.stream_name
+        p.password = self.password
 
         return p
