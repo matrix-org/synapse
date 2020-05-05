@@ -505,6 +505,11 @@ class ServerConfig(Config):
             "cleanup_extremities_with_dummy_events", True
         )
 
+        # The number of forward extremities in a room needed to send a dummy event.
+        self.dummy_event_threshold = config.get(
+            "dummy_event_threshold", 10,
+        )
+
         self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
 
         # Inhibits the /requestToken endpoints from returning an error that might leak
