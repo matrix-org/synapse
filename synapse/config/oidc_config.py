@@ -167,11 +167,11 @@ class OIDCConfig(Config):
 
                 # Jinja2 template for the localpart of the MXID
                 #
-                localpart: "{{ user.preferred_username }}"
+                localpart_template: "{{{{ user.preferred_username }}}}"
 
                 # Jinja2 template for the display name to set on first login. Optional.
                 #
-                #display_name: "{{ user.given_name }} {{ user.last_name }}"
+                #display_name_template: "{{{{ user.given_name }}}} {{{{ user.last_name }}}}"
         """.format(
             mapping_provider=DEFAULT_USER_MAPPING_PROVIDER
         )
