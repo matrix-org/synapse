@@ -26,6 +26,7 @@ from synapse.http.servlet import (
 )
 from synapse.rest.admin._base import (
     admin_patterns,
+    assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
@@ -256,7 +257,6 @@ class ListRoomRestServlet(RestServlet):
 class RoomRestServlet(RestServlet):
     """Get room details.
 
-    TODO: Return power level for each user
     TODO: Add on_POST to allow room creation without joining the room
     """
 
@@ -268,8 +268,7 @@ class RoomRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(self, request, room_id):
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
+        await assert_requester_is_admin(self.auth, request)
 
         ret = await self.store.get_room_with_stats(room_id)
         if not ret:
