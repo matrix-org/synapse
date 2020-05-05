@@ -301,7 +301,7 @@ class LoggingContext(object):
         warnings.warn(
             "synapse.logging.context.LoggingContext.current_context() is deprecated "
             "in favor of synapse.logging.context.current_context().",
-            PendingDeprecationWarning,
+            DeprecationWarning,
             stacklevel=2,
         )
         return current_context()
@@ -323,7 +323,7 @@ class LoggingContext(object):
         warnings.warn(
             "synapse.logging.context.LoggingContext.set_current_context() is deprecated "
             "in favor of synapse.logging.context.set_current_context().",
-            PendingDeprecationWarning,
+            DeprecationWarning,
             stacklevel=2,
         )
         return set_current_context(context)
