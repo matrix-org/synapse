@@ -229,7 +229,7 @@ class OidcHandler:
 
         return self._provider_metadata
 
-    async def load_jwks(self, force=False) -> JWKS:
+    async def load_jwks(self, force: bool = False) -> JWKS:
         """Load the JSON Web Key Set used to sign ID tokens.
 
         If we're not using the ``userinfo_endpoint``, user infos are extracted
@@ -523,7 +523,7 @@ class OidcHandler:
         request.redirect(uri)
         finish_request(request)
 
-    async def handle_oidc_callback(self, request) -> None:
+    async def handle_oidc_callback(self, request: SynapseRequest) -> None:
         """Handle an incoming request to /_synapse/oidc/callback
 
         Since we might want to display OIDC-related errors in a user-friendly
@@ -732,7 +732,7 @@ class OidcHandler:
             "Retrieved user attributes from user mapping provider: %r", attributes
         )
 
-        if attributes["localpart"] == "":
+        if not attributes["localpart"]:
             raise MappingException("localpart is empty")
 
         localpart = map_username_to_mxid_localpart(attributes["localpart"])
