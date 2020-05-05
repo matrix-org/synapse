@@ -26,7 +26,12 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
 
-from synapse.handlers.oidc_handler import OidcError, OidcHandler, OidcMappingProvider
+from synapse.handlers.oidc_handler import (
+    MappingException,
+    OidcError,
+    OidcHandler,
+    OidcMappingProvider,
+)
 from synapse.types import UserID
 
 from tests.unittest import HomeserverTestCase, override_config
@@ -74,9 +79,11 @@ COOKIE_PATH = "/_synapse/oidc"
 MockedMappingProvider = Mock(OidcMappingProvider)
 
 
-def simple_async_mock(return_value=None):
+def simple_async_mock(return_value=None, raises=None):
     # AsyncMock is not available in python3.5, this mimics part of its behaviour
     async def cb(*args, **kwargs):
+        if raises:
+            raise raises
         return return_value
 
     return Mock(side_effect=cb)
@@ -116,13 +123,21 @@ def metadata_edit(handler, values):
     saved = {}
 
     for (key, value) in values.items():
-        saved[key] = meta[key]
-        meta[key] = value
+        if key in meta:
+            saved[key] = meta[key]
+
+        if value is None:
+            del meta[key]
+        else:
+            meta[key] = value
 
     yield
 
     for (key, value) in values.items():
-        meta[key] = saved[key]
+        if key in saved:
+            meta[key] = saved[key]
+        else:
+            del meta[key]
 
 
 class OidcHandlerTestCase(HomeserverTestCase):
@@ -155,11 +170,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         return hs
 
-    def assertRenderedError(self, error, error_description=None):
+    def assertRenderedError(self, error, error_description=None, reset=True):
         args = self.handler._render_error.call_args[0]
         self.assertEqual(args[1], error)
         if error_description is not None:
             self.assertEqual(args[2], error_description)
+        # Reset the render_error mock
+        if reset:
+            self.handler._render_error.reset_mock()
 
     def test_config(self):
         self.assertEqual(self.handler._callback_url, CALLBACK_URL)
@@ -208,6 +226,18 @@ class OidcHandlerTestCase(HomeserverTestCase):
         yield defer.ensureDeferred(self.handler.load_jwks(force=True))
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
 
+        # Throw if the JWKS uri is missing
+        with metadata_edit(self.handler, {"jwks_uri": None}):
+            with self.assertRaises(RuntimeError):
+                yield defer.ensureDeferred(self.handler.load_jwks(force=True))
+
+        # Return empty key set if JWKS are not used
+        self.handler._scopes = []  # not asking the openid scope
+        self.http_client.get_json.reset_mock()
+        jwks = yield defer.ensureDeferred(self.handler.load_jwks(force=True))
+        self.http_client.get_json.assert_not_called()
+        self.assertEqual(jwks, {"keys": []})
+
     @override_config({"oidc_config": COMMON_CONFIG})
     def test_validate_config(self):
         h = self.handler
@@ -245,6 +275,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         with metadata_edit(h, {"jwks_uri": "http://insecure/jwks.json"}):
             self.assertRaisesRegex(ValueError, "jwks_uri", h._validate_metadata)
+
+        with metadata_edit(h, {"response_types_supported": ["id_token"]}):
+            self.assertRaisesRegex(
+                ValueError, "response_types_supported", h._validate_metadata
+            )
 
         # Tests for configs that the userinfo endpoint
         self.assertFalse(h._uses_userinfo)
@@ -314,16 +349,11 @@ class OidcHandlerTestCase(HomeserverTestCase):
         request = Mock(args={})
         request.args[b"error"] = [b"invalid_client"]
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
-        self.handler._render_error.assert_called_once_with(
-            request, "invalid_client", ""
-        )
+        self.assertRenderedError("invalid_client", "")
 
         request.args[b"error_description"] = [b"some description"]
-        self.handler._render_error.reset_mock()
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
-        self.handler._render_error.assert_called_once_with(
-            request, "invalid_client", "some description"
-        )
+        self.assertRenderedError("invalid_client", "some description")
 
     @defer.inlineCallbacks
     def test_callback(self):
@@ -337,8 +367,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
             "preferred_username": "bar",
         }
         user_id = UserID("foo", "domain.org")
+        self.handler._render_error = Mock(return_value=None)
         self.handler._exchange_code = simple_async_mock(return_value=token)
         self.handler._parse_id_token = simple_async_mock(return_value=userinfo)
+        self.handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
         self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
         self.handler._auth_handler.complete_sso_login = simple_async_mock()
         request = Mock(spec=["args", "getCookie", "addCookie"])
@@ -361,10 +393,55 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._auth_handler.complete_sso_login.assert_called_once_with(
             user_id, request, client_redirect_url,
         )
-
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_called_once_with(token, nonce=nonce)
         self.handler._map_userinfo_to_user.assert_called_once_with(userinfo)
+        self.handler._fetch_userinfo.assert_not_called()
+        self.handler._render_error.assert_not_called()
+
+        # Handle mapping errors
+        self.handler._map_userinfo_to_user = simple_async_mock(
+            raises=MappingException()
+        )
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("mapping_error")
+        self.handler._map_userinfo_to_user = simple_async_mock(return_value=user_id)
+
+        # Handle ID token errors
+        self.handler._parse_id_token = simple_async_mock(raises=Exception())
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("invalid_token")
+
+        self.handler._auth_handler.complete_sso_login.reset_mock()
+        self.handler._exchange_code.reset_mock()
+        self.handler._parse_id_token.reset_mock()
+        self.handler._map_userinfo_to_user.reset_mock()
+        self.handler._fetch_userinfo.reset_mock()
+
+        # With userinfo fetching
+        self.handler._scopes = []  # do not ask the "openid" scope
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+
+        self.handler._auth_handler.complete_sso_login.assert_called_once_with(
+            user_id, request, client_redirect_url,
+        )
+        self.handler._exchange_code.assert_called_once_with(code)
+        self.handler._parse_id_token.assert_not_called()
+        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo)
+        self.handler._fetch_userinfo.assert_called_once_with(token)
+        self.handler._render_error.assert_not_called()
+
+        # Handle userinfo fetching error
+        self.handler._fetch_userinfo = simple_async_mock(raises=Exception())
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("fetch_error")
+
+        # Handle code exchange failure
+        self.handler._exchange_code = simple_async_mock(
+            raises=OidcError("invalid_request")
+        )
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("invalid_request")
 
     @defer.inlineCallbacks
     def test_callback_session(self):
@@ -376,7 +453,12 @@ class OidcHandlerTestCase(HomeserverTestCase):
         request.getCookie.return_value = None
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("missing_session", "No session cookie found")
-        self.handler._render_error.reset_mock()
+
+        # Missing session parameter
+        request.args = {}
+        request.getCookie.return_value = "session"
+        yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
+        self.assertRenderedError("invalid_request", "State parameter is missing")
 
         # Invalid cookie
         request.args = {}
@@ -384,7 +466,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         request.getCookie.return_value = "session"
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_session")
-        self.handler._render_error.reset_mock()
 
         # Mismatching session
         session = self.handler._macaroon_generator.generate_oidc_session_token(
@@ -395,7 +476,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         request.getCookie.return_value = session
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("mismatching_session")
-        self.handler._render_error.reset_mock()
 
         # Valid session
         request.args = {}
@@ -403,7 +483,6 @@ class OidcHandlerTestCase(HomeserverTestCase):
         request.getCookie.return_value = session
         yield defer.ensureDeferred(self.handler.handle_oidc_callback(request))
         self.assertRenderedError("invalid_request")
-        self.handler._render_error.reset_mock()
 
     @override_config({"oidc_config": {"client_auth_method": "client_secret_post"}})
     @defer.inlineCallbacks
