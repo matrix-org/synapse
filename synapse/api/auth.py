@@ -76,11 +76,11 @@ class Auth(object):
         self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
         register_cache("cache", "token_cache", self.token_cache)
 
-        self._auth_blocking = AuthBlocking(hs)
+        self._auth_blocking = AuthBlocking(self.hs)
 
         self._account_validity = hs.config.account_validity
-        self._track_appservice_user_ips = self.hs.config.track_appservice_user_ips
-        self._macaroon_secret_key = self.hs.config.macaroon_secret_key
+        self._track_appservice_user_ips = hs.config.track_appservice_user_ips
+        self._macaroon_secret_key = hs.config.macaroon_secret_key
 
     @defer.inlineCallbacks
     def check_from_context(self, room_version: str, event, context, do_sig_check=True):

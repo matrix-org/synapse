@@ -30,10 +30,10 @@ class AuthBlocking(object):
 
         self._server_notices_mxid = hs.config.server_notices_mxid
         self._hs_disabled = hs.config.hs_disabled
-        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._hs_disabled_message = hs.config.hs_disabled_message
         self._admin_contact = hs.config.admin_contact
         self._max_mau_value = hs.config.max_mau_value
+        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_limits_reserved_threepids = hs.config.mau_limits_reserved_threepids
 
     @defer.inlineCallbacks
