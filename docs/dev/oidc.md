@@ -55,8 +55,8 @@ oidc_config:
      - profile
    user_mapping_provider:
      config:
-       localpart: '{{ user.name }}'
-       display_name: '{{ user.name|capitalize }}'
+       localpart_template: '{{ user.name }}'
+       display_name_template: '{{ user.name|capitalize }}'
 ```
 
 ### [Auth0][auth0]
@@ -98,8 +98,8 @@ oidc_config:
      - profile
    user_mapping_provider:
      config:
-       localpart: '{{ user.preferred_username }}'
-       display_name: '{{ user.name }}'
+       localpart_template: '{{ user.preferred_username }}'
+       display_name_template: '{{ user.name }}'
 ```
 
 ### GitHub
@@ -121,13 +121,13 @@ oidc_config:
    authorization_endpoint: "https://github.com/login/oauth/authorize"
    token_endpoint: "https://github.com/login/oauth/access_token"
    userinfo_endpoint: "https://api.github.com/user"
-   subject_claim: 'id'
    scopes:
      - read:user
    user_mapping_provider:
      config:
-       localpart: '{{ user.login }}'
-       display_name: '{{ user.name }}'
+       subject_claim: 'id'
+       localpart_template: '{{ user.login }}'
+       display_name_template: '{{ user.name }}'
 ```
 
 ### Google
@@ -148,6 +148,28 @@ oidc_config:
      - profile
    user_mapping_provider:
      config:
-       localpart: '{{ user.given_name|lower }}'
-       display_name: '{{ user.name }}'
+       localpart_template: '{{ user.given_name|lower }}'
+       display_name_template: '{{ user.name }}'
+```
+
+### Twitch
+
+1. Setup a developer account on [Twitch](https://dev.twitch.tv/)
+2. Obtain the OAuth 2.0 credentials by [creating an app](https://dev.twitch.tv/console/apps/)
+3. Add this OAuth Redirect URL: `[synapse base url]/_synapse/oidc/callback`
+
+```yaml
+oidc_config:
+   enabled: true
+   issuer: "https://id.twitch.tv/oauth2/"
+   discover: true
+   client_id: "your-client-id" # TO BE FILLED
+   client_secret: "your-client-secret" # TO BE FILLED
+   client_auth_method: "client_secret_post"
+   scopes:
+     - openid
+   user_mapping_provider:
+     config:
+       localpart_template: '{{ user.preferred_username }}'
+       display_name_template: '{{ user.name }}'
 ```
