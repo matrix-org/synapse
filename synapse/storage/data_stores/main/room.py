@@ -125,7 +125,9 @@ class RoomWorkerStore(SQLBaseStore):
             res["public"] = bool(res["public"])
             return res
 
-        return self.db.runInteraction("get_room_with_stats", get_room_with_stats_txn, room_id)
+        return self.db.runInteraction(
+            "get_room_with_stats", get_room_with_stats_txn, room_id
+        )
 
     def get_public_room_ids(self):
         return self.db.simple_select_onecol(
