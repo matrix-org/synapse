@@ -31,9 +31,6 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
     def test_receipt(self):
         self.reconnect()
 
-        # make the client subscribe to the receipts stream
-        self.test_handler.stream_positions.update({"receipts": 0})
-
         # tell the master to send a new receipt
         self.get_success(
             self.hs.get_datastore().insert_receipt(
@@ -44,7 +41,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
 
         # there should be one RDATA command
         self.test_handler.on_rdata.assert_called_once()
-        stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "receipts")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]  # type: ReceiptsStream.ReceiptsStreamRow
@@ -74,7 +71,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
 
         # We should now have caught up and get the missing data
         self.test_handler.on_rdata.assert_called_once()
-        stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "receipts")
         self.assertEqual(token, 3)
         self.assertEqual(1, len(rdata_rows))

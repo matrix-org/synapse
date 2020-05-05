@@ -48,8 +48,8 @@ class FederationStream(Stream):
             current_token = lambda: 0
             update_function = self._stub_update_function
 
-        super().__init__(current_token, update_function)
+        super().__init__(hs.get_instance_name(), current_token, update_function)
 
     @staticmethod
-    async def _stub_update_function(from_token, upto_token, limit):
+    async def _stub_update_function(instance_name, from_token, upto_token, limit):
         return [], upto_token, False

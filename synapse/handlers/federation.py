@@ -2562,9 +2562,8 @@ class FederationHandler(BaseHandler):
             "missing": [e.event_id for e in missing_locals],
         }
 
-    @defer.inlineCallbacks
     @log_function
-    def exchange_third_party_invite(
+    async def exchange_third_party_invite(
         self, sender_user_id, target_user_id, room_id, signed
     ):
         third_party_invite = {"signed": signed}
@@ -2580,16 +2579,16 @@ class FederationHandler(BaseHandler):
             "state_key": target_user_id,
         }
 
-        if (yield self.auth.check_host_in_room(room_id, self.hs.hostname)):
-            room_version = yield self.store.get_room_version_id(room_id)
+        if await self.auth.check_host_in_room(room_id, self.hs.hostname):
+            room_version = await self.store.get_room_version_id(room_id)
             builder = self.event_builder_factory.new(room_version, event_dict)
 
             EventValidator().validate_builder(builder)
-            event, context = yield self.event_creation_handler.create_new_client_event(
+            event, context = await self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
 
-            event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event_allowed = await self.third_party_event_rules.check_event_allowed(
                 event, context
             )
             if not event_allowed:
@@ -2601,7 +2600,7 @@ class FederationHandler(BaseHandler):
                     403, "This event is not allowed in this context", Codes.FORBIDDEN
                 )
 
-            event, context = yield self.add_display_name_to_third_party_invite(
+            event, context = await self.add_display_name_to_third_party_invite(
                 room_version, event_dict, event, context
             )
 
@@ -2612,19 +2611,19 @@ class FederationHandler(BaseHandler):
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                yield self.auth.check_from_context(room_version, event, context)
+                await self.auth.check_from_context(room_version, event, context)
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
                 raise e
 
-            yield self._check_signature(event, context)
+            await self._check_signature(event, context)
 
             # We retrieve the room member handler here as to not cause a cyclic dependency
             member_handler = self.hs.get_room_member_handler()
-            yield member_handler.send_membership_event(None, event, context)
+            await member_handler.send_membership_event(None, event, context)
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
-            yield self.federation_client.forward_third_party_invite(
+            await self.federation_client.forward_third_party_invite(
                 destinations, room_id, event_dict
             )
 

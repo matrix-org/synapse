@@ -50,6 +50,8 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
     def __init__(self, hs):
         super().__init__(hs)
 
+        self._instance_name = hs.get_instance_name()
+
         # We pull the streams from the replication steamer (if we try and make
         # them ourselves we end up in an import loop).
         self.streams = hs.get_replication_streamer().get_streams()
@@ -67,7 +69,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         upto_token = parse_integer(request, "upto_token", required=True)
 
         updates, upto_token, limited = await stream.get_updates_since(
-            from_token, upto_token
+            self._instance_name, from_token, upto_token
         )
 
         return (
