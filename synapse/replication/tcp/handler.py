@@ -99,7 +99,8 @@ class ReplicationCommandHandler:
         # The factory used to create connections.
         self._factory = None  # type: Optional[ReconnectingClientFactory]
 
-        # The currently connected connections.
+        # The currently connected connections. (The list of places we need to send
+        # outgoing replication commands to.)
         self._connections = []  # type: List[AbstractConnection]
 
         LaterGauge(
