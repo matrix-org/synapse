@@ -265,7 +265,7 @@ class ReplicationCommandHandler:
             if not sbc or stream_name not in sbc:
                 # Let's drop the row for now, on the assumption we'll receive a
                 # `POSITION` soon and we'll catch up correctly then.
-                logger.info(
+                logger.debug(
                     "Discarding RDATA for unconnected stream %s -> %s",
                     stream_name,
                     cmd.token,
