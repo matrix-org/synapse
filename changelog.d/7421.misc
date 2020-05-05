@@ -1,1 +1,1 @@
-Move logs about "Discarding RDATA for unconnected stream federation" to debug.
+Move catchup of replication streams logic to worker.
