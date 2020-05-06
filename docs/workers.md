@@ -1,23 +1,37 @@
 # Scaling synapse via workers
 
-Synapse has experimental support for splitting out functionality into
-multiple separate python processes, helping greatly with scalability.  These
+For small instances it recommended to run Synapse in monolith mode (the
+default). For larger instances where performance is a concern it can be helpful
+to split out functionality into multiple separate python processes. These
 processes are called 'workers', and are (eventually) intended to scale
 horizontally independently.
 
-All of the below is highly experimental and subject to change as Synapse evolves,
-but documenting it here to help folks needing highly scalable Synapses similar
-to the one running matrix.org!
+Synapse's worker support is under active development and subject to change as
+we attempt to rapidly scale ever larger Synapse instances. However we are
+documenting it here to help admins needing a highly scalable Synapse instance
+similar to the one running matrix.org.
 
-All processes continue to share the same database instance, and as such, workers
-only work with postgres based synapse deployments (sharing a single sqlite
-across multiple processes is a recipe for disaster, plus you should be using
-postgres anyway if you care about scalability).
+All processes continue to share the same database instance, and as such,
+workers only work with postgres based synapse deployments. SQlite should only
+be used for demo purposes and any admin considering workers should already by
+running postgres.
 
-The workers communicate with the master synapse process via a synapse-specific
-TCP protocol called 'replication' - analogous to MySQL or Postgres style
-database replication; feeding a stream of relevant data to the workers so they
-can be kept in sync with the main synapse process and database state.
+Originally the workers communicated with the master synapse process via a
+synapse-specific TCP protocol called 'replication' - analogous to MySQL or
+Postgres style database replication; feeding a stream of relevant data to the
+workers so they can be kept in sync with the main synapse process and database
+state.
+
+More recently (v1.13.0) Redis support was added, Redis is an alternative to
+direct tcp connections to the master: rather than all the workers connecting to
+the master, all the workers and the master connect to redis, which relays
+replication commands between processes. This can give a significant cpu saving
+on the master and will be a prerequisite for upcoming performance improvements.
+
+This doc covers details of both approaches (TCP Replication and Redis
+Replication), however the TCP Replication implementation will be deprecated in
+favour of Redis.
+
 
 ## Configuration
 
@@ -27,9 +41,18 @@ the correct worker, or to the main synapse instance. Note that this includes
 requests made to the federation port. See [reverse_proxy.md](reverse_proxy.md)
 for information on setting up a reverse proxy.
 
-To enable workers, you need to add two replication listeners to the master
-synapse, e.g.:
+To enable workers, you need to add replication listeners to the master
+synapse, in the case of Redis Replication you need only configure an HTTP listener e.g.:
 
+    listeners:
+      # The HTTP replication port
+      - port: 9093
+        bind_address: '127.0.0.1'
+        type: http
+        resources:
+         - names: [replication]
+
+For TCP Replication
     listeners:
       # The TCP replication port
       - port: 9092
@@ -42,13 +65,10 @@ synapse, e.g.:
         resources:
          - names: [replication]
 
-Under **no circumstances** should these replication API listeners be exposed to
-the public internet; it currently implements no authentication whatsoever and is
-unencrypted.
 
-(Roughly, the TCP port is used for streaming data from the master to the
-workers, and the HTTP port for the workers to send data to the main
-synapse process.)
+Under **no circumstances** should replication API listeners be exposed to
+the public internet; they currently do not implement authentication and are
+unencrypted.
 
 You then create a set of configs for the various worker processes.  These
 should be worker configuration files, and should be stored in a dedicated
@@ -101,7 +121,8 @@ recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
 [systemd-with-workers](systemd-with-workers). To use `synctl`, see below.
 
-### Using synctl
+
+#### Using synctl
 
 If you want to use `synctl` to manage your synapse processes, you will need to
 create an an additional configuration file for the master synapse process. That
