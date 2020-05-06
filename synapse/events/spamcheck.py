@@ -81,10 +81,13 @@ class SpamChecker(object):
             True if the user may send an invite, otherwise False
         """
         for spam_checker in self.spam_checkers:
-            if spam_checker.user_may_invite(inviter_userid, invitee_userid, room_id):
-                return True
+            if (
+                spam_checker.user_may_invite(inviter_userid, invitee_userid, room_id)
+                is False
+            ):
+                return False
 
-        return False
+        return True
 
     def user_may_create_room(self, userid: str) -> bool:
         """Checks if a given user may create a room
@@ -98,10 +101,10 @@ class SpamChecker(object):
             True if the user may create a room, otherwise False
         """
         for spam_checker in self.spam_checkers:
-            if spam_checker.user_may_create_room(userid):
-                return True
+            if spam_checker.user_may_create_room(userid) is False:
+                return False
 
-        return False
+        return True
 
     def user_may_create_room_alias(self, userid: str, room_alias: str) -> bool:
         """Checks if a given user may create a room alias
@@ -116,10 +119,10 @@ class SpamChecker(object):
             True if the user may create a room alias, otherwise False
         """
         for spam_checker in self.spam_checkers:
-            if spam_checker.user_may_create_room_alias(userid, room_alias):
-                return True
+            if spam_checker.user_may_create_room_alias(userid, room_alias) is False:
+                return False
 
-        return False
+        return True
 
     def user_may_publish_room(self, userid: str, room_id: str) -> bool:
         """Checks if a given user may publish a room to the directory
@@ -134,10 +137,10 @@ class SpamChecker(object):
             True if the user may publish the room, otherwise False
         """
         for spam_checker in self.spam_checkers:
-            if spam_checker.user_may_publish_room(userid, room_id):
-                return True
+            if spam_checker.user_may_publish_room(userid, room_id) is False:
+                return False
 
-        return False
+        return True
 
     def check_username_for_spam(self, user_profile: Dict[str, str]) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
