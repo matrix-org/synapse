@@ -647,7 +647,12 @@ class EventsStore(
             self.db.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
-            txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
+
+            def inv(*args):
+                logger.info("Invalidating get_latest_event_ids: %r", *args)
+                self.get_latest_event_ids_in_room.invalidate(*args)
+
+            txn.call_after(inv, (room_id,))
 
         self.db.simple_insert_many_txn(
             txn,
@@ -658,6 +663,7 @@ class EventsStore(
                 for ev_id in new_extrem
             ],
         )
+        logger.info("new forward extremities: %s", new_forward_extremities)
         # We now insert into stream_ordering_to_exterm a mapping from room_id,
         # new stream_ordering to new forward extremeties in the room.
         # This allows us to later efficiently look up the forward extremeties
