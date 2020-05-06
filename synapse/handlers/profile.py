@@ -288,6 +288,9 @@ class BaseProfileHandler(BaseHandler):
         await self.ratelimit(requester)
 
         room_ids = await self.store.get_rooms_for_user(target_user.to_string())
+        logger.info(
+            "*** Got the following rooms for %s: %s", target_user.to_string(), room_ids,
+        )
 
         for room_id in room_ids:
             handler = self.hs.get_room_member_handler()
