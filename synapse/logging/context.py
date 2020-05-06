@@ -245,7 +245,6 @@ class LoggingContext(object):
         "name",
         "parent_context",
         "_resource_usage",
-        "_prev_resource_usage",
         "usage_start",
         "main_thread",
         "finished",
@@ -260,7 +259,6 @@ class LoggingContext(object):
 
         # track the resources used by this context so far
         self._resource_usage = ContextResourceUsage()
-        self._prev_resource_usage = None  # type: Optional[ContextResourceUsage]
 
         # The thread resource usage when the logcontext became active. None
         # if the context is not currently active.
@@ -433,21 +431,7 @@ class LoggingContext(object):
                 return
 
             utime_delta, stime_delta = self._get_cputime(rusage)
-            self._resource_usage.ru_utime += utime_delta
-            self._resource_usage.ru_stime += stime_delta
-
-            # if we have a parent, pass the change in our usage stats on.
-            if self.parent_context:
-                if self._prev_resource_usage:
-                    delta_resource_usage = (
-                        self._resource_usage - self._prev_resource_usage
-                    )
-                else:
-                    delta_resource_usage = self._resource_usage
-                self.parent_context._resource_usage += delta_resource_usage
-
-                # Store the current usage for future deltas.
-                self._prev_resource_usage = self._resource_usage.copy()
+            self.add_cputime(utime_delta, stime_delta)
         finally:
             self.usage_start = None
 
@@ -505,30 +489,52 @@ class LoggingContext(object):
 
         return utime_delta, stime_delta
 
+    def add_cputime(self, utime_delta: float, stime_delta: float) -> None:
+        """Update the CPU time usage of this context (and any parents, recursively).
+
+        Args:
+            utime_delta: additional user time, in seconds, spent in this context.
+            stime_delta: additional system time, in seconds, spent in this context.
+        """
+        self._resource_usage.ru_utime += utime_delta
+        self._resource_usage.ru_stime += stime_delta
+        if self.parent_context:
+            self.parent_context.add_cputime(utime_delta, stime_delta)
+
     def add_database_transaction(self, duration_sec: float) -> None:
+        """Record the use of a database transaction and the length of time it took.
+
+        Args:
+            duration_sec: The number of seconds the database transaction took.
+        """
         if duration_sec < 0:
             raise ValueError("DB txn time can only be non-negative")
         self._resource_usage.db_txn_count += 1
         self._resource_usage.db_txn_duration_sec += duration_sec
+        if self.parent_context:
+            self.parent_context.add_database_transaction(duration_sec)
 
     def add_database_scheduled(self, sched_sec: float) -> None:
         """Record a use of the database pool
 
         Args:
-            sched_sec (float): number of seconds it took us to get a
-                connection
+            sched_sec: number of seconds it took us to get a connection
         """
         if sched_sec < 0:
             raise ValueError("DB scheduling time can only be non-negative")
         self._resource_usage.db_sched_duration_sec += sched_sec
+        if self.parent_context:
+            self.parent_context.add_database_scheduled(sched_sec)
 
     def record_event_fetch(self, event_count: int) -> None:
         """Record a number of events being fetched from the db
 
         Args:
-            event_count (int): number of events being fetched
+            event_count: number of events being fetched
         """
         self._resource_usage.evt_db_fetch_count += event_count
+        if self.parent_context:
+            self.parent_context.record_event_fetch(event_count)
 
 
 class LoggingContextFilter(logging.Filter):
