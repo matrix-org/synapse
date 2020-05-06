@@ -62,7 +62,7 @@ class LogoutAllRestServlet(RestServlet):
         return 200, {}
 
     async def on_POST(self, request):
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()
 
         # first delete all of the user's devices
