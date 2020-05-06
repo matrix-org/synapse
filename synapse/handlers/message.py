@@ -419,7 +419,7 @@ class EventCreationHandler(object):
 
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
-        self._dummy_events_threshold = hs.config.dummy_event_threshold
+        self._dummy_events_threshold = hs.config.dummy_events_threshold
 
     @defer.inlineCallbacks
     def create_event(

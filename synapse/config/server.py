@@ -506,7 +506,7 @@ class ServerConfig(Config):
         )
 
         # The number of forward extremities in a room needed to send a dummy event.
-        self.dummy_event_threshold = config.get("dummy_event_threshold", 10)
+        self.dummy_events_threshold = config.get("dummy_events_threshold", 10)
 
         self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
 
@@ -836,7 +836,7 @@ class ServerConfig(Config):
         # This setting defines the threshold (i.e. number of forward extremities in the
         # room) at which dummy events are sent. The default value is 10.
         #
-        #dummy_event_threshold: 5
+        #dummy_events_threshold: 5
 
 
         ## Homeserver blocking ##
