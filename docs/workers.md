@@ -121,8 +121,25 @@ recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
 [systemd-with-workers](systemd-with-workers). To use `synctl`, see below.
 
+### Installing Redis
+If you are configuring Redis replication, then you need to install Redis
+outside of Synapse.
 
-#### Using synctl
+1. Install redis following the normal procedure for your distro - eg `apt
+   install redis-server` for debian/ubuntu
+2. check it's running and accessible: you should be able to `echo PING | nc -q1
+   localhost 6379` and get a response of `+PONG`.
+3. Add config to homeserver.yaml:
+    ```yaml
+    redis:
+      enabled: true
+    ```
+    Optional parameters which can go alongside `enabled` are `host`, `port`,
+    `password`, `dbid`. If you don't know if you need the last two, you
+    probably don't.
+4. That's it. Restart master and all workers.
+
+### Using synctl
 
 If you want to use `synctl` to manage your synapse processes, you will need to
 create an an additional configuration file for the master synapse process. That
