@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, Dict, List, Tuple
+
 from synapse.config import ConfigError
 from synapse.util.module_loader import load_module
 
@@ -23,7 +25,7 @@ class SpamCheckerConfig(Config):
     section = "spamchecker"
 
     def read_config(self, config, **kwargs):
-        self.spam_checkers = []
+        self.spam_checkers = []  # type: List[Tuple[Any, Dict]]
 
         spam_checkers = config.get("spam_checker") or []
         if isinstance(spam_checkers, dict):

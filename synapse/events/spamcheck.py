@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import inspect
-from typing import Dict
+from typing import Any, Dict, List, Tuple
 
 from synapse.spam_checker_api import SpamCheckerApi
 
@@ -26,7 +26,7 @@ if MYPY:
 
 class SpamChecker(object):
     def __init__(self, hs: "synapse.server.HomeServer"):
-        self.spam_checkers = []
+        self.spam_checkers = []  # type: List[Tuple[Any, Dict]]
 
         for spam_checker in hs.config.spam_checkers:
             module = None
