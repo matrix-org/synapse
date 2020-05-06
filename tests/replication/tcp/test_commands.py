@@ -28,15 +28,17 @@ class ParseCommandTestCase(TestCase):
         self.assertIsInstance(cmd, ReplicateCommand)
 
     def test_parse_rdata(self):
-        line = 'RDATA events 6287863 ["ev", ["$eventid", "!roomid", "type", null, null, null]]'
+        line = 'RDATA events master 6287863 ["ev", ["$eventid", "!roomid", "type", null, null, null]]'
         cmd = parse_command_from_line(line)
         self.assertIsInstance(cmd, RdataCommand)
         self.assertEqual(cmd.stream_name, "events")
+        self.assertEqual(cmd.instance_name, "master")
         self.assertEqual(cmd.token, 6287863)
 
     def test_parse_rdata_batch(self):
-        line = 'RDATA presence batch ["@foo:example.com", "online"]'
+        line = 'RDATA presence master batch ["@foo:example.com", "online"]'
         cmd = parse_command_from_line(line)
         self.assertIsInstance(cmd, RdataCommand)
         self.assertEqual(cmd.stream_name, "presence")
+        self.assertEqual(cmd.instance_name, "master")
         self.assertIsNone(cmd.token)

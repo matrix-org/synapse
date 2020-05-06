@@ -12,6 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# type: ignore
+
+from mock import Mock
+
 from synapse.replication.tcp.streams._base import ReceiptsStream
 
 from tests.replication.tcp.streams._base import BaseStreamTestCase
@@ -20,11 +25,11 @@ USER_ID = "@feeling:blue"
 
 
 class ReceiptsStreamTestCase(BaseStreamTestCase):
+    def _build_replication_data_handler(self):
+        return Mock(wraps=super()._build_replication_data_handler())
+
     def test_receipt(self):
         self.reconnect()
-
-        # make the client subscribe to the receipts stream
-        self.test_handler.streams.add("receipts")
 
         # tell the master to send a new receipt
         self.get_success(
@@ -36,7 +41,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
 
         # there should be one RDATA command
         self.test_handler.on_rdata.assert_called_once()
-        stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "receipts")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]  # type: ReceiptsStream.ReceiptsStreamRow
@@ -66,7 +71,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
 
         # We should now have caught up and get the missing data
         self.test_handler.on_rdata.assert_called_once()
-        stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "receipts")
         self.assertEqual(token, 3)
         self.assertEqual(1, len(rdata_rows))

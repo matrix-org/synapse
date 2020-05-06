@@ -32,7 +32,6 @@ from twisted.python.threadpool import ThreadPool
 from twisted.trial import unittest
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.federation.transport import server as federation_server
@@ -55,6 +54,7 @@ from tests.server import (
     render,
     setup_test_homeserver,
 )
+from tests.test_utils import event_injection
 from tests.test_utils.logging_setup import setup_logging
 from tests.utils import default_config, setupdb
 
@@ -596,36 +596,14 @@ class HomeserverTestCase(TestCase):
         """
         Inject a membership event into a room.
 
+        Deprecated: use event_injection.inject_room_member directly
+
         Args:
             room: Room ID to inject the event into.
             user: MXID of the user to inject the membership for.
             membership: The membership type.
         """
-        event_builder_factory = self.hs.get_event_builder_factory()
-        event_creation_handler = self.hs.get_event_creation_handler()
-
-        room_version = self.get_success(
-            self.hs.get_datastore().get_room_version_id(room)
-        )
-
-        builder = event_builder_factory.for_room_version(
-            KNOWN_ROOM_VERSIONS[room_version],
-            {
-                "type": EventTypes.Member,
-                "sender": user,
-                "state_key": user,
-                "room_id": room,
-                "content": {"membership": membership},
-            },
-        )
-
-        event, context = self.get_success(
-            event_creation_handler.create_new_client_event(builder)
-        )
-
-        self.get_success(
-            self.hs.get_storage().persistence.persist_event(event, context)
-        )
+        event_injection.inject_member_event(self.hs, room, user, membership)
 
 
 class FederatingHomeserverTestCase(HomeserverTestCase):

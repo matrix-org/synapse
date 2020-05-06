@@ -1,0 +1,1 @@
+Use `stream.current_token()` and remove `stream_positions()`.

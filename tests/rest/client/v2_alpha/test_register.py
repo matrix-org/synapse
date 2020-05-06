@@ -33,7 +33,11 @@ from tests import unittest
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
-    servlets = [register.register_servlets]
+    servlets = [
+        login.register_servlets,
+        register.register_servlets,
+        synapse.rest.admin.register_servlets,
+    ]
     url = b"/_matrix/client/r0/register"
 
     def default_config(self):
@@ -259,6 +263,47 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertCountEqual(
             [["m.login.email.identity"]], (f["stages"] for f in flows)
         )
+
+    @unittest.override_config(
+        {
+            "request_token_inhibit_3pid_errors": True,
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_request_token_existing_email_inhibit_error(self):
+        """Test that requesting a token via this endpoint doesn't leak existing
+        associations if configured that way.
+        """
+        user_id = self.register_user("kermit", "monkey")
+        self.login("kermit", "monkey")
+
+        email = "test@example.com"
+
+        # Add a threepid
+        self.get_success(
+            self.hs.get_datastore().user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address=email,
+                validated_at=0,
+                added_at=0,
+            )
+        )
+
+        request, channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": email, "send_attempt": 1},
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+        self.assertIsNotNone(channel.json_body.get("sid"))
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
