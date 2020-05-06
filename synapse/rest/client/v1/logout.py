@@ -34,10 +34,10 @@ class LogoutRestServlet(RestServlet):
         return 200, {}
 
     async def on_POST(self, request):
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_expired=True)
 
         if requester.device_id is None:
-            # the acccess token wasn't associated with a device.
+            # The access token wasn't associated with a device.
             # Just delete the access token
             access_token = self.auth.get_access_token_from_request(request)
             await self._auth_handler.delete_access_token(access_token)
