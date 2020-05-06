@@ -219,10 +219,6 @@ Asks the server for the current position of all streams.
 
    Inform the server a pusher should be removed
 
-#### INVALIDATE_CACHE (C)
-
-   Inform the server a cache should be invalidated
-
 ### REMOTE_SERVER_UP (S, C)
 
    Inform other processes that a remote server may have come back online.
