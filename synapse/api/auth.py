@@ -537,8 +537,7 @@ class Auth(object):
 
         return defer.succeed(auth_ids)
 
-    @defer.inlineCallbacks
-    def check_can_change_room_list(self, room_id: str, user: UserID):
+    async def check_can_change_room_list(self, room_id: str, user: UserID):
         """Determine whether the user is allowed to edit the room's entry in the
         published room list.
 
@@ -547,17 +546,17 @@ class Auth(object):
             user
         """
 
-        is_admin = yield self.is_server_admin(user)
+        is_admin = await self.is_server_admin(user)
         if is_admin:
             return True
 
         user_id = user.to_string()
-        yield self.check_user_in_room(room_id, user_id)
+        await self.check_user_in_room(room_id, user_id)
 
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
         # m.room.canonical_alias events
-        power_level_event = yield self.state.get_current_state(
+        power_level_event = await self.state.get_current_state(
             room_id, EventTypes.PowerLevels, ""
         )
 
