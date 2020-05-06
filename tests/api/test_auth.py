@@ -52,6 +52,10 @@ class AuthTestCase(unittest.TestCase):
         self.hs.handlers = TestHandlers(self.hs)
         self.auth = Auth(self.hs)
 
+        # AuthBlocking reads from the hs' config on initialization. We need to
+        # modify its config instead of the hs'
+        self.auth_blocking = self.auth._auth_blocking
+
         self.test_user = "@foo:bar"
         self.test_token = b"_test_token_"
 
@@ -321,15 +325,15 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_blocking_mau(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.max_mau_value = 50
+        self.auth_blocking._limit_usage_by_mau = False
+        self.auth_blocking._max_mau_value = 50
         lots_of_users = 100
         small_number_of_users = 1
 
         # Ensure no error thrown
         yield defer.ensureDeferred(self.auth.check_auth_blocking())
 
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(lots_of_users)
@@ -349,8 +353,8 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_blocking_mau__depending_on_user_type(self):
-        self.hs.config.max_mau_value = 50
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._max_mau_value = 50
+        self.auth_blocking._limit_usage_by_mau = True
 
         self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
         # Support users allowed
@@ -370,12 +374,12 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_reserved_threepid(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 1
+        self.auth_blocking._limit_usage_by_mau = True
+        self.auth_blocking._max_mau_value = 1
         self.store.get_monthly_active_count = lambda: defer.succeed(2)
         threepid = {"medium": "email", "address": "reserved@server.com"}
         unknown_threepid = {"medium": "email", "address": "unreserved@server.com"}
-        self.hs.config.mau_limits_reserved_threepids = [threepid]
+        self.auth_blocking._mau_limits_reserved_threepids = [threepid]
 
         with self.assertRaises(ResourceLimitError):
             yield defer.ensureDeferred(self.auth.check_auth_blocking())
@@ -389,8 +393,8 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_hs_disabled(self):
-        self.hs.config.hs_disabled = True
-        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        self.auth_blocking._hs_disabled = True
+        self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         with self.assertRaises(ResourceLimitError) as e:
             yield defer.ensureDeferred(self.auth.check_auth_blocking())
         self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
@@ -404,10 +408,10 @@ class AuthTestCase(unittest.TestCase):
         """
         # this should be the default, but we had a bug where the test was doing the wrong
         # thing, so let's make it explicit
-        self.hs.config.server_notices_mxid = None
+        self.auth_blocking._server_notices_mxid = None
 
-        self.hs.config.hs_disabled = True
-        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        self.auth_blocking._hs_disabled = True
+        self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         with self.assertRaises(ResourceLimitError) as e:
             yield defer.ensureDeferred(self.auth.check_auth_blocking())
         self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
@@ -416,8 +420,8 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_server_notices_mxid_special_cased(self):
-        self.hs.config.hs_disabled = True
+        self.auth_blocking._hs_disabled = True
         user = "@user:server"
-        self.hs.config.server_notices_mxid = user
-        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        self.auth_blocking._server_notices_mxid = user
+        self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         yield defer.ensureDeferred(self.auth.check_auth_blocking(user))
