@@ -268,28 +268,27 @@ class RoomMemberHandler(object):
     ):
         key = (room_id,)
 
-<<<<<<< HEAD
         as_id = object()
         if requester.app_service:
             as_id = requester.app_service.id
 
         then = self.clock.time_msec()
 
-        with (yield self.member_limiter.queue(as_id)):
+        with (await self.member_limiter.queue(as_id)):
             diff = self.clock.time_msec() - then
 
             if diff > 80 * 1000:
                 # haproxy would have timed the request out anyway...
                 raise SynapseError(504, "took to long to process")
 
-            with (yield self.member_linearizer.queue(key)):
+            with (await self.member_linearizer.queue(key)):
                 diff = self.clock.time_msec() - then
 
                 if diff > 80 * 1000:
                     # haproxy would have timed the request out anyway...
                     raise SynapseError(504, "took to long to process")
 
-                result = yield self._update_membership(
+                result = await self._update_membership(
                     requester,
                     target,
                     room_id,
@@ -301,21 +300,6 @@ class RoomMemberHandler(object):
                     content=content,
                     require_consent=require_consent,
                 )
-=======
-        with (await self.member_linearizer.queue(key)):
-            result = await self._update_membership(
-                requester,
-                target,
-                room_id,
-                action,
-                txn_id=txn_id,
-                remote_room_hosts=remote_room_hosts,
-                third_party_signed=third_party_signed,
-                ratelimit=ratelimit,
-                content=content,
-                require_consent=require_consent,
-            )
->>>>>>> release-v1.13.0
 
         return result
 
