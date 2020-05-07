@@ -486,7 +486,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
         return frozenset(r.room_id for r in rooms)
 
-    @cachedInlineCallbacks(max_entries=500000, cache_context=True, iterable=True)
+    @cachedInlineCallbacks(max_entries=500000, cache_context=True)
     def get_users_who_share_room_with_user(self, user_id, cache_context):
         """Returns the set of users who share a room with `user_id`
         """

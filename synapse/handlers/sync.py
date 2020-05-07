@@ -1143,6 +1143,7 @@ class SyncHandler(object):
             # that were in a room we've left.
 
             logger.info("get_users_who_share_room... called from _generate_sync_entry")
+            logger.info("*Called with %s", user_id)
             users_who_share_room = await self.store.get_users_who_share_room_with_user(
                 user_id
             )
