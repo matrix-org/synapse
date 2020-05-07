@@ -431,25 +431,8 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
-    def test_logging_out_all_devices_of_expired_user(self):
-        user_id = self.register_user("kermit", "monkey")
+        # Log the user in again (allowed for expired accounts)
         tok = self.login("kermit", "monkey")
-
-        self.register_user("admin", "adminpassword", admin=True)
-        admin_tok = self.login("admin", "adminpassword")
-
-        url = "/_matrix/client/unstable/admin/account_validity/validity"
-        params = {
-            "user_id": user_id,
-            "expiration_ts": 0,
-            "enable_renewal_emails": False,
-        }
-        request_data = json.dumps(params)
-        request, channel = self.make_request(
-            b"POST", url, request_data, access_token=admin_tok
-        )
-        self.render(request)
-        self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Try to log out all of the user's sessions
         request, channel = self.make_request(b"POST", "/logout/all", access_token=tok)
