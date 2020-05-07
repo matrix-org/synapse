@@ -135,6 +135,7 @@ class SlavedEventStore(
             )
 
             if data.type == EventTypes.Member:
+                logger.info("INVALIDATING get_rooms_for_user_with_stream_ordering")
                 self.get_rooms_for_user_with_stream_ordering.invalidate(
                     (data.state_key,)
                 )

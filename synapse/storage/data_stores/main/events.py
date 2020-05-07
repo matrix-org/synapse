@@ -605,6 +605,7 @@ class EventsStore(
             }
 
             for member in members_changed:
+                logger.info("INVALIDATING get_rooms_for_user_with_stream_ordering")
                 txn.call_after(
                     self.get_rooms_for_user_with_stream_ordering.invalidate, (member,)
                 )
