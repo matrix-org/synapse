@@ -686,7 +686,7 @@ class OidcHandler:
 
         # Call the mapper to register/login the user
         try:
-            user_id = await self._map_userinfo_to_user(userinfo)
+            user_id = await self._map_userinfo_to_user(userinfo, token)
         except MappingException as e:
             logger.exception("Could not map user")
             self._render_error(request, "mapping_error", str(e))
@@ -724,7 +724,7 @@ class OidcHandler:
         now = self._clock.time_msec()
         return now < expiry
 
-    async def _map_userinfo_to_user(self, userinfo: UserInfo) -> str:
+    async def _map_userinfo_to_user(self, userinfo: UserInfo, token: Token) -> str:
         """Maps a UserInfo object to a mxid.
 
         UserInfo should have a claim that uniquely identifies users. This claim
@@ -738,6 +738,7 @@ class OidcHandler:
 
         Args:
             userinfo: an object representing the user
+            token: a dict with the tokens obtained from the provider
 
         Raises:
             MappingException: if there was an error while mapping some properties
@@ -767,7 +768,9 @@ class OidcHandler:
             return registered_user_id
 
         try:
-            attributes = self._user_mapping_provider.map_user_attributes(userinfo)
+            attributes = await self._user_mapping_provider.map_user_attributes(
+                userinfo, token
+            )
         except Exception as e:
             raise MappingException(
                 "Could not extract user attributes from OIDC response: " + str(e)
@@ -845,11 +848,14 @@ class OidcMappingProvider(Generic[C]):
         """
         raise NotImplementedError()
 
-    def map_user_attributes(self, userinfo: UserInfo) -> UserAttribute:
+    async def map_user_attributes(
+        self, userinfo: UserInfo, token: Token
+    ) -> UserAttribute:
         """Map a ``UserInfo`` objects into user attributes.
 
         Args:
             userinfo: An object representing the user given by the OIDC provider
+            token: A dict with the tokens returned by the provider
 
         Returns:
             A dict containing the ``localpart`` and (optionally) the ``display_name``
@@ -919,7 +925,9 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
         return userinfo[self._config["subject_claim"]]
 
-    def map_user_attributes(self, userinfo: UserInfo) -> UserAttribute:
+    async def map_user_attributes(
+        self, userinfo: UserInfo, token: Token
+    ) -> UserAttribute:
         localpart = self._config["localpart_template"].render(user=userinfo).strip()
 
         display_name = None  # type: Optional[str]

@@ -410,7 +410,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_called_once_with(token, nonce=nonce)
-        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo)
+        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo, token)
         self.handler._fetch_userinfo.assert_not_called()
         self.handler._render_error.assert_not_called()
 
@@ -442,7 +442,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         )
         self.handler._exchange_code.assert_called_once_with(code)
         self.handler._parse_id_token.assert_not_called()
-        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo)
+        self.handler._map_userinfo_to_user.assert_called_once_with(userinfo, token)
         self.handler._fetch_userinfo.assert_called_once_with(token)
         self.handler._render_error.assert_not_called()
 
