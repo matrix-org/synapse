@@ -317,21 +317,26 @@ class AuthHandler(BaseHandler):
             except StoreError:
                 raise SynapseError(400, "Unknown session ID: %s" % (sid,))
 
+            # If the client provides parameters, update what is persisted,
+            # otherwise use whatever was last provided.
+            #
+            # This was designed to allow the client to omit the parameters
+            # and just supply the session in subsequent calls so it split
+            # auth between devices by just sharing the session, (eg. so you
+            # could continue registration from your phone having clicked the
+            # email auth link on there). It's probably too open to abuse
+            # because it lets unauthenticated clients store arbitrary objects
+            # on a homeserver.
+            #
+            # Revisit: Assuming the REST APIs do sensible validation, the data
+            # isn't arbitrary.
+            #
             # Note that the registration endpoint explicitly removes the
             # "initial_device_display_name" parameter if it is provided
             # without a "password" parameter. See the changes to
             # synapse.rest.client.v2_alpha.register.RegisterRestServlet.on_POST
             # in commit 544722bad23fc31056b9240189c3cbbbf0ffd3f9.
             if clientdict:
-                # This was designed to allow the client to omit the parameters
-                # and just supply the session in subsequent calls so it split
-                # auth between devices by just sharing the session, (eg. so you
-                # could continue registration from your phone having clicked the
-                # email auth link on there). It's probably too open to abuse
-                # because it lets unauthenticated clients store arbitrary objects
-                # on a homeserver.
-                # Revisit: Assuming the REST APIs do sensible validation, the data
-                # isn't arbitrary.
                 await self.store.set_ui_auth_clientdict(sid, clientdict)
             else:
                 clientdict = session.clientdict
