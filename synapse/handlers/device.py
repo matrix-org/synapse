@@ -695,9 +695,10 @@ class DeviceListUpdater(object):
         try:
             result = yield self.federation.query_user_devices(origin, user_id)
         except (NotRetryingDestination, RequestSendFailed, HttpResponseException):
-            # TODO: Remember that we are now out of sync and try again
-            # later
             logger.warning("Failed to handle device list update for %s", user_id)
+            # Mark the remote user's device list as stale so we know we need to retry it
+            # later.
+            yield self.store.mark_remote_user_device_cache_as_stale(user_id)
             # We abort on exceptions rather than accepting the update
             # as otherwise synapse will 'forget' that its device list
             # is out of date. If we bail then we will retry the resync
@@ -711,13 +712,14 @@ class DeviceListUpdater(object):
             logger.info(e)
             return
         except Exception as e:
-            # TODO: Remember that we are now out of sync and try again
-            # later
             set_tag("error", True)
             log_kv(
                 {"message": "Exception raised by federation request", "exception": e}
             )
             logger.exception("Failed to handle device list update for %s", user_id)
+            # Mark the remote user's device list as stale so we know we need to retry it
+            # later.
+            yield self.store.mark_remote_user_device_cache_as_stale(user_id)
             return
         log_kv({"result": result})
         stream_id = result["stream_id"]
