@@ -55,7 +55,7 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 ### Stage 1: runtime
 ###
 
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.10
+FROM docker.io/python:${PYTHON_VERSION}-alpine3.11
 
 # xmlsec is required for saml support
 RUN apk add --no-cache --virtual .runtime_deps \
