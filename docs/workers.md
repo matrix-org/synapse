@@ -9,12 +9,12 @@ horizontally independently.
 Synapse's worker support is under active development and subject to change as
 we attempt to rapidly scale ever larger Synapse instances. However we are
 documenting it here to help admins needing a highly scalable Synapse instance
-similar to the one running matrix.org.
+similar to the one running `matrix.org`.
 
 All processes continue to share the same database instance, and as such,
-workers only work with postgres based synapse deployments. SQLite should only
+workers only work with PostgreSQL based synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already by
-running postgres.
+running PostgreSQL.
 
 ## Master/worker communication
 
@@ -54,22 +54,21 @@ listeners:
      - names: [replication]
 ```
 
-Under **no circumstances** should replication API listeners be exposed to
-the public internet; they currently do not implement authentication and are
-unencrypted.
+Under **no circumstances** should these replication API listeners be exposed to
+the public internet; they have no authentication and are unencrypted.
 
-You shuld then create a set of configs for the various worker processes.  Each
+You should then create a set of configs for the various worker processes.  Each
 worker configuration file inherits the configuration of the main homeserver
 configuration file.  You can then override configuration specific to that
 worker, e.g. the HTTP listener that it provides (if any); logging
 configuration; etc.  You should minimise the number of overrides though to
 maintain a usable config.
 
-In the config file for each worker, you must specify: the type of worker
+In the config file for each worker, you must specify the type of worker
 application (`worker_app`). The currently available worker applications are
-listed below. You must also specify the replication endpoints that it talking
-to on the main synapse process.  `worker_replication_host` should specify the
-host of the main synapse, `worker_replication_port` should point to the TCP
+listed below. You must also specify the replication endpoints that it should
+talk to on the main synapse process.  `worker_replication_host` should specify
+the host of the main synapse, `worker_replication_port` should point to the TCP
 replication listener port and `worker_replication_http_port` should point to
 the HTTP replication port.
 
