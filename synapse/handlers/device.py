@@ -732,7 +732,12 @@ class DeviceListUpdater(object):
         origin = get_domain_from_id(user_id)
         try:
             result = yield self.federation.query_user_devices(origin, user_id)
-        except (NotRetryingDestination, RequestSendFailed, HttpResponseException):
+        except NotRetryingDestination:
+            # Mark the remote user's device list as stale so we know we need to retry it
+            # later.
+            yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+            return
+        except (RequestSendFailed, HttpResponseException):
             logger.warning("Failed to handle device list update for %s", user_id)
             # Mark the remote user's device list as stale so we know we need to retry it
             # later.
