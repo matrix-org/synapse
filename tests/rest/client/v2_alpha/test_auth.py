@@ -19,7 +19,8 @@ from twisted.internet.defer import succeed
 import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
-from synapse.rest.client.v2_alpha import auth, register
+from synapse.rest.client.v1 import login
+from synapse.rest.client.v2_alpha import auth, devices, register
 
 from tests import unittest
 
@@ -34,11 +35,15 @@ class DummyRecaptchaChecker(UserInteractiveAuthChecker):
         return succeed(True)
 
 
+class DummyPasswordChecker(UserInteractiveAuthChecker):
+    def check_auth(self, authdict, clientip):
+        return succeed(authdict["identifier"]["user"])
+
+
 class FallbackAuthTests(unittest.HomeserverTestCase):
 
     servlets = [
         auth.register_servlets,
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
         register.register_servlets,
     ]
     hijack_auth = False
@@ -116,9 +121,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")
 
-    def test_cannot_change_operation(self):
+    def test_legacy_registration(self):
         """
-        The initial requested operation cannot be modified during the user interactive authentication session.
+        Registration allows the parameters to vary through the process.
         """
 
         # Make the initial request to register. (Later on a different password
@@ -167,23 +172,22 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
         # Now we should have fulfilled a complete auth flow, including
         # the recaptcha fallback step. Make the initial request again, but
-        # with a different password. This causes the request to fail since the
-        # operaiton was modified during the ui auth session.
+        # with a changed password. This still completes.
         request, channel = self.make_request(
             "POST",
             "register",
             {
                 "username": "user",
                 "type": "m.login.password",
-                "password": "foo",  # Note this doesn't match the original request.
+                "password": "foo",  # Note that this is different.
                 "auth": {"session": session},
             },
         )
         self.render(request)
-        self.assertEqual(channel.code, 403)
+        self.assertEqual(channel.code, 200)
 
-    # This behavior is currently disabled.
-    test_cannot_change_operation.skip = True
+        # We're given a registered user.
+        self.assertEqual(channel.json_body["user_id"], "@user:test")
 
     def test_complete_operation_unknown_session(self):
         """
@@ -224,3 +228,108 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEqual(request.code, 400)
+
+
+class UIAuthTests(unittest.HomeserverTestCase):
+    servlets = [
+        auth.register_servlets,
+        devices.register_servlets,
+        login.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        register.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        auth_handler = hs.get_auth_handler()
+        auth_handler.checkers[LoginType.PASSWORD] = DummyPasswordChecker(hs)
+
+        self.user_pass = "pass"
+        self.user = self.register_user("test", self.user_pass)
+        self.user_tok = self.login("test", self.user_pass)
+
+    def get_device_ids(self):
+        # Get the list of devices so one can be deleted.
+        request, channel = self.make_request(
+            "GET", "devices", access_token=self.user_tok,
+        )
+        self.render(request)
+
+        # Get the ID of the device.
+        self.assertEqual(request.code, 200)
+        return [d["device_id"] for d in channel.json_body["devices"]]
+
+    def delete_device(self, expected_response, body):
+        # Note that this uses the delete_devices endpoint so that we can modify
+        # the payload half-way through some tests.
+        request, channel = self.make_request(
+            "POST", "delete_devices", body, access_token=self.user_tok,
+        )
+        self.render(request)
+
+        # Ensure the response is sane.
+        self.assertEqual(request.code, expected_response)
+
+        return channel
+
+    def test_ui_auth(self):
+        """
+        Test user interactive authentication outside of registration.
+        """
+        device_id = self.get_device_ids()[0]
+
+        # Attempt to delete this device.
+        # Returns a 401 as per the spec
+        channel = self.delete_device(401, {"devices": [device_id]})
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # Make another request providing the UI auth flow.
+        self.delete_device(
+            200,
+            {
+                "devices": [device_id],
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+    def test_cannot_change_operation(self):
+        """
+        The initial requested operation cannot be modified during the user interactive authentication session.
+        """
+        # Create a second login.
+        self.login("test", self.user_pass)
+
+        device_ids = self.get_device_ids()
+        self.assertEqual(len(device_ids), 2)
+
+        # Attempt to delete the first device.
+        # Returns a 401 as per the spec
+        channel = self.delete_device(401, {"devices": [device_ids[0]]})
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # Make another request providing the UI auth flow, but try to delete the
+        # second device. This results in an error.
+        self.delete_device(
+            403,
+            {
+                "devices": [device_ids[1]],
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
