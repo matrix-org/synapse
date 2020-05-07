@@ -1148,7 +1148,7 @@ class SyncHandler(object):
             # rooms) and taking a copy of the set is relatively expensive.
             if user_id not in users_who_share_room:
                 users_who_share_room = set(users_who_share_room)
-                users_who_share_room.add(user_id)
+                #users_who_share_room.add(user_id)
 
             tracked_users = users_who_share_room
 
