@@ -364,7 +364,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         state = "state"
         nonce = "nonce"
         client_redirect_url = "http://client/redirect"
-        session = self.handler._macaroon_generator.generate_oidc_session_token(
+        session = self.handler._generate_oidc_session_token(
             state=state, nonce=nonce, client_redirect_url=client_redirect_url,
         )
         request.getCookie.return_value = session
@@ -453,7 +453,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError("invalid_session")
 
         # Mismatching session
-        session = self.handler._macaroon_generator.generate_oidc_session_token(
+        session = self.handler._generate_oidc_session_token(
             state="state", nonce="nonce", client_redirect_url="http://client/redirect",
         )
         request.args = {}

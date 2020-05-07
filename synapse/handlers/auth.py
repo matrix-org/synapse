@@ -1165,51 +1165,12 @@ class MacaroonGenerator(object):
         macaroon.add_first_party_caveat("type = delete_pusher")
         return macaroon.serialize()
 
-    def generate_oidc_session_token(
-        self,
-        state: str,
-        nonce: str,
-        client_redirect_url: str,
-        duration_in_ms: int = (60 * 60 * 1000),
-    ) -> str:
-        """Generates a signed token storing data about an OIDC session.
-
-        When Synapse initiates an authorization flow, it creates a random state
-        and a random nonce. Those parameters are given to the provider and
-        should be verified when the client comes back from the provider.
-        It is also used to store the client_redirect_url, which is used to
-        complete the SSO login flow.
-
-        Args:
-            state: The ``state`` parameter passed to the OIDC provider.
-            nonce: The ``nonce`` parameter passed to the OIDC provider.
-            client_redirect_url: The URL the client gave when it initiated the
-                flow.
-            duration_in_ms: An optional duration for the token in milliseconds.
-                Defaults to an hour.
-
-        Returns:
-            A signed macaroon token with the session informations.
-        """
-        macaroon = self._generate_base_macaroon(None)
-        macaroon.add_first_party_caveat("type = session")
-        macaroon.add_first_party_caveat("state = %s" % (state,))
-        macaroon.add_first_party_caveat("nonce = %s" % (nonce,))
-        macaroon.add_first_party_caveat(
-            "client_redirect_url = %s" % (client_redirect_url,)
-        )
-        now = self.hs.get_clock().time_msec()
-        expiry = now + duration_in_ms
-        macaroon.add_first_party_caveat("time < %d" % (expiry,))
-        return macaroon.serialize()
-
-    def _generate_base_macaroon(self, user_id: Optional[str]) -> pymacaroons.Macaroon:
+    def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
         macaroon = pymacaroons.Macaroon(
             location=self.hs.config.server_name,
             identifier="key",
             key=self.hs.config.macaroon_secret_key,
         )
         macaroon.add_first_party_caveat("gen = 1")
-        if user_id is not None:
-            macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
+        macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon

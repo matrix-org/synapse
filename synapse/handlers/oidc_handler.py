@@ -25,7 +25,10 @@ from authlib.oauth2.rfc6749.parameters import prepare_grant_uri
 from authlib.oidc.core import CodeIDToken, ImplicitIDToken, UserInfo
 from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
 from jinja2 import Environment, Template
-from pymacaroons.exceptions import MacaroonDeserializationException
+from pymacaroons.exceptions import (
+    MacaroonDeserializationException,
+    MacaroonInvalidSignatureException,
+)
 from typing_extensions import TypedDict
 
 from twisted.web.client import readBody
@@ -113,9 +116,9 @@ class OidcHandler:
         self._auth_handler = hs.get_auth_handler()
         self._registration_handler = hs.get_registration_handler()
         self._datastore = hs.get_datastore()
-        self._macaroon_generator = hs.get_macaroon_generator()
         self._clock = hs.get_clock()
         self._hostname = hs.hostname  # type: str
+        self._server_name = hs.config.server_name  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._error_template = load_jinja2_templates(
             hs.config.sso_template_dir, ["oidc_error.html"]
@@ -523,7 +526,7 @@ class OidcHandler:
         state = generate_token()
         nonce = generate_token()
 
-        cookie = self._macaroon_generator.generate_oidc_session_token(
+        cookie = self._generate_oidc_session_token(
             state=state, nonce=nonce, client_redirect_url=client_redirect_url.decode(),
         )
         request.addCookie(
@@ -620,35 +623,16 @@ class OidcHandler:
         state = request.args[b"state"][0].decode()
 
         # Deserialize the session token and verify it.
-        # FIXME: macaroon verification should be refactored somewhere else
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(session)
+            nonce, client_redirect_url = self._verify_oidc_session_token(session, state)
         except MacaroonDeserializationException as e:
             logger.exception("Invalid session")
             self._render_error(request, "invalid_session", str(e))
             return
-
-        v = pymacaroons.Verifier()
-
-        v.satisfy_exact("gen = 1")
-        v.satisfy_exact("type = session")
-        v.satisfy_exact("state = %s" % (state,))
-        v.satisfy_general(self._verify_expiry)
-        v.satisfy_general(lambda c: c.startswith("nonce = "))
-        v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
-
-        try:
-            v.verify(macaroon, self._macaroon_secret_key)
-        except Exception as e:
+        except MacaroonInvalidSignatureException as e:
             logger.exception("Could not verify session")
             self._render_error(request, "mismatching_session", str(e))
             return
-
-        # Extract the `nonce` and `client_redirect_url` from the token
-        nonce = self._get_value_from_macaroon(macaroon, "nonce")
-        client_redirect_url = self._get_value_from_macaroon(
-            macaroon, "client_redirect_url"
-        )
 
         # Exchange the code with the provider
         if b"code" not in request.args:
@@ -696,6 +680,80 @@ class OidcHandler:
         await self._auth_handler.complete_sso_login(
             user_id, request, client_redirect_url
         )
+
+    def _generate_oidc_session_token(
+        self,
+        state: str,
+        nonce: str,
+        client_redirect_url: str,
+        duration_in_ms: int = (60 * 60 * 1000),
+    ) -> str:
+        """Generates a signed token storing data about an OIDC session.
+
+        When Synapse initiates an authorization flow, it creates a random state
+        and a random nonce. Those parameters are given to the provider and
+        should be verified when the client comes back from the provider.
+        It is also used to store the client_redirect_url, which is used to
+        complete the SSO login flow.
+
+        Args:
+            state: The ``state`` parameter passed to the OIDC provider.
+            nonce: The ``nonce`` parameter passed to the OIDC provider.
+            client_redirect_url: The URL the client gave when it initiated the
+                flow.
+            duration_in_ms: An optional duration for the token in milliseconds.
+                Defaults to an hour.
+
+        Returns:
+            A signed macaroon token with the session informations.
+        """
+        macaroon = pymacaroons.Macaroon(
+            location=self._server_name, identifier="key", key=self._macaroon_secret_key,
+        )
+        macaroon.add_first_party_caveat("gen = 1")
+        macaroon.add_first_party_caveat("type = session")
+        macaroon.add_first_party_caveat("state = %s" % (state,))
+        macaroon.add_first_party_caveat("nonce = %s" % (nonce,))
+        macaroon.add_first_party_caveat(
+            "client_redirect_url = %s" % (client_redirect_url,)
+        )
+        now = self._clock.time_msec()
+        expiry = now + duration_in_ms
+        macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        return macaroon.serialize()
+
+    def _verify_oidc_session_token(self, session: str, state: str) -> Tuple[str, str]:
+        """Verifies and extract an OIDC session token.
+
+        This verifies that a given session token was issued by this homeserver
+        and extract the nonce and client_redirect_url caveats.
+
+        Args:
+            session: The session token to verify
+            state: The state the OIDC provider gave back
+
+        Returns:
+            The nonce and the client_redirect_url for this session
+        """
+        macaroon = pymacaroons.Macaroon.deserialize(session)
+
+        v = pymacaroons.Verifier()
+        v.satisfy_exact("gen = 1")
+        v.satisfy_exact("type = session")
+        v.satisfy_exact("state = %s" % (state,))
+        v.satisfy_general(lambda c: c.startswith("nonce = "))
+        v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
+        v.satisfy_general(self._verify_expiry)
+
+        v.verify(macaroon, self._macaroon_secret_key)
+
+        # Extract the `nonce` and `client_redirect_url` from the token
+        nonce = self._get_value_from_macaroon(macaroon, "nonce")
+        client_redirect_url = self._get_value_from_macaroon(
+            macaroon, "client_redirect_url"
+        )
+
+        return nonce, client_redirect_url
 
     def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str) -> str:
         """Extracts a caveat value from a macaroon token.
