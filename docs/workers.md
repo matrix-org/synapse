@@ -12,17 +12,16 @@ documenting it here to help admins needing a highly scalable Synapse instance
 similar to the one running `matrix.org`.
 
 All processes continue to share the same database instance, and as such,
-workers only work with PostgreSQL based synapse deployments. SQLite should only
-be used for demo purposes and any admin considering workers should already by
+workers only work with PostgreSQL-based Synapse deployments. SQLite should only
+be used for demo purposes and any admin considering workers should already be
 running PostgreSQL.
 
 ## Master/worker communication
 
-The workers communicate with the master process via a synapse-specific protocol
-called 'replication' - analogous to MySQL- or Postgres-style database
-replication - which feeds a stream of relevant data from the master to the
-workers so they can be kept in sync with the main synapse process and database
-state.
+The workers communicate with the master process via a Synapse-specific protocol
+called 'replication' (analogous to MySQL- or Postgres-style database
+replication) which feeds a stream of relevant data from the master to the
+workers so they can be kept in sync with the master process and database state.
 
 Additionally, workers may make HTTP requests to the master, to send information
 in the other direction. Typically this is used for operations which need to
@@ -37,7 +36,7 @@ requests made to the federation port. See [reverse_proxy.md](reverse_proxy.md)
 for information on setting up a reverse proxy.
 
 To enable workers, you need to add *two* replication listeners to the
-main synapse configuration file (`homeserver.yaml`). For example:
+main Synapse configuration file (`homeserver.yaml`). For example:
 
 ```yaml
 listeners:
@@ -105,9 +104,9 @@ recommend the use of `systemd` where available: for information on setting up
 
 ### **Experimental** support for replication over redis
 
-As of Synapse v1.13.0, it is possible to configure synapse to send replication
+As of Synapse v1.13.0, it is possible to configure Synapse to send replication
 via a [Redis pub/sub channel](https://redis.io/topics/pubsub). This is an
-alternative to direct tcp connections to the master: rather than all the
+alternative to direct TCP connections to the master: rather than all the
 workers connecting to the master, all the workers and the master connect to
 Redis, which relays replication commands between processes. This can give a
 significant cpu saving on the master and will be a prerequisite for upcoming
@@ -144,7 +143,7 @@ To configure Synapse to use Redis:
 Once redis replication is in use, `worker_replication_port` is redundant and
 can be removed from the worker configuration files. Similarly, the
 configuration for the `listener` for the TCP replication port can be removed
-from the main configuration file. Note that the *HTTP* replication port is
+from the main configuration file. Note that the HTTP replication port is
 still required.
 
 ### Using synctl
