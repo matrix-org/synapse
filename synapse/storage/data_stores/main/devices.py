@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple, Set
 
 from six import iteritems
 
@@ -654,21 +654,30 @@ class DeviceWorkerStore(SQLBaseStore):
         return results
 
     @defer.inlineCallbacks
-    def get_user_ids_requiring_device_list_resync(self, user_ids: Collection[str]):
+    def get_user_ids_requiring_device_list_resync(
+        self, user_ids: Optional[Collection[str]] = None,
+    ) -> Set[str]:
         """Given a list of remote users return the list of users that we
         should resync the device lists for.
 
         Returns:
-            Deferred[Set[str]]
+            The IDs of users whose device lists need resync.
         """
-
-        rows = yield self.db.simple_select_many_batch(
-            table="device_lists_remote_resync",
-            column="user_id",
-            iterable=user_ids,
-            retcols=("user_id",),
-            desc="get_user_ids_requiring_device_list_resync",
-        )
+        if user_ids:
+            rows = yield self.db.simple_select_many_batch(
+                table="device_lists_remote_resync",
+                column="user_id",
+                iterable=user_ids,
+                retcols=("user_id",),
+                desc="get_user_ids_requiring_device_list_resync_with_iterable",
+            )
+        else:
+            rows = yield self.db.simple_select_list(
+                table="device_lists_remote_resync",
+                keyvalues=None,
+                retcols=("user_id",),
+                desc="get_user_ids_requiring_device_list_resync"
+            )
 
         return {row["user_id"] for row in rows}
 
