@@ -12,26 +12,21 @@ documenting it here to help admins needing a highly scalable Synapse instance
 similar to the one running matrix.org.
 
 All processes continue to share the same database instance, and as such,
-workers only work with postgres based synapse deployments. SQlite should only
+workers only work with postgres based synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already by
 running postgres.
 
-Originally the workers communicated with the master synapse process via a
-synapse-specific TCP protocol called 'replication' - analogous to MySQL or
-Postgres style database replication; feeding a stream of relevant data to the
+## Master/worker communication
+
+The workers communicate with the master process via a synapse-specific protocol
+called 'replication' - analogous to MySQL- or Postgres-style database
+replication - which feeds a stream of relevant data from the master to the
 workers so they can be kept in sync with the main synapse process and database
 state.
 
-More recently (v1.13.0) Redis support was added, Redis is an alternative to
-direct tcp connections to the master: rather than all the workers connecting to
-the master, all the workers and the master connect to redis, which relays
-replication commands between processes. This can give a significant cpu saving
-on the master and will be a prerequisite for upcoming performance improvements.
-
-This doc covers details of both approaches (TCP Replication and Redis
-Replication), however the TCP Replication implementation will be deprecated in
-favour of Redis.
-
+Additionally, workers may make HTTP requests to the master, to send information
+in the other direction. Typically this is used for operations which need to
+wait for a reply - such as sending an event.
 
 ## Configuration
 
@@ -41,56 +36,44 @@ the correct worker, or to the main synapse instance. Note that this includes
 requests made to the federation port. See [reverse_proxy.md](reverse_proxy.md)
 for information on setting up a reverse proxy.
 
-To enable workers, you need to add replication listeners to the master
-synapse, in the case of Redis Replication you need only configure an HTTP listener e.g.:
+To enable workers, you need to add *two* replication listeners to the
+main synapse configuration file (`homeserver.yaml`). For example:
 
-    listeners:
-      # The HTTP replication port
-      - port: 9093
-        bind_address: '127.0.0.1'
-        type: http
-        resources:
-         - names: [replication]
+```yaml
+listeners:
+  # The TCP replication port
+  - port: 9092
+    bind_address: '127.0.0.1'
+    type: replication
 
-For TCP Replication
-    listeners:
-      # The TCP replication port
-      - port: 9092
-        bind_address: '127.0.0.1'
-        type: replication
-      # The HTTP replication port
-      - port: 9093
-        bind_address: '127.0.0.1'
-        type: http
-        resources:
-         - names: [replication]
-
+  # The HTTP replication port
+  - port: 9093
+    bind_address: '127.0.0.1'
+    type: http
+    resources:
+     - names: [replication]
+```
 
 Under **no circumstances** should replication API listeners be exposed to
 the public internet; they currently do not implement authentication and are
 unencrypted.
 
-You then create a set of configs for the various worker processes.  These
-should be worker configuration files, and should be stored in a dedicated
-subdirectory, to allow synctl to manipulate them.
+You shuld then create a set of configs for the various worker processes.  Each
+worker configuration file inherits the configuration of the main homeserver
+configuration file.  You can then override configuration specific to that
+worker, e.g. the HTTP listener that it provides (if any); logging
+configuration; etc.  You should minimise the number of overrides though to
+maintain a usable config.
 
-Each worker configuration file inherits the configuration of the main homeserver
-configuration file.  You can then override configuration specific to that worker,
-e.g. the HTTP listener that it provides (if any); logging configuration; etc.
-You should minimise the number of overrides though to maintain a usable config.
-
-In the config file for each worker, you must specify the type of worker
+In the config file for each worker, you must specify: the type of worker
 application (`worker_app`). The currently available worker applications are
-listed below. You must also specify the replication endpoints that it's talking
+listed below. You must also specify the replication endpoints that it talking
 to on the main synapse process.  `worker_replication_host` should specify the
 host of the main synapse, `worker_replication_port` should point to the TCP
 replication listener port and `worker_replication_http_port` should point to
 the HTTP replication port.
 
-Currently, the `event_creator` and `federation_reader` workers require specifying
-`worker_replication_http_port`.
-
-For instance:
+For example:
 
     worker_app: synapse.app.synchrotron
 
@@ -121,23 +104,49 @@ recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
 [systemd-with-workers](systemd-with-workers). To use `synctl`, see below.
 
-### Installing Redis
-If you are configuring Redis replication, then you need to install Redis
-outside of Synapse.
+### **Experimental** support for replication over redis
 
-1. Install redis following the normal procedure for your distro - eg `apt
-   install redis-server` for debian/ubuntu
-2. check it's running and accessible: you should be able to `echo PING | nc -q1
+As of Synapse v1.13.0, it is possible to configure synapse to send replication
+via a [Redis pub/sub channel](https://redis.io/topics/pubsub). This is an
+alternative to direct tcp connections to the master: rather than all the
+workers connecting to the master, all the workers and the master connect to
+Redis, which relays replication commands between processes. This can give a
+significant cpu saving on the master and will be a prerequisite for upcoming
+performance improvements.
+
+Note that this support is currently experimental; you may experience lost
+messages and similar problems! It is strongly recommended that admins setting
+up workers for the first time use direct TCP replication as above.
+
+To configure Synapse to use Redis:
+
+1. Install Redis following the normal procedure for your distribution - for
+   example, on Debian, `apt install redis-server`. (It is safe to use an
+   existing Redis deployment if you have one: we use a pub/sub stream named
+   according to the `server_name` of your synapse server.)
+2. Check Redis is running and accessible: you should be able to `echo PING | nc -q1
    localhost 6379` and get a response of `+PONG`.
-3. Add config to homeserver.yaml:
+3. Install the python prerequisites. If you installed synapse into a
+   virtualenv, this can be done with:
+   ```sh
+   pip install matrix-synapse[redis]
+   ```
+   The debian packages from matrix.org already include the required
+   dependencies.
+4. Add config to the shared configuration (`homeserver.yaml`):
     ```yaml
     redis:
       enabled: true
     ```
     Optional parameters which can go alongside `enabled` are `host`, `port`,
-    `password`, `dbid`. If you don't know if you need the last two, you
-    probably don't.
-4. That's it. Restart master and all workers.
+    `password`. Normally none of these are required.
+5. Restart master and all workers.
+
+Once redis replication is in use, `worker_replication_port` is redundant and
+can be removed from the worker configuration files. Similarly, the
+configuration for the `listener` for the TCP replication port can be removed
+from the main configuration file. Note that the *HTTP* replication port is
+still required.
 
 ### Using synctl
 
