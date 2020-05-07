@@ -131,10 +131,9 @@ class ReplicationCommandHandler:
             import txredisapi
 
             logger.info(
-                "Connecting to redis (host=%r port=%r DBID=%r)",
+                "Connecting to redis (host=%r port=%r)",
                 hs.config.redis_host,
                 hs.config.redis_port,
-                hs.config.redis_dbid,
             )
 
             # We need two connections to redis, one for the subscription stream and
@@ -145,7 +144,6 @@ class ReplicationCommandHandler:
             outbound_redis_connection = txredisapi.lazyConnection(
                 host=hs.config.redis_host,
                 port=hs.config.redis_port,
-                dbid=hs.config.redis_dbid,
                 password=hs.config.redis.redis_password,
                 reconnect=True,
             )
