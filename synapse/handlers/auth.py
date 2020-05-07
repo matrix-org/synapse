@@ -340,26 +340,26 @@ class AuthHandler(BaseHandler):
             # without a "password" parameter. See the changes to
             # synapse.rest.client.v2_alpha.register.RegisterRestServlet.on_POST
             # in commit 544722bad23fc31056b9240189c3cbbbf0ffd3f9.
-            if clientdict:
-                # Ensure that the queried operation does not vary between stages of
-                # the UI authentication session. This is done by generating a stable
-                # comparator based on the URI, method, and body (minus the auth dict)
-                # and storing it during the initial query. Subsequent queries ensure
-                # that this comparator has not changed.
-                #
-                # For backwards compatibility the registration endpoint persists any
-                # changes instead of validating them.
-                if validate_operation:
-                    comparator = (uri, method, clientdict)
-                    if (session.uri, session.method, session.clientdict) != comparator:
-                        raise SynapseError(
-                            403,
-                            "Requested operation has changed during the UI authentication session.",
-                        )
-                else:
-                    await self.store.set_ui_auth_clientdict(sid, clientdict)
-            else:
+            if not clientdict:
                 clientdict = session.clientdict
+
+            # Ensure that the queried operation does not vary between stages of
+            # the UI authentication session. This is done by generating a stable
+            # comparator based on the URI, method, and body (minus the auth dict)
+            # and storing it during the initial query. Subsequent queries ensure
+            # that this comparator has not changed.
+            #
+            # For backwards compatibility the registration endpoint persists any
+            # changes instead of validating them.
+            if validate_operation:
+                comparator = (uri, method, clientdict)
+                if (session.uri, session.method, session.clientdict) != comparator:
+                    raise SynapseError(
+                        403,
+                        "Requested operation has changed during the UI authentication session.",
+                    )
+            else:
+                await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         if not authdict:
             raise InteractiveAuthIncompleteError(

@@ -218,7 +218,20 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.assertEqual(request.code, 200)
         return [d["device_id"] for d in channel.json_body["devices"]]
 
-    def delete_device(self, expected_response, body):
+    def delete_device(self, device, expected_response, body=None):
+        """Delete an individual device."""
+        request, channel = self.make_request(
+            "DELETE", "devices/" + device, body, access_token=self.user_tok,
+        )
+        self.render(request)
+
+        # Ensure the response is sane.
+        self.assertEqual(request.code, expected_response)
+
+        return channel
+
+    def delete_devices(self, expected_response, body):
+        """Delete 1 or more devices."""
         # Note that this uses the delete_devices endpoint so that we can modify
         # the payload half-way through some tests.
         request, channel = self.make_request(
@@ -239,7 +252,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Attempt to delete this device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(401, {"devices": [device_id]})
+        channel = self.delete_device(device_id, 401)
 
         # Grab the session
         session = channel.json_body["session"]
@@ -248,9 +261,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Make another request providing the UI auth flow.
         self.delete_device(
+            device_id,
             200,
             {
-                "devices": [device_id],
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": self.user},
@@ -260,9 +273,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_cannot_change_operation(self):
+    def test_cannot_change_body(self):
         """
-        The initial requested operation cannot be modified during the user interactive authentication session.
+        The initial requested client dict cannot be modified during the user interactive authentication session.
         """
         # Create a second login.
         self.login("test", self.user_pass)
@@ -272,7 +285,41 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         # Attempt to delete the first device.
         # Returns a 401 as per the spec
-        channel = self.delete_device(401, {"devices": [device_ids[0]]})
+        channel = self.delete_devices(401, {"devices": [device_ids[0]]})
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Ensure that flows are what is expected.
+        self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
+
+        # Make another request providing the UI auth flow, but try to delete the
+        # second device. This results in an error.
+        self.delete_devices(
+            403,
+            {
+                "devices": [device_ids[1]],
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": self.user},
+                    "password": self.user_pass,
+                    "session": session,
+                },
+            },
+        )
+
+    def test_cannot_change_uri(self):
+        """
+        The initial requested URI cannot be modified during the user interactive authentication session.
+        """
+        # Create a second login.
+        self.login("test", self.user_pass)
+
+        device_ids = self.get_device_ids()
+        self.assertEqual(len(device_ids), 2)
+
+        # Attempt to delete the first device.
+        # Returns a 401 as per the spec
+        channel = self.delete_device(device_ids[0], 401)
 
         # Grab the session
         session = channel.json_body["session"]
@@ -282,9 +329,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # Make another request providing the UI auth flow, but try to delete the
         # second device. This results in an error.
         self.delete_device(
+            device_ids[1],
             403,
             {
-                "devices": [device_ids[1]],
                 "auth": {
                     "type": "m.login.password",
                     "identifier": {"type": "m.id.user", "user": self.user},
