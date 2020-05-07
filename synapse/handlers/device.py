@@ -122,9 +122,9 @@ class DeviceWorkerHandler(BaseHandler):
 
         # First we check if any devices have changed for users that we share
         # rooms with.
-        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+        users_who_share_room = yield defer.ensureDeferred(self.store.get_users_who_share_room_with_user(
             user_id
-        )
+        ))
 
         #tracked_users = set(users_who_share_room)
 
@@ -445,9 +445,9 @@ class DeviceHandler(DeviceWorkerHandler):
         remote servers if the user is local.
         """
         logger.info("get_users_who_share_room... called from notify_device_update")
-        users_who_share_room = yield self.store.get_users_who_share_room_with_user(
+        users_who_share_room = yield defer.ensureDeferred(self.store.get_users_who_share_room_with_user(
             user_id
-        )
+        ))
 
         hosts = set()
         if self.hs.is_mine_id(user_id):

@@ -474,30 +474,29 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             _get_users_server_still_shares_room_with_txn,
         )
 
-    @defer.inlineCallbacks
-    def get_rooms_for_user(self, user_id, on_invalidate=None):
+    async def get_rooms_for_user(self, user_id, on_invalidate=None):
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
         participating in.
         """
-        rooms = yield self.get_rooms_for_user_with_stream_ordering(
+        rooms = await self.get_rooms_for_user_with_stream_ordering(
             user_id, on_invalidate=on_invalidate
         )
         return frozenset(r.room_id for r in rooms)
 
-    @cachedInlineCallbacks(max_entries=500000, cache_context=True)
-    def get_users_who_share_room_with_user(self, user_id, cache_context):
+    @cached(max_entries=500000, cache_context=True, iterable=True)
+    async def get_users_who_share_room_with_user(self, user_id, cache_context):
         """Returns the set of users who share a room with `user_id`
         """
         logger.info("Called with %s %s", user_id, cache_context)
-        room_ids = yield self.get_rooms_for_user(
+        room_ids = await self.get_rooms_for_user(
             user_id, on_invalidate=cache_context.invalidate
         )
 
         user_who_share_room = set()
         for room_id in room_ids:
-            user_ids = yield self.get_users_in_room(
+            user_ids = await self.get_users_in_room(
                 room_id, on_invalidate=cache_context.invalidate
             )
             user_who_share_room.update(user_ids)
