@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+import traceback
 from typing import Iterable, List, Set
 
 from six import iteritems, itervalues
@@ -165,6 +166,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=100000, iterable=True)
     def get_users_in_room(self, room_id):
+        logger.info("Traceback: %s", traceback.format_stack())
         return self.db.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
         )

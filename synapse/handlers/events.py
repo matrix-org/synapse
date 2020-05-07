@@ -172,6 +172,7 @@ class EventHandler(BaseHandler):
         if not event:
             return None
 
+        logger.info("get_users_in_room called from get_event!")
         users = await self.store.get_users_in_room(event.room_id)
         is_peeking = user.to_string() not in users
 
