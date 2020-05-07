@@ -64,24 +64,18 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         auth_handler = hs.get_auth_handler()
         auth_handler.checkers[LoginType.RECAPTCHA] = self.recaptcha_checker
 
-    @unittest.INFO
-    def test_fallback_captcha(self):
-
-        request, channel = self.make_request(
-            "POST",
-            "register",
-            {"username": "user", "type": "m.login.password", "password": "bar"},
-        )
+    def register(self, expected_response, body):
+        """Make a register request."""
+        request, channel = self.make_request("POST", "register", body,)
         self.render(request)
 
-        # Returns a 401 as per the spec
-        self.assertEqual(request.code, 401)
-        # Grab the session
-        session = channel.json_body["session"]
-        # Assert our configured public key is being given
-        self.assertEqual(
-            channel.json_body["params"]["m.login.recaptcha"]["public_key"], "brokencake"
-        )
+        self.assertEqual(request.code, expected_response)
+        return channel
+
+    def recaptcha(self, session, expected_post_response, post_session=None):
+        """Get and respond to a fallback recaptcha. Returns the second request."""
+        if post_session is None:
+            post_session = session
 
         request, channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
@@ -92,31 +86,42 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         request, channel = self.make_request(
             "POST",
             "auth/m.login.recaptcha/fallback/web?session="
-            + session
+            + post_session
             + "&g-recaptcha-response=a",
         )
         self.render(request)
-        self.assertEqual(request.code, 200)
+        self.assertEqual(request.code, expected_post_response)
 
         # The recaptcha handler is called with the response given
         attempts = self.recaptcha_checker.recaptcha_attempts
         self.assertEqual(len(attempts), 1)
         self.assertEqual(attempts[0][0]["response"], "a")
 
-        # also complete the dummy auth
-        request, channel = self.make_request(
-            "POST", "register", {"auth": {"session": session, "type": "m.login.dummy"}}
+    @unittest.INFO
+    def test_fallback_captcha(self):
+        """Ensure that fallback auth via a captcha works."""
+        # Returns a 401 as per the spec
+        channel = self.register(
+            401, {"username": "user", "type": "m.login.password", "password": "bar"},
         )
-        self.render(request)
+
+        # Grab the session
+        session = channel.json_body["session"]
+        # Assert our configured public key is being given
+        self.assertEqual(
+            channel.json_body["params"]["m.login.recaptcha"]["public_key"], "brokencake"
+        )
+
+        # Complete the recaptcha step.
+        self.recaptcha(session, 200)
+
+        # also complete the dummy auth
+        self.register(200, {"auth": {"session": session, "type": "m.login.dummy"}})
 
         # Now we should have fulfilled a complete auth flow, including
         # the recaptcha fallback step, we can then send a
         # request to the register API with the session in the authdict.
-        request, channel = self.make_request(
-            "POST", "register", {"auth": {"session": session}}
-        )
-        self.render(request)
-        self.assertEqual(channel.code, 200)
+        channel = self.register(200, {"auth": {"session": session}})
 
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")
@@ -128,15 +133,11 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
 
         # Make the initial request to register. (Later on a different password
         # will be used.)
-        request, channel = self.make_request(
-            "POST",
-            "register",
-            {"username": "user", "type": "m.login.password", "password": "bar"},
-        )
-        self.render(request)
-
         # Returns a 401 as per the spec
-        self.assertEqual(request.code, 401)
+        channel = self.register(
+            401, {"username": "user", "type": "m.login.password", "password": "bar"},
+        )
+
         # Grab the session
         session = channel.json_body["session"]
         # Assert our configured public key is being given
@@ -144,38 +145,17 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
             channel.json_body["params"]["m.login.recaptcha"]["public_key"], "brokencake"
         )
 
-        request, channel = self.make_request(
-            "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
-        )
-        self.render(request)
-        self.assertEqual(request.code, 200)
-
-        request, channel = self.make_request(
-            "POST",
-            "auth/m.login.recaptcha/fallback/web?session="
-            + session
-            + "&g-recaptcha-response=a",
-        )
-        self.render(request)
-        self.assertEqual(request.code, 200)
-
-        # The recaptcha handler is called with the response given
-        attempts = self.recaptcha_checker.recaptcha_attempts
-        self.assertEqual(len(attempts), 1)
-        self.assertEqual(attempts[0][0]["response"], "a")
+        # Complete the recaptcha step.
+        self.recaptcha(session, 200)
 
         # also complete the dummy auth
-        request, channel = self.make_request(
-            "POST", "register", {"auth": {"session": session, "type": "m.login.dummy"}}
-        )
-        self.render(request)
+        self.register(200, {"auth": {"session": session, "type": "m.login.dummy"}})
 
         # Now we should have fulfilled a complete auth flow, including
         # the recaptcha fallback step. Make the initial request again, but
         # with a changed password. This still completes.
-        request, channel = self.make_request(
-            "POST",
-            "register",
+        channel = self.register(
+            200,
             {
                 "username": "user",
                 "type": "m.login.password",
@@ -183,8 +163,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
                 "auth": {"session": session},
             },
         )
-        self.render(request)
-        self.assertEqual(channel.code, 200)
 
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")
@@ -193,18 +171,13 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         """
         Attempting to mark an invalid session as complete should error.
         """
-
         # Make the initial request to register. (Later on a different password
         # will be used.)
-        request, channel = self.make_request(
-            "POST",
-            "register",
-            {"username": "user", "type": "m.login.password", "password": "bar"},
-        )
-        self.render(request)
-
         # Returns a 401 as per the spec
-        self.assertEqual(request.code, 401)
+        channel = self.register(
+            401, {"username": "user", "type": "m.login.password", "password": "bar"}
+        )
+
         # Grab the session
         session = channel.json_body["session"]
         # Assert our configured public key is being given
@@ -212,22 +185,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
             channel.json_body["params"]["m.login.recaptcha"]["public_key"], "brokencake"
         )
 
-        request, channel = self.make_request(
-            "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
-        )
-        self.render(request)
-        self.assertEqual(request.code, 200)
-
-        # Attempt to complete an unknown session, which should return an error.
-        unknown_session = session + "unknown"
-        request, channel = self.make_request(
-            "POST",
-            "auth/m.login.recaptcha/fallback/web?session="
-            + unknown_session
-            + "&g-recaptcha-response=a",
-        )
-        self.render(request)
-        self.assertEqual(request.code, 400)
+        # Attempt to complete the recaptcha step with an unknown session.
+        # This results in an error.
+        self.recaptcha(session, 400, session + "unknown")
 
 
 class UIAuthTests(unittest.HomeserverTestCase):
