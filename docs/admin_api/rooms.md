@@ -267,8 +267,7 @@ end of the list.
 
 # DRAFT: Room Details API
 
-The Room Details admin API allows server admins to get all details of a room,
-including a list of all room members.
+The Room Details admin API allows server admins to get all details of a room.
 
 This API is still a draft and details might change!
 
