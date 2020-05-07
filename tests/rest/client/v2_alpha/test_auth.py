@@ -182,6 +182,9 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(channel.code, 403)
 
+    # This behavior is currently disabled.
+    test_cannot_change_operation.skip = True
+
     def test_complete_operation_unknown_session(self):
         """
         Attempting to mark an invalid session as complete should error.
