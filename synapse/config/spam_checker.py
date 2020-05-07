@@ -39,7 +39,7 @@ class SpamCheckerConfig(Config):
                 if not isinstance(spam_checker, dict):
                     raise ConfigError("spam_checker syntax is incorrect")
 
-                self.spam_checkers = load_module(spam_checker)
+                self.spam_checkers.append(load_module(spam_checker))
         else:
             raise ConfigError("spam_checker syntax is incorrect")
 

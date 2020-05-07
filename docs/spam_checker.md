@@ -83,7 +83,8 @@ spam_checker:
       my_custom_option: true
 ```
 
-More spam checkers can be added in tandem by appending more items to the list.
+More spam checkers can be added in tandem by appending more items to the list. An
+action is blocked when at least one of the configured spam checkers flags it.
 
 ## Examples
 
