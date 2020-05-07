@@ -1150,15 +1150,15 @@ class SyncHandler(object):
             # Always tell the user about their own devices. We check as the user
             # ID is almost certainly already included (unless they're not in any
             # rooms) and taking a copy of the set is relatively expensive.
-            if user_id not in users_who_share_room:
-                users_who_share_room = set(users_who_share_room)
-                users_who_share_room.add(user_id)
+            #if user_id not in users_who_share_room:
+            #    users_who_share_room = set(users_who_share_room)
+            #    users_who_share_room.add(user_id)
 
-            tracked_users = users_who_share_room
+            #tracked_users = users_who_share_room
 
             # Step 1a, check for changes in devices of users we share a room with
             users_that_have_changed = await self.store.get_users_whose_devices_changed(
-                since_token.device_list_key, tracked_users
+                since_token.device_list_key, users_who_share_room
             )
 
             # Step 1b, check for newly joined rooms
