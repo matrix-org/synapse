@@ -176,11 +176,9 @@ class Auth(object):
             allow_guest: If False, will raise an AuthError if the user making the
                 request is a guest.
             rights: The operation being performed; the access token must allow this
-            allow_expired: Whether to allow the request through even if the account is
-                expired. If true, Synapse will still require an access token to be
-                provided but won't check if the account it belongs to has expired. This
-                works thanks to /login delivering access tokens regardless of accounts'
-                expiration.
+            allow_expired: If True, allow the request through even if the account
+                is expired, or session token lifetime has ended. Note that
+                /login will deliver access tokens regardless of expiration.
 
         Returns:
             defer.Deferred: resolves to a `synapse.types.Requester` object
