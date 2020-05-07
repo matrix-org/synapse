@@ -317,6 +317,11 @@ class AuthHandler(BaseHandler):
             except StoreError:
                 raise SynapseError(400, "Unknown session ID: %s" % (sid,))
 
+            # Note that the registration endpoint explicitly removes the
+            # "initial_device_display_name" parameter if it is provided
+            # without a "password" parameter. See the changes to
+            # synapse.rest.client.v2_alpha.register.RegisterRestServlet.on_POST
+            # in commit 544722bad23fc31056b9240189c3cbbbf0ffd3f9.
             if clientdict:
                 # This was designed to allow the client to omit the parameters
                 # and just supply the session in subsequent calls so it split
