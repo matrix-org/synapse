@@ -150,6 +150,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.handler._render_error.reset_mock()
 
     def test_config(self):
+        """Basic config correctly sets up the callback URL and client auth correctly."""
         self.assertEqual(self.handler._callback_url, CALLBACK_URL)
         self.assertEqual(self.handler._client_auth.client_id, CLIENT_ID)
         self.assertEqual(self.handler._client_auth.client_secret, CLIENT_SECRET)
@@ -157,6 +158,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config({"oidc_config": {"discover": True}})
     @defer.inlineCallbacks
     def test_discovery(self):
+        """The handler should discover the endpoints from OIDC discovery document."""
         # This would throw if some metadata were invalid
         metadata = yield defer.ensureDeferred(self.handler.load_metadata())
         self.http_client.get_json.assert_called_once_with(WELL_KNOWN)
@@ -176,12 +178,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config({"oidc_config": COMMON_CONFIG})
     @defer.inlineCallbacks
     def test_no_discovery(self):
+        """When discovery is disabled, it should not try to load from discovery document."""
         yield defer.ensureDeferred(self.handler.load_metadata())
         self.http_client.get_json.assert_not_called()
 
     @override_config({"oidc_config": COMMON_CONFIG})
     @defer.inlineCallbacks
     def test_load_jwks(self):
+        """JWKS loading is done once (then cached) if used."""
         jwks = yield defer.ensureDeferred(self.handler.load_jwks())
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
         self.assertEqual(jwks, {"keys": []})
@@ -210,6 +214,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     @override_config({"oidc_config": COMMON_CONFIG})
     def test_validate_config(self):
+        """Provider metadatas are extensively validated."""
         h = self.handler
 
         # Default test config does not throw
@@ -280,12 +285,14 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     @override_config({"oidc_config": {"skip_verification": True}})
     def test_skip_verification(self):
+        """Provider metadata validation can be disabled by config."""
         with self.metadata_edit({"issuer": "http://insecure"}):
             # This should not throw
             self.handler._validate_metadata()
 
     @defer.inlineCallbacks
     def test_redirect_request(self):
+        """The redirect request has the right arguments & generates a valid session cookie."""
         req = Mock(spec=["addCookie", "redirect", "finish"])
         yield defer.ensureDeferred(
             self.handler.handle_redirect_request(req, b"http://client/redirect")
@@ -330,6 +337,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     @defer.inlineCallbacks
     def test_callback_error(self):
+        """Errors from the provider returned in the callback are displayed."""
         self.handler._render_error = Mock()
         request = Mock(args={})
         request.args[b"error"] = [b"invalid_client"]
@@ -342,6 +350,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     @defer.inlineCallbacks
     def test_callback(self):
+        """Code callback works and display errors if something went wrong.
+
+        A lot of scenarios are tested here:
+         - when the callback works, with userinfo from ID token
+         - when the user mapping fails
+         - when ID token verification fails
+         - when the callback works, with userinfo fetched from the userinfo endpoint
+         - when the userinfo fetching fails
+         - when the code exchange fails
+        """
         token = {
             "type": "bearer",
             "id_token": "id_token",
@@ -430,6 +448,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
     @defer.inlineCallbacks
     def test_callback_session(self):
+        """The callback verifies the session presence and validity"""
         self.handler._render_error = Mock(return_value=None)
         request = Mock(spec=["args", "getCookie", "addCookie"])
 
@@ -472,6 +491,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @override_config({"oidc_config": {"client_auth_method": "client_secret_post"}})
     @defer.inlineCallbacks
     def test_exchange_code(self):
+        """Code exchange behaves correctly and handles various error scenarios."""
         token = {"type": "bearer"}
         token_json = json.dumps(token).encode("utf-8")
         self.http_client.request = simple_async_mock(
