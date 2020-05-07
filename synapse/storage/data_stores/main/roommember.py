@@ -474,13 +474,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             _get_users_server_still_shares_room_with_txn,
         )
 
-    async def get_rooms_for_user(self, user_id, on_invalidate=None):
+    @defer.inlineCallbacks
+    def get_rooms_for_user(self, user_id, on_invalidate=None):
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
         participating in.
         """
-        rooms = await self.get_rooms_for_user_with_stream_ordering(
+        rooms = yield self.get_rooms_for_user_with_stream_ordering(
             user_id, on_invalidate=on_invalidate
         )
         return frozenset(r.room_id for r in rooms)
