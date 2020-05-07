@@ -490,6 +490,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     def get_users_who_share_room_with_user(self, user_id, cache_context):
         """Returns the set of users who share a room with `user_id`
         """
+        logger.info("Called with %s %s", user_id, cache_context)
         room_ids = yield self.get_rooms_for_user(
             user_id, on_invalidate=cache_context.invalidate
         )
