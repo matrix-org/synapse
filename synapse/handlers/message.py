@@ -419,6 +419,8 @@ class EventCreationHandler(object):
 
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
+        self._dummy_events_threshold = hs.config.dummy_events_threshold
+
     @defer.inlineCallbacks
     def create_event(
         self,
@@ -1085,7 +1087,7 @@ class EventCreationHandler(object):
         """
         self._expire_rooms_to_exclude_from_dummy_event_insertion()
         room_ids = await self.store.get_rooms_with_many_extremities(
-            min_count=10,
+            min_count=self._dummy_events_threshold,
             limit=5,
             room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys(),
         )
