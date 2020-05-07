@@ -174,7 +174,7 @@ class OidcHandler:
         m.validate_authorization_endpoint()
         m.validate_token_endpoint()
 
-        if "token_endpoint_auth_methods_supported" in m:
+        if m.get("token_endpoint_auth_methods_supported") is not None:
             m.validate_token_endpoint_auth_methods_supported()
             if (
                 self._client_auth_method
@@ -187,7 +187,7 @@ class OidcHandler:
                     )
                 )
 
-        if "response_types_supported" in m:
+        if m.get("response_types_supported") is not None:
             m.validate_response_types_supported()
 
             if "code" not in m["response_types_supported"]:
@@ -204,8 +204,8 @@ class OidcHandler:
                 )
         else:
             # If we're not using userinfo, we need a valid jwks to validate the ID token
-            if "jwks" not in m:
-                if "jwks_uri" in m:
+            if m.get("jwks") is None:
+                if m.get("jwks_uri") is not None:
                     m.validate_jwks_uri()
                 else:
                     raise ValueError('"jwks_uri" must be set')

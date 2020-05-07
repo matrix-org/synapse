@@ -17,7 +17,7 @@ import json
 from contextlib import contextmanager
 from urllib.parse import parse_qs, urlparse
 
-from mock import Mock
+from mock import Mock, patch
 
 import attr
 import pymacaroons
@@ -38,7 +38,7 @@ from tests.unittest import HomeserverTestCase, override_config
 
 
 @attr.s
-class FakeResponse(object):
+class FakeResponse:
     code = attr.ib()
     body = attr.ib()
     phrase = attr.ib()
@@ -89,55 +89,23 @@ def simple_async_mock(return_value=None, raises=None):
     return Mock(side_effect=cb)
 
 
-def get_jwks():
-    return {"keys": []}
-
-
-def get_metadata():
-    # Minimal discovery document, as defined in OpenID.Discovery
-    # https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
-    return {
-        "issuer": ISSUER,
-        "authorization_endpoint": AUTHORIZATION_ENDPOINT,
-        "token_endpoint": TOKEN_ENDPOINT,
-        "jwks_uri": JWKS_URI,
-        "userinfo_endpoint": USERINFO_ENDPOINT,
-        "response_types_supported": ["code"],
-        "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["RS256"],
-    }
-
-
 async def get_json(url):
     # Mock get_json calls to handle jwks & oidc discovery endpoints
     if url == WELL_KNOWN:
-        return get_metadata()
+        # Minimal discovery document, as defined in OpenID.Discovery
+        # https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+        return {
+            "issuer": ISSUER,
+            "authorization_endpoint": AUTHORIZATION_ENDPOINT,
+            "token_endpoint": TOKEN_ENDPOINT,
+            "jwks_uri": JWKS_URI,
+            "userinfo_endpoint": USERINFO_ENDPOINT,
+            "response_types_supported": ["code"],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+        }
     elif url == JWKS_URI:
-        return get_jwks()
-
-
-@contextmanager
-def metadata_edit(handler, values):
-    # Temporarily edits the provider metadata
-    meta = handler._provider_metadata
-    saved = {}
-
-    for (key, value) in values.items():
-        if key in meta:
-            saved[key] = meta[key]
-
-        if value is None:
-            del meta[key]
-        else:
-            meta[key] = value
-
-    yield
-
-    for (key, value) in values.items():
-        if key in saved:
-            meta[key] = saved[key]
-        else:
-            del meta[key]
+        return {"keys": []}
 
 
 class OidcHandlerTestCase(HomeserverTestCase):
@@ -170,14 +138,16 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         return hs
 
-    def assertRenderedError(self, error, error_description=None, reset=True):
+    def metadata_edit(self, values):
+        return patch.dict(self.handler._provider_metadata, values)
+
+    def assertRenderedError(self, error, error_description=None):
         args = self.handler._render_error.call_args[0]
         self.assertEqual(args[1], error)
         if error_description is not None:
             self.assertEqual(args[2], error_description)
         # Reset the render_error mock
-        if reset:
-            self.handler._render_error.reset_mock()
+        self.handler._render_error.reset_mock()
 
     def test_config(self):
         self.assertEqual(self.handler._callback_url, CALLBACK_URL)
@@ -227,7 +197,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.http_client.get_json.assert_called_once_with(JWKS_URI)
 
         # Throw if the JWKS uri is missing
-        with metadata_edit(self.handler, {"jwks_uri": None}):
+        with self.metadata_edit({"jwks_uri": None}):
             with self.assertRaises(RuntimeError):
                 yield defer.ensureDeferred(self.handler.load_jwks(force=True))
 
@@ -245,50 +215,50 @@ class OidcHandlerTestCase(HomeserverTestCase):
         # Default test config does not throw
         h._validate_metadata()
 
-        with metadata_edit(h, {"issuer": None}):
+        with self.metadata_edit({"issuer": None}):
             self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
 
-        with metadata_edit(h, {"issuer": "http://insecure/"}):
+        with self.metadata_edit({"issuer": "http://insecure/"}):
             self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
 
-        with metadata_edit(h, {"issuer": "https://invalid/?because=query"}):
+        with self.metadata_edit({"issuer": "https://invalid/?because=query"}):
             self.assertRaisesRegex(ValueError, "issuer", h._validate_metadata)
 
-        with metadata_edit(h, {"authorization_endpoint": None}):
+        with self.metadata_edit({"authorization_endpoint": None}):
             self.assertRaisesRegex(
                 ValueError, "authorization_endpoint", h._validate_metadata
             )
 
-        with metadata_edit(h, {"authorization_endpoint": "http://insecure/auth"}):
+        with self.metadata_edit({"authorization_endpoint": "http://insecure/auth"}):
             self.assertRaisesRegex(
                 ValueError, "authorization_endpoint", h._validate_metadata
             )
 
-        with metadata_edit(h, {"token_endpoint": None}):
+        with self.metadata_edit({"token_endpoint": None}):
             self.assertRaisesRegex(ValueError, "token_endpoint", h._validate_metadata)
 
-        with metadata_edit(h, {"token_endpoint": "http://insecure/token"}):
+        with self.metadata_edit({"token_endpoint": "http://insecure/token"}):
             self.assertRaisesRegex(ValueError, "token_endpoint", h._validate_metadata)
 
-        with metadata_edit(h, {"jwks_uri": None}):
+        with self.metadata_edit({"jwks_uri": None}):
             self.assertRaisesRegex(ValueError, "jwks_uri", h._validate_metadata)
 
-        with metadata_edit(h, {"jwks_uri": "http://insecure/jwks.json"}):
+        with self.metadata_edit({"jwks_uri": "http://insecure/jwks.json"}):
             self.assertRaisesRegex(ValueError, "jwks_uri", h._validate_metadata)
 
-        with metadata_edit(h, {"response_types_supported": ["id_token"]}):
+        with self.metadata_edit({"response_types_supported": ["id_token"]}):
             self.assertRaisesRegex(
                 ValueError, "response_types_supported", h._validate_metadata
             )
 
-        with metadata_edit(
-            h, {"token_endpoint_auth_methods_supported": ["client_secret_basic"]}
+        with self.metadata_edit(
+            {"token_endpoint_auth_methods_supported": ["client_secret_basic"]}
         ):
             # should not throw, as client_secret_basic is the default auth method
             h._validate_metadata()
 
-        with metadata_edit(
-            h, {"token_endpoint_auth_methods_supported": ["client_secret_post"]}
+        with self.metadata_edit(
+            {"token_endpoint_auth_methods_supported": ["client_secret_post"]}
         ):
             self.assertRaisesRegex(
                 ValueError,
@@ -302,15 +272,15 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertTrue(h._uses_userinfo)
         self.assertRaisesRegex(ValueError, "userinfo_endpoint", h._validate_metadata)
 
-        with metadata_edit(
-            h, {"userinfo_endpoint": USERINFO_ENDPOINT, "jwks_uri": None}
+        with self.metadata_edit(
+            {"userinfo_endpoint": USERINFO_ENDPOINT, "jwks_uri": None}
         ):
             # Shouldn't raise with a valid userinfo, even without
             h._validate_metadata()
 
     @override_config({"oidc_config": {"skip_verification": True}})
     def test_skip_verification(self):
-        with metadata_edit(self.handler, {"issuer": "http://insecure"}):
+        with self.metadata_edit({"issuer": "http://insecure"}):
             # This should not throw
             self.handler._validate_metadata()
 
