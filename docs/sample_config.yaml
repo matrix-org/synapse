@@ -1527,7 +1527,7 @@ oidc_config:
       # module. This section will be passed as a Python dictionary to the
       # module's `parse_config` method.
       #
-      # Bellow is the config of the default mapping provider, based on Jinja2
+      # Below is the config of the default mapping provider, based on Jinja2
       # templates. Those templates are used to render user attributes, where the
       # userinfo object is available through the `user` variable.
       #
@@ -1631,7 +1631,7 @@ sso:
     #   This template has no additional variables.
     #
     # * HTML page to display to users if something goes wrong during the
-    #   OpenID Connect authentication process: 'oidc_error.html'.
+    #   OpenID Connect authentication process: 'sso_error.html'.
     #
     #   When rendering, this template is given two variables:
     #     * error: the technical name of the error

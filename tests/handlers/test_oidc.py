@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import json
-from contextlib import contextmanager
 from urllib.parse import parse_qs, urlparse
 
 from mock import Mock, patch

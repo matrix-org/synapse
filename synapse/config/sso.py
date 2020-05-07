@@ -134,7 +134,7 @@ class SSOConfig(Config):
             #   This template has no additional variables.
             #
             # * HTML page to display to users if something goes wrong during the
-            #   OpenID Connect authentication process: 'oidc_error.html'.
+            #   OpenID Connect authentication process: 'sso_error.html'.
             #
             #   When rendering, this template is given two variables:
             #     * error: the technical name of the error

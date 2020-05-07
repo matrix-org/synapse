@@ -14,9 +14,10 @@
 # limitations under the License.
 import json
 import logging
-from typing import Dict, Generic, List, Optional, TypeVar
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar
 from urllib.parse import urlencode
 
+import attr
 import pymacaroons
 from authlib.common.security import generate_token
 from authlib.jose import JsonWebToken
@@ -121,7 +122,7 @@ class OidcHandler:
         self._server_name = hs.config.server_name  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._error_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["oidc_error.html"]
+            hs.config.sso_template_dir, ["sso_error.html"]
         )[0]
 
         # identifier for the external_ids table
@@ -133,7 +134,7 @@ class OidcHandler:
         """Renders the error template and respond with it.
 
         This is used to show errors to the user. The template of this page can
-        be found under ``synapse/res/templates/oidc_error.html``.
+        be found under ``synapse/res/templates/sso_error.html``.
 
         Args:
             request: The incoming request from the browser.
@@ -356,17 +357,18 @@ class OidcHandler:
             method="POST", uri=uri, data=body.encode("utf-8"), headers=headers,
         )
 
-        # This is used in multiple error messages bellow
+        # This is used in multiple error messages below
         status = "{code} {phrase}".format(
             code=response.code, phrase=response.phrase.decode("utf-8")
         )
+
+        resp_body = await readBody(response)
 
         if response.code >= 500:
             # In case of a server error, we should first try to decode the body
             # and check for an error field. If not, we respond with a generic
             # error message.
             try:
-                resp_body = await readBody(response)
                 resp = json.loads(resp_body.decode("utf-8"))
                 error = resp["error"]
                 description = resp.get("error_description", error)
@@ -384,7 +386,6 @@ class OidcHandler:
 
         # Since it is a not a 5xx code, body should be a valid JSON. It will
         # raise if not.
-        resp_body = await readBody(response)
         resp = json.loads(resp_body.decode("utf-8"))
 
         if "error" in resp:
@@ -393,7 +394,7 @@ class OidcHandler:
             # it should be a 4xx code. If not, warn about it but don't do
             # anything special and report the original error message.
             if response.code < 400:
-                logger.warning(
+                logger.debug(
                     "Invalid response from the authorization server: "
                     'responded with a "{status}" '
                     "but body has an error field: {error!r}".format(
@@ -879,7 +880,6 @@ class OidcMappingProvider(Generic[C]):
         Args:
             config: A custom config object from this module, parsed by ``parse_config()``
         """
-        pass
 
     @staticmethod
     def parse_config(config: dict) -> C:
@@ -928,14 +928,12 @@ def jinja_finalize(thing):
 
 env = Environment(finalize=jinja_finalize)
 
-JinjaOidcMappingConfig = TypedDict(
-    "JinjaOidcMappingConfig",
-    {
-        "subject_claim": str,
-        "localpart_template": Template,
-        "display_name_template": Optional[Template],
-    },
-)
+
+@attr.s
+class JinjaOidcMappingConfig:
+    subject_claim = attr.ib()  # type: str
+    localpart_template = attr.ib()  # type: Template
+    display_name_template = attr.ib()  # type: Optional[Template]
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
@@ -981,18 +979,18 @@ class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):
         )
 
     def get_remote_user_id(self, userinfo: UserInfo) -> str:
-        return userinfo[self._config["subject_claim"]]
+        return userinfo[self._config.subject_claim]
 
     async def map_user_attributes(
         self, userinfo: UserInfo, token: Token
     ) -> UserAttribute:
-        localpart = self._config["localpart_template"].render(user=userinfo).strip()
+        localpart = self._config.localpart_template.render(user=userinfo).strip()
 
         display_name = None  # type: Optional[str]
-        if self._config["display_name_template"] is not None:
-            display_name = (
-                self._config["display_name_template"].render(user=userinfo).strip()
-            )
+        if self._config.display_name_template is not None:
+            display_name = self._config.display_name_template.render(
+                user=userinfo
+            ).strip()
 
             if display_name == "":
                 display_name = None

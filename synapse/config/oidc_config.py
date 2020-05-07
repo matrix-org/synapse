@@ -155,7 +155,7 @@ class OIDCConfig(Config):
               # module. This section will be passed as a Python dictionary to the
               # module's `parse_config` method.
               #
-              # Bellow is the config of the default mapping provider, based on Jinja2
+              # Below is the config of the default mapping provider, based on Jinja2
               # templates. Those templates are used to render user attributes, where the
               # userinfo object is available through the `user` variable.
               #
