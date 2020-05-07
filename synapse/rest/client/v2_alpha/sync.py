@@ -171,6 +171,7 @@ class SyncRestServlet(RestServlet):
             user.to_string(), affect_presence=affect_presence
         )
         with context:
+            logger.info("Sync servlet")
             sync_result = await self.sync_handler.wait_for_sync_for_user(
                 sync_config,
                 since_token=since_token,

@@ -1098,6 +1098,7 @@ class PresenceEventSource(object):
         users_interested_in = set()
         users_interested_in.add(user_id)  # So that we receive our own presence
 
+        logger.info("get_users_who_share_room... _get_interested_in")
         users_who_share_room = await self.store.get_users_who_share_room_with_user(
             user_id, on_invalidate=cache_context.invalidate
         )

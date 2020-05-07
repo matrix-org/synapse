@@ -308,12 +308,14 @@ class SyncHandler(object):
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
+            logger.info("_wait_for_sync_for_user1")
             result = await self.current_sync_for_user(
                 sync_config, since_token, full_state=full_state
             )
         else:
 
             def current_sync_callback(before_token, after_token):
+                logger.info("_wait_for_sync_for_user2")
                 return self.current_sync_for_user(sync_config, since_token)
 
             result = await self.notifier.wait_for_events(
@@ -340,6 +342,7 @@ class SyncHandler(object):
     ) -> SyncResult:
         """Get the sync for client needed to match what the server has now.
         """
+        logger.info("current_sync_for_user")
         return await self.generate_sync_result(sync_config, since_token, full_state)
 
     async def push_rules_for_user(self, user: UserID) -> JsonDict:
@@ -1139,6 +1142,7 @@ class SyncHandler(object):
             # room with by looking at all users that have left a room plus users
             # that were in a room we've left.
 
+            logger.info("get_users_who_share_room... called from _generate_sync_entry")
             users_who_share_room = await self.store.get_users_who_share_room_with_user(
                 user_id
             )
@@ -1148,7 +1152,7 @@ class SyncHandler(object):
             # rooms) and taking a copy of the set is relatively expensive.
             if user_id not in users_who_share_room:
                 users_who_share_room = set(users_who_share_room)
-                #users_who_share_room.add(user_id)
+                users_who_share_room.add(user_id)
 
             tracked_users = users_who_share_room
 

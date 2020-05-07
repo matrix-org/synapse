@@ -129,7 +129,7 @@ class DeviceWorkerHandler(BaseHandler):
         tracked_users = set(users_who_share_room)
 
         # Always tell the user about their own devices
-        #tracked_users.add(user_id)
+        tracked_users.add(user_id)
 
         changed = yield self.store.get_users_whose_devices_changed(
             from_token.device_list_key, tracked_users
@@ -444,6 +444,7 @@ class DeviceHandler(DeviceWorkerHandler):
         """Notify that a user's device(s) has changed. Pokes the notifier, and
         remote servers if the user is local.
         """
+        logger.info("get_users_who_share_room... called from notify_device_update")
         users_who_share_room = yield self.store.get_users_who_share_room_with_user(
             user_id
         )
