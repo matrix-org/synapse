@@ -46,7 +46,6 @@ from twisted.internet import defer
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
-from synapse.util.async_helpers import yieldable_gather_results
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +207,5 @@ class GroupAttestionRenewer(object):
                     "Error renewing attestation of %r in %r", user_id, group_id
                 )
 
-        await yieldable_gather_results(
-            _renew_attestation, ((row["group_id"], row["user_id"]) for row in rows)
-        )
+        for row in rows:
+            await _renew_attestation((row["group_id"], row["user_id"]))
