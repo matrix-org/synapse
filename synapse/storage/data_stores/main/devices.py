@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, Optional, Tuple, Set
+from typing import List, Optional, Set, Tuple
 
 from six import iteritems
 
@@ -676,7 +676,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 table="device_lists_remote_resync",
                 keyvalues=None,
                 retcols=("user_id",),
-                desc="get_user_ids_requiring_device_list_resync"
+                desc="get_user_ids_requiring_device_list_resync",
             )
 
         return {row["user_id"] for row in rows}
