@@ -175,7 +175,7 @@ class DataStore(
                 db_conn,
                 database,
                 instance_name="master",
-                table="cache_invalidation_stream",
+                table="cache_invalidation_stream_by_instance",
                 instance_column="instance_name",
                 id_column="stream_id",
                 sequence_name="cache_invalidation_stream_seq",

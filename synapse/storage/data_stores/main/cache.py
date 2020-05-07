@@ -53,7 +53,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             # invalidations are idempotent, so duplicates are fine.
             sql = """
                 SELECT stream_id, cache_func, keys, invalidation_ts
-                FROM cache_invalidation_stream
+                FROM cache_invalidation_stream_by_instance
                 WHERE stream_id > ? AND instance_name = ?
                 ORDER BY stream_id ASC
                 LIMIT ?
@@ -165,7 +165,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
             self.db.simple_insert_txn(
                 txn,
-                table="cache_invalidation_stream",
+                table="cache_invalidation_stream_by_instance",
                 values={
                     "stream_id": stream_id,
                     "instance_name": self._instance_name,
