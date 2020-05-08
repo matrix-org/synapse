@@ -12,17 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+from typing import List, Union
 
 from twisted.internet.defer import succeed
 
 import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import auth, devices, register
+from synapse.types import JsonDict
 
 from tests import unittest
+from tests.server import FakeChannel
 
 
 class DummyRecaptchaChecker(UserInteractiveAuthChecker):
@@ -64,22 +67,26 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         auth_handler = hs.get_auth_handler()
         auth_handler.checkers[LoginType.RECAPTCHA] = self.recaptcha_checker
 
-    def register(self, expected_response, body):
+    def register(self, expected_response: int, body: JsonDict) -> FakeChannel:
         """Make a register request."""
-        request, channel = self.make_request("POST", "register", body,)
+        request, channel = self.make_request(
+            "POST", "register", body
+        )  # type: SynapseRequest, FakeChannel
         self.render(request)
 
         self.assertEqual(request.code, expected_response)
         return channel
 
-    def recaptcha(self, session, expected_post_response, post_session=None):
+    def recaptcha(
+        self, session: str, expected_post_response: int, post_session: str = None
+    ) -> None:
         """Get and respond to a fallback recaptcha. Returns the second request."""
         if post_session is None:
             post_session = session
 
         request, channel = self.make_request(
             "GET", "auth/m.login.recaptcha/fallback/web?session=" + session
-        )
+        )  # type: SynapseRequest, FakeChannel
         self.render(request)
         self.assertEqual(request.code, 200)
 
@@ -207,22 +214,24 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.user = self.register_user("test", self.user_pass)
         self.user_tok = self.login("test", self.user_pass)
 
-    def get_device_ids(self):
+    def get_device_ids(self) -> List[str]:
         # Get the list of devices so one can be deleted.
         request, channel = self.make_request(
             "GET", "devices", access_token=self.user_tok,
-        )
+        )  # type: SynapseRequest, FakeChannel
         self.render(request)
 
         # Get the ID of the device.
         self.assertEqual(request.code, 200)
         return [d["device_id"] for d in channel.json_body["devices"]]
 
-    def delete_device(self, device, expected_response, body=None):
+    def delete_device(
+        self, device: str, expected_response: int, body: Union[bytes, JsonDict] = b""
+    ) -> FakeChannel:
         """Delete an individual device."""
         request, channel = self.make_request(
-            "DELETE", "devices/" + device, body, access_token=self.user_tok,
-        )
+            "DELETE", "devices/" + device, body, access_token=self.user_tok
+        )  # type: SynapseRequest, FakeChannel
         self.render(request)
 
         # Ensure the response is sane.
@@ -230,13 +239,13 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
         return channel
 
-    def delete_devices(self, expected_response, body):
+    def delete_devices(self, expected_response: int, body: JsonDict) -> FakeChannel:
         """Delete 1 or more devices."""
         # Note that this uses the delete_devices endpoint so that we can modify
         # the payload half-way through some tests.
         request, channel = self.make_request(
             "POST", "delete_devices", body, access_token=self.user_tok,
-        )
+        )  # type: SynapseRequest, FakeChannel
         self.render(request)
 
         # Ensure the response is sane.
