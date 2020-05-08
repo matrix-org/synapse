@@ -278,8 +278,9 @@ class AuthHandler(BaseHandler):
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
 
-            validate_operation: Whether it should be validate that the operation
-                                happening on the account has not changed.
+            validate_operation: Whether to validate that the operation happening
+                                on the account has not changed. If this is false,
+                                the clientdict is persisted instead of validated.
 
         Returns:
             A tuple of (creds, params, session_id).
