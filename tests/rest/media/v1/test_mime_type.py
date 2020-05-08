@@ -18,6 +18,18 @@ class MimeTypeTests(unittest.TestCase):
         self.assertEqual(binary.type, "application")
         self.assertEqual(binary.subtype, "octet-stream")
 
+    def test_parameters(self):
+        """Tests MIME types with parameters."""
+        txt = MimeType("text/plain; charset=UTF-8")
+        self.assertEqual(txt.type, "text")
+        self.assertEqual(txt.subtype, "plain")
+        self.assertEqual(txt.parameters, "; charset=UTF-8")
+
+        txt = MimeType("text/plain; charset=UTF-8; disposition=parameterized")
+        self.assertEqual(txt.type, "text")
+        self.assertEqual(txt.subtype, "plain")
+        self.assertEqual(txt.parameters, "; charset=UTF-8; disposition=parameterized")
+
     def test_normalization(self):
         """Tests that commonly encountered invalid mime types are corrected."""
         jpg = MimeType("image/jpg")
