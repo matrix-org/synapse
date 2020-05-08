@@ -682,7 +682,8 @@ class DeviceListUpdater(object):
 
         return False
 
-    async def _maybe_retry_device_resync(self):
+    @defer.inlineCallbacks
+    def _maybe_retry_device_resync(self):
         """Retry to resync device lists that are out of sync, except if another retry is
         in progress.
         """
@@ -694,7 +695,7 @@ class DeviceListUpdater(object):
             # we don't send too many requests.
             self._resync_retry_in_progress = True
             # Get all of the users that need resyncing.
-            need_resync = await self.store.get_user_ids_requiring_device_list_resync()
+            need_resync = yield self.store.get_user_ids_requiring_device_list_resync()
             # Iterate over the set of user IDs.
             for user_id in need_resync:
                 # Try to resync the current user's devices list. Exception handling
@@ -703,7 +704,7 @@ class DeviceListUpdater(object):
                 # means that if an exception is raised by this function, it must be
                 # because of a database issue, which means _maybe_retry_device_resync
                 # probably won't be able to go much further anyway.
-                result = await self.user_device_resync(user_id=user_id)
+                result = yield self.user_device_resync(user_id=user_id)
                 # user_device_resync only returns a result if it managed to successfully
                 # resync and update the database. Updating the table of users requiring
                 # resync isn't necessary here as user_device_resync already does it
