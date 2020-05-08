@@ -126,13 +126,13 @@ class AuthHandler(BaseHandler):
         # It notifies the user they are about to give access to their matrix account
         # to the client.
         self._sso_redirect_confirm_template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
+            hs.config.sso_template_dir, ["sso_redirect_confirm.html"],
         )[0]
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
         self._sso_auth_confirm_template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
+            hs.config.sso_template_dir, ["sso_auth_confirm.html"],
         )[0]
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
