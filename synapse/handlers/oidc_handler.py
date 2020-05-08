@@ -497,7 +497,10 @@ class OidcHandler:
         return UserInfo(claims)
 
     async def handle_redirect_request(
-        self, request: SynapseRequest, client_redirect_url: bytes
+        self,
+        request: SynapseRequest,
+        client_redirect_url: bytes,
+        ui_auth_session_id: Optional[str] = None,
     ) -> None:
         """Handle an incoming request to /login/sso/redirect
 
@@ -541,7 +544,7 @@ class OidcHandler:
 
         metadata = await self.load_metadata()
         authorization_endpoint = metadata.get("authorization_endpoint")
-        uri = prepare_grant_uri(
+        return prepare_grant_uri(
             authorization_endpoint,
             client_id=self._client_auth.client_id,
             response_type="code",
@@ -550,8 +553,6 @@ class OidcHandler:
             state=state,
             nonce=nonce,
         )
-        request.redirect(uri)
-        finish_request(request)
 
     async def handle_oidc_callback(self, request: SynapseRequest) -> None:
         """Handle an incoming request to /_synapse/oidc/callback
