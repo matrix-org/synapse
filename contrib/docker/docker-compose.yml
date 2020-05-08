@@ -15,10 +15,9 @@ services:
     restart: unless-stopped
     # See the readme for a full documentation of the environment settings
     environment:
-      - SYNAPSE_CONFIG_PATH=/etc/homeserver.yaml
+      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
     volumes:
       # You may either store all the files in a local folder
-      - ./matrix-config/homeserver.yaml:/etc/homeserver.yaml
       - ./files:/data
       # .. or you may split this between different storage points
       # - ./files:/data

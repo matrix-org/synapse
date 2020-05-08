@@ -1,0 +1,1 @@
+Move client command handling out of TCP protocol.

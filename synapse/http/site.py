@@ -193,6 +193,12 @@ class SynapseRequest(Request):
         self.finish_time = time.time()
         Request.connectionLost(self, reason)
 
+        if self.logcontext is None:
+            logger.info(
+                "Connection from %s lost before request headers were read", self.client
+            )
+            return
+
         # we only get here if the connection to the client drops before we send
         # the response.
         #
@@ -236,13 +242,6 @@ class SynapseRequest(Request):
     def _finished_processing(self):
         """Log the completion of this request and update the metrics
         """
-
-        if self.logcontext is None:
-            # this can happen if the connection closed before we read the
-            # headers (so render was never called). In that case we'll already
-            # have logged a warning, so just bail out.
-            return
-
         usage = self.logcontext.get_resource_usage()
 
         if self._processing_finished_time is None:

@@ -270,12 +270,13 @@ def start(hs, listeners=None):
 
         # Start the tracer
         synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
-            hs.config
+            hs
         )
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
         hs.get_datastore().db.start_profiling()
+        hs.get_pusherpool().start()
 
         setup_sentry(hs)
         setup_sdnotify(hs)
@@ -315,7 +316,7 @@ def setup_sentry(hs):
         scope.set_tag("matrix_server_name", hs.config.server_name)
 
         app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
-        name = hs.config.worker_name if hs.config.worker_name else "master"
+        name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)
 

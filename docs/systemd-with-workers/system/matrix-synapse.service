@@ -1,0 +1,21 @@
+[Unit]
+Description=Synapse master
+
+# This service should be restarted when the synapse target is restarted.
+PartOf=matrix-synapse.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=matrix-synapse
+WorkingDirectory=/var/lib/matrix-synapse
+EnvironmentFile=/etc/default/matrix-synapse
+ExecStartPre=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d/ --generate-keys
+ExecStart=/opt/venvs/matrix-synapse/bin/python -m synapse.app.homeserver --config-path=/etc/matrix-synapse/homeserver.yaml --config-path=/etc/matrix-synapse/conf.d/
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=3
+SyslogIdentifier=matrix-synapse
+
+[Install]
+WantedBy=matrix-synapse.target

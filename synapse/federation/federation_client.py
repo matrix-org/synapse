@@ -33,6 +33,7 @@ from typing import (
 from prometheus_client import Counter
 
 from twisted.internet import defer
+from twisted.internet.defer import Deferred
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
@@ -51,7 +52,7 @@ from synapse.api.room_versions import (
 )
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
-from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, preserve_fn
 from synapse.logging.utils import log_function
 from synapse.types import JsonDict
 from synapse.util import unwrapFirstError
@@ -219,8 +220,7 @@ class FederationClient(FederationBase):
         # FIXME: We should handle signature failures more gracefully.
         pdus[:] = await make_deferred_yieldable(
             defer.gatherResults(
-                self._check_sigs_and_hashes(room_version.identifier, pdus),
-                consumeErrors=True,
+                self._check_sigs_and_hashes(room_version, pdus), consumeErrors=True,
             ).addErrback(unwrapFirstError)
         )
 
@@ -290,9 +290,7 @@ class FederationClient(FederationBase):
                     pdu = pdu_list[0]
 
                     # Check signatures are correct.
-                    signed_pdu = await self._check_sigs_and_hash(
-                        room_version.identifier, pdu
-                    )
+                    signed_pdu = await self._check_sigs_and_hash(room_version, pdu)
 
                     break
 
@@ -345,6 +343,83 @@ class FederationClient(FederationBase):
 
         return state_event_ids, auth_event_ids
 
+    async def _check_sigs_and_hash_and_fetch(
+        self,
+        origin: str,
+        pdus: List[EventBase],
+        room_version: RoomVersion,
+        outlier: bool = False,
+        include_none: bool = False,
+    ) -> List[EventBase]:
+        """Takes a list of PDUs and checks the signatures and hashs of each
+        one. If a PDU fails its signature check then we check if we have it in
+        the database and if not then request if from the originating server of
+        that PDU.
+
+        If a PDU fails its content hash check then it is redacted.
+
+        The given list of PDUs are not modified, instead the function returns
+        a new list.
+
+        Args:
+            origin
+            pdu
+            room_version
+            outlier: Whether the events are outliers or not
+            include_none: Whether to include None in the returned list
+                for events that have failed their checks
+
+        Returns:
+            Deferred : A list of PDUs that have valid signatures and hashes.
+        """
+        deferreds = self._check_sigs_and_hashes(room_version, pdus)
+
+        @defer.inlineCallbacks
+        def handle_check_result(pdu: EventBase, deferred: Deferred):
+            try:
+                res = yield make_deferred_yieldable(deferred)
+            except SynapseError:
+                res = None
+
+            if not res:
+                # Check local db.
+                res = yield self.store.get_event(
+                    pdu.event_id, allow_rejected=True, allow_none=True
+                )
+
+            if not res and pdu.origin != origin:
+                try:
+                    res = yield defer.ensureDeferred(
+                        self.get_pdu(
+                            destinations=[pdu.origin],
+                            event_id=pdu.event_id,
+                            room_version=room_version,
+                            outlier=outlier,
+                            timeout=10000,
+                        )
+                    )
+                except SynapseError:
+                    pass
+
+            if not res:
+                logger.warning(
+                    "Failed to find copy of %s with valid signature", pdu.event_id
+                )
+
+            return res
+
+        handle = preserve_fn(handle_check_result)
+        deferreds2 = [handle(pdu, deferred) for pdu, deferred in zip(pdus, deferreds)]
+
+        valid_pdus = await make_deferred_yieldable(
+            defer.gatherResults(deferreds2, consumeErrors=True)
+        ).addErrback(unwrapFirstError)
+
+        if include_none:
+            return valid_pdus
+        else:
+            return [p for p in valid_pdus if p]
+
     async def get_event_auth(self, destination, room_id, event_id):
         res = await self.transport_layer.get_event_auth(destination, room_id, event_id)
 
@@ -356,7 +431,7 @@ class FederationClient(FederationBase):
         ]
 
         signed_auth = await self._check_sigs_and_hash_and_fetch(
-            destination, auth_chain, outlier=True, room_version=room_version.identifier
+            destination, auth_chain, outlier=True, room_version=room_version
         )
 
         signed_auth.sort(key=lambda e: e.depth)
@@ -583,7 +658,7 @@ class FederationClient(FederationBase):
                 destination,
                 list(pdus.values()),
                 outlier=True,
-                room_version=room_version.identifier,
+                room_version=room_version,
             )
 
             valid_pdus_map = {p.event_id: p for p in valid_pdus}
@@ -678,7 +753,7 @@ class FederationClient(FederationBase):
         pdu = event_from_pdu_json(pdu_dict, room_version)
 
         # Check signatures are correct.
-        pdu = await self._check_sigs_and_hash(room_version.identifier, pdu)
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
 
         # FIXME: We should handle signature failures more gracefully.
 
@@ -808,18 +883,37 @@ class FederationClient(FederationBase):
 
     def get_public_rooms(
         self,
-        destination,
-        limit=None,
-        since_token=None,
-        search_filter=None,
-        include_all_networks=False,
-        third_party_instance_id=None,
+        remote_server: str,
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        include_all_networks: bool = False,
+        third_party_instance_id: Optional[str] = None,
     ):
-        if destination == self.server_name:
-            return
+        """Get the list of public rooms from a remote homeserver
 
+        Args:
+            remote_server: The name of the remote server
+            limit: Maximum amount of rooms to return
+            since_token: Used for result pagination
+            search_filter: A filter dictionary to send the remote homeserver
+                and filter the result set
+            include_all_networks: Whether to include results from all third party instances
+            third_party_instance_id: Whether to only include results from a specific third
+                party instance
+
+        Returns:
+            Deferred[Dict[str, Any]]: The response from the remote server, or None if
+            `remote_server` is the same as the local server_name
+
+        Raises:
+            HttpResponseException: There was an exception returned from the remote server
+            SynapseException: M_FORBIDDEN when the remote server has disallowed publicRoom
+                requests over federation
+
+        """
         return self.transport_layer.get_public_rooms(
-            destination,
+            remote_server,
             limit,
             since_token,
             search_filter,
@@ -870,7 +964,7 @@ class FederationClient(FederationBase):
             ]
 
             signed_events = await self._check_sigs_and_hash_and_fetch(
-                destination, events, outlier=False, room_version=room_version.identifier
+                destination, events, outlier=False, room_version=room_version
             )
         except HttpResponseException as e:
             if not e.code == 400:
@@ -882,14 +976,13 @@ class FederationClient(FederationBase):
 
         return signed_events
 
-    @defer.inlineCallbacks
-    def forward_third_party_invite(self, destinations, room_id, event_dict):
+    async def forward_third_party_invite(self, destinations, room_id, event_dict):
         for destination in destinations:
             if destination == self.server_name:
                 continue
 
             try:
-                yield self.transport_layer.exchange_third_party_invite(
+                await self.transport_layer.exchange_third_party_invite(
                     destination=destination, room_id=room_id, event_dict=event_dict
                 )
                 return None

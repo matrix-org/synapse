@@ -19,11 +19,13 @@ import synapse.handlers.set_password
 import synapse.http.client
 import synapse.notifier
 import synapse.replication.tcp.client
+import synapse.replication.tcp.handler
 import synapse.rest.media.v1.media_repository
 import synapse.server_notices.server_notices_manager
 import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
+from synapse.events.builder import EventBuilderFactory
 
 class HomeServer(object):
     @property
@@ -96,7 +98,7 @@ class HomeServer(object):
         pass
     def get_notifier(self) -> synapse.notifier.Notifier:
         pass
-    def get_presence_handler(self) -> synapse.handlers.presence.PresenceHandler:
+    def get_presence_handler(self) -> synapse.handlers.presence.BasePresenceHandler:
         pass
     def get_clock(self) -> synapse.util.Clock:
         pass
@@ -106,11 +108,23 @@ class HomeServer(object):
         pass
     def get_tcp_replication(
         self,
-    ) -> synapse.replication.tcp.client.ReplicationClientHandler:
+    ) -> synapse.replication.tcp.handler.ReplicationCommandHandler:
+        pass
+    def get_replication_data_handler(
+        self,
+    ) -> synapse.replication.tcp.client.ReplicationDataHandler:
         pass
     def get_federation_registry(
         self,
     ) -> synapse.federation.federation_server.FederationHandlerRegistry:
         pass
     def is_mine_id(self, domain_id: str) -> bool:
+        pass
+    def get_instance_id(self) -> str:
+        pass
+    def get_instance_name(self) -> str:
+        pass
+    def get_event_builder_factory(self) -> EventBuilderFactory:
+        pass
+    def get_storage(self) -> synapse.storage.Storage:
         pass

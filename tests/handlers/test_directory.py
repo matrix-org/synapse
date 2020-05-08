@@ -18,6 +18,7 @@ from mock import Mock
 
 from twisted.internet import defer
 
+import synapse
 import synapse.api.errors
 from synapse.api.constants import EventTypes
 from synapse.config.room_directory import RoomDirectoryConfig
@@ -87,38 +88,6 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
             ignore_backoff=True,
         )
 
-    def test_delete_alias_not_allowed(self):
-        room_id = "!8765qwer:test"
-        self.get_success(
-            self.store.create_room_alias_association(self.my_room, room_id, ["test"])
-        )
-
-        self.get_failure(
-            self.handler.delete_association(
-                create_requester("@user:test"), self.my_room
-            ),
-            synapse.api.errors.AuthError,
-        )
-
-    def test_delete_alias(self):
-        room_id = "!8765qwer:test"
-        user_id = "@user:test"
-        self.get_success(
-            self.store.create_room_alias_association(
-                self.my_room, room_id, ["test"], user_id
-            )
-        )
-
-        result = self.get_success(
-            self.handler.delete_association(create_requester(user_id), self.my_room)
-        )
-        self.assertEquals(room_id, result)
-
-        # The alias should not be found.
-        self.get_failure(
-            self.handler.get_association(self.my_room), synapse.api.errors.SynapseError
-        )
-
     def test_incoming_fed_query(self):
         self.get_success(
             self.store.create_room_alias_association(
@@ -131,6 +100,181 @@ class DirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEquals({"room_id": "!8765asdf:test", "servers": ["test"]}, response)
+
+
+class TestCreateAlias(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        directory.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.handler = hs.get_handlers().directory_handler
+
+        # Create user
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        # Create a test room
+        self.room_id = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok
+        )
+
+        self.test_alias = "#test:test"
+        self.room_alias = RoomAlias.from_string(self.test_alias)
+
+        # Create a test user.
+        self.test_user = self.register_user("user", "pass", admin=False)
+        self.test_user_tok = self.login("user", "pass")
+        self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
+
+    def test_create_alias_joined_room(self):
+        """A user can create an alias for a room they're in."""
+        self.get_success(
+            self.handler.create_association(
+                create_requester(self.test_user), self.room_alias, self.room_id,
+            )
+        )
+
+    def test_create_alias_other_room(self):
+        """A user cannot create an alias for a room they're NOT in."""
+        other_room_id = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok
+        )
+
+        self.get_failure(
+            self.handler.create_association(
+                create_requester(self.test_user), self.room_alias, other_room_id,
+            ),
+            synapse.api.errors.SynapseError,
+        )
+
+    def test_create_alias_admin(self):
+        """An admin can create an alias for a room they're NOT in."""
+        other_room_id = self.helper.create_room_as(
+            self.test_user, tok=self.test_user_tok
+        )
+
+        self.get_success(
+            self.handler.create_association(
+                create_requester(self.admin_user), self.room_alias, other_room_id,
+            )
+        )
+
+
+class TestDeleteAlias(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        directory.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.handler = hs.get_handlers().directory_handler
+        self.state_handler = hs.get_state_handler()
+
+        # Create user
+        self.admin_user = self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
+
+        # Create a test room
+        self.room_id = self.helper.create_room_as(
+            self.admin_user, tok=self.admin_user_tok
+        )
+
+        self.test_alias = "#test:test"
+        self.room_alias = RoomAlias.from_string(self.test_alias)
+
+        # Create a test user.
+        self.test_user = self.register_user("user", "pass", admin=False)
+        self.test_user_tok = self.login("user", "pass")
+        self.helper.join(room=self.room_id, user=self.test_user, tok=self.test_user_tok)
+
+    def _create_alias(self, user):
+        # Create a new alias to this room.
+        self.get_success(
+            self.store.create_room_alias_association(
+                self.room_alias, self.room_id, ["test"], user
+            )
+        )
+
+    def test_delete_alias_not_allowed(self):
+        """A user that doesn't meet the expected guidelines cannot delete an alias."""
+        self._create_alias(self.admin_user)
+        self.get_failure(
+            self.handler.delete_association(
+                create_requester(self.test_user), self.room_alias
+            ),
+            synapse.api.errors.AuthError,
+        )
+
+    def test_delete_alias_creator(self):
+        """An alias creator can delete their own alias."""
+        # Create an alias from a different user.
+        self._create_alias(self.test_user)
+
+        # Delete the user's alias.
+        result = self.get_success(
+            self.handler.delete_association(
+                create_requester(self.test_user), self.room_alias
+            )
+        )
+        self.assertEquals(self.room_id, result)
+
+        # Confirm the alias is gone.
+        self.get_failure(
+            self.handler.get_association(self.room_alias),
+            synapse.api.errors.SynapseError,
+        )
+
+    def test_delete_alias_admin(self):
+        """A server admin can delete an alias created by another user."""
+        # Create an alias from a different user.
+        self._create_alias(self.test_user)
+
+        # Delete the user's alias as the admin.
+        result = self.get_success(
+            self.handler.delete_association(
+                create_requester(self.admin_user), self.room_alias
+            )
+        )
+        self.assertEquals(self.room_id, result)
+
+        # Confirm the alias is gone.
+        self.get_failure(
+            self.handler.get_association(self.room_alias),
+            synapse.api.errors.SynapseError,
+        )
+
+    def test_delete_alias_sufficient_power(self):
+        """A user with a sufficient power level should be able to delete an alias."""
+        self._create_alias(self.admin_user)
+
+        # Increase the user's power level.
+        self.helper.send_state(
+            self.room_id,
+            "m.room.power_levels",
+            {"users": {self.test_user: 100}},
+            tok=self.admin_user_tok,
+        )
+
+        # They can now delete the alias.
+        result = self.get_success(
+            self.handler.delete_association(
+                create_requester(self.test_user), self.room_alias
+            )
+        )
+        self.assertEquals(self.room_id, result)
+
+        # Confirm the alias is gone.
+        self.get_failure(
+            self.handler.get_association(self.room_alias),
+            synapse.api.errors.SynapseError,
+        )
 
 
 class CanonicalAliasTestCase(unittest.HomeserverTestCase):
@@ -159,30 +303,42 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         )
 
         self.test_alias = "#test:test"
-        self.room_alias = RoomAlias.from_string(self.test_alias)
+        self.room_alias = self._add_alias(self.test_alias)
+
+    def _add_alias(self, alias: str) -> RoomAlias:
+        """Add an alias to the test room."""
+        room_alias = RoomAlias.from_string(alias)
 
         # Create a new alias to this room.
         self.get_success(
             self.store.create_room_alias_association(
-                self.room_alias, self.room_id, ["test"], self.admin_user
+                room_alias, self.room_id, ["test"], self.admin_user
+            )
+        )
+        return room_alias
+
+    def _set_canonical_alias(self, content):
+        """Configure the canonical alias state on the room."""
+        self.helper.send_state(
+            self.room_id, "m.room.canonical_alias", content, tok=self.admin_user_tok,
+        )
+
+    def _get_canonical_alias(self):
+        """Get the canonical alias state of the room."""
+        return self.get_success(
+            self.state_handler.get_current_state(
+                self.room_id, EventTypes.CanonicalAlias, ""
             )
         )
 
     def test_remove_alias(self):
         """Removing an alias that is the canonical alias should remove it there too."""
         # Set this new alias as the canonical alias for this room
-        self.helper.send_state(
-            self.room_id,
-            "m.room.canonical_alias",
-            {"alias": self.test_alias, "alt_aliases": [self.test_alias]},
-            tok=self.admin_user_tok,
+        self._set_canonical_alias(
+            {"alias": self.test_alias, "alt_aliases": [self.test_alias]}
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertEqual(data["content"]["alias"], self.test_alias)
         self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
 
@@ -193,11 +349,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertNotIn("alias", data["content"])
         self.assertNotIn("alt_aliases", data["content"])
 
@@ -205,29 +357,17 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
         """Removing an alias listed as in alt_aliases should remove it there too."""
         # Create a second alias.
         other_test_alias = "#test2:test"
-        other_room_alias = RoomAlias.from_string(other_test_alias)
-        self.get_success(
-            self.store.create_room_alias_association(
-                other_room_alias, self.room_id, ["test"], self.admin_user
-            )
-        )
+        other_room_alias = self._add_alias(other_test_alias)
 
         # Set the alias as the canonical alias for this room.
-        self.helper.send_state(
-            self.room_id,
-            "m.room.canonical_alias",
+        self._set_canonical_alias(
             {
                 "alias": self.test_alias,
                 "alt_aliases": [self.test_alias, other_test_alias],
-            },
-            tok=self.admin_user_tok,
+            }
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertEqual(data["content"]["alias"], self.test_alias)
         self.assertEqual(
             data["content"]["alt_aliases"], [self.test_alias, other_test_alias]
@@ -240,11 +380,7 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        data = self.get_success(
-            self.state_handler.get_current_state(
-                self.room_id, EventTypes.CanonicalAlias, ""
-            )
-        )
+        data = self._get_canonical_alias()
         self.assertEqual(data["content"]["alias"], self.test_alias)
         self.assertEqual(data["content"]["alt_aliases"], [self.test_alias])
 

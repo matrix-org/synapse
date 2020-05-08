@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 57
+# XXX: If you're about to bump this to 59 (or higher) please create an update
+# that drops the unused `cache_invalidation_stream` table, as per #7436!
+SCHEMA_VERSION = 58
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 

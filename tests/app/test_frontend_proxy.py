@@ -27,8 +27,8 @@ class FrontendProxyTests(HomeserverTestCase):
 
         return hs
 
-    def default_config(self, name="test"):
-        c = super().default_config(name)
+    def default_config(self):
+        c = super().default_config()
         c["worker_app"] = "synapse.app.frontend_proxy"
         return c
 

@@ -42,7 +42,7 @@ from synapse.logging._terse_json import (
     TerseJSONToConsoleLogObserver,
     TerseJSONToTCPLogObserver,
 )
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import current_context
 
 
 def stdlib_log_level_to_twisted(level: str) -> LogLevel:
@@ -86,7 +86,7 @@ class LogContextObserver(object):
             ].startswith("Timing out client"):
                 return
 
-        context = LoggingContext.current_context()
+        context = current_context()
 
         # Copy the context information to the log event.
         if context is not None:

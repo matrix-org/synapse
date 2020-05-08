@@ -1,1 +1,0 @@
-Port `synapse.handlers.presence` to async/await.

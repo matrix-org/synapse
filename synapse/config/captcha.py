@@ -24,7 +24,6 @@ class CaptchaConfig(Config):
         self.enable_registration_captcha = config.get(
             "enable_registration_captcha", False
         )
-        self.captcha_bypass_secret = config.get("captcha_bypass_secret")
         self.recaptcha_siteverify_api = config.get(
             "recaptcha_siteverify_api",
             "https://www.recaptcha.net/recaptcha/api/siteverify",
@@ -48,10 +47,6 @@ class CaptchaConfig(Config):
         # public/private key.
         #
         #enable_registration_captcha: false
-
-        # A secret key used to bypass the captcha test entirely.
-        #
-        #captcha_bypass_secret: "YOUR_SECRET_HERE"
 
         # The API endpoint to use for verifying m.login.recaptcha responses.
         #
