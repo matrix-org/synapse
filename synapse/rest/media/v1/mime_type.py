@@ -45,7 +45,11 @@ class MimeType(object):
 
     def __eq__(self, other) -> bool:
         if isinstance(other, MimeType):
-            return self.type == other.type and self.subtype == other.subtype and self.parameters == other.parameters
+            return (
+                self.type == other.type
+                and self.subtype == other.subtype
+                and self.parameters == other.parameters
+            )
         elif isinstance(other, str):
             return str(self) == other
         return False
