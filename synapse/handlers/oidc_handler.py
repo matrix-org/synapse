@@ -525,13 +525,19 @@ class OidcHandler:
                 We'll respond to it with a redirect and a cookie.
             client_redirect_url: the URL that we should redirect the client to
                 when everything is done
+            ui_auth_session_id: The session ID of the ongoing UI Auth (or
+                None if this is a login).
+
         """
 
         state = generate_token()
         nonce = generate_token()
 
         cookie = self._generate_oidc_session_token(
-            state=state, nonce=nonce, client_redirect_url=client_redirect_url.decode(),
+            state=state,
+            nonce=nonce,
+            client_redirect_url=client_redirect_url.decode(),
+            ui_auth_session_id=ui_auth_session_id,
         )
         request.addCookie(
             SESSION_COOKIE_NAME,
@@ -626,7 +632,11 @@ class OidcHandler:
 
         # Deserialize the session token and verify it.
         try:
-            nonce, client_redirect_url = self._verify_oidc_session_token(session, state)
+            (
+                nonce,
+                client_redirect_url,
+                ui_auth_session_id,
+            ) = self._verify_oidc_session_token(session, state)
         except MacaroonDeserializationException as e:
             logger.exception("Invalid session")
             self._render_error(request, "invalid_session", str(e))
@@ -679,15 +689,21 @@ class OidcHandler:
             return
 
         # and finally complete the login
-        await self._auth_handler.complete_sso_login(
-            user_id, request, client_redirect_url
-        )
+        if ui_auth_session_id:
+            await self._auth_handler.complete_sso_ui_auth(
+                user_id, ui_auth_session_id, request
+            )
+        else:
+            await self._auth_handler.complete_sso_login(
+                user_id, request, client_redirect_url
+            )
 
     def _generate_oidc_session_token(
         self,
         state: str,
         nonce: str,
         client_redirect_url: str,
+        ui_auth_session_id: Optional[str],
         duration_in_ms: int = (60 * 60 * 1000),
     ) -> str:
         """Generates a signed token storing data about an OIDC session.
@@ -703,6 +719,8 @@ class OidcHandler:
             nonce: The ``nonce`` parameter passed to the OIDC provider.
             client_redirect_url: The URL the client gave when it initiated the
                 flow.
+            ui_auth_session_id: The session ID of the ongoing UI Auth (or
+                None if this is a login).
             duration_in_ms: An optional duration for the token in milliseconds.
                 Defaults to an hour.
 
@@ -719,12 +737,19 @@ class OidcHandler:
         macaroon.add_first_party_caveat(
             "client_redirect_url = %s" % (client_redirect_url,)
         )
+        if ui_auth_session_id:
+            macaroon.add_first_party_caveat(
+                "ui_auth_session_id = %s" % (ui_auth_session_id,)
+            )
         now = self._clock.time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
+
         return macaroon.serialize()
 
-    def _verify_oidc_session_token(self, session: str, state: str) -> Tuple[str, str]:
+    def _verify_oidc_session_token(
+        self, session: str, state: str
+    ) -> Tuple[str, str, Optional[str]]:
         """Verifies and extract an OIDC session token.
 
         This verifies that a given session token was issued by this homeserver
@@ -735,7 +760,7 @@ class OidcHandler:
             state: The state the OIDC provider gave back
 
         Returns:
-            The nonce and the client_redirect_url for this session
+            The nonce, client_redirect_url, and ui_auth_session_id for this session
         """
         macaroon = pymacaroons.Macaroon.deserialize(session)
 
@@ -745,24 +770,34 @@ class OidcHandler:
         v.satisfy_exact("state = %s" % (state,))
         v.satisfy_general(lambda c: c.startswith("nonce = "))
         v.satisfy_general(lambda c: c.startswith("client_redirect_url = "))
+        # Sometimes there's a UI auth session ID, it seems to be OK to attempt
+        # to always satisfy this.
+        v.satisfy_general(lambda c: c.startswith("ui_auth_session_id = "))
         v.satisfy_general(self._verify_expiry)
 
         v.verify(macaroon, self._macaroon_secret_key)
 
-        # Extract the `nonce` and `client_redirect_url` from the token
+        # Extract the `nonce`, `client_redirect_url`, and maybe the
+        # `ui_auth_session_id` from the token.
         nonce = self._get_value_from_macaroon(macaroon, "nonce")
         client_redirect_url = self._get_value_from_macaroon(
             macaroon, "client_redirect_url"
         )
+        ui_auth_session_id = self._get_value_from_macaroon(
+            macaroon, "ui_auth_session_id", required=False
+        )
 
-        return nonce, client_redirect_url
+        return nonce, client_redirect_url, ui_auth_session_id
 
-    def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str) -> str:
+    def _get_value_from_macaroon(
+        self, macaroon: pymacaroons.Macaroon, key: str, required: bool = True
+    ) -> Optional[str]:
         """Extracts a caveat value from a macaroon token.
 
         Args:
             macaroon: the token
             key: the key of the caveat to extract
+            required: Whether to raise an exception if the caveat is not found.
 
         Returns:
             The extracted value
@@ -774,7 +809,10 @@ class OidcHandler:
         for caveat in macaroon.caveats:
             if caveat.caveat_id.startswith(prefix):
                 return caveat.caveat_id[len(prefix) :]
-        raise Exception("No %s caveat in macaroon" % (key,))
+
+        if required:
+            raise Exception("No %s caveat in macaroon" % (key,))
+        return None
 
     def _verify_expiry(self, caveat: str) -> bool:
         prefix = "time < "

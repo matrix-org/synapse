@@ -131,12 +131,17 @@ class AuthRestServlet(RestServlet):
         self.registration_handler = hs.get_registration_handler()
 
         # SSO configuration.
-        self._saml_enabled = hs.config.saml2_enabled
-        if self._saml_enabled:
-            self._saml_handler = hs.get_saml_handler()
         self._cas_enabled = hs.config.cas_enabled
         if self._cas_enabled:
             self._cas_handler = hs.get_cas_handler()
+            self._cas_server_url = hs.config.cas_server_url
+            self._cas_service_url = hs.config.cas_service_url
+        self._saml_enabled = hs.config.saml2_enabled
+        if self._saml_enabled:
+            self._saml_handler = hs.get_saml_handler()
+        self._oidc_enabled = hs.config.oidc_enabled
+        if self._oidc_enabled:
+            self._oidc_handler = hs.get_oidc_handler()
             self._cas_server_url = hs.config.cas_server_url
             self._cas_service_url = hs.config.cas_service_url
 
@@ -172,9 +177,15 @@ class AuthRestServlet(RestServlet):
                 )
 
             elif self._saml_enabled:
-                client_redirect_url = ""
+                client_redirect_url = b""
                 sso_redirect_url = self._saml_handler.handle_redirect_request(
                     client_redirect_url, session
+                )
+
+            elif self._oidc_enabled:
+                client_redirect_url = b""
+                sso_redirect_url = await self._oidc_handler.handle_redirect_request(
+                    request, client_redirect_url, session
                 )
 
             else:
