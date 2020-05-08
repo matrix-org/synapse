@@ -783,21 +783,21 @@ class OidcHandler:
         client_redirect_url = self._get_value_from_macaroon(
             macaroon, "client_redirect_url"
         )
-        ui_auth_session_id = self._get_value_from_macaroon(
-            macaroon, "ui_auth_session_id", required=False
-        )
+        try:
+            ui_auth_session_id = self._get_value_from_macaroon(
+                macaroon, "ui_auth_session_id"
+            )  # type: Optional[str]
+        except ValueError:
+            ui_auth_session_id = None
 
         return nonce, client_redirect_url, ui_auth_session_id
 
-    def _get_value_from_macaroon(
-        self, macaroon: pymacaroons.Macaroon, key: str, required: bool = True
-    ) -> Optional[str]:
+    def _get_value_from_macaroon(self, macaroon: pymacaroons.Macaroon, key: str) -> str:
         """Extracts a caveat value from a macaroon token.
 
         Args:
             macaroon: the token
             key: the key of the caveat to extract
-            required: Whether to raise an exception if the caveat is not found.
 
         Returns:
             The extracted value
@@ -809,10 +809,7 @@ class OidcHandler:
         for caveat in macaroon.caveats:
             if caveat.caveat_id.startswith(prefix):
                 return caveat.caveat_id[len(prefix) :]
-
-        if required:
-            raise Exception("No %s caveat in macaroon" % (key,))
-        return None
+        raise ValueError("No %s caveat in macaroon" % (key,))
 
     def _verify_expiry(self, caveat: str) -> bool:
         prefix = "time < "
