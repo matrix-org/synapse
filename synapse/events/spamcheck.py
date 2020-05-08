@@ -28,23 +28,15 @@ class SpamChecker(object):
     def __init__(self, hs: "synapse.server.HomeServer"):
         self.spam_checkers = []  # type: List[Any]
 
-        for spam_checker in hs.config.spam_checkers:
-            module = None
-            config = None
-            try:
-                module, config = spam_checker
-            except Exception:
-                pass
-
-            if module is not None:
-                # Older spam checkers don't accept the `api` argument, so we
-                # try and detect support.
-                spam_args = inspect.getfullargspec(module)
-                if "api" in spam_args.args:
-                    api = SpamCheckerApi(hs)
-                    self.spam_checkers.append(module(config=config, api=api))
-                else:
-                    self.spam_checkers.append(module(config=config))
+        for module, config in hs.config.spam_checkers:
+            # Older spam checkers don't accept the `api` argument, so we
+            # try and detect support.
+            spam_args = inspect.getfullargspec(module)
+            if "api" in spam_args.args:
+                api = SpamCheckerApi(hs)
+                self.spam_checkers.append(module(config=config, api=api))
+            else:
+                self.spam_checkers.append(module(config=config))
 
     def check_event_for_spam(self, event: "synapse.events.EventBase") -> bool:
         """Checks if a given event is considered "spammy" by this server.
