@@ -13,9 +13,19 @@
  * limitations under the License.
  */
 
-ALTER TABLE ONLY local_media_repository_thumbnails
-    DROP CONSTRAINT IF EXISTS local_media_repository_thumbn_media_id_thumbnail_width_thum_key,
-    ADD CONSTRAINT local_media_repository_thumbn_media_id_thumbnail_width_thum_key UNIQUE (media_id, thumbnail_width, thumbnail_height, thumbnail_type, thumbnail_method);
-ALTER TABLE ONLY remote_media_cache_thumbnails
-    DROP CONSTRAINT IF EXISTS remote_media_cache_thumbnails_media_origin_media_id_thumbna_key,
-    ADD CONSTRAINT remote_media_cache_thumbnails_media_origin_media_id_thumbna_key UNIQUE (media_origin, media_id, thumbnail_width, thumbnail_height, thumbnail_type, thumbnail_method);
+-- add new index that includes method to local media
+INSERT INTO background_updates (update_name, progress_json) VALUES
+  ('local_media_repository_thumbnails_method_idx', '{}');
+
+-- drop old index
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+  ('local_media_repository_drop_index_wo_method', '{}', 'local_media_repository_thumbnails_method_idx');
+
+-- add new index that includes method to remote media
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+  ('remote_media_repository_thumbnails_method_idx', '{}', 'local_media_repository_drop_index_wo_method');
+
+-- drop old index
+INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+  ('remote_media_repository_drop_index_wo_method', '{}', 'remote_media_repository_thumbnails_method_idx');
+

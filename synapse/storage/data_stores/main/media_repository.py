@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.internet import defer
+
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import Database
 
@@ -29,6 +31,75 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             columns=["created_ts"],
             where_clause="url_cache IS NOT NULL",
         )
+
+        self.db.updates.register_background_index_update(
+            update_name="local_media_repository_thumbnails_method_idx",
+            index_name="local_media_repository_thumbn_media_id_width_height_method_key",
+            table="local_media_repository_thumbnails",
+            columns=[
+                "media_id",
+                "thumbnail_width",
+                "thumbnail_height",
+                "thumbnail_type",
+                "thumbnail_method",
+            ],
+            unique=True,
+        )
+
+        self.db.updates.register_background_index_update(
+            update_name="remote_media_repository_thumbnails_method_idx",
+            index_name="remote_media_repository_thumbn_media_origin_id_width_height_method_key",
+            table="remote_media_cache_thumbnails",
+            columns=[
+                "media_origin",
+                "media_id",
+                "thumbnail_width",
+                "thumbnail_height",
+                "thumbnail_type",
+                "thumbnail_method",
+            ],
+            unique=True,
+        )
+
+        self.db.updates.register_background_update_handler(
+            "local_media_repository_drop_index_wo_method",
+            self._drop_local_media_index_without_method,
+        )
+
+        self.db.updates.register_background_update_handler(
+            "remote_media_repository_drop_index_wo_method",
+            self._drop_remote_media_index_without_method,
+        )
+
+    @defer.inlineCallbacks
+    def _drop_local_media_index_without_method(self, progress, batch_size):
+        def f(conn):
+            txn = conn.cursor()
+            txn.execute(
+                "ALTER TABLE local_media_repository_thumbnails DROP CONSTRAINT IF EXISTS local_media_repository_thumbn_media_id_thumbnail_width_thum_key"
+            )
+            txn.close()
+
+        yield self.db.runWithConnection(f)
+        yield self.db.updates._end_background_update(
+            "local_media_repository_drop_index_wo_method"
+        )
+        return 1
+
+    @defer.inlineCallbacks
+    def _drop_remote_media_index_without_method(self, progress, batch_size):
+        def f(conn):
+            txn = conn.cursor()
+            txn.execute(
+                "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_repository_thumbn_media_id_thumbnail_width_thum_key"
+            )
+            txn.close()
+
+        yield self.db.runWithConnection(f)
+        yield self.db.updates._end_background_update(
+            "remote_media_repository_drop_index_wo_method"
+        )
+        return 1
 
 
 class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
