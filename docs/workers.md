@@ -73,21 +73,23 @@ the HTTP replication port.
 
 For example:
 
-    worker_app: synapse.app.synchrotron
+```yaml
+worker_app: synapse.app.synchrotron
 
-    # The replication listener on the synapse to talk to.
-    worker_replication_host: 127.0.0.1
-    worker_replication_port: 9092
-    worker_replication_http_port: 9093
+# The replication listener on the synapse to talk to.
+worker_replication_host: 127.0.0.1
+worker_replication_port: 9092
+worker_replication_http_port: 9093
 
-    worker_listeners:
-     - type: http
-       port: 8083
-       resources:
-         - names:
-           - client
+worker_listeners:
+ - type: http
+   port: 8083
+   resources:
+     - names:
+       - client
 
-    worker_log_config: /home/matrix/synapse/config/synchrotron_log_config.yaml
+worker_log_config: /home/matrix/synapse/config/synchrotron_log_config.yaml
+```
 
 ...is a full configuration for a synchrotron worker instance, which will expose a
 plain HTTP `/sync` endpoint on port 8083 separately from the `/sync` endpoint provided
