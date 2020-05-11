@@ -875,8 +875,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         self.distributor.declare("user_joined_room")
         self.distributor.declare("user_left_room")
 
-    @defer.inlineCallbacks
-    def _is_remote_room_too_complex(self, room_id, remote_room_hosts):
+    async def _is_remote_room_too_complex(self, room_id, remote_room_hosts):
         """
         Check if complexity of a remote room is too great.
 
@@ -888,7 +887,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             if unable to be fetched
         """
         max_complexity = self.hs.config.limit_remote_rooms.complexity
-        complexity = yield self.federation_handler.get_room_complexity(
+        complexity = await self.federation_handler.get_room_complexity(
             remote_room_hosts, room_id
         )
 
