@@ -96,6 +96,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     LEFT JOIN room_stats_current ON
                         group_rooms.room_id = room_stats_current.room_id
                         WHERE joined_members > 0
+                        AND (room_version <> '') IS FALSE
                 )
             """
             args = [group_id]
@@ -133,6 +134,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     LEFT JOIN room_stats_current ON
                         group_rooms.room_id = room_stats_current.room_id
                         WHERE joined_members > 0
+                        AND (room_version <> '') IS FALSE
                 )
             """
 
