@@ -98,10 +98,10 @@ class GroupServerWorkerStore(SQLBaseStore):
                         AND joined_members > 0
                     LEFT JOIN rooms ON
                         group_rooms.room_id = rooms.room_id
-                        AND (room_version <> '') IS FALSE
+                        AND (room_version <> '') = ?
                 )
             """
-            args = [group_id]
+            args = [group_id, False]
 
             if not include_private:
                 sql += " AND is_public = ?"
@@ -157,15 +157,15 @@ class GroupServerWorkerStore(SQLBaseStore):
                         AND joined_members > 0
                     LEFT JOIN rooms ON
                         group_rooms.room_id = rooms.room_id
-                        AND (room_version <> '') IS FALSE
+                        AND (room_version <> '') = ?
                 )
             """
 
             if not include_private:
                 sql += " AND is_public = ?"
-                txn.execute(sql, (group_id, True))
+                txn.execute(sql, (group_id, False, True))
             else:
-                txn.execute(sql, (group_id,))
+                txn.execute(sql, (group_id, False))
 
             rooms = [
                 {
