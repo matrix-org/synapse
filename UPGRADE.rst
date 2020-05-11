@@ -78,6 +78,7 @@ for example:
 Upgrading to v1.13.0
 ====================
 
+
 Incorrect database migration in old synapse versions
 ----------------------------------------------------
 
@@ -104,6 +105,15 @@ affected can be repaired as follows:
         ('populate_stats_process_users', '{}', 'populate_stats_process_rooms');
 
 2. Restart synapse.
+
+New Single Sign-on HTML Templates
+---------------------------------
+
+New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
+`sso_account_deactivated.html`) were added to Synapse. If your Synapse is
+configured to use SSO and a custom  `sso_redirect_confirm_template_dir`
+configuration then these templates will need to be duplicated into that
+directory.
 
 
 Upgrading to v1.12.0

@@ -1,6 +1,7 @@
 Synapse 1.13.0rc1 (2020-05-11)
 ==============================
 
+
 Features
 --------
 
@@ -79,6 +80,10 @@ Improved Documentation
 Deprecations and Removals
 -------------------------
 
+Plugins using the `complete_sso_login` method of `synapse.module_api.ModuleApi`
+should update to using the async/await version `complete_sso_login_async` which
+includes additional checks. The non-async version is considered deprecated.
+
 - Remove nonfunctional `captcha_bypass_secret` option from `homeserver.yaml`. ([\#7137](https://github.com/matrix-org/synapse/issues/7137))
 
 
@@ -134,20 +139,6 @@ Internal Changes
 - Prevent methods in `synapse.handlers.auth` from polling the homeserver config every request. ([\#7420](https://github.com/matrix-org/synapse/issues/7420))
 - Speed up fetching device lists changes when handling `/sync` requests. ([\#7423](https://github.com/matrix-org/synapse/issues/7423))
 - Run group attestation renewal in series rather than parallel for performance. ([\#7442](https://github.com/matrix-org/synapse/issues/7442))
-
-
-Next version
-============
-
-* New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
- `sso_account_deactivated.html`) were added to Synapse. If your Synapse is
- configured to use SSO and a custom  `sso_redirect_confirm_template_dir`
- configuration then these templates will need to be duplicated into that
- directory.
-
-* Plugins using the `complete_sso_login` method of `synapse.module_api.ModuleApi`
-  should update to using the async/await version `complete_sso_login_async` which
-  includes additional checks. The non-async version is considered deprecated.
 
 
 Synapse 1.12.4 (2020-04-23)
