@@ -123,6 +123,25 @@ Plugins using the ``complete_sso_login`` method of
 version ``complete_sso_login_async`` which includes additional checks. The
 non-async version is considered deprecated.
 
+Rolling back to v1.12.4 after a failed upgrade
+----------------------------------------------
+
+v1.13.0 includes a lot of large changes. If something problematic occurs, you
+may want to roll-back to a previous version of Synapse. Because v1.13.0 also
+includes a new database schema version, reverting that version is also required
+alongside the generic rollback instructions mentioned above. In short, to roll
+back to v1.12.4 you need to:
+
+1. Stop the server
+2. Decrease the schema version in the database:
+
+  .. code:: sql
+    
+    UPGRADE schema_version SET version = 57;
+
+3. Downgrade Synapse by following the instructions for your installation method
+   in the "Rolling back to older versions" section above.
+    
 
 Upgrading to v1.12.0
 ====================
