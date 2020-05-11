@@ -26,16 +26,15 @@ from twisted.internet import defer
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, LimitBlockingTypes, Membership, UserTypes
+from synapse.api.auth_blocking import AuthBlocking
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
-    ResourceLimitError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.config.server import is_threepid_reserved
 from synapse.events import EventBase
 from synapse.types import StateMap, UserID
 from synapse.util.caches import register_cache
@@ -77,7 +76,11 @@ class Auth(object):
         self.token_cache = LruCache(10000)
         register_cache("cache", "token_cache", self.token_cache)
 
+        self._auth_blocking = AuthBlocking(self.hs)
+
         self._account_validity = hs.config.account_validity
+        self._track_appservice_user_ips = hs.config.track_appservice_user_ips
+        self._macaroon_secret_key = hs.config.macaroon_secret_key
 
     @defer.inlineCallbacks
     def check_from_context(self, room_version: str, event, context, do_sig_check=True):
@@ -191,7 +194,7 @@ class Auth(object):
                 opentracing.set_tag("authenticated_entity", user_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
-                if ip_addr and self.hs.config.track_appservice_user_ips:
+                if ip_addr and self._track_appservice_user_ips:
                     yield self.store.insert_client_ip(
                         user_id=user_id,
                         access_token=access_token,
@@ -454,7 +457,7 @@ class Auth(object):
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        v.verify(macaroon, self._macaroon_secret_key)
 
     def _verify_expiry(self, caveat):
         prefix = "time < "
@@ -663,71 +666,5 @@ class Auth(object):
                 % (user_id, room_id),
             )
 
-    @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
-        """Checks if the user should be rejected for some external reason,
-        such as monthly active user limiting or global disable flag
-
-        Args:
-            user_id(str|None): If present, checks for presence against existing
-                MAU cohort
-
-            threepid(dict|None): If present, checks for presence against configured
-                reserved threepid. Used in cases where the user is trying register
-                with a MAU blocked server, normally they would be rejected but their
-                threepid is on the reserved list. user_id and
-                threepid should never be set at the same time.
-
-            user_type(str|None): If present, is used to decide whether to check against
-                certain blocking reasons like MAU.
-        """
-
-        # Never fail an auth check for the server notices users or support user
-        # This can be a problem where event creation is prohibited due to blocking
-        if user_id is not None:
-            if user_id == self.hs.config.server_notices_mxid:
-                return
-            if (yield self.store.is_support_user(user_id)):
-                return
-
-        if self.hs.config.hs_disabled:
-            raise ResourceLimitError(
-                403,
-                self.hs.config.hs_disabled_message,
-                errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                admin_contact=self.hs.config.admin_contact,
-                limit_type=LimitBlockingTypes.HS_DISABLED,
-            )
-        if self.hs.config.limit_usage_by_mau is True:
-            assert not (user_id and threepid)
-
-            # If the user is already part of the MAU cohort or a trial user
-            if user_id:
-                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
-                if timestamp:
-                    return
-
-                is_trial = yield self.store.is_trial_user(user_id)
-                if is_trial:
-                    return
-            elif threepid:
-                # If the user does not exist yet, but is signing up with a
-                # reserved threepid then pass auth check
-                if is_threepid_reserved(
-                    self.hs.config.mau_limits_reserved_threepids, threepid
-                ):
-                    return
-            elif user_type == UserTypes.SUPPORT:
-                # If the user does not exist yet and is of type "support",
-                # allow registration. Support users are excluded from MAU checks.
-                return
-            # Else if there is no room in the MAU bucket, bail
-            current_mau = yield self.store.get_monthly_active_count()
-            if current_mau >= self.hs.config.max_mau_value:
-                raise ResourceLimitError(
-                    403,
-                    "Monthly Active User Limit Exceeded",
-                    admin_contact=self.hs.config.admin_contact,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                    limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
-                )
+    def check_auth_blocking(self, *args, **kwargs):
+        return self._auth_blocking.check_auth_blocking(*args, **kwargs)

@@ -19,6 +19,7 @@ import json
 
 from mock import Mock
 
+from synapse.api.auth_blocking import AuthBlocking
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.rest.client.v2_alpha import register, sync
@@ -45,11 +46,17 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.hs.config.limit_usage_by_mau = True
         self.hs.config.hs_disabled = False
         self.hs.config.max_mau_value = 2
-        self.hs.config.mau_trial_days = 0
         self.hs.config.server_notices_mxid = "@server:red"
         self.hs.config.server_notices_mxid_display_name = None
         self.hs.config.server_notices_mxid_avatar_url = None
         self.hs.config.server_notices_room_name = "Test Server Notice Room"
+        self.hs.config.mau_trial_days = 0
+
+        # AuthBlocking reads config options during hs creation. Recreate the
+        # hs' copy of AuthBlocking after we've updated config values above
+        self.auth_blocking = AuthBlocking(self.hs)
+        self.hs.get_auth()._auth_blocking = self.auth_blocking
+
         return self.hs
 
     def test_simple_deny_mau(self):
@@ -121,6 +128,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def test_trial_users_cant_come_back(self):
+        self.auth_blocking._mau_trial_days = 1
         self.hs.config.mau_trial_days = 1
 
         # We should be able to register more than the limit initially
@@ -169,8 +177,8 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def test_tracked_but_not_limited(self):
-        self.hs.config.max_mau_value = 1  # should not matter
-        self.hs.config.limit_usage_by_mau = False
+        self.auth_blocking._max_mau_value = 1  # should not matter
+        self.auth_blocking._limit_usage_by_mau = False
         self.hs.config.mau_stats_only = True
 
         # Simply being able to create 2 users indicates that the

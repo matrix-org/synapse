@@ -191,6 +191,11 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
+            if self.get_config().oidc_enabled:
+                from synapse.rest.oidc import OIDCResource
+
+                resources["/_synapse/oidc"] = OIDCResource(self)
+
             if self.get_config().saml2_enabled:
                 from synapse.rest.saml2 import SAML2Resource
 
@@ -420,6 +425,13 @@ def setup(config_options):
 
                 # Check if it needs to be reprovisioned every day.
                 hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
+
+            # Load the OIDC provider metadatas, if OIDC is enabled.
+            if hs.config.oidc_enabled:
+                oidc = hs.get_oidc_handler()
+                # Loading the provider metadata also ensures the provider config is valid.
+                yield defer.ensureDeferred(oidc.load_metadata())
+                yield defer.ensureDeferred(oidc.load_jwks())
 
             _base.start(hs, config.listeners)
 

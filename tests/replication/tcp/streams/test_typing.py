@@ -15,7 +15,6 @@
 from mock import Mock
 
 from synapse.handlers.typing import RoomMember
-from synapse.replication.http import streams
 from synapse.replication.tcp.streams import TypingStream
 
 from tests.replication.tcp.streams._base import BaseStreamTestCase
@@ -24,10 +23,6 @@ USER_ID = "@feeling:blue"
 
 
 class TypingStreamTestCase(BaseStreamTestCase):
-    servlets = [
-        streams.register_servlets,
-    ]
-
     def _build_replication_data_handler(self):
         return Mock(wraps=super()._build_replication_data_handler())
 

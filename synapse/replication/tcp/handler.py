@@ -15,18 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    TypeVar,
-)
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple, TypeVar
 
 from prometheus_client import Counter
 
@@ -38,7 +27,6 @@ from synapse.replication.tcp.commands import (
     ClearUserSyncsCommand,
     Command,
     FederationAckCommand,
-    InvalidateCacheCommand,
     PositionCommand,
     RdataCommand,
     RemoteServerUpCommand,
@@ -81,9 +69,6 @@ class ReplicationCommandHandler:
         self._instance_id = hs.get_instance_id()
         self._instance_name = hs.get_instance_name()
 
-        # Set of streams that we've caught up with.
-        self._streams_connected = set()  # type: Set[str]
-
         self._streams = {
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
         }  # type: Dict[str, Stream]
@@ -99,8 +84,12 @@ class ReplicationCommandHandler:
         # The factory used to create connections.
         self._factory = None  # type: Optional[ReconnectingClientFactory]
 
-        # The currently connected connections.
+        # The currently connected connections. (The list of places we need to send
+        # outgoing replication commands to.)
         self._connections = []  # type: List[AbstractConnection]
+
+        # For each connection, the incoming streams that are coming from that connection
+        self._streams_by_connection = {}  # type: Dict[AbstractConnection, Set[str]]
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",
@@ -130,10 +119,9 @@ class ReplicationCommandHandler:
             import txredisapi
 
             logger.info(
-                "Connecting to redis (host=%r port=%r DBID=%r)",
+                "Connecting to redis (host=%r port=%r)",
                 hs.config.redis_host,
                 hs.config.redis_port,
-                hs.config.redis_dbid,
             )
 
             # We need two connections to redis, one for the subscription stream and
@@ -144,7 +132,6 @@ class ReplicationCommandHandler:
             outbound_redis_connection = txredisapi.lazyConnection(
                 host=hs.config.redis_host,
                 port=hs.config.redis_port,
-                dbid=hs.config.redis_dbid,
                 password=hs.config.redis.redis_password,
                 reconnect=True,
             )
@@ -170,7 +157,7 @@ class ReplicationCommandHandler:
             return
 
         for stream_name, stream in self._streams.items():
-            current_token = stream.current_token()
+            current_token = stream.current_token(self._instance_name)
             self.send_command(
                 PositionCommand(stream_name, self._instance_name, current_token)
             )
@@ -209,18 +196,6 @@ class ReplicationCommandHandler:
 
             self._notifier.on_new_replication_data()
 
-    async def on_INVALIDATE_CACHE(
-        self, conn: AbstractConnection, cmd: InvalidateCacheCommand
-    ):
-        invalidate_cache_counter.inc()
-
-        if self._is_master:
-            # We invalidate the cache locally, but then also stream that to other
-            # workers.
-            await self._store.invalidate_cache_and_stream(
-                cmd.cache_func, tuple(cmd.keys)
-            )
-
     async def on_USER_IP(self, conn: AbstractConnection, cmd: UserIpCommand):
         user_ip_cache_counter.inc()
 
@@ -257,12 +232,14 @@ class ReplicationCommandHandler:
         #   2. so we don't race with getting a POSITION command and fetching
         #      missing RDATA.
         with await self._position_linearizer.queue(cmd.stream_name):
-            if stream_name not in self._streams_connected:
-                # If the stream isn't marked as connected then we haven't seen a
-                # `POSITION` command yet, and so we may have missed some rows.
+            # make sure that we've processed a POSITION for this stream *on this
+            # connection*. (A POSITION on another connection is no good, as there
+            # is no guarantee that we have seen all the intermediate updates.)
+            sbc = self._streams_by_connection.get(conn)
+            if not sbc or stream_name not in sbc:
                 # Let's drop the row for now, on the assumption we'll receive a
                 # `POSITION` soon and we'll catch up correctly then.
-                logger.warning(
+                logger.debug(
                     "Discarding RDATA for unconnected stream %s -> %s",
                     stream_name,
                     cmd.token,
@@ -292,7 +269,7 @@ class ReplicationCommandHandler:
             rows: a list of Stream.ROW_TYPE objects as returned by
                 Stream.parse_row.
         """
-        logger.debug("Received rdata %s -> %s", stream_name, token)
+        logger.debug("Received rdata %s (%s) -> %s", stream_name, instance_name, token)
         await self._replication_data_handler.on_rdata(
             stream_name, instance_name, token, rows
         )
@@ -302,30 +279,40 @@ class ReplicationCommandHandler:
             # Ignore POSITION that are just our own echoes
             return
 
-        stream = self._streams.get(cmd.stream_name)
+        logger.info("Handling '%s %s'", cmd.NAME, cmd.to_line())
+
+        stream_name = cmd.stream_name
+        stream = self._streams.get(stream_name)
         if not stream:
-            logger.error("Got POSITION for unknown stream: %s", cmd.stream_name)
+            logger.error("Got POSITION for unknown stream: %s", stream_name)
             return
 
         # We protect catching up with a linearizer in case the replication
         # connection reconnects under us.
-        with await self._position_linearizer.queue(cmd.stream_name):
+        with await self._position_linearizer.queue(stream_name):
             # We're about to go and catch up with the stream, so remove from set
             # of connected streams.
-            self._streams_connected.discard(cmd.stream_name)
+            for streams in self._streams_by_connection.values():
+                streams.discard(stream_name)
 
             # We clear the pending batches for the stream as the fetching of the
             # missing updates below will fetch all rows in the batch.
-            self._pending_batches.pop(cmd.stream_name, [])
+            self._pending_batches.pop(stream_name, [])
 
             # Find where we previously streamed up to.
-            current_token = stream.current_token()
+            current_token = stream.current_token(cmd.instance_name)
 
             # If the position token matches our current token then we're up to
             # date and there's nothing to do. Otherwise, fetch all updates
             # between then and now.
             missing_updates = cmd.token != current_token
             while missing_updates:
+                logger.info(
+                    "Fetching replication rows for '%s' between %i and %i",
+                    stream_name,
+                    current_token,
+                    cmd.token,
+                )
                 (
                     updates,
                     current_token,
@@ -341,16 +328,20 @@ class ReplicationCommandHandler:
 
                 for token, rows in _batch_updates(updates):
                     await self.on_rdata(
-                        cmd.stream_name,
+                        stream_name,
                         cmd.instance_name,
                         token,
                         [stream.parse_row(row) for row in rows],
                     )
 
-            # We've now caught up to position sent to us, notify handler.
-            await self._replication_data_handler.on_position(cmd.stream_name, cmd.token)
+            logger.info("Caught up with stream '%s' to %i", stream_name, cmd.token)
 
-            self._streams_connected.add(cmd.stream_name)
+            # We've now caught up to position sent to us, notify handler.
+            await self._replication_data_handler.on_position(
+                cmd.stream_name, cmd.instance_name, cmd.token
+            )
+
+            self._streams_by_connection.setdefault(conn, set()).add(stream_name)
 
     async def on_REMOTE_SERVER_UP(
         self, conn: AbstractConnection, cmd: RemoteServerUpCommand
@@ -408,6 +399,12 @@ class ReplicationCommandHandler:
     def lost_connection(self, connection: AbstractConnection):
         """Called when a connection is closed/lost.
         """
+        # we no longer need _streams_by_connection for this connection.
+        streams = self._streams_by_connection.pop(connection, None)
+        if streams:
+            logger.info(
+                "Lost replication connection; streams now disconnected: %s", streams
+            )
         try:
             self._connections.remove(connection)
         except ValueError:
@@ -468,12 +465,6 @@ class ReplicationCommandHandler:
         """Poke the master to remove a pusher for a user
         """
         cmd = RemovePusherCommand(app_id, push_key, user_id)
-        self.send_command(cmd)
-
-    def send_invalidate_cache(self, cache_func: Callable, keys: tuple):
-        """Poke the master to invalidate a cache.
-        """
-        cmd = InvalidateCacheCommand(cache_func.__name__, keys)
         self.send_command(cmd)
 
     def send_user_ip(
