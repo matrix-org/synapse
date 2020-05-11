@@ -137,7 +137,7 @@ back to v1.12.4 you need to:
 
    .. code:: sql
     
-      UPGRADE schema_version SET version = 57;
+      UPDATE schema_version SET version = 57;
 
 3. Downgrade Synapse by following the instructions for your installation method
    in the "Rolling back to older versions" section above.
