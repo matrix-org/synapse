@@ -113,7 +113,7 @@ New templates (``sso_auth_confirm.html``, ``sso_auth_success.html``, and
 ``sso_account_deactivated.html``) were added to Synapse. If your Synapse is
 configured to use SSO and a custom  ``sso_redirect_confirm_template_dir``
 configuration then these templates will need to be copied from
-[synapse/res/templates](synapse/res/templates) into that directory.
+[synapse/res/templates](./synapse/res/templates) into that directory.
 
 Synapse SSO Plugins Method Deprecation
 --------------------------------------
