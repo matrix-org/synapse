@@ -16,7 +16,7 @@
 from synapse.federation.send_queue import EduRow
 from synapse.replication.tcp.streams.federation import FederationStream
 
-from tests.replication.tcp.streams._base import BaseStreamTestCase
+from tests.replication._base import BaseStreamTestCase
 
 
 class FederationStreamTestCase(BaseStreamTestCase):
