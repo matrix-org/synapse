@@ -329,6 +329,18 @@ class AuthHandler(BaseHandler):
                 # isn't arbitrary.
                 clientdict = session.clientdict
 
+            # Ensure that the queried operation does not vary between stages of
+            # the UI authentication session. This is done by generating a stable
+            # comparator based on the URI, method, and body (minus the auth dict)
+            # and storing it during the initial query. Subsequent queries ensure
+            # that this comparator has not changed.
+            comparator = (uri, method, clientdict)
+            if (session.uri, session.method, session.clientdict) != comparator:
+                raise SynapseError(
+                    403,
+                    "Requested operation has changed during the UI authentication session.",
+                )
+
         if not authdict:
             raise InteractiveAuthIncompleteError(
                 self._auth_dict_for_flows(flows, session.session_id)
