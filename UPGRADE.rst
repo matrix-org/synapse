@@ -83,8 +83,8 @@ Incorrect database migration in old synapse versions
 ----------------------------------------------------
 
 A bug was introduced in Synapse 1.4.0 which could cause the room directory to
-be incomplete or empty if Synapse was upgraded directly from v1.2.1 or earlier,
-to versions between v1.4.0 and v1.12.x.
+be incomplete or empty if Synapse was upgraded directly from v1.2.1 or
+earlier, to versions between v1.4.0 and v1.12.x.
 
 This will *not* be a problem for Synapse installations which were:
  * created at v1.4.0 or later,
@@ -109,11 +109,19 @@ affected can be repaired as follows:
 New Single Sign-on HTML Templates
 ---------------------------------
 
-New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
-`sso_account_deactivated.html`) were added to Synapse. If your Synapse is
-configured to use SSO and a custom  `sso_redirect_confirm_template_dir`
-configuration then these templates will need to be duplicated into that
-directory.
+New templates (``sso_auth_confirm.html``, ``sso_auth_success.html``, and
+``sso_account_deactivated.html``) were added to Synapse. If your Synapse is
+configured to use SSO and a custom  ``sso_redirect_confirm_template_dir``
+configuration then these templates will need to be copied from
+[synapse/res/templates](synapse/res/templates) into that directory.
+
+Synapse SSO Plugins Method Deprecation
+--------------------------------------
+
+Plugins using the ``complete_sso_login`` method of
+``synapse.module_api.ModuleApi`` should update to using the async/await
+version ``complete_sso_login_async`` which includes additional checks. The
+non-async version is considered deprecated.
 
 
 Upgrading to v1.12.0

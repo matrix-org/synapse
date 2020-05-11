@@ -1,6 +1,23 @@
 Synapse 1.13.0rc1 (2020-05-11)
 ==============================
 
+This release brings some potential changes necessary for certain
+configurations of Synapse:
+
+* If your Synapse is configured to use SSO and have a custom
+  `sso_redirect_confirm_template_dir` configuration option set, you will need
+  to duplicate the new `sso_auth_confirm.html`, `sso_auth_success.html` and
+  `sso_account_deactivated.html` templates into that directory.
+* Synapse plugins using the `complete_sso_login` method of
+  `synapse.module_api.ModuleApi` should instead switch to the async/await
+  version, `complete_sso_login_async`, which includes additional checks. The
+  former version is now deprecated.
+* A bug was introduced in Synapse 1.4.0 which could cause the room directory
+  to be incomplete or empty if Synapse was upgraded directly from v1.2.1 or
+  earlier, to versions between v1.4.0 and v1.12.x.
+
+Please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes
+and for general upgrade guidance.
 
 Features
 --------
@@ -11,7 +28,7 @@ Features
 - Admin API `POST /_synapse/admin/v1/join/<roomIdOrAlias>` to join users to a room like `auto_join_rooms` for creation of users. ([\#7051](https://github.com/matrix-org/synapse/issues/7051))
 - Add options to prevent users from changing their profile or associated 3PIDs. ([\#7096](https://github.com/matrix-org/synapse/issues/7096))
 - Support SSO in the user interactive authentication workflow. ([\#7102](https://github.com/matrix-org/synapse/issues/7102), [\#7186](https://github.com/matrix-org/synapse/issues/7186), [\#7279](https://github.com/matrix-org/synapse/issues/7279), [\#7343](https://github.com/matrix-org/synapse/issues/7343))
-- Allow server admins to define and enforce a password policy ([MSC2000](https://github.com/matrix-org/matrix-doc/issues/2000). ([\#7118](https://github.com/matrix-org/synapse/issues/7118))
+- Allow server admins to define and enforce a password policy ([MSC2000](https://github.com/matrix-org/matrix-doc/issues/2000)). ([\#7118](https://github.com/matrix-org/synapse/issues/7118))
 - Improve the support for SSO authentication on the login fallback page. ([\#7152](https://github.com/matrix-org/synapse/issues/7152), [\#7235](https://github.com/matrix-org/synapse/issues/7235))
 - Always whitelist the login fallback in the SSO configuration if `public_baseurl` is set. ([\#7153](https://github.com/matrix-org/synapse/issues/7153))
 - Admin users are no longer required to be in a room to create an alias for it. ([\#7191](https://github.com/matrix-org/synapse/issues/7191))
@@ -79,10 +96,6 @@ Improved Documentation
 
 Deprecations and Removals
 -------------------------
-
-Plugins using the `complete_sso_login` method of `synapse.module_api.ModuleApi`
-should update to using the async/await version `complete_sso_login_async` which
-includes additional checks. The non-async version is considered deprecated.
 
 - Remove nonfunctional `captcha_bypass_secret` option from `homeserver.yaml`. ([\#7137](https://github.com/matrix-org/synapse/issues/7137))
 
