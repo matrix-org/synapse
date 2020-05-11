@@ -96,7 +96,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
             cmd = parse_command_from_line(message)
         except Exception:
             logger.exception(
-                "[%s] failed to parse line: %r", message,
+                "Failed to parse replication line: %r", message,
             )
             return
 

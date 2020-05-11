@@ -1,1 +1,0 @@
-Persist user interactive authentication sessions across workers and Synapse restarts.
