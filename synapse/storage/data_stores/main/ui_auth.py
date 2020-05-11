@@ -172,27 +172,6 @@ class UIAuthWorkerStore(SQLBaseStore):
 
         return results
 
-    async def set_ui_auth_clientdict(
-        self, session_id: str, clientdict: JsonDict
-    ) -> None:
-        """
-        Store an updated clientdict for a given session ID.
-
-        Args:
-            session_id: The ID of this session as returned from check_auth
-            clientdict:
-                The dictionary from the client root level, not the 'auth' key.
-        """
-        # The clientdict gets stored as JSON.
-        clientdict_json = json.dumps(clientdict)
-
-        self.db.simple_update_one(
-            table="ui_auth_sessions",
-            keyvalues={"session_id": session_id},
-            updatevalues={"clientdict": clientdict_json},
-            desc="set_ui_auth_client_dict",
-        )
-
     async def set_ui_auth_session_data(self, session_id: str, key: str, value: Any):
         """
         Store a key-value pair into the sessions data associated with this

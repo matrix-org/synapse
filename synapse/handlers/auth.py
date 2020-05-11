@@ -317,7 +317,7 @@ class AuthHandler(BaseHandler):
             except StoreError:
                 raise SynapseError(400, "Unknown session ID: %s" % (sid,))
 
-            if clientdict:
+            if not clientdict:
                 # This was designed to allow the client to omit the parameters
                 # and just supply the session in subsequent calls so it split
                 # auth between devices by just sharing the session, (eg. so you
@@ -327,8 +327,6 @@ class AuthHandler(BaseHandler):
                 # on a homeserver.
                 # Revisit: Assuming the REST APIs do sensible validation, the data
                 # isn't arbitrary.
-                await self.store.set_ui_auth_clientdict(sid, clientdict)
-            else:
                 clientdict = session.clientdict
 
         if not authdict:
