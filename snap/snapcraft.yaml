@@ -55,3 +55,7 @@ parts:
       - libldap-2.4-2
       - libpq5
       - libsasl2-2
+      - libicu60
+      - libjpeg-turbo8
+      - libxml2
+      - libxslt1.1
