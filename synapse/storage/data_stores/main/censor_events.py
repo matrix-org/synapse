@@ -33,14 +33,9 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class CensorEventsStore(CacheInvalidationWorkerStore, EventsWorkerStore, SQLBaseStore):
+class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBaseStore):
     def __init__(self, database: Database, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
-
-        # This should only exist on master for now
-        assert (
-            hs.config.worker.worker_app is None
-        ), "Can only instantiate CensorEventsStore on master"
 
         def _censor_redactions():
             return run_as_background_process(

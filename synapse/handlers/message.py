@@ -260,7 +260,6 @@ class MessageHandler(object):
         Args:
             event (EventBase): The event to schedule the expiry of.
         """
-        assert not self._is_worker_app
 
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
         if not isinstance(expiry_ts, int) or event.is_state():
