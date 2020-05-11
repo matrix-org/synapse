@@ -74,7 +74,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         Args:
             group_id: The ID of the group to query for rooms
-            include_private: Whether to return private rooms
+            include_private: Whether to return private rooms in results
 
         Returns:
             Deferred[List[Dict[str, str|bool]]]: A list of dictionaries, each in the
@@ -114,10 +114,31 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         return self.db.runInteraction("get_rooms_in_group", _get_rooms_in_group_txn)
 
-    def get_rooms_for_summary_by_category(self, group_id, include_private=False):
+    def get_rooms_for_summary_by_category(
+        self,
+        group_id: str,
+        include_private: bool = False,
+    ):
         """Get the rooms and categories that should be included in a summary request
 
-        Returns ([rooms], [categories])
+        Args:
+            group_id: The ID of the group to query the summary for
+            include_private: Whether to return private rooms in results
+
+        Returns:
+            Deferred[Tuple[List, Dict]]: A tuple containing:
+
+                * A list of dictionaries with the keys:
+                    * "room_id": str, the room ID
+                    * "is_public": bool, whether the room is public
+                    * "category_id": str|None, the category ID if set, else None
+                    * "order": int, the sort order of rooms
+
+                * A dictionary with the key:
+                    * category_id (str): a dictionary with the keys:
+                        * "is_public": bool, whether the category is public
+                        * "profile": str, the category profile
+                        * "order": int, the sort order of rooms in this category
         """
 
         def _get_rooms_for_summary_txn(txn):
