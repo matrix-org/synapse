@@ -115,9 +115,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return self.db.runInteraction("get_rooms_in_group", _get_rooms_in_group_txn)
 
     def get_rooms_for_summary_by_category(
-        self,
-        group_id: str,
-        include_private: bool = False,
+        self, group_id: str, include_private: bool = False,
     ):
         """Get the rooms and categories that should be included in a summary request
 
