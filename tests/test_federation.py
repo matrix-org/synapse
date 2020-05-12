@@ -177,7 +177,8 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         store.get_rooms_for_user = Mock()
         store.get_rooms_for_user.return_value = ["!someroom:test"]
 
-        # Manually inject a fake device list update.
+        # Manually inject a fake device list update. We need this update to include at
+        # least one prev_id so that the user's device list will need to be retried.
         device_list_updater = self.homeserver.get_device_handler().device_list_updater
         self.get_success(device_list_updater.incoming_device_list_update(
             origin=remote_origin,
