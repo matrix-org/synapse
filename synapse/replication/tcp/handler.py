@@ -186,15 +186,15 @@ class ReplicationCommandHandler:
         return self._streams_to_replicate
 
     async def on_REPLICATE(self, conn: AbstractConnection, cmd: ReplicateCommand):
-        # We only want to announce positions by the writer of the streams.
-        # Currently this is just the master process.
-        if not self._is_master:
-            return
-
-        for stream_name, stream in self._streams.items():
-            current_token = stream.current_token(self._instance_name)
+        # We respond with current position of all streams this instance
+        # replicates.
+        for stream in self.get_streams_to_replicate():
             self.send_command(
-                PositionCommand(stream_name, self._instance_name, current_token)
+                PositionCommand(
+                    stream.NAME,
+                    self._instance_name,
+                    stream.current_token(self._instance_name),
+                )
             )
 
     async def on_USER_SYNC(self, conn: AbstractConnection, cmd: UserSyncCommand):
