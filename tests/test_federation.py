@@ -190,7 +190,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
                     "prev_id": [5],
                     "stream_id": 6,
                     "user_id": remote_user_id,
-                }
+                },
             )
         )
 
