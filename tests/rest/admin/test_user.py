@@ -743,9 +743,10 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         res = self.get_success(self.handler.get_devices_by_user(self.other_user))
         self.other_user_device_id = res[0]["device_id"]
 
-        self.url = "/_synapse/admin/v2/users/%s/devices/%s" % (urllib.parse.quote(
-            self.other_user
-        ), self.other_user_device_id)
+        self.url = "/_synapse/admin/v2/users/%s/devices/%s" % (
+            urllib.parse.quote(self.other_user),
+            self.other_user_device_id,
+        )
 
     def test_no_auth(self):
         """
@@ -801,12 +802,13 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that a lookup for a user that does not exist returns a 404
         """
-        url = "/_synapse/admin/v2/users/@unknown_person:test/devices/%s" % self.other_user_device_id
+        url = (
+            "/_synapse/admin/v2/users/@unknown_person:test/devices/%s"
+            % self.other_user_device_id
+        )
 
         request, channel = self.make_request(
-            "GET",
-            url,
-            access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -814,9 +816,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
         request, channel = self.make_request(
-            "PUT",
-            url,
-            access_token=self.admin_user_tok,
+            "PUT", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -824,9 +824,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
         request, channel = self.make_request(
-            "DELETE",
-            url,
-            access_token=self.admin_user_tok,
+            "DELETE", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -837,12 +835,13 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that a lookup for a user that is not a local returns a 400
         """
-        url = "/_synapse/admin/v2/users/@unknown_person:unknown_domain/devices/%s" % self.other_user_device_id
+        url = (
+            "/_synapse/admin/v2/users/@unknown_person:unknown_domain/devices/%s"
+            % self.other_user_device_id
+        )
 
         request, channel = self.make_request(
-            "GET",
-            url,
-            access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -850,9 +849,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
         request, channel = self.make_request(
-            "PUT",
-            url,
-            access_token=self.admin_user_tok,
+            "PUT", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -860,9 +857,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Can only lookup local users", channel.json_body["error"])
 
         request, channel = self.make_request(
-            "DELETE",
-            url,
-            access_token=self.admin_user_tok,
+            "DELETE", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -878,9 +873,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         )
 
         request, channel = self.make_request(
-            "GET",
-            url,
-            access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -888,18 +881,14 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
         request, channel = self.make_request(
-            "PUT",
-            url,
-            access_token=self.admin_user_tok,
+            "PUT", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
         request, channel = self.make_request(
-            "DELETE",
-            url,
-            access_token=self.admin_user_tok,
+            "DELETE", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -912,7 +901,11 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         """
         # Set iniital display name.
         update = {"display_name": "new display"}
-        self.get_success(self.handler.update_device(self.other_user, self.other_user_device_id, update))
+        self.get_success(
+            self.handler.update_device(
+                self.other_user, self.other_user_device_id, update
+            )
+        )
 
         # Request to update a device display name with a new value that is longer than allowed.
         update = {
@@ -934,9 +927,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure the display name was not updated.
         request, channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.admin_user_tok,
+            "GET", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -949,12 +940,14 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         """
         # Set iniital display name.
         update = {"display_name": "new display"}
-        self.get_success(self.handler.update_device(self.other_user, self.other_user_device_id, update))
+        self.get_success(
+            self.handler.update_device(
+                self.other_user, self.other_user_device_id, update
+            )
+        )
 
         request, channel = self.make_request(
-            "PUT",
-            self.url,
-            access_token=self.admin_user_tok,
+            "PUT", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -962,9 +955,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure the display name was not updated.
         request, channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.admin_user_tok,
+            "GET", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -989,9 +980,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
         # Check new display_name
         request, channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.admin_user_tok,
+            "GET", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -1003,9 +992,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         Tests that a normal lookup for a device is successfully
         """
         request, channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.admin_user_tok,
+            "GET", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -1029,9 +1016,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
 
         # Delete device
         request, channel = self.make_request(
-            "DELETE",
-            self.url,
-            access_token=self.admin_user_tok,
+            "DELETE", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -1089,9 +1074,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         """
         url = "/_synapse/admin/v2/users/@unknown_person:test/devices"
         request, channel = self.make_request(
-            "GET",
-            url,
-            access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -1105,9 +1088,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@unknown_person:unknown_domain/devices"
 
         request, channel = self.make_request(
-            "GET",
-            url,
-            access_token=self.admin_user_tok,
+            "GET", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -1125,9 +1106,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
         # Get devices
         request, channel = self.make_request(
-            "GET",
-            self.url,
-            access_token=self.admin_user_tok,
+             "GET", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -1192,9 +1171,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         """
         url = "/_synapse/admin/v2/users/@unknown_person:test/delete_devices"
         request, channel = self.make_request(
-            "POST",
-            url,
-            access_token=self.admin_user_tok,
+            "POST", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -1208,9 +1185,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@unknown_person:unknown_domain/delete_devices"
 
         request, channel = self.make_request(
-            "POST",
-            url,
-            access_token=self.admin_user_tok,
+            "POST", url, access_token=self.admin_user_tok,
         )
         self.render(request)
 

@@ -1,0 +1,1 @@
+Allow server admins to list users's devices and logout specific devices.
