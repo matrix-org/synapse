@@ -16,9 +16,9 @@ SSO mapping providers are currently supported for OpenID and SAML SSO
 configurations. Please see the details below for how to implement your own.
 
 External mapping providers are provided to Synapse in the form of an external
-Python module. Retrieve this module from [PyPi](https://pypi.org) or elsewhere,
-but must be importable via Synapse (e.g. they must be in the same virtualenv
-as Synapse). The Synapse config is modified to point to the mapping provider
+Python module. You can retrieve this module from [PyPi](https://pypi.org) or elsewhere,
+but it must be importable via Synapse (e.g. it must be in the same virtualenv
+as Synapse). The Synapse config is then modified to point to the mapping provider
 (and optionally provide additional configuration for it).
 
 ## OpenID Mapping Providers
