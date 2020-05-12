@@ -180,24 +180,28 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         # Manually inject a fake device list update. We need this update to include at
         # least one prev_id so that the user's device list will need to be retried.
         device_list_updater = self.homeserver.get_device_handler().device_list_updater
-        self.get_success(device_list_updater.incoming_device_list_update(
-            origin=remote_origin,
-            edu_content={
-                "deleted": False,
-                "device_display_name": "Mobile",
-                "device_id": "QBUAZIFURK",
-                "prev_id": [5],
-                "stream_id": 6,
-                "user_id": remote_user_id,
-            }
-        ))
+        self.get_success(
+            device_list_updater.incoming_device_list_update(
+                origin=remote_origin,
+                edu_content={
+                    "deleted": False,
+                    "device_display_name": "Mobile",
+                    "device_id": "QBUAZIFURK",
+                    "prev_id": [5],
+                    "stream_id": 6,
+                    "user_id": remote_user_id,
+                }
+            )
+        )
 
         # Check that there was one resync attempt.
         self.assertEqual(self.resync_attempts, 1)
 
         # Check that the resync attempt failed and caused the user's device list to be
         # marked as stale.
-        need_resync = self.get_success(store.get_user_ids_requiring_device_list_resync())
+        need_resync = self.get_success(
+            store.get_user_ids_requiring_device_list_resync()
+        )
         self.assertIn(remote_user_id, need_resync)
 
         # Check that waiting for 30 seconds caused Synapse to retry resyncing the device
