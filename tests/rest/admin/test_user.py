@@ -1106,7 +1106,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
 
         # Get devices
         request, channel = self.make_request(
-             "GET", self.url, access_token=self.admin_user_tok,
+            "GET", self.url, access_token=self.admin_user_tok,
         )
         self.render(request)
 
