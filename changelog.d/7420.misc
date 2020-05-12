@@ -1,1 +1,0 @@
-Prevent methods in `synapse.handlers.auth` from polling the homeserver config every request.

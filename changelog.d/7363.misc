@@ -1,1 +1,0 @@
-Convert RegistrationWorkerStore.is_server_admin and dependent code to async/await.
