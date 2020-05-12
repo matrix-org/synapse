@@ -70,7 +70,6 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         logger.info("Connected to redis")
         super().connectionMade()
         run_as_background_process("subscribe-replication", self._send_subscribe)
-        self.handler.new_connection(self)
 
     async def _send_subscribe(self):
         # it's important to make sure that we only send the REPLICATE command once we
@@ -81,6 +80,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         logger.info(
             "Successfully subscribed to redis stream, sending REPLICATE command"
         )
+        self.handler.new_connection(self)
         await self._async_send_command(ReplicateCommand())
         logger.info("REPLICATE successfully sent")
 
