@@ -84,6 +84,11 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         await self._async_send_command(ReplicateCommand())
         logger.info("REPLICATE successfully sent")
 
+        # We send out our positions when there is a new connection in case the
+        # other side missed updates. We do this for Redis connections as the
+        # otherside won't know we've connected and so won't issue a REPLICATE.
+        self.handler.send_positions_to_connection(self)
+
     def messageReceived(self, pattern: str, channel: str, message: str):
         """Received a message from redis.
         """
