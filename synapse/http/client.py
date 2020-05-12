@@ -49,7 +49,6 @@ from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
-from synapse.util.caches import CACHE_SIZE_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -241,7 +240,10 @@ class SimpleHttpClient(object):
         # tends to do so in batches, so we need to allow the pool to keep
         # lots of idle connections around.
         pool = HTTPConnectionPool(self.reactor)
-        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
+        # XXX: The justification for using the cache factor here is that larger instances
+        # will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
         self.agent = ProxyAgent(

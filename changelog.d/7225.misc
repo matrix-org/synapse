@@ -1,1 +1,0 @@
-Extend room admin api (`GET /_synapse/admin/v1/rooms`) with additional attributes.
