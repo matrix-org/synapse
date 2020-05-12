@@ -68,10 +68,6 @@ database:
   name: sqlite3
   args:
     database: %(database_path)s
-
-# Number of events to cache in memory.
-#
-#event_cache_size: 10K
 """
 
 
@@ -116,8 +112,6 @@ class DatabaseConfig(Config):
         self.databases = []
 
     def read_config(self, config, **kwargs):
-        self.event_cache_size = self.parse_size(config.get("event_cache_size", "10K"))
-
         # We *experimentally* support specifying multiple databases via the
         # `databases` key. This is a map from a label to database config in the
         # same format as the `database` config option, plus an extra
