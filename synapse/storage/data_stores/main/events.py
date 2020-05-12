@@ -123,7 +123,11 @@ class DeltaState:
 
 
 class PersistEventsStore:
-    """T
+    """Contains all the functions for writing events to the database.
+
+    Should only be instansiated on one process (when using a worker mode setup).
+
+    Note: This is not part of the `DataStore` mixin.
     """
 
     def __init__(self, hs: "HomeServer", db: Database, main_data_store: "DataStore"):
