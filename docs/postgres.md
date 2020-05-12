@@ -61,7 +61,33 @@ Note that the PostgreSQL database *must* have the correct encoding set
 
 You may need to enable password authentication so `synapse_user` can
 connect to the database. See
-<https://www.postgresql.org/docs/11/auth-pg-hba-conf.html>.
+<https://www.postgresql.org/docs/current/auth-pg-hba-conf.html>.
+
+If you get an error along the lines of `FATAL:  Ident authentication failed for
+user "synapse_user"`, you may need to use an authentication method other than
+`ident`:
+
+* If the `synapse_user` user has a password, add the password to the `database:`
+  section of `homeserver.yaml`. Then add the following to `pg_hba.conf`:
+
+  ```
+  host    synapse     synapse_user    ::1/128     md5  # or `scram-sha-256` instead of `md5` if you use that
+  ```
+
+* If the `synapse_user` user does not have a password, then a password doesn't
+  have to be added to `homeserver.yaml`. But the following does need to be added
+  to `pg_hba.conf`:
+
+  ```
+  host    synapse     synapse_user    ::1/128     trust
+  ```
+
+Note that line order matters in `pg_hba.conf`, so make sure that if you do add a
+new line, it is inserted before:
+
+```
+host    all         all             ::1/128     ident
+```
 
 ### Fixing incorrect `COLLATE` or `CTYPE`
 
@@ -104,19 +130,41 @@ of free memory the database host has available.
 When you are ready to start using PostgreSQL, edit the `database`
 section in your config file to match the following lines:
 
-    database:
-        name: psycopg2
-        args:
-            user: <user>
-            password: <pass>
-            database: <db>
-            host: <host>
-            cp_min: 5
-            cp_max: 10
+```yaml
+database:
+  name: psycopg2
+  args:
+    user: <user>
+    password: <pass>
+    database: <db>
+    host: <host>
+    cp_min: 5
+    cp_max: 10
+```
 
 All key, values in `args` are passed to the `psycopg2.connect(..)`
 function, except keys beginning with `cp_`, which are consumed by the
-twisted adbapi connection pool.
+twisted adbapi connection pool. See the [libpq
+documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS)
+for a list of options which can be passed.
+
+You should consider tuning the `args.keepalives_*` options if there is any danger of
+the connection between your homeserver and database dropping, otherwise Synapse
+may block for an extended period while it waits for a response from the
+database server. Example values might be:
+
+```yaml
+# seconds of inactivity after which TCP should send a keepalive message to the server
+keepalives_idle: 10
+
+# the number of seconds after which a TCP keepalive message that is not
+# acknowledged by the server should be retransmitted
+keepalives_interval: 10
+
+# the number of TCP keepalives that can be lost before the client's connection
+# to the server is considered dead
+keepalives_count: 3
+```
 
 ## Porting from SQLite
 

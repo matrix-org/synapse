@@ -2,7 +2,6 @@
 - [Installing Synapse](#installing-synapse)
   - [Installing from source](#installing-from-source)
     - [Platform-Specific Instructions](#platform-specific-instructions)
-    - [Troubleshooting Installation](#troubleshooting-installation)
   - [Prebuilt packages](#prebuilt-packages)
 - [Setting up Synapse](#setting-up-synapse)
   - [TLS certificates](#tls-certificates)
@@ -10,6 +9,7 @@
   - [Registering a user](#registering-a-user)
   - [Setting up a TURN server](#setting-up-a-turn-server)
   - [URL previews](#url-previews)
+- [Troubleshooting Installation](#troubleshooting-installation)
 
 # Choosing your server name
 
@@ -70,7 +70,7 @@ pip install -U matrix-synapse
 ```
 
 Before you can start Synapse, you will need to generate a configuration
-file. To do this, run (in your virtualenv, as before)::
+file. To do this, run (in your virtualenv, as before):
 
 ```
 cd ~/synapse
@@ -84,22 +84,24 @@ python -m synapse.app.homeserver \
 ... substituting an appropriate value for `--server-name`.
 
 This command will generate you a config file that you can then customise, but it will
-also generate a set of keys for you. These keys will allow your Home Server to
-identify itself to other Home Servers, so don't lose or delete them. It would be
+also generate a set of keys for you. These keys will allow your homeserver to
+identify itself to other homeserver, so don't lose or delete them. It would be
 wise to back them up somewhere safe. (If, for whatever reason, you do need to
-change your Home Server's keys, you may find that other Home Servers have the
+change your homeserver's keys, you may find that other homeserver have the
 old key cached. If you update the signing key, you should change the name of the
 key in the `<server name>.signing.key` file (the second word) to something
 different. See the
 [spec](https://matrix.org/docs/spec/server_server/latest.html#retrieving-server-keys)
-for more information on key management.)
+for more information on key management).
 
 To actually run your new homeserver, pick a working directory for Synapse to
-run (e.g. `~/synapse`), and::
+run (e.g. `~/synapse`), and:
 
-    cd ~/synapse
-    source env/bin/activate
-    synctl start
+```
+cd ~/synapse
+source env/bin/activate
+synctl start
+```
 
 ### Platform-Specific Instructions
 
@@ -110,7 +112,7 @@ Installing prerequisites on Ubuntu or Debian:
 ```
 sudo apt-get install build-essential python3-dev libffi-dev \
                      python3-pip python3-setuptools sqlite3 \
-                     libssl-dev python3-virtualenv libjpeg-dev libxslt1-dev
+                     libssl-dev virtualenv libjpeg-dev libxslt1-dev
 ```
 
 #### ArchLinux
@@ -188,7 +190,7 @@ doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
 There is currently no port for OpenBSD. Additionally, OpenBSD's security
 settings require a slightly more difficult installation process.
 
-XXX: I suspect this is out of date.
+(XXX: I suspect this is out of date)
 
 1. Create a new directory in `/usr/local` called `_synapse`. Also, create a
    new user called `_synapse` and set that directory as the new user's home.
@@ -196,7 +198,7 @@ XXX: I suspect this is out of date.
    write and execute permissions on the same memory space to be run from
    `/usr/local`.
 2. `su` to the new `_synapse` user and change to their home directory.
-3. Create a new virtualenv: `virtualenv -p python2.7 ~/.synapse`
+3. Create a new virtualenv: `virtualenv -p python3 ~/.synapse`
 4. Source the virtualenv configuration located at
    `/usr/local/_synapse/.synapse/bin/activate`. This is done in `ksh` by
    using the `.` command, rather than `bash`'s `source`.
@@ -216,45 +218,6 @@ Debian, Fedora, or source installation methods. More information about WSL can
 be found at https://docs.microsoft.com/en-us/windows/wsl/install-win10 for
 Windows 10 and https://docs.microsoft.com/en-us/windows/wsl/install-on-server
 for Windows Server.
-
-### Troubleshooting Installation
-
-XXX a bunch of this is no longer relevant.
-
-Synapse requires pip 8 or later, so if your OS provides too old a version you
-may need to manually upgrade it::
-
-    sudo pip install --upgrade pip
-
-Installing may fail with `Could not find any downloads that satisfy the requirement pymacaroons-pynacl (from matrix-synapse==0.12.0)`.
-You can fix this by manually upgrading pip and virtualenv::
-
-    sudo pip install --upgrade virtualenv
-
-You can next rerun `virtualenv -p python3 synapse` to update the virtual env.
-
-Installing may fail during installing virtualenv with `InsecurePlatformWarning: A true SSLContext object is not available. This prevents urllib3 from configuring SSL appropriately and may cause certain SSL connections to fail. For more information, see https://urllib3.readthedocs.org/en/latest/security.html#insecureplatformwarning.`
-You can fix this  by manually installing ndg-httpsclient::
-
-    pip install --upgrade ndg-httpsclient
-
-Installing may fail with `mock requires setuptools>=17.1. Aborting installation`.
-You can fix this by upgrading setuptools::
-
-    pip install --upgrade setuptools
-
-If pip crashes mid-installation for reason (e.g. lost terminal), pip may
-refuse to run until you remove the temporary installation directory it
-created. To reset the installation::
-
-    rm -rf /tmp/pip_install_matrix
-
-pip seems to leak *lots* of memory during installation.  For instance, a Linux
-host with 512MB of RAM may run out of memory whilst installing Twisted.  If this
-happens, you will have to individually install the dependencies which are
-failing, e.g.::
-
-    pip install twisted
 
 ## Prebuilt packages
 
@@ -314,7 +277,7 @@ For `buster` and `sid`, Synapse is available in the Debian repositories and
 it should be possible to install it with simply:
 
 ```
-    sudo apt install matrix-synapse
+sudo apt install matrix-synapse
 ```
 
 There is also a version of `matrix-synapse` in `stretch-backports`. Please see
@@ -375,15 +338,17 @@ sudo pip install py-bcrypt
 
 Synapse can be found in the void repositories as 'synapse':
 
-    xbps-install -Su
-    xbps-install -S synapse
+```
+xbps-install -Su
+xbps-install -S synapse
+```
 
 ### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
 
  - Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
- - Packages: `pkg install py27-matrix-synapse`
+ - Packages: `pkg install py37-matrix-synapse`
 
 
 ### NixOS
@@ -420,6 +385,7 @@ so, you will need to edit `homeserver.yaml`, as follows:
       resources:
         - names: [client, federation]
   ```
+
 * You will also need to uncomment the `tls_certificate_path` and
   `tls_private_key_path` lines under the `TLS` section. You can either
   point these settings at an existing certificate and key, or you can
@@ -435,7 +401,7 @@ so, you will need to edit `homeserver.yaml`, as follows:
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
-[federate.md](docs/federate.md)
+[federate.md](docs/federate.md).
 
 
 ## Email
@@ -482,7 +448,7 @@ on your server even if `enable_registration` is `false`.
 ## Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See [docs/turn-howto.md](docs/turn-howto.md) for details.
+a TURN server. See [docs/turn-howto.md](docs/turn-howto.md) for details.
 
 ## URL previews
 
@@ -491,10 +457,24 @@ turn it on you must enable the `url_preview_enabled: True` config parameter
 and explicitly specify the IP ranges that Synapse is not allowed to spider for
 previewing in the `url_preview_ip_range_blacklist` configuration parameter.
 This is critical from a security perspective to stop arbitrary Matrix users
-spidering 'internal' URLs on your network.  At the very least we recommend that
+spidering 'internal' URLs on your network. At the very least we recommend that
 your loopback and RFC1918 IP addresses are blacklisted.
 
-This also requires the optional lxml and netaddr python dependencies to be
-installed.  This in turn requires the libxml2 library to be available - on
+This also requires the optional `lxml` and `netaddr` python dependencies to be
+installed. This in turn requires the `libxml2` library to be available - on
 Debian/Ubuntu this means `apt-get install libxml2-dev`, or equivalent for
 your OS.
+
+# Troubleshooting Installation
+
+`pip` seems to leak *lots* of memory during installation. For instance, a Linux
+host with 512MB of RAM may run out of memory whilst installing Twisted. If this
+happens, you will have to individually install the dependencies which are
+failing, e.g.:
+
+```
+pip install twisted
+```
+
+If you have any other problems, feel free to ask in
+[#synapse:matrix.org](https://matrix.to/#/#synapse:matrix.org).

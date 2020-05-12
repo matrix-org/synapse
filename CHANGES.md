@@ -1,3 +1,17 @@
+Next version
+============
+
+* New templates (`sso_auth_confirm.html`, `sso_auth_success.html`, and
+ `sso_account_deactivated.html`) were added to Synapse. If your Synapse is
+ configured to use SSO and a custom  `sso_redirect_confirm_template_dir`
+ configuration then these templates will need to be duplicated into that
+ directory.
+
+* Plugins using the `complete_sso_login` method of `synapse.module_api.ModuleApi`
+  should update to using the async/await version `complete_sso_login_async` which
+  includes additional checks. The non-async version is considered deprecated.
+
+
 Synapse 1.12.4 (2020-04-23)
 ===========================
 
@@ -21,7 +35,6 @@ Bugfixes
 - Do not treat display names as globs in push rules. ([\#7271](https://github.com/matrix-org/synapse/issues/7271))
 - Fix a bug with cross-signing devices belonging to remote users who did not share a room with any user on the local homeserver. ([\#7289](https://github.com/matrix-org/synapse/issues/7289))
 
-
 Synapse 1.12.3 (2020-04-03)
 ===========================
 
@@ -31,12 +44,9 @@ correctly fix the issue with building the Debian packages. ([\#7212](https://git
 Synapse 1.12.2 (2020-04-02)
 ===========================
 
-This release works around [an
-issue](https://github.com/matrix-org/synapse/issues/7208) with building the
-debian packages.
+This release works around [an issue](https://github.com/matrix-org/synapse/issues/7208) with building the debian packages.
 
 No other significant changes since 1.12.1.
-
 
 Synapse 1.12.1 (2020-04-02)
 ===========================
@@ -53,7 +63,6 @@ Bugfixes
 - Fix starting workers when federation sending not split out. ([\#7133](https://github.com/matrix-org/synapse/issues/7133)). Introduced in v1.12.0.
 - Avoid importing `sqlite3` when using the postgres backend. Contributed by David Vo. ([\#7155](https://github.com/matrix-org/synapse/issues/7155)). Introduced in v1.12.0rc1.
 - Fix a bug which could cause outbound federation traffic to stop working if a client uploaded an incorrect e2e device signature. ([\#7177](https://github.com/matrix-org/synapse/issues/7177)). Introduced in v1.11.0.
-
 
 Synapse 1.12.0 (2020-03-23)
 ===========================

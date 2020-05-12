@@ -1,0 +1,1 @@
+Don't attempt to use an invalid sqlite config if no database configuration is provided. Contributed by @nekatak.

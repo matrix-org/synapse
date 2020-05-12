@@ -505,7 +505,21 @@ class ServerConfig(Config):
             "cleanup_extremities_with_dummy_events", True
         )
 
+        # The number of forward extremities in a room needed to send a dummy event.
+        self.dummy_events_threshold = config.get("dummy_events_threshold", 10)
+
         self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
+
+        # Inhibits the /requestToken endpoints from returning an error that might leak
+        # information about whether an e-mail address is in use or not on this
+        # homeserver, and instead return a 200 with a fake sid if this kind of error is
+        # met, without sending anything.
+        # This is a compromise between sending an email, which could be a spam vector,
+        # and letting the client know which email address is bound to an account and
+        # which one isn't.
+        self.request_token_inhibit_3pid_errors = config.get(
+            "request_token_inhibit_3pid_errors", False,
+        )
 
     def has_tls_listener(self) -> bool:
         return any(l["tls"] for l in self.listeners)
@@ -604,10 +618,15 @@ class ServerConfig(Config):
         #
         pid_file: %(pid_file)s
 
-        # The path to the web client which will be served at /_matrix/client/
-        # if 'webclient' is configured under the 'listeners' configuration.
+        # The absolute URL to the web client which /_matrix/client will redirect
+        # to if 'webclient' is configured under the 'listeners' configuration.
         #
-        #web_client_location: "/path/to/web/root"
+        # This option can be also set to the filesystem path to the web client
+        # which will be served at /_matrix/client/ if 'webclient' is configured
+        # under the 'listeners' configuration, however this is a security risk:
+        # https://github.com/matrix-org/synapse#security-note
+        #
+        #web_client_location: https://riot.example.com/
 
         # The public-facing base URL that clients use to access this HS
         # (not including _matrix/...). This is the same URL a user would
@@ -807,6 +826,18 @@ class ServerConfig(Config):
           #  bind_addresses: ['::1', '127.0.0.1']
           #  type: manhole
 
+        # Forward extremities can build up in a room due to networking delays between
+        # homeservers. Once this happens in a large room, calculation of the state of
+        # that room can become quite expensive. To mitigate this, once the number of
+        # forward extremities reaches a given threshold, Synapse will send an
+        # org.matrix.dummy_event event, which will reduce the forward extremities
+        # in the room.
+        #
+        # This setting defines the threshold (i.e. number of forward extremities in the
+        # room) at which dummy events are sent. The default value is 10.
+        #
+        #dummy_events_threshold: 5
+
 
         ## Homeserver blocking ##
 
@@ -967,6 +998,16 @@ class ServerConfig(Config):
           #  - shortest_max_lifetime: 3d
           #    longest_max_lifetime: 1y
           #    interval: 1d
+
+        # Inhibits the /requestToken endpoints from returning an error that might leak
+        # information about whether an e-mail address is in use or not on this
+        # homeserver.
+        # Note that for some endpoints the error situation is the e-mail already being
+        # used, and for others the error is entering the e-mail being unused.
+        # If this option is enabled, instead of returning an error, these endpoints will
+        # act as if no error happened and return a fake session ID ('sid') to clients.
+        #
+        #request_token_inhibit_3pid_errors: true
         """
             % locals()
         )
