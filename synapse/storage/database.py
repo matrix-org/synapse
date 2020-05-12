@@ -212,9 +212,9 @@ class LoggingTransaction:
     def executemany(self, sql: str, *args: Any):
         self._do_execute(self.txn.executemany, sql, *args)
 
-    def _make_sql_one_line(self, sql):
+    def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
-        return " ".join(l.strip() for l in sql.splitlines() if l.strip())
+        return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
     def _do_execute(self, func, sql, *args):
         sql = self._make_sql_one_line(sql)
