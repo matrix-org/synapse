@@ -346,25 +346,30 @@ class AuthHandler(BaseHandler):
 
             # Ensure that the queried operation does not vary between stages of
             # the UI authentication session. This is done by generating a stable
-            # comparator based on the URI, method, and client dict (minus the
-            # auth dict) and storing it during the initial query. Subsequent
+            # comparator and storing it during the initial query. Subsequent
             # queries ensure that this comparator has not changed.
-            if validate_clientdict:
-                session_comparator = (session.uri, session.method, session.clientdict)
-                comparator = (uri, method, clientdict)
-            else:
-                session_comparator = (session.uri, session.method)  # type: ignore
-                comparator = (uri, method)  # type: ignore
-
-            if session_comparator != comparator:
+            #
+            # The comparator is based on the requested URI and HTTP method. The
+            # client dict (minus the auth dict) should also be checked, but some
+            # clients are not spec compliant, just warn for now if the client
+            # dict changes.
+            if (session.uri, session.method) != (uri, method):
                 raise SynapseError(
                     403,
                     "Requested operation has changed during the UI authentication session.",
                 )
 
+            if validate_clientdict:
+                if session.clientdict != clientdict:
+                    logger.warning(
+                        "Requested operation has changed during the UI "
+                        "authentication session. A future version of Synapse "
+                        "will remove this capability."
+                    )
+
             # For backwards compatibility the registration endpoint persists
             # changes to the client dict instead of validating them.
-            if not validate_clientdict:
+            else:
                 await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         if not authdict:

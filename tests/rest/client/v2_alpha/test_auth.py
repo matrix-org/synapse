@@ -316,6 +316,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
             },
         )
 
+    # This test is currently skipped since it is allowed for non-spec compliant clients.
+    test_cannot_change_body.skip = "Skipped to allow for non-compliant clients"  # type: ignore
+
     def test_cannot_change_uri(self):
         """
         The initial requested URI cannot be modified during the user interactive authentication session.
