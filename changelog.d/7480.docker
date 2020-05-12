@@ -1,0 +1,1 @@
+Use defaults for "room_invite_state_types" option when generating a static config for docker.
