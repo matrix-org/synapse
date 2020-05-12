@@ -178,6 +178,7 @@ room_invite_state_types:
     - "m.room.join_rules"
     - "m.room.canonical_alias"
     - "m.room.avatar"
+    - "m.room.encryption"
     - "m.room.name"
 
 {% if SYNAPSE_APPSERVICES %}
