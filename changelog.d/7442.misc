@@ -1,1 +1,0 @@
-Run group attestation renewal in series rather than parallel for performance.

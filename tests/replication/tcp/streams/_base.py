@@ -27,6 +27,7 @@ from synapse.app.generic_worker import (
     GenericWorkerServer,
 )
 from synapse.http.site import SynapseRequest
+from synapse.replication.http import streams
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
@@ -42,6 +43,10 @@ logger = logging.getLogger(__name__)
 class BaseStreamTestCase(unittest.HomeserverTestCase):
     """Base class for tests of the replication streams"""
 
+    servlets = [
+        streams.register_servlets,
+    ]
+
     def prepare(self, reactor, clock, hs):
         # build a replication server
         server_factory = ReplicationStreamProtocolFactory(hs)
@@ -49,17 +54,11 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         self.server = server_factory.buildProtocol(None)
 
         # Make a new HomeServer object for the worker
-        config = self.default_config()
-        config["worker_app"] = "synapse.app.generic_worker"
-        config["worker_replication_host"] = "testserv"
-        config["worker_replication_http_port"] = "8765"
-
         self.reactor.lookups["testserv"] = "1.2.3.4"
-
         self.worker_hs = self.setup_test_homeserver(
             http_client=None,
             homeserverToUse=GenericWorkerServer,
-            config=config,
+            config=self._get_worker_hs_config(),
             reactor=self.reactor,
         )
 
@@ -77,6 +76,13 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         self._client_transport = None
         self._server_transport = None
+
+    def _get_worker_hs_config(self) -> dict:
+        config = self.default_config()
+        config["worker_app"] = "synapse.app.generic_worker"
+        config["worker_replication_host"] = "testserv"
+        config["worker_replication_http_port"] = "8765"
+        return config
 
     def _build_replication_data_handler(self):
         return TestReplicationDataHandler(self.worker_hs)
