@@ -6,12 +6,13 @@ from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
 from synapse.types import Requester, UserID
 from synapse.util import Clock
+from synapse.util.retryutils import NotRetryingDestination
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
 
 
-class MessageAcceptTests(unittest.TestCase):
+class MessageAcceptTests(unittest.HomeserverTestCase):
     def setUp(self):
 
         self.http_client = Mock()
@@ -145,3 +146,60 @@ class MessageAcceptTests(unittest.TestCase):
         # Make sure the invalid event isn't there
         extrem = maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
         self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")
+
+    def test_retry_device_list_resync(self):
+        """Tests that device lists are marked as stale if they couldn't be synced, and
+        that stale device lists are retried periodically.
+        """
+        remote_user_id = "@john:test_remote"
+        remote_origin = "test_remote"
+
+        # Track the number of attempts to resync the user's device list.
+        self.resync_attempts = 0
+
+        # When this function is called, increment the number of resync attempts (only if
+        # we're querying devices for the right user ID), then raise a
+        # NotRetryingDestination error to fail the resync gracefully.
+        def query_user_devices(destination, user_id):
+            if user_id == remote_user_id:
+                self.resync_attempts += 1
+
+            raise NotRetryingDestination(0, 0, destination)
+
+        # Register the mock on the federation client.
+        federation_client = self.homeserver.get_federation_client()
+        federation_client.query_user_devices = Mock()
+        federation_client.query_user_devices.side_effect = query_user_devices
+
+        # Register a mock on the store so that the incoming update doesn't fail because
+        # we don't share a room with the user.
+        store = self.homeserver.get_datastore()
+        store.get_rooms_for_user = Mock()
+        store.get_rooms_for_user.return_value = ["!someroom:test"]
+
+        # Manually inject a fake device list update.
+        device_list_updater = self.homeserver.get_device_handler().device_list_updater
+        self.get_success(device_list_updater.incoming_device_list_update(
+            origin=remote_origin,
+            edu_content={
+                "deleted": False,
+                "device_display_name": "Mobile",
+                "device_id": "QBUAZIFURK",
+                "prev_id": [5],
+                "stream_id": 6,
+                "user_id": remote_user_id,
+            }
+        ))
+
+        # Check that there was one resync attempt.
+        self.assertEqual(self.resync_attempts, 1)
+
+        # Check that the resync attempt failed and caused the user's device list to be
+        # marked as stale.
+        need_resync = self.get_success(store.get_user_ids_requiring_device_list_resync())
+        self.assertIn(remote_user_id, need_resync)
+
+        # Check that waiting for 30 seconds caused Synapse to retry resyncing the device
+        # list.
+        self.reactor.advance(30)
+        self.assertEqual(self.resync_attempts, 2)
