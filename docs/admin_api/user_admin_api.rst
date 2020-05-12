@@ -1,3 +1,5 @@
+.. contents::
+
 Create or modify Account
 ========================
 
@@ -244,3 +246,212 @@ with a body of:
     }
 
 including an ``access_token`` of a server admin.
+
+
+User devices
+============
+
+List all devices
+----------------
+Gets information about all devices for a specific ``user_id``.
+
+**Parameters**
+
+The following query parameters are available:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+The following fields are possible in the JSON response body:
+
+- ``devices`` - An array of objects, each containing information about a device.
+  Devices objects contain the following fields:
+
+  - ``device_id`` - Identifier of device.
+  - ``display_name`` - Display name set by the user for this device.
+    Absent if no name has been set.
+  - ``last_seen_ip`` - The IP address where this device was last seen.
+    (May be a few minutes out of date, for efficiency reasons).
+  - ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
+    devices was last seen. (May be a few minutes out of date, for efficiency reasons).
+  - ``user_id`` - Owner of  device.
+
+**Usage**
+
+A standard request for query devices of an user:
+
+::
+
+    GET /_synapse/admin/v2/users/<user_id>/devices
+
+    {}
+
+
+Response:
+
+.. code:: json
+
+    {
+      "devices": [
+        {
+          "device_id": "QBUAZIFURK",
+          "display_name": "android",
+          "last_seen_ip": "1.2.3.4",
+          "last_seen_ts": 1474491775024,
+          "user_id": "<user_id>"
+        },
+        {
+          "device_id": "AUIECTSRND",
+          "display_name": "ios",
+          "last_seen_ip": "1.2.3.5",
+          "last_seen_ts": 1474491775025,
+          "user_id": "<user_id>"
+        }
+      ]
+    }
+
+Delete multiple devices
+------------------
+Deletes the given devices for a specific ``user_id``, and invalidates
+any access token associated with them.
+
+**Parameters**
+
+The following query parameters are available:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+
+The following fields are required in the JSON request body:
+
+- ``devices`` - The list of device IDs to delete.
+
+**Usage**
+
+A standard request for delete devices:
+
+::
+
+    POST /_synapse/admin/v2/users/<user_id>/delete_devices
+
+    {
+      "devices": [
+        "QBUAZIFURK",
+        "AUIECTSRND"
+      ],
+    }
+
+
+Response:
+
+.. code:: json
+
+    {}
+
+Show a device
+---------------
+Gets information on a single device, by ``device_id`` for a specific ``user_id``.
+
+**Parameters**
+
+The following query parameters are available:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+- ``device_id`` - The device to retrieve.
+
+The following fields are possible in the JSON response body:
+
+- ``device_id`` - Identifier of device.
+- ``display_name`` - Display name set by the user for this device.
+  Absent if no name has been set.
+- ``last_seen_ip`` - The IP address where this device was last seen.
+  (May be a few minutes out of date, for efficiency reasons).
+- ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
+  devices was last seen. (May be a few minutes out of date, for efficiency reasons).
+- ``user_id`` - Owner of  device.
+
+
+**Usage**
+
+A standard request for get a device:
+
+::
+
+    GET /_synapse/admin/v2/users/<user_id>/devices/<device_id>
+
+    {}
+
+
+Response:
+
+.. code:: json
+
+    {
+      "device_id": "<device_id>",
+      "display_name": "android",
+      "last_seen_ip": "1.2.3.4",
+      "last_seen_ts": 1474491775024,
+      "user_id": "<user_id>"
+    }
+
+Update a device
+---------------
+Updates the metadata on the given ``device_id`` for a specific ``user_id``.
+
+**Parameters**
+
+The following query parameters are available:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+- ``device_id`` - The device to update.
+
+The following fields are required in the JSON request body:
+
+- ``display_name`` - The new display name for this device. If not given,
+  the display name is unchanged.
+
+**Usage**
+
+A standard request for update a device:
+
+::
+
+    PUT /_synapse/admin/v2/users/<user_id>/devices/<device_id>
+
+    {
+      "display_name": "My other phone"
+    }
+
+
+Response:
+
+.. code:: json
+
+    {}
+
+Delete a device
+---------------
+Deletes the given ``device_id`` for a specific ``user_id``,
+and invalidates any access token associated with it.
+
+**Parameters**
+
+The following query parameters are available:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+- ``device_id`` - The device to delete.
+
+**Usage**
+
+A standard request for delete a device:
+
+::
+
+    DELETE /_synapse/admin/v2/users/<user_id>/devices/<device_id>
+
+    {}
+
+
+Response:
+
+.. code:: json
+
+    {}
