@@ -330,15 +330,16 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         """
         handler = self.hs.get_registration_handler()
         store = self.hs.get_datastore()
+        auth_blocking = self.hs.get_auth()._auth_blocking
 
         # Configure MAU limit
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 2
-        self.hs.config.mau_trial_days = 0
+        auth_blocking._limit_usage_by_mau = True
+        auth_blocking._max_mau_value = 2
+        auth_blocking._mau_trial_days = 0
 
         # Set monthly active users to the limit
         store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(auth_blocking._max_mau_value)
         )
         # The registration of a new user fails due to the limit
         self.get_failure(
@@ -577,11 +578,12 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.hs.config.registration_shared_secret = None
 
         handler = self.hs.get_registration_handler()
+        auth_blocking = self.hs.get_auth()._auth_blocking
 
         # Configure MAU limit
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 2
-        self.hs.config.mau_trial_days = 0
+        auth_blocking._limit_usage_by_mau = True
+        auth_blocking._max_mau_value = 2
+        auth_blocking._mau_trial_days = 0
 
         # Sync to set admin user to active
         # before limit of monthly active users is reached
@@ -597,7 +599,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
         # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(auth_blocking._max_mau_value)
         )
         # The registration of a new user fails due to the limit
         self.get_failure(
@@ -625,20 +627,21 @@ class UserRestTestCase(unittest.HomeserverTestCase):
     def test_create_user_mau_limit_reached_passiv_admin(self):
         """
         Try to create a new regular user if MAU limit is reached.
-        Admin user was not active before creating user and creation fails.
+        Admin user was not active before creating user.
         """
         self.hs.config.registration_shared_secret = None
 
         handler = self.hs.get_registration_handler()
+        auth_blocking = self.hs.get_auth()._auth_blocking
 
         # Configure MAU limit
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 2
-        self.hs.config.mau_trial_days = 0
+        auth_blocking._limit_usage_by_mau = True
+        auth_blocking._max_mau_value = 2
+        auth_blocking._mau_trial_days = 0
 
         # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(auth_blocking._max_mau_value)
         )
         # The registration of a new user fails due to the limit
         self.get_failure(
@@ -659,7 +662,10 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
 
-        self.assertEqual(500, int(channel.result["code"]), msg=channel.result["body"])
+        # Admin user is not blocked by mau anymore
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual(False, channel.json_body["admin"])
 
     def test_set_password(self):
         """
