@@ -21,7 +21,6 @@ from collections import OrderedDict, namedtuple
 from functools import wraps
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
-import six
 from six import integer_types, iteritems, text_type
 from six.moves import range
 
@@ -55,12 +54,6 @@ if TYPE_CHECKING:
     from synapse.storage.data_stores.main import DataStore
     from synapse.server import HomeServer
 
-# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
-# despite being deprecated and removed in favor of memoryview
-if six.PY2:
-    db_binary_type = six.moves.builtins.buffer
-else:
-    db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 
@@ -1171,7 +1164,7 @@ class PersistEventsStore:
                 {
                     "event_id": event.event_id,
                     "algorithm": ref_alg,
-                    "hash": db_binary_type(ref_hash_bytes),
+                    "hash": memoryview(ref_hash_bytes),
                 }
             )
 
