@@ -165,7 +165,7 @@ class ReplicationCommandHandler:
 
         for stream_name, stream in self._streams.items():
             current_token = stream.current_token(self._instance_name)
-            self.send_command(
+            conn.send_command(
                 PositionCommand(stream_name, self._instance_name, current_token)
             )
 
