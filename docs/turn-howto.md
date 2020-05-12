@@ -120,7 +120,7 @@ Your home server configuration file needs the following extra keys:
 As an example, here is the relevant section of the config file for matrix.org:
 
     turn_uris: [ "turn:turn.matrix.org:3478?transport=udp", "turn:turn.matrix.org:3478?transport=tcp" ]
-    turn_shared_secret: n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons
+    turn_shared_secret: "n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons"
     turn_user_lifetime: 86400000
     turn_allow_guests: True
 

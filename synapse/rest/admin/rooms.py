@@ -26,6 +26,7 @@ from synapse.http.servlet import (
 )
 from synapse.rest.admin._base import (
     admin_patterns,
+    assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
@@ -169,7 +170,7 @@ class ListRoomRestServlet(RestServlet):
     in a dictionary containing room information. Supports pagination.
     """
 
-    PATTERNS = admin_patterns("/rooms")
+    PATTERNS = admin_patterns("/rooms$")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -183,10 +184,23 @@ class ListRoomRestServlet(RestServlet):
         # Extract query parameters
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
-        order_by = parse_string(request, "order_by", default="alphabetical")
+        order_by = parse_string(request, "order_by", default=RoomSortOrder.NAME.value)
         if order_by not in (
             RoomSortOrder.ALPHABETICAL.value,
             RoomSortOrder.SIZE.value,
+            RoomSortOrder.NAME.value,
+            RoomSortOrder.CANONICAL_ALIAS.value,
+            RoomSortOrder.JOINED_MEMBERS.value,
+            RoomSortOrder.JOINED_LOCAL_MEMBERS.value,
+            RoomSortOrder.VERSION.value,
+            RoomSortOrder.CREATOR.value,
+            RoomSortOrder.ENCRYPTION.value,
+            RoomSortOrder.FEDERATABLE.value,
+            RoomSortOrder.PUBLIC.value,
+            RoomSortOrder.JOIN_RULES.value,
+            RoomSortOrder.GUEST_ACCESS.value,
+            RoomSortOrder.HISTORY_VISIBILITY.value,
+            RoomSortOrder.STATE_EVENTS.value,
         ):
             raise SynapseError(
                 400,
@@ -238,6 +252,29 @@ class ListRoomRestServlet(RestServlet):
                 response["prev_batch"] = 0
 
         return 200, response
+
+
+class RoomRestServlet(RestServlet):
+    """Get room details.
+
+    TODO: Add on_POST to allow room creation without joining the room
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, room_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        ret = await self.store.get_room_with_stats(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        return 200, ret
 
 
 class JoinRoomAliasServlet(RestServlet):

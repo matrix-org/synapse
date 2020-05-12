@@ -18,7 +18,6 @@ import logging
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
-from synapse.handlers.auth import SUCCESS_TEMPLATE
 from synapse.http.server import finish_request
 from synapse.http.servlet import RestServlet, parse_string
 
@@ -90,6 +89,30 @@ TERMS_TEMPLATE = """
 </html>
 """
 
+SUCCESS_TEMPLATE = """
+<html>
+<head>
+<title>Success!</title>
+<meta name='viewport' content='width=device-width, initial-scale=1,
+    user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
+<link rel="stylesheet" href="/_matrix/static/client/register/style.css">
+<script>
+if (window.onAuthDone) {
+    window.onAuthDone();
+} else if (window.opener && window.opener.postMessage) {
+     window.opener.postMessage("authDone", "*");
+}
+</script>
+</head>
+<body>
+    <div>
+        <p>Thank you</p>
+        <p>You may now close this window and return to the application</p>
+    </div>
+</body>
+</html>
+"""
+
 
 class AuthRestServlet(RestServlet):
     """
@@ -117,7 +140,7 @@ class AuthRestServlet(RestServlet):
             self._cas_server_url = hs.config.cas_server_url
             self._cas_service_url = hs.config.cas_service_url
 
-    def on_GET(self, request, stagetype):
+    async def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
@@ -157,7 +180,7 @@ class AuthRestServlet(RestServlet):
             else:
                 raise SynapseError(400, "Homeserver not configured for SSO.")
 
-            html = self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
+            html = await self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
 
         else:
             raise SynapseError(404, "Unknown auth stage type")

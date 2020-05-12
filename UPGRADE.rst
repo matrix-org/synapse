@@ -75,6 +75,139 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.13.0
+====================
+
+
+Incorrect database migration in old synapse versions
+----------------------------------------------------
+
+A bug was introduced in Synapse 1.4.0 which could cause the room directory to
+be incomplete or empty if Synapse was upgraded directly from v1.2.1 or
+earlier, to versions between v1.4.0 and v1.12.x.
+
+This will *not* be a problem for Synapse installations which were:
+ * created at v1.4.0 or later,
+ * upgraded via v1.3.x, or
+ * upgraded straight from v1.2.1 or earlier to v1.13.0 or later.
+
+If completeness of the room directory is a concern, installations which are
+affected can be repaired as follows:
+
+1. Run the following sql from a `psql` or `sqlite3` console:
+
+   .. code:: sql
+
+     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+        ('populate_stats_process_rooms', '{}', 'current_state_events_membership');
+
+     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+        ('populate_stats_process_users', '{}', 'populate_stats_process_rooms');
+
+2. Restart synapse.
+
+New Single Sign-on HTML Templates
+---------------------------------
+
+New templates (``sso_auth_confirm.html``, ``sso_auth_success.html``, and
+``sso_account_deactivated.html``) were added to Synapse. If your Synapse is
+configured to use SSO and a custom  ``sso_redirect_confirm_template_dir``
+configuration then these templates will need to be copied from
+`synapse/res/templates <synapse/res/templates>`_ into that directory.
+
+Synapse SSO Plugins Method Deprecation
+--------------------------------------
+
+Plugins using the ``complete_sso_login`` method of
+``synapse.module_api.ModuleApi`` should update to using the async/await
+version ``complete_sso_login_async`` which includes additional checks. The
+non-async version is considered deprecated.
+
+Rolling back to v1.12.4 after a failed upgrade
+----------------------------------------------
+
+v1.13.0 includes a lot of large changes. If something problematic occurs, you
+may want to roll-back to a previous version of Synapse. Because v1.13.0 also
+includes a new database schema version, reverting that version is also required
+alongside the generic rollback instructions mentioned above. In short, to roll
+back to v1.12.4 you need to:
+
+1. Stop the server
+2. Decrease the schema version in the database:
+
+   .. code:: sql
+    
+      UPDATE schema_version SET version = 57;
+
+3. Downgrade Synapse by following the instructions for your installation method
+   in the "Rolling back to older versions" section above.
+    
+
+Upgrading to v1.12.0
+====================
+
+This version includes a database update which is run as part of the upgrade,
+and which may take some time (several hours in the case of a large
+server). Synapse will not respond to HTTP requests while this update is taking
+place.
+
+This is only likely to be a problem in the case of a server which is
+participating in many rooms.
+
+0. As with all upgrades, it is recommended that you have a recent backup of
+   your database which can be used for recovery in the event of any problems.
+
+1. As an initial check to see if you will be affected, you can try running the
+   following query from the `psql` or `sqlite3` console. It is safe to run it
+   while Synapse is still running.
+
+   .. code:: sql
+
+      SELECT MAX(q.v) FROM (
+        SELECT (
+          SELECT ej.json AS v
+          FROM state_events se INNER JOIN event_json ej USING (event_id)
+          WHERE se.room_id=rooms.room_id AND se.type='m.room.create' AND se.state_key=''
+          LIMIT 1
+        ) FROM rooms WHERE rooms.room_version IS NULL
+      ) q;
+
+   This query will take about the same amount of time as the upgrade process: ie,
+   if it takes 5 minutes, then it is likely that Synapse will be unresponsive for
+   5 minutes during the upgrade.
+
+   If you consider an outage of this duration to be acceptable, no further
+   action is necessary and you can simply start Synapse 1.12.0.
+
+   If you would prefer to reduce the downtime, continue with the steps below.
+
+2. The easiest workaround for this issue is to manually
+   create a new index before upgrading. On PostgreSQL, his can be done as follows:
+
+   .. code:: sql
+
+      CREATE INDEX CONCURRENTLY tmp_upgrade_1_12_0_index
+      ON state_events(room_id) WHERE type = 'm.room.create';
+
+   The above query may take some time, but is also safe to run while Synapse is
+   running.
+
+   We assume that no SQLite users have databases large enough to be
+   affected. If you *are* affected, you can run a similar query, omitting the
+   ``CONCURRENTLY`` keyword. Note however that this operation may in itself cause
+   Synapse to stop running for some time. Synapse admins are reminded that
+   `SQLite is not recommended for use outside a test
+   environment <https://github.com/matrix-org/synapse/blob/master/README.rst#using-postgresql>`_.
+
+3. Once the index has been created, the ``SELECT`` query in step 1 above should
+   complete quickly. It is therefore safe to upgrade to Synapse 1.12.0.
+
+4. Once Synapse 1.12.0 has successfully started and is responding to HTTP
+   requests, the temporary index can be removed:
+
+   .. code:: sql
+
+      DROP INDEX tmp_upgrade_1_12_0_index;
 
 Upgrading to v1.10.0
 ====================

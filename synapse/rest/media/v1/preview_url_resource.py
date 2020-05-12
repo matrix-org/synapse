@@ -86,6 +86,7 @@ class PreviewUrlResource(DirectServeResource):
         self.media_storage = media_storage
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
+        self.url_preview_accept_language = hs.config.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
@@ -315,9 +316,12 @@ class PreviewUrlResource(DirectServeResource):
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
-                logger.debug("Trying to get url '%s'", url)
+                logger.debug("Trying to get preview for url '%s'", url)
                 length, headers, uri, code = await self.client.get_file(
-                    url, output_stream=f, max_size=self.max_spider_size
+                    url,
+                    output_stream=f,
+                    max_size=self.max_spider_size,
+                    headers={"Accept-Language": self.url_preview_accept_language},
                 )
             except SynapseError:
                 # Pass SynapseErrors through directly, so that the servlet
@@ -398,7 +402,7 @@ class PreviewUrlResource(DirectServeResource):
 
         now = self.clock.time_msec()
 
-        logger.info("Running url preview cache expiry")
+        logger.debug("Running url preview cache expiry")
 
         if not (await self.store.db.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
@@ -431,6 +435,8 @@ class PreviewUrlResource(DirectServeResource):
 
         if removed_media:
             logger.info("Deleted %d entries from url cache", len(removed_media))
+        else:
+            logger.debug("No entries removed from url cache")
 
         # Now we delete old images associated with the url cache.
         # These may be cached for a bit on the client (i.e., they
@@ -477,7 +483,10 @@ class PreviewUrlResource(DirectServeResource):
 
         await self.store.delete_url_cache_media(removed_media)
 
-        logger.info("Deleted %d media from url cache", len(removed_media))
+        if removed_media:
+            logger.info("Deleted %d media from url cache", len(removed_media))
+        else:
+            logger.debug("No media removed from url cache")
 
 
 def decode_and_calc_og(body, media_uri, request_encoding=None):

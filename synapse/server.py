@@ -204,6 +204,7 @@ class HomeServer(object):
         "account_validity_handler",
         "cas_handler",
         "saml_handler",
+        "oidc_handler",
         "event_client_serializer",
         "password_policy_handler",
         "storage",
@@ -234,7 +235,8 @@ class HomeServer(object):
         self._listening_services = []
         self.start_time = None
 
-        self.instance_id = random_string(5)
+        self._instance_id = random_string(5)
+        self._instance_name = config.worker_name or "master"
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
@@ -254,7 +256,15 @@ class HomeServer(object):
         This is used to distinguish running instances in worker-based
         deployments.
         """
-        return self.instance_id
+        return self._instance_id
+
+    def get_instance_name(self) -> str:
+        """A unique name for this synapse process.
+
+        Used to identify the process over replication and in config. Does not
+        change over restarts.
+        """
+        return self._instance_name
 
     def setup(self):
         logger.info("Setting up.")
@@ -552,6 +562,11 @@ class HomeServer(object):
         from synapse.handlers.saml_handler import SamlHandler
 
         return SamlHandler(self)
+
+    def build_oidc_handler(self):
+        from synapse.handlers.oidc_handler import OidcHandler
+
+        return OidcHandler(self)
 
     def build_event_client_serializer(self):
         return EventClientSerializer(self)

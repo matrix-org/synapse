@@ -657,6 +657,12 @@ def read_config_files(config_files):
     for config_file in config_files:
         with open(config_file) as file_stream:
             yaml_config = yaml.safe_load(file_stream)
+
+        if not isinstance(yaml_config, dict):
+            err = "File %r is empty or doesn't parse into a key-value map. IGNORING."
+            print(err % (config_file,))
+            continue
+
         specified_config.update(yaml_config)
 
     if "server_name" not in specified_config:

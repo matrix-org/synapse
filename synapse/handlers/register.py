@@ -146,9 +146,9 @@ class RegistrationHandler(BaseHandler):
         """Registers a new client on the server.
 
         Args:
-            localpart : The local part of the user ID to register. If None,
+            localpart: The local part of the user ID to register. If None,
               one will be generated.
-            password (unicode) : The password to assign to this user so they can
+            password (unicode): The password to assign to this user so they can
               login again. This can be None which means they cannot login again
               via a password (e.g. the user is an application service user).
             user_type (str|None): type of user. One of the values from
@@ -171,7 +171,9 @@ class RegistrationHandler(BaseHandler):
             yield self.auth.check_auth_blocking(threepid=threepid)
         password_hash = None
         if password:
-            password_hash = yield self._auth_handler.hash(password)
+            password_hash = yield defer.ensureDeferred(
+                self._auth_handler.hash(password)
+            )
 
         if localpart is not None:
             yield self.check_username(localpart, guest_access_token=guest_access_token)
@@ -247,7 +249,7 @@ class RegistrationHandler(BaseHandler):
                     fail_count += 1
 
         if not self.hs.config.user_consent_at_registration:
-            yield self._auto_join_rooms(user_id)
+            yield defer.ensureDeferred(self._auto_join_rooms(user_id))
         else:
             logger.info(
                 "Skipping auto-join for %s because consent is required at registration",
@@ -269,8 +271,7 @@ class RegistrationHandler(BaseHandler):
 
         return user_id
 
-    @defer.inlineCallbacks
-    def _auto_join_rooms(self, user_id):
+    async def _auto_join_rooms(self, user_id):
         """Automatically joins users to auto join rooms - creating the room in the first place
         if the user is the first to be created.
 
@@ -284,9 +285,9 @@ class RegistrationHandler(BaseHandler):
         # that an auto-generated support or bot user is not a real user and will never be
         # the user to create the room
         should_auto_create_rooms = False
-        is_real_user = yield self.store.is_real_user(user_id)
+        is_real_user = await self.store.is_real_user(user_id)
         if self.hs.config.autocreate_auto_join_rooms and is_real_user:
-            count = yield self.store.count_real_users()
+            count = await self.store.count_real_users()
             should_auto_create_rooms = count == 1
         for r in self.hs.config.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)
@@ -305,7 +306,7 @@ class RegistrationHandler(BaseHandler):
 
                         # getting the RoomCreationHandler during init gives a dependency
                         # loop
-                        yield self.hs.get_room_creation_handler().create_room(
+                        await self.hs.get_room_creation_handler().create_room(
                             fake_requester,
                             config={
                                 "preset": "public_chat",
@@ -314,7 +315,7 @@ class RegistrationHandler(BaseHandler):
                             ratelimit=False,
                         )
                 else:
-                    yield self._join_user_to_room(fake_requester, r)
+                    await self._join_user_to_room(fake_requester, r)
             except ConsentNotGivenError as e:
                 # Technically not necessary to pull out this error though
                 # moving away from bare excepts is a good thing to do.
@@ -322,15 +323,14 @@ class RegistrationHandler(BaseHandler):
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
-    @defer.inlineCallbacks
-    def post_consent_actions(self, user_id):
+    async def post_consent_actions(self, user_id):
         """A series of registration actions that can only be carried out once consent
         has been granted
 
         Args:
             user_id (str): The user to join
         """
-        yield self._auto_join_rooms(user_id)
+        await self._auto_join_rooms(user_id)
 
     @defer.inlineCallbacks
     def appservice_register(self, user_localpart, as_token):
@@ -397,14 +397,13 @@ class RegistrationHandler(BaseHandler):
         self._next_generated_user_id += 1
         return str(id)
 
-    @defer.inlineCallbacks
-    def _join_user_to_room(self, requester, room_identifier):
+    async def _join_user_to_room(self, requester, room_identifier):
         room_member_handler = self.hs.get_room_member_handler()
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
         elif RoomAlias.is_valid(room_identifier):
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = yield room_member_handler.lookup_room_alias(
+            room_id, remote_room_hosts = await room_member_handler.lookup_room_alias(
                 room_alias
             )
             room_id = room_id.to_string()
@@ -413,7 +412,7 @@ class RegistrationHandler(BaseHandler):
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
             )
 
-        yield room_member_handler.update_membership(
+        await room_member_handler.update_membership(
             requester=requester,
             target=requester.user,
             room_id=room_id,
@@ -545,14 +544,15 @@ class RegistrationHandler(BaseHandler):
                 user_id, ["guest = true"]
             )
         else:
-            access_token = yield self._auth_handler.get_access_token_for_user_id(
-                user_id, device_id=device_id, valid_until_ms=valid_until_ms
+            access_token = yield defer.ensureDeferred(
+                self._auth_handler.get_access_token_for_user_id(
+                    user_id, device_id=device_id, valid_until_ms=valid_until_ms
+                )
             )
 
         return (device_id, access_token)
 
-    @defer.inlineCallbacks
-    def post_registration_actions(self, user_id, auth_result, access_token):
+    async def post_registration_actions(self, user_id, auth_result, access_token):
         """A user has completed registration
 
         Args:
@@ -563,7 +563,7 @@ class RegistrationHandler(BaseHandler):
                 device, or None if `inhibit_login` enabled.
         """
         if self.hs.config.worker_app:
-            yield self._post_registration_client(
+            await self._post_registration_client(
                 user_id=user_id, auth_result=auth_result, access_token=access_token
             )
             return
@@ -575,19 +575,18 @@ class RegistrationHandler(BaseHandler):
             if is_threepid_reserved(
                 self.hs.config.mau_limits_reserved_threepids, threepid
             ):
-                yield self.store.upsert_monthly_active_user(user_id)
+                await self.store.upsert_monthly_active_user(user_id)
 
-            yield self._register_email_threepid(user_id, threepid, access_token)
+            await self._register_email_threepid(user_id, threepid, access_token)
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]
-            yield self._register_msisdn_threepid(user_id, threepid)
+            await self._register_msisdn_threepid(user_id, threepid)
 
         if auth_result and LoginType.TERMS in auth_result:
-            yield self._on_user_consented(user_id, self.hs.config.user_consent_version)
+            await self._on_user_consented(user_id, self.hs.config.user_consent_version)
 
-    @defer.inlineCallbacks
-    def _on_user_consented(self, user_id, consent_version):
+    async def _on_user_consented(self, user_id, consent_version):
         """A user consented to the terms on registration
 
         Args:
@@ -596,8 +595,8 @@ class RegistrationHandler(BaseHandler):
                 consented to.
         """
         logger.info("%s has consented to the privacy policy", user_id)
-        yield self.store.user_set_consent_version(user_id, consent_version)
-        yield self.post_consent_actions(user_id)
+        await self.store.user_set_consent_version(user_id, consent_version)
+        await self.post_consent_actions(user_id)
 
     @defer.inlineCallbacks
     def _register_email_threepid(self, user_id, threepid, token):
@@ -622,8 +621,13 @@ class RegistrationHandler(BaseHandler):
             logger.info("Can't add incomplete 3pid")
             return
 
-        yield self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        yield defer.ensureDeferred(
+            self._auth_handler.add_threepid(
+                user_id,
+                threepid["medium"],
+                threepid["address"],
+                threepid["validated_at"],
+            )
         )
 
         # And we add an email pusher for them by default, but only
@@ -675,6 +679,11 @@ class RegistrationHandler(BaseHandler):
                 return None
             raise
 
-        yield self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+        yield defer.ensureDeferred(
+            self._auth_handler.add_threepid(
+                user_id,
+                threepid["medium"],
+                threepid["address"],
+                threepid["validated_at"],
+            )
         )

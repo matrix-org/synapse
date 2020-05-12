@@ -338,8 +338,10 @@ class DeviceHandler(DeviceWorkerHandler):
             else:
                 raise
 
-        yield self._auth_handler.delete_access_tokens_for_user(
-            user_id, device_id=device_id
+        yield defer.ensureDeferred(
+            self._auth_handler.delete_access_tokens_for_user(
+                user_id, device_id=device_id
+            )
         )
 
         yield self.store.delete_e2e_keys_by_device(user_id=user_id, device_id=device_id)
@@ -391,8 +393,10 @@ class DeviceHandler(DeviceWorkerHandler):
         # Delete access tokens and e2e keys for each device. Not optimised as it is not
         # considered as part of a critical path.
         for device_id in device_ids:
-            yield self._auth_handler.delete_access_tokens_for_user(
-                user_id, device_id=device_id
+            yield defer.ensureDeferred(
+                self._auth_handler.delete_access_tokens_for_user(
+                    user_id, device_id=device_id
+                )
             )
             yield self.store.delete_e2e_keys_by_device(
                 user_id=user_id, device_id=device_id

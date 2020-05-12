@@ -49,7 +49,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
-from synapse.util.stringutils import assert_valid_client_secret
+from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -135,6 +135,11 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -202,6 +207,11 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
@@ -489,7 +499,7 @@ class RegisterRestServlet(RestServlet):
             # registered a user for this session, so we could just return the
             # user here. We carry on and go through the auth checks though,
             # for paranoia.
-            registered_user_id = self.auth_handler.get_session_data(
+            registered_user_id = await self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
             )
 
@@ -506,6 +516,7 @@ class RegisterRestServlet(RestServlet):
             body,
             self.hs.get_ip_from_request(request),
             "register a new account",
+            validate_clientdict=False,
         )
 
         # Check that we're not trying to register a denied 3pid.
@@ -588,7 +599,7 @@ class RegisterRestServlet(RestServlet):
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
-            self.auth_handler.set_session_data(
+            await self.auth_handler.set_session_data(
                 session_id, "registered_user_id", registered_user_id
             )
 

@@ -54,19 +54,23 @@ class E2eKeysHandler(object):
 
         self._edu_updater = SigningKeyEduUpdater(hs, self)
 
+        federation_registry = hs.get_federation_registry()
+
         self._is_master = hs.config.worker_app is None
         if not self._is_master:
             self._user_device_resync_client = ReplicationUserDevicesResyncRestServlet.make_client(
                 hs
             )
+        else:
+            # Only register this edu handler on master as it requires writing
+            # device updates to the db
+            #
+            # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
+            federation_registry.register_edu_handler(
+                "org.matrix.signing_key_update",
+                self._edu_updater.incoming_signing_key_update,
+            )
 
-        federation_registry = hs.get_federation_registry()
-
-        # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
-        federation_registry.register_edu_handler(
-            "org.matrix.signing_key_update",
-            self._edu_updater.incoming_signing_key_update,
-        )
         # doesn't really work as part of the generic query API, because the
         # query request requires an object POST, but we abuse the
         # "query handler" interface.
@@ -170,8 +174,8 @@ class E2eKeysHandler(object):
             """This is called when we are querying the device list of a user on
             a remote homeserver and their device list is not in the device list
             cache. If we share a room with this user and we're not querying for
-            specific user we will update the cache
-            with their device list."""
+            specific user we will update the cache with their device list.
+            """
 
             destination_query = remote_queries_not_in_cache[destination]
 
@@ -957,13 +961,19 @@ class E2eKeysHandler(object):
         return signature_list, failures
 
     @defer.inlineCallbacks
-    def _get_e2e_cross_signing_verify_key(self, user_id, key_type, from_user_id=None):
-        """Fetch the cross-signing public key from storage and interpret it.
+    def _get_e2e_cross_signing_verify_key(
+        self, user_id: str, key_type: str, from_user_id: str = None
+    ):
+        """Fetch locally or remotely query for a cross-signing public key.
+
+        First, attempt to fetch the cross-signing public key from storage.
+        If that fails, query the keys from the homeserver they belong to
+        and update our local copy.
 
         Args:
-            user_id (str): the user whose key should be fetched
-            key_type (str): the type of key to fetch
-            from_user_id (str): the user that we are fetching the keys for.
+            user_id: the user whose key should be fetched
+            key_type: the type of key to fetch
+            from_user_id: the user that we are fetching the keys for.
                 This affects what signatures are fetched.
 
         Returns:
@@ -972,15 +982,139 @@ class E2eKeysHandler(object):
 
         Raises:
             NotFoundError: if the key is not found
+            SynapseError: if `user_id` is invalid
         """
+        user = UserID.from_string(user_id)
         key = yield self.store.get_e2e_cross_signing_key(
             user_id, key_type, from_user_id
         )
-        if key is None:
-            logger.debug("no %s key found for %s", key_type, user_id)
+
+        if key:
+            # We found a copy of this key in our database. Decode and return it
+            key_id, verify_key = get_verify_key_from_cross_signing_key(key)
+            return key, key_id, verify_key
+
+        # If we couldn't find the key locally, and we're looking for keys of
+        # another user then attempt to fetch the missing key from the remote
+        # user's server.
+        #
+        # We may run into this in possible edge cases where a user tries to
+        # cross-sign a remote user, but does not share any rooms with them yet.
+        # Thus, we would not have their key list yet. We instead fetch the key,
+        # store it and notify clients of new, associated device IDs.
+        if self.is_mine(user) or key_type not in ["master", "self_signing"]:
+            # Note that master and self_signing keys are the only cross-signing keys we
+            # can request over federation
             raise NotFoundError("No %s key found for %s" % (key_type, user_id))
-        key_id, verify_key = get_verify_key_from_cross_signing_key(key)
+
+        (
+            key,
+            key_id,
+            verify_key,
+        ) = yield self._retrieve_cross_signing_keys_for_remote_user(user, key_type)
+
+        if key is None:
+            raise NotFoundError("No %s key found for %s" % (key_type, user_id))
+
         return key, key_id, verify_key
+
+    @defer.inlineCallbacks
+    def _retrieve_cross_signing_keys_for_remote_user(
+        self, user: UserID, desired_key_type: str,
+    ):
+        """Queries cross-signing keys for a remote user and saves them to the database
+
+        Only the key specified by `key_type` will be returned, while all retrieved keys
+        will be saved regardless
+
+        Args:
+            user: The user to query remote keys for
+            desired_key_type: The type of key to receive. One of "master", "self_signing"
+
+        Returns:
+            Deferred[Tuple[Optional[Dict], Optional[str], Optional[VerifyKey]]]: A tuple
+            of the retrieved key content, the key's ID and the matching VerifyKey.
+            If the key cannot be retrieved, all values in the tuple will instead be None.
+        """
+        try:
+            remote_result = yield self.federation.query_user_devices(
+                user.domain, user.to_string()
+            )
+        except Exception as e:
+            logger.warning(
+                "Unable to query %s for cross-signing keys of user %s: %s %s",
+                user.domain,
+                user.to_string(),
+                type(e),
+                e,
+            )
+            return None, None, None
+
+        # Process each of the retrieved cross-signing keys
+        desired_key = None
+        desired_key_id = None
+        desired_verify_key = None
+        retrieved_device_ids = []
+        for key_type in ["master", "self_signing"]:
+            key_content = remote_result.get(key_type + "_key")
+            if not key_content:
+                continue
+
+            # Ensure these keys belong to the correct user
+            if "user_id" not in key_content:
+                logger.warning(
+                    "Invalid %s key retrieved, missing user_id field: %s",
+                    key_type,
+                    key_content,
+                )
+                continue
+            if user.to_string() != key_content["user_id"]:
+                logger.warning(
+                    "Found %s key of user %s when querying for keys of user %s",
+                    key_type,
+                    key_content["user_id"],
+                    user.to_string(),
+                )
+                continue
+
+            # Validate the key contents
+            try:
+                # verify_key is a VerifyKey from signedjson, which uses
+                # .version to denote the portion of the key ID after the
+                # algorithm and colon, which is the device ID
+                key_id, verify_key = get_verify_key_from_cross_signing_key(key_content)
+            except ValueError as e:
+                logger.warning(
+                    "Invalid %s key retrieved: %s - %s %s",
+                    key_type,
+                    key_content,
+                    type(e),
+                    e,
+                )
+                continue
+
+            # Note down the device ID attached to this key
+            retrieved_device_ids.append(verify_key.version)
+
+            # If this is the desired key type, save it and its ID/VerifyKey
+            if key_type == desired_key_type:
+                desired_key = key_content
+                desired_verify_key = verify_key
+                desired_key_id = key_id
+
+            # At the same time, store this key in the db for subsequent queries
+            yield self.store.set_e2e_cross_signing_key(
+                user.to_string(), key_type, key_content
+            )
+
+        # Notify clients that new devices for this user have been discovered
+        if retrieved_device_ids:
+            # XXX is this necessary?
+            yield self.device_handler.notify_device_update(
+                user.to_string(), retrieved_device_ids
+            )
+
+        return desired_key, desired_key_id, desired_verify_key
 
 
 def _check_cross_signing_key(key, user_id, key_type, signing_key=None):

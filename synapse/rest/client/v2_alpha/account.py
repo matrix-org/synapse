@@ -30,7 +30,7 @@ from synapse.http.servlet import (
 )
 from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.stringutils import assert_valid_client_secret
+from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -100,6 +100,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is None:
+            if self.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -390,6 +395,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
+            if self.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -453,6 +463,11 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         existing_user_id = await self.store.get_user_id_by_threepid("msisdn", msisdn)
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.account_threepid_delegate_msisdn:
