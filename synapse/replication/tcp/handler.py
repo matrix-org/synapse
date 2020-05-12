@@ -36,7 +36,12 @@ from synapse.replication.tcp.commands import (
     UserSyncCommand,
 )
 from synapse.replication.tcp.protocol import AbstractConnection
-from synapse.replication.tcp.streams import STREAMS_MAP, Stream
+from synapse.replication.tcp.streams import (
+    STREAMS_MAP,
+    CachesStream,
+    FederationStream,
+    Stream,
+)
 from synapse.util.async_helpers import Linearizer
 
 logger = logging.getLogger(__name__)
@@ -72,6 +77,26 @@ class ReplicationCommandHandler:
         self._streams = {
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
         }  # type: Dict[str, Stream]
+
+        # List of streams that this instance is the source of
+        self._streams_to_replicate = []  # type: List[Stream]
+
+        for stream in self._streams.values():
+            if stream.NAME == CachesStream.NAME:
+                # All workers can write to the cache invalidation stream.
+                self._streams_to_replicate.append(stream)
+                continue
+
+            # Only add any other streams if we're on master.
+            if hs.config.worker_app is not None:
+                continue
+
+            if stream.NAME == FederationStream.NAME and hs.config.send_federation:
+                # We only support federation stream if federation sending
+                # has been disabled on the master.
+                continue
+
+            self._streams_to_replicate.append(stream)
 
         self._position_linearizer = Linearizer(
             "replication_position", clock=self._clock
@@ -149,6 +174,16 @@ class ReplicationCommandHandler:
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
             hs.get_reactor().connectTCP(host, port, self._factory)
+
+    def get_streams(self) -> Dict[str, Stream]:
+        """Get a map from stream name to all streams.
+        """
+        return self._streams
+
+    def get_streams_to_replicate(self) -> List[Stream]:
+        """Get a list of streams that this instances replicates.
+        """
+        return self._streams_to_replicate
 
     async def on_REPLICATE(self, conn: AbstractConnection, cmd: ReplicateCommand):
         # We only want to announce positions by the writer of the streams.
