@@ -264,19 +264,10 @@ Please **avoid** rebasing your branch, especially once the PR has been
 reviewed: doing so makes it very difficult for a reviewer to see what has
 changed since a previous review.
 
-## Merge Strategy
+## Notes for maintainers on merging PRs etc
 
-We use the commit history of develop/master extensively to identify
-when regressions were introduced and what changes have been made.
-
-We aim to have a clean merge history, which means we normally squash-merge
-changes into develop. For small changes this means there is no need to rebase
-to clean up your PR before merging. Larger changes with an organised set of
-commits may be merged as-is, if the history is judged to be useful.
-
-This use of squash-merging will mean PRs built on each other will be hard to
-merge. We suggest avoiding these where possible, and if required, ensuring
-each PR has a tidy set of commits to ease merging.
+There are some notes for those with commit access to the project on how we
+manage git [here](docs/dev/git.md).
 
 ## Conclusion
 
