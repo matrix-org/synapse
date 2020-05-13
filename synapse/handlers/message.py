@@ -72,7 +72,6 @@ class MessageHandler(object):
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
-        self._is_worker_app = bool(hs.config.worker_app)
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
