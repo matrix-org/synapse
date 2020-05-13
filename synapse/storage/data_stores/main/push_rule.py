@@ -16,6 +16,7 @@
 
 import abc
 import logging
+from typing import Union
 
 from canonicaljson import json
 
@@ -82,7 +83,7 @@ class PushRulesWorkerStore(
         if hs.config.worker.worker_app is None:
             self._push_rules_stream_id_gen = ChainedIdGenerator(
                 self._stream_id_gen, db_conn, "push_rules_stream", "stream_id"
-            )
+            )  # type: Union[ChainedIdGenerator, SlavedIdTracker]
         else:
             self._push_rules_stream_id_gen = SlavedIdTracker(
                 db_conn, "push_rules_stream", "stream_id"
