@@ -245,7 +245,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
         """
         The client dict can be modified during the user interactive authentication session.
 
-        Note that this is not spec compliant, but is necessary for clients to work.
+        Note that it is not spec compliant to modify the client dict during a
+        user interactive authentication session, but many clients currently do.
+
+        When Synapse is updated to be spec compliant, the call to re-use the
+        session ID should be rejected.
         """
         # Create a second login.
         self.login("test", self.user_pass)
