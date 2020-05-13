@@ -41,6 +41,8 @@ Some other things you will need to know when contributing to Synapse:
    integration system](#continuous-integration-and-testing) and try to fix any
    errors that come up.
 
+ * If you need to [update your PR](#updating-your-pull-request), just add new
+   commits to your branch rather than rebasing.
 
 ## Code style
 
@@ -124,7 +126,8 @@ chicken-and-egg problem.
 There are two options for solving this:
 
  1. Open the PR without a changelog file, see what number you got, and *then*
-    add the changelog file to your branch, or:
+    add the changelog file to your branch (see [Updating your pull
+    request](#updating-your-pull-request)), or:
 
  1. look at the [list of all
     issues/PRs](https://github.com/matrix-org/synapse/issues?q=), add one to the
@@ -249,6 +252,17 @@ Docker images are available for running the integration tests (SyTest) locally,
 see the [documentation in the SyTest repo](
 https://github.com/matrix-org/sytest/blob/develop/docker/README.md) for more
 information.
+
+## Updating your pull request
+
+If you decide to make changes to your pull request - perhaps to address issues
+raised in a review, or to fix problems highlighted by [continuous
+integration](#continuous-integration-and-testing) - just add new commits to your
+branch, and push to GitHub. The pull request will automatically be updated.
+
+Please **avoid** rebasing your branch, especially once the PR has been
+reviewed: doing so makes it very difficult for a reviewer to see what has
+changed since a previous review.
 
 ## Merge Strategy
 
