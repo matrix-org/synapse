@@ -19,7 +19,7 @@ from mock import Mock
 
 from synapse.replication.tcp.streams._base import ReceiptsStream
 
-from tests.replication.tcp.streams._base import BaseStreamTestCase
+from tests.replication._base import BaseStreamTestCase
 
 USER_ID = "@feeling:blue"
 
