@@ -118,7 +118,7 @@ class DeltaState:
 class PersistEventsStore:
     """Contains all the functions for writing events to the database.
 
-    Should only be instansiated on one process (when using a worker mode setup).
+    Should only be instantiated on one process (when using a worker mode setup).
 
     Note: This is not part of the `DataStore` mixin.
     """

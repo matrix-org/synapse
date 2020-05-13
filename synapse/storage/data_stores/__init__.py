@@ -67,7 +67,7 @@ class DataStores(object):
                     self.main = main_store_class(database, db_conn, hs)
 
                     # If we're on a process that can persist events (currently
-                    # master), also instansiate a `PersistEventsStore`
+                    # master), also instantiate a `PersistEventsStore`
                     if hs.config.worker.worker_app is None:
                         self.persist_events = PersistEventsStore(
                             hs, database, self.main
