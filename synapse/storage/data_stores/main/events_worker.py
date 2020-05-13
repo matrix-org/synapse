@@ -76,7 +76,7 @@ class EventsWorkerStore(SQLBaseStore):
     def __init__(self, database: Database, db_conn, hs):
         super(EventsWorkerStore, self).__init__(database, db_conn, hs)
 
-        if hs.config.worker_app is None:
+        if hs.config.worker.writers.events == hs.get_instance_name():
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
                 "events",

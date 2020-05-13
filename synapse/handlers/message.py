@@ -365,10 +365,11 @@ class EventCreationHandler(object):
         self.notifier = hs.get_notifier()
         self.config = hs.config
         self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+        self._instance_name = hs.get_instance_name()
 
         self.room_invite_state_types = self.hs.config.room_invite_state_types
 
-        self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
+        self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
         # This is only used to get at ratelimit function, and maybe_kick_guest_users
         self.base_handler = BaseHandler(hs)
@@ -822,8 +823,9 @@ class EventCreationHandler(object):
         success = False
         try:
             # If we're a worker we need to hit out to the master.
-            if self.config.worker_app:
-                await self.send_event_to_master(
+            if self.config.worker.writers.events != self._instance_name:
+                await self.send_event(
+                    instance_name=self.config.worker.writers.events,
                     event_id=event.event_id,
                     store=self.store,
                     requester=requester,
@@ -888,7 +890,7 @@ class EventCreationHandler(object):
 
         This should only be run on master.
         """
-        assert not self.config.worker_app
+        assert self.config.worker.writers.events == self._instance_name
 
         if ratelimit:
             # We check if this is a room admin redacting an event so that we
