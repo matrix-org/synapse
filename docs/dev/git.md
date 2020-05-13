@@ -90,9 +90,57 @@ each of the commits I am about to merge make sense in their own right”, but
 remember that we're just doing our best to balance “keeping the commit history
 clean” with other factors.
 
+Git branching model
+-------------------
+
+A [lot](https://nvie.com/posts/a-successful-git-branching-model/)
+[of](http://scottchacon.com/2011/08/31/github-flow.html)
+[words](https://www.endoflineblog.com/gitflow-considered-harmful) have been
+written in the past about git branching models (no really, [a
+lot](https://martinfowler.com/articles/branching-patterns.html)). I tend to
+think the whole thing is overblown. Fundamentally, it's not that
+complicated. Here's how we do it.
+
+Let's start with a picture:
+
+![branching model](git/branches.jpg)
+
+It looks complicated, but it's really not. There's one basic rule: *anyone* is
+free to merge from *any* more-stable branch to *any* less-stable branch at
+*any* time<sup id="a2">[2](#f2)</sup>. (The principle behind this is that if a
+change is good enough for the more-stable branch, then it's also good enough go
+put in a less-stable branch.)
+
+Meanwhile, merging (or squashing, as per the above) from a less-stable to a
+more-stable branch is a deliberate action in which you want to publish a change
+or a set of changes to (some subset of) the world: for example, this happens
+when a PR is landed, or as part of our release process.
+
+So, what counts as a more- or less-stable branch? A little reflection will show
+that our active branches are ordered thus, from more-stable to less-stable:
+
+ * `master` (tracks our last release).
+ * `release-vX.Y.Z` (the branch where we prepare the next release)<sup
+   id="a3">[3](#f3)</sup>.
+ * PR branches which are targetting the release.
+ * `develop` (our "mainline" branch containing our bleeding-edge).
+ * regular PR branches.
+
+The corollary is: if you have a bugfix that needs to land in both
+`release-vX.Y.Z` *and* `develop`, then you should base your PR on
+`release-vX.Y.Z`, get it merged there, and then merge from `release-vX.Y.Z` to
+`develop`. (If a fix lands in `develop` and we later need it in a
+release-branch, we can of course cherry-pick it, but landing it in the release
+branch first helps reduce the chance of annoying conflicts.)
 
 ---
 
 <b id="f1">[1]</b>: “Squash and merge” is GitHub's term for this
 operation. Given that there is no merge involved, I'm not convinced it's the
 most intuitive name. [^](#a1)
+
+<b id="f2">[2]</b>: Well, anyone with commit access.[^](#a2)
+
+<b id="f3">[3]</b>: Very, very occasionally (I think this has happened once in
+the history of Synapse), we've had two releases in flight at once. Obviously,
+`release-v1.2.3` is more-stable than `release-v1.3.0`. [^](#a3)
