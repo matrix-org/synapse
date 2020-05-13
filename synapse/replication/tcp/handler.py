@@ -186,6 +186,13 @@ class ReplicationCommandHandler:
         return self._streams_to_replicate
 
     async def on_REPLICATE(self, conn: AbstractConnection, cmd: ReplicateCommand):
+        self.send_positions_to_connection(conn)
+
+    def send_positions_to_connection(self, conn: AbstractConnection):
+        """Send current position of all streams this process is source of to
+        the connection.
+        """
+
         # We respond with current position of all streams this instance
         # replicates.
         for stream in self.get_streams_to_replicate():
