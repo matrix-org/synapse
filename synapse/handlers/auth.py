@@ -252,7 +252,6 @@ class AuthHandler(BaseHandler):
         clientdict: Dict[str, Any],
         clientip: str,
         description: str,
-        validate_clientdict: bool = True,
     ) -> Tuple[dict, dict, str]:
         """
         Takes a dictionary sent by the client in the login / registration
@@ -277,10 +276,6 @@ class AuthHandler(BaseHandler):
 
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
-
-            validate_clientdict: Whether to validate that the operation happening
-                                 on the account has not changed. If this is false,
-                                 the client dict is persisted instead of validated.
 
         Returns:
             A tuple of (creds, params, session_id).
@@ -359,13 +354,12 @@ class AuthHandler(BaseHandler):
                     "Requested operation has changed during the UI authentication session.",
                 )
 
-            if validate_clientdict:
-                if session.clientdict != clientdict:
-                    logger.warning(
-                        "Requested operation has changed during the UI "
-                        "authentication session. A future version of Synapse "
-                        "will remove this capability."
-                    )
+            if session.clientdict != clientdict:
+                logger.warning(
+                    "Requested operation has changed during the UI "
+                    "authentication session. A future version of Synapse "
+                    "will remove this capability."
+                )
 
             # For backwards compatibility, changes to the client dict are
             # persisted as clients modify them throughout their user interactive
