@@ -261,6 +261,9 @@ class PasswordRestServlet(RestServlet):
                 if "medium" not in threepid or "address" not in threepid:
                     raise SynapseError(500, "Malformed threepid")
                 if threepid["medium"] == "email":
+                    # For emails, canonicalise the address.
+                    # We store all email addreses as cononised in the DB.
+                    # (See add_threepid in synapse/handlers/auth.py)
                     threepid["address"] = canonicalise_email(threepid["address"])
                 # if using email, we must know about the email they're authing with!
                 threepid_user_id = await self.datastore.get_user_id_by_threepid(

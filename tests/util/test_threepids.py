@@ -20,9 +20,21 @@ from tests.unittest import HomeserverTestCase
 
 
 class CanonicaliseEmailTests(HomeserverTestCase):
-    def test_invalid_format(self):
+    def test_no_at(self):
         with self.assertRaises(SynapseError) as cm:
             canonicalise_email("address-without-at.bar")
+        e = cm.exception
+        self.assertEqual(e.code, 400)
+
+    def test_two_at(self):
+        with self.assertRaises(SynapseError) as cm:
+            canonicalise_email("foo@foo@test.bar")
+        e = cm.exception
+        self.assertEqual(e.code, 400)
+
+    def test_bad_format(self):
+        with self.assertRaises(SynapseError) as cm:
+            canonicalise_email("user@bad.example.net@good.example.com")
         e = cm.exception
         self.assertEqual(e.code, 400)
 
@@ -38,4 +50,9 @@ class CanonicaliseEmailTests(HomeserverTestCase):
     def test_address_casefold(self):
         self.assertEqual(
             canonicalise_email("Strauß@Example.com"), "strauss@example.com"
+        )
+
+    def test_address_trim(self):
+        self.assertEqual(
+            canonicalise_email(" foo@test.bar "), "foo@test.bar"
         )

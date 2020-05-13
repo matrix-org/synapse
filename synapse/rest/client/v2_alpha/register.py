@@ -568,12 +568,9 @@ class RegisterRestServlet(RestServlet):
                 for login_type in [LoginType.EMAIL_IDENTITY, LoginType.MSISDN]:
                     if login_type in auth_result:
                         medium = auth_result[login_type]["medium"]
+                        address = auth_result[login_type]["address"]
                         if medium == "email":
-                            address = canonicalise_email(
-                                auth_result[login_type]["address"]
-                            )
-                        else:
-                            address = auth_result[login_type]["address"]
+                            address = canonicalise_email(address)
 
                         existing_user_id = await self.store.get_user_id_by_threepid(
                             medium, address

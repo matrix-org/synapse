@@ -386,44 +386,39 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.email = "test@example.com"
         self.url_3pid = b"account/3pid"
 
-    def test_add_email(self):
-        """Test adding an email to profile
-        """
-        client_secret = "foobar"
-        session_id = self._request_token(self.email, client_secret)
+    def test_add_valid_email(self):
+        self.get_success(self._add_email(self.email, self.email))
 
-        self.assertEquals(len(self.email_attempts), 1)
-        link = self._get_link_from_email()
-
-        self._validate_token(link)
-
-        request, channel = self.make_request(
-            "POST",
-            b"/_matrix/client/unstable/account/3pid/add",
-            {
-                "client_secret": client_secret,
-                "sid": session_id,
-                "auth": {
-                    "type": "m.login.password",
-                    "user": self.user_id,
-                    "password": "test",
-                },
-            },
-            access_token=self.user_id_tok,
+    def test_add_email_no_at(self):
+        self.get_success(
+            self._request_token_invalid_email("address-without-at.bar")
         )
 
-        self.render(request)
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Get user
-        request, channel = self.make_request(
-            "GET", self.url_3pid, access_token=self.user_id_tok,
+    def test_add_email_two_at(self):
+        self.get_success(
+            self._request_token_invalid_email("foo@foo@test.bar")
         )
-        self.render(request)
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
-        self.assertEqual(self.email, channel.json_body["threepids"][0]["address"])
+    def test_add_email_bad_format(self):
+        self.get_success(
+            self._request_token_invalid_email("user@bad.example.net@good.example.com")
+        )
+
+    def test_add_email_domain_to_lower(self):
+        self.get_success(self._add_email("foo@TEST.BAR", "foo@test.bar"))
+
+    def test_add_email_domain_with_umlaut(self):
+        self.get_success(self._add_email("foo@Öumlaut.com", "foo@öumlaut.com"))
+
+    def test_add_email_address_casefold(self):
+        self.get_success(
+            self._add_email("Strauß@Example.com", "strauss@example.com")
+        )
+
+    def test_address_trim(self):
+        self.get_success(
+            self._add_email(" foo@test.bar ", "foo@test.bar")
+        )
 
     def test_add_email_if_disabled(self):
         """Test adding email to profile when doing so is disallowed
@@ -616,6 +611,16 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         return channel.json_body["sid"]
 
+    def _request_token_invalid_email(self, email, client_secret="foobar"):
+        request, channel = self.make_request(
+            "POST",
+            b"account/3pid/email/requestToken",
+            {"client_secret": client_secret, "email": email, "send_attempt": 1},
+        )
+        self.render(request)
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+
     def _validate_token(self, link):
         # Remove the host
         path = link.replace("https://example.com", "")
@@ -643,3 +648,42 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         assert match, "Could not find link in email"
 
         return match.group(0)
+
+    def _add_email(self, request_email, expected_email):
+        """Test adding an email to profile
+        """
+        client_secret = "foobar"
+        session_id = self._request_token(request_email, client_secret)
+
+        self.assertEquals(len(self.email_attempts), 1)
+        link = self._get_link_from_email()
+
+        self._validate_token(link)
+
+        request, channel = self.make_request(
+            "POST",
+            b"/_matrix/client/unstable/account/3pid/add",
+            {
+                "client_secret": client_secret,
+                "sid": session_id,
+                "auth": {
+                    "type": "m.login.password",
+                    "user": self.user_id,
+                    "password": "test",
+                },
+            },
+            access_token=self.user_id_tok,
+        )
+
+        self.render(request)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Get user
+        request, channel = self.make_request(
+            "GET", self.url_3pid, access_token=self.user_id_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual(expected_email, channel.json_body["threepids"][0]["address"])

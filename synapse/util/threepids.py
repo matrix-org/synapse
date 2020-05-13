@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import email.utils
 import logging
 import re
 
@@ -62,11 +63,18 @@ def canonicalise_email(address) -> str:
     Returns:
         (str) The canonical form of the email address
     Raises:
-        SynapseError if the number could not be parsed.
+        SynapseError if the address could not be parsed.
     """
 
-    try:
-        address = address.split("@")
-        return address[0].casefold() + "@" + address[1].lower()
-    except IndexError:
+    address = address.strip()
+    # Validate address
+    # See https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-11340
+    parsedAddress = email.utils.parseaddr(address)[1]
+
+    # parseaddr does not find missing "@"
+    regex = r"^[^@]+@[^@]+\.[^@]+$"
+    if parsedAddress == '' or not bool(re.fullmatch(regex, address)):
+        logger.debug("Couldn't parse email address %s", address)
         raise SynapseError(400, "Unable to parse email address")
+    address = address.split("@")
+    return address[0].casefold() + "@" + address[1].lower()
