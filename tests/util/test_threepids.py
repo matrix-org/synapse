@@ -53,6 +53,4 @@ class CanonicaliseEmailTests(HomeserverTestCase):
         )
 
     def test_address_trim(self):
-        self.assertEqual(
-            canonicalise_email(" foo@test.bar "), "foo@test.bar"
-        )
+        self.assertEqual(canonicalise_email(" foo@test.bar "), "foo@test.bar")

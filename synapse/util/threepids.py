@@ -73,7 +73,7 @@ def canonicalise_email(address) -> str:
 
     # parseaddr does not find missing "@"
     regex = r"^[^@]+@[^@]+\.[^@]+$"
-    if parsedAddress == '' or not bool(re.fullmatch(regex, address)):
+    if parsedAddress == "" or not bool(re.fullmatch(regex, address)):
         logger.debug("Couldn't parse email address %s", address)
         raise SynapseError(400, "Unable to parse email address")
     address = address.split("@")

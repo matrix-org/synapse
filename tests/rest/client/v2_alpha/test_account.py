@@ -390,14 +390,10 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.get_success(self._add_email(self.email, self.email))
 
     def test_add_email_no_at(self):
-        self.get_success(
-            self._request_token_invalid_email("address-without-at.bar")
-        )
+        self.get_success(self._request_token_invalid_email("address-without-at.bar"))
 
     def test_add_email_two_at(self):
-        self.get_success(
-            self._request_token_invalid_email("foo@foo@test.bar")
-        )
+        self.get_success(self._request_token_invalid_email("foo@foo@test.bar"))
 
     def test_add_email_bad_format(self):
         self.get_success(
@@ -411,14 +407,10 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.get_success(self._add_email("foo@Öumlaut.com", "foo@öumlaut.com"))
 
     def test_add_email_address_casefold(self):
-        self.get_success(
-            self._add_email("Strauß@Example.com", "strauss@example.com")
-        )
+        self.get_success(self._add_email("Strauß@Example.com", "strauss@example.com"))
 
     def test_address_trim(self):
-        self.get_success(
-            self._add_email(" foo@test.bar ", "foo@test.bar")
-        )
+        self.get_success(self._add_email(" foo@test.bar ", "foo@test.bar"))
 
     def test_add_email_if_disabled(self):
         """Test adding email to profile when doing so is disallowed
