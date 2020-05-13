@@ -51,7 +51,7 @@ class ServerNoticesConfig(Config):
             None if server notices are not enabled.
 
         server_notices_mxid_avatar_url (str|None):
-            The MXC-URL for the avatar to use for the server notices user.
+            The MXC URL for the avatar of the server notices user.
             None if server notices are not enabled.
 
         server_notices_room_name (str|None):
