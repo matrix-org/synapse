@@ -1,1 +1,1 @@
-Ensure that a user inteactive authentication session is tied to a single request.
+Restore compatibility with non-compliant clients during the user inteactive authentication process.

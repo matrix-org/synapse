@@ -367,10 +367,10 @@ class AuthHandler(BaseHandler):
                         "will remove this capability."
                     )
 
-            # For backwards compatibility the registration endpoint persists
-            # changes to the client dict instead of validating them.
-            else:
-                await self.store.set_ui_auth_clientdict(sid, clientdict)
+            # For backwards compatibility, changes to the client dict are
+            # persisted as clients modify them throughout their user interactive
+            # authentication flow.
+            await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
