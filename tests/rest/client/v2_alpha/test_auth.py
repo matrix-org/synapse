@@ -133,47 +133,6 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         # We're given a registered user.
         self.assertEqual(channel.json_body["user_id"], "@user:test")
 
-    def test_legacy_registration(self):
-        """
-        Registration allows the parameters to vary through the process.
-        """
-
-        # Make the initial request to register. (Later on a different password
-        # will be used.)
-        # Returns a 401 as per the spec
-        channel = self.register(
-            401, {"username": "user", "type": "m.login.password", "password": "bar"},
-        )
-
-        # Grab the session
-        session = channel.json_body["session"]
-        # Assert our configured public key is being given
-        self.assertEqual(
-            channel.json_body["params"]["m.login.recaptcha"]["public_key"], "brokencake"
-        )
-
-        # Complete the recaptcha step.
-        self.recaptcha(session, 200)
-
-        # also complete the dummy auth
-        self.register(200, {"auth": {"session": session, "type": "m.login.dummy"}})
-
-        # Now we should have fulfilled a complete auth flow, including
-        # the recaptcha fallback step. Make the initial request again, but
-        # with a changed password. This still completes.
-        channel = self.register(
-            200,
-            {
-                "username": "user",
-                "type": "m.login.password",
-                "password": "foo",  # Note that this is different.
-                "auth": {"session": session},
-            },
-        )
-
-        # We're given a registered user.
-        self.assertEqual(channel.json_body["user_id"], "@user:test")
-
     def test_complete_operation_unknown_session(self):
         """
         Attempting to mark an invalid session as complete should error.
@@ -282,9 +241,15 @@ class UIAuthTests(unittest.HomeserverTestCase):
             },
         )
 
-    def test_cannot_change_body(self):
+    def test_can_change_body(self):
         """
-        The initial requested client dict cannot be modified during the user interactive authentication session.
+        The client dict can be modified during the user interactive authentication session.
+
+        Note that it is not spec compliant to modify the client dict during a
+        user interactive authentication session, but many clients currently do.
+
+        When Synapse is updated to be spec compliant, the call to re-use the
+        session ID should be rejected.
         """
         # Create a second login.
         self.login("test", self.user_pass)
@@ -302,9 +267,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.assertIn({"stages": ["m.login.password"]}, channel.json_body["flows"])
 
         # Make another request providing the UI auth flow, but try to delete the
-        # second device. This results in an error.
+        # second device.
         self.delete_devices(
-            403,
+            200,
             {
                 "devices": [device_ids[1]],
                 "auth": {
