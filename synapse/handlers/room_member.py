@@ -17,7 +17,7 @@
 
 import abc
 import logging
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 from six.moves import http_client
 
@@ -25,6 +25,7 @@ from synapse import types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.types import Collection, Requester, RoomAlias, RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -265,7 +266,7 @@ class RoomMemberHandler(object):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
-    ) -> dict:
+    ) -> Union[EventBase, Optional[dict]]:
         key = (room_id,)
 
         with (await self.member_linearizer.queue(key)):
@@ -296,7 +297,7 @@ class RoomMemberHandler(object):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
-    ) -> dict:
+    ) -> Union[EventBase, Optional[dict]]:
         content_specified = bool(content)
         if content is None:
             content = {}
@@ -470,12 +471,11 @@ class RoomMemberHandler(object):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    res = await self._remote_reject_invite(
+                    return await self._remote_reject_invite(
                         requester, remote_room_hosts, room_id, target, content,
                     )
-                    return res
 
-        res = await self._local_membership_update(
+        return await self._local_membership_update(
             requester=requester,
             target=target,
             room_id=room_id,
@@ -486,7 +486,6 @@ class RoomMemberHandler(object):
             content=content,
             require_consent=require_consent,
         )
-        return res
 
     async def transfer_room_state_on_room_upgrade(
         self, old_room_id: str, room_id: str
@@ -573,7 +572,7 @@ class RoomMemberHandler(object):
         self,
         requester: Requester,
         event: EventBase,
-        context: dict,
+        context: EventContext,
         ratelimit: bool = True,
     ):
         """
@@ -699,6 +698,7 @@ class RoomMemberHandler(object):
         )
         if invite:
             return UserID.from_string(invite.sender)
+        return None
 
     async def do_3pid_invite(
         self,
@@ -921,7 +921,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         room_id: str,
         user: UserID,
         content: dict,
-    ) -> Optional[dict]:
+    ) -> None:
         """Implements RoomMemberHandler._remote_join
         """
         # filter ourselves out of remote_room_hosts: do_invite_join ignores it
