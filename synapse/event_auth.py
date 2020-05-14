@@ -212,6 +212,9 @@ def _can_federate(
     event: EventBase, auth_events: Dict[Tuple[str, str], EventBase]
 ) -> bool:
     creation_event = auth_events.get((EventTypes.Create, ""))
+    # There should always be a creation event, but if not don't federate.
+    if not creation_event:
+        return False
 
     return creation_event.content.get("m.federate", True) is True
 
