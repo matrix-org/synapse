@@ -13,9 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from unittest import TestCase
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import AuthError, Codes
+from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.room_versions import RoomVersions
+from synapse.events import EventBase
 from synapse.federation.federation_base import event_from_pdu_json
 from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
@@ -207,3 +210,65 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(r[(EventTypes.Member, other_user)], join_event.event_id)
 
         return join_event
+
+
+class EventFromPduTestCase(TestCase):
+    def test_valid_json(self):
+        """Valid JSON should be turned into an event."""
+        ev = event_from_pdu_json(
+            {
+                "type": EventTypes.Message,
+                "content": {"bool": True, "null": None, "int": 1, "str": "foobar"},
+                "room_id": "!room:test",
+                "sender": "@user:test",
+                "depth": 1,
+                "prev_events": [],
+                "auth_events": [],
+                "origin_server_ts": 1234,
+            },
+            RoomVersions.STRICT_CANONICALJSON,
+        )
+
+        self.assertIsInstance(ev, EventBase)
+
+    def test_invalid_numbers(self):
+        """Invalid values for an integer should be rejected, all floats should be rejected."""
+        for value in [
+            -(2 ** 53),
+            2 ** 53,
+            1.0,
+            float("inf"),
+            float("-inf"),
+            float("nan"),
+        ]:
+            with self.assertRaises(SynapseError):
+                event_from_pdu_json(
+                    {
+                        "type": EventTypes.Message,
+                        "content": {"foo": value},
+                        "room_id": "!room:test",
+                        "sender": "@user:test",
+                        "depth": 1,
+                        "prev_events": [],
+                        "auth_events": [],
+                        "origin_server_ts": 1234,
+                    },
+                    RoomVersions.STRICT_CANONICALJSON,
+                )
+
+    def test_invalid_nested(self):
+        """List and dictionaries are recursively searched."""
+        with self.assertRaises(SynapseError):
+            event_from_pdu_json(
+                {
+                    "type": EventTypes.Message,
+                    "content": {"foo": [{"bar": 2 ** 56}]},
+                    "room_id": "!room:test",
+                    "sender": "@user:test",
+                    "depth": 1,
+                    "prev_events": [],
+                    "auth_events": [],
+                    "origin_server_ts": 1234,
+                },
+                RoomVersions.STRICT_CANONICALJSON,
+            )
