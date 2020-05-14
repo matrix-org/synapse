@@ -576,7 +576,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                         if key[0] == EventTypes.Member
                     ]
                     for etype, state_key in context.delta_ids:
-                        users_in_room.pop(state_key, None)
+                        if etype == EventTypes.Member:
+                            users_in_room.pop(state_key, None)
 
         # We check if we have any of the member event ids in the event cache
         # before we ask the DB
