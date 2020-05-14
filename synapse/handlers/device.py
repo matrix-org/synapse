@@ -738,8 +738,10 @@ class DeviceListUpdater(object):
             # later.
             yield self.store.mark_remote_user_device_cache_as_stale(user_id)
             return
-        except (RequestSendFailed, HttpResponseException):
-            logger.warning("Failed to handle device list update for %s", user_id)
+        except (RequestSendFailed, HttpResponseException) as e:
+            logger.warning(
+                "Failed to handle device list update for %s: %s", user_id, e,
+            )
             # Mark the remote user's device list as stale so we know we need to retry it
             # later.
             yield self.store.mark_remote_user_device_cache_as_stale(user_id)
