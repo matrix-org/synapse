@@ -1,0 +1,1 @@
+Merge Synapse v1.12.4 `master` into the `dinsic` branch.
