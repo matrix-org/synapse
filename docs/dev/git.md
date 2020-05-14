@@ -47,11 +47,11 @@ available via the GitHub UI (or via the little-known [refs/pull
 namespace](https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/checking-out-pull-requests-locally)).
 
 
-Of course, in reality, things are more complicated than that: we have release
-branches as well as `develop` and `master` and we deliberately merge changes
-between them; often slip through and have to be fixed later. So this is very
-much an ideal that we're aiming for rather than a cast-iron set of rules which
-must be obeyed.
+Of course, in reality, things are more complicated than that. We have release
+branches as well as `develop` and `master`, and we deliberately merge changes
+between them. Bugs often slip through and have to be fixed later. That's all
+fine: this not a cast-iron rule which must be obeyed, but an ideal to aim
+towards.
 
 Merges, squashes, rebases: wtf?
 -------------------------------
@@ -59,7 +59,9 @@ Merges, squashes, rebases: wtf?
 Ok, so that's what we'd like to achieve. How do we achieve it?
 
 The TL;DR is: when you come to merge a pull request, you *probably* want to
-[“squash and merge”](git/squash.png).
+“squash and merge”:
+
+![squash and merge](git/squash.png).
 
 (This applies whether you are merging your own PR, or that of another
 contributor.)
