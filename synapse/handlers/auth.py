@@ -252,7 +252,6 @@ class AuthHandler(BaseHandler):
         clientdict: Dict[str, Any],
         clientip: str,
         description: str,
-        validate_clientdict: bool = True,
     ) -> Tuple[dict, dict, str]:
         """
         Takes a dictionary sent by the client in the login / registration
@@ -277,10 +276,6 @@ class AuthHandler(BaseHandler):
 
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
-
-            validate_clientdict: Whether to validate that the operation happening
-                                 on the account has not changed. If this is false,
-                                 the client dict is persisted instead of validated.
 
         Returns:
             A tuple of (creds, params, session_id).
@@ -346,26 +341,30 @@ class AuthHandler(BaseHandler):
 
             # Ensure that the queried operation does not vary between stages of
             # the UI authentication session. This is done by generating a stable
-            # comparator based on the URI, method, and client dict (minus the
-            # auth dict) and storing it during the initial query. Subsequent
+            # comparator and storing it during the initial query. Subsequent
             # queries ensure that this comparator has not changed.
-            if validate_clientdict:
-                session_comparator = (session.uri, session.method, session.clientdict)
-                comparator = (uri, method, clientdict)
-            else:
-                session_comparator = (session.uri, session.method)  # type: ignore
-                comparator = (uri, method)  # type: ignore
-
-            if session_comparator != comparator:
+            #
+            # The comparator is based on the requested URI and HTTP method. The
+            # client dict (minus the auth dict) should also be checked, but some
+            # clients are not spec compliant, just warn for now if the client
+            # dict changes.
+            if (session.uri, session.method) != (uri, method):
                 raise SynapseError(
                     403,
                     "Requested operation has changed during the UI authentication session.",
                 )
 
-            # For backwards compatibility the registration endpoint persists
-            # changes to the client dict instead of validating them.
-            if not validate_clientdict:
-                await self.store.set_ui_auth_clientdict(sid, clientdict)
+            if session.clientdict != clientdict:
+                logger.warning(
+                    "Requested operation has changed during the UI "
+                    "authentication session. A future version of Synapse "
+                    "will remove this capability."
+                )
+
+            # For backwards compatibility, changes to the client dict are
+            # persisted as clients modify them throughout their user interactive
+            # authentication flow.
+            await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         if not authdict:
             raise InteractiveAuthIncompleteError(

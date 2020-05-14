@@ -17,6 +17,7 @@
 from ._base import RootConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
+from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
 from .consent_config import ConsentConfig
@@ -55,6 +56,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ServerConfig,
         TlsConfig,
+        CacheConfig,
         DatabaseConfig,
         LoggingConfig,
         RatelimitConfig,

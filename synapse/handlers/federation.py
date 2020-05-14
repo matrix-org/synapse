@@ -2681,8 +2681,7 @@ class FederationHandler(BaseHandler):
         member_handler = self.hs.get_room_member_handler()
         await member_handler.send_membership_event(None, event, context)
 
-    @defer.inlineCallbacks
-    def add_display_name_to_third_party_invite(
+    async def add_display_name_to_third_party_invite(
         self, room_version, event_dict, event, context
     ):
         key = (
@@ -2690,10 +2689,10 @@ class FederationHandler(BaseHandler):
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
-            original_invite = yield self.store.get_event(
+            original_invite = await self.store.get_event(
                 original_invite_id, allow_none=True
             )
         if original_invite:
@@ -2714,14 +2713,13 @@ class FederationHandler(BaseHandler):
 
         builder = self.event_builder_factory.new(room_version, event_dict)
         EventValidator().validate_builder(builder)
-        event, context = yield self.event_creation_handler.create_new_client_event(
+        event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
         EventValidator().validate_new(event, self.config)
         return (event, context)
 
-    @defer.inlineCallbacks
-    def _check_signature(self, event, context):
+    async def _check_signature(self, event, context):
         """
         Checks that the signature in the event is consistent with its invite.
 
@@ -2738,12 +2736,12 @@ class FederationHandler(BaseHandler):
         signed = event.content["third_party_invite"]["signed"]
         token = signed["token"]
 
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 
         invite_event = None
         if invite_event_id:
-            invite_event = yield self.store.get_event(invite_event_id, allow_none=True)
+            invite_event = await self.store.get_event(invite_event_id, allow_none=True)
 
         if not invite_event:
             raise AuthError(403, "Could not find invite")
@@ -2792,7 +2790,7 @@ class FederationHandler(BaseHandler):
                             raise
                         try:
                             if "key_validity_url" in public_key_object:
-                                yield self._check_key_revocation(
+                                await self._check_key_revocation(
                                     public_key, public_key_object["key_validity_url"]
                                 )
                         except Exception:
@@ -2806,8 +2804,7 @@ class FederationHandler(BaseHandler):
                 last_exception = e
         raise last_exception
 
-    @defer.inlineCallbacks
-    def _check_key_revocation(self, public_key, url):
+    async def _check_key_revocation(self, public_key, url):
         """
         Checks whether public_key has been revoked.
 
@@ -2821,7 +2818,7 @@ class FederationHandler(BaseHandler):
                 for revocation.
         """
         try:
-            response = yield self.http_client.get_json(url, {"public_key": public_key})
+            response = await self.http_client.get_json(url, {"public_key": public_key})
         except Exception:
             raise SynapseError(502, "Third party certificate could not be checked")
         if "valid" not in response or not response["valid"]:
@@ -2916,8 +2913,7 @@ class FederationHandler(BaseHandler):
         else:
             user_joined_room(self.distributor, user, room_id)
 
-    @defer.inlineCallbacks
-    def get_room_complexity(self, remote_room_hosts, room_id):
+    async def get_room_complexity(self, remote_room_hosts, room_id):
         """
         Fetch the complexity of a remote room over federation.
 
@@ -2931,12 +2927,12 @@ class FederationHandler(BaseHandler):
         """
 
         for host in remote_room_hosts:
-            res = yield self.federation_client.get_room_complexity(host, room_id)
+            res = await self.federation_client.get_room_complexity(host, room_id)
 
             # We got a result, return it.
             if res:
-                defer.returnValue(res)
+                return res
 
         # We fell off the bottom, couldn't get the complexity from anyone. Oh
         # well.
-        defer.returnValue(None)
+        return None

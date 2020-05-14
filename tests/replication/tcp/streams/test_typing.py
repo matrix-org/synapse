@@ -17,7 +17,7 @@ from mock import Mock
 from synapse.handlers.typing import RoomMember
 from synapse.replication.tcp.streams import TypingStream
 
-from tests.replication.tcp.streams._base import BaseStreamTestCase
+from tests.replication._base import BaseStreamTestCase
 
 USER_ID = "@feeling:blue"
 
