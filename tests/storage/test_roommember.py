@@ -137,9 +137,9 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
 
-        # Regression test for #7376: create a state events whose key matches bob's
+        # Regression test for #7376: create a state event whose key matches bob's
         # user_id, but which is *not* a membership event, and persist that; then check
-        # what the state is for the next event.
+        # that `get_joined_users_from_context` returns the correct users for the next event.
         non_member_event = event_injection.inject_event(
             self.hs,
             room_id=room,
