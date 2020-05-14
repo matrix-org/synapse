@@ -109,7 +109,7 @@ contributions and would like to have you shouted out in the release notes!
 For example, a fix in PR #1234 would have its changelog entry in
 `changelog.d/1234.bugfix`, and contain content like:
 
-> The security levels of Florbs are now validated when received over
+> The security levels of Florbs are now validated when received
 > via the `/federation/florb` endpoint. Contributed by Jane Matrix.
 
 If there are multiple pull requests involved in a single bugfix/feature/etc,
@@ -129,7 +129,7 @@ There are two options for solving this:
     add the changelog file to your branch (see [Updating your pull
     request](#updating-your-pull-request)), or:
 
- 1. look at the [list of all
+ 1. Look at the [list of all
     issues/PRs](https://github.com/matrix-org/synapse/issues?q=), add one to the
     highest number you see, and quickly open the PR before somebody else claims
     your number.
