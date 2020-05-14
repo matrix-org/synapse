@@ -181,7 +181,7 @@ def check(
     _can_send_event(event, auth_events)
 
     if event.type == EventTypes.PowerLevels:
-        _check_power_levels(event, auth_events)
+        _check_power_levels(room_version_obj, event, auth_events)
 
     if event.type == EventTypes.Redaction:
         check_redaction(room_version_obj, event, auth_events)
@@ -442,7 +442,7 @@ def check_redaction(room_version_obj: RoomVersion, event, auth_events):
     raise AuthError(403, "You don't have permission to redact events")
 
 
-def _check_power_levels(event, auth_events):
+def _check_power_levels(room_version_obj, event, auth_events):
     user_list = event.content.get("users", {})
     # Validate users
     for k, v in user_list.items():
@@ -483,6 +483,14 @@ def _check_power_levels(event, auth_events):
     new_list = event.content.get("events", {})
     for ev_id in set(list(old_list) + list(new_list)):
         levels_to_check.append((ev_id, "events"))
+
+    # MSC2209 specifies these checks should also be done for the "notifications"
+    # key.
+    if room_version_obj.limit_notifications_power_levels:
+        old_list = current_state.content.get("notifications", {})
+        new_list = event.content.get("notifications", {})
+        for ev_id in set(list(old_list) + list(new_list)):
+            levels_to_check.append((ev_id, "notifications"))
 
     old_state = current_state.content
     new_state = event.content
