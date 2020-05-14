@@ -1,3 +1,19 @@
+Synapse 1.13.0rc2 (2020-05-14)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug which could cause messages not to be sent over federation, when state events with state keys matching user IDs (such as custom user statuses) were received. ([\#7376](https://github.com/matrix-org/synapse/issues/7376))
+- Restore compatibility with non-compliant clients during the user interactive authentication process. ([\#7483](https://github.com/matrix-org/synapse/issues/7483))
+
+
+Internal Changes
+----------------
+
+- Fix linting errors in new version of Flake8. ([\#7470](https://github.com/matrix-org/synapse/issues/7470))
+
+
 Synapse 1.13.0rc1 (2020-05-11)
 ==============================
 
