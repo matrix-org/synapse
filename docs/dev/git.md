@@ -124,7 +124,7 @@ that our active branches are ordered thus, from more-stable to less-stable:
  * `master` (tracks our last release).
  * `release-vX.Y.Z` (the branch where we prepare the next release)<sup
    id="a3">[3](#f3)</sup>.
- * PR branches which are targetting the release.
+ * PR branches which are targeting the release.
  * `develop` (our "mainline" branch containing our bleeding-edge).
  * regular PR branches.
 
