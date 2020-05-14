@@ -1093,7 +1093,7 @@ account_validity:
 # pending invites for the given 3PID (and then allow it to sign up on
 # the platform):
 #
-#allow_invited_3pids: False
+#allow_invited_3pids: false
 #
 #allowed_local_3pids:
 #  - medium: email
@@ -1106,7 +1106,7 @@ account_validity:
 # If true, stop users from trying to change the 3PIDs associated with
 # their accounts.
 #
-#disable_3pid_changes: False
+#disable_3pid_changes: false
 
 # Enable 3PIDs lookup requests to identity servers from this server.
 #
@@ -1178,8 +1178,8 @@ account_validity:
 # Useful when provisioning users based on the contents of a 3rd party
 # directory and to avoid ambiguities.
 #
-#disable_set_displayname: False
-#disable_set_avatar_url: False
+#disable_set_displayname: false
+#disable_set_avatar_url: false
 
 # Handle threepid (email/phone etc) registration and password resets through a set of
 # *trusted* identity servers. Note that this allows the configured identity server to
