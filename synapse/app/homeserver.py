@@ -69,7 +69,6 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.prepare_database import UpgradeDatabaseException
-from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
@@ -191,6 +190,11 @@ class SynapseHomeServer(HomeServer):
                     "/_synapse/admin": AdminRestResource(self),
                 }
             )
+
+            if self.get_config().oidc_enabled:
+                from synapse.rest.oidc import OIDCResource
+
+                resources["/_synapse/oidc"] = OIDCResource(self)
 
             if self.get_config().saml2_enabled:
                 from synapse.rest.saml2 import SAML2Resource
@@ -422,6 +426,13 @@ def setup(config_options):
                 # Check if it needs to be reprovisioned every day.
                 hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
 
+            # Load the OIDC provider metadatas, if OIDC is enabled.
+            if hs.config.oidc_enabled:
+                oidc = hs.get_oidc_handler()
+                # Loading the provider metadata also ensures the provider config is valid.
+                yield defer.ensureDeferred(oidc.load_metadata())
+                yield defer.ensureDeferred(oidc.load_jwks())
+
             _base.start(hs, config.listeners)
 
             hs.get_datastore().db.updates.start_doing_background_updates()
@@ -504,8 +515,8 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
-    stats["cache_factor"] = CACHE_SIZE_FACTOR
-    stats["event_cache_size"] = hs.config.event_cache_size
+    stats["cache_factor"] = hs.config.caches.global_factor
+    stats["event_cache_size"] = hs.config.caches.event_cache_size
 
     #
     # Performance statistics

@@ -1,0 +1,1 @@
+Allow for using more than one spam checker module at once.

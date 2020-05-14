@@ -13,7 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import attr
+
 from ._base import Config
+
+
+@attr.s
+class InstanceLocationConfig:
+    """The host and port to talk to an instance via HTTP replication.
+    """
+
+    host = attr.ib(type=str)
+    port = attr.ib(type=int)
 
 
 class WorkerConfig(Config):
@@ -70,6 +81,12 @@ class WorkerConfig(Config):
                     bind_addresses.append(bind_address)
                 elif not bind_addresses:
                     bind_addresses.append("")
+
+        # A map from instance name to host/port of their HTTP replication endpoint.
+        instance_map = config.get("instance_map", {}) or {}
+        self.instance_map = {
+            name: InstanceLocationConfig(**c) for name, c in instance_map.items()
+        }
 
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in
