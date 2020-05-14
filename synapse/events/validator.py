@@ -56,6 +56,7 @@ class EventValidator(object):
             if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "'%s' not a string type" % (s,))
 
+        # Depending on the room version, ensure the data is spec compliant JSON.
         if event.room_version.strict_canonicaljson:
             validate_canonicaljson(event.content)
 
