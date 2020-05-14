@@ -17,8 +17,8 @@ from six import integer_types, string_types
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
-from synapse.events.utils import validate_canonicaljson
 from synapse.api.room_versions import EventFormatVersions
+from synapse.events.utils import validate_canonicaljson
 from synapse.types import EventID, RoomID, UserID
 
 
