@@ -19,6 +19,7 @@ import synapse.handlers.room_member
 import synapse.handlers.set_password
 import synapse.http.client
 import synapse.notifier
+import synapse.push.pusherpool
 import synapse.replication.tcp.client
 import synapse.replication.tcp.handler
 import synapse.rest.media.v1.media_repository
@@ -132,4 +133,6 @@ class HomeServer(object):
     def get_registration_handler(self) -> synapse.handlers.register.RegistrationHandler:
         pass
     def get_macaroon_generator(self) -> synapse.handlers.auth.MacaroonGenerator:
+        pass
+    def get_pusherpool(self) -> synapse.push.pusherpool.PusherPool:
         pass

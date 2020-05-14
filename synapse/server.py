@@ -581,7 +581,7 @@ class HomeServer(object):
         return ReplicationStreamer(self)
 
     def build_replication_data_handler(self):
-        return ReplicationDataHandler(self.get_datastore())
+        return ReplicationDataHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

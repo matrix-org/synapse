@@ -26,7 +26,6 @@ from twisted.web.resource import NoResource
 
 import synapse
 import synapse.events
-from synapse.api.constants import EventTypes
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
@@ -80,11 +79,6 @@ from synapse.replication.tcp.streams import (
     TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
-)
-from synapse.replication.tcp.streams.events import (
-    EventsStream,
-    EventsStreamEventRow,
-    EventsStreamRow,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events
@@ -633,7 +627,7 @@ class GenericWorkerServer(HomeServer):
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
-        super(GenericWorkerReplicationHandler, self).__init__(hs.get_datastore())
+        super(GenericWorkerReplicationHandler, self).__init__(hs)
 
         self.store = hs.get_datastore()
         self.typing_handler = hs.get_typing_handler()
@@ -659,30 +653,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
                     stream_name, token, rows
                 )
 
-            if stream_name == EventsStream.NAME:
-                # We shouldn't get multiple rows per token for events stream, so
-                # we don't need to optimise this for multiple rows.
-                for row in rows:
-                    if row.type != EventsStreamEventRow.TypeId:
-                        continue
-                    assert isinstance(row, EventsStreamRow)
-
-                    event = await self.store.get_event(
-                        row.data.event_id, allow_rejected=True
-                    )
-                    if event.rejected_reason:
-                        continue
-
-                    extra_users = ()
-                    if event.type == EventTypes.Member:
-                        extra_users = (event.state_key,)
-                    max_token = self.store.get_room_max_stream_ordering()
-                    self.notifier.on_new_room_event(
-                        event, token, max_token, extra_users
-                    )
-
-                await self.pusher_pool.on_new_notifications(token, token)
-            elif stream_name == PushRulesStream.NAME:
+            if stream_name == PushRulesStream.NAME:
                 self.notifier.on_new_event(
                     "push_rules_key", token, users=[row.user_id for row in rows]
                 )
