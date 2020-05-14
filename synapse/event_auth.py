@@ -486,7 +486,7 @@ def _check_power_levels(room_version_obj, event, auth_events):
 
     # MSC2209 specifies these checks should also be done for the "notifications"
     # key.
-    if room_version_obj.check_notifications_auth:
+    if room_version_obj.limit_notifications_power_levels:
         old_list = current_state.content.get("notifications", {})
         new_list = event.content.get("notifications", {})
         for ev_id in set(list(old_list) + list(new_list)):
