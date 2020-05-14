@@ -17,8 +17,6 @@
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
-
-from synapse.storage import background_updates
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.roommember import ProfileInfo
 from synapse.util.caches.descriptors import cached

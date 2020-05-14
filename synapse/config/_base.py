@@ -18,8 +18,8 @@
 import argparse
 import errno
 import os
-from io import open as io_open
 from collections import OrderedDict
+from io import open as io_open
 from textwrap import dedent
 from typing import Any, MutableMapping, Optional
 

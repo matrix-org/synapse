@@ -32,9 +32,7 @@ from twisted.web.iweb import IPolicyForHTTPS
 
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
-from synapse.http.federation.matrix_federation_agent import (
-    MatrixFederationAgent,
-)
+from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.http.federation.srv_resolver import Server
 from synapse.http.federation.well_known_resolver import (
     WellKnownResolver,

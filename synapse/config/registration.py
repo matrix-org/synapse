@@ -162,9 +162,9 @@ class RegistrationConfig(Config):
             self.replicate_user_profiles_to = [self.replicate_user_profiles_to]
 
         self.shadow_server = config.get("shadow_server", None)
-        self.rewrite_identity_server_urls = config.get(
-            "rewrite_identity_server_urls"
-        ) or {}
+        self.rewrite_identity_server_urls = (
+            config.get("rewrite_identity_server_urls") or {}
+        )
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False

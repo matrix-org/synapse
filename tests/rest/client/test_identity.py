@@ -120,9 +120,7 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         # TODO: This class does not use a singleton to get it's http client
         # This should be fixed for easier testing
         # https://github.com/matrix-org/synapse-dinsic/issues/26
-        self.hs.get_handlers().identity_handler.http_client = (
-            mock_http_client
-        )
+        self.hs.get_handlers().identity_handler.http_client = mock_http_client
 
         return self.hs
 
@@ -142,8 +140,8 @@ class IdentityEnabledTestCase(unittest.HomeserverTestCase):
         self.hs.get_room_member_handler().simple_http_client = Mock(
             spec=["get_json", "post_json_get_json"]
         )
-        self.hs.get_room_member_handler().simple_http_client.get_json.return_value = (
-            defer.succeed((200, "{}"))
+        self.hs.get_room_member_handler().simple_http_client.get_json.return_value = defer.succeed(
+            (200, "{}")
         )
 
         params = {

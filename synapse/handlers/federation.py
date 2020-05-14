@@ -412,8 +412,7 @@ class FederationHandler(BaseHandler):
                     # First though we need to fetch all the events that are in
                     # state_map, so we can build up the state below.
                     evs = await self.store.get_events(
-                        list(state_map.values()),
-                        get_prev_content=False,
+                        list(state_map.values()), get_prev_content=False,
                     )
                     event_map.update(evs)
 

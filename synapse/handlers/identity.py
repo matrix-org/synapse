@@ -172,9 +172,7 @@ class IdentityHandler(BaseHandler):
         bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         if use_v2:
             bind_url = "%s/_matrix/identity/v2/3pid/bind" % (id_server_url,)
-            headers["Authorization"] = create_id_access_token_header(
-                id_access_token
-            )
+            headers["Authorization"] = create_id_access_token_header(id_access_token)
         else:
             bind_url = "%s/_matrix/identity/api/v1/3pid/bind" % (id_server_url,)
 
@@ -417,7 +415,9 @@ class IdentityHandler(BaseHandler):
         if add_https:
             rewritten_url = "https://" + rewritten_url
 
-        rewritten_url = self.rewrite_identity_server_urls.get(rewritten_url, rewritten_url)
+        rewritten_url = self.rewrite_identity_server_urls.get(
+            rewritten_url, rewritten_url
+        )
         logger.debug("Rewriting identity server rule from %s to %s", url, rewritten_url)
         return rewritten_url
 
@@ -463,7 +463,8 @@ class IdentityHandler(BaseHandler):
 
         try:
             data = yield self.http_client.post_json_get_json(
-                "%s/_matrix/identity/api/v1/validate/email/requestToken" % (id_server_url,),
+                "%s/_matrix/identity/api/v1/validate/email/requestToken"
+                % (id_server_url,),
                 params,
             )
             return data
@@ -520,7 +521,8 @@ class IdentityHandler(BaseHandler):
         id_server_url = self.rewrite_id_server_url(id_server_url)
         try:
             data = yield self.http_client.post_json_get_json(
-                "%s/_matrix/identity/api/v1/validate/msisdn/requestToken" % (id_server_url,),
+                "%s/_matrix/identity/api/v1/validate/msisdn/requestToken"
+                % (id_server_url,),
                 params,
             )
         except HttpResponseException as e:
@@ -806,7 +808,7 @@ class IdentityHandler(BaseHandler):
                 400,
                 "Non-dict object from %s during v2 hash_details request: %s"
                 % (id_server_url, hash_details),
-                )
+            )
 
         # Extract information from hash_details
         supported_lookup_algorithms = hash_details.get("algorithms")
@@ -821,7 +823,7 @@ class IdentityHandler(BaseHandler):
                 400,
                 "Invalid hash details received from identity server %s: %s"
                 % (id_server_url, hash_details),
-                )
+            )
 
         # Check if any of the supported lookup algorithms are present
         if LookupAlgorithm.SHA256 in supported_lookup_algorithms:
@@ -863,7 +865,7 @@ class IdentityHandler(BaseHandler):
                     "pepper": lookup_pepper,
                 },
                 headers=headers,
-                )
+            )
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except Exception as e:
@@ -1011,9 +1013,7 @@ class IdentityHandler(BaseHandler):
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(
-                    "Error trying to call /store-invite on %s: %s",
-                    id_server_url,
-                    e,
+                    "Error trying to call /store-invite on %s: %s", id_server_url, e,
                 )
 
             if data is None:

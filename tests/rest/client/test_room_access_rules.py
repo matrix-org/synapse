@@ -21,6 +21,7 @@ import string
 from mock import Mock
 
 from twisted.internet import defer
+
 from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -83,9 +84,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["send_invite"])
         mock_federation_client.send_invite.side_effect = send_invite
 
-        mock_http_client = Mock(
-            spec=["get_json", "post_json_get_json"],
-        )
+        mock_http_client = Mock(spec=["get_json", "post_json_get_json"],)
         # Mocking the response for /info on the IS API.
         mock_http_client.get_json.side_effect = get_json
         # Mocking the response for /store-invite on the IS API.
@@ -99,7 +98,9 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         # TODO: This class does not use a singleton to get it's http client
         # This should be fixed for easier testing
         # https://github.com/matrix-org/synapse-dinsic/issues/26
-        self.hs.get_handlers().identity_handler.blacklisting_http_client = mock_http_client
+        self.hs.get_handlers().identity_handler.blacklisting_http_client = (
+            mock_http_client
+        )
 
         return self.hs
 

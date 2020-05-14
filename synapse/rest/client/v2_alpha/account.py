@@ -31,10 +31,10 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.types import UserID
 from synapse.push.mailer import Mailer, load_jinja2_templates
+from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.stringutils import assert_valid_client_secret, random_string
+from synapse.util.stringutils import assert_valid_client_secret
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -650,7 +650,10 @@ class ThreepidRestServlet(RestServlet):
             threepid = body.get("threepid")
 
             await self.auth_handler.add_threepid(
-                user_id, threepid["medium"], threepid["address"], threepid["validated_at"]
+                user_id,
+                threepid["medium"],
+                threepid["address"],
+                threepid["validated_at"],
             )
 
             if self.hs.config.shadow_server:
@@ -710,7 +713,7 @@ class ThreepidRestServlet(RestServlet):
             "%s/_matrix/client/r0/account/3pid?access_token=%s&user_id=%s"
             % (shadow_hs_url, as_token, user_id),
             body,
-            )
+        )
 
 
 class ThreepidAddRestServlet(RestServlet):

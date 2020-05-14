@@ -619,10 +619,7 @@ class RegistrationHandler(BaseHandler):
 
     @defer.inlineCallbacks
     def post_registration_actions(
-        self,
-        user_id,
-        auth_result,
-        access_token,
+        self, user_id, auth_result, access_token,
     ):
         """A user has completed registration
 
@@ -654,7 +651,8 @@ class RegistrationHandler(BaseHandler):
                 # Bind the 3PID to the identity server
                 logger.debug(
                     "Binding email to %s on id_server %s",
-                    user_id, self.hs.config.account_threepid_delegate_email,
+                    user_id,
+                    self.hs.config.account_threepid_delegate_email,
                 )
                 threepid_creds = threepid["threepid_creds"]
 
@@ -662,7 +660,9 @@ class RegistrationHandler(BaseHandler):
                 # `bind_threepid` will add https:// to it, so this restricts
                 # account_threepid_delegate.email to https:// addresses only
                 # We assume this is always the case for dinsic however.
-                if self.hs.config.account_threepid_delegate_email.startswith("https://"):
+                if self.hs.config.account_threepid_delegate_email.startswith(
+                    "https://"
+                ):
                     id_server = self.hs.config.account_threepid_delegate_email[8:]
                 else:
                     # Must start with http:// instead

@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import inspect
-from typing import Dict, Optional, List
+from typing import Dict, List, Optional
 
 from synapse.spam_checker_api import SpamCheckerApi
 

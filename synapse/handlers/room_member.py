@@ -24,16 +24,8 @@ from twisted.internet import defer
 
 from synapse import types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.ratelimiting import Ratelimiter
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    HttpResponseException,
-    SynapseError,
-)
-from synapse.handlers.identity import LookupAlgorithm, create_id_access_token_header
-from synapse.http.client import SimpleHttpClient
 from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.types import Collection, RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
