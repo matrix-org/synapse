@@ -42,7 +42,6 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
-from synapse.events.utils import validate_canonicaljson
 from synapse.events.validator import EventValidator
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -793,14 +792,9 @@ class EventCreationHandler(object):
             EventTypes.Create,
             "",
         ):
-            room_version_id = event.content.get(
-                "room_version", RoomVersions.V1.identifier
-            )
-            room_version = KNOWN_ROOM_VERSIONS[room_version_id]
+            room_version = event.content.get("room_version", RoomVersions.V1.identifier)
         else:
-            room_version = yield defer.ensureDeferred(
-                self.store.get_room_version(event.room_id)
-            )
+            room_version = yield self.store.get_room_version_id(event.room_id)
 
         event_allowed = yield self.third_party_event_rules.check_event_allowed(
             event, context
@@ -811,14 +805,10 @@ class EventCreationHandler(object):
             )
 
         try:
-            yield self.auth.check_from_context(room_version.identifier, event, context)
+            yield self.auth.check_from_context(room_version, event, context)
         except AuthError as err:
             logger.warning("Denying new event %r because %s", event, err)
             raise err
-
-        # Ensure the data is spec compliant JSON.
-        if room_version.strict_canonicaljson:
-            validate_canonicaljson(event.get_pdu_json())
 
         # Ensure that we can round trip before trying to persist in db
         try:

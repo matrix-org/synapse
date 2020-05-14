@@ -17,6 +17,7 @@ from six import integer_types, string_types
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
+from synapse.events.utils import validate_canonicaljson
 from synapse.api.room_versions import EventFormatVersions
 from synapse.types import EventID, RoomID, UserID
 
@@ -54,6 +55,9 @@ class EventValidator(object):
         for s in event_strings:
             if not isinstance(getattr(event, s), string_types):
                 raise SynapseError(400, "'%s' not a string type" % (s,))
+
+        if event.room_version.strict_canonicaljson:
+            validate_canonicaljson(event.content)
 
         if event.type == EventTypes.Aliases:
             if "aliases" in event.content:
