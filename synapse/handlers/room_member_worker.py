@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import List, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.handlers.room_member import RoomMemberHandler
@@ -22,6 +23,7 @@ from synapse.replication.http.membership import (
     ReplicationRemoteRejectInviteRestServlet as ReplRejectInvite,
     ReplicationUserJoinedLeftRoomRestServlet as ReplJoinedLeft,
 )
+from synapse.types import Requester, UserID
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,14 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         self._remote_reject_client = ReplRejectInvite.make_client(hs)
         self._notify_change_client = ReplJoinedLeft.make_client(hs)
 
-    async def _remote_join(self, requester, remote_room_hosts, room_id, user, content):
+    async def _remote_join(
+        self,
+        requester: Requester,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
+    ) -> Optional[dict]:
         """Implements RoomMemberHandler._remote_join
         """
         if len(remote_room_hosts) == 0:
@@ -53,8 +62,13 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         return ret
 
     async def _remote_reject_invite(
-        self, requester, remote_room_hosts, room_id, target, content
-    ):
+        self,
+        requester: Requester,
+        remote_room_hosts: List[str],
+        room_id: str,
+        target: UserID,
+        content: dict,
+    ) -> dict:
         """Implements RoomMemberHandler._remote_reject_invite
         """
         return await self._remote_reject_client(
@@ -65,16 +79,16 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             content=content,
         )
 
-    async def _user_joined_room(self, target, room_id):
+    async def _user_joined_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_joined_room
         """
-        return await self._notify_change_client(
+        await self._notify_change_client(
             user_id=target.to_string(), room_id=room_id, change="joined"
         )
 
-    async def _user_left_room(self, target, room_id):
+    async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room
         """
-        return await self._notify_change_client(
+        await self._notify_change_client(
             user_id=target.to_string(), room_id=room_id, change="left"
         )
