@@ -1,0 +1,22 @@
+version: '3.1'
+
+services:
+
+  redis:
+    image: redis:5.0
+
+  sytest:
+    image: matrixdotorg/sytest-synapse:py37
+    depends_on:
+      - redis
+    env_file: docker-compose-env
+    environment:
+      POSTGRES: "1"
+      WORKERS: "1"
+      BLACKLIST: "synapse-blacklist-with-workers"
+      REDIS: "redis"
+    working_dir: "/src"
+    entrypoint: ""
+    volumes:
+      - ${BUILDKITE_BUILD_CHECKOUT_PATH}:/src
+      - ${BUILDKITE_BUILD_CHECKOUT_PATH}/logs:/logs

@@ -1,0 +1,23 @@
+version: '3.1'
+
+services:
+
+  postgres:
+    image: postgres:12
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--lc-collate C --lc-ctype C --encoding UTF8"
+    command: -c fsync=off
+
+  testenv:
+    image: python:3.8
+    depends_on:
+      - postgres
+    env_file: docker-compose-env
+    environment:
+      SYNAPSE_POSTGRES_HOST: postgres
+      SYNAPSE_POSTGRES_USER: postgres
+      SYNAPSE_POSTGRES_PASSWORD: postgres
+    working_dir: /src
+    volumes:
+      - ${BUILDKITE_BUILD_CHECKOUT_PATH}:/src
