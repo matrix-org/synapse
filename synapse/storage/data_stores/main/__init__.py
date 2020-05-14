@@ -34,6 +34,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
 from .cache import CacheInvalidationWorkerStore
+from .censor_events import CensorEventsStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
@@ -42,16 +43,17 @@ from .e2e_room_keys import EndToEndRoomKeyStore
 from .end_to_end_keys import EndToEndKeyStore
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
-from .events import EventsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
 from .media_repository import MediaRepositoryStore
+from .metrics import ServerMetricsStore
 from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
+from .purge_events import PurgeEventsStore
 from .push_rule import PushRuleStore
 from .pusher import PusherStore
 from .receipts import ReceiptsStore
@@ -88,7 +90,7 @@ class DataStore(
     StateStore,
     SignatureStore,
     ApplicationServiceStore,
-    EventsStore,
+    PurgeEventsStore,
     EventFederationStore,
     MediaRepositoryStore,
     RejectionsStore,
@@ -113,8 +115,10 @@ class DataStore(
     MonthlyActiveUsersStore,
     StatsStore,
     RelationsStore,
+    CensorEventsStore,
     UIAuthStore,
     CacheInvalidationWorkerStore,
+    ServerMetricsStore,
 ):
     def __init__(self, database: Database, db_conn, hs):
         self.hs = hs

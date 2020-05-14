@@ -165,6 +165,39 @@ class EventAuthTestCase(unittest.TestCase):
                 do_sig_check=False,
             )
 
+    def test_msc2209(self):
+        """
+        Notifications power levels get checked due to MSC2209.
+        """
+        creator = "@creator:example.com"
+        pleb = "@joiner:example.com"
+
+        auth_events = {
+            ("m.room.create", ""): _create_event(creator),
+            ("m.room.member", creator): _join_event(creator),
+            ("m.room.power_levels", ""): _power_levels_event(
+                creator, {"state_default": "30", "users": {pleb: "30"}}
+            ),
+            ("m.room.member", pleb): _join_event(pleb),
+        }
+
+        # pleb should be able to modify the notifications power level.
+        event_auth.check(
+            RoomVersions.V1,
+            _power_levels_event(pleb, {"notifications": {"room": 100}}),
+            auth_events,
+            do_sig_check=False,
+        )
+
+        # But an MSC2209 room rejects this change.
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.MSC2209_DEV,
+                _power_levels_event(pleb, {"notifications": {"room": 100}}),
+                auth_events,
+                do_sig_check=False,
+            )
+
 
 # helpers for making events
 

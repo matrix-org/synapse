@@ -58,7 +58,11 @@ class RoomVersion(object):
     enforce_key_validity = attr.ib()  # bool
 
     # bool: before MSC2261/MSC2432, m.room.aliases had special auth rules and redaction rules
-    special_case_aliases_auth = attr.ib(type=bool, default=False)
+    special_case_aliases_auth = attr.ib(type=bool)
+
+    # bool: MSC2209: Check 'notifications' key while verifying
+    # m.room.power_levels auth rules.
+    limit_notifications_power_levels = attr.ib(type=bool)
 
 
 class RoomVersions(object):
@@ -69,6 +73,7 @@ class RoomVersions(object):
         StateResolutionVersions.V1,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        limit_notifications_power_levels=False,
     )
     V2 = RoomVersion(
         "2",
@@ -77,6 +82,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        limit_notifications_power_levels=False,
     )
     V3 = RoomVersion(
         "3",
@@ -85,6 +91,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        limit_notifications_power_levels=False,
     )
     V4 = RoomVersion(
         "4",
@@ -93,6 +100,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=False,
         special_case_aliases_auth=True,
+        limit_notifications_power_levels=False,
     )
     V5 = RoomVersion(
         "5",
@@ -101,6 +109,7 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=True,
+        limit_notifications_power_levels=False,
     )
     MSC2432_DEV = RoomVersion(
         "org.matrix.msc2432",
@@ -109,6 +118,16 @@ class RoomVersions(object):
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
+        limit_notifications_power_levels=False,
+    )
+    MSC2209_DEV = RoomVersion(
+        "org.matrix.msc2209",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=True,
+        limit_notifications_power_levels=True,
     )
 
 
@@ -121,5 +140,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V4,
         RoomVersions.V5,
         RoomVersions.MSC2432_DEV,
+        RoomVersions.MSC2209_DEV,
     )
 }  # type: Dict[str, RoomVersion]

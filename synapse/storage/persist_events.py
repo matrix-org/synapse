@@ -23,7 +23,6 @@ from typing import Iterable, List, Optional, Set, Tuple
 from six import iteritems
 from six.moves import range
 
-import attr
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -35,6 +34,7 @@ from synapse.logging.context import PreserveLoggingContext, make_deferred_yielda
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateResolutionStore
 from synapse.storage.data_stores import DataStores
+from synapse.storage.data_stores.main.events import DeltaState
 from synapse.types import StateMap
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure
@@ -71,22 +71,6 @@ stale_forward_extremities_counter = Histogram(
     "Number of unchanged forward extremities for each new event",
     buckets=(0, 1, 2, 3, 5, 7, 10, 15, 20, 50, 100, 200, 500, "+Inf"),
 )
-
-
-@attr.s(slots=True)
-class DeltaState:
-    """Deltas to use to update the `current_state_events` table.
-
-    Attributes:
-        to_delete: List of type/state_keys to delete from current state
-        to_insert: Map of state to upsert into current state
-        no_longer_in_room: The server is not longer in the room, so the room
-            should e.g. be removed from `current_state_events` table.
-    """
-
-    to_delete = attr.ib(type=List[Tuple[str, str]])
-    to_insert = attr.ib(type=StateMap[str])
-    no_longer_in_room = attr.ib(type=bool, default=False)
 
 
 class _EventPeristenceQueue(object):
@@ -205,6 +189,7 @@ class EventsPersistenceStorage(object):
         # store for now.
         self.main_store = stores.main
         self.state_store = stores.state
+        self.persist_events_store = stores.persist_events
 
         self._clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
@@ -445,7 +430,7 @@ class EventsPersistenceStorage(object):
                         if current_state is not None:
                             current_state_for_room[room_id] = current_state
 
-            await self.main_store._persist_events_and_state_updates(
+            await self.persist_events_store._persist_events_and_state_updates(
                 chunk,
                 current_state_for_room=current_state_for_room,
                 state_delta_for_room=state_delta_for_room,
@@ -491,13 +476,15 @@ class EventsPersistenceStorage(object):
         )
 
         # Remove any events which are prev_events of any existing events.
-        existing_prevs = await self.main_store._get_events_which_are_prevs(result)
+        existing_prevs = await self.persist_events_store._get_events_which_are_prevs(
+            result
+        )
         result.difference_update(existing_prevs)
 
         # Finally handle the case where the new events have soft-failed prev
         # events. If they do we need to remove them and their prev events,
         # otherwise we end up with dangling extremities.
-        existing_prevs = await self.main_store._get_prevs_before_rejected(
+        existing_prevs = await self.persist_events_store._get_prevs_before_rejected(
             e_id for event in new_events for e_id in event.prev_event_ids()
         )
         result.difference_update(existing_prevs)
