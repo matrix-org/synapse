@@ -58,6 +58,8 @@ class EventValidator(object):
 
         # Depending on the room version, ensure the data is spec compliant JSON.
         if event.room_version.strict_canonicaljson:
+            # Note that only the client controlled portion of the event is
+            # checked, since we trust the portions of the event we created.
             validate_canonicaljson(event.content)
 
         if event.type == EventTypes.Aliases:
