@@ -18,7 +18,7 @@ from synapse.replication.tcp.streams._base import (
     AccountDataStream,
 )
 
-from tests.replication.tcp.streams._base import BaseStreamTestCase
+from tests.replication._base import BaseStreamTestCase
 
 
 class AccountDataStreamTestCase(BaseStreamTestCase):
