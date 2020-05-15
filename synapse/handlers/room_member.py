@@ -217,16 +217,13 @@ class RoomMemberHandler(object):
 
     async def copy_room_tags_and_direct_to_room(
         self, old_room_id, new_room_id, user_id
-    ):
+    ) -> None:
         """Copies the tags and direct room state from one room to another.
 
         Args:
-            old_room_id (str)
-            new_room_id (str)
-            user_id (str)
-
-        Returns:
-            Deferred[None]
+            old_room_id: The room ID of the old room.
+            new_room_id: The room ID of the new room.
+            user_id: The user's ID.
         """
         # Retrieve user account data for predecessor room
         user_account_data, _ = await self.store.get_account_data_for_user(user_id)
@@ -498,11 +495,7 @@ class RoomMemberHandler(object):
 
         Args:
             old_room_id: The ID of the old room
-
             room_id: The ID of the new room
-
-        Returns:
-            Deferred
         """
         logger.info("Transferring room state from %s to %s", old_room_id, room_id)
 
@@ -579,12 +572,12 @@ class RoomMemberHandler(object):
         Change the membership status of a user in a room.
 
         Args:
-            requester (Requester): The local user who requested the membership
+            requester: The local user who requested the membership
                 event. If None, certain checks, like whether this homeserver can
                 act as the sender, will be skipped.
-            event (SynapseEvent): The membership event.
+            event: The membership event.
             context: The context of the event.
-            ratelimit (bool): Whether to rate limit this request.
+            ratelimit: Whether to rate limit this request.
         Raises:
             SynapseError if there was a problem changing the membership.
         """
@@ -909,7 +902,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Check if the complexity of a local room is too great.
 
         Args:
-            room_id
+            room_id: The room ID to check for complexity.
         """
         max_complexity = self.hs.config.limit_remote_rooms.complexity
         complexity = await self.store.get_room_complexity(room_id)
