@@ -252,7 +252,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:py35"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -285,7 +285,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:py35"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -322,7 +322,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:py35"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -356,7 +356,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:py38"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -393,7 +393,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:py37"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"

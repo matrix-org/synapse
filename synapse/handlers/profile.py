@@ -493,7 +493,7 @@ class BaseProfileHandler(BaseHandler):
     @defer.inlineCallbacks
     def check_profile_query_allowed(self, target_user, requester=None):
         """Checks whether a profile query is allowed. If the
-        'limit_profile_requests_to_known_users' config flag is set to True and a
+        'require_auth_for_profile_requests' config flag is set to True and a
         'requester' is provided, the query is only allowed if the two users
         share a room.
 

@@ -875,7 +875,7 @@ class RoomCreationHandler(BaseHandler):
 
         if "encryption_alg" in config:
             yield send(
-                etype=EventTypes.Encryption,
+                etype=EventTypes.RoomEncryption,
                 state_key="",
                 content={"algorithm": config["encryption_alg"]},
             )

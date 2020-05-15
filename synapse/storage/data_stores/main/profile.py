@@ -126,6 +126,9 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def set_profile_displayname(self, user_localpart, new_displayname, batchnum):
+        # Invalidate the read cache for this user
+        self.get_profile_displayname.invalidate((user_localpart,))
+
         return self.db.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
@@ -135,6 +138,9 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     def set_profile_avatar_url(self, user_localpart, new_avatar_url, batchnum):
+        # Invalidate the read cache for this user
+        self.get_profile_avatar_url.invalidate((user_localpart,))
+
         return self.db.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},

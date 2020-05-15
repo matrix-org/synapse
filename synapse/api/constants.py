@@ -85,7 +85,6 @@ class EventTypes(object):
     RoomAvatar = "m.room.avatar"
     RoomEncryption = "m.room.encryption"
     GuestAccess = "m.room.guest_access"
-    Encryption = "m.room.encryption"
 
     # These are used for validation
     Message = "m.room.message"

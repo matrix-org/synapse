@@ -12,7 +12,7 @@ if [[ -z $BUILDKITE_PULL_REQUEST_BASE_BRANCH ]]; then
 
     # It probably hasn't had a PR opened yet. Since all PRs land on develop, we
     # can probably assume it's based on it and will be merged into it.
-    GITBASE="develop"
+    GITBASE="dinsic"
 else
     # Get the reference, using the GitHub API
     GITBASE=$BUILDKITE_PULL_REQUEST_BASE_BRANCH
