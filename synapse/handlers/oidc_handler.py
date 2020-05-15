@@ -311,7 +311,7 @@ class OidcHandler:
         ``ClientAuth`` to authenticate with the client with its ID and secret.
 
         Args:
-            code: The autorization code we got from the callback.
+            code: The authorization code we got from the callback.
 
         Returns:
             A dict containing various tokens.
@@ -501,10 +501,10 @@ class OidcHandler:
         request: SynapseRequest,
         client_redirect_url: bytes,
         ui_auth_session_id: Optional[str] = None,
-    ) -> None:
+    ) -> str:
         """Handle an incoming request to /login/sso/redirect
 
-        It redirects the browser to the authorization endpoint with a few
+        It returns a redirect to the authorization endpoint with a few
         parameters:
 
           - ``client_id``: the client ID set in ``oidc_config.client_id``
@@ -514,11 +514,10 @@ class OidcHandler:
           - ``state``: a random string
           - ``nonce``: a random string
 
-        In addition to redirecting the client, we are setting a cookie with
+        In addition generating a redirect URL, we are setting a cookie with
         a signed macaroon token containing the state, the nonce and the
         client_redirect_url params. Those are then checked when the client
         comes back from the provider.
-
 
         Args:
             request: the incoming request from the browser.
@@ -527,6 +526,9 @@ class OidcHandler:
                 when everything is done
             ui_auth_session_id: The session ID of the ongoing UI Auth (or
                 None if this is a login).
+
+        Returns:
+            The redirect URL to the authorization endpoint.
 
         """
 
