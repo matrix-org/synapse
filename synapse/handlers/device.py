@@ -539,7 +539,10 @@ class DeviceListUpdater(object):
         # Attempt to resync out of sync device lists every 30s.
         self._resync_retry_in_progress = False
         self.clock.looping_call(
-            run_as_background_process, 30 * 1000, self._maybe_retry_device_resync,
+            run_as_background_process,
+            30 * 1000,
+            func=self._maybe_retry_device_resync,
+            desc="_maybe_retry_device_resync",
         )
 
     @trace
