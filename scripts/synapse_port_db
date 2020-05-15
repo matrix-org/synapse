@@ -48,6 +48,7 @@ from synapse.storage.data_stores.main.events_bg_updates import (
 from synapse.storage.data_stores.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
+from synapse.storage.data_stores.main.profile import ProfileStore
 from synapse.storage.data_stores.main.registration import (
     RegistrationBackgroundUpdateStore,
 )
@@ -145,6 +146,7 @@ class Store(
     DeviceBackgroundUpdateStore,
     EventsBackgroundUpdatesStore,
     MediaRepositoryBackgroundUpdateStore,
+    ProfileStore,
     RegistrationBackgroundUpdateStore,
     RoomBackgroundUpdateStore,
     RoomMemberBackgroundUpdateStore,
