@@ -72,11 +72,9 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == "events":
-            self._stream_id_gen.advance(token)
             for row in rows:
                 self._process_event_stream_row(token, row)
         elif stream_name == "backfill":
-            self._backfill_id_gen.advance(-token)
             for row in rows:
                 self._invalidate_caches_for_event(
                     -token,
