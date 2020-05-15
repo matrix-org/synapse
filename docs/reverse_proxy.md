@@ -62,7 +62,7 @@ the reverse proxy and the homeserver.
 > **NOTE**: Do not add a `/` after the port in `proxy_pass`, otherwise nginx will
 canonicalise/normalise the URI.
 
-### Caddy
+### Caddy 1
 
         matrix.example.com {
           proxy /_matrix http://localhost:8008 {
@@ -74,6 +74,16 @@ canonicalise/normalise the URI.
           proxy / http://localhost:8008 {
             transparent
           }
+        }
+
+### Caddy 2
+
+        matrix.example.com {
+          reverse_proxy /_matrix/* http://localhost:8008
+        }
+
+        example.com:8448 {
+          reverse_proxy http://localhost:8008
         }
 
 ### Apache
