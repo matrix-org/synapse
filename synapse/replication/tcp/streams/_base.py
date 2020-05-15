@@ -593,6 +593,8 @@ class AccountDataStream(Stream):
             if stream_id <= to_token
         )
 
+        # we know that the room_results are already limited to `to_token` so no need
+        # for a check on `stream_id` here.
         room_rows = (
             (stream_id, (user_id, room_id, account_data_type))
             for stream_id, user_id, room_id, account_data_type in room_results
