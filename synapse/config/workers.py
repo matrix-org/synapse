@@ -15,7 +15,7 @@
 
 import attr
 
-from ._base import Config
+from ._base import Config, ConfigError
 
 
 @attr.s
@@ -102,6 +102,17 @@ class WorkerConfig(Config):
         # Map from type of streams to source, c.f. WriterLocations.
         writers = config.get("writers", {}) or {}
         self.writers = WriterLocations(**writers)
+
+        # Check that the configured writer for events also appears in
+        # `instance_map`.
+        if (
+            self.writers.events != "master"
+            and self.writers.events not in self.instance_map
+        ):
+            raise ConfigError(
+                "Instance %r is configured to write events but does not appear in `instance_map` config."
+                % (self.writers.events,)
+            )
 
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in
