@@ -644,7 +644,9 @@ class RoomMemberHandler(object):
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target_user, room_id)
 
-    async def _can_guest_join(self, current_state_ids: Dict[Tuple[str, str], str]) -> bool:
+    async def _can_guest_join(
+        self, current_state_ids: Dict[Tuple[str, str], str]
+    ) -> bool:
         """
         Returns whether a guest can join a room based on its current state.
         """
