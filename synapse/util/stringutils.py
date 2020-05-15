@@ -19,8 +19,7 @@ import re
 import string
 from collections import Iterable
 
-import six
-from six import PY2, PY3
+from six import PY3
 from six.moves import range
 
 from synapse.api.errors import Codes, SynapseError
@@ -66,23 +65,6 @@ def is_ascii(s):
         return False
     else:
         return True
-
-
-def to_ascii(s):
-    """Converts a string to ascii if it is ascii, otherwise leave it alone.
-
-    If given None then will return None.
-    """
-    if PY3:
-        return s
-
-    if s is None:
-        return None
-
-    try:
-        return s.encode("ascii")
-    except UnicodeEncodeError:
-        return s
 
 
 def assert_valid_client_secret(client_secret):
