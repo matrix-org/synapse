@@ -19,9 +19,6 @@ import re
 import string
 from collections import Iterable
 
-from six import PY3
-from six.moves import range
-
 from synapse.api.errors import Codes, SynapseError
 
 _string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
@@ -46,24 +43,13 @@ def random_string_with_symbols(length):
 
 
 def is_ascii(s):
-
-    if PY3:
-        if isinstance(s, bytes):
-            try:
-                s.decode("ascii").encode("ascii")
-            except UnicodeDecodeError:
-                return False
-            except UnicodeEncodeError:
-                return False
-            return True
-
-    try:
-        s.encode("ascii")
-    except UnicodeEncodeError:
-        return False
-    except UnicodeDecodeError:
-        return False
-    else:
+    if isinstance(s, bytes):
+        try:
+            s.decode("ascii").encode("ascii")
+        except UnicodeDecodeError:
+            return False
+        except UnicodeEncodeError:
+            return False
         return True
 
 
