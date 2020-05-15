@@ -85,42 +85,6 @@ def to_ascii(s):
         return s
 
 
-def exception_to_unicode(e):
-    """Helper function to extract the text of an exception as a unicode string
-
-    Args:
-        e (Exception): exception to be stringified
-
-    Returns:
-        unicode
-    """
-    # urgh, this is a mess. The basic problem here is that psycopg2 constructs its
-    # exceptions with PyErr_SetString, with a (possibly non-ascii) argument. str() will
-    # then produce the raw byte sequence. Under Python 2, this will then cause another
-    # error if it gets mixed with a `unicode` object, as per
-    # https://github.com/matrix-org/synapse/issues/4252
-
-    # First of all, if we're under python3, everything is fine because it will sort this
-    # nonsense out for us.
-    if not PY2:
-        return str(e)
-
-    # otherwise let's have a stab at decoding the exception message. We'll circumvent
-    # Exception.__str__(), which would explode if someone raised Exception(u'non-ascii')
-    # and instead look at what is in the args member.
-
-    if len(e.args) == 0:
-        return ""
-    elif len(e.args) > 1:
-        return six.text_type(repr(e.args))
-
-    msg = e.args[0]
-    if isinstance(msg, bytes):
-        return msg.decode("utf-8", errors="replace")
-    else:
-        return msg
-
-
 def assert_valid_client_secret(client_secret):
     """Validate that a given string matches the client_secret regex defined by the spec"""
     if client_secret_regex.match(client_secret) is None:
