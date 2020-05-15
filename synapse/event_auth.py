@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, List, Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -30,7 +30,7 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.events import EventBase
-from synapse.types import UserID, get_domain_from_id
+from synapse.types import StateMap, UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 def check(
     room_version_obj: RoomVersion,
     event: EventBase,
-    auth_events: Dict[Tuple[str, str], EventBase],
+    auth_events: StateMap[EventBase],
     do_sig_check: bool = True,
     do_size_check: bool = True,
 ) -> None:
@@ -208,9 +208,7 @@ def _check_size_limits(event: EventBase) -> None:
         too_big("event")
 
 
-def _can_federate(
-    event: EventBase, auth_events: Dict[Tuple[str, str], EventBase]
-) -> bool:
+def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
     creation_event = auth_events.get((EventTypes.Create, ""))
     # There should always be a creation event, but if not don't federate.
     if not creation_event:
@@ -220,7 +218,7 @@ def _can_federate(
 
 
 def _is_membership_change_allowed(
-    event: EventBase, auth_events: Dict[Tuple[str, str], EventBase]
+    event: EventBase, auth_events: StateMap[EventBase]
 ) -> None:
     membership = event.content["membership"]
 
@@ -348,7 +346,7 @@ def _is_membership_change_allowed(
 
 
 def _check_event_sender_in_room(
-    event: EventBase, auth_events: Dict[Tuple[str, str], EventBase]
+    event: EventBase, auth_events: StateMap[EventBase]
 ) -> None:
     key = (EventTypes.Member, event.user_id)
     member_event = auth_events.get(key)
@@ -400,9 +398,7 @@ def get_send_level(
     return int(send_level)
 
 
-def _can_send_event(
-    event: EventBase, auth_events: Dict[Tuple[str, str], EventBase]
-) -> bool:
+def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
     power_levels_event = _get_power_level_event(auth_events)
 
     send_level = get_send_level(event.type, event.get("state_key"), power_levels_event)
@@ -425,9 +421,7 @@ def _can_send_event(
 
 
 def check_redaction(
-    room_version_obj: RoomVersion,
-    event: EventBase,
-    auth_events: Dict[Tuple[str, str], EventBase],
+    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase],
 ) -> bool:
     """Check whether the event sender is allowed to redact the target event.
 
@@ -461,9 +455,7 @@ def check_redaction(
 
 
 def _check_power_levels(
-    room_version_obj: RoomVersion,
-    event: EventBase,
-    auth_events: Dict[Tuple[str, str], EventBase],
+    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase],
 ) -> None:
     user_list = event.content.get("users", {})
     # Validate users
@@ -556,15 +548,11 @@ def _check_power_levels(
             )
 
 
-def _get_power_level_event(
-    auth_events: Dict[Tuple[str, str], EventBase]
-) -> Optional[EventBase]:
+def _get_power_level_event(auth_events: StateMap[EventBase]) -> Optional[EventBase]:
     return auth_events.get((EventTypes.PowerLevels, ""))
 
 
-def get_user_power_level(
-    user_id: str, auth_events: Dict[Tuple[str, str], EventBase]
-) -> int:
+def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
     """Get a user's power level
 
     Args:
@@ -600,9 +588,7 @@ def get_user_power_level(
             return 0
 
 
-def _get_named_level(
-    auth_events: Dict[Tuple[str, str], EventBase], name: str, default: int
-) -> int:
+def _get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:
     power_level_event = _get_power_level_event(auth_events)
 
     if not power_level_event:
@@ -615,9 +601,7 @@ def _get_named_level(
         return default
 
 
-def _verify_third_party_invite(
-    event: EventBase, auth_events: Dict[Tuple[str, str], EventBase]
-):
+def _verify_third_party_invite(event: EventBase, auth_events: StateMap[EventBase]):
     """
     Validates that the invite event is authorized by a previous third-party invite.
 
