@@ -29,6 +29,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import RoomStreamToken, get_domain_from_id
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
@@ -537,7 +538,9 @@ class DeviceListUpdater(object):
 
         # Attempt to resync out of sync device lists every 30s.
         self._resync_retry_in_progress = False
-        self.clock.looping_call(self._maybe_retry_device_resync, 30 * 1000)
+        self.clock.looping_call(
+            run_as_background_process, 30 * 1000, self._maybe_retry_device_resync,
+        )
 
     @trace
     @defer.inlineCallbacks
