@@ -142,6 +142,7 @@ class ReplicationEndpoint(object):
         """
         clock = hs.get_clock()
         client = hs.get_simple_http_client()
+        local_instance_name = hs.get_instance_name()
 
         master_host = hs.config.worker_replication_host
         master_port = hs.config.worker_replication_http_port
@@ -151,6 +152,8 @@ class ReplicationEndpoint(object):
         @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
         def send_request(instance_name="master", **kwargs):
+            if instance_name == local_instance_name:
+                raise Exception("Trying to send HTTP request to self")
             if instance_name == "master":
                 host = master_host
                 port = master_port
