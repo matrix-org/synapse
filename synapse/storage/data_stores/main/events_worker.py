@@ -77,6 +77,8 @@ class EventsWorkerStore(SQLBaseStore):
         super(EventsWorkerStore, self).__init__(database, db_conn, hs)
 
         if hs.config.worker_app is None:
+            # We are the process in charge of generating stream ids for events,
+            # so instantiate ID generators based on the database
             self._stream_id_gen = StreamIdGenerator(
                 db_conn,
                 "events",
@@ -91,6 +93,9 @@ class EventsWorkerStore(SQLBaseStore):
                 extra_tables=[("ex_outlier_stream", "event_stream_ordering")],
             )
         else:
+            # Another process is in charge of persisting events and generating
+            # stream IDs: rely on the replication streams to let us know which
+            # IDs we can process.
             self._stream_id_gen = SlavedIdTracker(db_conn, "events", "stream_ordering")
             self._backfill_id_gen = SlavedIdTracker(
                 db_conn, "events", "stream_ordering", step=-1
