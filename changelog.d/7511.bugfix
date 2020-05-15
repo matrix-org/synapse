@@ -1,1 +1,1 @@
-Fix a typo that broke the update remote profile background process. Bug introduced in #2429.
+Fix a long-standing bug that broke the update remote profile background process.
