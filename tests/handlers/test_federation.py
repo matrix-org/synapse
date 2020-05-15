@@ -226,7 +226,7 @@ class EventFromPduTestCase(TestCase):
                 "auth_events": [],
                 "origin_server_ts": 1234,
             },
-            RoomVersions.STRICT_CANONICALJSON,
+            RoomVersions.V6,
         )
 
         self.assertIsInstance(ev, EventBase)
@@ -253,7 +253,7 @@ class EventFromPduTestCase(TestCase):
                         "auth_events": [],
                         "origin_server_ts": 1234,
                     },
-                    RoomVersions.STRICT_CANONICALJSON,
+                    RoomVersions.V6,
                 )
 
     def test_invalid_nested(self):
@@ -270,5 +270,5 @@ class EventFromPduTestCase(TestCase):
                     "auth_events": [],
                     "origin_server_ts": 1234,
                 },
-                RoomVersions.STRICT_CANONICALJSON,
+                RoomVersions.V6,
             )

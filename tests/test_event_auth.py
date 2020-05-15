@@ -136,21 +136,18 @@ class EventAuthTestCase(unittest.TestCase):
 
         # creator should be able to send aliases
         event_auth.check(
-            RoomVersions.MSC2432_DEV,
-            _alias_event(creator),
-            auth_events,
-            do_sig_check=False,
+            RoomVersions.V6, _alias_event(creator), auth_events, do_sig_check=False,
         )
 
         # No particular checks are done on the state key.
         event_auth.check(
-            RoomVersions.MSC2432_DEV,
+            RoomVersions.V6,
             _alias_event(creator, state_key=""),
             auth_events,
             do_sig_check=False,
         )
         event_auth.check(
-            RoomVersions.MSC2432_DEV,
+            RoomVersions.V6,
             _alias_event(creator, state_key="test.com"),
             auth_events,
             do_sig_check=False,
@@ -159,10 +156,7 @@ class EventAuthTestCase(unittest.TestCase):
         # Per standard auth rules, the member must be in the room.
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC2432_DEV,
-                _alias_event(other),
-                auth_events,
-                do_sig_check=False,
+                RoomVersions.V6, _alias_event(other), auth_events, do_sig_check=False,
             )
 
     def test_msc2209(self):
@@ -192,7 +186,7 @@ class EventAuthTestCase(unittest.TestCase):
         # But an MSC2209 room rejects this change.
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC2209_DEV,
+                RoomVersions.V6,
                 _power_levels_event(pleb, {"notifications": {"room": 100}}),
                 auth_events,
                 do_sig_check=False,

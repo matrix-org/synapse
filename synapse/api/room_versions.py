@@ -120,34 +120,14 @@ class RoomVersions(object):
         strict_canonicaljson=False,
         limit_notifications_power_levels=False,
     )
-    MSC2432_DEV = RoomVersion(
-        "org.matrix.msc2432",
-        RoomDisposition.UNSTABLE,
+    V6 = RoomVersion(
+        "6",
+        RoomDisposition.STABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
         special_case_aliases_auth=False,
-        strict_canonicaljson=False,
-        limit_notifications_power_levels=False,
-    )
-    STRICT_CANONICALJSON = RoomVersion(
-        "org.matrix.strict_canonicaljson",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
-        StateResolutionVersions.V2,
-        enforce_key_validity=True,
-        special_case_aliases_auth=True,
         strict_canonicaljson=True,
-        limit_notifications_power_levels=False,
-    )
-    MSC2209_DEV = RoomVersion(
-        "org.matrix.msc2209",
-        RoomDisposition.UNSTABLE,
-        EventFormatVersions.V3,
-        StateResolutionVersions.V2,
-        enforce_key_validity=True,
-        special_case_aliases_auth=True,
-        strict_canonicaljson=False,
         limit_notifications_power_levels=True,
     )
 
@@ -160,8 +140,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V3,
         RoomVersions.V4,
         RoomVersions.V5,
-        RoomVersions.MSC2432_DEV,
-        RoomVersions.STRICT_CANONICALJSON,
-        RoomVersions.MSC2209_DEV,
+        RoomVersions.V6,
     )
 }  # type: Dict[str, RoomVersion]
