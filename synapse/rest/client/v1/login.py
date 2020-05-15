@@ -197,7 +197,7 @@ class LoginRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid thirdparty identifier")
 
             # For emails, canonicalise the address.
-            # We store all email addreses as cononised in the DB.
+            # We store all email addresses canonicalised in the DB.
             # (See add_threepid in synapse/handlers/auth.py)
             if medium == "email":
                 address = canonicalise_email(address)

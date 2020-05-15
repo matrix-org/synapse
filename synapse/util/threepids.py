@@ -53,15 +53,15 @@ def check_3pid_allowed(hs, medium, address):
     return False
 
 
-def canonicalise_email(address) -> str:
+def canonicalise_email(address: str) -> str:
     """'Canonicalise' email address
     Case folding of local part of email address and lowercase domain part
     See MSC2265, https://github.com/matrix-org/matrix-doc/pull/2265
 
     Args:
-        address (str): email address within that medium (e.g. "wotan@matrix.org")
+        address: email address to be canonicalised
     Returns:
-        (str) The canonical form of the email address
+        The canonical form of the email address
     Raises:
         SynapseError if the address could not be parsed.
     """

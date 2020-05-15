@@ -262,7 +262,7 @@ class PasswordRestServlet(RestServlet):
                     raise SynapseError(500, "Malformed threepid")
                 if threepid["medium"] == "email":
                     # For emails, canonicalise the address.
-                    # We store all email addreses as cononised in the DB.
+                    # We store all email addresses canonicalised in the DB.
                     # (See add_threepid in synapse/handlers/auth.py)
                     threepid["address"] = canonicalise_email(threepid["address"])
                 # if using email, we must know about the email they're authing with!
