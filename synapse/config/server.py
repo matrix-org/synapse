@@ -505,6 +505,9 @@ class ServerConfig(Config):
             "cleanup_extremities_with_dummy_events", True
         )
 
+        # The number of forward extremities in a room needed to send a dummy event.
+        self.dummy_events_threshold = config.get("dummy_events_threshold", 10)
+
         self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
 
         # Inhibits the /requestToken endpoints from returning an error that might leak
@@ -519,7 +522,7 @@ class ServerConfig(Config):
         )
 
     def has_tls_listener(self) -> bool:
-        return any(l["tls"] for l in self.listeners)
+        return any(listener["tls"] for listener in self.listeners)
 
     def generate_config_section(
         self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
@@ -822,6 +825,18 @@ class ServerConfig(Config):
           #- port: 9000
           #  bind_addresses: ['::1', '127.0.0.1']
           #  type: manhole
+
+        # Forward extremities can build up in a room due to networking delays between
+        # homeservers. Once this happens in a large room, calculation of the state of
+        # that room can become quite expensive. To mitigate this, once the number of
+        # forward extremities reaches a given threshold, Synapse will send an
+        # org.matrix.dummy_event event, which will reduce the forward extremities
+        # in the room.
+        #
+        # This setting defines the threshold (i.e. number of forward extremities in the
+        # room) at which dummy events are sent. The default value is 10.
+        #
+        #dummy_events_threshold: 5
 
 
         ## Homeserver blocking ##

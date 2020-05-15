@@ -15,7 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Callable, List
+from typing import Callable, Iterable, List, TypeVar
 
 from prometheus_client import Counter
 
@@ -42,12 +42,14 @@ users_woken_by_stream_counter = Counter(
     "synapse_notifier_users_woken_by_stream", "", ["stream"]
 )
 
+T = TypeVar("T")
+
 
 # TODO(paul): Should be shared somewhere
-def count(func, l):
-    """Return the number of items in l for which func returns true."""
+def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
+    """Return the number of items in it for which func returns true."""
     n = 0
-    for x in l:
+    for x in it:
         if func(x):
             n += 1
     return n
@@ -273,10 +275,9 @@ class Notifier(object):
             "room_key", room_stream_id, users=extra_users, rooms=[event.room_id]
         )
 
-    @defer.inlineCallbacks
-    def _notify_app_services(self, room_stream_id):
+    async def _notify_app_services(self, room_stream_id):
         try:
-            yield self.appservice_handler.notify_interested_services(room_stream_id)
+            await self.appservice_handler.notify_interested_services(room_stream_id)
         except Exception:
             logger.exception("Error notifying application services of event")
 
@@ -475,20 +476,18 @@ class Notifier(object):
 
         return result
 
-    @defer.inlineCallbacks
-    def _get_room_ids(self, user, explicit_room_id):
-        joined_room_ids = yield self.store.get_rooms_for_user(user.to_string())
+    async def _get_room_ids(self, user, explicit_room_id):
+        joined_room_ids = await self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
                 return [explicit_room_id], True
-            if (yield self._is_world_readable(explicit_room_id)):
+            if await self._is_world_readable(explicit_room_id):
                 return [explicit_room_id], False
             raise AuthError(403, "Non-joined access not allowed")
         return joined_room_ids, True
 
-    @defer.inlineCallbacks
-    def _is_world_readable(self, room_id):
-        state = yield self.state_handler.get_current_state(
+    async def _is_world_readable(self, room_id):
+        state = await self.state_handler.get_current_state(
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:

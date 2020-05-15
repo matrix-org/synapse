@@ -16,8 +16,6 @@ import logging
 
 from six import iteritems
 
-from twisted.internet import defer
-
 from synapse.api.constants import (
     EventTypes,
     LimitBlockingTypes,
@@ -167,8 +165,7 @@ class ResourceLimitsServerNotices(object):
             user_id, content, EventTypes.Pinned, ""
         )
 
-    @defer.inlineCallbacks
-    def _check_and_set_tags(self, user_id, room_id):
+    async def _check_and_set_tags(self, user_id, room_id):
         """
         Since server notices rooms were originally not with tags,
         important to check that tags have been set correctly
@@ -176,20 +173,19 @@ class ResourceLimitsServerNotices(object):
             user_id(str): the user in question
             room_id(str): the server notices room for that user
         """
-        tags = yield self._store.get_tags_for_room(user_id, room_id)
+        tags = await self._store.get_tags_for_room(user_id, room_id)
         need_to_set_tag = True
         if tags:
             if SERVER_NOTICE_ROOM_TAG in tags:
                 # tag already present, nothing to do here
                 need_to_set_tag = False
         if need_to_set_tag:
-            max_id = yield self._store.add_tag_to_room(
+            max_id = await self._store.add_tag_to_room(
                 user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
             )
             self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
-    @defer.inlineCallbacks
-    def _is_room_currently_blocked(self, room_id):
+    async def _is_room_currently_blocked(self, room_id):
         """
         Determines if the room is currently blocked
 
@@ -207,7 +203,7 @@ class ResourceLimitsServerNotices(object):
         currently_blocked = False
         pinned_state_event = None
         try:
-            pinned_state_event = yield self._state.get_current_state(
+            pinned_state_event = await self._state.get_current_state(
                 room_id, event_type=EventTypes.Pinned
             )
         except AuthError:
@@ -218,7 +214,7 @@ class ResourceLimitsServerNotices(object):
         if pinned_state_event is not None:
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 
-        events = yield self._store.get_events(referenced_events)
+        events = await self._store.get_events(referenced_events)
         for event_id, event in iteritems(events):
             if event.type != EventTypes.Message:
                 continue

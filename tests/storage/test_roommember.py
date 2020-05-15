@@ -22,6 +22,8 @@ from synapse.rest.client.v1 import login, room
 from synapse.types import Requester, UserID
 
 from tests import unittest
+from tests.test_utils import event_injection
+from tests.utils import TestHomeServer
 
 
 class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
@@ -38,7 +40,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor, clock, hs: TestHomeServer):
 
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic
@@ -113,6 +115,52 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
         # It now knows about Charlie's server.
         self.assertEqual(self.store._known_servers_count, 2)
+
+    def test_get_joined_users_from_context(self):
+        room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
+        bob_event = event_injection.inject_member_event(
+            self.hs, room, self.u_bob, Membership.JOIN
+        )
+
+        # first, create a regular event
+        event, context = event_injection.create_event(
+            self.hs,
+            room_id=room,
+            sender=self.u_alice,
+            prev_event_ids=[bob_event.event_id],
+            type="m.test.1",
+            content={},
+        )
+
+        users = self.get_success(
+            self.store.get_joined_users_from_context(event, context)
+        )
+        self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
+
+        # Regression test for #7376: create a state event whose key matches bob's
+        # user_id, but which is *not* a membership event, and persist that; then check
+        # that `get_joined_users_from_context` returns the correct users for the next event.
+        non_member_event = event_injection.inject_event(
+            self.hs,
+            room_id=room,
+            sender=self.u_bob,
+            prev_event_ids=[bob_event.event_id],
+            type="m.test.2",
+            state_key=self.u_bob,
+            content={},
+        )
+        event, context = event_injection.create_event(
+            self.hs,
+            room_id=room,
+            sender=self.u_alice,
+            prev_event_ids=[non_member_event.event_id],
+            type="m.test.3",
+            content={},
+        )
+        users = self.get_success(
+            self.store.get_joined_users_from_context(event, context)
+        )
+        self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
 
 
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):

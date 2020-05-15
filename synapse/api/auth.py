@@ -22,23 +22,23 @@ import pymacaroons
 from netaddr import IPAddress
 
 from twisted.internet import defer
+from twisted.web.server import Request
 
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, LimitBlockingTypes, Membership, UserTypes
+from synapse.api.auth_blocking import AuthBlocking
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
-    ResourceLimitError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.config.server import is_threepid_reserved
 from synapse.events import EventBase
 from synapse.types import StateMap, UserID
-from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
+from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
@@ -74,10 +74,14 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
 
-        self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
+        self.token_cache = LruCache(10000)
         register_cache("cache", "token_cache", self.token_cache)
 
+        self._auth_blocking = AuthBlocking(self.hs)
+
         self._account_validity = hs.config.account_validity
+        self._track_appservice_user_ips = hs.config.track_appservice_user_ips
+        self._macaroon_secret_key = hs.config.macaroon_secret_key
 
     @defer.inlineCallbacks
     def check_from_context(self, room_version: str, event, context, do_sig_check=True):
@@ -159,19 +163,25 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def get_user_by_req(
-        self, request, allow_guest=False, rights="access", allow_expired=False
+        self,
+        request: Request,
+        allow_guest: bool = False,
+        rights: str = "access",
+        allow_expired: bool = False,
     ):
         """ Get a registered user's ID.
 
         Args:
-            request - An HTTP request with an access_token query parameter.
-            allow_expired - Whether to allow the request through even if the account is
-                expired. If true, Synapse will still require an access token to be
-                provided but won't check if the account it belongs to has expired. This
-                works thanks to /login delivering access tokens regardless of accounts'
-                expiration.
+            request: An HTTP request with an access_token query parameter.
+            allow_guest: If False, will raise an AuthError if the user making the
+                request is a guest.
+            rights: The operation being performed; the access token must allow this
+            allow_expired: If True, allow the request through even if the account
+                is expired, or session token lifetime has ended. Note that
+                /login will deliver access tokens regardless of expiration.
+
         Returns:
-            defer.Deferred: resolves to a ``synapse.types.Requester`` object
+            defer.Deferred: resolves to a `synapse.types.Requester` object
         Raises:
             InvalidClientCredentialsError if no user by that token exists or the token
                 is invalid.
@@ -191,7 +201,7 @@ class Auth(object):
                 opentracing.set_tag("authenticated_entity", user_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
-                if ip_addr and self.hs.config.track_appservice_user_ips:
+                if ip_addr and self._track_appservice_user_ips:
                     yield self.store.insert_client_ip(
                         user_id=user_id,
                         access_token=access_token,
@@ -202,7 +212,9 @@ class Auth(object):
 
                 return synapse.types.create_requester(user_id, app_service=app_service)
 
-            user_info = yield self.get_user_by_access_token(access_token, rights)
+            user_info = yield self.get_user_by_access_token(
+                access_token, rights, allow_expired=allow_expired
+            )
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -277,13 +289,17 @@ class Auth(object):
         return user_id, app_service
 
     @defer.inlineCallbacks
-    def get_user_by_access_token(self, token, rights="access"):
+    def get_user_by_access_token(
+        self, token: str, rights: str = "access", allow_expired: bool = False,
+    ):
         """ Validate access token and get user_id from it
 
         Args:
-            token (str): The access token to get the user by.
-            rights (str): The operation being performed; the access token must
-                allow this.
+            token: The access token to get the user by
+            rights: The operation being performed; the access token must
+                allow this
+            allow_expired: If False, raises an InvalidClientTokenError
+                if the token is expired
         Returns:
             Deferred[dict]: dict that includes:
                `user` (UserID)
@@ -291,8 +307,10 @@ class Auth(object):
                `token_id` (int|None): access token id. May be None if guest
                `device_id` (str|None): device corresponding to access token
         Raises:
+            InvalidClientTokenError if a user by that token exists, but the token is
+                expired
             InvalidClientCredentialsError if no user by that token exists or the token
-                is invalid.
+                is invalid
         """
 
         if rights == "access":
@@ -301,7 +319,8 @@ class Auth(object):
             if r:
                 valid_until_ms = r["valid_until_ms"]
                 if (
-                    valid_until_ms is not None
+                    not allow_expired
+                    and valid_until_ms is not None
                     and valid_until_ms < self.clock.time_msec()
                 ):
                     # there was a valid access token, but it has expired.
@@ -454,7 +473,7 @@ class Auth(object):
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        v.verify(macaroon, self._macaroon_secret_key)
 
     def _verify_expiry(self, caveat):
         prefix = "time < "
@@ -572,7 +591,7 @@ class Auth(object):
         return user_level >= send_level
 
     @staticmethod
-    def has_access_token(request):
+    def has_access_token(request: Request):
         """Checks if the request has an access_token.
 
         Returns:
@@ -583,7 +602,7 @@ class Auth(object):
         return bool(query_params) or bool(auth_headers)
 
     @staticmethod
-    def get_access_token_from_request(request):
+    def get_access_token_from_request(request: Request):
         """Extracts the access_token from the request.
 
         Args:
@@ -663,71 +682,5 @@ class Auth(object):
                 % (user_id, room_id),
             )
 
-    @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
-        """Checks if the user should be rejected for some external reason,
-        such as monthly active user limiting or global disable flag
-
-        Args:
-            user_id(str|None): If present, checks for presence against existing
-                MAU cohort
-
-            threepid(dict|None): If present, checks for presence against configured
-                reserved threepid. Used in cases where the user is trying register
-                with a MAU blocked server, normally they would be rejected but their
-                threepid is on the reserved list. user_id and
-                threepid should never be set at the same time.
-
-            user_type(str|None): If present, is used to decide whether to check against
-                certain blocking reasons like MAU.
-        """
-
-        # Never fail an auth check for the server notices users or support user
-        # This can be a problem where event creation is prohibited due to blocking
-        if user_id is not None:
-            if user_id == self.hs.config.server_notices_mxid:
-                return
-            if (yield self.store.is_support_user(user_id)):
-                return
-
-        if self.hs.config.hs_disabled:
-            raise ResourceLimitError(
-                403,
-                self.hs.config.hs_disabled_message,
-                errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                admin_contact=self.hs.config.admin_contact,
-                limit_type=LimitBlockingTypes.HS_DISABLED,
-            )
-        if self.hs.config.limit_usage_by_mau is True:
-            assert not (user_id and threepid)
-
-            # If the user is already part of the MAU cohort or a trial user
-            if user_id:
-                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
-                if timestamp:
-                    return
-
-                is_trial = yield self.store.is_trial_user(user_id)
-                if is_trial:
-                    return
-            elif threepid:
-                # If the user does not exist yet, but is signing up with a
-                # reserved threepid then pass auth check
-                if is_threepid_reserved(
-                    self.hs.config.mau_limits_reserved_threepids, threepid
-                ):
-                    return
-            elif user_type == UserTypes.SUPPORT:
-                # If the user does not exist yet and is of type "support",
-                # allow registration. Support users are excluded from MAU checks.
-                return
-            # Else if there is no room in the MAU bucket, bail
-            current_mau = yield self.store.get_monthly_active_count()
-            if current_mau >= self.hs.config.max_mau_value:
-                raise ResourceLimitError(
-                    403,
-                    "Monthly Active User Limit Exceeded",
-                    admin_contact=self.hs.config.admin_contact,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                    limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
-                )
+    def check_auth_blocking(self, *args, **kwargs):
+        return self._auth_blocking.check_auth_blocking(*args, **kwargs)

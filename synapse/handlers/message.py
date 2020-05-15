@@ -72,7 +72,6 @@ class MessageHandler(object):
         self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
-        self._is_worker_app = bool(hs.config.worker_app)
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
@@ -260,7 +259,6 @@ class MessageHandler(object):
         Args:
             event (EventBase): The event to schedule the expiry of.
         """
-        assert not self._is_worker_app
 
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
         if not isinstance(expiry_ts, int) or event.is_state():
@@ -418,6 +416,8 @@ class EventCreationHandler(object):
         self._message_handler = hs.get_message_handler()
 
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+
+        self._dummy_events_threshold = hs.config.dummy_events_threshold
 
     @defer.inlineCallbacks
     def create_event(
@@ -1085,7 +1085,7 @@ class EventCreationHandler(object):
         """
         self._expire_rooms_to_exclude_from_dummy_event_insertion()
         room_ids = await self.store.get_rooms_with_many_extremities(
-            min_count=10,
+            min_count=self._dummy_events_threshold,
             limit=5,
             room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys(),
         )

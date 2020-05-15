@@ -204,6 +204,7 @@ class HomeServer(object):
         "account_validity_handler",
         "cas_handler",
         "saml_handler",
+        "oidc_handler",
         "event_client_serializer",
         "password_policy_handler",
         "storage",
@@ -562,6 +563,11 @@ class HomeServer(object):
 
         return SamlHandler(self)
 
+    def build_oidc_handler(self):
+        from synapse.handlers.oidc_handler import OidcHandler
+
+        return OidcHandler(self)
+
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
 
@@ -575,7 +581,7 @@ class HomeServer(object):
         return ReplicationStreamer(self)
 
     def build_replication_data_handler(self):
-        return ReplicationDataHandler(self.get_datastore())
+        return ReplicationDataHandler(self)
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

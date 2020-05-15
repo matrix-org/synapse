@@ -14,12 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
+from typing import Optional, Tuple
 
 import synapse.server
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.types import Collection
 
 from tests.test_utils import get_awaitable_result
@@ -75,6 +76,23 @@ def inject_event(
     """
     test_reactor = hs.get_reactor()
 
+    event, context = create_event(hs, room_version, prev_event_ids, **kwargs)
+
+    d = hs.get_storage().persistence.persist_event(event, context)
+    test_reactor.advance(0)
+    get_awaitable_result(d)
+
+    return event
+
+
+def create_event(
+    hs: synapse.server.HomeServer,
+    room_version: Optional[str] = None,
+    prev_event_ids: Optional[Collection[str]] = None,
+    **kwargs
+) -> Tuple[EventBase, EventContext]:
+    test_reactor = hs.get_reactor()
+
     if room_version is None:
         d = hs.get_datastore().get_room_version_id(kwargs["room_id"])
         test_reactor.advance(0)
@@ -89,8 +107,4 @@ def inject_event(
     test_reactor.advance(0)
     event, context = get_awaitable_result(d)
 
-    d = hs.get_storage().persistence.persist_event(event, context)
-    test_reactor.advance(0)
-    get_awaitable_result(d)
-
-    return event
+    return event, context
