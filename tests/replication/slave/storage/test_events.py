@@ -24,10 +24,10 @@ from synapse.storage.roommember import RoomsForUser
 
 from ._base import BaseSlavedStoreTestCase
 
-USER_ID = "@feeling:blue"
-USER_ID_2 = "@bright:blue"
+USER_ID = "@feeling:test"
+USER_ID_2 = "@bright:test"
 OUTLIER = {"outlier": True}
-ROOM_ID = "!room:blue"
+ROOM_ID = "!room:test"
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +239,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check("get_rooms_for_user_with_stream_ordering", (USER_ID_2,), set())
 
         # limit the replication rate
-        repl_transport = self.server_to_client_transport
+        repl_transport = self._server_transport
         repl_transport.autoflush = False
 
         # build the join and message events and persist them in the same batch.

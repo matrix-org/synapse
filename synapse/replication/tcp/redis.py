@@ -70,7 +70,6 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         logger.info("Connected to redis")
         super().connectionMade()
         run_as_background_process("subscribe-replication", self._send_subscribe)
-        self.handler.new_connection(self)
 
     async def _send_subscribe(self):
         # it's important to make sure that we only send the REPLICATE command once we
@@ -81,8 +80,14 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         logger.info(
             "Successfully subscribed to redis stream, sending REPLICATE command"
         )
+        self.handler.new_connection(self)
         await self._async_send_command(ReplicateCommand())
         logger.info("REPLICATE successfully sent")
+
+        # We send out our positions when there is a new connection in case the
+        # other side missed updates. We do this for Redis connections as the
+        # otherside won't know we've connected and so won't issue a REPLICATE.
+        self.handler.send_positions_to_connection(self)
 
     def messageReceived(self, pattern: str, channel: str, message: str):
         """Received a message from redis.
@@ -96,7 +101,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
             cmd = parse_command_from_line(message)
         except Exception:
             logger.exception(
-                "[%s] failed to parse line: %r", message,
+                "Failed to parse replication line: %r", message,
             )
             return
 

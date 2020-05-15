@@ -4,7 +4,7 @@ import urllib.parse
 from mock import Mock
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import devices
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
 
@@ -20,6 +20,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
+        logout.register_servlets,
         devices.register_servlets,
         lambda hs, http_server: WhoamiRestServlet(hs).register(http_server),
     ]
@@ -255,6 +256,72 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
+
+    @override_config({"session_lifetime": "24h"})
+    def test_session_can_hard_logout_after_being_soft_logged_out(self):
+        self.register_user("kermit", "monkey")
+
+        # log in as normal
+        access_token = self.login("kermit", "monkey")
+
+        # we should now be able to make requests with the access token
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.result)
+
+        # time passes
+        self.reactor.advance(24 * 3600)
+
+        # ... and we should be soft-logouted
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 401, channel.result)
+        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEquals(channel.json_body["soft_logout"], True)
+
+        # Now try to hard logout this session
+        request, channel = self.make_request(
+            b"POST", "/logout", access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    @override_config({"session_lifetime": "24h"})
+    def test_session_can_hard_logout_all_sessions_after_being_soft_logged_out(self):
+        self.register_user("kermit", "monkey")
+
+        # log in as normal
+        access_token = self.login("kermit", "monkey")
+
+        # we should now be able to make requests with the access token
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.result)
+
+        # time passes
+        self.reactor.advance(24 * 3600)
+
+        # ... and we should be soft-logouted
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 401, channel.result)
+        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEquals(channel.json_body["soft_logout"], True)
+
+        # Now try to hard log out all of the user's sessions
+        request, channel = self.make_request(
+            b"POST", "/logout/all", access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
 
 
 class CASTestCase(unittest.HomeserverTestCase):

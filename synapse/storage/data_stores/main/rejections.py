@@ -21,17 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class RejectionsStore(SQLBaseStore):
-    def _store_rejections_txn(self, txn, event_id, reason):
-        self.db.simple_insert_txn(
-            txn,
-            table="rejections",
-            values={
-                "event_id": event_id,
-                "reason": reason,
-                "last_check": self._clock.time_msec(),
-            },
-        )
-
     def get_rejection_reason(self, event_id):
         return self.db.simple_select_one_onecol(
             table="rejections",
