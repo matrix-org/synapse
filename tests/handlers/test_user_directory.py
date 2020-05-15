@@ -185,7 +185,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 # Allow all users.
                 return False
 
-        spam_checker.spam_checker = AllowAll()
+        spam_checker.spam_checkers = [AllowAll()]
 
         # The results do not change:
         # We get one search result when searching for user2 by user1.
@@ -198,7 +198,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 # All users are spammy.
                 return True
 
-        spam_checker.spam_checker = BlockAll()
+        spam_checker.spam_checkers = [BlockAll()]
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))

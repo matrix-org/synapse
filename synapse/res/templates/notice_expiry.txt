@@ -2,6 +2,6 @@ Hi {{ display_name }},
 
 Your account will expire on {{ expiration_ts|format_ts("%d-%m-%Y") }}. This means that you will lose access to your account after this date.
 
-To extend the validity of your account, please click on the link bellow (or copy and paste it to a new browser tab):
+To extend the validity of your account, please click on the link below (or copy and paste it to a new browser tab):
 
 {{ url }}

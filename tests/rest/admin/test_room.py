@@ -701,6 +701,47 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)
 
+    def test_single_room(self):
+        """Test that a single room can be requested correctly"""
+        # Create two test rooms
+        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        room_name_1 = "something"
+        room_name_2 = "else"
+
+        # Set the name for each room
+        self.helper.send_state(
+            room_id_1, "m.room.name", {"name": room_name_1}, tok=self.admin_user_tok,
+        )
+        self.helper.send_state(
+            room_id_2, "m.room.name", {"name": room_name_2}, tok=self.admin_user_tok,
+        )
+
+        url = "/_synapse/admin/v1/rooms/%s" % (room_id_1,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.assertIn("room_id", channel.json_body)
+        self.assertIn("name", channel.json_body)
+        self.assertIn("canonical_alias", channel.json_body)
+        self.assertIn("joined_members", channel.json_body)
+        self.assertIn("joined_local_members", channel.json_body)
+        self.assertIn("version", channel.json_body)
+        self.assertIn("creator", channel.json_body)
+        self.assertIn("encryption", channel.json_body)
+        self.assertIn("federatable", channel.json_body)
+        self.assertIn("public", channel.json_body)
+        self.assertIn("join_rules", channel.json_body)
+        self.assertIn("guest_access", channel.json_body)
+        self.assertIn("history_visibility", channel.json_body)
+        self.assertIn("state_events", channel.json_body)
+
+        self.assertEqual(room_id_1, channel.json_body["room_id"])
+
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 

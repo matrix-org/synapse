@@ -33,6 +33,8 @@ from prometheus_client import REGISTRY
 
 from twisted.web.resource import Resource
 
+from synapse.util import caches
+
 try:
     from prometheus_client.samples import Sample
 except ImportError:
@@ -103,13 +105,15 @@ def nameify_sample(sample):
 
 
 def generate_latest(registry, emit_help=False):
+
+    # Trigger the cache metrics to be rescraped, which updates the common
+    # metrics but do not produce metrics themselves
+    for collector in caches.collectors_by_name.values():
+        collector.collect()
+
     output = []
 
     for metric in registry.collect():
-
-        if metric.name.startswith("__unused"):
-            continue
-
         if not metric.samples:
             # No samples, don't bother.
             continue

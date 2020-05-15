@@ -253,6 +253,18 @@ listeners:
   #  bind_addresses: ['::1', '127.0.0.1']
   #  type: manhole
 
+# Forward extremities can build up in a room due to networking delays between
+# homeservers. Once this happens in a large room, calculation of the state of
+# that room can become quite expensive. To mitigate this, once the number of
+# forward extremities reaches a given threshold, Synapse will send an
+# org.matrix.dummy_event event, which will reduce the forward extremities
+# in the room.
+#
+# This setting defines the threshold (i.e. number of forward extremities in the
+# room) at which dummy events are sent. The default value is 10.
+#
+#dummy_events_threshold: 5
+
 
 ## Homeserver blocking ##
 
@@ -413,6 +425,16 @@ retention:
   #  - shortest_max_lifetime: 3d
   #    longest_max_lifetime: 1y
   #    interval: 1d
+
+# Inhibits the /requestToken endpoints from returning an error that might leak
+# information about whether an e-mail address is in use or not on this
+# homeserver.
+# Note that for some endpoints the error situation is the e-mail already being
+# used, and for others the error is entering the e-mail being unused.
+# If this option is enabled, instead of returning an error, these endpoints will
+# act as if no error happened and return a fake session ID ('sid') to clients.
+#
+#request_token_inhibit_3pid_errors: true
 
 
 ## TLS ##
@@ -581,6 +603,45 @@ acme:
 
 
 
+## Caching ##
+
+# Caching can be configured through the following options.
+#
+# A cache 'factor' is a multiplier that can be applied to each of
+# Synapse's caches in order to increase or decrease the maximum
+# number of entries that can be stored.
+
+# The number of events to cache in memory. Not affected by
+# caches.global_factor.
+#
+#event_cache_size: 10K
+
+caches:
+   # Controls the global cache factor, which is the default cache factor
+   # for all caches if a specific factor for that cache is not otherwise
+   # set.
+   #
+   # This can also be set by the "SYNAPSE_CACHE_FACTOR" environment
+   # variable. Setting by environment variable takes priority over
+   # setting through the config file.
+   #
+   # Defaults to 0.5, which will half the size of all caches.
+   #
+   #global_factor: 1.0
+
+   # A dictionary of cache name to cache factor for that individual
+   # cache. Overrides the global cache factor for a given cache.
+   #
+   # These can also be set through environment variables comprised
+   # of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in capital
+   # letters and underscores. Setting by environment variable
+   # takes priority over setting through the config file.
+   # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
+   #
+   per_cache_factors:
+     #get_users_who_share_room_with_user: 2.0
+
+
 ## Database ##
 
 # The 'database' setting defines the database that synapse uses to store all of
@@ -623,10 +684,6 @@ database:
   name: sqlite3
   args:
     database: DATADIR/homeserver.db
-
-# Number of events to cache in memory.
-#
-#event_cache_size: 10K
 
 
 ## Logging ##
@@ -1448,6 +1505,94 @@ saml2_config:
   #template_dir: "res/templates"
 
 
+# Enable OpenID Connect for registration and login. Uses authlib.
+#
+oidc_config:
+    # enable OpenID Connect. Defaults to false.
+    #
+    #enabled: true
+
+    # use the OIDC discovery mechanism to discover endpoints. Defaults to true.
+    #
+    #discover: true
+
+    # the OIDC issuer. Used to validate tokens and discover the providers endpoints. Required.
+    #
+    #issuer: "https://accounts.example.com/"
+
+    # oauth2 client id to use. Required.
+    #
+    #client_id: "provided-by-your-issuer"
+
+    # oauth2 client secret to use. Required.
+    #
+    #client_secret: "provided-by-your-issuer"
+
+    # auth method to use when exchanging the token.
+    # Valid values are "client_secret_basic" (default), "client_secret_post" and "none".
+    #
+    #client_auth_method: "client_auth_basic"
+
+    # list of scopes to ask. This should include the "openid" scope. Defaults to ["openid"].
+    #
+    #scopes: ["openid"]
+
+    # the oauth2 authorization endpoint. Required if provider discovery is disabled.
+    #
+    #authorization_endpoint: "https://accounts.example.com/oauth2/auth"
+
+    # the oauth2 token endpoint. Required if provider discovery is disabled.
+    #
+    #token_endpoint: "https://accounts.example.com/oauth2/token"
+
+    # the OIDC userinfo endpoint. Required if discovery is disabled and the "openid" scope is not asked.
+    #
+    #userinfo_endpoint: "https://accounts.example.com/userinfo"
+
+    # URI where to fetch the JWKS. Required if discovery is disabled and the "openid" scope is used.
+    #
+    #jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
+
+    # skip metadata verification. Defaults to false.
+    # Use this if you are connecting to a provider that is not OpenID Connect compliant.
+    # Avoid this in production.
+    #
+    #skip_verification: false
+
+
+    # An external module can be provided here as a custom solution to mapping
+    # attributes returned from a OIDC provider onto a matrix user.
+    #
+    user_mapping_provider:
+      # The custom module's class. Uncomment to use a custom module.
+      # Default is 'synapse.handlers.oidc_handler.JinjaOidcMappingProvider'.
+      #
+      #module: mapping_provider.OidcMappingProvider
+
+      # Custom configuration values for the module. Below options are intended
+      # for the built-in provider, they should be changed if using a custom
+      # module. This section will be passed as a Python dictionary to the
+      # module's `parse_config` method.
+      #
+      # Below is the config of the default mapping provider, based on Jinja2
+      # templates. Those templates are used to render user attributes, where the
+      # userinfo object is available through the `user` variable.
+      #
+      config:
+        # name of the claim containing a unique identifier for the user.
+        # Defaults to `sub`, which OpenID Connect compliant providers should provide.
+        #
+        #subject_claim: "sub"
+
+        # Jinja2 template for the localpart of the MXID
+        #
+        localpart_template: "{{ user.preferred_username }}"
+
+        # Jinja2 template for the display name to set on first login. Optional.
+        #
+        #display_name_template: "{{ user.given_name }} {{ user.last_name }}"
+
+
 
 # Enable CAS for registration and login.
 #
@@ -1507,6 +1652,37 @@ sso:
     #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
     #
     #     * server_name: the homeserver's name.
+    #
+    # * HTML page which notifies the user that they are authenticating to confirm
+    #   an operation on their account during the user interactive authentication
+    #   process: 'sso_auth_confirm.html'.
+    #
+    #   When rendering, this template is given the following variables:
+    #     * redirect_url: the URL the user is about to be redirected to. Needs
+    #                     manual escaping (see
+    #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+    #
+    #     * description: the operation which the user is being asked to confirm
+    #
+    # * HTML page shown after a successful user interactive authentication session:
+    #   'sso_auth_success.html'.
+    #
+    #   Note that this page must include the JavaScript which notifies of a successful authentication
+    #   (see https://matrix.org/docs/spec/client_server/r0.6.0#fallback).
+    #
+    #   This template has no additional variables.
+    #
+    # * HTML page shown during single sign-on if a deactivated user (according to Synapse's database)
+    #   attempts to login: 'sso_account_deactivated.html'.
+    #
+    #   This template has no additional variables.
+    #
+    # * HTML page to display to users if something goes wrong during the
+    #   OpenID Connect authentication process: 'sso_error.html'.
+    #
+    #   When rendering, this template is given two variables:
+    #     * error: the technical name of the error
+    #     * error_description: a human-readable message for the error
     #
     # You can see the default templates at:
     # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
@@ -1726,10 +1902,17 @@ password_providers:
 #  include_content: true
 
 
-#spam_checker:
-#  module: "my_custom_project.SuperSpamChecker"
-#  config:
-#    example_option: 'things'
+# Spam checkers are third-party modules that can block specific actions
+# of local users, such as creating rooms and registering undesirable
+# usernames, as well as remote users by redacting incoming events.
+#
+spam_checker:
+   #- module: "my_custom_project.SuperSpamChecker"
+   #  config:
+   #    example_option: 'things'
+   #- module: "some_other_project.BadEventStopper"
+   #  config:
+   #    example_stop_events_from: ['@bad:example.com']
 
 
 # Uncomment to allow non-server-admin users to create groups on this server

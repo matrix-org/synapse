@@ -92,13 +92,16 @@ CONDITIONAL_REQUIREMENTS = {
         'eliot<1.8.0;python_version<"3.5.3"',
     ],
     "saml2": ["pysaml2>=4.5.0"],
+    "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0", "parameterized"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
-    "redis": ["txredisapi>=1.4.7"],
+    # hiredis is not a *strict* dependency, but it makes things much faster.
+    # (if it is not installed, we fall back to slow code.)
+    "redis": ["txredisapi>=1.4.7", "hiredis"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]

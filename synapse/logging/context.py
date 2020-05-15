@@ -27,6 +27,7 @@ import inspect
 import logging
 import threading
 import types
+import warnings
 from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 
 from typing_extensions import Literal
@@ -287,6 +288,46 @@ class LoggingContext(object):
             return str(self.request)
         return "%s@%x" % (self.name, id(self))
 
+    @classmethod
+    def current_context(cls) -> LoggingContextOrSentinel:
+        """Get the current logging context from thread local storage
+
+        This exists for backwards compatibility. ``current_context()`` should be
+        called directly.
+
+        Returns:
+            LoggingContext: the current logging context
+        """
+        warnings.warn(
+            "synapse.logging.context.LoggingContext.current_context() is deprecated "
+            "in favor of synapse.logging.context.current_context().",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return current_context()
+
+    @classmethod
+    def set_current_context(
+        cls, context: LoggingContextOrSentinel
+    ) -> LoggingContextOrSentinel:
+        """Set the current logging context in thread local storage
+
+        This exists for backwards compatibility. ``set_current_context()`` should be
+        called directly.
+
+        Args:
+            context(LoggingContext): The context to activate.
+        Returns:
+            The context that was previously active
+        """
+        warnings.warn(
+            "synapse.logging.context.LoggingContext.set_current_context() is deprecated "
+            "in favor of synapse.logging.context.set_current_context().",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return set_current_context(context)
+
     def __enter__(self) -> "LoggingContext":
         """Enters this logging context into thread local storage"""
         old_context = set_current_context(self)
@@ -390,15 +431,7 @@ class LoggingContext(object):
                 return
 
             utime_delta, stime_delta = self._get_cputime(rusage)
-            self._resource_usage.ru_utime += utime_delta
-            self._resource_usage.ru_stime += stime_delta
-
-            # if we have a parent, pass our CPU usage stats on
-            if self.parent_context:
-                self.parent_context._resource_usage += self._resource_usage
-
-                # reset them in case we get entered again
-                self._resource_usage.reset()
+            self.add_cputime(utime_delta, stime_delta)
         finally:
             self.usage_start = None
 
@@ -456,30 +489,52 @@ class LoggingContext(object):
 
         return utime_delta, stime_delta
 
+    def add_cputime(self, utime_delta: float, stime_delta: float) -> None:
+        """Update the CPU time usage of this context (and any parents, recursively).
+
+        Args:
+            utime_delta: additional user time, in seconds, spent in this context.
+            stime_delta: additional system time, in seconds, spent in this context.
+        """
+        self._resource_usage.ru_utime += utime_delta
+        self._resource_usage.ru_stime += stime_delta
+        if self.parent_context:
+            self.parent_context.add_cputime(utime_delta, stime_delta)
+
     def add_database_transaction(self, duration_sec: float) -> None:
+        """Record the use of a database transaction and the length of time it took.
+
+        Args:
+            duration_sec: The number of seconds the database transaction took.
+        """
         if duration_sec < 0:
             raise ValueError("DB txn time can only be non-negative")
         self._resource_usage.db_txn_count += 1
         self._resource_usage.db_txn_duration_sec += duration_sec
+        if self.parent_context:
+            self.parent_context.add_database_transaction(duration_sec)
 
     def add_database_scheduled(self, sched_sec: float) -> None:
         """Record a use of the database pool
 
         Args:
-            sched_sec (float): number of seconds it took us to get a
-                connection
+            sched_sec: number of seconds it took us to get a connection
         """
         if sched_sec < 0:
             raise ValueError("DB scheduling time can only be non-negative")
         self._resource_usage.db_sched_duration_sec += sched_sec
+        if self.parent_context:
+            self.parent_context.add_database_scheduled(sched_sec)
 
     def record_event_fetch(self, event_count: int) -> None:
         """Record a number of events being fetched from the db
 
         Args:
-            event_count (int): number of events being fetched
+            event_count: number of events being fetched
         """
         self._resource_usage.evt_db_fetch_count += event_count
+        if self.parent_context:
+            self.parent_context.record_event_fetch(event_count)
 
 
 class LoggingContextFilter(logging.Filter):

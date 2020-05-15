@@ -140,7 +140,7 @@ class AuthRestServlet(RestServlet):
             self._cas_server_url = hs.config.cas_server_url
             self._cas_service_url = hs.config.cas_service_url
 
-    def on_GET(self, request, stagetype):
+    async def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
@@ -180,7 +180,7 @@ class AuthRestServlet(RestServlet):
             else:
                 raise SynapseError(400, "Homeserver not configured for SSO.")
 
-            html = self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
+            html = await self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
 
         else:
             raise SynapseError(404, "Unknown auth stage type")
