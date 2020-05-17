@@ -612,6 +612,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
+        self.assertEqual("Unable to parse email address", channel.json_body["error"])
 
     def _validate_token(self, link):
         # Remove the host

@@ -200,7 +200,10 @@ class LoginRestServlet(RestServlet):
             # We store all email addresses canonicalised in the DB.
             # (See add_threepid in synapse/handlers/auth.py)
             if medium == "email":
-                address = canonicalise_email(address)
+                try:
+                    address = canonicalise_email(address)
+                except ValueError as e:
+                    raise SynapseError(400, str(e))
 
             # We also apply account rate limiting using the 3PID as a key, as
             # otherwise using 3PID bypasses the ratelimiting based on user ID.

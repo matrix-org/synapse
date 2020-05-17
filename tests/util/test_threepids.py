@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.api.errors import SynapseError
 from synapse.util.threepids import canonicalise_email
 
 from tests.unittest import HomeserverTestCase
@@ -21,22 +20,16 @@ from tests.unittest import HomeserverTestCase
 
 class CanonicaliseEmailTests(HomeserverTestCase):
     def test_no_at(self):
-        with self.assertRaises(SynapseError) as cm:
+        with self.assertRaises(ValueError):
             canonicalise_email("address-without-at.bar")
-        e = cm.exception
-        self.assertEqual(e.code, 400)
 
     def test_two_at(self):
-        with self.assertRaises(SynapseError) as cm:
+        with self.assertRaises(ValueError):
             canonicalise_email("foo@foo@test.bar")
-        e = cm.exception
-        self.assertEqual(e.code, 400)
 
     def test_bad_format(self):
-        with self.assertRaises(SynapseError) as cm:
+        with self.assertRaises(ValueError):
             canonicalise_email("user@bad.example.net@good.example.com")
-        e = cm.exception
-        self.assertEqual(e.code, 400)
 
     def test_valid_format(self):
         self.assertEqual(canonicalise_email("foo@test.bar"), "foo@test.bar")

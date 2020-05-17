@@ -936,7 +936,10 @@ class AuthHandler(BaseHandler):
         # for the presence of an email address during password reset was
         # case sensitive).
         if medium == "email":
-            address = canonicalise_email(address)
+            try:
+                address = canonicalise_email(address)
+            except ValueError as e:
+                raise SynapseError(400, str(e))
 
         await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
@@ -964,7 +967,10 @@ class AuthHandler(BaseHandler):
 
         # 'Canonicalise' email addresses as per above
         if medium == "email":
-            address = canonicalise_email(address)
+            try:
+                address = canonicalise_email(address)
+            except ValueError as e:
+                raise SynapseError(400, str(e))
 
         identity_handler = self.hs.get_handlers().identity_handler
         result = await identity_handler.try_unbind_threepid(

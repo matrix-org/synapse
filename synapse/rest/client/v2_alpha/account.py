@@ -84,7 +84,10 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        email = canonicalise_email(body["email"])
+        try:
+            email = canonicalise_email(body["email"])
+        except ValueError as e:
+            raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -264,7 +267,10 @@ class PasswordRestServlet(RestServlet):
                     # For emails, canonicalise the address.
                     # We store all email addresses canonicalised in the DB.
                     # (See add_threepid in synapse/handlers/auth.py)
-                    threepid["address"] = canonicalise_email(threepid["address"])
+                    try:
+                        threepid["address"] = canonicalise_email(threepid["address"])
+                    except ValueError as e:
+                        raise SynapseError(400, str(e))
                 # if using email, we must know about the email they're authing with!
                 threepid_user_id = await self.datastore.get_user_id_by_threepid(
                     threepid["medium"], threepid["address"]
@@ -379,7 +385,10 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        email = canonicalise_email(body["email"])
+        try:
+            email = canonicalise_email(body["email"])
+        except ValueError as e:
+            raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 

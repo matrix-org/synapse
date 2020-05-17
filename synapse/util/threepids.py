@@ -17,8 +17,6 @@ import email.utils
 import logging
 import re
 
-from synapse.api.errors import SynapseError
-
 logger = logging.getLogger(__name__)
 
 
@@ -63,7 +61,7 @@ def canonicalise_email(address: str) -> str:
     Returns:
         The canonical form of the email address
     Raises:
-        SynapseError if the address could not be parsed.
+        ValueError if the address could not be parsed.
     """
 
     address = address.strip()
@@ -75,6 +73,7 @@ def canonicalise_email(address: str) -> str:
     regex = r"^[^@]+@[^@]+\.[^@]+$"
     if parsedAddress == "" or not bool(re.fullmatch(regex, address)):
         logger.debug("Couldn't parse email address %s", address)
-        raise SynapseError(400, "Unable to parse email address")
+        raise ValueError("Unable to parse email address")
+
     address = address.split("@")
     return address[0].casefold() + "@" + address[1].lower()
