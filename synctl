@@ -317,20 +317,15 @@ def main():
     action = options.action
 
     if action == "stop" or action == "restart":
-        has_stopped = False
-
-        if len(workers) > 0:
-            stopped_worker_count = 0
-            for worker in workers:
-                if stop(worker.pidfile, worker.app):
-                    stopped_worker_count += 1
-            # If all the workers were stopped
-            if len(workers) == stopped_worker_count:
-                has_stopped = True
+        has_stopped = True
+        for worker in workers:
+            if not stop(worker.pidfile, worker.app):
+                # A worker doesn't stop
+                has_stopped = False
 
         if start_stop_synapse:
-            if stop(pidfile, "synapse.app.homeserver"):
-                has_stopped = True
+            if not stop(pidfile, "synapse.app.homeserver"):
+                has_stopped = False
         if not has_stopped:
             sys.exit(1)
 
