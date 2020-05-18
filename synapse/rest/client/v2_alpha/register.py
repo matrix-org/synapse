@@ -426,12 +426,16 @@ class RegisterRestServlet(RestServlet):
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
         if "password" in body:
-            if (
-                not isinstance(body["password"], string_types)
-                or len(body["password"]) > 512
-            ):
+            password = body.pop("password")
+            if not isinstance(password, string_types) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
-            self.password_policy_handler.validate_password(body["password"])
+            self.password_policy_handler.validate_password(password)
+
+            # If the password is valid, hash it and store it back on the request.
+            # This ensures the hashed password is handled everywhere.
+            if "password_hash" in body:
+                raise SynapseError(400, "Unexpected property: password_hash")
+            body["password_hash"] = await self.auth_handler.hash(password)
 
         desired_username = None
         if "username" in body:
@@ -484,7 +488,7 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
-        if "initial_device_display_name" in body and "password" not in body:
+        if "initial_device_display_name" in body and "password_hash" not in body:
             # ignore 'initial_device_display_name' if sent without
             # a password to work around a client bug where it sent
             # the 'initial_device_display_name' param alone, wiping out
@@ -546,11 +550,11 @@ class RegisterRestServlet(RestServlet):
             registered = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
-            assert_params_in_dict(params, ["password"])
+            assert_params_in_dict(params, ["password_hash"])
 
             desired_username = params.get("username", None)
             guest_access_token = params.get("guest_access_token", None)
-            new_password = params.get("password", None)
+            new_password_hash = params.get("password_hash", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
@@ -583,7 +587,7 @@ class RegisterRestServlet(RestServlet):
 
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
-                password=new_password,
+                password_hash=new_password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
                 address=client_addr,
