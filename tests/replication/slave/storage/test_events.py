@@ -17,10 +17,11 @@ from canonicaljson import encode_canonical_json
 
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
-from synapse.events.snapshot import EventContext
 from synapse.handlers.room import RoomEventSource
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.storage.roommember import RoomsForUser
+
+from tests.server import FakeTransport
 
 from ._base import BaseSlavedStoreTestCase
 
@@ -240,6 +241,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         # limit the replication rate
         repl_transport = self._server_transport
+        assert isinstance(repl_transport, FakeTransport)
         repl_transport.autoflush = False
 
         # build the join and message events and persist them in the same batch.
@@ -322,7 +324,6 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         type="m.room.message",
         key=None,
         internal={},
-        state=None,
         depth=None,
         prev_events=[],
         auth_events=[],
@@ -362,15 +363,8 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         event = make_event_from_dict(event_dict, internal_metadata_dict=internal)
 
         self.event_id += 1
-
-        if state is not None:
-            state_ids = {key: e.event_id for key, e in state.items()}
-            context = EventContext.with_state(
-                state_group=None, current_state_ids=state_ids, prev_state_ids=state_ids
-            )
-        else:
-            state_handler = self.hs.get_state_handler()
-            context = self.get_success(state_handler.compute_event_context(event))
+        state_handler = self.hs.get_state_handler()
+        context = self.get_success(state_handler.compute_event_context(event))
 
         self.master_store.add_push_actions_to_staging(
             event.event_id, {user_id: actions for user_id, actions in push_actions}
