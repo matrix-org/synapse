@@ -100,7 +100,7 @@ class WorkerConfig(Config):
         }
 
         # Map from type of streams to source, c.f. WriterLocations.
-        writers = config.get("writers") or {}
+        writers = config.get("stream_writers") or {}
         self.writers = WriterLocations(**writers)
 
         # Check that the configured writer for events also appears in
