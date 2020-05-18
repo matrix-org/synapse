@@ -94,13 +94,13 @@ class WorkerConfig(Config):
                     bind_addresses.append("")
 
         # A map from instance name to host/port of their HTTP replication endpoint.
-        instance_map = config.get("instance_map", {}) or {}
+        instance_map = config.get("instance_map") or {}
         self.instance_map = {
             name: InstanceLocationConfig(**c) for name, c in instance_map.items()
         }
 
         # Map from type of streams to source, c.f. WriterLocations.
-        writers = config.get("writers", {}) or {}
+        writers = config.get("writers") or {}
         self.writers = WriterLocations(**writers)
 
         # Check that the configured writer for events also appears in

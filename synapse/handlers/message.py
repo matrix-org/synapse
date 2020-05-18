@@ -888,7 +888,7 @@ class EventCreationHandler(object):
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
 
-        This should only be run on master.
+        This should only be run on instance in charge of persisting events.
         """
         assert self.config.worker.writers.events == self._instance_name
 

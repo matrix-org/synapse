@@ -89,6 +89,8 @@ class ReplicationCommandHandler:
                 self._streams_to_replicate.append(stream)
                 continue
 
+            # Only add EventStream and BackfillStream as a source on the
+            # instance in charge of event persistence.
             if (
                 isinstance(stream, (EventsStream, BackfillStream))
                 and hs.config.worker.writers.events == hs.get_instance_name()
