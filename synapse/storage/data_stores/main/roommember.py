@@ -45,7 +45,6 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 from synapse.util.metrics import Measure
-from synapse.util.stringutils import to_ascii
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +178,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             """
 
         txn.execute(sql, (room_id, Membership.JOIN))
-        return [to_ascii(r[0]) for r in txn]
+        return [r[0] for r in txn]
 
     @cached(max_entries=100000)
     def get_room_summary(self, room_id):
@@ -223,7 +222,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (room_id,))
             res = {}
             for count, membership in txn:
-                summary = res.setdefault(to_ascii(membership), MemberSummary([], count))
+                summary = res.setdefault(membership, MemberSummary([], count))
 
             # we order by membership and then fairly arbitrarily by event_id so
             # heroes are consistent
@@ -255,11 +254,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # 6 is 5 (number of heroes) plus 1, in case one of them is the calling user.
             txn.execute(sql, (room_id, Membership.JOIN, Membership.INVITE, 6))
             for user_id, membership, event_id in txn:
-                summary = res[to_ascii(membership)]
+                summary = res[membership]
                 # we will always have a summary for this membership type at this
                 # point given the summary currently contains the counts.
                 members = summary.members
-                members.append((to_ascii(user_id), to_ascii(event_id)))
+                members.append((user_id, event_id))
 
             return res
 
@@ -584,13 +583,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             ev_entry = event_map.get(event_id)
             if ev_entry:
                 if ev_entry.event.membership == Membership.JOIN:
-                    users_in_room[to_ascii(ev_entry.event.state_key)] = ProfileInfo(
-                        display_name=to_ascii(
-                            ev_entry.event.content.get("displayname", None)
-                        ),
-                        avatar_url=to_ascii(
-                            ev_entry.event.content.get("avatar_url", None)
-                        ),
+                    users_in_room[ev_entry.event.state_key] = ProfileInfo(
+                        display_name=ev_entry.event.content.get("displayname", None),
+                        avatar_url=ev_entry.event.content.get("avatar_url", None),
                     )
             else:
                 missing_member_event_ids.append(event_id)
@@ -604,9 +599,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         if event is not None and event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
                 if event.event_id in member_event_ids:
-                    users_in_room[to_ascii(event.state_key)] = ProfileInfo(
-                        display_name=to_ascii(event.content.get("displayname", None)),
-                        avatar_url=to_ascii(event.content.get("avatar_url", None)),
+                    users_in_room[event.state_key] = ProfileInfo(
+                        display_name=event.content.get("displayname", None),
+                        avatar_url=event.content.get("avatar_url", None),
                     )
 
         return users_in_room

@@ -19,7 +19,7 @@ import random
 import sys
 from io import BytesIO
 
-from six import PY3, raise_from, string_types
+from six import raise_from, string_types
 from six.moves import urllib
 
 import attr
@@ -70,11 +70,7 @@ incoming_responses_counter = Counter(
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
-
-if PY3:
-    MAXINT = sys.maxsize
-else:
-    MAXINT = sys.maxint
+MAXINT = sys.maxsize
 
 
 _next_id = 1
