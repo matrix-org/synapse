@@ -18,6 +18,8 @@ import re
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventTypes
+
 logger = logging.getLogger(__name__)
 
 # intentionally looser than what aliases we allow to be registered since
@@ -50,17 +52,17 @@ def calculate_room_name(
         (string or None) A human readable name for the room.
     """
     # does it have a name?
-    if ("m.room.name", "") in room_state_ids:
+    if (EventTypes.Name, "") in room_state_ids:
         m_room_name = yield store.get_event(
-            room_state_ids[("m.room.name", "")], allow_none=True
+            room_state_ids[(EventTypes.Name, "")], allow_none=True
         )
         if m_room_name and m_room_name.content and m_room_name.content["name"]:
             return m_room_name.content["name"]
 
     # does it have a canonical alias?
-    if ("m.room.canonical_alias", "") in room_state_ids:
+    if (EventTypes.CanonicalAlias, "") in room_state_ids:
         canon_alias = yield store.get_event(
-            room_state_ids[("m.room.canonical_alias", "")], allow_none=True
+            room_state_ids[(EventTypes.CanonicalAlias, "")], allow_none=True
         )
         if (
             canon_alias
@@ -74,32 +76,22 @@ def calculate_room_name(
     # for an event type, so rearrange the data structure
     room_state_bytype_ids = _state_as_two_level_dict(room_state_ids)
 
-    # right then, any aliases at all?
-    if "m.room.aliases" in room_state_bytype_ids:
-        m_room_aliases = room_state_bytype_ids["m.room.aliases"]
-        for alias_id in m_room_aliases.values():
-            alias_event = yield store.get_event(alias_id, allow_none=True)
-            if alias_event and alias_event.content.get("aliases"):
-                the_aliases = alias_event.content["aliases"]
-                if len(the_aliases) > 0 and _looks_like_an_alias(the_aliases[0]):
-                    return the_aliases[0]
-
     if not fallback_to_members:
         return None
 
     my_member_event = None
-    if ("m.room.member", user_id) in room_state_ids:
+    if (EventTypes.Member, user_id) in room_state_ids:
         my_member_event = yield store.get_event(
-            room_state_ids[("m.room.member", user_id)], allow_none=True
+            room_state_ids[(EventTypes.Member, user_id)], allow_none=True
         )
 
     if (
         my_member_event is not None
         and my_member_event.content["membership"] == "invite"
     ):
-        if ("m.room.member", my_member_event.sender) in room_state_ids:
+        if (EventTypes.Member, my_member_event.sender) in room_state_ids:
             inviter_member_event = yield store.get_event(
-                room_state_ids[("m.room.member", my_member_event.sender)],
+                room_state_ids[(EventTypes.Member, my_member_event.sender)],
                 allow_none=True,
             )
             if inviter_member_event:
@@ -114,9 +106,9 @@ def calculate_room_name(
 
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
-    if "m.room.member" in room_state_bytype_ids:
+    if EventTypes.Member in room_state_bytype_ids:
         member_events = yield store.get_events(
-            list(room_state_bytype_ids["m.room.member"].values())
+            list(room_state_bytype_ids[EventTypes.Member].values())
         )
         all_members = [
             ev
@@ -138,9 +130,9 @@ def calculate_room_name(
             # self-chat, peeked room with 1 participant,
             # or inbound invite, or outbound 3PID invite.
             if all_members[0].sender == user_id:
-                if "m.room.third_party_invite" in room_state_bytype_ids:
+                if EventTypes.ThirdPartyInvite in room_state_bytype_ids:
                     third_party_invites = room_state_bytype_ids[
-                        "m.room.third_party_invite"
+                        EventTypes.ThirdPartyInvite
                     ].values()
 
                     if len(third_party_invites) > 0:

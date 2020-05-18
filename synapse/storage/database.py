@@ -15,9 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import sys
 import time
-from typing import Iterable, Tuple
+from time import monotonic as monotonic_time
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+)
 
 from six import iteritems, iterkeys, itervalues
 from six.moves import intern, range
@@ -29,27 +39,22 @@ from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
-from synapse.logging.context import LoggingContext, make_deferred_yieldable
+from synapse.logging.context import (
+    LoggingContext,
+    LoggingContextOrSentinel,
+    current_context,
+    make_deferred_yieldable,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
-from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.util.stringutils import exception_to_unicode
-
-# import a function which will return a monotonic time, in seconds
-try:
-    # on python 3, use time.monotonic, since time.clock can go backwards
-    from time import monotonic as monotonic_time
-except ImportError:
-    # ... but python 2 doesn't have it
-    from time import clock as monotonic_time
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
+from synapse.storage.types import Connection, Cursor
+from synapse.types import Collection
 
 logger = logging.getLogger(__name__)
 
-try:
-    MAX_TXN_ID = sys.maxint - 1
-except AttributeError:
-    # python 3 does not have a maximum int value
-    MAX_TXN_ID = 2 ** 63 - 1
+# python 3 does not have a maximum int value
+MAX_TXN_ID = 2 ** 63 - 1
 
 sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
@@ -73,11 +78,12 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "device_lists_remote_extremeties": "device_lists_remote_extremeties_unique_idx",
     "device_lists_remote_cache": "device_lists_remote_cache_unique_idx",
     "event_search": "event_search_event_id_idx",
+    "device_lists_outbound_last_success": "device_lists_outbound_last_success_unique_idx",
 }
 
 
 def make_pool(
-    reactor, db_config: DatabaseConnectionConfig, engine
+    reactor, db_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
 ) -> adbapi.ConnectionPool:
     """Get the connection pool for the database.
     """
@@ -90,7 +96,9 @@ def make_pool(
     )
 
 
-def make_conn(db_config: DatabaseConnectionConfig, engine):
+def make_conn(
+    db_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
+) -> Connection:
     """Make a new connection to the database and return it.
 
     Returns:
@@ -107,20 +115,27 @@ def make_conn(db_config: DatabaseConnectionConfig, engine):
     return db_conn
 
 
-class LoggingTransaction(object):
+# The type of entry which goes on our after_callbacks and exception_callbacks lists.
+#
+# Python 3.5.2 doesn't support Callable with an ellipsis, so we wrap it in quotes so
+# that mypy sees the type but the runtime python doesn't.
+_CallbackListEntry = Tuple["Callable[..., None]", Iterable[Any], Dict[str, Any]]
+
+
+class LoggingTransaction:
     """An object that almost-transparently proxies for the 'txn' object
     passed to the constructor. Adds logging and metrics to the .execute()
     method.
 
     Args:
         txn: The database transcation object to wrap.
-        name (str): The name of this transactions for logging.
-        database_engine (Sqlite3Engine|PostgresEngine)
-        after_callbacks(list|None): A list that callbacks will be appended to
+        name: The name of this transactions for logging.
+        database_engine
+        after_callbacks: A list that callbacks will be appended to
             that have been added by `call_after` which should be run on
             successful completion of the transaction. None indicates that no
             callbacks should be allowed to be scheduled to run.
-        exception_callbacks(list|None): A list that callbacks will be appended
+        exception_callbacks: A list that callbacks will be appended
             to that have been added by `call_on_exception` which should be run
             if transaction ends with an error. None indicates that no callbacks
             should be allowed to be scheduled to run.
@@ -135,51 +150,72 @@ class LoggingTransaction(object):
     ]
 
     def __init__(
-        self, txn, name, database_engine, after_callbacks=None, exception_callbacks=None
+        self,
+        txn: Cursor,
+        name: str,
+        database_engine: BaseDatabaseEngine,
+        after_callbacks: Optional[List[_CallbackListEntry]] = None,
+        exception_callbacks: Optional[List[_CallbackListEntry]] = None,
     ):
-        object.__setattr__(self, "txn", txn)
-        object.__setattr__(self, "name", name)
-        object.__setattr__(self, "database_engine", database_engine)
-        object.__setattr__(self, "after_callbacks", after_callbacks)
-        object.__setattr__(self, "exception_callbacks", exception_callbacks)
+        self.txn = txn
+        self.name = name
+        self.database_engine = database_engine
+        self.after_callbacks = after_callbacks
+        self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback, *args, **kwargs):
+    def call_after(self, callback: "Callable[..., None]", *args, **kwargs):
         """Call the given callback on the main twisted thread after the
         transaction has finished. Used to invalidate the caches on the
         correct thread.
         """
+        # if self.after_callbacks is None, that means that whatever constructed the
+        # LoggingTransaction isn't expecting there to be any callbacks; assert that
+        # is not the case.
+        assert self.after_callbacks is not None
         self.after_callbacks.append((callback, args, kwargs))
 
-    def call_on_exception(self, callback, *args, **kwargs):
+    def call_on_exception(self, callback: "Callable[..., None]", *args, **kwargs):
+        # if self.exception_callbacks is None, that means that whatever constructed the
+        # LoggingTransaction isn't expecting there to be any callbacks; assert that
+        # is not the case.
+        assert self.exception_callbacks is not None
         self.exception_callbacks.append((callback, args, kwargs))
 
-    def __getattr__(self, name):
-        return getattr(self.txn, name)
+    def fetchall(self) -> List[Tuple]:
+        return self.txn.fetchall()
 
-    def __setattr__(self, name, value):
-        setattr(self.txn, name, value)
+    def fetchone(self) -> Tuple:
+        return self.txn.fetchone()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple]:
         return self.txn.__iter__()
+
+    @property
+    def rowcount(self) -> int:
+        return self.txn.rowcount
+
+    @property
+    def description(self) -> Any:
+        return self.txn.description
 
     def execute_batch(self, sql, args):
         if isinstance(self.database_engine, PostgresEngine):
-            from psycopg2.extras import execute_batch
+            from psycopg2.extras import execute_batch  # type: ignore
 
             self._do_execute(lambda *x: execute_batch(self.txn, *x), sql, args)
         else:
             for val in args:
                 self.execute(sql, val)
 
-    def execute(self, sql, *args):
+    def execute(self, sql: str, *args: Any):
         self._do_execute(self.txn.execute, sql, *args)
 
-    def executemany(self, sql, *args):
+    def executemany(self, sql: str, *args: Any):
         self._do_execute(self.txn.executemany, sql, *args)
 
-    def _make_sql_one_line(self, sql):
+    def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
-        return " ".join(l.strip() for l in sql.splitlines() if l.strip())
+        return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
     def _do_execute(self, func, sql, *args):
         sql = self._make_sql_one_line(sql)
@@ -206,6 +242,9 @@ class LoggingTransaction(object):
             secs = time.time() - start
             sql_logger.debug("[SQL time] {%s} %f sec", self.name, secs)
             sql_query_timer.labels(sql.split()[0]).observe(secs)
+
+    def close(self):
+        self.txn.close()
 
 
 class PerformanceCounters(object):
@@ -251,7 +290,9 @@ class Database(object):
 
     _TXN_ID = 0
 
-    def __init__(self, hs, database_config: DatabaseConnectionConfig, engine):
+    def __init__(
+        self, hs, database_config: DatabaseConnectionConfig, engine: BaseDatabaseEngine
+    ):
         self.hs = hs
         self._clock = hs.get_clock()
         self._database_config = database_config
@@ -259,9 +300,9 @@ class Database(object):
 
         self.updates = BackgroundUpdater(hs, self)
 
-        self._previous_txn_total_time = 0
-        self._current_txn_total_time = 0
-        self._previous_loop_ts = 0
+        self._previous_txn_total_time = 0.0
+        self._current_txn_total_time = 0.0
+        self._previous_loop_ts = 0.0
 
         # TODO(paul): These can eventually be removed once the metrics code
         #   is running in mainline, and we have some nice monitoring frontends
@@ -343,7 +384,7 @@ class Database(object):
 
             top_three_counters = self._txn_perf_counters.interval(duration, limit=3)
 
-            perf_logger.info(
+            perf_logger.debug(
                 "Total database time: %.3f%% {%s}", ratio * 100, top_three_counters
             )
 
@@ -382,20 +423,14 @@ class Database(object):
                     # This can happen if the database disappears mid
                     # transaction.
                     logger.warning(
-                        "[TXN OPERROR] {%s} %s %d/%d",
-                        name,
-                        exception_to_unicode(e),
-                        i,
-                        N,
+                        "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
                     )
                     if i < N:
                         i += 1
                         try:
                             conn.rollback()
                         except self.engine.module.Error as e1:
-                            logger.warning(
-                                "[TXN EROLL] {%s} %s", name, exception_to_unicode(e1)
-                            )
+                            logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
                     raise
                 except self.engine.module.DatabaseError as e:
@@ -407,9 +442,7 @@ class Database(object):
                                 conn.rollback()
                             except self.engine.module.Error as e1:
                                 logger.warning(
-                                    "[TXN EROLL] {%s} %s",
-                                    name,
-                                    exception_to_unicode(e1),
+                                    "[TXN EROLL] {%s} %s", name, e1,
                                 )
                             continue
                     raise
@@ -454,7 +487,7 @@ class Database(object):
             end = monotonic_time()
             duration = end - start
 
-            LoggingContext.current_context().add_database_transaction(duration)
+            current_context().add_database_transaction(duration)
 
             transaction_logger.debug("[TXN END] {%s} %f sec", name, duration)
 
@@ -463,25 +496,25 @@ class Database(object):
             sql_txn_timer.labels(desc).observe(duration)
 
     @defer.inlineCallbacks
-    def runInteraction(self, desc, func, *args, **kwargs):
+    def runInteraction(self, desc: str, func: Callable, *args: Any, **kwargs: Any):
         """Starts a transaction on the database and runs a given function
 
         Arguments:
-            desc (str): description of the transaction, for logging and metrics
-            func (func): callback function, which will be called with a
+            desc: description of the transaction, for logging and metrics
+            func: callback function, which will be called with a
                 database transaction (twisted.enterprise.adbapi.Transaction) as
                 its first argument, followed by `args` and `kwargs`.
 
-            args (list): positional args to pass to `func`
-            kwargs (dict): named args to pass to `func`
+            args: positional args to pass to `func`
+            kwargs: named args to pass to `func`
 
         Returns:
             Deferred: The result of func
         """
-        after_callbacks = []
-        exception_callbacks = []
+        after_callbacks = []  # type: List[_CallbackListEntry]
+        exception_callbacks = []  # type: List[_CallbackListEntry]
 
-        if LoggingContext.current_context() == LoggingContext.sentinel:
+        if not current_context():
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
@@ -505,21 +538,21 @@ class Database(object):
         return result
 
     @defer.inlineCallbacks
-    def runWithConnection(self, func, *args, **kwargs):
+    def runWithConnection(self, func: Callable, *args: Any, **kwargs: Any):
         """Wraps the .runWithConnection() method on the underlying db_pool.
 
         Arguments:
-            func (func): callback function, which will be called with a
+            func: callback function, which will be called with a
                 database connection (twisted.enterprise.adbapi.Connection) as
                 its first argument, followed by `args` and `kwargs`.
-            args (list): positional args to pass to `func`
-            kwargs (dict): named args to pass to `func`
+            args: positional args to pass to `func`
+            kwargs: named args to pass to `func`
 
         Returns:
             Deferred: The result of func
         """
-        parent_context = LoggingContext.current_context()
-        if parent_context == LoggingContext.sentinel:
+        parent_context = current_context()  # type: Optional[LoggingContextOrSentinel]
+        if not parent_context:
             logger.warning(
                 "Starting db connection from sentinel context: metrics will be lost"
             )
@@ -554,8 +587,8 @@ class Database(object):
         Returns:
             A list of dicts where the key is the column header.
         """
-        col_headers = list(intern(str(column[0])) for column in cursor.description)
-        results = list(dict(zip(col_headers, row)) for row in cursor)
+        col_headers = [intern(str(column[0])) for column in cursor.description]
+        results = [dict(zip(col_headers, row)) for row in cursor]
         return results
 
     def execute(self, desc, decoder, query, *args):
@@ -800,7 +833,7 @@ class Database(object):
                 return False
 
         # We didn't find any existing rows, so insert a new one
-        allvalues = {}
+        allvalues = {}  # type: Dict[str, Any]
         allvalues.update(keyvalues)
         allvalues.update(values)
         allvalues.update(insertion_values)
@@ -829,7 +862,7 @@ class Database(object):
         Returns:
             None
         """
-        allvalues = {}
+        allvalues = {}  # type: Dict[str, Any]
         allvalues.update(keyvalues)
         allvalues.update(insertion_values)
 
@@ -849,20 +882,24 @@ class Database(object):
         txn.execute(sql, list(allvalues.values()))
 
     def simple_upsert_many_txn(
-        self, txn, table, key_names, key_values, value_names, value_values
-    ):
+        self,
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[str]],
+    ) -> None:
         """
         Upsert, many times.
 
         Args:
-            table (str): The table to upsert into
-            key_names (list[str]): The key column names.
-            key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names. If empty, no
-                values will be used, even if value_values is provided.
-            value_values (list[list]): A list of each row's value column values.
-        Returns:
-            None
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
         """
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
@@ -874,20 +911,24 @@ class Database(object):
             )
 
     def simple_upsert_many_txn_emulated(
-        self, txn, table, key_names, key_values, value_names, value_values
-    ):
+        self,
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Iterable[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[str]],
+    ) -> None:
         """
         Upsert, many times, but without native UPSERT support or batching.
 
         Args:
-            table (str): The table to upsert into
-            key_names (list[str]): The key column names.
-            key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names. If empty, no
-                values will be used, even if value_values is provided.
-            value_values (list[list]): A list of each row's value column values.
-        Returns:
-            None
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
         """
         # No value columns, therefore make a blank list so that the following
         # zip() works correctly.
@@ -901,22 +942,26 @@ class Database(object):
             self.simple_upsert_txn_emulated(txn, table, _keys, _vals)
 
     def simple_upsert_many_txn_native_upsert(
-        self, txn, table, key_names, key_values, value_names, value_values
-    ):
+        self,
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[Any]],
+    ) -> None:
         """
         Upsert, many times, using batching where possible.
 
         Args:
-            table (str): The table to upsert into
-            key_names (list[str]): The key column names.
-            key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names. If empty, no
-                values will be used, even if value_values is provided.
-            value_values (list[list]): A list of each row's value column values.
-        Returns:
-            None
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
         """
-        allnames = []
+        allnames = []  # type: List[str]
         allnames.extend(key_names)
         allnames.extend(value_names)
 
@@ -1100,7 +1145,7 @@ class Database(object):
             keyvalues : dict of column names and values to select the rows with
             retcols : list of strings giving the names of the columns to return
         """
-        results = []
+        results = []  # type: List[Dict[str, Any]]
 
         if not iterable:
             return results
@@ -1439,7 +1484,7 @@ class Database(object):
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
         where_clause = "WHERE " if filters or keyvalues else ""
-        arg_list = []
+        arg_list = []  # type: List[Any]
         if filters:
             where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
             arg_list += list(filters.values())
@@ -1504,7 +1549,7 @@ class Database(object):
 
 def make_in_list_sql_clause(
     database_engine, column: str, iterable: Iterable
-) -> Tuple[str, Iterable]:
+) -> Tuple[str, list]:
     """Returns an SQL clause that checks the given column is in the iterable.
 
     On SQLite this expands to `column IN (?, ?, ...)`, whereas on Postgres
@@ -1527,3 +1572,74 @@ def make_in_list_sql_clause(
         return "%s = ANY(?)" % (column,), [list(iterable)]
     else:
         return "%s IN (%s)" % (column, ",".join("?" for _ in iterable)), list(iterable)
+
+
+KV = TypeVar("KV")
+
+
+def make_tuple_comparison_clause(
+    database_engine: BaseDatabaseEngine, keys: List[Tuple[str, KV]]
+) -> Tuple[str, List[KV]]:
+    """Returns a tuple comparison SQL clause
+
+    Depending what the SQL engine supports, builds a SQL clause that looks like either
+    "(a, b) > (?, ?)", or "(a > ?) OR (a == ? AND b > ?)".
+
+    Args:
+        database_engine
+        keys: A set of (column, value) pairs to be compared.
+
+    Returns:
+        A tuple of SQL query and the args
+    """
+    if database_engine.supports_tuple_comparison:
+        return (
+            "(%s) > (%s)" % (",".join(k[0] for k in keys), ",".join("?" for _ in keys)),
+            [k[1] for k in keys],
+        )
+
+    # we want to build a clause
+    #    (a > ?) OR
+    #    (a == ? AND b > ?) OR
+    #    (a == ? AND b == ? AND c > ?)
+    #    ...
+    #    (a == ? AND b == ? AND ... AND z > ?)
+    #
+    # or, equivalently:
+    #
+    #  (a > ? OR (a == ? AND
+    #    (b > ? OR (b == ? AND
+    #      ...
+    #        (y > ? OR (y == ? AND
+    #          z > ?
+    #        ))
+    #      ...
+    #    ))
+    #  ))
+    #
+    # which itself is equivalent to (and apparently easier for the query optimiser):
+    #
+    #  (a >= ? AND (a > ? OR
+    #    (b >= ? AND (b > ? OR
+    #      ...
+    #        (y >= ? AND (y > ? OR
+    #          z > ?
+    #        ))
+    #      ...
+    #    ))
+    #  ))
+    #
+    #
+
+    clause = ""
+    args = []  # type: List[KV]
+    for k, v in keys[:-1]:
+        clause = clause + "(%s >= ? AND (%s > ? OR " % (k, k)
+        args.extend([v, v])
+
+    (k, v) = keys[-1]
+    clause += "%s > ?" % (k,)
+    args.append(v)
+
+    clause += "))" * (len(keys) - 1)
+    return clause, args

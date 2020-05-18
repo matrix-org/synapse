@@ -14,7 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.http.server import DirectServeResource, wrap_html_request_handler
+from synapse.http.server import (
+    DirectServeResource,
+    finish_request,
+    wrap_html_request_handler,
+)
 
 
 class SAML2ResponseResource(DirectServeResource):
@@ -24,7 +28,19 @@ class SAML2ResponseResource(DirectServeResource):
 
     def __init__(self, hs):
         super().__init__()
+        self._error_html_content = hs.config.saml2_error_html_content
         self._saml_handler = hs.get_saml_handler()
+
+    async def _async_render_GET(self, request):
+        # We're not expecting any GET request on that resource if everything goes right,
+        # but some IdPs sometimes end up responding with a 302 redirect on this endpoint.
+        # In this case, just tell the user that something went wrong and they should
+        # try to authenticate again.
+        request.setResponseCode(400)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(self._error_html_content),))
+        request.write(self._error_html_content.encode("utf8"))
+        finish_request(request)
 
     @wrap_html_request_handler
     async def _async_render_POST(self, request):

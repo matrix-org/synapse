@@ -9,7 +9,11 @@ into Synapse, and provides a number of methods by which it can integrate
 with the authentication system.
 
 This document serves as a reference for those looking to implement their
-own password auth providers.
+own password auth providers. Additionally, here is a list of known
+password auth provider module implementations:
+
+* [matrix-synapse-ldap3](https://github.com/matrix-org/matrix-synapse-ldap3/)
+* [matrix-synapse-shared-secret-auth](https://github.com/devture/matrix-synapse-shared-secret-auth)
 
 ## Required methods
 

@@ -19,6 +19,7 @@ import logging
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Iterable, List, TypeVar
 
 from six.moves import urllib
 
@@ -40,6 +41,8 @@ from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 MESSAGE_FROM_PERSON_IN_ROOM = (
@@ -526,12 +529,10 @@ class Mailer(object):
                     # If the room doesn't have a name, say who the messages
                     # are from explicitly to avoid, "messages in the Bob room"
                     sender_ids = list(
-                        set(
-                            [
-                                notif_events[n["event_id"]].sender
-                                for n in notifs_by_room[room_id]
-                            ]
-                        )
+                        {
+                            notif_events[n["event_id"]].sender
+                            for n in notifs_by_room[room_id]
+                        }
                     )
 
                     member_events = yield self.store.get_events(
@@ -557,13 +558,13 @@ class Mailer(object):
             else:
                 # If the reason room doesn't have a name, say who the messages
                 # are from explicitly to avoid, "messages in the Bob room"
+                room_id = reason["room_id"]
+
                 sender_ids = list(
-                    set(
-                        [
-                            notif_events[n["event_id"]].sender
-                            for n in notifs_by_room[reason["room_id"]]
-                        ]
-                    )
+                    {
+                        notif_events[n["event_id"]].sender
+                        for n in notifs_by_room[room_id]
+                    }
                 )
 
                 member_events = yield self.store.get_events(
@@ -640,10 +641,10 @@ def safe_text(raw_text):
     )
 
 
-def deduped_ordered_list(l):
+def deduped_ordered_list(it: Iterable[T]) -> List[T]:
     seen = set()
     ret = []
-    for item in l:
+    for item in it:
         if item not in seen:
             seen.add(item)
             ret.append(item)

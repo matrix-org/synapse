@@ -15,6 +15,7 @@
 
 import logging
 
+from synapse.storage.data_stores.main.events import PersistEventsStore
 from synapse.storage.data_stores.state import StateGroupDataStore
 from synapse.storage.database import Database, make_conn
 from synapse.storage.engines import create_engine
@@ -37,6 +38,9 @@ class DataStores(object):
         # store.
 
         self.databases = []
+        self.main = None
+        self.state = None
+        self.persist_events = None
 
         for database_config in hs.config.database.databases:
             db_name = database_config.name
@@ -45,7 +49,7 @@ class DataStores(object):
             with make_conn(database_config, engine) as db_conn:
                 logger.info("Preparing database %r...", db_name)
 
-                engine.check_database(db_conn.cursor())
+                engine.check_database(db_conn)
                 prepare_database(
                     db_conn, engine, hs.config, data_stores=database_config.data_stores,
                 )
@@ -54,10 +58,29 @@ class DataStores(object):
 
                 if "main" in database_config.data_stores:
                     logger.info("Starting 'main' data store")
+
+                    # Sanity check we don't try and configure the main store on
+                    # multiple databases.
+                    if self.main:
+                        raise Exception("'main' data store already configured")
+
                     self.main = main_store_class(database, db_conn, hs)
+
+                    # If we're on a process that can persist events (currently
+                    # master), also instantiate a `PersistEventsStore`
+                    if hs.config.worker.worker_app is None:
+                        self.persist_events = PersistEventsStore(
+                            hs, database, self.main
+                        )
 
                 if "state" in database_config.data_stores:
                     logger.info("Starting 'state' data store")
+
+                    # Sanity check we don't try and configure the state store on
+                    # multiple databases.
+                    if self.state:
+                        raise Exception("'state' data store already configured")
+
                     self.state = StateGroupDataStore(database, db_conn, hs)
 
                 db_conn.commit()
@@ -65,3 +88,10 @@ class DataStores(object):
                 self.databases.append(database)
 
                 logger.info("Database %r prepared", db_name)
+
+        # Sanity check that we have actually configured all the required stores.
+        if not self.main:
+            raise Exception("No 'main' data store configured")
+
+        if not self.state:
+            raise Exception("No 'main' data store configured")

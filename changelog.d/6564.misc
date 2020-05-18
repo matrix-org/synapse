@@ -1,1 +1,0 @@
-Change `EventContext` to use the `Storage` class, in preparation for moving state database queries to a separate data store.

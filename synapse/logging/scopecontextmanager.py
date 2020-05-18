@@ -19,7 +19,7 @@ from opentracing import Scope, ScopeManager
 
 import twisted
 
-from synapse.logging.context import LoggingContext, nested_logging_context
+from synapse.logging.context import current_context, nested_logging_context
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +49,8 @@ class LogContextScopeManager(ScopeManager):
             (Scope) : the Scope that is active, or None if not
             available.
         """
-        ctx = LoggingContext.current_context()
-        if ctx is LoggingContext.sentinel:
-            return None
-        else:
-            return ctx.scope
+        ctx = current_context()
+        return ctx.scope
 
     def activate(self, span, finish_on_close):
         """
@@ -70,9 +67,9 @@ class LogContextScopeManager(ScopeManager):
         """
 
         enter_logcontext = False
-        ctx = LoggingContext.current_context()
+        ctx = current_context()
 
-        if ctx is LoggingContext.sentinel:
+        if not ctx:
             # We don't want this scope to affect.
             logger.error("Tried to activate scope outside of loggingcontext")
             return Scope(None, span)

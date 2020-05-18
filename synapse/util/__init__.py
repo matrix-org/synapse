@@ -15,7 +15,6 @@
 
 import logging
 import re
-from itertools import islice
 
 import attr
 
@@ -105,22 +104,6 @@ class Clock(object):
         except Exception:
             if not ignore_errs:
                 raise
-
-
-def batch_iter(iterable, size):
-    """batch an iterable up into tuples with a maximum size
-
-    Args:
-        iterable (iterable): the iterable to slice
-        size (int): the maximum batch size
-
-    Returns:
-        an iterator over the chunks
-    """
-    # make sure we can deal with iterables like lists too
-    sourceiter = iter(iterable)
-    # call islice until it returns an empty tuple
-    return iter(lambda: tuple(islice(sourceiter, size)), ())
 
 
 def log_failure(failure, msg, consumeErrors=True):

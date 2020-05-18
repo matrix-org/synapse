@@ -11,6 +11,13 @@ TURN server.
 
 The following sections describe how to install [coturn](<https://github.com/coturn/coturn>) (which implements the TURN REST API) and integrate it with synapse.
 
+## Requirements
+
+For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint with a public IP.
+
+Hosting TURN behind a NAT (even with appropriate port forwarding) is known to cause issues
+and to often not work.
+
 ## `coturn` Setup
 
 ### Initial installation
@@ -38,6 +45,8 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
 
         make
         make install
+
+### Configuration
 
 1.  Create or edit the config file in `/etc/turnserver.conf`. The relevant
     lines, with example values, are:
@@ -111,7 +120,7 @@ Your home server configuration file needs the following extra keys:
 As an example, here is the relevant section of the config file for matrix.org:
 
     turn_uris: [ "turn:turn.matrix.org:3478?transport=udp", "turn:turn.matrix.org:3478?transport=tcp" ]
-    turn_shared_secret: n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons
+    turn_shared_secret: "n0t4ctuAllymatr1Xd0TorgSshar3d5ecret4obvIousreAsons"
     turn_user_lifetime: 86400000
     turn_allow_guests: True
 

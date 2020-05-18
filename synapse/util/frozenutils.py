@@ -30,7 +30,7 @@ def freeze(o):
         return o
 
     try:
-        return tuple([freeze(i) for i in o])
+        return tuple(freeze(i) for i in o)
     except TypeError:
         pass
 
@@ -65,5 +65,5 @@ def _handle_frozendict(obj):
     )
 
 
-# A JSONEncoder which is capable of encoding frozendics without barfing
+# A JSONEncoder which is capable of encoding frozendicts without barfing
 frozendict_json_encoder = json.JSONEncoder(default=_handle_frozendict)

@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Any, Dict, Optional
 
 from six import iteritems
 
@@ -89,7 +90,11 @@ class RoomListHandler(BaseHandler):
             logger.info("Bypassing cache as search request.")
 
             return self._get_public_room_list(
-                limit, since_token, search_filter, network_tuple=network_tuple
+                limit,
+                since_token,
+                search_filter,
+                network_tuple=network_tuple,
+                from_federation=from_federation,
             )
 
         key = (limit, since_token, network_tuple)
@@ -105,22 +110,22 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def _get_public_room_list(
         self,
-        limit=None,
-        since_token=None,
-        search_filter=None,
-        network_tuple=EMPTY_THIRD_PARTY_ID,
-        from_federation=False,
-    ):
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        network_tuple: ThirdPartyInstanceID = EMPTY_THIRD_PARTY_ID,
+        from_federation: bool = False,
+    ) -> Dict[str, Any]:
         """Generate a public room list.
         Args:
-            limit (int|None): Maximum amount of rooms to return.
-            since_token (str|None)
-            search_filter (dict|None): Dictionary to filter rooms by.
-            network_tuple (ThirdPartyInstanceID): Which public list to use.
+            limit: Maximum amount of rooms to return.
+            since_token:
+            search_filter: Dictionary to filter rooms by.
+            network_tuple: Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
-            from_federation (bool): Whether this request originated from a
+            from_federation: Whether this request originated from a
                 federating server or a client. Used for room filtering.
         """
 
@@ -215,15 +220,6 @@ class RoomListHandler(BaseHandler):
                         last_room_id=initial_entry["room_id"],
                         direction_is_forward=False,
                     ).to_token()
-
-        for room in results:
-            # populate search result entries with additional fields, namely
-            # 'aliases'
-            room_id = room["room_id"]
-
-            aliases = yield self.store.get_aliases_for_room(room_id)
-            if aliases:
-                room["aliases"] = aliases
 
         response["chunk"] = results
 

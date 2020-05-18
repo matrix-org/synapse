@@ -51,6 +51,7 @@ push_rules_delta_state_cache_metric = register_cache(
     "cache",
     "push_rules_delta_state_cache_metric",
     cache=[],  # Meaningless size, as this isn't a cache that stores values
+    resizable=False,
 )
 
 
@@ -67,7 +68,8 @@ class BulkPushRuleEvaluator(object):
         self.room_push_rule_cache_metrics = register_cache(
             "cache",
             "room_push_rule_cache",
-            cache=[],  # Meaningless size, as this isn't a cache that stores values
+            cache=[],  # Meaningless size, as this isn't a cache that stores values,
+            resizable=False,
         )
 
     @defer.inlineCallbacks
@@ -400,11 +402,11 @@ class RulesForRoom(object):
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Found members %r: %r", self.room_id, members.values())
 
-        interested_in_user_ids = set(
+        interested_in_user_ids = {
             user_id
             for user_id, membership in itervalues(members)
             if membership == Membership.JOIN
-        )
+        }
 
         logger.debug("Joined: %r", interested_in_user_ids)
 
@@ -412,9 +414,9 @@ class RulesForRoom(object):
             interested_in_user_ids, on_invalidate=self.invalidate_all_cb
         )
 
-        user_ids = set(
+        user_ids = {
             uid for uid, have_pusher in iteritems(if_users_with_pushers) if have_pusher
-        )
+        }
 
         logger.debug("With pushers: %r", user_ids)
 

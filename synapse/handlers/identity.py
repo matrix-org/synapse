@@ -18,7 +18,7 @@
 """Utilities for interacting with Identity Servers"""
 
 import logging
-import urllib
+import urllib.parse
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
@@ -38,7 +38,7 @@ from synapse.api.errors import (
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.client import SimpleHttpClient
 from synapse.util.hash import sha256_and_url_safe_base64
-from synapse.util.stringutils import random_string
+from synapse.util.stringutils import assert_valid_client_secret, random_string
 
 from ._base import BaseHandler
 
@@ -84,6 +84,8 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(
                 400, "Missing param client_secret in creds", errcode=Codes.MISSING_PARAM
             )
+        assert_valid_client_secret(client_secret)
+
         session_id = creds.get("sid")
         if not session_id:
             raise SynapseError(
