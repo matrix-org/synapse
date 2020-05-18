@@ -14,7 +14,7 @@
 # limitations under the License.
 import collections
 import re
-from typing import Mapping, Union
+from typing import Any, Mapping, Union
 
 from six import string_types
 
@@ -23,6 +23,7 @@ from frozendict import frozendict
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.util.async_helpers import yieldable_gather_results
 
@@ -449,3 +450,35 @@ def copy_power_levels_contents(
         raise TypeError("Invalid power_levels value for %s: %r" % (k, v))
 
     return power_levels
+
+
+def validate_canonicaljson(value: Any):
+    """
+    Ensure that the JSON object is valid according to the rules of canonical JSON.
+
+    See the appendix section 3.1: Canonical JSON.
+
+    This rejects JSON that has:
+    * An integer outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
+    * Floats
+    * NaN, Infinity, -Infinity
+    """
+    if isinstance(value, int):
+        if value <= -(2 ** 53) or 2 ** 53 <= value:
+            raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
+
+    elif isinstance(value, float):
+        # Note that Infinity, -Infinity, and NaN are also considered floats.
+        raise SynapseError(400, "Bad JSON value: float", Codes.BAD_JSON)
+
+    elif isinstance(value, (dict, frozendict)):
+        for v in value.values():
+            validate_canonicaljson(v)
+
+    elif isinstance(value, (list, tuple)):
+        for i in value:
+            validate_canonicaljson(i)
+
+    elif not isinstance(value, (bool, str)) and value is not None:
+        # Other potential JSON values (bool, None, str) are safe.
+        raise SynapseError(400, "Unknown JSON value", Codes.BAD_JSON)

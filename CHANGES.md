@@ -1,3 +1,12 @@
+Synapse 1.13.0rc3 (2020-05-18)
+==============================
+
+Bugfixes
+--------
+
+- Hash passwords as early as possible during registration. ([\#7523](https://github.com/matrix-org/synapse/issues/7523))
+
+
 Synapse 1.13.0rc2 (2020-05-14)
 ==============================
 

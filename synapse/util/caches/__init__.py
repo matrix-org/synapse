@@ -15,10 +15,8 @@
 # limitations under the License.
 
 import logging
+from sys import intern
 from typing import Callable, Dict, Optional
-
-import six
-from six.moves import intern
 
 import attr
 from prometheus_client.core import Gauge
@@ -154,9 +152,6 @@ def intern_string(string):
         return None
 
     try:
-        if six.PY2:
-            string = string.encode("ascii")
-
         return intern(string)
     except UnicodeEncodeError:
         return string
