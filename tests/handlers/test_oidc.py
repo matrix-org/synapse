@@ -292,11 +292,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
     @defer.inlineCallbacks
     def test_redirect_request(self):
         """The redirect request has the right arguments & generates a valid session cookie."""
-        req = Mock(spec=["addCookie", "redirect", "finish"])
-        yield defer.ensureDeferred(
+        req = Mock(spec=["addCookie"])
+        url = yield defer.ensureDeferred(
             self.handler.handle_redirect_request(req, b"http://client/redirect")
         )
-        url = req.redirect.call_args[0][0]
         url = urlparse(url)
         auth_endpoint = urlparse(AUTHORIZATION_ENDPOINT)
 
@@ -382,7 +381,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
         nonce = "nonce"
         client_redirect_url = "http://client/redirect"
         session = self.handler._generate_oidc_session_token(
-            state=state, nonce=nonce, client_redirect_url=client_redirect_url,
+            state=state,
+            nonce=nonce,
+            client_redirect_url=client_redirect_url,
+            ui_auth_session_id=None,
         )
         request.getCookie.return_value = session
 
@@ -472,7 +474,10 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         # Mismatching session
         session = self.handler._generate_oidc_session_token(
-            state="state", nonce="nonce", client_redirect_url="http://client/redirect",
+            state="state",
+            nonce="nonce",
+            client_redirect_url="http://client/redirect",
+            ui_auth_session_id=None,
         )
         request.args = {}
         request.args[b"state"] = [b"mismatching state"]

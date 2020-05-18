@@ -16,21 +16,12 @@
 import logging
 from typing import Optional
 
-import six
-
 from synapse.storage.data_stores.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 logger = logging.getLogger(__name__)
-
-
-def __func__(inp):
-    if six.PY3:
-        return inp
-    else:
-        return inp.__func__
 
 
 class BaseSlavedStore(CacheInvalidationWorkerStore):
