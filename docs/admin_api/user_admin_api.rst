@@ -33,21 +33,22 @@ with a body of:
 
 including an ``access_token`` of a server admin.
 
-The parameter ``displayname`` is optional and defaults to the value of
-``user_id``.
+Parameters:
 
-The parameter ``threepids`` is optional and allows setting the third-party IDs
-(email, msisdn) belonging to a user.
+- ``password``, optional. If provided, the user's password is updated and all
+  devices are logged out.
+  
+- ``displayname``, optional, defaults to the value of ``user_id``.
 
-The parameter ``avatar_url`` is optional. Must be a [MXC
-URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
+- ``threepids``, optional, allows setting the third-party IDs (email, msisdn)
+  belonging to a user.
 
-The parameter ``admin`` is optional and defaults to ``false``.
+- ``avatar_url``, optional, must be a 
+  `MXC URI <https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris>`_.
 
-The parameter ``deactivated`` is optional and defaults to ``false``.
+- ``admin``, optional, defaults to ``false``.
 
-The parameter ``password`` is optional. If provided, the user's password is
-updated and all devices are logged out.
+- ``deactivated``, optional, defaults to ``false``.
 
 If the user already exists then optional parameters default to the current value.
 
