@@ -29,7 +29,7 @@ common practice and modern `git` usage.
 
 The `master` branch, which tracks the latest release, is still available. It is
 recommended that developers and distributors who have scripts which run builds
-using the default branch of `Synapse` should therefore consider pinning their
+using the default branch of Synapse should therefore consider pinning their
 scripts to `master`.
 
 
