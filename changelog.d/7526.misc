@@ -1,1 +1,0 @@
-Update the version of dh-virtualenv we use to build debs, and add focal to the list of target distributions.

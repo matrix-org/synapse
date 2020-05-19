@@ -1,3 +1,12 @@
+Synapse 1.13.0 (2020-05-19)
+===========================
+
+Internal Changes
+----------------
+
+- Update the version of dh-virtualenv we use to build debs, and add focal to the list of target distributions. ([\#7526](https://github.com/matrix-org/synapse/issues/7526))
+
+
 Synapse 1.13.0rc3 (2020-05-18)
 ==============================
 
