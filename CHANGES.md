@@ -1,6 +1,38 @@
 Synapse 1.13.0 (2020-05-19)
 ===========================
 
+This release brings some potential changes necessary for certain
+configurations of Synapse:
+
+* If your Synapse is configured to use SSO and have a custom
+  `sso_redirect_confirm_template_dir` configuration option set, you will need
+  to duplicate the new `sso_auth_confirm.html`, `sso_auth_success.html` and
+  `sso_account_deactivated.html` templates into that directory.
+* Synapse plugins using the `complete_sso_login` method of
+  `synapse.module_api.ModuleApi` should instead switch to the async/await
+  version, `complete_sso_login_async`, which includes additional checks. The
+  former version is now deprecated.
+* A bug was introduced in Synapse 1.4.0 which could cause the room directory
+  to be incomplete or empty if Synapse was upgraded directly from v1.2.1 or
+  earlier, to versions between v1.4.0 and v1.12.x.
+
+Please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes
+and for general upgrade guidance.
+
+
+Notice of change to the default `git` branch for Synapse
+--------------------------------------------------------
+
+With the release of Synapse 1.13.0, the default `git` branch for Synapse has
+changed to `develop`, which is the development tip. This is more consistent with
+common practice and modern `git` usage.
+
+The `master` branch, which tracks the latest release, is still available. It is
+recommended that developers and distributors who have scripts which run builds
+using the default branch of `Synapse` should therefore consider pinning their
+scripts to `master`.
+
+
 Internal Changes
 ----------------
 
@@ -33,24 +65,6 @@ Internal Changes
 
 Synapse 1.13.0rc1 (2020-05-11)
 ==============================
-
-This release brings some potential changes necessary for certain
-configurations of Synapse:
-
-* If your Synapse is configured to use SSO and have a custom
-  `sso_redirect_confirm_template_dir` configuration option set, you will need
-  to duplicate the new `sso_auth_confirm.html`, `sso_auth_success.html` and
-  `sso_account_deactivated.html` templates into that directory.
-* Synapse plugins using the `complete_sso_login` method of
-  `synapse.module_api.ModuleApi` should instead switch to the async/await
-  version, `complete_sso_login_async`, which includes additional checks. The
-  former version is now deprecated.
-* A bug was introduced in Synapse 1.4.0 which could cause the room directory
-  to be incomplete or empty if Synapse was upgraded directly from v1.2.1 or
-  earlier, to versions between v1.4.0 and v1.12.x.
-
-Please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes
-and for general upgrade guidance.
 
 Features
 --------
