@@ -126,30 +126,28 @@ class BaseHandler(object):
                 retry_after_ms=int(1000 * (time_allowed - time_now))
             )
 
-    @defer.inlineCallbacks
-    def maybe_kick_guest_users(self, event, context=None):
+    async def maybe_kick_guest_users(self, event, context=None):
         # Technically this function invalidates current_state by changing it.
         # Hopefully this isn't that important to the caller.
         if event.type == EventTypes.GuestAccess:
             guest_access = event.content.get("guest_access", "forbidden")
             if guest_access != "can_join":
                 if context:
-                    current_state_ids = yield context.get_current_state_ids()
-                    current_state = yield self.store.get_events(
+                    current_state_ids = await context.get_current_state_ids()
+                    current_state = await self.store.get_events(
                         list(current_state_ids.values())
                     )
                 else:
-                    current_state = yield self.state_handler.get_current_state(
+                    current_state = await self.state_handler.get_current_state(
                         event.room_id
                     )
 
                 current_state = list(current_state.values())
 
                 logger.info("maybe_kick_guest_users %r", current_state)
-                yield self.kick_guest_users(current_state)
+                await self.kick_guest_users(current_state)
 
-    @defer.inlineCallbacks
-    def kick_guest_users(self, current_state):
+    async def kick_guest_users(self, current_state):
         for member_event in current_state:
             try:
                 if member_event.type != EventTypes.Member:
@@ -180,7 +178,7 @@ class BaseHandler(object):
                 # homeserver.
                 requester = synapse.types.create_requester(target_user, is_guest=True)
                 handler = self.hs.get_room_member_handler()
-                yield handler.update_membership(
+                await handler.update_membership(
                     requester,
                     target_user,
                     member_event.room_id,

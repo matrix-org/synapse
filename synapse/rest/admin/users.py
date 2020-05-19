@@ -94,10 +94,10 @@ class UsersRestServletV2(RestServlet):
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
-        users = await self.store.get_users_paginate(
+        users, total = await self.store.get_users_paginate(
             start, limit, user_id, guests, deactivated
         )
-        ret = {"users": users}
+        ret = {"users": users, "total": total}
         if len(users) >= limit:
             ret["next_token"] = str(start + len(users))
 
@@ -199,7 +199,7 @@ class UserRestServletV2(RestServlet):
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
 
-            if "avatar_url" in body:
+            if "avatar_url" in body and type(body["avatar_url"]) == str:
                 await self.profile_handler.set_avatar_url(
                     target_user, requester, body["avatar_url"], True
                 )
@@ -243,11 +243,11 @@ class UserRestServletV2(RestServlet):
 
         else:  # create user
             password = body.get("password")
-            if password is not None and (
-                not isinstance(body["password"], text_type)
-                or len(body["password"]) > 512
-            ):
-                raise SynapseError(400, "Invalid password")
+            password_hash = None
+            if password is not None:
+                if not isinstance(password, text_type) or len(password) > 512:
+                    raise SynapseError(400, "Invalid password")
+                password_hash = await self.auth_handler.hash(password)
 
             admin = body.get("admin", None)
             user_type = body.get("user_type", None)
@@ -259,7 +259,7 @@ class UserRestServletV2(RestServlet):
 
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
-                password=password,
+                password_hash=password_hash,
                 admin=bool(admin),
                 default_display_name=displayname,
                 user_type=user_type,
@@ -276,7 +276,7 @@ class UserRestServletV2(RestServlet):
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
 
-            if "avatar_url" in body:
+            if "avatar_url" in body and type(body["avatar_url"]) == str:
                 await self.profile_handler.set_avatar_url(
                     user_id, requester, body["avatar_url"], True
                 )
@@ -298,7 +298,7 @@ class UserRegisterServlet(RestServlet):
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
-        self.handlers = hs.get_handlers()
+        self.auth_handler = hs.get_auth_handler()
         self.reactor = hs.get_reactor()
         self.nonces = {}
         self.hs = hs
@@ -362,15 +362,15 @@ class UserRegisterServlet(RestServlet):
                 400, "password must be specified", errcode=Codes.BAD_JSON
             )
         else:
-            if (
-                not isinstance(body["password"], text_type)
-                or len(body["password"]) > 512
-            ):
+            password = body["password"]
+            if not isinstance(password, text_type) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
 
-            password = body["password"].encode("utf-8")
-            if b"\x00" in password:
+            password_bytes = password.encode("utf-8")
+            if b"\x00" in password_bytes:
                 raise SynapseError(400, "Invalid password")
+
+            password_hash = await self.auth_handler.hash(password)
 
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
@@ -388,7 +388,7 @@ class UserRegisterServlet(RestServlet):
         want_mac_builder.update(b"\x00")
         want_mac_builder.update(username)
         want_mac_builder.update(b"\x00")
-        want_mac_builder.update(password)
+        want_mac_builder.update(password_bytes)
         want_mac_builder.update(b"\x00")
         want_mac_builder.update(b"admin" if admin else b"notadmin")
         if user_type:
@@ -407,7 +407,7 @@ class UserRegisterServlet(RestServlet):
 
         user_id = await register.registration_handler.register_user(
             localpart=body["username"].lower(),
-            password=body["password"],
+            password_hash=password_hash,
             admin=bool(admin),
             user_type=user_type,
         )

@@ -241,16 +241,26 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_path = self.get_config().web_client_location
+            webclient_loc = self.get_config().web_client_location
 
-            if webclient_path is None:
+            if webclient_loc is None:
                 logger.warning(
                     "Not enabling webclient resource, as web_client_location is unset."
                 )
+            elif webclient_loc.startswith("http://") or webclient_loc.startswith(
+                "https://"
+            ):
+                resources[WEB_CLIENT_PREFIX] = RootRedirect(webclient_loc)
             else:
+                logger.warning(
+                    "Running webclient on the same domain is not recommended: "
+                    "https://github.com/matrix-org/synapse#security-note - "
+                    "after you move webclient to different host you can set "
+                    "web_client_location to its full URL to enable redirection."
+                )
                 # GZip is disabled here due to
                 # https://twistedmatrix.com/trac/ticket/7678
-                resources[WEB_CLIENT_PREFIX] = File(webclient_path)
+                resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
@@ -262,6 +272,12 @@ class SynapseHomeServer(HomeServer):
 
     def start_listening(self, listeners):
         config = self.get_config()
+
+        if config.redis_enabled:
+            # If redis is enabled we connect via the replication command handler
+            # in the same way as the workers (since we're effectively a client
+            # rather than a server).
+            self.get_tcp_replication().start_replication(self)
 
         for listener in listeners:
             if listener["type"] == "http":

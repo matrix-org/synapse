@@ -20,11 +20,31 @@ Further details can be found in docs/tcp_replication.rst
 
 
 Structure of the module:
- * client.py   - the client classes used for workers to connect to master
+ * handler.py  - the classes used to handle sending/receiving commands to
+                 replication
  * command.py  - the definitions of all the valid commands
- * protocol.py - contains bot the client and server protocol implementations,
-                 these should not be used directly
- * resource.py - the server classes that accepts and handle client connections
- * streams.py  - the definitons of all the valid streams
+ * protocol.py - the TCP protocol classes
+ * resource.py - handles streaming stream updates to replications
+ * streams/    - the definitons of all the valid streams
 
+
+The general interaction of the classes are:
+
+        +---------------------+
+        | ReplicationStreamer |
+        +---------------------+
+                    |
+                    v
+        +---------------------------+     +----------------------+
+        | ReplicationCommandHandler |---->|ReplicationDataHandler|
+        +---------------------------+     +----------------------+
+                    | ^
+                    v |
+            +-------------+
+            | Protocols   |
+            | (TCP/redis) |
+            +-------------+
+
+Where the ReplicationDataHandler (or subclasses) handles incoming stream
+updates.
 """
