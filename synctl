@@ -322,7 +322,7 @@ def main():
         has_stopped = True
         for worker in workers:
             if not stop(worker.pidfile, worker.app):
-                # A worker doesn't stop
+                # A worker could not be stopped.
                 has_stopped = False
 
         if start_stop_synapse:

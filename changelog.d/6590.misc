@@ -1,1 +1,1 @@
-synctl: On restart don't start if nothing was stopped. Warns that the process might not be started by synctl.
+`synctl` now warns if it was unable to stop Synapse and will not attempt to start Synapse if nothing was stopped. Contributed by Romain Bouyé.
