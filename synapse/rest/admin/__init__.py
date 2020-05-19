@@ -26,6 +26,11 @@ from synapse.rest.admin._base import (
     assert_requester_is_admin,
     historical_admin_path_patterns,
 )
+from synapse.rest.admin.devices import (
+    DeleteDevicesRestServlet,
+    DeviceRestServlet,
+    DevicesRestServlet,
+)
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
@@ -39,9 +44,6 @@ from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
-    DeleteDevicesRestServlet,
-    DeviceRestServlet,
-    DevicesRestServlet,
     ResetPasswordRestServlet,
     SearchUsersRestServlet,
     UserAdminServlet,

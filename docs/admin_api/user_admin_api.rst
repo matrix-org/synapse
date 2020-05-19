@@ -255,26 +255,6 @@ List all devices
 ----------------
 Gets information about all devices for a specific ``user_id``.
 
-**Parameters**
-
-The following query parameters are available:
-
-- ``user_id`` - fully qualified: for example, ``@user:server.com``.
-
-The following fields are possible in the JSON response body:
-
-- ``devices`` - An array of objects, each containing information about a device.
-  Devices objects contain the following fields:
-
-  - ``device_id`` - Identifier of device.
-  - ``display_name`` - Display name set by the user for this device.
-    Absent if no name has been set.
-  - ``last_seen_ip`` - The IP address where this device was last seen.
-    (May be a few minutes out of date, for efficiency reasons).
-  - ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
-    devices was last seen. (May be a few minutes out of date, for efficiency reasons).
-  - ``user_id`` - Owner of  device.
-
 **Usage**
 
 A standard request for query devices of an user:
@@ -284,7 +264,6 @@ A standard request for query devices of an user:
     GET /_synapse/admin/v2/users/<user_id>/devices
 
     {}
-
 
 Response:
 
@@ -309,20 +288,30 @@ Response:
       ]
     }
 
-Delete multiple devices
-------------------
-Deletes the given devices for a specific ``user_id``, and invalidates
-any access token associated with them.
-
 **Parameters**
 
 The following query parameters are available:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 
-The following fields are required in the JSON request body:
+The following fields are possible in the JSON response body:
 
-- ``devices`` - The list of device IDs to delete.
+- ``devices`` - An array of objects, each containing information about a device.
+  Devices objects contain the following fields:
+
+  - ``device_id`` - Identifier of device.
+  - ``display_name`` - Display name set by the user for this device.
+    Absent if no name has been set.
+  - ``last_seen_ip`` - The IP address where this device was last seen.
+    (May be a few minutes out of date, for efficiency reasons).
+  - ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
+    devices was last seen. (May be a few minutes out of date, for efficiency reasons).
+  - ``user_id`` - Owner of  device.
+
+Delete multiple devices
+------------------
+Deletes the given devices for a specific ``user_id``, and invalidates
+any access token associated with them.
 
 **Usage**
 
@@ -346,28 +335,19 @@ Response:
 
     {}
 
-Show a device
----------------
-Gets information on a single device, by ``device_id`` for a specific ``user_id``.
-
 **Parameters**
 
 The following query parameters are available:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
-- ``device_id`` - The device to retrieve.
 
-The following fields are possible in the JSON response body:
+The following fields are required in the JSON request body:
 
-- ``device_id`` - Identifier of device.
-- ``display_name`` - Display name set by the user for this device.
-  Absent if no name has been set.
-- ``last_seen_ip`` - The IP address where this device was last seen.
-  (May be a few minutes out of date, for efficiency reasons).
-- ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
-  devices was last seen. (May be a few minutes out of date, for efficiency reasons).
-- ``user_id`` - Owner of  device.
+- ``devices`` - The list of device IDs to delete.
 
+Show a device
+---------------
+Gets information on a single device, by ``device_id`` for a specific ``user_id``.
 
 **Usage**
 
@@ -392,21 +372,27 @@ Response:
       "user_id": "<user_id>"
     }
 
-Update a device
----------------
-Updates the metadata on the given ``device_id`` for a specific ``user_id``.
-
 **Parameters**
 
 The following query parameters are available:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
-- ``device_id`` - The device to update.
+- ``device_id`` - The device to retrieve.
 
-The following fields are required in the JSON request body:
+The following fields are possible in the JSON response body:
 
-- ``display_name`` - The new display name for this device. If not given,
-  the display name is unchanged.
+- ``device_id`` - Identifier of device.
+- ``display_name`` - Display name set by the user for this device.
+  Absent if no name has been set.
+- ``last_seen_ip`` - The IP address where this device was last seen.
+  (May be a few minutes out of date, for efficiency reasons).
+- ``last_seen_ts`` - The timestamp (in milliseconds since the unix epoch) when this
+  devices was last seen. (May be a few minutes out of date, for efficiency reasons).
+- ``user_id`` - Owner of  device.
+
+Update a device
+---------------
+Updates the metadata on the given ``device_id`` for a specific ``user_id``.
 
 **Usage**
 
@@ -427,17 +413,22 @@ Response:
 
     {}
 
-Delete a device
----------------
-Deletes the given ``device_id`` for a specific ``user_id``,
-and invalidates any access token associated with it.
-
 **Parameters**
 
 The following query parameters are available:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
-- ``device_id`` - The device to delete.
+- ``device_id`` - The device to update.
+
+The following fields are required in the JSON request body:
+
+- ``display_name`` - The new display name for this device. If not given,
+  the display name is unchanged.
+
+Delete a device
+---------------
+Deletes the given ``device_id`` for a specific ``user_id``,
+and invalidates any access token associated with it.
 
 **Usage**
 
@@ -455,3 +446,10 @@ Response:
 .. code:: json
 
     {}
+
+**Parameters**
+
+The following query parameters are available:
+
+- ``user_id`` - fully qualified: for example, ``@user:server.com``.
+- ``device_id`` - The device to delete.
