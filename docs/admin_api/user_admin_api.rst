@@ -44,7 +44,7 @@ Parameters:
   belonging to a user
 
 - ``avatar_url``, optional, must be a [MXC
-URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris)
+  URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris)
 
 - ``admin``, optional, defaults to ``false``
 
