@@ -26,7 +26,7 @@ import six
 
 import attr
 from prometheus_client import Counter, Gauge, Histogram
-from prometheus_client.core import REGISTRY, GaugeMetricFamily, HistogramMetricFamily
+from prometheus_client.core import REGISTRY, CounterMetricFamily, GaugeMetricFamily, HistogramMetricFamily
 
 from twisted.internet import reactor
 
@@ -337,6 +337,78 @@ class GCCounts(object):
 
 if not running_on_pypy:
     REGISTRY.register(GCCounts())
+
+
+#
+# PyPy GC / memory metrics
+#
+
+
+class PyPyGCStats(object):
+    def collect(self):
+
+        # @stats is a pretty-printer object with __str__() returning a nice table,
+        # plus some fields that contain data from that table.
+        # unfortunately, fields are pretty-printed themselves (i. e. '4.5MB').
+        stats = gc.get_stats(memory_pressure=False)
+        # @s contains same fields as @stats, but as actual integers.
+        s = stats._s
+
+        # also note that field naming is completely braindead
+        # and only vaguely correlates with the pretty-printed table.
+        # >>>> gc.get_stats(False)
+        # Total memory consumed:
+        #     GC used:            8.7MB (peak: 39.0MB)        # s.total_gc_memory, s.peak_memory
+        #        in arenas:            3.0MB                  # s.total_arena_memory
+        #        rawmalloced:          1.7MB                  # s.total_rawmalloced_memory
+        #        nursery:              4.0MB                  # s.nursery_size
+        #     raw assembler used: 31.0kB                      # s.jit_backend_used
+        #     -----------------------------
+        #     Total:              8.8MB                       # stats.memory_used_sum
+        #
+        #     Total memory allocated:
+        #     GC allocated:            38.7MB (peak: 41.1MB)  # s.total_allocated_memory, s.peak_allocated_memory
+        #        in arenas:            30.9MB                 # s.peak_arena_memory
+        #        rawmalloced:          4.1MB                  # s.peak_rawmalloced_memory
+        #        nursery:              4.0MB                  # s.nursery_size
+        #     raw assembler allocated: 1.0MB                  # s.jit_backend_allocated
+        #     -----------------------------
+        #     Total:                   39.7MB                 # stats.memory_allocated_sum
+        #
+        #     Total time spent in GC:  0.073                  # s.total_gc_time
+
+        pypy_gc_time = CounterMetricFamily(
+            "pypy_gc_time_seconds_total", "Total time spent in PyPy GC", labels=[],
+        )
+        pypy_gc_time.add_metric([], s.total_gc_time / 1000)
+        yield pypy_gc_time
+
+        pypy_mem = GaugeMetricFamily(
+            "pypy_memory_bytes",
+            "Memory tracked by PyPy allocator",
+            labels=["state", "class", "kind"],
+        )
+        # memory used by JIT assembler
+        pypy_mem.add_metric(["used", "", "jit"], s.jit_backend_used)
+        pypy_mem.add_metric(["allocated", "", "jit"], s.jit_backend_allocated)
+        # memory used by GCed objects
+        pypy_mem.add_metric(["used", "", "arenas"], s.total_arena_memory)
+        pypy_mem.add_metric(["allocated", "", "arenas"], s.peak_arena_memory)
+        pypy_mem.add_metric(["used", "", "rawmalloced"], s.total_rawmalloced_memory)
+        pypy_mem.add_metric(["allocated", "", "rawmalloced"], s.peak_rawmalloced_memory)
+        pypy_mem.add_metric(["used", "", "nursery"], s.nursery_size)
+        pypy_mem.add_metric(["allocated", "", "nursery"], s.nursery_size)
+        # totals
+        pypy_mem.add_metric(["used", "totals", "gc"], s.total_gc_memory)
+        pypy_mem.add_metric(["allocated", "totals", "gc"], s.total_allocated_memory)
+        pypy_mem.add_metric(["used", "totals", "gc_peak"], s.peak_memory)
+        pypy_mem.add_metric(["allocated", "totals", "gc_peak"], s.peak_allocated_memory)
+        yield pypy_mem
+
+
+if running_on_pypy:
+    REGISTRY.register(PyPyGCStats())
+
 
 #
 # Twisted reactor metrics
