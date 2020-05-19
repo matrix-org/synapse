@@ -1,0 +1,1 @@
+Add a listener to workers that don't have the media repo enabled which returns 200 OK for OPTIONS requests.
