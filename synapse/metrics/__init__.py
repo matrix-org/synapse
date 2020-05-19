@@ -26,7 +26,12 @@ import six
 
 import attr
 from prometheus_client import Counter, Gauge, Histogram
-from prometheus_client.core import REGISTRY, CounterMetricFamily, GaugeMetricFamily, HistogramMetricFamily
+from prometheus_client.core import (
+    REGISTRY,
+    CounterMetricFamily,
+    GaugeMetricFamily,
+    HistogramMetricFamily,
+)
 
 from twisted.internet import reactor
 
