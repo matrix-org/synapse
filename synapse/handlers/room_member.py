@@ -26,6 +26,9 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.replication.http.membership import (
+    ReplicationLocallyRejectInviteRestServlet,
+)
 from synapse.types import Collection, Requester, RoomAlias, RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
@@ -44,11 +47,6 @@ class RoomMemberHandler(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, hs):
-        """
-
-        Args:
-            hs (synapse.server.HomeServer):
-        """
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -70,6 +68,17 @@ class RoomMemberHandler(object):
         self._server_notices_mxid = self.config.server_notices_mxid
         self._enable_lookup = hs.config.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
+
+        self._event_stream_writer_instance = hs.config.worker.writers.events
+        self._is_on_event_persistence_instance = (
+            self._event_stream_writer_instance == hs.get_instance_name()
+        )
+        if self._is_on_event_persistence_instance:
+            self.persist_event_storage = hs.get_storage().persistence
+        else:
+            self._locally_reject_client = ReplicationLocallyRejectInviteRestServlet.make_client(
+                hs
+            )
 
         # This is only used to get at ratelimit function, and
         # maybe_kick_guest_users. It's fine there are multiple of these as
@@ -120,6 +129,19 @@ class RoomMemberHandler(object):
             include event_id etc, or nothing if we locally rejected
         """
         raise NotImplementedError()
+
+    async def locally_reject_invite(self, user_id: str, room_id: str):
+        """Mark the invite has having been rejected even though we failed to
+        create a leave event for it.
+        """
+        if self._is_on_event_persistence_instance:
+            await self.persist_event_storage.locally_reject_invite(user_id, room_id)
+        else:
+            await self._locally_reject_client(
+                instance_name=self._event_stream_writer_instance,
+                user_id=user_id,
+                room_id=room_id,
+            )
 
     @abc.abstractmethod
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
@@ -1000,7 +1022,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            await self.store.locally_reject_invite(target.to_string(), room_id)
+            await self.locally_reject_invite(target.to_string(), room_id)
             return {}
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
