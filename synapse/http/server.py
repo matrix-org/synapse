@@ -410,6 +410,7 @@ class OptionsOnlyResource(resource.Resource):
 
     All other requests return a 404.
     """
+
     def render(self, request):
         if request.method == b"OPTIONS":
             code, response_json_object = _options_handler(request)
@@ -419,11 +420,7 @@ class OptionsOnlyResource(resource.Resource):
             code, response_json_object = 404, {}
 
         return respond_with_json(
-            request,
-            code,
-            response_json_object,
-            send_cors=False,
-            canonical_json=False,
+            request, code, response_json_object, send_cors=False, canonical_json=False,
         )
 
     def getChild(self, name, request):
