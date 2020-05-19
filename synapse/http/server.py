@@ -404,6 +404,32 @@ class DirectServeResource(resource.Resource):
         return NOT_DONE_YET
 
 
+class OptionsOnlyResource(resource.Resource):
+    """
+    A resource which responds only to OPTION requests for itself and all children.
+
+    All other requests return a 404.
+    """
+    def render(self, request):
+        if request.method == b"OPTIONS":
+            code, response_json_object = _options_handler(request)
+
+        else:
+            # Otherwise, 404.
+            code, response_json_object = 404, {}
+
+        return respond_with_json(
+            request,
+            code,
+            response_json_object,
+            send_cors=False,
+            canonical_json=False,
+        )
+
+    def getChild(self, name, request):
+        return self  # select ourselves as the child to render
+
+
 def _options_handler(request):
     """Request handler for OPTIONS requests
 

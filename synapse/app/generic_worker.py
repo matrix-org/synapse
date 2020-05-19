@@ -41,7 +41,7 @@ from synapse.config.logger import setup_logging
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.handlers.presence import BasePresenceHandler, get_interested_parties
-from synapse.http.server import JsonResource
+from synapse.http.server import JsonResource, OptionsOnlyResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
@@ -573,6 +573,16 @@ class GenericWorkerServer(HomeServer):
 
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
+
+            # Avoid 404s for requests to the media repo on workers which do not
+            # have the media listener enabled.
+            if "media" not in res["names"]:
+                resources.update(
+                    {
+                        MEDIA_PREFIX: OptionsOnlyResource(),
+                        LEGACY_MEDIA_PREFIX: OptionsOnlyResource(),
+                    }
+                )
 
         root_resource = create_resource_tree(resources, NoResource())
 
