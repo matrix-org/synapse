@@ -355,9 +355,9 @@ class PyPyGCStats(object):
         # @stats is a pretty-printer object with __str__() returning a nice table,
         # plus some fields that contain data from that table.
         # unfortunately, fields are pretty-printed themselves (i. e. '4.5MB').
-        stats = gc.get_stats(memory_pressure=False)
+        stats = gc.get_stats(memory_pressure=False)  # type: ignore
         # @s contains same fields as @stats, but as actual integers.
-        s = stats._s
+        s = stats._s  # type: ignore
 
         # also note that field naming is completely braindead
         # and only vaguely correlates with the pretty-printed table.
