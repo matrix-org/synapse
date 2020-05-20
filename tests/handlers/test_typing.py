@@ -86,7 +86,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         reactor.pump((1000,))
 
         hs = self.setup_test_homeserver(
-            notifier=Mock(), http_client=mock_federation_client, keyring=mock_keyring
+            notifier=Mock(),
+            http_client=mock_federation_client,
+            keyring=mock_keyring,
+            replication_streams={},
         )
 
         hs.datastores = datastores

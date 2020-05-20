@@ -125,6 +125,7 @@ class FederationHandler(BaseHandler):
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_simple_http_client()
+        self._replication = hs.get_replication_data_handler()
 
         self._send_events_to_master = ReplicationFederationSendEventsRestServlet.make_client(
             hs

@@ -74,7 +74,9 @@ class ReplicationCommandHandler:
         self._instance_id = hs.get_instance_id()
         self._instance_name = hs.get_instance_name()
 
-        self._streams = hs.get_replication_streams()
+        self._streams = {
+            stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
+        }  # type: Dict[str, Stream]
 
         # List of streams that this instance is the source of
         self._streams_to_replicate = []  # type: List[Stream]
@@ -172,6 +174,11 @@ class ReplicationCommandHandler:
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
             hs.get_reactor().connectTCP(host, port, self._factory)
+
+    def get_streams(self) -> Dict[str, Stream]:
+        """Get a map from stream name to all streams.
+        """
+        return self._streams
 
     def get_streams_to_replicate(self) -> List[Stream]:
         """Get a list of streams that this instances replicates.
