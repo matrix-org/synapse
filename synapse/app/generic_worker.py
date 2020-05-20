@@ -27,7 +27,7 @@ from twisted.web.resource import NoResource
 import synapse
 import synapse.events
 from synapse.api.constants import EventTypes
-from synapse.api.errors import HttpResponseException, SynapseError
+from synapse.api.errors import SynapseError
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
@@ -151,7 +151,7 @@ class PresenceStatusStubServlet(RestServlet):
 
     async def on_GET(self, request, user_id):
         await self.auth.get_user_by_req(request)
-        return 200, {"state": "offline"}
+        return 200, {"presence": "offline"}
 
     async def on_PUT(self, request, user_id):
         await self.auth.get_user_by_req(request)
