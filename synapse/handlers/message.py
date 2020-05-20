@@ -401,8 +401,10 @@ class EventCreationHandler(object):
         if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
+        self._is_worker_app = self.config.worker_app is not None
+
         if (
-            not self.config.worker_app
+            not self._is_worker_app
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
@@ -826,7 +828,7 @@ class EventCreationHandler(object):
         success = False
         try:
             # If we're a worker we need to hit out to the master.
-            if self.config.worker_app:
+            if self._is_worker_app:
                 await self.send_event_to_master(
                     event_id=event.event_id,
                     store=self.store,
@@ -892,7 +894,7 @@ class EventCreationHandler(object):
 
         This should only be run on master.
         """
-        assert not self.config.worker_app
+        assert not self._is_worker_app
 
         if ratelimit:
             # We check if this is a room admin redacting an event so that we
