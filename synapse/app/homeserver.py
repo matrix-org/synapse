@@ -31,7 +31,7 @@ from prometheus_client import Gauge
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
-from twisted.web.resource import EncodingResourceWrapper, IResource, NoResource
+from twisted.web.resource import EncodingResourceWrapper, IResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 
@@ -52,7 +52,11 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
-from synapse.http.server import RootRedirect
+from synapse.http.server import (
+    OptionsResource,
+    RootOptionsRedirectResource,
+    RootRedirect,
+)
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
@@ -121,11 +125,11 @@ class SynapseHomeServer(HomeServer):
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
-            root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
-            root_resource = RootRedirect(STATIC_PREFIX)
+            root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
-            root_resource = NoResource()
+            root_resource = OptionsResource()
 
         root_resource = create_resource_tree(resources, root_resource)
 

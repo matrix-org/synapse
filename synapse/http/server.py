@@ -350,9 +350,6 @@ class JsonResource(HttpServer, resource.Resource):
                 register_paths, so will return (possibly via Deferred) either
                 None, or a tuple of (http code, response body).
         """
-        if request.method == b"OPTIONS":
-            return _options_handler, "options_request_handler", {}
-
         request_path = request.path.decode("ascii")
 
         # Loop through all the registered callbacks to check if the method
@@ -404,29 +401,6 @@ class DirectServeResource(resource.Resource):
         return NOT_DONE_YET
 
 
-class OptionsOnlyResource(resource.Resource):
-    """
-    A resource which responds only to OPTION requests for itself and all children.
-
-    All other requests return a 404.
-    """
-
-    def render(self, request):
-        if request.method == b"OPTIONS":
-            code, response_json_object = _options_handler(request)
-
-        else:
-            # Otherwise, 404.
-            code, response_json_object = 404, {}
-
-        return respond_with_json(
-            request, code, response_json_object, send_cors=False, canonical_json=False,
-        )
-
-    def getChild(self, name, request):
-        return self  # select ourselves as the child to render
-
-
 def _options_handler(request):
     """Request handler for OPTIONS requests
 
@@ -469,6 +443,26 @@ class RootRedirect(resource.Resource):
         if len(name) == 0:
             return self  # select ourselves as the child to render
         return resource.Resource.getChild(self, name, request)
+
+
+class OptionsResource(resource.Resource):
+    """Responds to OPTION requests for itself and all children."""
+
+    def render_OPTIONS(self, request):
+        code, response_json_object = _options_handler(request)
+
+        return respond_with_json(
+            request, code, response_json_object, send_cors=False, canonical_json=False,
+        )
+
+    def getChildWithDefault(self, path, request):
+        if request.method == b"OPTIONS":
+            return self  # select ourselves as the child to render
+        return resource.Resource.getChildWithDefault(self, path, request)
+
+
+class RootOptionsRedirectResource(OptionsResource, RootRedirect):
+    pass
 
 
 def respond_with_json(
