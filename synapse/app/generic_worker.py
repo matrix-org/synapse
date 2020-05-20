@@ -140,31 +140,18 @@ logger = logging.getLogger("synapse.app.generic_worker")
 
 class PresenceStatusStubServlet(RestServlet):
     """If presence is disabled this servlet can be used to stub out setting
-    presence status, while proxying the getters to the master instance.
+    presence status.
     """
 
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     def __init__(self, hs):
         super(PresenceStatusStubServlet, self).__init__()
-        self.http_client = hs.get_simple_http_client()
         self.auth = hs.get_auth()
-        self.main_uri = hs.config.worker_main_http_uri
 
     async def on_GET(self, request, user_id):
-        # Pass through the auth headers, if any, in case the access token
-        # is there.
-        auth_headers = request.requestHeaders.getRawHeaders("Authorization", [])
-        headers = {"Authorization": auth_headers}
-
-        try:
-            result = await self.http_client.get_json(
-                self.main_uri + request.uri.decode("ascii"), headers=headers
-            )
-        except HttpResponseException as e:
-            raise e.to_synapse_error()
-
-        return 200, result
+        await self.auth.get_user_by_req(request)
+        return 200, {"state": "offline"}
 
     async def on_PUT(self, request, user_id):
         await self.auth.get_user_by_req(request)
