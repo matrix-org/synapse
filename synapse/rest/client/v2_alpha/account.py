@@ -228,7 +228,7 @@ class PasswordRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         # we do basic sanity checks here because the auth layer will store these
-        # in sessions. Pull out the username/password provided to us.
+        # in sessions. Pull out the new password provided to us.
         if "new_password" in body:
             new_password = body.pop("new_password")
             if not isinstance(new_password, str) or len(new_password) > 512:
