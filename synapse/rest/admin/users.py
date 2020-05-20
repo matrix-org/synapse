@@ -222,8 +222,14 @@ class UserRestServletV2(RestServlet):
                 else:
                     new_password = body["password"]
                     logout_devices = True
+
+                    new_password_hash = await self.auth_handler.hash(new_password)
+
                     await self.set_password_handler.set_password(
-                        target_user.to_string(), new_password, logout_devices, requester
+                        target_user.to_string(),
+                        new_password_hash,
+                        logout_devices,
+                        requester,
                     )
 
             if "deactivated" in body:
@@ -523,6 +529,7 @@ class ResetPasswordRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
     async def on_POST(self, request, target_user_id):
@@ -539,8 +546,10 @@ class ResetPasswordRestServlet(RestServlet):
         new_password = params["new_password"]
         logout_devices = params.get("logout_devices", True)
 
+        new_password_hash = await self.auth_handler.hash(new_password)
+
         await self._set_password_handler.set_password(
-            target_user_id, new_password, logout_devices, requester
+            target_user_id, new_password_hash, logout_devices, requester
         )
         return 200, {}
 
