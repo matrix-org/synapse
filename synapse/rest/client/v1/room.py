@@ -93,7 +93,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request)
 
-        info = await self._room_creation_handler.create_room(
+        info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
@@ -210,7 +210,10 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 content=content,
             )
         else:
-            event = await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict, txn_id=txn_id
             )
 
@@ -247,7 +250,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
-        event = await self.event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
             requester, event_dict, txn_id=txn_id
         )
 
@@ -781,7 +784,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        event = await self.event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.Redaction,
