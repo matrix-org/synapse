@@ -1069,6 +1069,8 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
         with self._stream_id_gen.get_next() as stream_ordering:
             yield self.db.runInteraction("locally_reject_invite", f, stream_ordering)
 
+        return stream_ordering
+
     def forget(self, user_id, room_id):
         """Indicate that user_id wishes to discard history for room_id."""
 

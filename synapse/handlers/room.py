@@ -717,7 +717,7 @@ class RoomCreationHandler(BaseHandler):
             if is_direct:
                 content["is_direct"] = is_direct
 
-            await self.room_member_handler.update_membership(
+            _, last_stream_id = await self.room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
                 room_id,
@@ -731,7 +731,7 @@ class RoomCreationHandler(BaseHandler):
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
-            await self.hs.get_room_member_handler().do_3pid_invite(
+            last_stream_id = await self.hs.get_room_member_handler().do_3pid_invite(
                 room_id,
                 requester.user,
                 medium,

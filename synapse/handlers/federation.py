@@ -1215,7 +1215,7 @@ class FederationHandler(BaseHandler):
 
     async def do_invite_join(
         self, target_hosts: Iterable[str], room_id: str, joinee: str, content: JsonDict
-    ) -> None:
+    ) -> Tuple[str, int]:
         """ Attempts to join the `joinee` to the room `room_id` via the
         servers contained in `target_hosts`.
 
@@ -1314,7 +1314,7 @@ class FederationHandler(BaseHandler):
             # about. If so, migrate over user information
             predecessor = await self.store.get_room_predecessor(room_id)
             if not predecessor or not isinstance(predecessor.get("room_id"), str):
-                return
+                return event.event_id, max_stream_id
             old_room_id = predecessor["room_id"]
             logger.debug(
                 "Found predecessor for %s during remote join: %s", room_id, old_room_id
@@ -1327,6 +1327,7 @@ class FederationHandler(BaseHandler):
             )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
+            return event.event_id, max_stream_id
         finally:
             room_queue = self.room_queues[room_id]
             del self.room_queues[room_id]
@@ -1556,7 +1557,7 @@ class FederationHandler(BaseHandler):
 
     async def do_remotely_reject_invite(
         self, target_hosts: Iterable[str], room_id: str, user_id: str, content: JsonDict
-    ) -> EventBase:
+    ) -> Tuple[EventBase, int]:
         origin, event, room_version = await self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
@@ -1576,9 +1577,9 @@ class FederationHandler(BaseHandler):
         await self.federation_client.send_leave(target_hosts, event)
 
         context = await self.state_handler.compute_event_context(event)
-        await self.persist_events_and_notify([(event, context)])
+        stream_id = await self.persist_events_and_notify([(event, context)])
 
-        return event
+        return event, stream_id
 
     async def _make_and_verify_event(
         self,
