@@ -1,1 +1,1 @@
-Remove Ubuntu Cosmic and Disco from the list of supported distributions due to end-of-life.
+Remove Ubuntu Cosmic and Disco from the list of distributions which we provide `.deb`s for, due to end-of-life.
