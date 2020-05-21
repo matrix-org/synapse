@@ -19,17 +19,33 @@ from twisted.internet import defer
 from synapse.api.constants import UserTypes
 
 from tests import unittest
+from tests.unittest import default_config, override_config
 
 FORTY_DAYS = 40 * 24 * 60 * 60
 
 
 class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
+    def default_config(self):
+        config = default_config("test")
+
+        config.update(
+            {
+                "limit_usage_by_mau": True,
+                "max_mau_value": 50,
+            }
+        )
+
+        # apply any additional config which was specified via the override_config
+        # decorator.
+        if self._extra_config is not None:
+            config.update(self._extra_config)
+
+        return config
+
     def make_homeserver(self, reactor, clock):
 
         hs = self.setup_test_homeserver()
         self.store = hs.get_datastore()
-        hs.config.limit_usage_by_mau = True
-        hs.config.max_mau_value = 50
 
         # Advance the clock a bit
         reactor.advance(FORTY_DAYS)
@@ -136,8 +152,8 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         result = self.store.user_last_seen_monthly_active(user_id3)
         self.assertNotEqual(self.get_success(result), 0)
 
+    @override_config({'max_mau_value': 5})
     def test_reap_monthly_active_users(self):
-        self.hs.config.max_mau_value = 5
         initial_users = 10
         for i in range(initial_users):
             self.store.upsert_monthly_active_user("@user%d:server" % i)
@@ -158,19 +174,21 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(count), 0)
 
+    # Note that below says mau_limit (no s), this is the name of the config
+    # value, although it gets stored on the config object as mau_limits.
+    @override_config({'max_mau_value': 5, "mau_limit_reserved_threepids": [
+        {"medium": "email", "address": "user%d@example.com" % i} for i in range(5)
+    ]})
     def test_reap_monthly_active_users_reserved_users(self):
         """ Tests that reaping correctly handles reaping where reserved users are
         present"""
-
-        self.hs.config.max_mau_value = 5
-        initial_users = 5
+        threepids = self.hs.config.mau_limits_reserved_threepids
+        initial_users = len(threepids)
         reserved_user_number = initial_users - 1
-        threepids = []
         for i in range(initial_users):
             user = "@user%d:server" % i
             email = "user%d@example.com" % i
             self.get_success(self.store.upsert_monthly_active_user(user))
-            threepids.append({"medium": "email", "address": email})
             # Need to ensure that the most recent entries in the
             # monthly_active_users table are reserved
             now = int(self.hs.get_clock().time_msec())
@@ -182,7 +200,6 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
                     self.store.user_add_threepid(user, "email", email, now, now)
                 )
 
-        self.hs.config.mau_limits_reserved_threepids = threepids
         self.store.db.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
@@ -279,11 +296,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(self.get_success(count), 0)
 
+    # Note that the max_mau_value setting should not matter.
+    @override_config({'limit_usage_by_mau': False, 'mau_stats_only': True, 'max_mau_value': 1})
     def test_track_monthly_users_without_cap(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.mau_stats_only = True
-        self.hs.config.max_mau_value = 1  # should not matter
-
         count = self.store.get_monthly_active_count()
         self.assertEqual(0, self.get_success(count))
 
@@ -294,9 +309,8 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.store.get_monthly_active_count()
         self.assertEqual(2, self.get_success(count))
 
+    @override_config({'limit_usage_by_mau': False, 'mau_stats_only': False})
     def test_no_users_when_not_tracking(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.mau_stats_only = False
         self.store.upsert_monthly_active_user = Mock()
 
         self.store.populate_monthly_active_users("@user:sever")
