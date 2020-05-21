@@ -168,14 +168,12 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Register the mock on the federation client.
         federation_client = self.homeserver.get_federation_client()
-        federation_client.query_user_devices = Mock()
-        federation_client.query_user_devices.side_effect = query_user_devices
+        federation_client.query_user_devices = Mock(side_effect=query_user_devices)
 
         # Register a mock on the store so that the incoming update doesn't fail because
         # we don't share a room with the user.
         store = self.homeserver.get_datastore()
-        store.get_rooms_for_user = Mock()
-        store.get_rooms_for_user.return_value = ["!someroom:test"]
+        store.get_rooms_for_user = Mock(return_value=["!someroom:test"])
 
         # Manually inject a fake device list update. We need this update to include at
         # least one prev_id so that the user's device list will need to be retried.
