@@ -908,11 +908,11 @@ class ServerConfig(Config):
           # Uncomment to enable room complexity checking.
           #
           #enabled: true
-           
+
           # the limit above which rooms cannot be joined. The default is 1.0.
           #
           #complexity: 0.5
-           
+
           # override the error which is returned when the room is too complex.
           #
           #complexity_error: "This room is too complex."
