@@ -186,10 +186,15 @@ def _check_yield_points(f: Callable, changes: List[str]):
                     )
                     raise Exception(err)
 
+            # the wrapped function yielded a Deferred: yield it back up to the parent
+            # inlineCallbacks().
             try:
                 result = yield d
-            except Exception as e:
-                result = Failure(e)
+            except Exception:
+                # this will fish an earlier Failure out of the stack where possible, and
+                # thus is preferable to passing in an exeception to the Failure
+                # constructor, since it results in less stack-mangling.
+                result = Failure()
 
             if current_context() != expected_context:
 
