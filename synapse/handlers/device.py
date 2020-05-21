@@ -710,7 +710,9 @@ class DeviceListUpdater(object):
                 # means that if an exception is raised by this function, it must be
                 # because of a database issue, which means _maybe_retry_device_resync
                 # probably won't be able to go much further anyway.
-                result = yield self.user_device_resync(user_id=user_id)
+                result = yield self.user_device_resync(
+                    user_id=user_id, mark_failed_as_stale=False,
+                )
                 # user_device_resync only returns a result if it managed to successfully
                 # resync and update the database. Updating the table of users requiring
                 # resync isn't necessary here as user_device_resync already does it
@@ -724,11 +726,13 @@ class DeviceListUpdater(object):
             self._resync_retry_in_progress = False
 
     @defer.inlineCallbacks
-    def user_device_resync(self, user_id):
+    def user_device_resync(self, user_id, mark_failed_as_stale=True):
         """Fetches all devices for a user and updates the device cache with them.
 
         Args:
             user_id (str): The user's id whose device_list will be updated.
+            mark_failed_as_stale (bool): Whether to mark the user's device list as stale
+                if the attempt to resync failed.
         Returns:
             Deferred[dict]: a dict with device info as under the "devices" in the result of this
             request:
@@ -740,17 +744,22 @@ class DeviceListUpdater(object):
         try:
             result = yield self.federation.query_user_devices(origin, user_id)
         except NotRetryingDestination:
-            # Mark the remote user's device list as stale so we know we need to retry it
-            # later.
-            yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+            if mark_failed_as_stale:
+                # Mark the remote user's device list as stale so we know we need to retry
+                # it later.
+                yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
             return
         except (RequestSendFailed, HttpResponseException) as e:
             logger.warning(
                 "Failed to handle device list update for %s: %s", user_id, e,
             )
-            # Mark the remote user's device list as stale so we know we need to retry it
-            # later.
-            yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
+            if mark_failed_as_stale:
+                # Mark the remote user's device list as stale so we know we need to retry
+                # it later.
+                yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
             # We abort on exceptions rather than accepting the update
             # as otherwise synapse will 'forget' that its device list
             # is out of date. If we bail then we will retry the resync
@@ -769,9 +778,12 @@ class DeviceListUpdater(object):
                 {"message": "Exception raised by federation request", "exception": e}
             )
             logger.exception("Failed to handle device list update for %s", user_id)
-            # Mark the remote user's device list as stale so we know we need to retry it
-            # later.
-            yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
+            if mark_failed_as_stale:
+                # Mark the remote user's device list as stale so we know we need to retry
+                # it later.
+                yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
             return
         log_kv({"result": result})
         stream_id = result["stream_id"]
