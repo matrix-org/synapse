@@ -26,7 +26,9 @@ FORTY_DAYS = 40 * 24 * 60 * 60
 
 def gen_3pids(count):
     """Generate `count` threepids as a list."""
-    return [{"medium": "email", "address": "user%i@matrix.org" % i} for i in range(count)]
+    return [
+        {"medium": "email", "address": "user%i@matrix.org" % i} for i in range(count)
+    ]
 
 
 class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
@@ -34,10 +36,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         config = default_config("test")
 
         config.update(
-            {
-                "limit_usage_by_mau": True,
-                "max_mau_value": 50,
-            }
+            {"limit_usage_by_mau": True, "max_mau_value": 50,}
         )
 
         # apply any additional config which was specified via the override_config
@@ -88,7 +87,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     # Note that below says mau_limit (no s), this is the name of the config
     # value, although it gets stored on the config object as mau_limits.
-    @override_config({'max_mau_value': 5, 'mau_limit_reserved_threepids': gen_3pids(3)})
+    @override_config({"max_mau_value": 5, "mau_limit_reserved_threepids": gen_3pids(3)})
     def test_initialise_reserved_users(self):
         user_num = self.initialize_reserve_users()
 
@@ -103,7 +102,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         timestamp = self.store.user_last_seen_monthly_active("@user2:server")
         self.assertTrue(self.get_success(timestamp))
 
-    @override_config({'max_mau_value': 0, 'mau_limit_reserved_threepids': gen_3pids(3)})
+    @override_config({"max_mau_value": 0, "mau_limit_reserved_threepids": gen_3pids(3)})
     def test_reserved_users_never_removed(self):
         """Test that users are never removed from the db."""
         user_num = self.initialize_reserve_users(FORTY_DAYS)
@@ -116,7 +115,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         active_count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(active_count), user_num)
 
-    @override_config({'max_mau_value': 2, 'mau_limit_reserved_threepids': gen_3pids(3)})
+    @override_config({"max_mau_value": 2, "mau_limit_reserved_threepids": gen_3pids(3)})
     def test_regular_users_removed(self):
         """Test that regular users are removed from the db"""
         user_num = self.initialize_reserve_users()
@@ -162,7 +161,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         result = self.store.user_last_seen_monthly_active(user_id3)
         self.assertNotEqual(self.get_success(result), 0)
 
-    @override_config({'max_mau_value': 5})
+    @override_config({"max_mau_value": 5})
     def test_reap_monthly_active_users(self):
         initial_users = 10
         for i in range(initial_users):
@@ -186,9 +185,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     # Note that below says mau_limit (no s), this is the name of the config
     # value, although it gets stored on the config object as mau_limits.
-    @override_config({'max_mau_value': 5, "mau_limit_reserved_threepids":
-        gen_3pids(5)
-    })
+    @override_config({"max_mau_value": 5, "mau_limit_reserved_threepids": gen_3pids(5)})
     def test_reap_monthly_active_users_reserved_users(self):
         """ Tests that reaping correctly handles reaping where reserved users are
         present"""
@@ -307,7 +304,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.get_success(count), 0)
 
     # Note that the max_mau_value setting should not matter.
-    @override_config({'limit_usage_by_mau': False, 'mau_stats_only': True, 'max_mau_value': 1})
+    @override_config(
+        {"limit_usage_by_mau": False, "mau_stats_only": True, "max_mau_value": 1}
+    )
     def test_track_monthly_users_without_cap(self):
         count = self.store.get_monthly_active_count()
         self.assertEqual(0, self.get_success(count))
@@ -319,7 +318,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.store.get_monthly_active_count()
         self.assertEqual(2, self.get_success(count))
 
-    @override_config({'limit_usage_by_mau': False, 'mau_stats_only': False})
+    @override_config({"limit_usage_by_mau": False, "mau_stats_only": False})
     def test_no_users_when_not_tracking(self):
         self.store.upsert_monthly_active_user = Mock()
 

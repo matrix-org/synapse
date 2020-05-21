@@ -81,9 +81,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
         self._rlsn._store.get_tags_for_room = Mock(return_value=defer.succeed({}))
 
-    @override_config(
-        {"hs_disabled": True,}
-    )
+    @override_config({"hs_disabled": True})
     def test_maybe_send_server_notice_disabled_hs(self):
         """If the HS is disabled, we should not send notices"""
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))

@@ -138,7 +138,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    @override_config({'limit_usage_by_mau': False, 'max_mau_value': 50})
+    @override_config({"limit_usage_by_mau": False, "max_mau_value": 50})
     def test_disabled_monthly_active_user(self):
         user_id = "@user:server"
         self.get_success(
@@ -149,7 +149,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
 
-    @override_config({'limit_usage_by_mau': True, 'max_mau_value': 50})
+    @override_config({"limit_usage_by_mau": True, "max_mau_value": 50})
     def test_adding_monthly_active_user_when_full(self):
         lots_of_users = 100
         user_id = "@user:server"
@@ -165,7 +165,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
 
-    @override_config({'limit_usage_by_mau': True, 'max_mau_value': 50})
+    @override_config({"limit_usage_by_mau": True, "max_mau_value": 50})
     def test_adding_monthly_active_user_when_space(self):
         user_id = "@user:server"
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
@@ -182,7 +182,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertTrue(active)
 
-    @override_config({'limit_usage_by_mau': True, 'max_mau_value': 50})
+    @override_config({"limit_usage_by_mau": True, "max_mau_value": 50})
     def test_updating_monthly_active_user_when_space(self):
         user_id = "@user:server"
         self.get_success(self.store.register_user(user_id=user_id, password_hash=None))
