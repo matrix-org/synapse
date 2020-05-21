@@ -740,8 +740,8 @@ class EventsPersistenceStorage(object):
         # whose state has changed as we've already their new state above.
         users_to_ignore = [
             state_key
-            for _, state_key in itertools.chain(delta.to_insert, delta.to_delete)
-            if self.is_mine_id(state_key)
+            for typ, state_key in itertools.chain(delta.to_insert, delta.to_delete)
+            if typ == EventTypes.Member and self.is_mine_id(state_key)
         ]
 
         if await self.main_store.is_local_host_in_room_ignoring_users(
