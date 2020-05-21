@@ -1,0 +1,1 @@
+Fix incorrect `method` label on `synapse_http_matrixfederationclient_{requests,responses}` prometheus metrics.

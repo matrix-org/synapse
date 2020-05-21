@@ -15,8 +15,6 @@
 # limitations under the License.
 import logging
 
-import six
-
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -27,9 +25,6 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
 
 from . import push_rule_evaluator, push_tools
-
-if six.PY3:
-    long = int
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +317,7 @@ class HttpPusher(object):
                         {
                             "app_id": self.app_id,
                             "pushkey": self.pushkey,
-                            "pushkey_ts": long(self.pushkey_ts / 1000),
+                            "pushkey_ts": int(self.pushkey_ts / 1000),
                             "data": self.data_minus_url,
                         }
                     ],
@@ -351,7 +346,7 @@ class HttpPusher(object):
                     {
                         "app_id": self.app_id,
                         "pushkey": self.pushkey,
-                        "pushkey_ts": long(self.pushkey_ts / 1000),
+                        "pushkey_ts": int(self.pushkey_ts / 1000),
                         "data": self.data_minus_url,
                         "tweaks": tweaks,
                     }
@@ -413,7 +408,7 @@ class HttpPusher(object):
                     {
                         "app_id": self.app_id,
                         "pushkey": self.pushkey,
-                        "pushkey_ts": long(self.pushkey_ts / 1000),
+                        "pushkey_ts": int(self.pushkey_ts / 1000),
                         "data": self.data_minus_url,
                     }
                 ],

@@ -17,6 +17,7 @@
 from ._base import RootConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
+from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
 from .consent_config import ConsentConfig
@@ -27,6 +28,7 @@ from .jwt_config import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
+from .oidc_config import OIDCConfig
 from .password import PasswordConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
@@ -54,6 +56,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ServerConfig,
         TlsConfig,
+        CacheConfig,
         DatabaseConfig,
         LoggingConfig,
         RatelimitConfig,
@@ -66,6 +69,7 @@ class HomeServerConfig(RootConfig):
         AppServiceConfig,
         KeyConfig,
         SAML2Config,
+        OIDCConfig,
         CasConfig,
         SSOConfig,
         JWTConfig,

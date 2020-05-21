@@ -1,6 +1,6 @@
 [Unit]
 Description=Synapse %i
-
+AssertPathExists=/etc/matrix-synapse/workers/%i.yaml
 # This service should be restarted when the synapse target is restarted.
 PartOf=matrix-synapse.target
 
