@@ -35,9 +35,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def default_config(self):
         config = default_config("test")
 
-        config.update(
-            {"limit_usage_by_mau": True, "max_mau_value": 50,}
-        )
+        config.update({"limit_usage_by_mau": True, "max_mau_value": 50})
 
         # apply any additional config which was specified via the override_config
         # decorator.
