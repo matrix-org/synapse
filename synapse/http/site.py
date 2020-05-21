@@ -15,6 +15,7 @@ import contextlib
 import logging
 import time
 
+from twisted.python.failure import Failure
 from twisted.web.server import Request, Site
 
 from synapse.http import redact_uri
@@ -190,6 +191,12 @@ class SynapseRequest(Request):
         Overrides twisted.web.server.Request.connectionLost to record the finish time and
         do logging.
         """
+        # There is a bug in Twisted where reason is not wrapped in a Failure object
+        # Detect this and wrap it manually as a workaround
+        # More information: https://github.com/matrix-org/synapse/issues/7441
+        if not isinstance(reason, Failure):
+            reason = Failure(reason)
+
         self.finish_time = time.time()
         Request.connectionLost(self, reason)
 

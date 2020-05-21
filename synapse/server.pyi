@@ -13,11 +13,13 @@ import synapse.handlers.device
 import synapse.handlers.e2e_keys
 import synapse.handlers.message
 import synapse.handlers.presence
+import synapse.handlers.register
 import synapse.handlers.room
 import synapse.handlers.room_member
 import synapse.handlers.set_password
 import synapse.http.client
 import synapse.notifier
+import synapse.push.pusherpool
 import synapse.replication.tcp.client
 import synapse.replication.tcp.handler
 import synapse.rest.media.v1.media_repository
@@ -127,4 +129,10 @@ class HomeServer(object):
     def get_event_builder_factory(self) -> EventBuilderFactory:
         pass
     def get_storage(self) -> synapse.storage.Storage:
+        pass
+    def get_registration_handler(self) -> synapse.handlers.register.RegistrationHandler:
+        pass
+    def get_macaroon_generator(self) -> synapse.handlers.auth.MacaroonGenerator:
+        pass
+    def get_pusherpool(self) -> synapse.push.pusherpool.PusherPool:
         pass

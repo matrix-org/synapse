@@ -1,0 +1,1 @@
+Add a worker store for search insertion, required for moving event persistence off master.

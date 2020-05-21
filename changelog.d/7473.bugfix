@@ -1,0 +1,1 @@
+Workaround for an upstream Twisted bug that caused Synapse to become unresponsive after startup.

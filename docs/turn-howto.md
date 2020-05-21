@@ -18,7 +18,7 @@ For TURN relaying with `coturn` to work, it must be hosted on a server/endpoint 
 Hosting TURN behind a NAT (even with appropriate port forwarding) is known to cause issues
 and to often not work.
 
-## `coturn` Setup
+## `coturn` setup
 
 ### Initial installation
 
@@ -26,7 +26,13 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
 
 #### Debian installation
 
-    # apt install coturn
+Just install the debian package:
+
+```sh
+apt install coturn
+```
+
+This will install and start a systemd service called `coturn`.
 
 #### Source installation
 
@@ -63,38 +69,52 @@ The TURN daemon `coturn` is available from a variety of sources such as native p
 1.  Consider your security settings. TURN lets users request a relay which will
     connect to arbitrary IP addresses and ports. The following configuration is
     suggested as a minimum starting point:
-    
+
         # VoIP traffic is all UDP. There is no reason to let users connect to arbitrary TCP endpoints via the relay.
         no-tcp-relay
-        
+
         # don't let the relay ever try to connect to private IP address ranges within your network (if any)
         # given the turn server is likely behind your firewall, remember to include any privileged public IPs too.
         denied-peer-ip=10.0.0.0-10.255.255.255
         denied-peer-ip=192.168.0.0-192.168.255.255
         denied-peer-ip=172.16.0.0-172.31.255.255
-        
+
         # special case the turn server itself so that client->TURN->TURN->client flows work
         allowed-peer-ip=10.0.0.1
-        
+
         # consider whether you want to limit the quota of relayed streams per user (or total) to avoid risk of DoS.
         user-quota=12 # 4 streams per video call, so 12 streams = 3 simultaneous relayed calls per user.
         total-quota=1200
 
-    Ideally coturn should refuse to relay traffic which isn't SRTP; see
-    <https://github.com/matrix-org/synapse/issues/2009>
+1.  Also consider supporting TLS/DTLS. To do this, add the following settings
+    to `turnserver.conf`:
+
+        # TLS certificates, including intermediate certs.
+        # For Let's Encrypt certificates, use `fullchain.pem` here.
+        cert=/path/to/fullchain.pem
+
+        # TLS private key file
+        pkey=/path/to/privkey.pem
 
 1.  Ensure your firewall allows traffic into the TURN server on the ports
-    you've configured it to listen on (remember to allow both TCP and UDP TURN
-    traffic)
+    you've configured it to listen on (By default: 3478 and 5349 for the TURN(s)
+    traffic (remember to allow both TCP and UDP traffic), and ports 49152-65535
+    for the UDP relay.)
 
-1.  If you've configured coturn to support TLS/DTLS, generate or import your
-    private key and certificate.
+1.  (Re)start the turn server:
 
-1.  Start the turn server:
+    * If you used the Debian package (or have set up a systemd unit yourself):
+      ```sh
+      systemctl restart coturn
+      ```
 
-         bin/turnserver -o
+    * If you installed from source:
 
-## synapse Setup
+      ```sh
+      bin/turnserver -o
+      ```
+
+## Synapse setup
 
 Your home server configuration file needs the following extra keys:
 
@@ -126,7 +146,14 @@ As an example, here is the relevant section of the config file for matrix.org:
 
 After updating the homeserver configuration, you must restart synapse:
 
+  * If you use synctl:
+    ```sh
     cd /where/you/run/synapse
     ./synctl restart
+    ```
+  * If you use systemd:
+    ```
+    systemctl restart synapse.service
+    ```
 
 ..and your Home Server now supports VoIP relaying!
