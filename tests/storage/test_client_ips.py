@@ -23,6 +23,7 @@ from synapse.http.site import XForwardedForRequest
 from synapse.rest.client.v1 import login
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class ClientIpStoreTestCase(unittest.HomeserverTestCase):
@@ -137,9 +138,8 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    @override_config({'limit_usage_by_mau': False, 'max_mau_value': 50})
     def test_disabled_monthly_active_user(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.max_mau_value = 50
         user_id = "@user:server"
         self.get_success(
             self.store.insert_client_ip(
@@ -149,9 +149,8 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
 
+    @override_config({'limit_usage_by_mau': True, 'max_mau_value': 50})
     def test_adding_monthly_active_user_when_full(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 50
         lots_of_users = 100
         user_id = "@user:server"
 
@@ -166,9 +165,8 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
 
+    @override_config({'limit_usage_by_mau': True, 'max_mau_value': 50})
     def test_adding_monthly_active_user_when_space(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 50
         user_id = "@user:server"
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
@@ -184,9 +182,8 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertTrue(active)
 
+    @override_config({'limit_usage_by_mau': True, 'max_mau_value': 50})
     def test_updating_monthly_active_user_when_space(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 50
         user_id = "@user:server"
         self.get_success(self.store.register_user(user_id=user_id, password_hash=None))
 
