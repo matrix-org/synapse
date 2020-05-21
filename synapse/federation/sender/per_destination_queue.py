@@ -80,6 +80,9 @@ class PerDestinationQueue(object):
 
         # a list of tuples of (pending pdu, order)
         self._pending_pdus = []  # type: List[Tuple[EventBase, int]]
+
+        # XXX this is never actually used: see
+        # https://github.com/matrix-org/synapse/issues/7549
         self._pending_edus = []  # type: List[Edu]
 
         # Pending EDUs by their "key". Keyed EDUs are EDUs that get clobbered
