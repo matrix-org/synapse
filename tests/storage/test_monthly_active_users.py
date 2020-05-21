@@ -24,6 +24,11 @@ from tests.unittest import default_config, override_config
 FORTY_DAYS = 40 * 24 * 60 * 60
 
 
+def gen_3pids(count):
+    """Generate `count` threepids as a list."""
+    return [{"medium": "email", "address": "user%i@matrix.org" % i} for i in range(count)]
+
+
 class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     def default_config(self):
         config = default_config("test")
@@ -52,21 +57,14 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         return hs
 
-    def test_initialise_reserved_users(self):
-        self.hs.config.max_mau_value = 5
+    def initialize_reserve_users(self, when=None):
         user1 = "@user1:server"
         user1_email = "user1@matrix.org"
         user2 = "@user2:server"
         user2_email = "user2@matrix.org"
         user3 = "@user3:server"
-        user3_email = "user3@matrix.org"
+        threepids = self.hs.config.mau_limits_reserved_threepids
 
-        threepids = [
-            {"medium": "email", "address": user1_email},
-            {"medium": "email", "address": user2_email},
-            {"medium": "email", "address": user3_email},
-        ]
-        self.hs.config.mau_limits_reserved_threepids = threepids
         # -1 because user3 is a support user and does not count
         user_num = len(threepids) - 1
 
@@ -86,22 +84,31 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         )
         self.pump()
 
+        return user_num
+
+    # Note that below says mau_limit (no s), this is the name of the config
+    # value, although it gets stored on the config object as mau_limits.
+    @override_config({'max_mau_value': 5, 'mau_limit_reserved_threepids': gen_3pids(3)})
+    def test_initialise_reserved_users(self):
+        user_num = self.initialize_reserve_users()
+
         active_count = self.store.get_monthly_active_count()
 
         # Test total counts, ensure user3 (support user) is not counted
         self.assertEquals(self.get_success(active_count), user_num)
 
         # Test user is marked as active
-        timestamp = self.store.user_last_seen_monthly_active(user1)
+        timestamp = self.store.user_last_seen_monthly_active("@user1:server")
         self.assertTrue(self.get_success(timestamp))
-        timestamp = self.store.user_last_seen_monthly_active(user2)
+        timestamp = self.store.user_last_seen_monthly_active("@user2:server")
         self.assertTrue(self.get_success(timestamp))
 
-        # Test that users are never removed from the db.
-        self.hs.config.max_mau_value = 0
+    @override_config({'max_mau_value': 0, 'mau_limit_reserved_threepids': gen_3pids(3)})
+    def test_reserved_users_never_removed(self):
+        """Test that users are never removed from the db."""
+        user_num = self.initialize_reserve_users(FORTY_DAYS)
 
         self.reactor.advance(FORTY_DAYS)
-        self.hs.config.max_mau_value = 5
 
         self.store.reap_monthly_active_users()
         self.pump()
@@ -109,7 +116,11 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         active_count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(active_count), user_num)
 
-        # Test that regular users are removed from the db
+    @override_config({'max_mau_value': 2, 'mau_limit_reserved_threepids': gen_3pids(3)})
+    def test_regular_users_removed(self):
+        """Test that regular users are removed from the db"""
+        user_num = self.initialize_reserve_users()
+
         ru_count = 2
         self.store.upsert_monthly_active_user("@ru1:server")
         self.store.upsert_monthly_active_user("@ru2:server")
@@ -117,7 +128,6 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         active_count = self.store.get_monthly_active_count()
         self.assertEqual(self.get_success(active_count), user_num + ru_count)
-        self.hs.config.max_mau_value = user_num
         self.store.reap_monthly_active_users()
         self.pump()
 
@@ -176,9 +186,9 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
     # Note that below says mau_limit (no s), this is the name of the config
     # value, although it gets stored on the config object as mau_limits.
-    @override_config({'max_mau_value': 5, "mau_limit_reserved_threepids": [
-        {"medium": "email", "address": "user%d@example.com" % i} for i in range(5)
-    ]})
+    @override_config({'max_mau_value': 5, "mau_limit_reserved_threepids":
+        gen_3pids(5)
+    })
     def test_reap_monthly_active_users_reserved_users(self):
         """ Tests that reaping correctly handles reaping where reserved users are
         present"""
@@ -187,7 +197,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         reserved_user_number = initial_users - 1
         for i in range(initial_users):
             user = "@user%d:server" % i
-            email = "user%d@example.com" % i
+            email = "user%d@matrix.org" % i
             self.get_success(self.store.upsert_monthly_active_user(user))
             # Need to ensure that the most recent entries in the
             # monthly_active_users table are reserved
