@@ -480,9 +480,6 @@ class RoomCreationHandler(BaseHandler):
             if not old_alt_aliases:
                 old_canonical_alias_content.pop("alt_aliases")
 
-        logger.debug("Old canonical alias content: %s", old_canonical_alias_content)
-        logger.debug("New canonical alias content: %s", new_canonical_alias_content)
-
         # If a canonical alias event existed for the old room, fire a canonical
         # alias event for the new room with a copy of the information.
         try:
@@ -497,7 +494,6 @@ class RoomCreationHandler(BaseHandler):
                 },
                 ratelimit=False,
             )
-            logger.info("Sent old canonical alias event")
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.
@@ -515,7 +511,6 @@ class RoomCreationHandler(BaseHandler):
                 },
                 ratelimit=False,
             )
-            logger.info("Sent new canonical alias event")
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.
