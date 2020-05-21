@@ -653,7 +653,8 @@ class DeviceWorkerStore(SQLBaseStore):
         self, user_ids: Optional[Collection[str]] = None,
     ) -> Set[str]:
         """Given a list of remote users return the list of users that we
-        should resync the device lists for.
+        should resync the device lists for. If None is given instead of a list,
+        return every user that we should resync the device lists for.
 
         Returns:
             The IDs of users whose device lists need resync.
