@@ -406,7 +406,7 @@ class EventCreationHandler(object):
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
         if (
-            self.config.worker_app is None
+            not self.config.worker_app
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
