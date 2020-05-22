@@ -26,7 +26,7 @@ from twisted.web.resource import NoResource
 
 import synapse
 import synapse.events
-from synapse.api.errors import SynapseError
+from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
@@ -202,9 +202,14 @@ class KeyUploadServlet(RestServlet):
             # is there.
             auth_headers = request.requestHeaders.getRawHeaders(b"Authorization", [])
             headers = {"Authorization": auth_headers}
-            result = await self.http_client.post_json_get_json(
-                self.main_uri + request.uri.decode("ascii"), body, headers=headers
-            )
+            try:
+                result = await self.http_client.post_json_get_json(
+                    self.main_uri + request.uri.decode("ascii"), body, headers=headers
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse() from e
+            except RequestSendFailed as e:
+                raise SynapseError(502, "Failed to talk to master") from e
 
             return 200, result
         else:
