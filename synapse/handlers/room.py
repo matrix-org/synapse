@@ -439,73 +439,78 @@ class RoomCreationHandler(BaseHandler):
         new_room_id: str,
         old_room_state: StateMap[str],
     ):
-        directory_handler = self.hs.get_handlers().directory_handler
-
-        aliases = await self.store.get_aliases_for_room(old_room_id)
-
         # check to see if we have a canonical alias.
         canonical_alias_event = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
         if canonical_alias_event_id:
             canonical_alias_event = await self.store.get_event(canonical_alias_event_id)
 
-        # first we try to remove the aliases from the old room (we suppress sending
-        # the room_aliases event until the end).
-        #
-        # Note that we'll only be able to remove aliases that (a) aren't owned by an AS,
-        # and (b) unless the user is a server admin, which the user created.
-        #
-        # This is probably correct - given we don't allow such aliases to be deleted
-        # normally, it would be odd to allow it in the case of doing a room upgrade -
-        # but it makes the upgrade less effective, and you have to wonder why a room
-        # admin can't remove aliases that point to that room anyway.
-        # (cf https://github.com/matrix-org/synapse/issues/2360)
-        #
-        removed_aliases = []
-        for alias_str in aliases:
-            alias = RoomAlias.from_string(alias_str)
-            try:
-                await directory_handler.delete_association(requester, alias)
-                removed_aliases.append(alias_str)
-            except SynapseError as e:
-                logger.warning("Unable to remove alias %s from old room: %s", alias, e)
+        await self.store.update_aliases_for_room(old_room_id, new_room_id)
 
-        # if we didn't find any aliases, or couldn't remove anyway, we can skip the rest
-        # of this.
-        if not removed_aliases:
+        if not canonical_alias_event:
             return
 
-        # we can now add any aliases we successfully removed to the new room.
-        for alias in removed_aliases:
-            try:
-                await directory_handler.create_association(
-                    requester,
-                    RoomAlias.from_string(alias),
-                    new_room_id,
-                    servers=(self.hs.hostname,),
-                    check_membership=False,
-                )
-                logger.info("Moved alias %s to new room", alias)
-            except SynapseError as e:
-                # I'm not really expecting this to happen, but it could if the spam
-                # checking module decides it shouldn't, or similar.
-                logger.error("Error adding alias %s to new room: %s", alias, e)
+        # If there is a canonical alias we need to update the one in the old
+        # room and set one in the new one.
+        old_canonical_alias_content = dict(canonical_alias_event.content)
+        new_canonical_alias_content = {}
+
+        canonical = canonical_alias_event.content.get("alias")
+        if canonical and self.hs.is_mine_id(canonical):
+            new_canonical_alias_content["alias"] = canonical
+            old_canonical_alias_content.pop("alias", None)
+
+        # We convert to a list as it will be a Tuple.
+        old_alt_aliases = list(old_canonical_alias_content.get("alt_aliases", []))
+        if old_alt_aliases:
+            old_canonical_alias_content["alt_aliases"] = old_alt_aliases
+            new_alt_aliases = new_canonical_alias_content.setdefault("alt_aliases", [])
+            for alias in canonical_alias_event.content.get("alt_aliases", []):
+                try:
+                    if self.hs.is_mine_id(alias):
+                        new_alt_aliases.append(alias)
+                        old_alt_aliases.remove(alias)
+                except Exception:
+                    logger.info(
+                        "Invalid alias %s in canonical alias event %s",
+                        alias,
+                        canonical_alias_event_id,
+                    )
+
+            if not old_alt_aliases:
+                old_canonical_alias_content.pop("alt_aliases")
 
         # If a canonical alias event existed for the old room, fire a canonical
         # alias event for the new room with a copy of the information.
         try:
-            if canonical_alias_event:
-                await self.event_creation_handler.create_and_send_nonmember_event(
-                    requester,
-                    {
-                        "type": EventTypes.CanonicalAlias,
-                        "state_key": "",
-                        "room_id": new_room_id,
-                        "sender": requester.user.to_string(),
-                        "content": canonical_alias_event.content,
-                    },
-                    ratelimit=False,
-                )
+            await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.CanonicalAlias,
+                    "state_key": "",
+                    "room_id": old_room_id,
+                    "sender": requester.user.to_string(),
+                    "content": old_canonical_alias_content,
+                },
+                ratelimit=False,
+            )
+        except SynapseError as e:
+            # again I'm not really expecting this to fail, but if it does, I'd rather
+            # we returned the new room to the client at this point.
+            logger.error("Unable to send updated alias events in old room: %s", e)
+
+        try:
+            await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.CanonicalAlias,
+                    "state_key": "",
+                    "room_id": new_room_id,
+                    "sender": requester.user.to_string(),
+                    "content": new_canonical_alias_content,
+                },
+                ratelimit=False,
+            )
         except SynapseError as e:
             # again I'm not really expecting this to fail, but if it does, I'd rather
             # we returned the new room to the client at this point.
