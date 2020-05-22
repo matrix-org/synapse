@@ -79,7 +79,7 @@ Upgrading to v1.14.0
 ====================
 
 This version includes a database update which is run as part of the upgrade,
-and which may take a couple of minutes in the case of a large server). Synapse
+and which may take a couple of minutes in the case of a large server. Synapse
 will not respond to HTTP requests while this update is taking place.
 
 Upgrading to v1.13.0

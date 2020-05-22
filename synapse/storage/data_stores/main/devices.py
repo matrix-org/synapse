@@ -55,10 +55,6 @@ DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES = (
 
 BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES = "remove_dup_outbound_pokes"
 
-BG_UPDATE_DROP_DEVICE_LISTS_OUTBOUND_LAST_SUCCESS_NON_UNIQUE_IDX = (
-    "drop_device_lists_outbound_last_success_non_unique_idx"
-)
-
 
 class DeviceWorkerStore(SQLBaseStore):
     def get_device(self, user_id, device_id):
