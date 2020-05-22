@@ -27,6 +27,7 @@ from synapse.api.errors import Codes, RedirectException, SynapseError
 from synapse.http.server import (
     DirectServeResource,
     JsonResource,
+    OptionsResource,
     wrap_html_request_handler,
 )
 from synapse.http.site import SynapseSite, logger
@@ -166,6 +167,57 @@ class JsonResourceTests(unittest.TestCase):
         self.assertEqual(channel.result["code"], b"400")
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
+
+
+class OptionsResourceTests(unittest.TestCase):
+    def setUp(self):
+        self.reactor = ThreadedMemoryReactorClock()
+
+        class DummyResource(Resource):
+            isLeaf = True
+            def render(self, request):
+                return request.path
+
+        # Setup a resource with some children.
+        self.resource = OptionsResource()
+        self.resource.putChild(b'res', DummyResource())
+
+    def _make_request(self, method, path):
+        """Create a request from the method/path and return a channel with the response."""
+        request, channel = make_request(self.reactor, method, path, shorthand=False)
+        request.prepath = []  # This doesn't get set properly by make_request.
+
+        # Create a site and query for the resource.
+        site = SynapseSite("test", "site_tag", {}, self.resource, "1.0")
+        request.site = site
+        resource = site.getResourceFor(request)
+
+        # Finally, render the resource and return the channel.
+        render(request, resource, self.reactor)
+        return channel
+
+    def test_unknown_options_request(self):
+        """An OPTIONS requests to an unknown URL still returns 200 OK."""
+        channel = self._make_request(b"OPTIONS", b"/foo/")
+        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.result["body"], b"{}")
+
+    def test_known_options_request(self):
+        """An OPTIONS requests to an known URL still returns 200 OK."""
+        channel = self._make_request(b"OPTIONS", b"/res/")
+        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.result["body"], b"{}")
+
+    def test_unknown_request(self):
+        """A non-OPTIONS request to an unknown URL should 404."""
+        channel = self._make_request(b"GET", b"/foo/")
+        self.assertEqual(channel.result["code"], b"404")
+
+    def test_known_request(self):
+        """A non-OPTIONS request to an known URL should query the proper resource."""
+        channel = self._make_request(b"GET", b"/res/")
+        self.assertEqual(channel.result["code"], b"200")
+        self.assertEqual(channel.result["body"], b"/res/")
 
 
 class WrapHtmlRequestHandlerTests(unittest.TestCase):
