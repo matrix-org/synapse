@@ -366,7 +366,9 @@ class EventCreationHandler(object):
         self.notifier = hs.get_notifier()
         self.config = hs.config
         self.require_membership_for_aliases = hs.config.require_membership_for_aliases
-        self._is_event_writer = (self.config.worker.writers.events == hs.get_instance_name())
+        self._is_event_writer = (
+            self.config.worker.writers.events == hs.get_instance_name()
+        )
 
         self.room_invite_state_types = self.hs.config.room_invite_state_types
 
@@ -403,10 +405,8 @@ class EventCreationHandler(object):
         if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
-        self._is_worker_app = self.config.worker_app is not None
-
         if (
-            not self._is_worker_app
+            self.config.worker_app is None
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
@@ -908,11 +908,7 @@ class EventCreationHandler(object):
 
         This should only be run on the instance in charge of persisting events.
         """
-<<<<<<< HEAD
-        assert not self._is_worker_app
-=======
-        assert self.config.worker.writers.events == self._instance_name
->>>>>>> origin/develop
+        assert self._is_event_writer
 
         if ratelimit:
             # We check if this is a room admin redacting an event so that we
