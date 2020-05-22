@@ -39,6 +39,10 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# How long we allow callers to wait for replication updates before timing out.
+_WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 30
+
+
 class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
     """Factory for building connections to the master. Will reconnect if the
     connection is lost.
@@ -201,7 +205,9 @@ class ReplicationDataHandler:
         # Create a new deferred that times out after N seconds, as we don't want
         # to wedge here forever.
         deferred = Deferred()
-        deferred = timeout_deferred(deferred, 30, self._reactor)
+        deferred = timeout_deferred(
+            deferred, _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS, self._reactor
+        )
 
         waiting_list = self._streams_to_waiters.setdefault(stream_name, [])
 
