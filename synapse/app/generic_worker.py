@@ -214,7 +214,7 @@ class KeyUploadServlet(RestServlet):
                     self.main_uri + request.uri.decode("ascii"), body, headers=headers
                 )
             except HttpResponseException as e:
-                raise e.to_synapse() from e
+                raise e.to_synapse_error() from e
             except RequestSendFailed as e:
                 raise SynapseError(502, "Failed to talk to master") from e
 
