@@ -366,7 +366,9 @@ class EventCreationHandler(object):
         self.notifier = hs.get_notifier()
         self.config = hs.config
         self.require_membership_for_aliases = hs.config.require_membership_for_aliases
-        self._instance_name = hs.get_instance_name()
+        self._is_event_writer = (
+            self.config.worker.writers.events == hs.get_instance_name()
+        )
 
         self.room_invite_state_types = self.hs.config.room_invite_state_types
 
@@ -836,7 +838,7 @@ class EventCreationHandler(object):
         success = False
         try:
             # If we're a worker we need to hit out to the master.
-            if self.config.worker.writers.events != self._instance_name:
+            if not self._is_event_writer:
                 result = await self.send_event(
                     instance_name=self.config.worker.writers.events,
                     event_id=event.event_id,
@@ -906,7 +908,7 @@ class EventCreationHandler(object):
 
         This should only be run on the instance in charge of persisting events.
         """
-        assert self.config.worker.writers.events == self._instance_name
+        assert self._is_event_writer
 
         if ratelimit:
             # We check if this is a room admin redacting an event so that we
