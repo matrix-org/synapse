@@ -40,6 +40,7 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     FederationError,
+    HttpResponseException,
     RequestSendFailed,
     SynapseError,
 )
@@ -1036,6 +1037,12 @@ class FederationHandler(BaseHandler):
                     # TODO: We can probably do something more intelligent here.
                     return True
                 except SynapseError as e:
+                    logger.info("Failed to backfill from %s because %s", dom, e)
+                    continue
+                except HttpResponseException as e:
+                    if 400 <= e.code < 500:
+                        raise e.to_synapse_error()
+
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
                 except CodeMessageException as e:
