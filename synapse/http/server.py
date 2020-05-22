@@ -413,6 +413,7 @@ def _options_handler(request):
     Returns:
         Tuple[int, dict]: http code, response body.
     """
+    set_cors_headers(request)
     return 200, {}
 
 

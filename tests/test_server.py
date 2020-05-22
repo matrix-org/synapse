@@ -203,11 +203,39 @@ class OptionsResourceTests(unittest.TestCase):
         self.assertEqual(channel.result["code"], b"200")
         self.assertEqual(channel.result["body"], b"{}")
 
+        # Ensure the correct CORS headers have been added
+        self.assertTrue(
+            channel.headers.hasHeader(b"Access-Control-Allow-Origin"),
+            "has CORS Origin header",
+        )
+        self.assertTrue(
+            channel.headers.hasHeader(b"Access-Control-Allow-Methods"),
+            "has CORS Methods header",
+        )
+        self.assertTrue(
+            channel.headers.hasHeader(b"Access-Control-Allow-Headers"),
+            "has CORS Headers header",
+        )
+
     def test_known_options_request(self):
         """An OPTIONS requests to an known URL still returns 200 OK."""
         channel = self._make_request(b"OPTIONS", b"/res/")
         self.assertEqual(channel.result["code"], b"200")
         self.assertEqual(channel.result["body"], b"{}")
+
+        # Ensure the correct CORS headers have been added
+        self.assertTrue(
+            channel.headers.hasHeader(b"Access-Control-Allow-Origin"),
+            "has CORS Origin header",
+        )
+        self.assertTrue(
+            channel.headers.hasHeader(b"Access-Control-Allow-Methods"),
+            "has CORS Methods header",
+        )
+        self.assertTrue(
+            channel.headers.hasHeader(b"Access-Control-Allow-Headers"),
+            "has CORS Headers header",
+        )
 
     def test_unknown_request(self):
         """A non-OPTIONS request to an unknown URL should 404."""
