@@ -100,7 +100,9 @@ class ShutdownRoomRestServlet(RestServlet):
         # we try and auto join below.
         #
         # TODO: Currently the events stream is written to from master
-        await self._replication.wait_for_stream_position("master", "events", stream_id)
+        await self._replication.wait_for_stream_position(
+            self.hs.config.worker.writers.events, "events", stream_id
+        )
 
         users = await self.state.get_current_users_in_room(room_id)
         kicked_users = []
