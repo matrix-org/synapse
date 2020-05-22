@@ -175,12 +175,13 @@ class OptionsResourceTests(unittest.TestCase):
 
         class DummyResource(Resource):
             isLeaf = True
+
             def render(self, request):
                 return request.path
 
         # Setup a resource with some children.
         self.resource = OptionsResource()
-        self.resource.putChild(b'res', DummyResource())
+        self.resource.putChild(b"res", DummyResource())
 
     def _make_request(self, method, path):
         """Create a request from the method/path and return a channel with the response."""
