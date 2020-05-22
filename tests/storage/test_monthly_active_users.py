@@ -54,14 +54,21 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         return hs
 
-    def initialize_reserve_users(self, when=None):
+    def test_initialise_reserved_users(self):
+        self.hs.config.max_mau_value = 5
         user1 = "@user1:server"
         user1_email = "user1@matrix.org"
         user2 = "@user2:server"
         user2_email = "user2@matrix.org"
         user3 = "@user3:server"
-        threepids = self.hs.config.mau_limits_reserved_threepids
+        user3_email = "user3@matrix.org"
 
+        threepids = [
+            {"medium": "email", "address": user1_email},
+            {"medium": "email", "address": user2_email},
+            {"medium": "email", "address": user3_email},
+        ]
+        self.hs.config.mau_limits_reserved_threepids = threepids
         # -1 because user3 is a support user and does not count
         user_num = len(threepids) - 1
 
@@ -81,31 +88,22 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         )
         self.pump()
 
-        return user_num
-
-    # Note that below says mau_limit (no s), this is the name of the config
-    # value, although it gets stored on the config object as mau_limits.
-    @override_config({"max_mau_value": 5, "mau_limit_reserved_threepids": gen_3pids(3)})
-    def test_initialise_reserved_users(self):
-        user_num = self.initialize_reserve_users()
-
         active_count = self.store.get_monthly_active_count()
 
         # Test total counts, ensure user3 (support user) is not counted
         self.assertEquals(self.get_success(active_count), user_num)
 
         # Test user is marked as active
-        timestamp = self.store.user_last_seen_monthly_active("@user1:server")
+        timestamp = self.store.user_last_seen_monthly_active(user1)
         self.assertTrue(self.get_success(timestamp))
-        timestamp = self.store.user_last_seen_monthly_active("@user2:server")
+        timestamp = self.store.user_last_seen_monthly_active(user2)
         self.assertTrue(self.get_success(timestamp))
 
-    @override_config({"max_mau_value": 0, "mau_limit_reserved_threepids": gen_3pids(3)})
-    def test_reserved_users_never_removed(self):
-        """Test that users are never removed from the db."""
-        user_num = self.initialize_reserve_users(FORTY_DAYS)
+        # Test that users are never removed from the db.
+        self.hs.config.max_mau_value = 0
 
         self.reactor.advance(FORTY_DAYS)
+        self.hs.config.max_mau_value = 5
 
         self.store.reap_monthly_active_users()
         self.pump()
@@ -113,11 +111,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         active_count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(active_count), user_num)
 
-    @override_config({"max_mau_value": 2, "mau_limit_reserved_threepids": gen_3pids(3)})
-    def test_regular_users_removed(self):
-        """Test that regular users are removed from the db"""
-        user_num = self.initialize_reserve_users()
-
+        # Test that regular users are removed from the db
         ru_count = 2
         self.store.upsert_monthly_active_user("@ru1:server")
         self.store.upsert_monthly_active_user("@ru2:server")
@@ -125,6 +119,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
 
         active_count = self.store.get_monthly_active_count()
         self.assertEqual(self.get_success(active_count), user_num + ru_count)
+        self.hs.config.max_mau_value = user_num
         self.store.reap_monthly_active_users()
         self.pump()
 
