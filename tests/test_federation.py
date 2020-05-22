@@ -27,13 +27,13 @@ class MessageAcceptTests(unittest.TestCase):
         user_id = UserID("us", "test")
         our_user = Requester(user_id, None, False, None, None)
         room_creator = self.homeserver.get_room_creation_handler()
-        room_d = ensureDeferred(
+        room_deferred = ensureDeferred(
             room_creator.create_room(
                 our_user, room_creator.PRESETS_DICT["public_chat"], ratelimit=False
             )
         )
         self.reactor.advance(0.1)
-        self.room_id = self.successResultOf(room_d)[0]["room_id"]
+        self.room_id = self.successResultOf(room_deferred)[0]["room_id"]
 
         self.store = self.homeserver.get_datastore()
 

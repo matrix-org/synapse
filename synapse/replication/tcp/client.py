@@ -145,7 +145,9 @@ class ReplicationDataHandler:
 
             await self.pusher_pool.on_new_notifications(token, token)
 
-        # Notify any waiting deferreds
+        # Notify any waiting deferreds. The list is ordered by position so we
+        # just iterate through the list until we reach a position that is
+        # greater than the received row position.
         waiting_list = self._streams_to_waiters.get(stream_name, [])
 
         # Index of first item with a position after the current token, i.e we
@@ -164,10 +166,13 @@ class ReplicationDataHandler:
                     # The deferred has been cancelled or timed out.
                     pass
             else:
+                # The list is sorted by position so we don't need to continue
+                # checking any futher entries in the list.
                 index_of_first_deferred_not_called = idx
                 break
 
-        # (This maintains the order so no need to resort)
+        # Drop all entries in the waiting list that were called in the above
+        # loop. (This maintains the order so no need to resort)
         waiting_list[:] = waiting_list[index_of_first_deferred_not_called:]
 
     async def on_position(self, stream_name: str, instance_name: str, token: int):
@@ -199,6 +204,9 @@ class ReplicationDataHandler:
         deferred = timeout_deferred(deferred, 30, self._reactor)
 
         waiting_list = self._streams_to_waiters.setdefault(stream_name, [])
+
+        # We insert into the list using heapq as it is more efficient than
+        # pushing then resorting each time.
         heapq.heappush(waiting_list, (position, deferred))
 
         # We measure here to get in flight counts and average waiting time.
