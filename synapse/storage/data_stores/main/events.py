@@ -138,10 +138,10 @@ class PersistEventsStore:
         self._backfill_id_gen = self.store._backfill_id_gen  # type: StreamIdGenerator
         self._stream_id_gen = self.store._stream_id_gen  # type: StreamIdGenerator
 
-        # This should only exist on master for now
+        # This should only exist on instances that are configured to write
         assert (
-            hs.config.worker.worker_app is None
-        ), "Can only instantiate PersistEventsStore on master"
+            hs.config.worker.writers.events == hs.get_instance_name()
+        ), "Can only instantiate EventsStore on master"
 
     @_retry_on_integrity_error
     @defer.inlineCallbacks
@@ -1590,3 +1590,31 @@ class PersistEventsStore:
                 if not ev.internal_metadata.is_outlier()
             ],
         )
+
+    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
+        """Mark the invite has having been rejected even though we failed to
+        create a leave event for it.
+        """
+
+        sql = (
+            "UPDATE local_invites SET stream_id = ?, locally_rejected = ? WHERE"
+            " room_id = ? AND invitee = ? AND locally_rejected is NULL"
+            " AND replaced_by is NULL"
+        )
+
+        def f(txn, stream_ordering):
+            txn.execute(sql, (stream_ordering, True, room_id, user_id))
+
+            # We also clear this entry from `local_current_membership`.
+            # Ideally we'd point to a leave event, but we don't have one, so
+            # nevermind.
+            self.db.simple_delete_txn(
+                txn,
+                table="local_current_membership",
+                keyvalues={"room_id": room_id, "user_id": user_id},
+            )
+
+        with self._stream_id_gen.get_next() as stream_ordering:
+            await self.db.runInteraction("locally_reject_invite", f, stream_ordering)
+
+        return stream_ordering

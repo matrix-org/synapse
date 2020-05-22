@@ -311,8 +311,8 @@ class EmailConfig(Config):
           # Username/password for authentication to the SMTP server. By default, no
           # authentication is attempted.
           #
-          # smtp_user: "exampleusername"
-          # smtp_pass: "examplepassword"
+          #smtp_user: "exampleusername"
+          #smtp_pass: "examplepassword"
 
           # Uncomment the following to require TLS transport security for SMTP.
           # By default, Synapse will connect over plain text, and will then switch to

@@ -144,6 +144,11 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = yield make_deferred_yieldable(d)
+    except TimeoutError as e:
+        logger.warning(
+            "{%s} [%s] Timed out reading response", request.txn_id, request.destination,
+        )
+        raise RequestSendFailed(e, can_retry=True) from e
     except Exception as e:
         logger.warning(
             "{%s} [%s] Error reading response: %s",
@@ -424,6 +429,8 @@ class MatrixFederationHttpClient(object):
                             )
 
                             response = yield request_deferred
+                    except TimeoutError as e:
+                        raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
                         raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
                     except Exception as e:
