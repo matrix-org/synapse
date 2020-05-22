@@ -154,7 +154,9 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            stream_id = await self.store.locally_reject_invite(user_id, room_id)
+            stream_id = await self.member_handler.locally_reject_invite(
+                user_id, room_id
+            )
             event_id = None
 
         return 200, {"event_id": event_id, "stream_id": stream_id}
@@ -185,9 +187,9 @@ class ReplicationLocallyRejectInviteRestServlet(ReplicationEndpoint):
     async def _handle_request(self, request, room_id, user_id):
         logger.info("locally_reject_invite: %s out of room: %s", user_id, room_id)
 
-        await self.member_handler.locally_reject_invite(user_id, room_id)
+        stream_id = await self.member_handler.locally_reject_invite(user_id, room_id)
 
-        return 200, {}
+        return 200, {"stream_id": stream_id}
 
 
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):

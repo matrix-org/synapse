@@ -130,18 +130,21 @@ class RoomMemberHandler(object):
         """
         raise NotImplementedError()
 
-    async def locally_reject_invite(self, user_id: str, room_id: str):
+    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
         """Mark the invite has having been rejected even though we failed to
         create a leave event for it.
         """
         if self._is_on_event_persistence_instance:
-            await self.persist_event_storage.locally_reject_invite(user_id, room_id)
+            return await self.persist_event_storage.locally_reject_invite(
+                user_id, room_id
+            )
         else:
-            await self._locally_reject_client(
+            result = await self._locally_reject_client(
                 instance_name=self._event_stream_writer_instance,
                 user_id=user_id,
                 room_id=room_id,
             )
+            return result["stream_id"]
 
     @abc.abstractmethod
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
@@ -1037,9 +1040,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            stream_id = await self.store.locally_reject_invite(
-                target.to_string(), room_id
-            )
+            stream_id = await self.locally_reject_invite(target.to_string(), room_id)
             return None, stream_id
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
