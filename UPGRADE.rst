@@ -75,9 +75,15 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
-Upgrading to v1.13.0
+Upgrading to v1.14.0
 ====================
 
+This version includes a database update which is run as part of the upgrade,
+and which may take a couple of minutes in the case of a large server). Synapse
+will not respond to HTTP requests while this update is taking place.
+
+Upgrading to v1.13.0
+====================
 
 Incorrect database migration in old synapse versions
 ----------------------------------------------------
@@ -136,12 +142,12 @@ back to v1.12.4 you need to:
 2. Decrease the schema version in the database:
 
    .. code:: sql
-    
+
       UPDATE schema_version SET version = 57;
 
 3. Downgrade Synapse by following the instructions for your installation method
    in the "Rolling back to older versions" section above.
-    
+
 
 Upgrading to v1.12.0
 ====================

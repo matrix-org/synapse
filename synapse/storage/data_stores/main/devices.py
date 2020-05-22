@@ -749,19 +749,13 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, self._remove_duplicate_outbound_pokes,
         )
 
-        # create a unique index on device_lists_outbound_last_success
-        self.db.updates.register_background_index_update(
+        # a pair of background updates that were added during the 1.14 release cycle,
+        # but replaced with 58/06dlols_unique_idx.py
+        self.db.updates.register_noop_background_update(
             "device_lists_outbound_last_success_unique_idx",
-            index_name="device_lists_outbound_last_success_unique_idx",
-            table="device_lists_outbound_last_success",
-            columns=["destination", "user_id"],
-            unique=True,
         )
-
-        # once that completes, we can remove the old non-unique index.
-        self.db.updates.register_background_update_handler(
-            BG_UPDATE_DROP_DEVICE_LISTS_OUTBOUND_LAST_SUCCESS_NON_UNIQUE_IDX,
-            self._drop_device_lists_outbound_last_success_non_unique_idx,
+        self.db.updates.register_noop_background_update(
+            "drop_device_lists_outbound_last_success_non_unique_idx",
         )
 
     @defer.inlineCallbacks
@@ -837,20 +831,6 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             )
 
         return rows
-
-    async def _drop_device_lists_outbound_last_success_non_unique_idx(
-        self, progress, batch_size
-    ):
-        def f(txn):
-            txn.execute("DROP INDEX IF EXISTS device_lists_outbound_last_success_idx")
-
-        await self.db.runInteraction(
-            "drop_device_lists_outbound_last_success_non_unique_idx", f,
-        )
-        await self.db.updates._end_background_update(
-            BG_UPDATE_DROP_DEVICE_LISTS_OUTBOUND_LAST_SUCCESS_NON_UNIQUE_IDX
-        )
-        return 1
 
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
