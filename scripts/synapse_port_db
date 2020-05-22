@@ -196,6 +196,9 @@ class MockHomeserver:
     def get_reactor(self):
         return reactor
 
+    def get_instance_name(self):
+        return "master"
+
 
 class Porter(object):
     def __init__(self, **kwargs):

@@ -100,7 +100,9 @@ class ShutdownRoomRestServlet(RestServlet):
         # we try and auto join below.
         #
         # TODO: Currently the events stream is written to from master
-        await self._replication.wait_for_stream_position("master", "events", stream_id)
+        await self._replication.wait_for_stream_position(
+            self.hs.config.worker.writers.events, "events", stream_id
+        )
 
         users = await self.state.get_current_users_in_room(room_id)
         kicked_users = []
@@ -113,7 +115,7 @@ class ShutdownRoomRestServlet(RestServlet):
 
             try:
                 target_requester = create_requester(user_id)
-                await self.room_member_handler.update_membership(
+                _, stream_id = await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,
                     room_id=room_id,
@@ -121,6 +123,11 @@ class ShutdownRoomRestServlet(RestServlet):
                     content={},
                     ratelimit=False,
                     require_consent=False,
+                )
+
+                # Wait for leave to come in over replication before trying to forget.
+                await self._replication.wait_for_stream_position(
+                    self.hs.config.worker.writers.events, "events", stream_id
                 )
 
                 await self.room_member_handler.forget(target_requester.user, room_id)

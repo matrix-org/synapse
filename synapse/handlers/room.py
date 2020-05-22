@@ -89,6 +89,8 @@ class RoomCreationHandler(BaseHandler):
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
 
+        self._replication = hs.get_replication_data_handler()
+
         # linearizer to stop two upgrades happening at once
         self._upgrade_linearizer = Linearizer("room_upgrade_linearizer")
 
@@ -751,6 +753,11 @@ class RoomCreationHandler(BaseHandler):
 
         if room_alias:
             result["room_alias"] = room_alias.to_string()
+
+        # Always wait for room creation to progate before returning
+        await self._replication.wait_for_stream_position(
+            self.hs.config.worker.writers.events, "events", last_stream_id
+        )
 
         return result, last_stream_id
 

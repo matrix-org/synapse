@@ -193,6 +193,12 @@ class BasePresenceHandler(abc.ABC):
     ) -> None:
         """Set the presence state of the user. """
 
+    @abc.abstractmethod
+    async def bump_presence_active_time(self, user: UserID):
+        """We've seen the user do something that indicates they're interacting
+        with the app.
+        """
+
 
 class PresenceHandler(BasePresenceHandler):
     def __init__(self, hs: "synapse.server.HomeServer"):
