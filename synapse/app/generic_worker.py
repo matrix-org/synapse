@@ -22,7 +22,6 @@ from typing import Dict, Iterable
 from typing_extensions import ContextManager
 
 from twisted.internet import defer, reactor
-from twisted.web.resource import NoResource
 
 import synapse
 import synapse.events
@@ -41,7 +40,7 @@ from synapse.config.logger import setup_logging
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.handlers.presence import BasePresenceHandler, get_interested_parties
-from synapse.http.server import JsonResource
+from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
@@ -566,7 +565,7 @@ class GenericWorkerServer(HomeServer):
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
-        root_resource = create_resource_tree(resources, NoResource())
+        root_resource = create_resource_tree(resources, OptionsResource())
 
         _base.listen_tcp(
             bind_addresses,
