@@ -452,7 +452,7 @@ class OptionsResource(resource.Resource):
         code, response_json_object = _options_handler(request)
 
         return respond_with_json(
-            request, code, response_json_object, send_cors=False, canonical_json=False,
+            request, code, response_json_object, send_cors=True, canonical_json=False,
         )
 
     def getChildWithDefault(self, path, request):
