@@ -16,21 +16,10 @@ project on github, and then [create a pull request](
 https://help.github.com/articles/using-pull-requests/) to ask us to pull your
 changes into our repo.
 
-**The single biggest thing you need to know is: please base your changes on
-the develop branch - *not* master.**
-
-We use the master branch to track the most recent release, so that folks who
-blindly clone the repo and automatically check out master get something that
-works. Develop is the unstable branch where all the development actually
-happens: the workflow is that contributors should fork the develop branch to
-make a 'feature' branch for a particular contribution, and then make a pull
-request to merge this back into the matrix.org 'official' develop branch. We
-use github's pull request workflow to review the contribution, and either ask
-you to make any refinements needed or merge it and make them ourselves. The
-changes will then land on master when we next do a release.
-
-Some other things you will need to know when contributing to Synapse:
-
+Some other points to follow:
+ 
+ * Please base your changes on the `develop` branch.
+  
  * Please follow the [code style requirements](#code-style).
 
  * Please include a [changelog entry](#changelog) with each PR.

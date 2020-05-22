@@ -740,8 +740,8 @@ class EventsPersistenceStorage(object):
         # whose state has changed as we've already their new state above.
         users_to_ignore = [
             state_key
-            for _, state_key in itertools.chain(delta.to_insert, delta.to_delete)
-            if self.is_mine_id(state_key)
+            for typ, state_key in itertools.chain(delta.to_insert, delta.to_delete)
+            if typ == EventTypes.Member and self.is_mine_id(state_key)
         ]
 
         if await self.main_store.is_local_host_in_room_ignoring_users(
@@ -787,8 +787,8 @@ class EventsPersistenceStorage(object):
         for user_id in left_users:
             await self.main_store.mark_remote_user_device_list_as_unsubscribed(user_id)
 
-    async def locally_reject_invite(self, user_id: str, room_id: str):
+    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
         """Mark the invite has having been rejected even though we failed to
         create a leave event for it.
         """
-        await self.persist_events_store.locally_reject_invite(user_id, room_id)
+        return await self.persist_events_store.locally_reject_invite(user_id, room_id)

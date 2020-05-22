@@ -17,7 +17,7 @@
 
 import abc
 import logging
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from six.moves import http_client
 
@@ -93,7 +93,7 @@ class RoomMemberHandler(object):
         room_id: str,
         user: UserID,
         content: dict,
-    ) -> Optional[dict]:
+    ) -> Tuple[str, int]:
         """Try and join a room that this server is not in
 
         Args:
@@ -113,7 +113,7 @@ class RoomMemberHandler(object):
         room_id: str,
         target: UserID,
         content: dict,
-    ) -> dict:
+    ) -> Tuple[Optional[str], int]:
         """Attempt to reject an invite for a room this server is not in. If we
         fail to do so we locally mark the invite as rejected.
 
@@ -176,7 +176,7 @@ class RoomMemberHandler(object):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
-    ) -> EventBase:
+    ) -> Tuple[str, int]:
         user_id = target.to_string()
 
         if content is None:
@@ -209,9 +209,10 @@ class RoomMemberHandler(object):
         )
         if duplicate is not None:
             # Discard the new event since this membership change is a no-op.
-            return duplicate
+            _, stream_id = await self.store.get_event_ordering(duplicate.event_id)
+            return duplicate.event_id, stream_id
 
-        await self.event_creation_handler.handle_new_client_event(
+        stream_id = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[target], ratelimit=ratelimit
         )
 
@@ -235,7 +236,7 @@ class RoomMemberHandler(object):
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target, room_id)
 
-        return event
+        return event.event_id, stream_id
 
     async def copy_room_tags_and_direct_to_room(
         self, old_room_id, new_room_id, user_id
@@ -285,7 +286,7 @@ class RoomMemberHandler(object):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
-    ) -> Union[EventBase, Optional[dict]]:
+    ) -> Tuple[Optional[str], int]:
         key = (room_id,)
 
         with (await self.member_linearizer.queue(key)):
@@ -316,7 +317,7 @@ class RoomMemberHandler(object):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
-    ) -> Union[EventBase, Optional[dict]]:
+    ) -> Tuple[Optional[str], int]:
         content_specified = bool(content)
         if content is None:
             content = {}
@@ -420,7 +421,13 @@ class RoomMemberHandler(object):
                 same_membership = old_membership == effective_membership_state
                 same_sender = requester.user.to_string() == old_state.sender
                 if same_sender and same_membership and same_content:
-                    return old_state
+                    _, stream_id = await self.store.get_event_ordering(
+                        old_state.event_id
+                    )
+                    return (
+                        old_state.event_id,
+                        stream_id,
+                    )
 
             if old_membership in ["ban", "leave"] and action == "kick":
                 raise AuthError(403, "The target user is not in the room")
@@ -727,7 +734,7 @@ class RoomMemberHandler(object):
         requester: Requester,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> None:
+    ) -> int:
         if self.config.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
@@ -759,11 +766,11 @@ class RoomMemberHandler(object):
         )
 
         if invitee:
-            await self.update_membership(
+            _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
-            await self._make_and_store_3pid_invite(
+            stream_id = await self._make_and_store_3pid_invite(
                 requester,
                 id_server,
                 medium,
@@ -773,6 +780,8 @@ class RoomMemberHandler(object):
                 txn_id=txn_id,
                 id_access_token=id_access_token,
             )
+
+        return stream_id
 
     async def _make_and_store_3pid_invite(
         self,
@@ -784,7 +793,7 @@ class RoomMemberHandler(object):
         user: UserID,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> None:
+    ) -> int:
         room_state = await self.state_handler.get_current_state(room_id)
 
         inviter_display_name = ""
@@ -839,7 +848,10 @@ class RoomMemberHandler(object):
             id_access_token=id_access_token,
         )
 
-        await self.event_creation_handler.create_and_send_nonmember_event(
+        (
+            event,
+            stream_id,
+        ) = await self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.ThirdPartyInvite,
@@ -857,6 +869,7 @@ class RoomMemberHandler(object):
             ratelimit=False,
             txn_id=txn_id,
         )
+        return stream_id
 
     async def _is_host_in_room(
         self, current_state_ids: Dict[Tuple[str, str], str]
@@ -938,7 +951,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         room_id: str,
         user: UserID,
         content: dict,
-    ) -> None:
+    ) -> Tuple[str, int]:
         """Implements RoomMemberHandler._remote_join
         """
         # filter ourselves out of remote_room_hosts: do_invite_join ignores it
@@ -967,7 +980,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         # join dance for now, since we're kinda implicitly checking
         # that we are allowed to join when we decide whether or not we
         # need to do the invite/join dance.
-        await self.federation_handler.do_invite_join(
+        event_id, stream_id = await self.federation_handler.do_invite_join(
             remote_room_hosts, room_id, user.to_string(), content
         )
         await self._user_joined_room(user, room_id)
@@ -977,14 +990,14 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if self.hs.config.limit_remote_rooms.enabled:
             if too_complex is False:
                 # We checked, and we're under the limit.
-                return
+                return event_id, stream_id
 
             # Check again, but with the local state events
             too_complex = await self._is_local_room_too_complex(room_id)
 
             if too_complex is False:
                 # We're under the limit.
-                return
+                return event_id, stream_id
 
             # The room is too large. Leave.
             requester = types.create_requester(user, None, False, None)
@@ -997,6 +1010,8 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
             )
 
+        return event_id, stream_id
+
     async def _remote_reject_invite(
         self,
         requester: Requester,
@@ -1004,15 +1019,15 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         room_id: str,
         target: UserID,
         content: dict,
-    ) -> dict:
+    ) -> Tuple[Optional[str], int]:
         """Implements RoomMemberHandler._remote_reject_invite
         """
         fed_handler = self.federation_handler
         try:
-            ret = await fed_handler.do_remotely_reject_invite(
+            event, stream_id = await fed_handler.do_remotely_reject_invite(
                 remote_room_hosts, room_id, target.to_string(), content=content,
             )
-            return ret
+            return event.event_id, stream_id
         except Exception as e:
             # if we were unable to reject the exception, just mark
             # it as rejected on our end and plough ahead.
@@ -1022,8 +1037,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            await self.locally_reject_invite(target.to_string(), room_id)
-            return {}
+            stream_id = await self.store.locally_reject_invite(
+                target.to_string(), room_id
+            )
+            return None, stream_id
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_joined_room
