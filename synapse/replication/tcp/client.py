@@ -101,8 +101,8 @@ class ReplicationDataHandler:
         self._streams = hs.get_replication_streams()
         self._instance_name = hs.get_instance_name()
 
-        # Map from stream to list of deferreds waiting for stream to particular
-        # position. The lists are sorted by the stream position.
+        # Map from stream to list of deferreds waiting for the stream to
+        # arrive at a particular position. The lists are sorted by stream position.
         self._streams_to_waiters = (
             {}
         )  # type: Dict[str, List[Tuple[int, Deferred[None]]]]

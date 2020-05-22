@@ -1303,7 +1303,7 @@ class FederationHandler(BaseHandler):
             )
 
             # We wait here until this instance has seen the events come down
-            # replication (if we're using replication) as the below use caches.
+            # replication (if we're using replication) as the below uses caches.
             #
             # TODO: Currently the events stream is written to from master
             await self._replication.wait_for_stream_position(
