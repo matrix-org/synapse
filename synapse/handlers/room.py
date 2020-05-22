@@ -22,6 +22,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
+from typing import Tuple
 
 from six import iteritems, string_types
 
@@ -518,7 +519,7 @@ class RoomCreationHandler(BaseHandler):
 
     async def create_room(
         self, requester, config, ratelimit=True, creator_join_profile=None
-    ):
+    ) -> Tuple[dict, int]:
         """ Creates a new room.
 
         Args:
@@ -535,9 +536,9 @@ class RoomCreationHandler(BaseHandler):
                 `avatar_url` and/or `displayname`.
 
         Returns:
-            Deferred[dict]:
-                a dict containing the keys `room_id` and, if an alias was
-                requested, `room_alias`.
+                First, a dict containing the keys `room_id` and, if an alias
+                was, requested, `room_alias`. Secondly, the stream_id of the
+                last persisted event.
         Raises:
             SynapseError if the room ID couldn't be stored, or something went
             horribly wrong.
@@ -669,7 +670,7 @@ class RoomCreationHandler(BaseHandler):
         # override any attempt to set room versions via the creation_content
         creation_content["room_version"] = room_version.identifier
 
-        await self._send_events_for_new_room(
+        last_stream_id = await self._send_events_for_new_room(
             requester,
             room_id,
             preset_config=preset_config,
@@ -683,7 +684,10 @@ class RoomCreationHandler(BaseHandler):
 
         if "name" in config:
             name = config["name"]
-            await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                _,
+                last_stream_id,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Name,
@@ -697,7 +701,10 @@ class RoomCreationHandler(BaseHandler):
 
         if "topic" in config:
             topic = config["topic"]
-            await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                _,
+                last_stream_id,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Topic,
@@ -715,7 +722,7 @@ class RoomCreationHandler(BaseHandler):
             if is_direct:
                 content["is_direct"] = is_direct
 
-            await self.room_member_handler.update_membership(
+            _, last_stream_id = await self.room_member_handler.update_membership(
                 requester,
                 UserID.from_string(invitee),
                 room_id,
@@ -729,7 +736,7 @@ class RoomCreationHandler(BaseHandler):
             id_access_token = invite_3pid.get("id_access_token")  # optional
             address = invite_3pid["address"]
             medium = invite_3pid["medium"]
-            await self.hs.get_room_member_handler().do_3pid_invite(
+            last_stream_id = await self.hs.get_room_member_handler().do_3pid_invite(
                 room_id,
                 requester.user,
                 medium,
@@ -745,7 +752,7 @@ class RoomCreationHandler(BaseHandler):
         if room_alias:
             result["room_alias"] = room_alias.to_string()
 
-        return result
+        return result, last_stream_id
 
     async def _send_events_for_new_room(
         self,
@@ -758,7 +765,13 @@ class RoomCreationHandler(BaseHandler):
         room_alias=None,
         power_level_content_override=None,  # Doesn't apply when initial state has power level state event content
         creator_join_profile=None,
-    ):
+    ) -> int:
+        """Sends the initial events into a new room.
+
+        Returns:
+            The stream_id of the last event persisted.
+        """
+
         def create(etype, content, **kwargs):
             e = {"type": etype, "content": content}
 
@@ -767,12 +780,16 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        async def send(etype, content, **kwargs):
+        async def send(etype, content, **kwargs) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
-            await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                _,
+                last_stream_id,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 creator, event, ratelimit=False
             )
+            return last_stream_id
 
         config = RoomCreationHandler.PRESETS_DICT[preset_config]
 
@@ -797,7 +814,9 @@ class RoomCreationHandler(BaseHandler):
         # of the first events that get sent into a room.
         pl_content = initial_state.pop((EventTypes.PowerLevels, ""), None)
         if pl_content is not None:
-            await send(etype=EventTypes.PowerLevels, content=pl_content)
+            last_sent_stream_id = await send(
+                etype=EventTypes.PowerLevels, content=pl_content
+            )
         else:
             power_level_content = {
                 "users": {creator_id: 100},
@@ -830,33 +849,39 @@ class RoomCreationHandler(BaseHandler):
             if power_level_content_override:
                 power_level_content.update(power_level_content_override)
 
-            await send(etype=EventTypes.PowerLevels, content=power_level_content)
+            last_sent_stream_id = await send(
+                etype=EventTypes.PowerLevels, content=power_level_content
+            )
 
         if room_alias and (EventTypes.CanonicalAlias, "") not in initial_state:
-            await send(
+            last_sent_stream_id = await send(
                 etype=EventTypes.CanonicalAlias,
                 content={"alias": room_alias.to_string()},
             )
 
         if (EventTypes.JoinRules, "") not in initial_state:
-            await send(
+            last_sent_stream_id = await send(
                 etype=EventTypes.JoinRules, content={"join_rule": config["join_rules"]}
             )
 
         if (EventTypes.RoomHistoryVisibility, "") not in initial_state:
-            await send(
+            last_sent_stream_id = await send(
                 etype=EventTypes.RoomHistoryVisibility,
                 content={"history_visibility": config["history_visibility"]},
             )
 
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
-                await send(
+                last_sent_stream_id = await send(
                     etype=EventTypes.GuestAccess, content={"guest_access": "can_join"}
                 )
 
         for (etype, state_key), content in initial_state.items():
-            await send(etype=etype, state_key=state_key, content=content)
+            last_sent_stream_id = await send(
+                etype=etype, state_key=state_key, content=content
+            )
+
+        return last_sent_stream_id
 
     async def _generate_room_id(
         self, creator_id: str, is_public: str, room_version: RoomVersion,

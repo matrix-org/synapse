@@ -1289,12 +1289,12 @@ class EventsWorkerStore(SQLBaseStore):
     async def is_event_after(self, event_id1, event_id2):
         """Returns True if event_id1 is after event_id2 in the stream
         """
-        to_1, so_1 = await self._get_event_ordering(event_id1)
-        to_2, so_2 = await self._get_event_ordering(event_id2)
+        to_1, so_1 = await self.get_event_ordering(event_id1)
+        to_2, so_2 = await self.get_event_ordering(event_id2)
         return (to_1, so_1) > (to_2, so_2)
 
     @cachedInlineCallbacks(max_entries=5000)
-    def _get_event_ordering(self, event_id):
+    def get_event_ordering(self, event_id):
         res = yield self.db.simple_select_one(
             table="events",
             retcols=["topological_ordering", "stream_ordering"],
