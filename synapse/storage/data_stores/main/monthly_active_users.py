@@ -122,6 +122,10 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
     def __init__(self, database: Database, db_conn, hs):
         super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
 
+        self._limit_usage_by_mau = hs.config.limit_usage_by_mau
+        self._mau_stats_only = hs.config.mau_stats_only
+        self._max_mau_value = hs.config.max_mau_value
+
         # Do not add more reserved users than the total allowable number
         # cur = LoggingTransaction(
         self.db.new_transaction(
@@ -130,7 +134,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             [],
             [],
             self._initialise_reserved_users,
-            hs.config.mau_limits_reserved_threepids[: self.hs.config.max_mau_value],
+            hs.config.mau_limits_reserved_threepids[: self._max_mau_value],
         )
 
     def _initialise_reserved_users(self, txn, threepids):
@@ -141,6 +145,15 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             txn (cursor):
             threepids (list[dict]): List of threepid dicts to reserve
         """
+
+        # XXX what is this function trying to achieve?  It upserts into
+        # monthly_active_users for each *registered* reserved mau user, but why?
+        #
+        #  - shouldn't there already be an entry for each reserved user (at least
+        #    if they have been active recently)?
+        #
+        #  - if it's important that the timestamp is kept up to date, why do we only
+        #    run this at startup?
 
         for tp in threepids:
             user_id = self.get_user_id_by_threepid_txn(txn, tp["medium"], tp["address"])
@@ -185,8 +198,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                 [thirty_days_ago] + in_clause_args,
             )
 
-            max_mau_value = self.hs.config.max_mau_value
-            if self.hs.config.limit_usage_by_mau:
+            if self._limit_usage_by_mau:
                 # If MAU user count still exceeds the MAU threshold, then delete on
                 # a least recently active basis.
                 # Note it is not possible to write this query using OFFSET due to
@@ -198,7 +210,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
 
                 # Limit must be >= 0 for postgres
                 num_of_non_reserved_users_to_remove = max(
-                    max_mau_value - len(reserved_users), 0
+                    self._max_mau_value - len(reserved_users), 0
                 )
 
                 # It is important to filter reserved users twice to guard
@@ -317,7 +329,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         Args:
             user_id(str): the user_id to query
         """
-        if self.hs.config.limit_usage_by_mau or self.hs.config.mau_stats_only:
+        if self._limit_usage_by_mau or self._mau_stats_only:
             # Trial users and guests should not be included as part of MAU group
             is_guest = yield self.is_guest(user_id)
             if is_guest:
@@ -338,11 +350,11 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                 # In the case where mau_stats_only is True and limit_usage_by_mau is
                 # False, there is no point in checking get_monthly_active_count - it
                 # adds no value and will break the logic if max_mau_value is exceeded.
-                if not self.hs.config.limit_usage_by_mau:
+                if not self._limit_usage_by_mau:
                     yield self.upsert_monthly_active_user(user_id)
                 else:
                     count = yield self.get_monthly_active_count()
-                    if count < self.hs.config.max_mau_value:
+                    if count < self._max_mau_value:
                         yield self.upsert_monthly_active_user(user_id)
             elif now - last_seen_timestamp > LAST_SEEN_GRANULARITY:
                 yield self.upsert_monthly_active_user(user_id)

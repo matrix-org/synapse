@@ -22,7 +22,6 @@ from typing import Dict, Iterable
 from typing_extensions import ContextManager
 
 from twisted.internet import defer, reactor
-from twisted.web.resource import NoResource
 
 import synapse
 import synapse.events
@@ -40,14 +39,22 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.handlers.presence import BasePresenceHandler, get_interested_parties
-from synapse.http.server import JsonResource
+from synapse.handlers.presence import (
+    BasePresenceHandler,
+    PresenceState,
+    get_interested_parties,
+)
+from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
+from synapse.replication.http.presence import (
+    ReplicationBumpPresenceActiveTime,
+    ReplicationPresenceSetState,
+)
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -248,6 +255,9 @@ class GenericWorkerPresence(BasePresenceHandler):
         # but we haven't notified the master of that yet
         self.users_going_offline = {}
 
+        self._bump_active_client = ReplicationBumpPresenceActiveTime.make_client(hs)
+        self._set_state_client = ReplicationPresenceSetState.make_client(hs)
+
         self._send_stop_syncing_loop = self.clock.looping_call(
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
@@ -304,10 +314,6 @@ class GenericWorkerPresence(BasePresenceHandler):
             if now - last_sync_ms > UPDATE_SYNCING_USERS_MS:
                 self.users_going_offline.pop(user_id, None)
                 self.send_user_sync(user_id, False, last_sync_ms)
-
-    def set_state(self, user, state, ignore_status_msg=False):
-        # TODO Hows this supposed to work?
-        return defer.succeed(None)
 
     async def user_syncing(
         self, user_id: str, affect_presence: bool
@@ -386,6 +392,42 @@ class GenericWorkerPresence(BasePresenceHandler):
             for user_id, count in self._user_to_num_current_syncs.items()
             if count > 0
         ]
+
+    async def set_state(self, target_user, state, ignore_status_msg=False):
+        """Set the presence state of the user.
+        """
+        presence = state["presence"]
+
+        valid_presence = (
+            PresenceState.ONLINE,
+            PresenceState.UNAVAILABLE,
+            PresenceState.OFFLINE,
+        )
+        if presence not in valid_presence:
+            raise SynapseError(400, "Invalid presence state")
+
+        user_id = target_user.to_string()
+
+        # If presence is disabled, no-op
+        if not self.hs.config.use_presence:
+            return
+
+        # Proxy request to master
+        await self._set_state_client(
+            user_id=user_id, state=state, ignore_status_msg=ignore_status_msg
+        )
+
+    async def bump_presence_active_time(self, user):
+        """We've seen the user do something that indicates they're interacting
+        with the app.
+        """
+        # If presence is disabled, no-op
+        if not self.hs.config.use_presence:
+            return
+
+        # Proxy request to master
+        user_id = user.to_string()
+        await self._bump_active_client(user_id=user_id)
 
 
 class GenericWorkerTyping(object):
@@ -566,7 +608,7 @@ class GenericWorkerServer(HomeServer):
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
-        root_resource = create_resource_tree(resources, NoResource())
+        root_resource = create_resource_tree(resources, OptionsResource())
 
         _base.listen_tcp(
             bind_addresses,

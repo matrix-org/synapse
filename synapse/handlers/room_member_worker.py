@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.handlers.room_member import RoomMemberHandler
@@ -43,7 +43,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         room_id: str,
         user: UserID,
         content: dict,
-    ) -> Optional[dict]:
+    ) -> Tuple[str, int]:
         """Implements RoomMemberHandler._remote_join
         """
         if len(remote_room_hosts) == 0:
@@ -59,7 +59,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         await self._user_joined_room(user, room_id)
 
-        return ret
+        return ret["event_id"], ret["stream_id"]
 
     async def _remote_reject_invite(
         self,
@@ -68,16 +68,17 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         room_id: str,
         target: UserID,
         content: dict,
-    ) -> dict:
+    ) -> Tuple[Optional[str], int]:
         """Implements RoomMemberHandler._remote_reject_invite
         """
-        return await self._remote_reject_client(
+        ret = await self._remote_reject_client(
             requester=requester,
             remote_room_hosts=remote_room_hosts,
             room_id=room_id,
             user_id=target.to_string(),
             content=content,
         )
+        return ret["event_id"], ret["stream_id"]
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_joined_room

@@ -38,7 +38,9 @@ from synapse.replication.tcp.commands import (
 from synapse.replication.tcp.protocol import AbstractConnection
 from synapse.replication.tcp.streams import (
     STREAMS_MAP,
+    BackfillStream,
     CachesStream,
+    EventsStream,
     FederationStream,
     Stream,
 )
@@ -85,6 +87,14 @@ class ReplicationCommandHandler:
             if stream.NAME == CachesStream.NAME:
                 # All workers can write to the cache invalidation stream.
                 self._streams_to_replicate.append(stream)
+                continue
+
+            if isinstance(stream, (EventsStream, BackfillStream)):
+                # Only add EventStream and BackfillStream as a source on the
+                # instance in charge of event persistence.
+                if hs.config.worker.writers.events == hs.get_instance_name():
+                    self._streams_to_replicate.append(stream)
+
                 continue
 
             # Only add any other streams if we're on master.
