@@ -177,7 +177,10 @@ class AuthRestServlet(RestServlet):
                 )
 
             elif self._saml_enabled:
-                client_redirect_url = b""
+                # Some SAML identity providers (e.g. Google) require a
+                # RelayState parameter on requests. It is not necessary here, so
+                # pass in a dummy redirect URL (which will never get used).
+                client_redirect_url = b"unused"
                 sso_redirect_url = self._saml_handler.handle_redirect_request(
                     client_redirect_url, session
                 )

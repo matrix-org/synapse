@@ -83,10 +83,10 @@ class ServerNoticesManager(object):
         if state_key is not None:
             event_dict["state_key"] = state_key
 
-        res = await self._event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
             requester, event_dict, ratelimit=False
         )
-        return res
+        return event
 
     @cached()
     async def get_or_create_notice_room_for_user(self, user_id):
@@ -143,7 +143,7 @@ class ServerNoticesManager(object):
             }
 
         requester = create_requester(self.server_notices_mxid)
-        info = await self._room_creation_handler.create_room(
+        info, _ = await self._room_creation_handler.create_room(
             requester,
             config={
                 "preset": RoomCreationPreset.PRIVATE_CHAT,

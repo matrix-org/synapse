@@ -1,3 +1,5 @@
+from typing import Dict
+
 import twisted.internet
 
 import synapse.api.auth
@@ -28,6 +30,7 @@ import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
 from synapse.events.builder import EventBuilderFactory
+from synapse.replication.tcp.streams import Stream
 
 class HomeServer(object):
     @property
@@ -135,4 +138,6 @@ class HomeServer(object):
     def get_macaroon_generator(self) -> synapse.handlers.auth.MacaroonGenerator:
         pass
     def get_pusherpool(self) -> synapse.push.pusherpool.PusherPool:
+        pass
+    def get_replication_streams(self) -> Dict[str, Stream]:
         pass
