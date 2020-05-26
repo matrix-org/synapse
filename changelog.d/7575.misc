@@ -1,0 +1,1 @@
+Fix str placeholders in an instance of `PrepareDatabaseException`.
