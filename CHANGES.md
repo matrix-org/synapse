@@ -9,7 +9,7 @@ Features
 - Add room details admin endpoint. Contributed by Awesome Technologies Innovationslabor GmbH. ([\#7317](https://github.com/matrix-org/synapse/issues/7317))
 - Allow for using more than one spam checker module at once. ([\#7435](https://github.com/matrix-org/synapse/issues/7435))
 - Add `instance_map` config and route replication calls. ([\#7495](https://github.com/matrix-org/synapse/issues/7495))
-- Add additional authentication checks for m.room.power_levels event per [MSC2209](https://github.com/matrix-org/matrix-doc/pull/2209). ([\#7502](https://github.com/matrix-org/synapse/issues/7502))
+- Add additional authentication checks for `m.room.power_levels` event per [MSC2209](https://github.com/matrix-org/matrix-doc/pull/2209). ([\#7502](https://github.com/matrix-org/synapse/issues/7502))
 - Implement room version 6 per [MSC2240](https://github.com/matrix-org/matrix-doc/pull/2240). ([\#7506](https://github.com/matrix-org/synapse/issues/7506))
 - Add option to move event persistence off master. ([\#7517](https://github.com/matrix-org/synapse/issues/7517))
 
@@ -17,7 +17,6 @@ Features
 Bugfixes
 --------
 
-- Add an experimental room version which strictly adheres to the canonical JSON specification. ([\#7381](https://github.com/matrix-org/synapse/issues/7381))
 - Fix a bug where event updates might not be sent over replication to worker processes after the stream falls behind. ([\#7384](https://github.com/matrix-org/synapse/issues/7384))
 - Allow expired user accounts to log out their device sessions. ([\#7443](https://github.com/matrix-org/synapse/issues/7443))
 - Fix a bug that would cause Synapse not to resync out-of-sync device lists. ([\#7453](https://github.com/matrix-org/synapse/issues/7453))
@@ -32,6 +31,7 @@ Bugfixes
 - Fix bug where a local user leaving a room could fail under rare circumstances. ([\#7548](https://github.com/matrix-org/synapse/issues/7548))
 - Fix "Missing RelayState parameter" error when using user interactive authentication with SAML for some SAML providers. ([\#7552](https://github.com/matrix-org/synapse/issues/7552))
 - Fix exception `'GenericWorkerReplicationHandler' object has no attribute 'send_federation_ack'`, introduced in v1.13.0. ([\#7565](https://github.com/matrix-org/synapse/issues/7565))
+- `synctl` now warns if it was unable to stop Synapse and will not attempt to start Synapse if nothing was stopped. Contributed by Romain Bouyé. ([\#6590](https://github.com/matrix-org/synapse/issues/6590))
 
 
 Updates to the Docker image
@@ -54,26 +54,25 @@ Improved Documentation
 Internal Changes
 ----------------
 
-- `synctl` now warns if it was unable to stop Synapse and will not attempt to start Synapse if nothing was stopped. Contributed by Romain Bouyé. ([\#6590](https://github.com/matrix-org/synapse/issues/6590))
-- Add MultiWriterIdGenerator to support multiple concurrent writers of streams. ([\#7281](https://github.com/matrix-org/synapse/issues/7281))
+- Add `MultiWriterIdGenerator` to support multiple concurrent writers of streams. ([\#7281](https://github.com/matrix-org/synapse/issues/7281))
 - Move catchup of replication streams logic to worker. ([\#7374](https://github.com/matrix-org/synapse/issues/7374))
 - Add typing annotations in `synapse.federation`. ([\#7382](https://github.com/matrix-org/synapse/issues/7382))
 - Convert the room handler to async/await. ([\#7396](https://github.com/matrix-org/synapse/issues/7396))
 - Improve performance of `get_e2e_cross_signing_key`. ([\#7428](https://github.com/matrix-org/synapse/issues/7428))
 - Improve performance of `mark_as_sent_devices_by_remote`. ([\#7429](https://github.com/matrix-org/synapse/issues/7429), [\#7562](https://github.com/matrix-org/synapse/issues/7562))
-- Support any process writing to cache invalidation stream. ([\#7436](https://github.com/matrix-org/synapse/issues/7436))
+- Support any process writing to the cache invalidation stream. ([\#7436](https://github.com/matrix-org/synapse/issues/7436))
 - Refactor event persistence database functions in preparation for allowing them to be run on non-master processes. ([\#7440](https://github.com/matrix-org/synapse/issues/7440))
 - Add type hints to the SAML handler. ([\#7445](https://github.com/matrix-org/synapse/issues/7445))
 - Remove storage method `get_hosts_in_room` that is no longer called anywhere. ([\#7448](https://github.com/matrix-org/synapse/issues/7448))
-- Fix some typos in the notice_expiry templates. ([\#7449](https://github.com/matrix-org/synapse/issues/7449))
+- Fix some typos in the `notice_expiry` templates. ([\#7449](https://github.com/matrix-org/synapse/issues/7449))
 - Convert the federation handler to async/await. ([\#7459](https://github.com/matrix-org/synapse/issues/7459))
 - Convert the search handler to async/await. ([\#7460](https://github.com/matrix-org/synapse/issues/7460))
 - Fix linting errors in new version of Flake8. ([\#7470](https://github.com/matrix-org/synapse/issues/7470))
-- Have all instance correctly respond to REPLICATE command. ([\#7475](https://github.com/matrix-org/synapse/issues/7475))
+- Have all instance correctly respond to `REPLICATE` command. ([\#7475](https://github.com/matrix-org/synapse/issues/7475))
 - Clean up replication unit tests. ([\#7490](https://github.com/matrix-org/synapse/issues/7490))
 - Move event stream handling out of slave store. ([\#7491](https://github.com/matrix-org/synapse/issues/7491))
 - Allow censoring of events to happen on workers. ([\#7492](https://github.com/matrix-org/synapse/issues/7492))
-- Move EventStream handling into default ReplicationDataHandler. ([\#7493](https://github.com/matrix-org/synapse/issues/7493))
+- Move `EventStream` handling into default `ReplicationDataHandler`. ([\#7493](https://github.com/matrix-org/synapse/issues/7493))
 - Add type hints to `synapse.event_auth`. ([\#7505](https://github.com/matrix-org/synapse/issues/7505))
 - Convert the room member handler to async/await. ([\#7507](https://github.com/matrix-org/synapse/issues/7507))
 - Add type hints to room member handler. ([\#7513](https://github.com/matrix-org/synapse/issues/7513))
@@ -91,7 +90,7 @@ Internal Changes
 - Fix some indentation inconsistencies in the sample config. ([\#7550](https://github.com/matrix-org/synapse/issues/7550))
 - Include `synapse.http.site` in type checking. ([\#7553](https://github.com/matrix-org/synapse/issues/7553))
 - Fix some test code to not mangle stacktraces, to make it easier to debug errors. ([\#7554](https://github.com/matrix-org/synapse/issues/7554))
-- Refresh apt cache when building dh_virtualenv docker image. ([\#7555](https://github.com/matrix-org/synapse/issues/7555))
+- Refresh apt cache when building `dh_virtualenv` docker image. ([\#7555](https://github.com/matrix-org/synapse/issues/7555))
 - Stop logging some expected HTTP request errors as exceptions. ([\#7556](https://github.com/matrix-org/synapse/issues/7556), [\#7563](https://github.com/matrix-org/synapse/issues/7563))
 - Convert sending mail to async/await. ([\#7557](https://github.com/matrix-org/synapse/issues/7557))
 - Simplify `reap_monthly_active_users`. ([\#7558](https://github.com/matrix-org/synapse/issues/7558))
