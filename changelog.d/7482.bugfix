@@ -1,1 +1,0 @@
-Fix Redis reconnection logic that can result in missed updates over replication if master reconnects to Redis without restarting.
