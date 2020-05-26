@@ -1,11 +1,5 @@
 matrix-synapse-py3 (1.13.0) stable; urgency=medium
 
-  * New synapse release 1.13.0.
-
- -- Synapse Packaging team <packages@matrix.org>  Tue, 26 May 2020 14:44:07 +0000
-
-matrix-synapse-py3 (1.13.0) stable; urgency=medium
-
   [ Patrick Cloke ]
   * Add information about .well-known files to Debian installation scripts.
 
