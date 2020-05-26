@@ -30,7 +30,7 @@ Bugfixes
 - Hash passwords as early as possible during password reset. ([\#7538](https://github.com/matrix-org/synapse/issues/7538))
 - Fix bug where a local user leaving a room could fail under rare circumstances. ([\#7548](https://github.com/matrix-org/synapse/issues/7548))
 - Fix "Missing RelayState parameter" error when using user interactive authentication with SAML for some SAML providers. ([\#7552](https://github.com/matrix-org/synapse/issues/7552))
-- Fix exception `'GenericWorkerReplicationHandler' object has no attribute 'send_federation_ack'`, introduced in v1.13.0. ([\#7565](https://github.com/matrix-org/synapse/issues/7565))
+- Fix exception `'GenericWorkerReplicationHandler' object has no attribute 'send_federation_ack'`, introduced in v1.13.0. ([\#7564](https://github.com/matrix-org/synapse/issues/7564))
 - `synctl` now warns if it was unable to stop Synapse and will not attempt to start Synapse if nothing was stopped. Contributed by Romain Bouyé. ([\#6590](https://github.com/matrix-org/synapse/issues/6590))
 
 
@@ -67,7 +67,6 @@ Internal Changes
 - Fix some typos in the `notice_expiry` templates. ([\#7449](https://github.com/matrix-org/synapse/issues/7449))
 - Convert the federation handler to async/await. ([\#7459](https://github.com/matrix-org/synapse/issues/7459))
 - Convert the search handler to async/await. ([\#7460](https://github.com/matrix-org/synapse/issues/7460))
-- Fix linting errors in new version of Flake8. ([\#7470](https://github.com/matrix-org/synapse/issues/7470))
 - Have all instance correctly respond to `REPLICATE` command. ([\#7475](https://github.com/matrix-org/synapse/issues/7475))
 - Clean up replication unit tests. ([\#7490](https://github.com/matrix-org/synapse/issues/7490))
 - Move event stream handling out of slave store. ([\#7491](https://github.com/matrix-org/synapse/issues/7491))
