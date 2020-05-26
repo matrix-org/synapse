@@ -52,11 +52,13 @@ class RegistrationWorkerStore(SQLBaseStore):
                 "name",
                 "password_hash",
                 "is_guest",
+                "admin",
                 "consent_version",
                 "consent_server_notice_sent",
                 "appservice_id",
                 "creation_ts",
                 "user_type",
+                "deactivated",
             ],
             allow_none=True,
             desc="get_user_by_id",
@@ -271,8 +273,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="delete_account_validity_for_user",
         )
 
-    @defer.inlineCallbacks
-    def is_server_admin(self, user):
+    async def is_server_admin(self, user):
         """Determines if a user is an admin of this homeserver.
 
         Args:
@@ -281,7 +282,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns (bool):
             true iff the user is a server admin, false otherwise.
         """
-        res = yield self.db.simple_select_one_onecol(
+        res = await self.db.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user.to_string()},
             retcol="admin",
@@ -289,7 +290,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="is_server_admin",
         )
 
-        return res if res else False
+        return bool(res) if res else False
 
     def set_server_admin(self, user, admin):
         """Sets whether a user is an admin of this homeserver.
@@ -299,12 +300,16 @@ class RegistrationWorkerStore(SQLBaseStore):
             admin (bool): true iff the user is to be a server admin,
                 false otherwise.
         """
-        return self.db.simple_update_one(
-            table="users",
-            keyvalues={"name": user.to_string()},
-            updatevalues={"admin": 1 if admin else 0},
-            desc="set_server_admin",
-        )
+
+        def set_server_admin_txn(txn):
+            self.db.simple_update_one_txn(
+                txn, "users", {"name": user.to_string()}, {"admin": 1 if admin else 0}
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_user_by_id, (user.to_string(),)
+            )
+
+        return self.db.runInteraction("set_server_admin", set_server_admin_txn)
 
     def _query_for_auth(self, txn, token):
         sql = (

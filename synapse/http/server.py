@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cgi
 import collections
+import html
 import http.client
 import logging
 import types
@@ -36,6 +36,7 @@ import synapse.metrics
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
+    RedirectException,
     SynapseError,
     UnrecognizedRequestError,
 )
@@ -153,14 +154,18 @@ def _return_html_error(f, request):
 
     Args:
         f (twisted.python.failure.Failure):
-        request (twisted.web.iweb.IRequest):
+        request (twisted.web.server.Request):
     """
     if f.check(CodeMessageException):
         cme = f.value
         code = cme.code
         msg = cme.msg
 
-        if isinstance(cme, SynapseError):
+        if isinstance(cme, RedirectException):
+            logger.info("%s redirect to %s", request, cme.location)
+            request.setHeader(b"location", cme.location)
+            request.cookies.extend(cme.cookies)
+        elif isinstance(cme, SynapseError):
             logger.info("%s SynapseError: %s - %s", request, code, msg)
         else:
             logger.error(
@@ -178,7 +183,7 @@ def _return_html_error(f, request):
             exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
-    body = HTML_ERROR_TEMPLATE.format(code=code, msg=cgi.escape(msg)).encode("utf-8")
+    body = HTML_ERROR_TEMPLATE.format(code=code, msg=html.escape(msg)).encode("utf-8")
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
     request.setHeader(b"Content-Length", b"%i" % (len(body),))
@@ -345,13 +350,12 @@ class JsonResource(HttpServer, resource.Resource):
                 register_paths, so will return (possibly via Deferred) either
                 None, or a tuple of (http code, response body).
         """
-        if request.method == b"OPTIONS":
-            return _options_handler, "options_request_handler", {}
+        request_path = request.path.decode("ascii")
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path.decode("ascii"))
+            m = path_entry.pattern.match(request_path)
             if m:
                 # We found a match!
                 return path_entry.callback, path_entry.servlet_classname, m.groupdict()
@@ -439,6 +443,26 @@ class RootRedirect(resource.Resource):
         if len(name) == 0:
             return self  # select ourselves as the child to render
         return resource.Resource.getChild(self, name, request)
+
+
+class OptionsResource(resource.Resource):
+    """Responds to OPTION requests for itself and all children."""
+
+    def render_OPTIONS(self, request):
+        code, response_json_object = _options_handler(request)
+
+        return respond_with_json(
+            request, code, response_json_object, send_cors=True, canonical_json=False,
+        )
+
+    def getChildWithDefault(self, path, request):
+        if request.method == b"OPTIONS":
+            return self  # select ourselves as the child to render
+        return resource.Resource.getChildWithDefault(self, path, request)
+
+
+class RootOptionsRedirectResource(OptionsResource, RootRedirect):
+    pass
 
 
 def respond_with_json(

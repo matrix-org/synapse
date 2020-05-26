@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import signedjson.key
+import unpaddedbase64
 
 from twisted.internet.defer import Deferred
 
@@ -21,11 +22,17 @@ from synapse.storage.keys import FetchKeyResult
 
 import tests.unittest
 
-KEY_1 = signedjson.key.decode_verify_key_base64(
-    "ed25519", "key1", "fP5l4JzpZPq/zdbBg5xx6lQGAAOM9/3w94cqiJ5jPrw"
+
+def decode_verify_key_base64(key_id: str, key_base64: str):
+    key_bytes = unpaddedbase64.decode_base64(key_base64)
+    return signedjson.key.decode_verify_key_bytes(key_id, key_bytes)
+
+
+KEY_1 = decode_verify_key_base64(
+    "ed25519:key1", "fP5l4JzpZPq/zdbBg5xx6lQGAAOM9/3w94cqiJ5jPrw"
 )
-KEY_2 = signedjson.key.decode_verify_key_base64(
-    "ed25519", "key2", "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+KEY_2 = decode_verify_key_base64(
+    "ed25519:key2", "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
 )
 
 

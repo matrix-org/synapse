@@ -35,6 +35,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
     def setUp(self):
         hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
         self.store = hs.get_datastore()
+        self.persist_events_store = hs.get_datastores().persist_events
 
     @defer.inlineCallbacks
     def test_get_unread_push_actions_for_user_in_range_for_http(self):
@@ -76,7 +77,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             )
             yield self.store.db.runInteraction(
                 "",
-                self.store._set_push_actions_for_event_and_users_txn,
+                self.persist_events_store._set_push_actions_for_event_and_users_txn,
                 [(event, None)],
                 [(event, None)],
             )

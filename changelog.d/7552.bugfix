@@ -1,0 +1,1 @@
+Fix "Missing RelayState parameter" error when using user interactive authentication with SAML for some SAML providers.

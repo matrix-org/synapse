@@ -346,11 +346,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             from_key (str): The room_key portion of a StreamToken
         """
         from_key = RoomStreamToken.parse_stream_token(from_key).stream
-        return set(
+        return {
             room_id
             for room_id in room_ids
             if self._events_stream_cache.has_entity_changed(room_id, from_key)
-        )
+        }
 
     @defer.inlineCallbacks
     def get_room_events_stream_for_room(
@@ -481,11 +481,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_id, limit, end_token
         )
 
-        logger.debug("stream before")
         events = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
-        logger.debug("stream after")
 
         self._set_before_and_after(events, rows)
 
@@ -525,8 +523,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return rows, token
 
-    def get_room_event_after_stream_ordering(self, room_id, stream_ordering):
-        """Gets details of the first event in a room at or after a stream ordering
+    def get_room_event_before_stream_ordering(self, room_id, stream_ordering):
+        """Gets details of the first event in a room at or before a stream ordering
 
         Args:
             room_id (str):
@@ -541,15 +539,15 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             sql = (
                 "SELECT stream_ordering, topological_ordering, event_id"
                 " FROM events"
-                " WHERE room_id = ? AND stream_ordering >= ?"
+                " WHERE room_id = ? AND stream_ordering <= ?"
                 " AND NOT outlier"
-                " ORDER BY stream_ordering"
+                " ORDER BY stream_ordering DESC"
                 " LIMIT 1"
             )
             txn.execute(sql, (room_id, stream_ordering))
             return txn.fetchone()
 
-        return self.db.runInteraction("get_room_event_after_stream_ordering", _f)
+        return self.db.runInteraction("get_room_event_before_stream_ordering", _f)
 
     @defer.inlineCallbacks
     def get_room_events_max_id(self, room_id=None):
@@ -679,11 +677,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         )
 
         events_before = yield self.get_events_as_list(
-            [e for e in results["before"]["event_ids"]], get_prev_content=True
+            list(results["before"]["event_ids"]), get_prev_content=True
         )
 
         events_after = yield self.get_events_as_list(
-            [e for e in results["after"]["event_ids"]], get_prev_content=True
+            list(results["after"]["event_ids"]), get_prev_content=True
         )
 
         return {

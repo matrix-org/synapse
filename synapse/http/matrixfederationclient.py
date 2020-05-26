@@ -19,7 +19,7 @@ import random
 import sys
 from io import BytesIO
 
-from six import PY3, raise_from, string_types
+from six import raise_from, string_types
 from six.moves import urllib
 
 import attr
@@ -70,11 +70,7 @@ incoming_responses_counter = Counter(
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
-
-if PY3:
-    MAXINT = sys.maxsize
-else:
-    MAXINT = sys.maxint
+MAXINT = sys.maxsize
 
 
 _next_id = 1
@@ -148,6 +144,11 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = yield make_deferred_yieldable(d)
+    except TimeoutError as e:
+        logger.warning(
+            "{%s} [%s] Timed out reading response", request.txn_id, request.destination,
+        )
+        raise RequestSendFailed(e, can_retry=True) from e
     except Exception as e:
         logger.warning(
             "{%s} [%s] Error reading response: %s",
@@ -408,6 +409,8 @@ class MatrixFederationHttpClient(object):
                         _sec_timeout,
                     )
 
+                    outgoing_requests_counter.labels(request.method).inc()
+
                     try:
                         with Measure(self.clock, "outbound_request"):
                             # we don't want all the fancy cookie and redirect handling
@@ -426,25 +429,37 @@ class MatrixFederationHttpClient(object):
                             )
 
                             response = yield request_deferred
+                    except TimeoutError as e:
+                        raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
                         raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
                     except Exception as e:
                         logger.info("Failed to send request: %s", e)
                         raise_from(RequestSendFailed(e, can_retry=True), e)
 
-                    logger.info(
-                        "{%s} [%s] Got response headers: %d %s",
-                        request.txn_id,
-                        request.destination,
-                        response.code,
-                        response.phrase.decode("ascii", errors="replace"),
-                    )
+                    incoming_responses_counter.labels(
+                        request.method, response.code
+                    ).inc()
 
                     set_tag(tags.HTTP_STATUS_CODE, response.code)
 
                     if 200 <= response.code < 300:
+                        logger.debug(
+                            "{%s} [%s] Got response headers: %d %s",
+                            request.txn_id,
+                            request.destination,
+                            response.code,
+                            response.phrase.decode("ascii", errors="replace"),
+                        )
                         pass
                     else:
+                        logger.info(
+                            "{%s} [%s] Got response headers: %d %s",
+                            request.txn_id,
+                            request.destination,
+                            response.code,
+                            response.phrase.decode("ascii", errors="replace"),
+                        )
                         # :'(
                         # Update transactions table?
                         d = treq.content(response)

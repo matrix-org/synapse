@@ -1,1 +1,0 @@
-Port `synapse.handlers.admin` and `synapse.handlers.deactivate_account` to async/await.

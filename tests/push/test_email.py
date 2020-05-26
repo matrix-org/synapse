@@ -163,7 +163,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -174,7 +174,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # It hasn't succeeded yet, so the stream ordering shouldn't have moved
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
@@ -192,7 +192,7 @@ class EmailPusherTests(HomeserverTestCase):
 
         # The stream ordering has increased
         pushers = self.get_success(
-            self.hs.get_datastore().get_pushers_by(dict(user_name=self.user_id))
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)

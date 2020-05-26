@@ -43,7 +43,7 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = self.as_yaml_files
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         self.as_token = "token1"
@@ -69,14 +69,14 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
                 pass
 
     def _add_appservice(self, as_token, id, url, hs_token, sender):
-        as_yaml = dict(
-            url=url,
-            as_token=as_token,
-            hs_token=hs_token,
-            id=id,
-            sender_localpart=sender,
-            namespaces={},
-        )
+        as_yaml = {
+            "url": url,
+            "as_token": as_token,
+            "hs_token": hs_token,
+            "id": id,
+            "sender_localpart": sender,
+            "namespaces": {},
+        }
         # use the token as the filename
         with open(as_token, "w") as outfile:
             outfile.write(yaml.dump(as_yaml))
@@ -110,7 +110,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = self.as_yaml_files
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         self.as_list = [
@@ -135,14 +135,14 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
 
     def _add_service(self, url, as_token, id):
-        as_yaml = dict(
-            url=url,
-            as_token=as_token,
-            hs_token="something",
-            id=id,
-            sender_localpart="a_sender",
-            namespaces={},
-        )
+        as_yaml = {
+            "url": url,
+            "as_token": as_token,
+            "hs_token": "something",
+            "id": id,
+            "sender_localpart": "a_sender",
+            "namespaces": {},
+        }
         # use the token as the filename
         with open(as_token, "w") as outfile:
             outfile.write(yaml.dump(as_yaml))
@@ -384,8 +384,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
         )
         self.assertEquals(2, len(services))
         self.assertEquals(
-            set([self.as_list[2]["id"], self.as_list[0]["id"]]),
-            set([services[0].id, services[1].id]),
+            {self.as_list[2]["id"], self.as_list[0]["id"]},
+            {services[0].id, services[1].id},
         )
 
 
@@ -422,7 +422,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = [f1, f2]
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         database = hs.get_datastores().databases[0]
@@ -440,7 +440,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = [f1, f2]
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
@@ -464,7 +464,7 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
         )
 
         hs.config.app_service_config_files = [f1, f2]
-        hs.config.event_cache_size = 1
+        hs.config.caches.event_cache_size = 1
         hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:

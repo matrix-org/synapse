@@ -18,7 +18,7 @@
 """Utilities for interacting with Identity Servers"""
 
 import logging
-import urllib
+import urllib.parse
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
@@ -38,7 +38,7 @@ from synapse.api.errors import (
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.client import SimpleHttpClient
 from synapse.util.hash import sha256_and_url_safe_base64
-from synapse.util.stringutils import random_string
+from synapse.util.stringutils import assert_valid_client_secret, random_string
 
 from ._base import BaseHandler
 
@@ -84,6 +84,8 @@ class IdentityHandler(BaseHandler):
             raise SynapseError(
                 400, "Missing param client_secret in creds", errcode=Codes.MISSING_PARAM
             )
+        assert_valid_client_secret(client_secret)
+
         session_id = creds.get("sid")
         if not session_id:
             raise SynapseError(
@@ -288,8 +290,7 @@ class IdentityHandler(BaseHandler):
 
         return changed
 
-    @defer.inlineCallbacks
-    def send_threepid_validation(
+    async def send_threepid_validation(
         self,
         email_address,
         client_secret,
@@ -317,7 +318,7 @@ class IdentityHandler(BaseHandler):
         """
         # Check that this email/client_secret/send_attempt combo is new or
         # greater than what we've seen previously
-        session = yield self.store.get_threepid_validation_session(
+        session = await self.store.get_threepid_validation_session(
             "email", client_secret, address=email_address, validated=False
         )
 
@@ -351,7 +352,7 @@ class IdentityHandler(BaseHandler):
         # Send the mail with the link containing the token, client_secret
         # and session_id
         try:
-            yield send_email_func(email_address, token, client_secret, session_id)
+            await send_email_func(email_address, token, client_secret, session_id)
         except Exception:
             logger.exception(
                 "Error sending threepid validation email to %s", email_address
@@ -362,7 +363,7 @@ class IdentityHandler(BaseHandler):
             self.hs.clock.time_msec() + self.hs.config.email_validation_token_lifetime
         )
 
-        yield self.store.start_or_continue_validation_session(
+        await self.store.start_or_continue_validation_session(
             "email",
             email_address,
             session_id,

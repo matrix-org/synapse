@@ -16,7 +16,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Set
 
 from six import iteritems, itervalues
 
@@ -33,8 +33,8 @@ from synapse.events.snapshot import EventContext
 from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
+from synapse.types import StateMap
 from synapse.util.async_helpers import Linearizer
-from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure, measure_func
 
@@ -52,7 +52,6 @@ state_groups_histogram = Histogram(
 KeyStateTuple = namedtuple("KeyStateTuple", ("context", "type", "state_key"))
 
 
-SIZE_OF_CACHE = 100000 * get_cache_factor_for("state_cache")
 EVICTION_TIMEOUT_SECONDS = 60 * 60
 
 
@@ -393,7 +392,7 @@ class StateHandler(object):
                 delta_ids=delta_ids,
             )
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = yield self.store.get_room_version_id(room_id)
 
         result = yield self._state_resolution_handler.resolve_state_groups(
             room_id,
@@ -446,7 +445,7 @@ class StateResolutionHandler(object):
         self._state_cache = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
-            max_len=SIZE_OF_CACHE,
+            max_len=100000,
             expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             iterable=True,
             reset_expiry_on_get=True,
@@ -594,7 +593,7 @@ def _make_state_cache_entry(new_state, state_groups_ids):
 def resolve_events_with_store(
     room_id: str,
     room_version: str,
-    state_sets: List[Dict[Tuple[str, str], str]],
+    state_sets: List[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_res_store: "StateResolutionStore",
 ):
@@ -661,23 +660,16 @@ class StateResolutionStore(object):
             allow_rejected=allow_rejected,
         )
 
-    def get_auth_chain(self, event_ids):
-        """Gets the full auth chain for a set of events (including rejected
-        events).
+    def get_auth_chain_difference(self, state_sets: List[Set[str]]):
+        """Given sets of state events figure out the auth chain difference (as
+        per state res v2 algorithm).
 
-        Includes the given event IDs in the result.
-
-        Note that:
-            1. All events must be state events.
-            2. For v1 rooms this may not have the full auth chain in the
-               presence of rejected events
-
-        Args:
-            event_ids (list): The event IDs of the events to fetch the auth
-                chain for. Must be state events.
+        This equivalent to fetching the full auth chain for each set of state
+        and returning the events that don't appear in each and every auth
+        chain.
 
         Returns:
-            Deferred[list[str]]: List of event IDs of the auth chain.
+            Deferred[Set[str]]: Set of event IDs.
         """
 
-        return self.store.get_auth_chain_ids(event_ids, include_given=True)
+        return self.store.get_auth_chain_difference(state_sets)

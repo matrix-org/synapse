@@ -1,0 +1,1 @@
+All endpoints now respond with a 200 OK for `OPTIONS` requests.

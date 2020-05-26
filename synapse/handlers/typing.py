@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import List
 
 from twisted.internet import defer
 
@@ -125,7 +126,7 @@ class TypingHandler(object):
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
 
-        yield self.auth.check_joined_room(room_id, target_user_id)
+        yield self.auth.check_user_in_room(room_id, target_user_id)
 
         logger.debug("%s has started typing in %s", target_user_id, room_id)
 
@@ -155,7 +156,7 @@ class TypingHandler(object):
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
 
-        yield self.auth.check_joined_room(room_id, target_user_id)
+        yield self.auth.check_user_in_room(room_id, target_user_id)
 
         logger.debug("%s has stopped typing in %s", target_user_id, room_id)
 
@@ -198,7 +199,7 @@ class TypingHandler(object):
                 now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
             )
 
-            for domain in set(get_domain_from_id(u) for u in users):
+            for domain in {get_domain_from_id(u) for u in users}:
                 if domain != self.server_name:
                     logger.debug("sending typing update to %s", domain)
                     self.federation.build_and_send_edu(
@@ -231,7 +232,7 @@ class TypingHandler(object):
             return
 
         users = yield self.state.get_current_users_in_room(room_id)
-        domains = set(get_domain_from_id(u) for u in users)
+        domains = {get_domain_from_id(u) for u in users}
 
         if self.server_name in domains:
             logger.info("Got typing update from %s: %r", user_id, content)
@@ -257,7 +258,13 @@ class TypingHandler(object):
             "typing_key", self._latest_room_serial, rooms=[member.room_id]
         )
 
-    def get_all_typing_updates(self, last_id, current_id):
+    async def get_all_typing_updates(
+        self, last_id: int, current_id: int, limit: int
+    ) -> List[dict]:
+        """Get up to `limit` typing updates between the given tokens, earliest
+        updates first.
+        """
+
         if last_id == current_id:
             return []
 
@@ -275,7 +282,7 @@ class TypingHandler(object):
                 typing = self._room_typing[room_id]
                 rows.append((serial, room_id, list(typing)))
         rows.sort()
-        return rows
+        return rows[:limit]
 
     def get_current_token(self):
         return self._latest_room_serial
