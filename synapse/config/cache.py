@@ -126,6 +126,12 @@ class CacheConfig(Config):
            # takes priority over setting through the config file.
            # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
            #
+           # Some caches have '*' and other characters that are not
+           # alphanumeric or underscores. These caches can be named with or
+           # without the special characters stripped. For example, to specify
+           # the cache factor for `*stateGroupCache*` via an environment
+           # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2`.
+           #
            per_cache_factors:
              #get_users_who_share_room_with_user: 2.0
         """
