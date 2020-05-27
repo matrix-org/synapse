@@ -332,11 +332,12 @@ class LoginRestServlet(RestServlet):
         )
 
         if create_non_existant_users:
-            user_id = await self.auth_handler.check_user_exists(user_id)
-            if not user_id:
-                user_id = await self.registration_handler.register_user(
+            canonical_uid = await self.auth_handler.check_user_exists(user_id)
+            if not canonical_uid:
+                canonical_uid = await self.registration_handler.register_user(
                     localpart=UserID.from_string(user_id).localpart
                 )
+            user_id = canonical_uid
 
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
