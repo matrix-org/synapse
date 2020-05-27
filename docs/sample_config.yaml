@@ -647,7 +647,7 @@ caches:
    # alphanumeric or underscores. These caches can be named with or
    # without the special characters stripped. For example, to specify
    # the cache factor for `*stateGroupCache*` via an environment
-   # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2`.
+   # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
    #
    per_cache_factors:
      #get_users_who_share_room_with_user: 2.0

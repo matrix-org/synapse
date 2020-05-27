@@ -46,7 +46,7 @@ def _canonicalise_cache_name(cache_name: str) -> str:
 
     Since we specify cache names in config and environment variables we need to
     ignore case and special characters. For example, some caches have asterisks
-    in their name to donate that they're not attached to a particular database
+    in their name to denote that they're not attached to a particular database
     function, and these asterisks need to be stripped out
     """
 
@@ -130,7 +130,7 @@ class CacheConfig(Config):
            # alphanumeric or underscores. These caches can be named with or
            # without the special characters stripped. For example, to specify
            # the cache factor for `*stateGroupCache*` via an environment
-           # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2`.
+           # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
            #
            per_cache_factors:
              #get_users_who_share_room_with_user: 2.0
