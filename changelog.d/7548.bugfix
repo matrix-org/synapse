@@ -1,1 +1,0 @@
-Fix bug where a local user leaving a room could fail under rare circumstances.

@@ -1,1 +1,0 @@
-Ignore incoming presence events from other homeservers if presence is disabled locally.

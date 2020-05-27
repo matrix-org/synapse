@@ -1,1 +1,0 @@
-Refactor event persistence database functions in preparation for allowing them to be run on non-master processes.

@@ -1,1 +1,0 @@
-Prevent rooms with 0 members or with invalid version strings from breaking group queries.

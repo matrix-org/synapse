@@ -1,1 +1,0 @@
-Fix a bug that would cause Synapse not to resync out-of-sync device lists.
