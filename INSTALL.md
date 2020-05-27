@@ -180,35 +180,15 @@ sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
 
 #### OpenBSD
 
-Installing prerequisites on OpenBSD:
+A binary package was introduced in OpenBSD 6.7, installation with:
 
 ```
-doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
-              libxslt jpeg
+doas pkg_add synapse
 ```
 
-There is currently no port for OpenBSD. Additionally, OpenBSD's security
-settings require a slightly more difficult installation process.
-
-(XXX: I suspect this is out of date)
-
-1. Create a new directory in `/usr/local` called `_synapse`. Also, create a
-   new user called `_synapse` and set that directory as the new user's home.
-   This is required because, by default, OpenBSD only allows binaries which need
-   write and execute permissions on the same memory space to be run from
-   `/usr/local`.
-2. `su` to the new `_synapse` user and change to their home directory.
-3. Create a new virtualenv: `virtualenv -p python3 ~/.synapse`
-4. Source the virtualenv configuration located at
-   `/usr/local/_synapse/.synapse/bin/activate`. This is done in `ksh` by
-   using the `.` command, rather than `bash`'s `source`.
-5. Optionally, use `pip` to install `lxml`, which Synapse needs to parse
-   webpages for their titles.
-6. Use `pip` to install this repository: `pip install matrix-synapse`
-7. Optionally, change `_synapse`'s shell to `/bin/false` to reduce the
-   chance of a compromised Synapse server being used to take over your box.
-
-After this, you may proceed with the rest of the install directions.
+The default homeserver location `/var/synapse` requires the underlying
+filesystem to be mounted with `wxallowed` (cf. `mount(8)`), so creating a
+separate filesystem and mounting it to `/var/synapse` should be considered.
 
 #### Windows
 
