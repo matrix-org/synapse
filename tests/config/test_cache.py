@@ -125,3 +125,47 @@ class CacheConfigTests(TestCase):
         cache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 150)
+
+    def test_cache_with_asterisk_in_name(self):
+        """Some caches have asterisks in their name, test that they are set correctly.
+        """
+
+        config = {
+            "caches": {
+                "per_cache_factors": {"*cache_a*": 5, "cache_b": 6, "cache_c": 2}
+            }
+        }
+        t = TestConfig()
+        t.caches._environ = {
+            "SYNAPSE_CACHE_FACTOR_CACHE_A": "2",
+            "SYNAPSE_CACHE_FACTOR_CACHE_B": 3,
+        }
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cache_a = LruCache(100)
+        add_resizable_cache("*cache_a*", cache_resize_callback=cache_a.set_cache_factor)
+        self.assertEqual(cache_a.max_size, 200)
+
+        cache_b = LruCache(100)
+        add_resizable_cache("*Cache_b*", cache_resize_callback=cache_b.set_cache_factor)
+        self.assertEqual(cache_b.max_size, 300)
+
+        cache_c = LruCache(100)
+        add_resizable_cache("*cache_c*", cache_resize_callback=cache_c.set_cache_factor)
+        self.assertEqual(cache_c.max_size, 200)
+
+    def test_apply_cache_factor_from_config(self):
+        """Caches can disable applying cache factor updates, mainly used by
+        event cache size.
+        """
+
+        config = {"caches": {"event_cache_size": "10k"}}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cache = LruCache(
+            max_size=t.caches.event_cache_size, apply_cache_factor_from_config=False,
+        )
+        add_resizable_cache("event_cache", cache_resize_callback=cache.set_cache_factor)
+
+        self.assertEqual(cache.max_size, 10240)
