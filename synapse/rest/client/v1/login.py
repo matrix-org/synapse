@@ -299,7 +299,7 @@ class LoginRestServlet(RestServlet):
         return result
 
     async def _complete_login(
-        self, user_id, login_submission, callback=None, create_non_existant_users=False
+        self, user_id, login_submission, callback=None, create_non_existent_users=False
     ):
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -312,7 +312,7 @@ class LoginRestServlet(RestServlet):
             user_id (str): ID of the user to register.
             login_submission (dict): Dictionary of login information.
             callback (func|None): Callback function to run after registration.
-            create_non_existant_users (bool): Whether to create the user if
+            create_non_existent_users (bool): Whether to create the user if
                 they don't exist. Defaults to False.
 
         Returns:
@@ -331,7 +331,7 @@ class LoginRestServlet(RestServlet):
             update=True,
         )
 
-        if create_non_existant_users:
+        if create_non_existent_users:
             canonical_uid = await self.auth_handler.check_user_exists(user_id)
             if not canonical_uid:
                 canonical_uid = await self.registration_handler.register_user(
@@ -392,7 +392,7 @@ class LoginRestServlet(RestServlet):
 
         user_id = UserID(user, self.hs.hostname).to_string()
         result = await self._complete_login(
-            user_id, login_submission, create_non_existant_users=True
+            user_id, login_submission, create_non_existent_users=True
         )
         return result
 
