@@ -75,6 +75,80 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.14.0
+====================
+
+This version includes a database update which is run as part of the upgrade,
+and which may take a couple of minutes in the case of a large server. Synapse
+will not respond to HTTP requests while this update is taking place.
+
+Upgrading to v1.13.0
+====================
+
+Incorrect database migration in old synapse versions
+----------------------------------------------------
+
+A bug was introduced in Synapse 1.4.0 which could cause the room directory to
+be incomplete or empty if Synapse was upgraded directly from v1.2.1 or
+earlier, to versions between v1.4.0 and v1.12.x.
+
+This will *not* be a problem for Synapse installations which were:
+ * created at v1.4.0 or later,
+ * upgraded via v1.3.x, or
+ * upgraded straight from v1.2.1 or earlier to v1.13.0 or later.
+
+If completeness of the room directory is a concern, installations which are
+affected can be repaired as follows:
+
+1. Run the following sql from a `psql` or `sqlite3` console:
+
+   .. code:: sql
+
+     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+        ('populate_stats_process_rooms', '{}', 'current_state_events_membership');
+
+     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
+        ('populate_stats_process_users', '{}', 'populate_stats_process_rooms');
+
+2. Restart synapse.
+
+New Single Sign-on HTML Templates
+---------------------------------
+
+New templates (``sso_auth_confirm.html``, ``sso_auth_success.html``, and
+``sso_account_deactivated.html``) were added to Synapse. If your Synapse is
+configured to use SSO and a custom  ``sso_redirect_confirm_template_dir``
+configuration then these templates will need to be copied from
+`synapse/res/templates <synapse/res/templates>`_ into that directory.
+
+Synapse SSO Plugins Method Deprecation
+--------------------------------------
+
+Plugins using the ``complete_sso_login`` method of
+``synapse.module_api.ModuleApi`` should update to using the async/await
+version ``complete_sso_login_async`` which includes additional checks. The
+non-async version is considered deprecated.
+
+Rolling back to v1.12.4 after a failed upgrade
+----------------------------------------------
+
+v1.13.0 includes a lot of large changes. If something problematic occurs, you
+may want to roll-back to a previous version of Synapse. Because v1.13.0 also
+includes a new database schema version, reverting that version is also required
+alongside the generic rollback instructions mentioned above. In short, to roll
+back to v1.12.4 you need to:
+
+1. Stop the server
+2. Decrease the schema version in the database:
+
+   .. code:: sql
+
+      UPDATE schema_version SET version = 57;
+
+3. Downgrade Synapse by following the instructions for your installation method
+   in the "Rolling back to older versions" section above.
+
+
 Upgrading to v1.12.0
 ====================
 

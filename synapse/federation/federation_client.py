@@ -883,18 +883,37 @@ class FederationClient(FederationBase):
 
     def get_public_rooms(
         self,
-        destination,
-        limit=None,
-        since_token=None,
-        search_filter=None,
-        include_all_networks=False,
-        third_party_instance_id=None,
+        remote_server: str,
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        include_all_networks: bool = False,
+        third_party_instance_id: Optional[str] = None,
     ):
-        if destination == self.server_name:
-            return
+        """Get the list of public rooms from a remote homeserver
 
+        Args:
+            remote_server: The name of the remote server
+            limit: Maximum amount of rooms to return
+            since_token: Used for result pagination
+            search_filter: A filter dictionary to send the remote homeserver
+                and filter the result set
+            include_all_networks: Whether to include results from all third party instances
+            third_party_instance_id: Whether to only include results from a specific third
+                party instance
+
+        Returns:
+            Deferred[Dict[str, Any]]: The response from the remote server, or None if
+            `remote_server` is the same as the local server_name
+
+        Raises:
+            HttpResponseException: There was an exception returned from the remote server
+            SynapseException: M_FORBIDDEN when the remote server has disallowed publicRoom
+                requests over federation
+
+        """
         return self.transport_layer.get_public_rooms(
-            destination,
+            remote_server,
             limit,
             since_token,
             search_filter,
@@ -957,14 +976,13 @@ class FederationClient(FederationBase):
 
         return signed_events
 
-    @defer.inlineCallbacks
-    def forward_third_party_invite(self, destinations, room_id, event_dict):
+    async def forward_third_party_invite(self, destinations, room_id, event_dict):
         for destination in destinations:
             if destination == self.server_name:
                 continue
 
             try:
-                yield self.transport_layer.exchange_third_party_invite(
+                await self.transport_layer.exchange_third_party_invite(
                     destination=destination, room_id=room_id, event_dict=event_dict
                 )
                 return None

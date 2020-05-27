@@ -1,1 +1,0 @@
-Return the proper error (M_BAD_ALIAS) when a non-existant canonical alias is provided.

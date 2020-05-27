@@ -80,7 +80,9 @@ class AuthHandler(BaseHandler):
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
-        self._sso_enabled = hs.config.saml2_enabled or hs.config.cas_enabled
+        self._sso_enabled = (
+            hs.config.cas_enabled or hs.config.saml2_enabled or hs.config.oidc_enabled
+        )
 
         # we keep this as a list despite the O(N^2) implication so that we can
         # keep PASSWORD first and avoid confusing clients which pick the first
@@ -126,13 +128,13 @@ class AuthHandler(BaseHandler):
         # It notifies the user they are about to give access to their matrix account
         # to the client.
         self._sso_redirect_confirm_template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
+            hs.config.sso_template_dir, ["sso_redirect_confirm.html"],
         )[0]
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
         self._sso_auth_confirm_template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir, ["sso_auth_confirm.html"],
+            hs.config.sso_template_dir, ["sso_auth_confirm.html"],
         )[0]
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
@@ -317,29 +319,54 @@ class AuthHandler(BaseHandler):
             except StoreError:
                 raise SynapseError(400, "Unknown session ID: %s" % (sid,))
 
+            # If the client provides parameters, update what is persisted,
+            # otherwise use whatever was last provided.
+            #
+            # This was designed to allow the client to omit the parameters
+            # and just supply the session in subsequent calls so it split
+            # auth between devices by just sharing the session, (eg. so you
+            # could continue registration from your phone having clicked the
+            # email auth link on there). It's probably too open to abuse
+            # because it lets unauthenticated clients store arbitrary objects
+            # on a homeserver.
+            #
+            # Revisit: Assuming the REST APIs do sensible validation, the data
+            # isn't arbitrary.
+            #
+            # Note that the registration endpoint explicitly removes the
+            # "initial_device_display_name" parameter if it is provided
+            # without a "password" parameter. See the changes to
+            # synapse.rest.client.v2_alpha.register.RegisterRestServlet.on_POST
+            # in commit 544722bad23fc31056b9240189c3cbbbf0ffd3f9.
             if not clientdict:
-                # This was designed to allow the client to omit the parameters
-                # and just supply the session in subsequent calls so it split
-                # auth between devices by just sharing the session, (eg. so you
-                # could continue registration from your phone having clicked the
-                # email auth link on there). It's probably too open to abuse
-                # because it lets unauthenticated clients store arbitrary objects
-                # on a homeserver.
-                # Revisit: Assuming the REST APIs do sensible validation, the data
-                # isn't arbitrary.
                 clientdict = session.clientdict
 
             # Ensure that the queried operation does not vary between stages of
             # the UI authentication session. This is done by generating a stable
-            # comparator based on the URI, method, and body (minus the auth dict)
-            # and storing it during the initial query. Subsequent queries ensure
-            # that this comparator has not changed.
-            comparator = (uri, method, clientdict)
-            if (session.uri, session.method, session.clientdict) != comparator:
+            # comparator and storing it during the initial query. Subsequent
+            # queries ensure that this comparator has not changed.
+            #
+            # The comparator is based on the requested URI and HTTP method. The
+            # client dict (minus the auth dict) should also be checked, but some
+            # clients are not spec compliant, just warn for now if the client
+            # dict changes.
+            if (session.uri, session.method) != (uri, method):
                 raise SynapseError(
                     403,
                     "Requested operation has changed during the UI authentication session.",
                 )
+
+            if session.clientdict != clientdict:
+                logger.warning(
+                    "Requested operation has changed during the UI "
+                    "authentication session. A future version of Synapse "
+                    "will remove this capability."
+                )
+
+            # For backwards compatibility, changes to the client dict are
+            # persisted as clients modify them throughout their user interactive
+            # authentication flow.
+            await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         if not authdict:
             raise InteractiveAuthIncompleteError(

@@ -36,7 +36,7 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.12.4"
+__version__ = "1.14.0rc2"
 
 if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     # We import here so that we don't have to install a bunch of deps when

@@ -253,6 +253,18 @@ listeners:
   #  bind_addresses: ['::1', '127.0.0.1']
   #  type: manhole
 
+# Forward extremities can build up in a room due to networking delays between
+# homeservers. Once this happens in a large room, calculation of the state of
+# that room can become quite expensive. To mitigate this, once the number of
+# forward extremities reaches a given threshold, Synapse will send an
+# org.matrix.dummy_event event, which will reduce the forward extremities
+# in the room.
+#
+# This setting defines the threshold (i.e. number of forward extremities in the
+# room) at which dummy events are sent. The default value is 10.
+#
+#dummy_events_threshold: 5
+
 
 ## Homeserver blocking ##
 
@@ -310,22 +322,27 @@ listeners:
 # Used by phonehome stats to group together related servers.
 #server_context: context
 
-# Resource-constrained homeserver Settings
+# Resource-constrained homeserver settings
 #
-# If limit_remote_rooms.enabled is True, the room complexity will be
-# checked before a user joins a new remote room. If it is above
-# limit_remote_rooms.complexity, it will disallow joining or
-# instantly leave.
+# When this is enabled, the room "complexity" will be checked before a user
+# joins a new remote room. If it is above the complexity limit, the server will
+# disallow joining, or will instantly leave.
 #
-# limit_remote_rooms.complexity_error can be set to customise the text
-# displayed to the user when a room above the complexity threshold has
-# its join cancelled.
+# Room complexity is an arbitrary measure based on factors such as the number of
+# users in the room.
 #
-# Uncomment the below lines to enable:
-#limit_remote_rooms:
-#  enabled: true
-#  complexity: 1.0
-#  complexity_error: "This room is too complex."
+limit_remote_rooms:
+  # Uncomment to enable room complexity checking.
+  #
+  #enabled: true
+
+  # the limit above which rooms cannot be joined. The default is 1.0.
+  #
+  #complexity: 0.5
+
+  # override the error which is returned when the room is too complex.
+  #
+  #complexity_error: "This room is too complex."
 
 # Whether to require a user to be in the room to add an alias to it.
 # Defaults to 'true'.
@@ -591,6 +608,51 @@ acme:
 
 
 
+## Caching ##
+
+# Caching can be configured through the following options.
+#
+# A cache 'factor' is a multiplier that can be applied to each of
+# Synapse's caches in order to increase or decrease the maximum
+# number of entries that can be stored.
+
+# The number of events to cache in memory. Not affected by
+# caches.global_factor.
+#
+#event_cache_size: 10K
+
+caches:
+   # Controls the global cache factor, which is the default cache factor
+   # for all caches if a specific factor for that cache is not otherwise
+   # set.
+   #
+   # This can also be set by the "SYNAPSE_CACHE_FACTOR" environment
+   # variable. Setting by environment variable takes priority over
+   # setting through the config file.
+   #
+   # Defaults to 0.5, which will half the size of all caches.
+   #
+   #global_factor: 1.0
+
+   # A dictionary of cache name to cache factor for that individual
+   # cache. Overrides the global cache factor for a given cache.
+   #
+   # These can also be set through environment variables comprised
+   # of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in capital
+   # letters and underscores. Setting by environment variable
+   # takes priority over setting through the config file.
+   # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
+   #
+   # Some caches have '*' and other characters that are not
+   # alphanumeric or underscores. These caches can be named with or
+   # without the special characters stripped. For example, to specify
+   # the cache factor for `*stateGroupCache*` via an environment
+   # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
+   #
+   per_cache_factors:
+     #get_users_who_share_room_with_user: 2.0
+
+
 ## Database ##
 
 # The 'database' setting defines the database that synapse uses to store all of
@@ -633,10 +695,6 @@ database:
   name: sqlite3
   args:
     database: DATADIR/homeserver.db
-
-# Number of events to cache in memory.
-#
-#event_cache_size: 10K
 
 
 ## Logging ##
@@ -895,25 +953,28 @@ url_preview_accept_language:
 
 
 ## Captcha ##
-# See docs/CAPTCHA_SETUP for full details of configuring this.
+# See docs/CAPTCHA_SETUP.md for full details of configuring this.
 
-# This homeserver's ReCAPTCHA public key.
+# This homeserver's ReCAPTCHA public key. Must be specified if
+# enable_registration_captcha is enabled.
 #
 #recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
-# This homeserver's ReCAPTCHA private key.
+# This homeserver's ReCAPTCHA private key. Must be specified if
+# enable_registration_captcha is enabled.
 #
 #recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
-# Enables ReCaptcha checks when registering, preventing signup
+# Uncomment to enable ReCaptcha checks when registering, preventing signup
 # unless a captcha is answered. Requires a valid ReCaptcha
-# public/private key.
+# public/private key. Defaults to 'false'.
 #
-#enable_registration_captcha: false
+#enable_registration_captcha: true
 
 # The API endpoint to use for verifying m.login.recaptcha responses.
+# Defaults to "https://www.recaptcha.net/recaptcha/api/siteverify".
 #
-#recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
+#recaptcha_siteverify_api: "https://my.recaptcha.site"
 
 
 ## TURN ##
@@ -1057,7 +1118,7 @@ account_validity:
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
 #
-# registration_shared_secret: <PRIVATE STRING>
+#registration_shared_secret: <PRIVATE STRING>
 
 # Set the number of bcrypt rounds used to generate password hash.
 # Larger numbers increase the work factor needed to generate the hash.
@@ -1190,7 +1251,8 @@ metrics_flags:
     #known_servers: true
 
 # Whether or not to report anonymized homeserver usage statistics.
-# report_stats: true|false
+#
+#report_stats: true|false
 
 # The endpoint to report the anonymized homeserver usage statistics to.
 # Defaults to https://matrix.org/report-usage-stats/push
@@ -1226,13 +1288,13 @@ metrics_flags:
 # the registration_shared_secret is used, if one is given; otherwise,
 # a secret key is derived from the signing key.
 #
-# macaroon_secret_key: <PRIVATE STRING>
+#macaroon_secret_key: <PRIVATE STRING>
 
 # a secret which is used to calculate HMACs for form values, to stop
 # falsification of values. Must be specified for the User Consent
 # forms to work.
 #
-# form_secret: <PRIVATE STRING>
+#form_secret: <PRIVATE STRING>
 
 ## Signing Keys ##
 
@@ -1458,6 +1520,94 @@ saml2_config:
   #template_dir: "res/templates"
 
 
+# Enable OpenID Connect for registration and login. Uses authlib.
+#
+oidc_config:
+    # enable OpenID Connect. Defaults to false.
+    #
+    #enabled: true
+
+    # use the OIDC discovery mechanism to discover endpoints. Defaults to true.
+    #
+    #discover: true
+
+    # the OIDC issuer. Used to validate tokens and discover the providers endpoints. Required.
+    #
+    #issuer: "https://accounts.example.com/"
+
+    # oauth2 client id to use. Required.
+    #
+    #client_id: "provided-by-your-issuer"
+
+    # oauth2 client secret to use. Required.
+    #
+    #client_secret: "provided-by-your-issuer"
+
+    # auth method to use when exchanging the token.
+    # Valid values are "client_secret_basic" (default), "client_secret_post" and "none".
+    #
+    #client_auth_method: "client_secret_basic"
+
+    # list of scopes to ask. This should include the "openid" scope. Defaults to ["openid"].
+    #
+    #scopes: ["openid"]
+
+    # the oauth2 authorization endpoint. Required if provider discovery is disabled.
+    #
+    #authorization_endpoint: "https://accounts.example.com/oauth2/auth"
+
+    # the oauth2 token endpoint. Required if provider discovery is disabled.
+    #
+    #token_endpoint: "https://accounts.example.com/oauth2/token"
+
+    # the OIDC userinfo endpoint. Required if discovery is disabled and the "openid" scope is not asked.
+    #
+    #userinfo_endpoint: "https://accounts.example.com/userinfo"
+
+    # URI where to fetch the JWKS. Required if discovery is disabled and the "openid" scope is used.
+    #
+    #jwks_uri: "https://accounts.example.com/.well-known/jwks.json"
+
+    # skip metadata verification. Defaults to false.
+    # Use this if you are connecting to a provider that is not OpenID Connect compliant.
+    # Avoid this in production.
+    #
+    #skip_verification: false
+
+
+    # An external module can be provided here as a custom solution to mapping
+    # attributes returned from a OIDC provider onto a matrix user.
+    #
+    user_mapping_provider:
+      # The custom module's class. Uncomment to use a custom module.
+      # Default is 'synapse.handlers.oidc_handler.JinjaOidcMappingProvider'.
+      #
+      #module: mapping_provider.OidcMappingProvider
+
+      # Custom configuration values for the module. Below options are intended
+      # for the built-in provider, they should be changed if using a custom
+      # module. This section will be passed as a Python dictionary to the
+      # module's `parse_config` method.
+      #
+      # Below is the config of the default mapping provider, based on Jinja2
+      # templates. Those templates are used to render user attributes, where the
+      # userinfo object is available through the `user` variable.
+      #
+      config:
+        # name of the claim containing a unique identifier for the user.
+        # Defaults to `sub`, which OpenID Connect compliant providers should provide.
+        #
+        #subject_claim: "sub"
+
+        # Jinja2 template for the localpart of the MXID
+        #
+        localpart_template: "{{ user.preferred_username }}"
+
+        # Jinja2 template for the display name to set on first login. Optional.
+        #
+        #display_name_template: "{{ user.given_name }} {{ user.last_name }}"
+
+
 
 # Enable CAS for registration and login.
 #
@@ -1542,6 +1692,13 @@ sso:
     #
     #   This template has no additional variables.
     #
+    # * HTML page to display to users if something goes wrong during the
+    #   OpenID Connect authentication process: 'sso_error.html'.
+    #
+    #   When rendering, this template is given two variables:
+    #     * error: the technical name of the error
+    #     * error_description: a human-readable message for the error
+    #
     # You can see the default templates at:
     # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
     #
@@ -1622,8 +1779,8 @@ email:
   # Username/password for authentication to the SMTP server. By default, no
   # authentication is attempted.
   #
-  # smtp_user: "exampleusername"
-  # smtp_pass: "examplepassword"
+  #smtp_user: "exampleusername"
+  #smtp_pass: "examplepassword"
 
   # Uncomment the following to require TLS transport security for SMTP.
   # By default, Synapse will connect over plain text, and will then switch to
@@ -1760,10 +1917,17 @@ password_providers:
 #  include_content: true
 
 
-#spam_checker:
-#  module: "my_custom_project.SuperSpamChecker"
-#  config:
-#    example_option: 'things'
+# Spam checkers are third-party modules that can block specific actions
+# of local users, such as creating rooms and registering undesirable
+# usernames, as well as remote users by redacting incoming events.
+#
+spam_checker:
+   #- module: "my_custom_project.SuperSpamChecker"
+   #  config:
+   #    example_option: 'things'
+   #- module: "some_other_project.BadEventStopper"
+   #  config:
+   #    example_stop_events_from: ['@bad:example.com']
 
 
 # Uncomment to allow non-server-admin users to create groups on this server

@@ -19,13 +19,12 @@ import logging
 import time
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Iterable, List, TypeVar
 
 from six.moves import urllib
 
 import bleach
 import jinja2
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
@@ -40,6 +39,8 @@ from synapse.util.async_helpers import concurrently_execute
 from synapse.visibility import filter_events_for_client
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 MESSAGE_FROM_PERSON_IN_ROOM = (
@@ -124,8 +125,7 @@ class Mailer(object):
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
-    @defer.inlineCallbacks
-    def send_password_reset_mail(self, email_address, token, client_secret, sid):
+    async def send_password_reset_mail(self, email_address, token, client_secret, sid):
         """Send an email with a password reset link to a user
 
         Args:
@@ -146,14 +146,13 @@ class Mailer(object):
 
         template_vars = {"link": link}
 
-        yield self.send_email(
+        await self.send_email(
             email_address,
             "[%s] Password Reset" % self.hs.config.server_name,
             template_vars,
         )
 
-    @defer.inlineCallbacks
-    def send_registration_mail(self, email_address, token, client_secret, sid):
+    async def send_registration_mail(self, email_address, token, client_secret, sid):
         """Send an email with a registration confirmation link to a user
 
         Args:
@@ -174,14 +173,13 @@ class Mailer(object):
 
         template_vars = {"link": link}
 
-        yield self.send_email(
+        await self.send_email(
             email_address,
             "[%s] Register your Email Address" % self.hs.config.server_name,
             template_vars,
         )
 
-    @defer.inlineCallbacks
-    def send_add_threepid_mail(self, email_address, token, client_secret, sid):
+    async def send_add_threepid_mail(self, email_address, token, client_secret, sid):
         """Send an email with a validation link to a user for adding a 3pid to their account
 
         Args:
@@ -203,20 +201,19 @@ class Mailer(object):
 
         template_vars = {"link": link}
 
-        yield self.send_email(
+        await self.send_email(
             email_address,
             "[%s] Validate Your Email" % self.hs.config.server_name,
             template_vars,
         )
 
-    @defer.inlineCallbacks
-    def send_notification_mail(
+    async def send_notification_mail(
         self, app_id, user_id, email_address, push_actions, reason
     ):
         """Send email regarding a user's room notifications"""
         rooms_in_order = deduped_ordered_list([pa["room_id"] for pa in push_actions])
 
-        notif_events = yield self.store.get_events(
+        notif_events = await self.store.get_events(
             [pa["event_id"] for pa in push_actions]
         )
 
@@ -229,7 +226,7 @@ class Mailer(object):
         state_by_room = {}
 
         try:
-            user_display_name = yield self.store.get_profile_displayname(
+            user_display_name = await self.store.get_profile_displayname(
                 UserID.from_string(user_id).localpart
             )
             if user_display_name is None:
@@ -237,14 +234,13 @@ class Mailer(object):
         except StoreError:
             user_display_name = user_id
 
-        @defer.inlineCallbacks
-        def _fetch_room_state(room_id):
-            room_state = yield self.store.get_current_state_ids(room_id)
+        async def _fetch_room_state(room_id):
+            room_state = await self.store.get_current_state_ids(room_id)
             state_by_room[room_id] = room_state
 
         # Run at most 3 of these at once: sync does 10 at a time but email
         # notifs are much less realtime than sync so we can afford to wait a bit.
-        yield concurrently_execute(_fetch_room_state, rooms_in_order, 3)
+        await concurrently_execute(_fetch_room_state, rooms_in_order, 3)
 
         # actually sort our so-called rooms_in_order list, most recent room first
         rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
@@ -252,19 +248,19 @@ class Mailer(object):
         rooms = []
 
         for r in rooms_in_order:
-            roomvars = yield self.get_room_vars(
+            roomvars = await self.get_room_vars(
                 r, user_id, notifs_by_room[r], notif_events, state_by_room[r]
             )
             rooms.append(roomvars)
 
-        reason["room_name"] = yield calculate_room_name(
+        reason["room_name"] = await calculate_room_name(
             self.store,
             state_by_room[reason["room_id"]],
             user_id,
             fallback_to_members=True,
         )
 
-        summary_text = yield self.make_summary_text(
+        summary_text = await self.make_summary_text(
             notifs_by_room, state_by_room, notif_events, user_id, reason
         )
 
@@ -279,12 +275,11 @@ class Mailer(object):
             "reason": reason,
         }
 
-        yield self.send_email(
+        await self.send_email(
             email_address, "[%s] %s" % (self.app_name, summary_text), template_vars
         )
 
-    @defer.inlineCallbacks
-    def send_email(self, email_address, subject, template_vars):
+    async def send_email(self, email_address, subject, template_vars):
         """Send an email with the given information and template text"""
         try:
             from_string = self.hs.config.email_notif_from % {"app": self.app_name}
@@ -314,7 +309,7 @@ class Mailer(object):
 
         logger.info("Sending email to %s" % email_address)
 
-        yield make_deferred_yieldable(
+        await make_deferred_yieldable(
             self.sendmail(
                 self.hs.config.email_smtp_host,
                 raw_from,
@@ -329,13 +324,14 @@ class Mailer(object):
             )
         )
 
-    @defer.inlineCallbacks
-    def get_room_vars(self, room_id, user_id, notifs, notif_events, room_state_ids):
+    async def get_room_vars(
+        self, room_id, user_id, notifs, notif_events, room_state_ids
+    ):
         my_member_event_id = room_state_ids[("m.room.member", user_id)]
-        my_member_event = yield self.store.get_event(my_member_event_id)
+        my_member_event = await self.store.get_event(my_member_event_id)
         is_invite = my_member_event.content["membership"] == "invite"
 
-        room_name = yield calculate_room_name(self.store, room_state_ids, user_id)
+        room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
         room_vars = {
             "title": room_name,
@@ -347,7 +343,7 @@ class Mailer(object):
 
         if not is_invite:
             for n in notifs:
-                notifvars = yield self.get_notif_vars(
+                notifvars = await self.get_notif_vars(
                     n, user_id, notif_events[n["event_id"]], room_state_ids
                 )
 
@@ -374,9 +370,8 @@ class Mailer(object):
 
         return room_vars
 
-    @defer.inlineCallbacks
-    def get_notif_vars(self, notif, user_id, notif_event, room_state_ids):
-        results = yield self.store.get_events_around(
+    async def get_notif_vars(self, notif, user_id, notif_event, room_state_ids):
+        results = await self.store.get_events_around(
             notif["room_id"],
             notif["event_id"],
             before_limit=CONTEXT_BEFORE,
@@ -389,25 +384,24 @@ class Mailer(object):
             "messages": [],
         }
 
-        the_events = yield filter_events_for_client(
+        the_events = await filter_events_for_client(
             self.storage, user_id, results["events_before"]
         )
         the_events.append(notif_event)
 
         for event in the_events:
-            messagevars = yield self.get_message_vars(notif, event, room_state_ids)
+            messagevars = await self.get_message_vars(notif, event, room_state_ids)
             if messagevars is not None:
                 ret["messages"].append(messagevars)
 
         return ret
 
-    @defer.inlineCallbacks
-    def get_message_vars(self, notif, event, room_state_ids):
+    async def get_message_vars(self, notif, event, room_state_ids):
         if event.type != EventTypes.Message:
             return
 
         sender_state_event_id = room_state_ids[("m.room.member", event.sender)]
-        sender_state_event = yield self.store.get_event(sender_state_event_id)
+        sender_state_event = await self.store.get_event(sender_state_event_id)
         sender_name = name_from_member_event(sender_state_event)
         sender_avatar_url = sender_state_event.content.get("avatar_url")
 
@@ -457,8 +451,7 @@ class Mailer(object):
 
         return messagevars
 
-    @defer.inlineCallbacks
-    def make_summary_text(
+    async def make_summary_text(
         self, notifs_by_room, room_state_ids, notif_events, user_id, reason
     ):
         if len(notifs_by_room) == 1:
@@ -468,17 +461,17 @@ class Mailer(object):
             # If the room has some kind of name, use it, but we don't
             # want the generated-from-names one here otherwise we'll
             # end up with, "new message from Bob in the Bob room"
-            room_name = yield calculate_room_name(
+            room_name = await calculate_room_name(
                 self.store, room_state_ids[room_id], user_id, fallback_to_members=False
             )
 
             my_member_event_id = room_state_ids[room_id][("m.room.member", user_id)]
-            my_member_event = yield self.store.get_event(my_member_event_id)
+            my_member_event = await self.store.get_event(my_member_event_id)
             if my_member_event.content["membership"] == "invite":
                 inviter_member_event_id = room_state_ids[room_id][
                     ("m.room.member", my_member_event.sender)
                 ]
-                inviter_member_event = yield self.store.get_event(
+                inviter_member_event = await self.store.get_event(
                     inviter_member_event_id
                 )
                 inviter_name = name_from_member_event(inviter_member_event)
@@ -503,7 +496,7 @@ class Mailer(object):
                     state_event_id = room_state_ids[room_id][
                         ("m.room.member", event.sender)
                     ]
-                    state_event = yield self.store.get_event(state_event_id)
+                    state_event = await self.store.get_event(state_event_id)
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
@@ -532,7 +525,7 @@ class Mailer(object):
                         }
                     )
 
-                    member_events = yield self.store.get_events(
+                    member_events = await self.store.get_events(
                         [
                             room_state_ids[room_id][("m.room.member", s)]
                             for s in sender_ids
@@ -564,7 +557,7 @@ class Mailer(object):
                     }
                 )
 
-                member_events = yield self.store.get_events(
+                member_events = await self.store.get_events(
                     [room_state_ids[room_id][("m.room.member", s)] for s in sender_ids]
                 )
 
@@ -638,10 +631,10 @@ def safe_text(raw_text):
     )
 
 
-def deduped_ordered_list(l):
+def deduped_ordered_list(it: Iterable[T]) -> List[T]:
     seen = set()
     ret = []
-    for item in l:
+    for item in it:
         if item not in seen:
             seen.add(item)
             ret.append(item)

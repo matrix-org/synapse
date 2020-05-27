@@ -14,11 +14,9 @@
 # limitations under the License.
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.types import UserID, create_requester
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +49,7 @@ class ServerNoticesManager(object):
         """
         return self._config.server_notices_mxid is not None
 
-    @defer.inlineCallbacks
-    def send_notice(
+    async def send_notice(
         self, user_id, event_content, type=EventTypes.Message, state_key=None
     ):
         """Send a notice to the given user
@@ -68,8 +65,8 @@ class ServerNoticesManager(object):
         Returns:
             Deferred[FrozenEvent]
         """
-        room_id = yield self.get_or_create_notice_room_for_user(user_id)
-        yield self.maybe_invite_user_to_room(user_id, room_id)
+        room_id = await self.get_or_create_notice_room_for_user(user_id)
+        await self.maybe_invite_user_to_room(user_id, room_id)
 
         system_mxid = self._config.server_notices_mxid
         requester = create_requester(system_mxid)
@@ -86,13 +83,13 @@ class ServerNoticesManager(object):
         if state_key is not None:
             event_dict["state_key"] = state_key
 
-        res = yield self._event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
             requester, event_dict, ratelimit=False
         )
-        return res
+        return event
 
-    @cachedInlineCallbacks()
-    def get_or_create_notice_room_for_user(self, user_id):
+    @cached()
+    async def get_or_create_notice_room_for_user(self, user_id):
         """Get the room for notices for a given user
 
         If we have not yet created a notice room for this user, create it, but don't
@@ -109,7 +106,7 @@ class ServerNoticesManager(object):
 
         assert self._is_mine_id(user_id), "Cannot send server notices to remote users"
 
-        rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
+        rooms = await self._store.get_rooms_for_local_user_where_membership_is(
             user_id, [Membership.INVITE, Membership.JOIN]
         )
         for room in rooms:
@@ -118,7 +115,7 @@ class ServerNoticesManager(object):
             # be joined. This is kinda deliberate, in that if somebody somehow
             # manages to invite the system user to a room, that doesn't make it
             # the server notices room.
-            user_ids = yield self._store.get_users_in_room(room.room_id)
+            user_ids = await self._store.get_users_in_room(room.room_id)
             if self.server_notices_mxid in user_ids:
                 # we found a room which our user shares with the system notice
                 # user
@@ -146,7 +143,7 @@ class ServerNoticesManager(object):
             }
 
         requester = create_requester(self.server_notices_mxid)
-        info = yield self._room_creation_handler.create_room(
+        info, _ = await self._room_creation_handler.create_room(
             requester,
             config={
                 "preset": RoomCreationPreset.PRIVATE_CHAT,
@@ -158,7 +155,7 @@ class ServerNoticesManager(object):
         )
         room_id = info["room_id"]
 
-        max_id = yield self._store.add_tag_to_room(
+        max_id = await self._store.add_tag_to_room(
             user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
         )
         self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
@@ -166,8 +163,7 @@ class ServerNoticesManager(object):
         logger.info("Created server notices room %s for %s", room_id, user_id)
         return room_id
 
-    @defer.inlineCallbacks
-    def maybe_invite_user_to_room(self, user_id: str, room_id: str):
+    async def maybe_invite_user_to_room(self, user_id: str, room_id: str):
         """Invite the given user to the given server room, unless the user has already
         joined or been invited to it.
 
@@ -179,14 +175,14 @@ class ServerNoticesManager(object):
 
         # Check whether the user has already joined or been invited to this room. If
         # that's the case, there is no need to re-invite them.
-        joined_rooms = yield self._store.get_rooms_for_local_user_where_membership_is(
+        joined_rooms = await self._store.get_rooms_for_local_user_where_membership_is(
             user_id, [Membership.INVITE, Membership.JOIN]
         )
         for room in joined_rooms:
             if room.room_id == room_id:
                 return
 
-        yield self._room_member_handler.update_membership(
+        await self._room_member_handler.update_membership(
             requester=requester,
             target=UserID.from_string(user_id),
             room_id=room_id,

@@ -26,6 +26,7 @@ from synapse.http.servlet import (
 )
 from synapse.rest.admin._base import (
     admin_patterns,
+    assert_requester_is_admin,
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
@@ -58,6 +59,7 @@ class ShutdownRoomRestServlet(RestServlet):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        self._replication = hs.get_replication_data_handler()
 
     async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
@@ -72,7 +74,7 @@ class ShutdownRoomRestServlet(RestServlet):
         message = content.get("message", self.DEFAULT_MESSAGE)
         room_name = content.get("room_name", "Content Violation Notification")
 
-        info = await self._room_creation_handler.create_room(
+        info, stream_id = await self._room_creation_handler.create_room(
             room_creator_requester,
             config={
                 "preset": "public_chat",
@@ -93,6 +95,15 @@ class ShutdownRoomRestServlet(RestServlet):
         # desirable in case the first attempt at blocking the room failed below.
         await self.store.block_room(room_id, requester_user_id)
 
+        # We now wait for the create room to come back in via replication so
+        # that we can assume that all the joins/invites have propogated before
+        # we try and auto join below.
+        #
+        # TODO: Currently the events stream is written to from master
+        await self._replication.wait_for_stream_position(
+            self.hs.config.worker.writers.events, "events", stream_id
+        )
+
         users = await self.state.get_current_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
@@ -104,7 +115,7 @@ class ShutdownRoomRestServlet(RestServlet):
 
             try:
                 target_requester = create_requester(user_id)
-                await self.room_member_handler.update_membership(
+                _, stream_id = await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,
                     room_id=room_id,
@@ -112,6 +123,11 @@ class ShutdownRoomRestServlet(RestServlet):
                     content={},
                     ratelimit=False,
                     require_consent=False,
+                )
+
+                # Wait for leave to come in over replication before trying to forget.
+                await self._replication.wait_for_stream_position(
+                    self.hs.config.worker.writers.events, "events", stream_id
                 )
 
                 await self.room_member_handler.forget(target_requester.user, room_id)
@@ -169,7 +185,7 @@ class ListRoomRestServlet(RestServlet):
     in a dictionary containing room information. Supports pagination.
     """
 
-    PATTERNS = admin_patterns("/rooms")
+    PATTERNS = admin_patterns("/rooms$")
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
@@ -251,6 +267,29 @@ class ListRoomRestServlet(RestServlet):
                 response["prev_batch"] = 0
 
         return 200, response
+
+
+class RoomRestServlet(RestServlet):
+    """Get room details.
+
+    TODO: Add on_POST to allow room creation without joining the room
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, room_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        ret = await self.store.get_room_with_stats(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        return 200, ret
 
 
 class JoinRoomAliasServlet(RestServlet):

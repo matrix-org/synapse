@@ -15,19 +15,14 @@
 from mock import Mock
 
 from synapse.handlers.typing import RoomMember
-from synapse.replication.http import streams
 from synapse.replication.tcp.streams import TypingStream
 
-from tests.replication.tcp.streams._base import BaseStreamTestCase
+from tests.replication._base import BaseStreamTestCase
 
 USER_ID = "@feeling:blue"
 
 
 class TypingStreamTestCase(BaseStreamTestCase):
-    servlets = [
-        streams.register_servlets,
-    ]
-
     def _build_replication_data_handler(self):
         return Mock(wraps=super()._build_replication_data_handler())
 
@@ -38,9 +33,6 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
         self.reconnect()
 
-        # make the client subscribe to the typing stream
-        self.test_handler.stream_positions.update({"typing": 0})
-
         typing._push_update(member=RoomMember(room_id, USER_ID), typing=True)
 
         self.reactor.advance(0)
@@ -50,7 +42,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assert_request_is_get_repl_stream_updates(request, "typing")
 
         self.test_handler.on_rdata.assert_called_once()
-        stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
@@ -77,7 +69,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual(int(request.args[b"from_token"][0]), token)
 
         self.test_handler.on_rdata.assert_called_once()
-        stream_name, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]

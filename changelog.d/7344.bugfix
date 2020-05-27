@@ -1,1 +1,0 @@
-Fix incorrect metrics reporting for `renew_attestations` background task.

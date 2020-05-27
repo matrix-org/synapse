@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SSO error</title>
+</head>
+<body>
+    <p>Oops! Something went wrong during authentication.</p>
+    <p>
+        Try logging in again from your Matrix client and if the problem persists
+        please contact the server's administrator.
+    </p>
+    <p>Error: <code>{{ error }}</code></p>
+    {% if error_description %}
+    <pre><code>{{ error_description }}</code></pre>
+    {% endif %}
+</body>
+</html>

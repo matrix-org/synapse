@@ -15,11 +15,10 @@
 # limitations under the License.
 import datetime
 import logging
-from typing import Dict, Hashable, Iterable, List, Tuple
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Tuple
 
 from prometheus_client import Counter
 
-import synapse.server
 from synapse.api.errors import (
     FederationDeniedError,
     HttpResponseException,
@@ -33,6 +32,9 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.presence import UserPresenceState
 from synapse.types import ReadReceipt
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
+
+if TYPE_CHECKING:
+    import synapse.server
 
 # This is defined in the Matrix spec and enforced by the receiver.
 MAX_EDUS_PER_TRANSACTION = 100
@@ -78,6 +80,9 @@ class PerDestinationQueue(object):
 
         # a list of tuples of (pending pdu, order)
         self._pending_pdus = []  # type: List[Tuple[EventBase, int]]
+
+        # XXX this is never actually used: see
+        # https://github.com/matrix-org/synapse/issues/7549
         self._pending_edus = []  # type: List[Edu]
 
         # Pending EDUs by their "key". Keyed EDUs are EDUs that get clobbered
