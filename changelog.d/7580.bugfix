@@ -1,0 +1,1 @@
+Fix specifying individual cache factors for caches with special characters in their name. Regression in v1.14.0rc1.

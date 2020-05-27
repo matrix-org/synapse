@@ -14,13 +14,17 @@
 # limitations under the License.
 
 import os
+import re
 from typing import Callable, Dict
 
 from ._base import Config, ConfigError
 
 # The prefix for all cache factor-related environment variables
-_CACHES = {}
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
+
+# Map from canonicalised cache name to cache.
+_CACHES = {}
+
 _DEFAULT_FACTOR_SIZE = 0.5
 _DEFAULT_EVENT_CACHE_SIZE = "10K"
 
@@ -37,6 +41,20 @@ class CacheProperties(object):
 properties = CacheProperties()
 
 
+def _canonicalise_cache_name(cache_name: str) -> str:
+    """Gets the canonical form of the cache name.
+
+    Since we specify cache names in config and environment variables we need to
+    ignore case and special characters. For example, some caches have asterisks
+    in their name to donate that they're not attached to a particular database
+    function, and these asterisks need to be stripped out
+    """
+
+    cache_name = re.sub(r"[^A-Za-z_1-9]", "", cache_name)
+
+    return cache_name.lower()
+
+
 def add_resizable_cache(cache_name: str, cache_resize_callback: Callable):
     """Register a cache that's size can dynamically change
 
@@ -45,7 +63,10 @@ def add_resizable_cache(cache_name: str, cache_resize_callback: Callable):
         cache_resize_callback: A callback function that will be ran whenever
             the cache needs to be resized
     """
-    _CACHES[cache_name.lower()] = cache_resize_callback
+    # Some caches have '*' in them which we strip out.
+    cache_name = _canonicalise_cache_name(cache_name)
+
+    _CACHES[cache_name] = cache_resize_callback
 
     # Ensure all loaded caches are sized appropriately
     #
@@ -105,6 +126,12 @@ class CacheConfig(Config):
            # takes priority over setting through the config file.
            # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
            #
+           # Some caches have '*' and other characters that are not
+           # alphanumeric or underscores. These caches can be named with or
+           # without the special characters stripped. For example, to specify
+           # the cache factor for `*stateGroupCache*` via an environment
+           # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2`.
+           #
            per_cache_factors:
              #get_users_who_share_room_with_user: 2.0
         """
@@ -130,10 +157,17 @@ class CacheConfig(Config):
         if not isinstance(individual_factors, dict):
             raise ConfigError("caches.per_cache_factors must be a dictionary")
 
+        # Canonicalise the cache names *before* updating with the environment
+        # variables.
+        individual_factors = {
+            _canonicalise_cache_name(key): val
+            for key, val in individual_factors.items()
+        }
+
         # Override factors from environment if necessary
         individual_factors.update(
             {
-                key[len(_CACHE_PREFIX) + 1 :].lower(): float(val)
+                _canonicalise_cache_name(key[len(_CACHE_PREFIX) + 1 :]): float(val)
                 for key, val in self._environ.items()
                 if key.startswith(_CACHE_PREFIX + "_")
             }
@@ -142,9 +176,9 @@ class CacheConfig(Config):
         for cache, factor in individual_factors.items():
             if not isinstance(factor, (int, float)):
                 raise ConfigError(
-                    "caches.per_cache_factors.%s must be a number" % (cache.lower(),)
+                    "caches.per_cache_factors.%s must be a number" % (cache,)
                 )
-            self.cache_factors[cache.lower()] = factor
+            self.cache_factors[cache] = factor
 
         # Resize all caches (if necessary) with the new factors we've loaded
         self.resize_all_caches()
