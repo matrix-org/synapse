@@ -1,1 +1,0 @@
-Fix cache config to not apply cache factor to event cache. Regression in v1.14.0rc1.
