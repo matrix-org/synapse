@@ -12,7 +12,7 @@ Bugfixes
 Improved Documentation
 ----------------------
 
-- Fix OIDC client_auth_method commented out value in sample config. ([\#7581](https://github.com/matrix-org/synapse/issues/7581))
+- Fix the OIDC `client_auth_method` value in the sample config. ([\#7581](https://github.com/matrix-org/synapse/issues/7581))
 
 
 Synapse 1.14.0rc1 (2020-05-26)
