@@ -125,3 +125,19 @@ class CacheConfigTests(TestCase):
         cache = LruCache(100)
         add_resizable_cache("foo", cache_resize_callback=cache.set_cache_factor)
         self.assertEqual(cache.max_size, 150)
+
+    def test_apply_cache_factor_from_config(self):
+        """Caches can disable applying cache factor updates, mainly used by
+        event cache size.
+        """
+
+        config = {"caches": {"event_cache_size": "10k"}}
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cache = LruCache(
+            max_size=t.caches.event_cache_size, apply_cache_factor_from_config=False,
+        )
+        add_resizable_cache("event_cache", cache_resize_callback=cache.set_cache_factor)
+
+        self.assertEqual(cache.max_size, 10240)

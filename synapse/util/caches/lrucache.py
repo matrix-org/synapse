@@ -81,6 +81,7 @@ class LruCache(object):
         """
         cache = cache_type()
         self.cache = cache  # Used for introspection.
+        self.apply_cache_factor_from_config = apply_cache_factor_from_config
 
         # Save the original max size, and apply the default size factor.
         self._original_max_size = max_size
