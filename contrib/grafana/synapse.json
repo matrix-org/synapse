@@ -89,7 +89,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(process_cpu_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+          "expr": "rate(process_cpu_seconds_total{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{job}}-{{index}} ",
@@ -193,7 +193,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(rate(synapse_storage_events_persisted_events{instance=\"$instance\"}[$bucket_size])) without (job,index)",
+          "expr": "sum(rate(synapse_storage_events_persisted_events{instance=~\"$instance\"}[$bucket_size])) without (job,index)",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "",
@@ -273,7 +273,7 @@
       "reverseYBuckets": false,
       "targets": [
         {
-          "expr": "sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\"}[$bucket_size])) by (le)",
+          "expr": "sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\"}[$bucket_size])) by (le)",
           "format": "heatmap",
           "intervalFactor": 1,
           "legendFormat": "{{le}}",
@@ -354,7 +354,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
+          "expr": "histogram_quantile(0.99, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -362,28 +362,28 @@
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
+          "expr": "histogram_quantile(0.95, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "95%",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.90, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
+          "expr": "histogram_quantile(0.90, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "90%",
           "refId": "C"
         },
         {
-          "expr": "histogram_quantile(0.50, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
+          "expr": "histogram_quantile(0.50, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "50%",
           "refId": "D"
         },
         {
-          "expr": "sum(rate(synapse_http_server_response_time_seconds_sum{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method) / sum(rate(synapse_http_server_response_time_seconds_count{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method)",
+          "expr": "sum(rate(synapse_http_server_response_time_seconds_sum{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method) / sum(rate(synapse_http_server_response_time_seconds_count{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\"}[$bucket_size])) without (job, index, method)",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "mean",
@@ -480,7 +480,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "expr": "histogram_quantile(0.99, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -488,28 +488,28 @@
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "expr": "histogram_quantile(0.95, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{job}}-{{index}} 95%",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.90, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "expr": "histogram_quantile(0.90, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{job}}-{{index}} 90%",
           "refId": "C"
         },
         {
-          "expr": "histogram_quantile(0.50, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
+          "expr": "histogram_quantile(0.50, sum(rate(synapse_http_server_response_time_seconds_bucket{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{job}}-{{index}} 50%",
           "refId": "D"
         },
         {
-          "expr": "sum(rate(synapse_http_server_response_time_seconds_sum{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method) / sum(rate(synapse_http_server_response_time_seconds_count{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method)",
+          "expr": "sum(rate(synapse_http_server_response_time_seconds_sum{servlet='RoomSendEventRestServlet',instance=~\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method) / sum(rate(synapse_http_server_response_time_seconds_count{servlet='RoomSendEventRestServlet',instance=\"$instance\",code=~\"2..\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (method)",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{job}}-{{index}} mean",
@@ -620,7 +620,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(process_cpu_system_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(process_cpu_system_seconds_total{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} system ",
@@ -629,7 +629,7 @@
               "step": 20
             },
             {
-              "expr": "rate(process_cpu_user_seconds_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(process_cpu_user_seconds_total{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -742,7 +742,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "process_open_fds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "process_open_fds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 2,
@@ -751,7 +751,7 @@
               "step": 20
             },
             {
-              "expr": "process_max_fds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "process_max_fds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "hide": true,
               "intervalFactor": 2,
@@ -842,7 +842,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "process_resident_memory_bytes{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "process_resident_memory_bytes{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}} {{index}}",
@@ -929,7 +929,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]))",
+              "expr": "histogram_quantile(0.99, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=~\"$instance\",job=~\"$job\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -938,14 +938,14 @@
               "step": 20
             },
             {
-              "expr": "histogram_quantile(0.95, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]))",
+              "expr": "histogram_quantile(0.95, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=~\"$instance\",job=~\"$job\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} 95%",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.90, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]))",
+              "expr": "histogram_quantile(0.90, rate(python_twisted_reactor_tick_time_bucket{index=~\"$index\",instance=~\"$instance\",job=~\"$job\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} 90%",
@@ -1037,7 +1037,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_twisted_reactor_tick_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_twisted_reactor_tick_time_count[$bucket_size])",
+              "expr": "rate(python_twisted_reactor_tick_time_sum{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_twisted_reactor_tick_time_count[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -1131,7 +1131,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "scrape_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "scrape_duration_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -1220,7 +1220,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "min_over_time(up{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "min_over_time(up{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}}",
@@ -1305,7 +1305,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "instant": false,
               "intervalFactor": 1,
@@ -1313,7 +1313,7 @@
               "refId": "A"
             },
             {
-              "expr": "rate(synapse_background_process_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_background_process_ru_utime_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -1426,7 +1426,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_storage_events_persisted_by_source_type{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_storage_events_persisted_by_source_type{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{type}}",
@@ -1512,7 +1512,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_storage_events_persisted_by_event_type{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_storage_events_persisted_by_event_type{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "instant": false,
               "intervalFactor": 2,
@@ -1605,7 +1605,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_storage_events_persisted_by_origin{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_storage_events_persisted_by_origin{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{origin_entity}} ({{origin_type}})",
@@ -1695,7 +1695,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(rate(synapse_storage_events_persisted_events_sep{job=~\"$job\",index=~\"$index\", type=\"m.room.member\",instance=\"$instance\", origin_type=\"local\"}[$bucket_size])) by (origin_type, origin_entity)",
+              "expr": "sum(rate(synapse_storage_events_persisted_events_sep{job=~\"$job\",index=~\"$index\", type=\"m.room.member\",instance=~\"$instance\", origin_type=\"local\"}[$bucket_size])) by (origin_type, origin_entity)",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{origin_entity}} ({{origin_type}})",
@@ -1806,7 +1806,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_requests_received{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -1910,7 +1910,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",index=~\"$index\",method!=\"OPTIONS\"}[$bucket_size]) and topk(10,synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",method!=\"OPTIONS\"})",
+              "expr": "rate(synapse_http_server_requests_received{instance=~\"$instance\",job=~\"$job\",index=~\"$index\",method!=\"OPTIONS\"}[$bucket_size]) and topk(10,synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",method!=\"OPTIONS\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{method}} {{servlet}} {{job}}-{{index}}",
@@ -2004,7 +2004,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2115,7 +2115,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "(rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) / rate(synapse_http_server_response_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "(rate(synapse_http_server_response_ru_utime_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) / rate(synapse_http_server_response_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -2222,7 +2222,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_response_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_response_db_txn_duration_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -2316,7 +2316,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "(sum(rate(synapse_http_server_response_time_seconds_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))/(sum(rate(synapse_http_server_response_time_seconds_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))",
+              "expr": "(sum(rate(synapse_http_server_response_time_seconds_sum{instance=~\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))/(sum(rate(synapse_http_server_response_time_seconds_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\",tag!=\"incremental_sync\"}[$bucket_size])) without (code))",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -2403,7 +2403,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "topk(10,synapse_http_server_in_flight_requests_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"})",
+              "expr": "topk(10,synapse_http_server_in_flight_requests_count{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"})",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2507,7 +2507,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_background_process_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_background_process_ru_utime_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2595,7 +2595,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_background_process_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) +  rate(synapse_background_process_db_sched_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_background_process_db_txn_duration_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) +  rate(synapse_background_process_db_sched_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -2707,14 +2707,14 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(rate(synapse_federation_client_sent_transactions{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_client_sent_transactions{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "successful txn rate",
               "refId": "A"
             },
             {
-              "expr": "sum(rate(synapse_util_metrics_block_count{block_name=\"_send_new_transaction\",instance=\"$instance\"}[$bucket_size]) - ignoring (block_name) rate(synapse_federation_client_sent_transactions{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_util_metrics_block_count{block_name=\"_send_new_transaction\",instance=~\"$instance\"}[$bucket_size]) - ignoring (block_name) rate(synapse_federation_client_sent_transactions{instance=\"$instance\"}[$bucket_size]))",
               "legendFormat": "failed txn rate",
               "refId": "B"
             }
@@ -2899,7 +2899,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations:total{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_client_sent_pdu_destinations:total{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2907,7 +2907,7 @@
               "refId": "A"
             },
             {
-              "expr": "sum(rate(synapse_federation_client_sent_edus{instance=\"$instance\"}[$bucket_size]))",
+              "expr": "sum(rate(synapse_federation_client_sent_edus{instance=~\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "edus",
@@ -2997,7 +2997,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_federation_client_sent_edus_by_type{instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_federation_client_sent_edus_by_type{instance=~\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3104,7 +3104,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_httppusher_http_pushes_processed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
+              "expr": "rate(synapse_http_httppusher_http_pushes_processed{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -3113,7 +3113,7 @@
               "step": 20
             },
             {
-              "expr": "rate(synapse_http_httppusher_http_pushes_failed{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
+              "expr": "rate(synapse_http_httppusher_http_pushes_failed{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) and on (instance, job, index) (synapse_http_httppusher_http_pushes_failed + synapse_http_httppusher_http_pushes_processed) > 0",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "failed {{job}}",
@@ -3205,7 +3205,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "topk(10,synapse_pushers{job=~\"$job\",index=~\"$index\", instance=\"$instance\"})",
+              "expr": "topk(10,synapse_pushers{job=~\"$job\",index=~\"$index\", instance=~\"$instance\"})",
               "legendFormat": "{{kind}} {{app_id}}",
               "refId": "A"
             }
@@ -3306,7 +3306,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_storage_schedule_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_schedule_time_count[$bucket_size])",
+              "expr": "rate(synapse_storage_schedule_time_sum{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_schedule_time_count[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}}",
@@ -3397,7 +3397,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.99, rate(synapse_storage_schedule_time_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_schedule_time_bucket{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -3406,21 +3406,21 @@
               "step": 20
             },
             {
-              "expr": "histogram_quantile(0.95, rate(synapse_storage_schedule_time_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "histogram_quantile(0.95, rate(synapse_storage_schedule_time_bucket{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}} {{index}} 95%",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.90, rate(synapse_storage_schedule_time_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_schedule_time_bucket{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}} {{index}} 90%",
               "refId": "C"
             },
             {
-              "expr": "rate(synapse_storage_schedule_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_schedule_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_storage_schedule_time_sum{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(synapse_storage_schedule_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -3514,7 +3514,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "topk(10, rate(synapse_storage_transaction_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
+              "expr": "topk(10, rate(synapse_storage_transaction_time_count{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -3606,7 +3606,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_storage_transaction_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_storage_transaction_time_sum{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "instant": false,
               "interval": "",
@@ -3717,7 +3717,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_metrics_block_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_ru_utime_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -3811,7 +3811,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "(rate(synapse_util_metrics_block_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds[$bucket_size])) / rate(synapse_util_metrics_block_count[$bucket_size])",
+              "expr": "(rate(synapse_util_metrics_block_ru_utime_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) + rate(synapse_util_metrics_block_ru_stime_seconds[$bucket_size])) / rate(synapse_util_metrics_block_count[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -3905,7 +3905,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -3999,7 +3999,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -4089,7 +4089,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_db_txn_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -4179,7 +4179,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_metrics_block_time_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_count[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_time_seconds{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]) / rate(synapse_util_metrics_block_count[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -4287,7 +4287,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_caches_cache:hits{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])/rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache:hits{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}[$bucket_size])/rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{name}} {{job}}-{{index}}",
@@ -4379,7 +4379,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "synapse_util_caches_cache:size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "synapse_util_caches_cache:size{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -4470,7 +4470,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache:total{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -4556,7 +4556,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "topk(10, rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache:hits{job=\"$job\",instance=\"$instance\"}[$bucket_size]))",
+              "expr": "topk(10, rate(synapse_util_caches_cache:total{job=\"$job\",index=~\"$index\",instance=~\"$instance\"}[$bucket_size]) - rate(synapse_util_caches_cache:hits{job=\"$job\",instance=\"$instance\"}[$bucket_size]))",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{name}} {{job}}-{{index}}",
@@ -4643,7 +4643,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_caches_cache:evicted_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_util_caches_cache:evicted_size{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{name}} {{job}}-{{index}}",
@@ -4745,7 +4745,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_gc_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[10m])",
+              "expr": "rate(python_gc_time_sum{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[10m])",
               "format": "time_series",
               "instant": false,
               "intervalFactor": 1,
@@ -4837,7 +4837,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_gc_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_gc_time_count[$bucket_size])",
+              "expr": "rate(python_gc_time_sum{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_gc_time_count[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}} {{index}} gen {{gen}} ",
@@ -4930,7 +4930,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "python_gc_counts{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "expr": "python_gc_counts{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} gen {{gen}}",
@@ -5016,7 +5016,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_gc_unreachable_total{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_gc_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(python_gc_unreachable_total{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_gc_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} gen {{gen}}",
@@ -5101,7 +5101,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_gc_time_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(python_gc_time_count{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} gen {{gen}}",
@@ -5268,7 +5268,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_replication_tcp_resource_user_sync{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_resource_user_sync{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "user started/stopped syncing",
@@ -5276,7 +5276,7 @@
               "step": 20
             },
             {
-              "expr": "rate(synapse_replication_tcp_resource_federation_ack{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_resource_federation_ack{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "federation ack",
@@ -5284,7 +5284,7 @@
               "step": 20
             },
             {
-              "expr": "rate(synapse_replication_tcp_resource_remove_pusher{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_resource_remove_pusher{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "remove pusher",
@@ -5292,7 +5292,7 @@
               "step": 20
             },
             {
-              "expr": "rate(synapse_replication_tcp_resource_invalidate_cache{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_resource_invalidate_cache{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "invalidate cache",
@@ -5300,7 +5300,7 @@
               "step": 20
             },
             {
-              "expr": "rate(synapse_replication_tcp_resource_user_ip_cache{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_resource_user_ip_cache{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "user ip cache",
@@ -5388,7 +5388,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_replication_tcp_resource_stream_updates{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_resource_stream_updates{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -5477,7 +5477,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum (rate(synapse_replication_tcp_protocol_inbound_commands{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
+              "expr": "sum (rate(synapse_replication_tcp_protocol_inbound_commands{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}} {{command}}",
@@ -5565,7 +5565,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "sum (rate(synapse_replication_tcp_protocol_outbound_commands{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
+              "expr": "sum (rate(synapse_replication_tcp_protocol_outbound_commands{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) without (name, conn_id)",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}} {{command}}",
@@ -5653,7 +5653,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "synapse_replication_tcp_resource_connections_per_stream{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "expr": "synapse_replication_tcp_resource_connections_per_stream{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} {{stream_name}}",
@@ -5740,7 +5740,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_replication_tcp_protocol_close_reason{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "expr": "rate(synapse_replication_tcp_protocol_close_reason{job=~\"$job\",index=~\"$index\",instance=~\"$instance\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} {{reason_type}}",
@@ -5846,7 +5846,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": " synapse_event_persisted_position{instance=\"$instance\",job=\"synapse\"}  - ignoring(index, job, name) group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": " synapse_event_persisted_position{instance=~\"$instance\",job=\"synapse\"}  - ignoring(index, job, name) group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -5937,7 +5937,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "time()*1000-synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "time()*1000-synapse_event_processing_last_ts{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 1,
@@ -6029,7 +6029,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "deriv(synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/1000 - 1",
+              "expr": "deriv(synapse_event_processing_last_ts{instance=~\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/1000 - 1",
               "format": "time_series",
               "hide": false,
               "interval": "",
@@ -6130,7 +6130,7 @@
           "reverseYBuckets": false,
           "targets": [
             {
-              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "synapse_forward_extremities_bucket{instance=~\"$instance\"} and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
               "format": "heatmap",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
@@ -6203,7 +6203,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "synapse_forward_extremities_bucket{instance=\"$instance\"} > 0",
+              "expr": "synapse_forward_extremities_bucket{instance=~\"$instance\"} > 0",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -6287,7 +6287,7 @@
           "reverseYBuckets": false,
           "targets": [
             {
-              "expr": "rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
               "format": "heatmap",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
@@ -6359,28 +6359,28 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "50%",
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "75%",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "90%",
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "99%",
@@ -6462,7 +6462,7 @@
           "reverseYBuckets": false,
           "targets": [
             {
-              "expr": "rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
               "format": "heatmap",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
@@ -6534,28 +6534,28 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.5, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "50%",
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.75, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "75%",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.90, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "90%",
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.99, rate(synapse_storage_events_stale_forward_extremities_persisted_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "99%",
@@ -6637,7 +6637,7 @@
           "reverseYBuckets": false,
           "targets": [
             {
-              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
               "format": "heatmap",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
@@ -6710,28 +6710,28 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)) ",
+              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)) ",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "50%",
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "75%",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "90%",
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=~\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
               "format": "time_series",
               "intervalFactor": 1,
               "legendFormat": "99%",
@@ -6878,9 +6878,9 @@
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": null,
-        "multi": false,
+        "multi": true,
         "name": "instance",
         "options": [],
         "query": "label_values(synapse_util_metrics_block_ru_utime_seconds, instance)",
