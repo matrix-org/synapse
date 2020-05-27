@@ -1,0 +1,1 @@
+Fix bug where `ReplicationStreamer` was not always started when replication was enabled. Bug introduced in v1.14.0rc1.
