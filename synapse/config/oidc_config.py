@@ -112,7 +112,7 @@ class OIDCConfig(Config):
             # auth method to use when exchanging the token.
             # Valid values are "client_secret_basic" (default), "client_secret_post" and "none".
             #
-            #client_auth_method: "client_auth_basic"
+            #client_auth_method: "client_secret_basic"
 
             # list of scopes to ask. This should include the "openid" scope. Defaults to ["openid"].
             #
