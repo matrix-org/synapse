@@ -1,3 +1,20 @@
+Synapse 1.14.0rc2 (2020-05-27)
+==============================
+
+Bugfixes
+--------
+
+- Fix cache config to not apply cache factor to event cache. Regression in v1.14.0rc1. ([\#7578](https://github.com/matrix-org/synapse/issues/7578))
+- Fix bug where `ReplicationStreamer` was not always started when replication was enabled. Bug introduced in v1.14.0rc1. ([\#7579](https://github.com/matrix-org/synapse/issues/7579))
+- Fix specifying individual cache factors for caches with special characters in their name. Regression in v1.14.0rc1. ([\#7580](https://github.com/matrix-org/synapse/issues/7580))
+
+
+Improved Documentation
+----------------------
+
+- Fix OIDC client_auth_method commented out value in sample config. ([\#7581](https://github.com/matrix-org/synapse/issues/7581))
+
+
 Synapse 1.14.0rc1 (2020-05-26)
 ==============================
 
