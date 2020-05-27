@@ -116,8 +116,6 @@ class ReplicationCommandHandler:
         # batching works.
         self._pending_batches = {}  # type: Dict[str, List[Any]]
 
-        self._queued_events = {}  # type: Dict[str, List[Any]]
-
         # The factory used to create connections.
         self._factory = None  # type: Optional[ReconnectingClientFactory]
 
