@@ -159,6 +159,9 @@ class ReplicationCommandHandler:
                 hs.config.redis_port,
             )
 
+            # First let's ensure that we have a ReplicationStreamer started.
+            hs.get_replication_streamer()
+
             # We need two connections to redis, one for the subscription stream and
             # one to send commands to (as you can't send further redis commands to a
             # connection after SUBSCRIBE is called).
