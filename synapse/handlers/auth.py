@@ -108,7 +108,11 @@ class AuthHandler(BaseHandler):
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
-        self._failed_uia_attempts_ratelimiter = Ratelimiter()
+        # XXX: Should this be hs.get_login_failed_attempts_ratelimiter?
+        self._failed_uia_attempts_ratelimiter = Ratelimiter(
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+        )
 
         self._clock = self.hs.get_clock()
 
@@ -199,8 +203,6 @@ class AuthHandler(BaseHandler):
         self._failed_uia_attempts_ratelimiter.ratelimit(
             user_id,
             time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
             update=False,
         )
 
@@ -216,8 +218,6 @@ class AuthHandler(BaseHandler):
             self._failed_uia_attempts_ratelimiter.can_do_action(
                 user_id,
                 time_now_s=self._clock.time(),
-                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
                 update=True,
             )
             raise

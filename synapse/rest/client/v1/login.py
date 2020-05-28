@@ -89,9 +89,8 @@ class LoginRestServlet(RestServlet):
         self.handlers = hs.get_handlers()
         self._clock = hs.get_clock()
         self._well_known_builder = WellKnownBuilder(hs)
-        self._address_ratelimiter = Ratelimiter()
-        self._account_ratelimiter = Ratelimiter()
-        self._failed_attempts_ratelimiter = Ratelimiter()
+        self._account_ratelimiter = hs.get_login_ratelimiter()
+        self._failed_attempts_ratelimiter = hs.get_login_failed_attempts_ratelimiter()
 
     def on_GET(self, request):
         flows = []
@@ -129,11 +128,9 @@ class LoginRestServlet(RestServlet):
         return 200, {}
 
     async def on_POST(self, request):
-        self._address_ratelimiter.ratelimit(
+        self._account_ratelimiter.ratelimit(
             request.getClientIP(),
             time_now_s=self.hs.clock.time(),
-            rate_hz=self.hs.config.rc_login_address.per_second,
-            burst_count=self.hs.config.rc_login_address.burst_count,
             update=True,
         )
 
@@ -206,8 +203,6 @@ class LoginRestServlet(RestServlet):
             self._failed_attempts_ratelimiter.ratelimit(
                 (medium, address),
                 time_now_s=self._clock.time(),
-                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
                 update=False,
             )
 
@@ -246,8 +241,6 @@ class LoginRestServlet(RestServlet):
                 self._failed_attempts_ratelimiter.can_do_action(
                     (medium, address),
                     time_now_s=self._clock.time(),
-                    rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                    burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
                     update=True,
                 )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
@@ -270,8 +263,6 @@ class LoginRestServlet(RestServlet):
         self._failed_attempts_ratelimiter.ratelimit(
             qualified_user_id.lower(),
             time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
             update=False,
         )
 
@@ -287,8 +278,6 @@ class LoginRestServlet(RestServlet):
             self._failed_attempts_ratelimiter.can_do_action(
                 qualified_user_id.lower(),
                 time_now_s=self._clock.time(),
-                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
                 update=True,
             )
             raise
@@ -326,8 +315,6 @@ class LoginRestServlet(RestServlet):
         self._account_ratelimiter.ratelimit(
             user_id.lower(),
             time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_account.per_second,
-            burst_count=self.hs.config.rc_login_account.burst_count,
             update=True,
         )
 
