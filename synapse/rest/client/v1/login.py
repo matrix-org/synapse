@@ -43,6 +43,12 @@ def login_submission_legacy_convert(submission):
         del submission["user"]
 
     if "medium" in submission and "address" in submission:
+        # "email" is the only accepted medium type
+        if submission["medium"] != "email":
+            raise SynapseError(
+                400, "'medium' parameter must be 'email'", errcode=Codes.INVALID_PARAM
+            )
+
         submission["identifier"] = {
             "type": "m.id.thirdparty",
             "medium": submission["medium"],
