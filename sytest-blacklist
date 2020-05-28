@@ -37,6 +37,11 @@ Inbound federation of state requires event_id as a mandatory paramater
 # Blacklisted until https://github.com/matrix-org/synapse/pull/6486 lands
 Can upload self-signing keys
 
+# Blacklisted due to https://github.com/matrix-org/synapse-dinsic/issues/43
+Inviting an AS-hosted user asks the AS server
+Accesing an AS-hosted room alias asks the AS server
+Events in rooms with AS-hosted room aliases are sent to AS server
+
 # flaky test
 If remote user leaves room we no longer receive device updates
 
