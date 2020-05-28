@@ -588,24 +588,23 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    @defer.inlineCallbacks
-    def invite_to_group(self, group_id, user_id, requester_user_id, content):
+    async def invite_to_group(self, group_id, user_id, requester_user_id, content):
         """Invite user to group
         """
 
-        group = yield self.check_group_is_ours(
+        group = await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
 
         # TODO: Check if user knocked
 
-        invited_users = yield self.store.get_invited_users_in_group(group_id)
+        invited_users = await self.store.get_invited_users_in_group(group_id)
         if user_id in invited_users:
             raise SynapseError(
                 400, "User already invited to group", errcode=Codes.BAD_STATE
             )
 
-        user_results = yield self.store.get_users_in_group(
+        user_results = await self.store.get_users_in_group(
             group_id, include_private=True
         )
         if user_id in (user_result["user_id"] for user_result in user_results):
@@ -618,18 +617,18 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         if self.hs.is_mine_id(user_id):
             groups_local = self.hs.get_groups_local_handler()
-            res = yield groups_local.on_invite(group_id, user_id, content)
+            res = await groups_local.on_invite(group_id, user_id, content)
             local_attestation = None
         else:
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content.update({"attestation": local_attestation})
 
-            res = yield self.transport_client.invite_to_group_notification(
+            res = await self.transport_client.invite_to_group_notification(
                 get_domain_from_id(user_id), group_id, user_id, content
             )
 
             user_profile = res.get("user_profile", {})
-            yield self.store.add_remote_profile_cache(
+            await self.store.add_remote_profile_cache(
                 user_id,
                 displayname=user_profile.get("displayname"),
                 avatar_url=user_profile.get("avatar_url"),
@@ -639,13 +638,13 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
             if not self.hs.is_mine_id(user_id):
                 remote_attestation = res["attestation"]
 
-                yield self.attestations.verify_attestation(
+                await self.attestations.verify_attestation(
                     remote_attestation, user_id=user_id, group_id=group_id
                 )
             else:
                 remote_attestation = None
 
-            yield self.store.add_user_to_group(
+            await self.store.add_user_to_group(
                 group_id,
                 user_id,
                 is_admin=False,
@@ -654,7 +653,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 remote_attestation=remote_attestation,
             )
         elif res["state"] == "invite":
-            yield self.store.add_group_invite(group_id, user_id)
+            await self.store.add_group_invite(group_id, user_id)
             return {"state": "invite"}
         elif res["state"] == "reject":
             return {"state": "reject"}
