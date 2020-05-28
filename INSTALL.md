@@ -180,35 +180,41 @@ sudo zypper in python-pip python-setuptools sqlite3 python-virtualenv \
 
 #### OpenBSD
 
-Installing prerequisites on OpenBSD:
+A port of Synapse is available under `net/synapse`. The filesystem
+underlying the homeserver directory (defaults to `/var/synapse`) has to be
+mounted with `wxallowed` (cf. `mount(8)`), so creating a separate filesystem
+and mounting it to `/var/synapse` should be taken into consideration.
+
+To be able to build Synapse's dependency on python the `WRKOBJDIR`
+(cf. `bsd.port.mk(5)`) for building python, too, needs to be on a filesystem
+mounted with `wxallowed` (cf. `mount(8)`).
+
+Creating a `WRKOBJDIR` for building python under `/usr/local` (which on a
+default OpenBSD installation is mounted with `wxallowed`):
 
 ```
-doas pkg_add python libffi py-pip py-setuptools sqlite3 py-virtualenv \
-              libxslt jpeg
+doas mkdir /usr/local/pobj_wxallowed
 ```
 
-There is currently no port for OpenBSD. Additionally, OpenBSD's security
-settings require a slightly more difficult installation process.
+Assuming `PORTS_PRIVSEP=Yes` (cf. `bsd.port.mk(5)`) and `SUDO=doas` are
+configured in `/etc/mk.conf`:
 
-(XXX: I suspect this is out of date)
+```
+doas chown _pbuild:_pbuild /usr/local/pobj_wxallowed
+```
 
-1. Create a new directory in `/usr/local` called `_synapse`. Also, create a
-   new user called `_synapse` and set that directory as the new user's home.
-   This is required because, by default, OpenBSD only allows binaries which need
-   write and execute permissions on the same memory space to be run from
-   `/usr/local`.
-2. `su` to the new `_synapse` user and change to their home directory.
-3. Create a new virtualenv: `virtualenv -p python3 ~/.synapse`
-4. Source the virtualenv configuration located at
-   `/usr/local/_synapse/.synapse/bin/activate`. This is done in `ksh` by
-   using the `.` command, rather than `bash`'s `source`.
-5. Optionally, use `pip` to install `lxml`, which Synapse needs to parse
-   webpages for their titles.
-6. Use `pip` to install this repository: `pip install matrix-synapse`
-7. Optionally, change `_synapse`'s shell to `/bin/false` to reduce the
-   chance of a compromised Synapse server being used to take over your box.
+Setting the `WRKOBJDIR` for building python:
 
-After this, you may proceed with the rest of the install directions.
+```
+echo WRKOBJDIR_lang/python/3.7=/usr/local/pobj_wxallowed  \\nWRKOBJDIR_lang/python/2.7=/usr/local/pobj_wxallowed >> /etc/mk.conf
+```
+
+Building Synapse:
+
+```
+cd /usr/ports/net/synapse
+make install
+```
 
 #### Windows
 
@@ -350,6 +356,18 @@ Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Mo
  - Ports: `cd /usr/ports/net-im/py-matrix-synapse && make install clean`
  - Packages: `pkg install py37-matrix-synapse`
 
+### OpenBSD
+
+As of OpenBSD 6.7 Synapse is available as a pre-compiled binary. The filesystem
+underlying the homeserver directory (defaults to `/var/synapse`) has to be
+mounted with `wxallowed` (cf. `mount(8)`), so creating a separate filesystem
+and mounting it to `/var/synapse` should be taken into consideration.
+
+Installing Synapse:
+
+```
+doas pkg_add synapse
+```
 
 ### NixOS
 
