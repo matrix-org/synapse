@@ -244,10 +244,7 @@ class HomeServer(object):
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         # The rate_hz and burst_count is overridden on a per-user basis
-        self.request_ratelimiter = Ratelimiter(
-            rate_hz=0,
-            burst_count=0,
-        )
+        self.request_ratelimiter = Ratelimiter(rate_hz=0, burst_count=0,)
         if config.rc_admin_redaction:
             self.admin_redaction_ratelimiter = Ratelimiter(
                 rate_hz=config.rc_admin_redaction.per_second,

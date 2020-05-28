@@ -201,9 +201,7 @@ class AuthHandler(BaseHandler):
 
         # Check if we should be ratelimited due to too many previous failed attempts
         self._failed_uia_attempts_ratelimiter.ratelimit(
-            user_id,
-            time_now_s=self._clock.time(),
-            update=False,
+            user_id, time_now_s=self._clock.time(), update=False,
         )
 
         # build a list of supported flows
@@ -216,9 +214,7 @@ class AuthHandler(BaseHandler):
         except LoginError:
             # Update the ratelimite to say we failed (`can_do_action` doesn't raise).
             self._failed_uia_attempts_ratelimiter.can_do_action(
-                user_id,
-                time_now_s=self._clock.time(),
-                update=True,
+                user_id, time_now_s=self._clock.time(), update=True,
             )
             raise
 

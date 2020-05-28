@@ -428,8 +428,7 @@ class RegistrationHandler(BaseHandler):
         time_now = self.clock.time()
 
         self.ratelimiter.ratelimit(
-            address,
-            time_now_s=time_now,
+            address, time_now_s=time_now,
         )
 
     def register_with_store(

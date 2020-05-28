@@ -40,10 +40,7 @@ class Ratelimiter(object):
         self.burst_count = burst_count
 
     def can_do_action(
-        self,
-        key: Any,
-        time_now_s: int,
-        update: bool = True,
+        self, key: Any, time_now_s: int, update: bool = True,
     ) -> Tuple[bool, float]:
         """Can the entity (e.g. user or IP address) perform the action?
 
@@ -62,9 +59,7 @@ class Ratelimiter(object):
         self._prune_message_counts(time_now_s)
 
         # Check if there is an existing count entry for this key
-        action_count, time_start, = self.actions.get(
-            key, (0.0, time_now_s)
-        )
+        action_count, time_start, = self.actions.get(key, (0.0, time_now_s))
 
         # Check whether performing another action is allowed
         time_delta = time_now_s - time_start
@@ -119,10 +114,7 @@ class Ratelimiter(object):
                 del self.actions[key]
 
     def ratelimit(
-        self,
-        key: Any,
-        time_now_s: int,
-        update: bool = True,
+        self, key: Any, time_now_s: int, update: bool = True,
     ):
         """Checks if an action can be performed. If not, raises a LimitExceededError
 
@@ -135,9 +127,7 @@ class Ratelimiter(object):
             LimitExceededError: If an action could not be performed, along with the time in
                 milliseconds until the action can be performed again
         """
-        allowed, time_allowed = self.can_do_action(
-            key, time_now_s, update
-        )
+        allowed, time_allowed = self.can_do_action(key, time_now_s, update)
 
         if not allowed:
             raise LimitExceededError(

@@ -56,6 +56,7 @@ class ProfileTestCase(unittest.TestCase):
             federation_server=Mock(),
             federation_registry=self.mock_registry,
             request_ratelimiter=NonCallableMock(
+                # rate_hz and burst_count are overridden in BaseHandler
                 spec_set=["can_do_action", "ratelimit", "rate_hz", "burst_count"]
             ),
             login_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),

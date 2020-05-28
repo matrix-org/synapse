@@ -43,6 +43,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             http_client=None,
             federation_client=Mock(),
             request_ratelimiter=NonCallableMock(
+                # rate_hz and burst_count are overridden in BaseHandler
                 spec_set=["can_do_action", "ratelimit", "rate_hz", "burst_count"]
             ),
             login_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),

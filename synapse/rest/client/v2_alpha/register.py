@@ -399,9 +399,7 @@ class RegisterRestServlet(RestServlet):
         time_now = self.clock.time()
 
         allowed, time_allowed = self.ratelimiter.can_do_action(
-            client_addr,
-            time_now_s=time_now,
-            update=False,
+            client_addr, time_now_s=time_now, update=False,
         )
 
         if not allowed:

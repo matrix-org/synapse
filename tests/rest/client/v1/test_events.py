@@ -43,9 +43,10 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver(
             config=config,
             request_ratelimiter=NonCallableMock(
+                # rate_hz and burst_count are overridden in BaseHandler
                 spec_set=["can_do_action", "ratelimit", "rate_hz", "burst_count"]
             ),
-            login_ratelimiter = NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
+            login_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
         )
         self.request_ratelimiter = hs.get_request_ratelimiter()
         self.request_ratelimiter.can_do_action.return_value = (True, 0)

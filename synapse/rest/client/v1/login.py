@@ -16,7 +16,6 @@
 import logging
 
 from synapse.api.errors import Codes, LoginError, SynapseError
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -129,9 +128,7 @@ class LoginRestServlet(RestServlet):
 
     async def on_POST(self, request):
         self._account_ratelimiter.ratelimit(
-            request.getClientIP(),
-            time_now_s=self.hs.clock.time(),
-            update=True,
+            request.getClientIP(), time_now_s=self.hs.clock.time(), update=True,
         )
 
         login_submission = parse_json_object_from_request(request)
@@ -201,9 +198,7 @@ class LoginRestServlet(RestServlet):
             # We also apply account rate limiting using the 3PID as a key, as
             # otherwise using 3PID bypasses the ratelimiting based on user ID.
             self._failed_attempts_ratelimiter.ratelimit(
-                (medium, address),
-                time_now_s=self._clock.time(),
-                update=False,
+                (medium, address), time_now_s=self._clock.time(), update=False,
             )
 
             # Check for login providers that support 3pid login types
@@ -239,9 +234,7 @@ class LoginRestServlet(RestServlet):
                 # this code path, which is fine as then the per-user ratelimit
                 # will kick in below.
                 self._failed_attempts_ratelimiter.can_do_action(
-                    (medium, address),
-                    time_now_s=self._clock.time(),
-                    update=True,
+                    (medium, address), time_now_s=self._clock.time(), update=True,
                 )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
@@ -261,9 +254,7 @@ class LoginRestServlet(RestServlet):
 
         # Check if we've hit the failed ratelimit (but don't update it)
         self._failed_attempts_ratelimiter.ratelimit(
-            qualified_user_id.lower(),
-            time_now_s=self._clock.time(),
-            update=False,
+            qualified_user_id.lower(), time_now_s=self._clock.time(), update=False,
         )
 
         try:
@@ -276,9 +267,7 @@ class LoginRestServlet(RestServlet):
             # exception and masking the LoginError. The actual ratelimiting
             # should have happened above.
             self._failed_attempts_ratelimiter.can_do_action(
-                qualified_user_id.lower(),
-                time_now_s=self._clock.time(),
-                update=True,
+                qualified_user_id.lower(), time_now_s=self._clock.time(), update=True,
             )
             raise
 
@@ -313,9 +302,7 @@ class LoginRestServlet(RestServlet):
         # too often. This happens here rather than before as we don't
         # necessarily know the user before now.
         self._account_ratelimiter.ratelimit(
-            user_id.lower(),
-            time_now_s=self._clock.time(),
-            update=True,
+            user_id.lower(), time_now_s=self._clock.time(), update=True,
         )
 
         if create_non_existant_users:

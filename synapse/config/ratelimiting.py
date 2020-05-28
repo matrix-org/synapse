@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
-
 from typing import Dict
+
+from ._base import Config
 
 
 class RateLimitConfig(object):
