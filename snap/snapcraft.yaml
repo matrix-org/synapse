@@ -32,11 +32,11 @@ parts:
     plugin: python
     python-version: python3
     python-packages:
-      - '.[all]'
       - pip
       - setuptools
       - setuptools-scm
       - wheel
+      - '.[all]'
     build-packages:
       - libffi-dev
       - libturbojpeg0-dev
