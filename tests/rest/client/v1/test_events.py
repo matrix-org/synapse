@@ -41,10 +41,17 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         config["auto_join_rooms"] = []
 
         hs = self.setup_test_homeserver(
-            config=config, ratelimiter=NonCallableMock(spec_set=["can_do_action"])
+            config=config,
+            request_ratelimiter=NonCallableMock(
+                spec_set=["can_do_action", "ratelimit", "rate_hz", "burst_count"]
+            ),
+            login_ratelimiter = NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
         )
-        self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
+        self.request_ratelimiter = hs.get_request_ratelimiter()
+        self.request_ratelimiter.can_do_action.return_value = (True, 0)
+
+        self.login_ratelimiter = hs.get_login_ratelimiter()
+        self.login_ratelimiter.can_do_action.return_value = (True, 0)
 
         hs.get_handlers().federation_handler = Mock()
 

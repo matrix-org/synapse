@@ -49,10 +49,17 @@ class RoomBase(unittest.HomeserverTestCase):
             "red",
             http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
+            request_ratelimiter=NonCallableMock(
+                spec_set=["can_do_action", "ratelimit", "rate_hz", "burst_count"]
+            ),
+            login_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
         )
-        self.ratelimiter = self.hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
+        self.request_ratelimiter = self.hs.get_request_ratelimiter()
+        self.request_ratelimiter.can_do_action.return_value = (True, 0)
+        self.request_ratelimiter.rate_hz = Mock()
+
+        self.login_ratelimiter = self.hs.get_login_ratelimiter()
+        self.login_ratelimiter.can_do_action.return_value = (True, 0)
 
         self.hs.get_federation_handler = Mock(return_value=Mock())
 

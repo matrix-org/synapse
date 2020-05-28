@@ -23,10 +23,16 @@ class BaseSlavedStoreTestCase(BaseStreamTestCase):
 
         hs = self.setup_test_homeserver(
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
+            request_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
+            login_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
         )
 
-        hs.get_ratelimiter().can_do_action.return_value = (True, 0)
+        # Prevent ratelimiting
+        self.request_ratelimiter = hs.get_request_ratelimiter()
+        self.request_ratelimiter.can_do_action.return_value = (True, 0)
+
+        self.login_ratelimiter = hs.get_login_ratelimiter()
+        self.login_ratelimiter.can_do_action.return_value = (True, 0)
 
         return hs
 

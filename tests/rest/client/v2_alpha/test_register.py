@@ -147,8 +147,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
     def test_POST_ratelimiting_guest(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
+        self.hs.get_registration_ratelimiter().burst_count = 5
+        self.hs.get_registration_ratelimiter().rate_hz = 0.17
 
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
@@ -169,8 +169,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
     def test_POST_ratelimiting(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
+        self.hs.get_registration_ratelimiter().burst_count = 5
+        self.hs.get_registration_ratelimiter().rate_hz = 0.17
 
         for i in range(0, 6):
             params = {
