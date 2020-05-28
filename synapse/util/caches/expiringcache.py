@@ -28,8 +28,15 @@ SENTINEL = object()
 
 
 class ExpiringCache(object):
-    def __init__(self, cache_name, clock, max_len=0, expiry_ms=0,
-                 reset_expiry_on_get=False, iterable=False):
+    def __init__(
+        self,
+        cache_name,
+        clock,
+        max_len=0,
+        expiry_ms=0,
+        reset_expiry_on_get=False,
+        iterable=False,
+    ):
         """
         Args:
             cache_name (str): Name of this cache, used for logging.
@@ -67,8 +74,7 @@ class ExpiringCache(object):
 
         def f():
             return run_as_background_process(
-                "prune_cache_%s" % self._cache_name,
-                self._prune_cache,
+                "prune_cache_%s" % self._cache_name, self._prune_cache
             )
 
         self._clock.looping_call(f, self._expiry_ms / 2)
@@ -153,7 +159,9 @@ class ExpiringCache(object):
 
         logger.debug(
             "[%s] _prune_cache before: %d, after len: %d",
-            self._cache_name, begin_length, len(self)
+            self._cache_name,
+            begin_length,
+            len(self),
         )
 
     def __len__(self):

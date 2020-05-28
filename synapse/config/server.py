@@ -17,7 +17,12 @@
 
 import logging
 import os.path
+import re
+from textwrap import indent
+from typing import Dict, List, Optional
 
+import attr
+import yaml
 from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
@@ -34,14 +39,28 @@ logger = logging.Logger(__name__)
 #
 # We later check for errors when binding to 0.0.0.0 and ignore them if :: is also in
 # in the list.
-DEFAULT_BIND_ADDRESSES = ['::', '0.0.0.0']
+DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
-DEFAULT_ROOM_VERSION = "4"
+DEFAULT_ROOM_VERSION = "5"
+
+ROOM_COMPLEXITY_TOO_GREAT = (
+    "Your homeserver is unable to join rooms this large or complex. "
+    "Please speak to your server administrator, or upgrade your instance "
+    "to join this room."
+)
+
+METRICS_PORT_WARNING = """\
+The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
+a listener. Please see
+https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md
+on how to configure the new listener.
+--------------------------------------------------------------------------------"""
 
 
 class ServerConfig(Config):
+    section = "server"
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.server_name = config["server_name"]
         self.server_context = config.get("server_context", None)
 
@@ -58,7 +77,6 @@ class ServerConfig(Config):
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
-        self.cpu_affinity = config.get("cpu_affinity")
 
         # Whether to send federation traffic out in this process. This only
         # applies to some federation traffic, and so shouldn't be used to
@@ -81,13 +99,13 @@ class ServerConfig(Config):
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API.
         self.require_auth_for_profile_requests = config.get(
-            "require_auth_for_profile_requests", False,
+            "require_auth_for_profile_requests", False
         )
 
         # Whether to require sharing a room with a user to retrieve their
         # profile data
-        self.limit_profile_requests_to_known_users = config.get(
-            "limit_profile_requests_to_known_users", False,
+        self.limit_profile_requests_to_users_who_share_rooms = config.get(
+            "limit_profile_requests_to_users_who_share_rooms", False,
         )
 
         if "restrict_public_rooms_to_local_users" in config and (
@@ -106,28 +124,27 @@ class ServerConfig(Config):
             self.allow_public_rooms_without_auth = False
             self.allow_public_rooms_over_federation = False
         else:
-            # If set to 'False', requires authentication to access the server's public
-            # rooms directory through the client API. Defaults to 'True'.
+            # If set to 'true', removes the need for authentication to access the server's
+            # public rooms directory through the client API, meaning that anyone can
+            # query the room directory. Defaults to 'false'.
             self.allow_public_rooms_without_auth = config.get(
-                "allow_public_rooms_without_auth", True
+                "allow_public_rooms_without_auth", False
             )
-            # If set to 'False', forbids any other homeserver to fetch the server's public
-            # rooms directory via federation. Defaults to 'True'.
+            # If set to 'true', allows any other homeserver to fetch the server's public
+            # rooms directory via federation. Defaults to 'false'.
             self.allow_public_rooms_over_federation = config.get(
-                "allow_public_rooms_over_federation", True
+                "allow_public_rooms_over_federation", False
             )
 
-        default_room_version = config.get(
-            "default_room_version", DEFAULT_ROOM_VERSION,
-        )
+        default_room_version = config.get("default_room_version", DEFAULT_ROOM_VERSION)
 
         # Ensure room version is a str
         default_room_version = str(default_room_version)
 
         if default_room_version not in KNOWN_ROOM_VERSIONS:
             raise ConfigError(
-                "Unknown default_room_version: %s, known room versions: %s" %
-                (default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
+                "Unknown default_room_version: %s, known room versions: %s"
+                % (default_room_version, list(KNOWN_ROOM_VERSIONS.keys()))
             )
 
         # Get the actual room version object rather than just the identifier
@@ -142,46 +159,55 @@ class ServerConfig(Config):
 
         # Whether we should block invites sent to users on this server
         # (other than those sent by local server admins)
-        self.block_non_admin_invites = config.get(
-            "block_non_admin_invites", False,
-        )
+        self.block_non_admin_invites = config.get("block_non_admin_invites", False)
 
         # Whether to enable experimental MSC1849 (aka relations) support
         self.experimental_msc1849_support_enabled = config.get(
-            "experimental_msc1849_support_enabled", False,
+            "experimental_msc1849_support_enabled", True
         )
 
         # Options to control access by tracking MAU
         self.limit_usage_by_mau = config.get("limit_usage_by_mau", False)
         self.max_mau_value = 0
         if self.limit_usage_by_mau:
-            self.max_mau_value = config.get(
-                "max_mau_value", 0,
-            )
+            self.max_mau_value = config.get("max_mau_value", 0)
         self.mau_stats_only = config.get("mau_stats_only", False)
 
         self.mau_limits_reserved_threepids = config.get(
             "mau_limit_reserved_threepids", []
         )
 
-        self.mau_trial_days = config.get(
-            "mau_trial_days", 0,
-        )
+        self.mau_trial_days = config.get("mau_trial_days", 0)
+        self.mau_limit_alerting = config.get("mau_limit_alerting", True)
+
+        # How long to keep redacted events in the database in unredacted form
+        # before redacting them.
+        redaction_retention_period = config.get("redaction_retention_period", "7d")
+        if redaction_retention_period is not None:
+            self.redaction_retention_period = self.parse_duration(
+                redaction_retention_period
+            )
+        else:
+            self.redaction_retention_period = None
+
+        # How long to keep entries in the `users_ips` table.
+        user_ips_max_age = config.get("user_ips_max_age", "28d")
+        if user_ips_max_age is not None:
+            self.user_ips_max_age = self.parse_duration(user_ips_max_age)
+        else:
+            self.user_ips_max_age = None
 
         # Options to disable HS
         self.hs_disabled = config.get("hs_disabled", False)
         self.hs_disabled_message = config.get("hs_disabled_message", "")
-        self.hs_disabled_limit_type = config.get("hs_disabled_limit_type", "")
 
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
 
         # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None
-        federation_domain_whitelist = config.get(
-            "federation_domain_whitelist", None,
-        )
+        self.federation_domain_whitelist = None  # type: Optional[dict]
+        federation_domain_whitelist = config.get("federation_domain_whitelist", None)
 
         if federation_domain_whitelist is not None:
             # turn the whitelist into a hash for speed of lookup
@@ -191,7 +217,7 @@ class ServerConfig(Config):
                 self.federation_domain_whitelist[domain] = True
 
         self.federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", [],
+            "federation_ip_range_blacklist", []
         )
 
         # Attempt to create an IPSet from the given ranges
@@ -204,13 +230,12 @@ class ServerConfig(Config):
             self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
         except Exception as e:
             raise ConfigError(
-                "Invalid range(s) provided in "
-                "federation_ip_range_blacklist: %s" % e
+                "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
             )
 
         if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != '/':
-                self.public_baseurl += '/'
+            if self.public_baseurl[-1] != "/":
+                self.public_baseurl += "/"
         self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
@@ -221,7 +246,7 @@ class ServerConfig(Config):
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to True.
         self.require_membership_for_aliases = config.get(
-            "require_membership_for_aliases", True,
+            "require_membership_for_aliases", True
         )
 
         # Whether to allow per-room membership profiles through the send of membership
@@ -231,7 +256,7 @@ class ServerConfig(Config):
         # Whether to show the users on this homeserver in the user directory. Defaults to
         # True.
         self.show_users_in_user_directory = config.get(
-            "show_users_in_user_directory", True,
+            "show_users_in_user_directory", True
         )
 
         retention_config = config.get("retention")
@@ -275,13 +300,25 @@ class ServerConfig(Config):
             self.retention_default_min_lifetime = None
             self.retention_default_max_lifetime = None
 
-        self.retention_allowed_lifetime_min = retention_config.get("allowed_lifetime_min")
+        if self.retention_enabled:
+            logger.info(
+                "Message retention policies support enabled with the following default"
+                " policy: min_lifetime = %s ; max_lifetime = %s",
+                self.retention_default_min_lifetime,
+                self.retention_default_max_lifetime,
+            )
+
+        self.retention_allowed_lifetime_min = retention_config.get(
+            "allowed_lifetime_min"
+        )
         if self.retention_allowed_lifetime_min is not None:
             self.retention_allowed_lifetime_min = self.parse_duration(
                 self.retention_allowed_lifetime_min
             )
 
-        self.retention_allowed_lifetime_max = retention_config.get("allowed_lifetime_max")
+        self.retention_allowed_lifetime_max = retention_config.get(
+            "allowed_lifetime_max"
+        )
         if self.retention_allowed_lifetime_max is not None:
             self.retention_allowed_lifetime_max = self.parse_duration(
                 self.retention_allowed_lifetime_max
@@ -290,14 +327,15 @@ class ServerConfig(Config):
         if (
             self.retention_allowed_lifetime_min is not None
             and self.retention_allowed_lifetime_max is not None
-            and self.retention_allowed_lifetime_min > self.retention_allowed_lifetime_max
+            and self.retention_allowed_lifetime_min
+            > self.retention_allowed_lifetime_max
         ):
             raise ConfigError(
                 "Invalid retention policy limits: 'allowed_lifetime_min' can not be"
                 " greater than 'allowed_lifetime_max'"
             )
 
-        self.retention_purge_jobs = []
+        self.retention_purge_jobs = []  # type: List[Dict[str, Optional[int]]]
         for purge_job_config in retention_config.get("purge_jobs", []):
             interval_config = purge_job_config.get("interval")
 
@@ -330,20 +368,24 @@ class ServerConfig(Config):
                     " 'longest_max_lifetime' value."
                 )
 
-            self.retention_purge_jobs.append({
-                "interval": interval,
-                "shortest_max_lifetime": shortest_max_lifetime,
-                "longest_max_lifetime": longest_max_lifetime,
-            })
+            self.retention_purge_jobs.append(
+                {
+                    "interval": interval,
+                    "shortest_max_lifetime": shortest_max_lifetime,
+                    "longest_max_lifetime": longest_max_lifetime,
+                }
+            )
 
         if not self.retention_purge_jobs:
-            self.retention_purge_jobs = [{
-                "interval": self.parse_duration("1d"),
-                "shortest_max_lifetime": None,
-                "longest_max_lifetime": None,
-            }]
+            self.retention_purge_jobs = [
+                {
+                    "interval": self.parse_duration("1d"),
+                    "shortest_max_lifetime": None,
+                    "longest_max_lifetime": None,
+                }
+            ]
 
-        self.listeners = []
+        self.listeners = []  # type: List[dict]
         for listener in config.get("listeners", []):
             if not isinstance(listener.get("port", None), int):
                 raise ConfigError(
@@ -368,9 +410,9 @@ class ServerConfig(Config):
 
             # if we still have an empty list of addresses, use the default list
             if not bind_addresses:
-                if listener['type'] == 'metrics':
+                if listener["type"] == "metrics":
                     # the metrics listener doesn't support IPv6
-                    bind_addresses.append('0.0.0.0')
+                    bind_addresses.append("0.0.0.0")
                 else:
                     bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
 
@@ -381,6 +423,26 @@ class ServerConfig(Config):
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
 
+        @attr.s
+        class LimitRemoteRoomsConfig(object):
+            enabled = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
+            complexity = attr.ib(
+                validator=attr.validators.instance_of(
+                    (float, int)  # type: ignore[arg-type] # noqa
+                ),
+                default=1.0,
+            )
+            complexity_error = attr.ib(
+                validator=attr.validators.instance_of(str),
+                default=ROOM_COMPLEXITY_TOO_GREAT,
+            )
+
+        self.limit_remote_rooms = LimitRemoteRoomsConfig(
+            **config.get("limit_remote_rooms", {})
+        )
+
         bind_port = config.get("bind_port")
         if bind_port:
             if config.get("no_tls", False):
@@ -390,78 +452,73 @@ class ServerConfig(Config):
             bind_host = config.get("bind_host", "")
             gzip_responses = config.get("gzip_responses", True)
 
-            self.listeners.append({
-                "port": bind_port,
-                "bind_addresses": [bind_host],
-                "tls": True,
-                "type": "http",
-                "resources": [
-                    {
-                        "names": ["client"],
-                        "compress": gzip_responses,
-                    },
-                    {
-                        "names": ["federation"],
-                        "compress": False,
-                    }
-                ]
-            })
+            self.listeners.append(
+                {
+                    "port": bind_port,
+                    "bind_addresses": [bind_host],
+                    "tls": True,
+                    "type": "http",
+                    "resources": [
+                        {"names": ["client"], "compress": gzip_responses},
+                        {"names": ["federation"], "compress": False},
+                    ],
+                }
+            )
 
             unsecure_port = config.get("unsecure_port", bind_port - 400)
             if unsecure_port:
-                self.listeners.append({
-                    "port": unsecure_port,
-                    "bind_addresses": [bind_host],
-                    "tls": False,
-                    "type": "http",
-                    "resources": [
-                        {
-                            "names": ["client"],
-                            "compress": gzip_responses,
-                        },
-                        {
-                            "names": ["federation"],
-                            "compress": False,
-                        }
-                    ]
-                })
+                self.listeners.append(
+                    {
+                        "port": unsecure_port,
+                        "bind_addresses": [bind_host],
+                        "tls": False,
+                        "type": "http",
+                        "resources": [
+                            {"names": ["client"], "compress": gzip_responses},
+                            {"names": ["federation"], "compress": False},
+                        ],
+                    }
+                )
 
         manhole = config.get("manhole")
         if manhole:
-            self.listeners.append({
-                "port": manhole,
-                "bind_addresses": ["127.0.0.1"],
-                "type": "manhole",
-                "tls": False,
-            })
+            self.listeners.append(
+                {
+                    "port": manhole,
+                    "bind_addresses": ["127.0.0.1"],
+                    "type": "manhole",
+                    "tls": False,
+                }
+            )
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
-            logger.warn(
-                ("The metrics_port configuration option is deprecated in Synapse 0.31 "
-                 "in favour of a listener. Please see "
-                 "http://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.rst"
-                 " on how to configure the new listener."))
+            logger.warning(METRICS_PORT_WARNING)
 
-            self.listeners.append({
-                "port": metrics_port,
-                "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
-                "tls": False,
-                "type": "http",
-                "resources": [
-                    {
-                        "names": ["metrics"],
-                        "compress": False,
-                    },
-                ]
-            })
+            self.listeners.append(
+                {
+                    "port": metrics_port,
+                    "bind_addresses": [config.get("metrics_bind_host", "127.0.0.1")],
+                    "tls": False,
+                    "type": "http",
+                    "resources": [{"names": ["metrics"], "compress": False}],
+                }
+            )
 
         _check_resource_config(self.listeners)
 
-    def has_tls_listener(self):
+        self.cleanup_extremities_with_dummy_events = config.get(
+            "cleanup_extremities_with_dummy_events", True
+        )
+
+        self.enable_ephemeral_messages = config.get("enable_ephemeral_messages", False)
+
+    def has_tls_listener(self) -> bool:
         return any(l["tls"] for l in self.listeners)
 
-    def default_config(self, server_name, data_dir_path, **kwargs):
+    def generate_config_section(
+        self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
+    ):
         _, bind_port = parse_and_validate_server_name(server_name)
         if bind_port is not None:
             unsecure_port = bind_port - 400
@@ -474,7 +531,72 @@ class ServerConfig(Config):
         # Bring DEFAULT_ROOM_VERSION into the local-scope for use in the
         # default config string
         default_room_version = DEFAULT_ROOM_VERSION
-        return """\
+        secure_listeners = []
+        unsecure_listeners = []
+        private_addresses = ["::1", "127.0.0.1"]
+        if listeners:
+            for listener in listeners:
+                if listener["tls"]:
+                    secure_listeners.append(listener)
+                else:
+                    # If we don't want open ports we need to bind the listeners
+                    # to some address other than 0.0.0.0. Here we chose to use
+                    # localhost.
+                    # If the addresses are already bound we won't overwrite them
+                    # however.
+                    if not open_private_ports:
+                        listener.setdefault("bind_addresses", private_addresses)
+
+                    unsecure_listeners.append(listener)
+
+            secure_http_bindings = indent(
+                yaml.dump(secure_listeners), " " * 10
+            ).lstrip()
+
+            unsecure_http_bindings = indent(
+                yaml.dump(unsecure_listeners), " " * 10
+            ).lstrip()
+
+        if not unsecure_listeners:
+            unsecure_http_bindings = (
+                """- port: %(unsecure_port)s
+            tls: false
+            type: http
+            x_forwarded: true"""
+                % locals()
+            )
+
+            if not open_private_ports:
+                unsecure_http_bindings += (
+                    "\n            bind_addresses: ['::1', '127.0.0.1']"
+                )
+
+            unsecure_http_bindings += """
+
+            resources:
+              - names: [client, federation]
+                compress: false"""
+
+            if listeners:
+                # comment out this block
+                unsecure_http_bindings = "#" + re.sub(
+                    "\n {10}",
+                    lambda match: match.group(0) + "#",
+                    unsecure_http_bindings,
+                )
+
+        if not secure_listeners:
+            secure_http_bindings = (
+                """#- port: %(bind_port)s
+          #  type: http
+          #  tls: true
+          #  resources:
+          #    - names: [client, federation]"""
+                % locals()
+            )
+
+        return (
+            """\
         ## Server ##
 
         # The domain name of the server, with optional explicit port.
@@ -487,29 +609,6 @@ class ServerConfig(Config):
         # When running as a daemon, the file to store the pid in
         #
         pid_file: %(pid_file)s
-
-        # CPU affinity mask. Setting this restricts the CPUs on which the
-        # process will be scheduled. It is represented as a bitmask, with the
-        # lowest order bit corresponding to the first logical CPU and the
-        # highest order bit corresponding to the last logical CPU. Not all CPUs
-        # may exist on a given system but a mask may specify more CPUs than are
-        # present.
-        #
-        # For example:
-        #    0x00000001  is processor #0,
-        #    0x00000003  is processors #0 and #1,
-        #    0xFFFFFFFF  is all processors (#0 through #31).
-        #
-        # Pinning a Python process to a single CPU is desirable, because Python
-        # is inherently single-threaded due to the GIL, and can suffer a
-        # 30-40%% slowdown due to cache blow-out and thread context switching
-        # if the scheduler happens to schedule the underlying threads across
-        # different cores. See
-        # https://www.mirantis.com/blog/improve-performance-python-programs-restricting-single-cpu/.
-        #
-        # This setting requires the affinity package to be installed!
-        #
-        #cpu_affinity: 0xFFFFFFFF
 
         # The path to the web client which will be served at /_matrix/client/
         # if 'webclient' is configured under the 'listeners' configuration.
@@ -542,22 +641,23 @@ class ServerConfig(Config):
         #
         #require_auth_for_profile_requests: true
 
-        # Whether to require a user to share a room with another user in order
+        # Uncomment to require a user to share a room with another user in order
         # to retrieve their profile information. Only checked on Client-Server
         # requests. Profile requests from other servers should be checked by the
         # requesting server. Defaults to 'false'.
         #
-        # limit_profile_requests_to_known_users: true
+        #limit_profile_requests_to_users_who_share_rooms: true
 
-        # If set to 'false', requires authentication to access the server's public rooms
-        # directory through the client API. Defaults to 'true'.
+        # If set to 'true', removes the need for authentication to access the server's
+        # public rooms directory through the client API, meaning that anyone can
+        # query the room directory. Defaults to 'false'.
         #
-        #allow_public_rooms_without_auth: false
+        #allow_public_rooms_without_auth: true
 
-        # If set to 'false', forbids any other homeserver to fetch the server's public
-        # rooms directory via federation. Defaults to 'true'.
+        # If set to 'true', allows any other homeserver to fetch the server's public
+        # rooms directory via federation. Defaults to 'false'.
         #
-        #allow_public_rooms_over_federation: false
+        #allow_public_rooms_over_federation: true
 
         # The default room version for newly created rooms.
         #
@@ -581,7 +681,7 @@ class ServerConfig(Config):
         # Whether room invites to users on this server should be blocked
         # (except those sent by local server admins). The default is False.
         #
-        #block_non_admin_invites: True
+        #block_non_admin_invites: true
 
         # Room searching
         #
@@ -604,6 +704,9 @@ class ServerConfig(Config):
         # Prevent federation requests from being sent to the following
         # blacklist IP address CIDR ranges. If this option is not specified, or
         # specified with an empty list, no ip range blacklist will be enforced.
+        #
+        # As of Synapse v1.4.0 this option also affects any outbound requests to identity
+        # servers provided by user input.
         #
         # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
         # listed here, since they correspond to unroutable addresses.)
@@ -631,8 +734,8 @@ class ServerConfig(Config):
         #
         #   type: the type of listener. Normally 'http', but other valid options are:
         #       'manhole' (see docs/manhole.md),
-        #       'metrics' (see docs/metrics-howto.rst),
-        #       'replication' (see docs/workers.rst).
+        #       'metrics' (see docs/metrics-howto.md),
+        #       'replication' (see docs/workers.md).
         #
         #   tls: set to true to enable TLS for this listener. Will use the TLS
         #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -667,12 +770,12 @@ class ServerConfig(Config):
         #
         #   media: the media API (/_matrix/media).
         #
-        #   metrics: the metrics interface. See docs/metrics-howto.rst.
+        #   metrics: the metrics interface. See docs/metrics-howto.md.
         #
         #   openid: OpenID authentication.
         #
         #   replication: the HTTP replication API (/_synapse/replication). See
-        #       docs/workers.rst.
+        #       docs/workers.md.
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
@@ -686,29 +789,17 @@ class ServerConfig(Config):
           # will also need to give Synapse a TLS key and certificate: see the TLS section
           # below.)
           #
-          #- port: %(bind_port)s
-          #  type: http
-          #  tls: true
-          #  resources:
-          #    - names: [client, federation]
+          %(secure_http_bindings)s
 
           # Unsecure HTTP listener: for when matrix traffic passes through a reverse proxy
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
-          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
           #
-          - port: %(unsecure_port)s
-            tls: false
-            bind_addresses: ['::1', '127.0.0.1']
-            type: http
-            x_forwarded: true
+          %(unsecure_http_bindings)s
 
-            resources:
-              - names: [client, federation]
-                compress: false
-
-            # example additonal_resources:
+            # example additional_resources:
             #
             #additional_resources:
             #  "/_matrix/my/custom/endpoint":
@@ -731,9 +822,8 @@ class ServerConfig(Config):
 
         # Global blocking
         #
-        #hs_disabled: False
+        #hs_disabled: false
         #hs_disabled_message: 'Human readable reason for why the HS is blocked'
-        #hs_disabled_limit_type: 'error code(str), to help clients decode reason'
 
         # Monthly Active User Blocking
         #
@@ -753,15 +843,22 @@ class ServerConfig(Config):
         # sign up in a short space of time never to return after their initial
         # session.
         #
-        #limit_usage_by_mau: False
+        # 'mau_limit_alerting' is a means of limiting client side alerting
+        # should the mau limit be reached. This is useful for small instances
+        # where the admin has 5 mau seats (say) for 5 specific people and no
+        # interest increasing the mau limit further. Defaults to True, which
+        # means that alerting is enabled
+        #
+        #limit_usage_by_mau: false
         #max_mau_value: 50
         #mau_trial_days: 2
+        #mau_limit_alerting: false
 
         # If enabled, the metrics for the number of monthly active users will
         # be populated, however no one will be limited. If limit_usage_by_mau
         # is true, this is implied to be true.
         #
-        #mau_stats_only: False
+        #mau_stats_only: false
 
         # Sometimes the server admin will want to ensure certain accounts are
         # never blocked by mau checking. These accounts are specified here.
@@ -772,6 +869,23 @@ class ServerConfig(Config):
 
         # Used by phonehome stats to group together related servers.
         #server_context: context
+
+        # Resource-constrained homeserver Settings
+        #
+        # If limit_remote_rooms.enabled is True, the room complexity will be
+        # checked before a user joins a new remote room. If it is above
+        # limit_remote_rooms.complexity, it will disallow joining or
+        # instantly leave.
+        #
+        # limit_remote_rooms.complexity_error can be set to customise the text
+        # displayed to the user when a room above the complexity threshold has
+        # its join cancelled.
+        #
+        # Uncomment the below lines to enable:
+        #limit_remote_rooms:
+        #  enabled: true
+        #  complexity: 1.0
+        #  complexity_error: "This room is too complex."
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.
@@ -851,7 +965,85 @@ class ServerConfig(Config):
           #  - shortest_max_lifetime: 3d
           #    longest_max_lifetime: 1y
           #    interval: 24h
-        """ % locals()
+
+        # How long to keep redacted events in unredacted form in the database. After
+        # this period redacted events get replaced with their redacted form in the DB.
+        #
+        # Defaults to `7d`. Set to `null` to disable.
+        #
+        #redaction_retention_period: 28d
+
+        # How long to track users' last seen time and IPs in the database.
+        #
+        # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
+        #
+        #user_ips_max_age: 14d
+
+        # Message retention policy at the server level.
+        #
+        # Room admins and mods can define a retention period for their rooms using the
+        # 'm.room.retention' state event, and server admins can cap this period by setting
+        # the 'allowed_lifetime_min' and 'allowed_lifetime_max' config options.
+        #
+        # If this feature is enabled, Synapse will regularly look for and purge events
+        # which are older than the room's maximum retention period. Synapse will also
+        # filter events received over federation so that events that should have been
+        # purged are ignored and not stored again.
+        #
+        retention:
+          # The message retention policies feature is disabled by default. Uncomment the
+          # following line to enable it.
+          #
+          #enabled: true
+
+          # Default retention policy. If set, Synapse will apply it to rooms that lack the
+          # 'm.room.retention' state event. Currently, the value of 'min_lifetime' doesn't
+          # matter much because Synapse doesn't take it into account yet.
+          #
+          #default_policy:
+          #  min_lifetime: 1d
+          #  max_lifetime: 1y
+
+          # Retention policy limits. If set, a user won't be able to send a
+          # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
+          # that's not within this range. This is especially useful in closed federations,
+          # in which server admins can make sure every federating server applies the same
+          # rules.
+          #
+          #allowed_lifetime_min: 1d
+          #allowed_lifetime_max: 1y
+
+          # Server admins can define the settings of the background jobs purging the
+          # events which lifetime has expired under the 'purge_jobs' section.
+          #
+          # If no configuration is provided, a single job will be set up to delete expired
+          # events in every room daily.
+          #
+          # Each job's configuration defines which range of message lifetimes the job
+          # takes care of. For example, if 'shortest_max_lifetime' is '2d' and
+          # 'longest_max_lifetime' is '3d', the job will handle purging expired events in
+          # rooms whose state defines a 'max_lifetime' that's both higher than 2 days, and
+          # lower than or equal to 3 days. Both the minimum and the maximum value of a
+          # range are optional, e.g. a job with no 'shortest_max_lifetime' and a
+          # 'longest_max_lifetime' of '3d' will handle every room with a retention policy
+          # which 'max_lifetime' is lower than or equal to three days.
+          #
+          # The rationale for this per-job configuration is that some rooms might have a
+          # retention policy with a low 'max_lifetime', where history needs to be purged
+          # of outdated messages on a more frequent basis than for the rest of the rooms
+          # (e.g. every 12h), but not want that purge to be performed by a job that's
+          # iterating over every room it knows, which could be heavy on the server.
+          #
+          #purge_jobs:
+          #  - shortest_max_lifetime: 1d
+          #    longest_max_lifetime: 3d
+          #    interval: 12h
+          #  - shortest_max_lifetime: 3d
+          #    longest_max_lifetime: 1y
+          #    interval: 1d
+        """
+            % locals()
+        )
 
     def read_arguments(self, args):
         if args.manhole is not None:
@@ -861,19 +1053,29 @@ class ServerConfig(Config):
         if args.print_pidfile is not None:
             self.print_pidfile = args.print_pidfile
 
-    def add_arguments(self, parser):
+    @staticmethod
+    def add_arguments(parser):
         server_group = parser.add_argument_group("server")
-        server_group.add_argument("-D", "--daemonize", action='store_true',
-                                  default=None,
-                                  help="Daemonize the home server")
-        server_group.add_argument("--print-pidfile", action='store_true',
-                                  default=None,
-                                  help="Print the path to the pidfile just"
-                                  " before daemonizing")
-        server_group.add_argument("--manhole", metavar="PORT", dest="manhole",
-                                  type=int,
-                                  help="Turn on the twisted telnet manhole"
-                                  " service on the given port.")
+        server_group.add_argument(
+            "-D",
+            "--daemonize",
+            action="store_true",
+            default=None,
+            help="Daemonize the homeserver",
+        )
+        server_group.add_argument(
+            "--print-pidfile",
+            action="store_true",
+            default=None,
+            help="Print the path to the pidfile just before daemonizing",
+        )
+        server_group.add_argument(
+            "--manhole",
+            metavar="PORT",
+            dest="manhole",
+            type=int,
+            help="Turn on the twisted telnet manhole service on the given port.",
+        )
 
 
 def is_threepid_reserved(reserved_threepids, threepid):
@@ -887,7 +1089,7 @@ def is_threepid_reserved(reserved_threepids, threepid):
     """
 
     for tp in reserved_threepids:
-        if (threepid['medium'] == tp['medium'] and threepid['address'] == tp['address']):
+        if threepid["medium"] == tp["medium"] and threepid["address"] == tp["address"]:
             return True
     return False
 
@@ -900,9 +1102,7 @@ def read_gc_thresholds(thresholds):
         return None
     try:
         assert len(thresholds) == 3
-        return (
-            int(thresholds[0]), int(thresholds[1]), int(thresholds[2]),
-        )
+        return (int(thresholds[0]), int(thresholds[1]), int(thresholds[2]))
     except Exception:
         raise ConfigError(
             "Value of `gc_threshold` must be a list of three integers if set"
@@ -920,40 +1120,38 @@ def _warn_if_webclient_configured(listeners):
     for listener in listeners:
         for res in listener.get("resources", []):
             for name in res.get("names", []):
-                if name == 'webclient':
+                if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
 
 
 KNOWN_RESOURCES = (
-    'client',
-    'consent',
-    'federation',
-    'keys',
-    'media',
-    'metrics',
-    'openid',
-    'replication',
-    'static',
-    'webclient',
+    "client",
+    "consent",
+    "federation",
+    "keys",
+    "media",
+    "metrics",
+    "openid",
+    "replication",
+    "static",
+    "webclient",
 )
 
 
 def _check_resource_config(listeners):
-    resource_names = set(
+    resource_names = {
         res_name
         for listener in listeners
         for res in listener.get("resources", [])
         for res_name in res.get("names", [])
-    )
+    }
 
     for resource in resource_names:
         if resource not in KNOWN_RESOURCES:
-            raise ConfigError(
-                "Unknown listener resource '%s'" % (resource, )
-            )
+            raise ConfigError("Unknown listener resource '%s'" % (resource,))
         if resource == "consent":
             try:
-                check_requirements('resources.consent')
+                check_requirements("resources.consent")
             except DependencyException as e:
                 raise ConfigError(e.message)

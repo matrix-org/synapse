@@ -14,11 +14,11 @@
 # limitations under the License.
 
 import logging
-
-from twisted.internet import defer
+from typing import Tuple
 
 from synapse.http import servlet
 from synapse.http.servlet import parse_json_object_from_request
+from synapse.logging.opentracing import set_tag, trace
 from synapse.rest.client.transactions import HttpTransactionCache
 
 from ._base import client_patterns
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 class SendToDeviceRestServlet(servlet.RestServlet):
     PATTERNS = client_patterns(
-        "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$",
+        "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$"
     )
 
     def __init__(self, hs):
@@ -42,25 +42,27 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.txns = HttpTransactionCache(hs)
         self.device_message_handler = hs.get_device_message_handler()
 
+    @trace(opname="sendToDevice")
     def on_PUT(self, request, message_type, txn_id):
+        set_tag("message_type", message_type)
+        set_tag("txn_id", txn_id)
         return self.txns.fetch_or_execute_request(
             request, self._put, request, message_type, txn_id
         )
 
-    @defer.inlineCallbacks
-    def _put(self, request, message_type, txn_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def _put(self, request, message_type, txn_id):
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         content = parse_json_object_from_request(request)
 
         sender_user_id = requester.user.to_string()
 
-        yield self.device_message_handler.send_device_message(
+        await self.device_message_handler.send_device_message(
             sender_user_id, message_type, content["messages"]
         )
 
-        response = (200, {})
-        defer.returnValue(response)
+        response = (200, {})  # type: Tuple[int, dict]
+        return response
 
 
 def register_servlets(hs, http_server):

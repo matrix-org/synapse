@@ -18,8 +18,6 @@ import logging
 from six import string_types
 from six.moves import http_client
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -33,9 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReportEventRestServlet(RestServlet):
-    PATTERNS = client_patterns(
-        "/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$"
-    )
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/report/(?P<event_id>[^/]*)$")
 
     def __init__(self, hs):
         super(ReportEventRestServlet, self).__init__()
@@ -44,9 +40,8 @@ class ReportEventRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id, event_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request, room_id, event_id):
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         body = parse_json_object_from_request(request)
@@ -65,7 +60,7 @@ class ReportEventRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
-        yield self.store.add_event_report(
+        await self.store.add_event_report(
             room_id=room_id,
             event_id=event_id,
             user_id=user_id,
@@ -74,7 +69,7 @@ class ReportEventRestServlet(RestServlet):
             received_ts=self.clock.time_msec(),
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

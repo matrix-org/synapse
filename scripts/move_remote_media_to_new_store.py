@@ -50,7 +50,7 @@ def main(src_repo, dest_repo):
     dest_paths = MediaFilePaths(dest_repo)
     for line in sys.stdin:
         line = line.strip()
-        parts = line.split('|')
+        parts = line.split("|")
         if len(parts) != 2:
             print("Unable to parse input line %s" % line, file=sys.stderr)
             exit(1)
@@ -72,7 +72,7 @@ def move_media(origin_server, file_id, src_paths, dest_paths):
     # check that the original exists
     original_file = src_paths.remote_media_filepath(origin_server, file_id)
     if not os.path.exists(original_file):
-        logger.warn(
+        logger.warning(
             "Original for %s/%s (%s) does not exist",
             origin_server,
             file_id,
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("-v", action='store_true', help='enable debug logging')
+    parser.add_argument("-v", action="store_true", help="enable debug logging")
     parser.add_argument("src_repo", help="Path to source content repo")
     parser.add_argument("dest_repo", help="Path to source content repo")
     args = parser.parse_args()

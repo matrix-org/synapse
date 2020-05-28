@@ -24,9 +24,14 @@ from synapse.util.stringutils import random_string_with_symbols
 
 
 class AccountValidityConfig(Config):
+    section = "accountvalidity"
+
     def __init__(self, config, synapse_config):
+        if config is None:
+            return
+        super(AccountValidityConfig, self).__init__()
         self.enabled = config.get("enabled", False)
-        self.renew_by_email_enabled = ("renew_at" in config)
+        self.renew_by_email_enabled = "renew_at" in config
 
         if self.enabled:
             if "period" in config:
@@ -42,7 +47,7 @@ class AccountValidityConfig(Config):
             else:
                 self.renew_email_subject = "Renew your %(app)s account"
 
-            self.startup_job_max_delta = self.period * 10. / 100.
+            self.startup_job_max_delta = self.period * 10.0 / 100.0
 
         if self.renew_by_email_enabled:
             if "public_baseurl" not in synapse_config:
@@ -77,8 +82,9 @@ class AccountValidityConfig(Config):
 
 
 class RegistrationConfig(Config):
+    section = "registration"
 
-    def read_config(self, config):
+    def read_config(self, config, **kwargs):
         self.enable_registration = bool(
             strtobool(str(config.get("enable_registration", False)))
         )
@@ -88,7 +94,7 @@ class RegistrationConfig(Config):
             )
 
         self.account_validity = AccountValidityConfig(
-            config.get("account_validity", {}), config,
+            config.get("account_validity") or {}, config
         )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
@@ -104,25 +110,48 @@ class RegistrationConfig(Config):
         self.registration_shared_secret = config.get("registration_shared_secret")
         self.register_mxid_from_3pid = config.get("register_mxid_from_3pid")
         self.register_just_use_email_for_display_name = config.get(
-            "register_just_use_email_for_display_name", False,
+            "register_just_use_email_for_display_name", False
         )
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
         self.trusted_third_party_id_servers = config.get(
-            "trusted_third_party_id_servers",
-            ["matrix.org", "vector.im"],
+            "trusted_third_party_id_servers", ["matrix.org", "vector.im"]
         )
+        account_threepid_delegates = config.get("account_threepid_delegates") or {}
+        self.account_threepid_delegate_email = account_threepid_delegates.get("email")
+        if (
+            self.account_threepid_delegate_email
+            and not self.account_threepid_delegate_email.startswith("http")
+        ):
+            raise ConfigError(
+                "account_threepid_delegates.email must begin with http:// or https://"
+            )
+        self.account_threepid_delegate_msisdn = account_threepid_delegates.get("msisdn")
+        if (
+            self.account_threepid_delegate_msisdn
+            and not self.account_threepid_delegate_msisdn.startswith("http")
+        ):
+            raise ConfigError(
+                "account_threepid_delegates.msisdn must begin with http:// or https://"
+            )
+        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
+            raise ConfigError(
+                "The configuration option `public_baseurl` is required if "
+                "`account_threepid_delegate.msisdn` is set, such that "
+                "clients know where to submit validation tokens to. Please "
+                "configure `public_baseurl`."
+            )
+
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
 
-        self.invite_3pid_guest = (
-            self.allow_guest_access and config.get("invite_3pid_guest", False)
-        )
+        if config.get("invite_3pid_guest", False):
+            raise ConfigError("invite_3pid_guest is no longer supported")
 
         self.auto_join_rooms = config.get("auto_join_rooms", [])
         for room_alias in self.auto_join_rooms:
             if not RoomAlias.is_valid(room_alias):
-                raise ConfigError('Invalid auto_join_rooms entry %s' % (room_alias,))
+                raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
         self.disable_set_displayname = config.get("disable_set_displayname", False)
@@ -130,24 +159,34 @@ class RegistrationConfig(Config):
 
         self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
         if not isinstance(self.replicate_user_profiles_to, list):
-            self.replicate_user_profiles_to = [self.replicate_user_profiles_to, ]
+            self.replicate_user_profiles_to = [self.replicate_user_profiles_to]
 
         self.shadow_server = config.get("shadow_server", None)
-        self.rewrite_identity_server_urls = config.get("rewrite_identity_server_urls", {})
-
-        self.disable_msisdn_registration = (
-            config.get("disable_msisdn_registration", False)
+        self.rewrite_identity_server_urls = (
+            config.get("rewrite_identity_server_urls") or {}
         )
 
-    def default_config(self, generate_secrets=False, **kwargs):
+        self.disable_msisdn_registration = config.get(
+            "disable_msisdn_registration", False
+        )
+
+        session_lifetime = config.get("session_lifetime")
+        if session_lifetime is not None:
+            session_lifetime = self.parse_duration(session_lifetime)
+        self.session_lifetime = session_lifetime
+
+    def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
                 random_string_with_symbols(50),
             )
         else:
-            registration_shared_secret = '# registration_shared_secret: <PRIVATE STRING>'
+            registration_shared_secret = (
+                "# registration_shared_secret: <PRIVATE STRING>"
+            )
 
-        return """\
+        return (
+            """\
         ## Registration ##
         #
         # Registration can be rate-limited using the parameters in the "Ratelimiting"
@@ -160,23 +199,6 @@ class RegistrationConfig(Config):
         # Optional account validity configuration. This allows for accounts to be denied
         # any request after a given period.
         #
-        # ``enabled`` defines whether the account validity feature is enabled. Defaults
-        # to False.
-        #
-        # ``period`` allows setting the period after which an account is valid
-        # after its registration. When renewing the account, its validity period
-        # will be extended by this amount of time. This parameter is required when using
-        # the account validity feature.
-        #
-        # ``renew_at`` is the amount of time before an account's expiry date at which
-        # Synapse will send an email to the account's email address with a renewal link.
-        # This needs the ``email`` and ``public_baseurl`` configuration sections to be
-        # filled.
-        #
-        # ``renew_email_subject`` is the subject of the email sent out with the renewal
-        # link. ``%%(app)s`` can be used as a placeholder for the ``app_name`` parameter
-        # from the ``email`` section.
-        #
         # Once this feature is enabled, Synapse will look for registered users without an
         # expiration date at startup and will add one to every account it found using the
         # current settings at that time.
@@ -187,21 +209,66 @@ class RegistrationConfig(Config):
         # date will be randomly selected within a range [now + period - d ; now + period],
         # where d is equal to 10%% of the validity period.
         #
-        #account_validity:
-        #  enabled: True
-        #  period: 6w
-        #  renew_at: 1w
-        #  renew_email_subject: "Renew your %%(app)s account"
-        #  # Directory in which Synapse will try to find the HTML files to serve to the
-        #  # user when trying to renew an account. Optional, defaults to
-        #  # synapse/res/templates.
-        #  template_dir: "res/templates"
-        #  # HTML to be displayed to the user after they successfully renewed their
-        #  # account. Optional.
-        #  account_renewed_html_path: "account_renewed.html"
-        #  # HTML to be displayed when the user tries to renew an account with an invalid
-        #  # renewal token. Optional.
-        #  invalid_token_html_path: "invalid_token.html"
+        account_validity:
+          # The account validity feature is disabled by default. Uncomment the
+          # following line to enable it.
+          #
+          #enabled: true
+
+          # The period after which an account is valid after its registration. When
+          # renewing the account, its validity period will be extended by this amount
+          # of time. This parameter is required when using the account validity
+          # feature.
+          #
+          #period: 6w
+
+          # The amount of time before an account's expiry date at which Synapse will
+          # send an email to the account's email address with a renewal link. By
+          # default, no such emails are sent.
+          #
+          # If you enable this setting, you will also need to fill out the 'email' and
+          # 'public_baseurl' configuration sections.
+          #
+          #renew_at: 1w
+
+          # The subject of the email sent out with the renewal link. '%%(app)s' can be
+          # used as a placeholder for the 'app_name' parameter from the 'email'
+          # section.
+          #
+          # Note that the placeholder must be written '%%(app)s', including the
+          # trailing 's'.
+          #
+          # If this is not set, a default value is used.
+          #
+          #renew_email_subject: "Renew your %%(app)s account"
+
+          # Directory in which Synapse will try to find templates for the HTML files to
+          # serve to the user when trying to renew an account. If not set, default
+          # templates from within the Synapse package will be used.
+          #
+          #template_dir: "res/templates"
+
+          # File within 'template_dir' giving the HTML to be displayed to the user after
+          # they successfully renewed their account. If not set, default text is used.
+          #
+          #account_renewed_html_path: "account_renewed.html"
+
+          # File within 'template_dir' giving the HTML to be displayed when the user
+          # tries to renew an account with an invalid renewal token. If not set,
+          # default text is used.
+          #
+          #invalid_token_html_path: "invalid_token.html"
+
+        # Time that a user's session remains valid for, after they log in.
+        #
+        # Note that this is not currently compatible with guest logins.
+        #
+        # Note also that this is calculated at login time: changes are not applied
+        # retrospectively to users who have already logged in.
+        #
+        # By default, this is infinite.
+        #
+        #session_lifetime: 24h
 
         # The user must provide all of the below types of 3PID when registering.
         #
@@ -238,7 +305,7 @@ class RegistrationConfig(Config):
         # pending invites for the given 3PID (and then allow it to sign up on
         # the platform):
         #
-        #allow_invited_3pids: False
+        #allow_invited_3pids: false
         #
         #allowed_local_3pids:
         #  - medium: email
@@ -251,7 +318,7 @@ class RegistrationConfig(Config):
         # If true, stop users from trying to change the 3PIDs associated with
         # their accounts.
         #
-        #disable_3pid_changes: False
+        #disable_3pid_changes: false
 
         # Enable 3PIDs lookup requests to identity servers from this server.
         #
@@ -290,6 +357,14 @@ class RegistrationConfig(Config):
         # Also defines the ID server which will be called when an account is
         # deactivated (one will be picked arbitrarily).
         #
+        # Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
+        # server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
+        # background migration script, informing itself that the identity server all of its
+        # 3PIDs have been bound to is likely one of the below.
+        #
+        # As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
+        # it is now solely used for the purposes of the background migration script, and can be
+        # removed once it has run.
         #trusted_third_party_id_servers:
         #  - matrix.org
         #  - vector.im
@@ -315,8 +390,34 @@ class RegistrationConfig(Config):
         # Useful when provisioning users based on the contents of a 3rd party
         # directory and to avoid ambiguities.
         #
-        #disable_set_displayname: False
-        #disable_set_avatar_url: False
+        #disable_set_displayname: false
+        #disable_set_avatar_url: false
+
+        # Handle threepid (email/phone etc) registration and password resets through a set of
+        # *trusted* identity servers. Note that this allows the configured identity server to
+        # reset passwords for accounts!
+        #
+        # Be aware that if `email` is not set, and SMTP options have not been
+        # configured in the email config block, registration and user password resets via
+        # email will be globally disabled.
+        #
+        # Additionally, if `msisdn` is not set, registration and password resets via msisdn
+        # will be disabled regardless. This is due to Synapse currently not supporting any
+        # method of sending SMS messages on its own.
+        #
+        # To enable using an identity server for operations regarding a particular third-party
+        # identifier type, set the value to the URL of that identity server as shown in the
+        # examples below.
+        #
+        # Servers handling the these requests must answer the `/requestToken` endpoints defined
+        # by the Matrix Identity Service API specification:
+        # https://matrix.org/docs/spec/identity_service/latest
+        #
+        # If a delegate is specified, the config option public_baseurl must also be filled out.
+        #
+        account_threepid_delegates:
+            #email: https://example.com     # Delegate email sending to example.com
+            #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms
@@ -331,17 +432,27 @@ class RegistrationConfig(Config):
         # users cannot be auto-joined since they do not exist.
         #
         #autocreate_auto_join_rooms: true
-        """ % locals()
 
-    def add_arguments(self, parser):
+        # Rewrite identity server URLs with a map from one URL to another. Applies to URLs
+        # provided by clients (which have https:// prepended) and those specified
+        # in `account_threepid_delegates`. URLs should not feature a trailing slash.
+        #
+        #rewrite_identity_server_urls:
+        #   "https://somewhere.example.com": "https://somewhereelse.example.com"
+        """
+            % locals()
+        )
+
+    @staticmethod
+    def add_arguments(parser):
         reg_group = parser.add_argument_group("registration")
         reg_group.add_argument(
-            "--enable-registration", action="store_true", default=None,
-            help="Enable registration for new users."
+            "--enable-registration",
+            action="store_true",
+            default=None,
+            help="Enable registration for new users.",
         )
 
     def read_arguments(self, args):
         if args.enable_registration is not None:
-            self.enable_registration = bool(
-                strtobool(str(args.enable_registration))
-            )
+            self.enable_registration = bool(strtobool(str(args.enable_registration)))

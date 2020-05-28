@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.types import ReadReceipt
 
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, override_config
 
 
 class FederationSenderTestCases(HomeserverTestCase):
@@ -29,6 +29,7 @@ class FederationSenderTestCases(HomeserverTestCase):
             federation_transport_client=Mock(spec=["send_transaction"]),
         )
 
+    @override_config({"send_federation": True})
     def test_send_receipts(self):
         mock_state_handler = self.hs.get_state_handler()
         mock_state_handler.get_current_hosts_in_room.return_value = ["test", "host2"]
@@ -51,16 +52,16 @@ class FederationSenderTestCases(HomeserverTestCase):
         json_cb = mock_send_transaction.call_args[0][1]
         data = json_cb()
         self.assertEqual(
-            data['edus'],
+            data["edus"],
             [
                 {
-                    'edu_type': 'm.receipt',
-                    'content': {
-                        'room_id': {
-                            'm.read': {
-                                'user_id': {
-                                    'event_ids': ['event_id'],
-                                    'data': {'ts': 1234},
+                    "edu_type": "m.receipt",
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "user_id": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
                                 }
                             }
                         }
@@ -69,6 +70,7 @@ class FederationSenderTestCases(HomeserverTestCase):
             ],
         )
 
+    @override_config({"send_federation": True})
     def test_send_receipts_with_backoff(self):
         """Send two receipts in quick succession; the second should be flushed, but
         only after 20ms"""
@@ -93,16 +95,16 @@ class FederationSenderTestCases(HomeserverTestCase):
         json_cb = mock_send_transaction.call_args[0][1]
         data = json_cb()
         self.assertEqual(
-            data['edus'],
+            data["edus"],
             [
                 {
-                    'edu_type': 'm.receipt',
-                    'content': {
-                        'room_id': {
-                            'm.read': {
-                                'user_id': {
-                                    'event_ids': ['event_id'],
-                                    'data': {'ts': 1234},
+                    "edu_type": "m.receipt",
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "user_id": {
+                                    "event_ids": ["event_id"],
+                                    "data": {"ts": 1234},
                                 }
                             }
                         }
@@ -128,16 +130,16 @@ class FederationSenderTestCases(HomeserverTestCase):
         json_cb = mock_send_transaction.call_args[0][1]
         data = json_cb()
         self.assertEqual(
-            data['edus'],
+            data["edus"],
             [
                 {
-                    'edu_type': 'm.receipt',
-                    'content': {
-                        'room_id': {
-                            'm.read': {
-                                'user_id': {
-                                    'event_ids': ['other_id'],
-                                    'data': {'ts': 1234},
+                    "edu_type": "m.receipt",
+                    "content": {
+                        "room_id": {
+                            "m.read": {
+                                "user_id": {
+                                    "event_ids": ["other_id"],
+                                    "data": {"ts": 1234},
                                 }
                             }
                         }

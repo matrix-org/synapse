@@ -135,9 +135,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         self.assertEquals(len(self.email_attempts), 1)
 
         # Attempt to reset password without clicking the link
-        self._reset_password(
-            new_password, session_id, client_secret, expected_code=401,
-        )
+        self._reset_password(new_password, session_id, client_secret, expected_code=401)
 
         # Assert we can log in with the old password
         self.login("kermit", old_password)
@@ -172,9 +170,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         session_id = "weasle"
 
         # Attempt to reset password without even requesting an email
-        self._reset_password(
-            new_password, session_id, client_secret, expected_code=401,
-        )
+        self._reset_password(new_password, session_id, client_secret, expected_code=401)
 
         # Assert we can log in with the old password
         self.login("kermit", old_password)
@@ -252,29 +248,14 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-        hs = self.setup_test_homeserver()
-        return hs
+        self.hs = self.setup_test_homeserver()
+        return self.hs
 
     def test_deactivate_account(self):
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
 
-        request_data = json.dumps({
-            "auth": {
-                "type": "m.login.password",
-                "user": user_id,
-                "password": "test",
-            },
-            "erase": False,
-        })
-        request, channel = self.make_request(
-            "POST",
-            "account/deactivate",
-            request_data,
-            access_token=tok,
-        )
-        self.render(request)
-        self.assertEqual(request.code, 200)
+        self.deactivate(user_id, tok)
 
         store = self.hs.get_datastore()
 
@@ -304,7 +285,9 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         )
 
         # Make sure the invite is here.
-        pending_invites = self.get_success(store.get_invited_rooms_for_user(invitee_id))
+        pending_invites = self.get_success(
+            store.get_invited_rooms_for_local_user(invitee_id)
+        )
         self.assertEqual(len(pending_invites), 1, pending_invites)
         self.assertEqual(pending_invites[0].room_id, room_id, pending_invites)
 
@@ -312,12 +295,16 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.deactivate(invitee_id, invitee_tok)
 
         # Check that the invite isn't there anymore.
-        pending_invites = self.get_success(store.get_invited_rooms_for_user(invitee_id))
+        pending_invites = self.get_success(
+            store.get_invited_rooms_for_local_user(invitee_id)
+        )
         self.assertEqual(len(pending_invites), 0, pending_invites)
 
         # Check that the membership of @invitee:test in the room is now "leave".
         memberships = self.get_success(
-            store.get_rooms_for_user_where_membership_is(invitee_id, [Membership.LEAVE])
+            store.get_rooms_for_local_user_where_membership_is(
+                invitee_id, [Membership.LEAVE]
+            )
         )
         self.assertEqual(len(memberships), 1, memberships)
         self.assertEqual(memberships[0].room_id, room_id, memberships)

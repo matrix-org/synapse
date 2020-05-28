@@ -36,25 +36,26 @@ def check_3pid_allowed(hs, medium, address):
 
     if hs.config.check_is_for_allowed_local_3pids:
         data = yield hs.get_simple_http_client().get_json(
-            "https://%s%s" % (
+            "https://%s%s"
+            % (
                 hs.config.check_is_for_allowed_local_3pids,
-                "/_matrix/identity/api/v1/internal-info"
+                "/_matrix/identity/api/v1/internal-info",
             ),
-            {'medium': medium, 'address': address}
+            {"medium": medium, "address": address},
         )
 
         # Check for invalid response
-        if 'hs' not in data and 'shadow_hs' not in data:
+        if "hs" not in data and "shadow_hs" not in data:
             defer.returnValue(False)
 
         # Check if this user is intended to register for this homeserver
         if (
-            data.get('hs') != hs.config.server_name
-            and data.get('shadow_hs') != hs.config.server_name
+            data.get("hs") != hs.config.server_name
+            and data.get("shadow_hs") != hs.config.server_name
         ):
             defer.returnValue(False)
 
-        if data.get('requires_invite', False) and not data.get('invited', False):
+        if data.get("requires_invite", False) and not data.get("invited", False):
             # Requires an invite but hasn't been invited
             defer.returnValue(False)
 
@@ -64,11 +65,13 @@ def check_3pid_allowed(hs, medium, address):
         for constraint in hs.config.allowed_local_3pids:
             logger.debug(
                 "Checking 3PID %s (%s) against %s (%s)",
-                address, medium, constraint['pattern'], constraint['medium'],
+                address,
+                medium,
+                constraint["pattern"],
+                constraint["medium"],
             )
-            if (
-                medium == constraint['medium'] and
-                re.match(constraint['pattern'], address)
+            if medium == constraint["medium"] and re.match(
+                constraint["pattern"], address
             ):
                 defer.returnValue(True)
     else:

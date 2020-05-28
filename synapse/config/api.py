@@ -18,17 +18,21 @@ from ._base import Config
 
 
 class ApiConfig(Config):
+    section = "api"
 
-    def read_config(self, config):
-        self.room_invite_state_types = config.get("room_invite_state_types", [
-            EventTypes.JoinRules,
-            EventTypes.CanonicalAlias,
-            EventTypes.RoomAvatar,
-            EventTypes.RoomEncryption,
-            EventTypes.Name,
-        ])
+    def read_config(self, config, **kwargs):
+        self.room_invite_state_types = config.get(
+            "room_invite_state_types",
+            [
+                EventTypes.JoinRules,
+                EventTypes.CanonicalAlias,
+                EventTypes.RoomAvatar,
+                EventTypes.RoomEncryption,
+                EventTypes.Name,
+            ],
+        )
 
-    def default_config(cls, **kwargs):
+    def generate_config_section(cls, **kwargs):
         return """\
         ## API Configuration ##
 
@@ -40,4 +44,6 @@ class ApiConfig(Config):
         #  - "{RoomAvatar}"
         #  - "{RoomEncryption}"
         #  - "{Name}"
-        """.format(**vars(EventTypes))
+        """.format(
+            **vars(EventTypes)
+        )

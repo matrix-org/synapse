@@ -50,6 +50,33 @@ and you should enable 'federation_verify_certificates' in your configuration.
 If you are *sure* you want to do this, set 'accept_keys_insecurely' on the
 trusted_key_server configuration."""
 
+TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN = """\
+Synapse requires that a list of trusted key servers are specified in order to
+provide signing keys for other servers in the federation.
+
+This homeserver does not have a trusted key server configured in
+homeserver.yaml and will fall back to the default of 'matrix.org'.
+
+Trusted key servers should be long-lived and stable which makes matrix.org a
+good choice for many admins, but some admins may wish to choose another. To
+suppress this warning, the admin should set 'trusted_key_servers' in
+homeserver.yaml to their desired key server and 'suppress_key_server_warning'
+to 'true'.
+
+In a future release the software-defined default will be removed entirely and
+the trusted key server will be defined exclusively by the value of
+'trusted_key_servers'.
+--------------------------------------------------------------------------------"""
+
+TRUSTED_KEY_SERVER_CONFIGURED_AS_M_ORG_WARN = """\
+This server is configured to use 'matrix.org' as its trusted key server via the
+'trusted_key_servers' config option. 'matrix.org' is a good choice for a key
+server since it is long-lived, stable and trusted. However, some admins may
+wish to use another server for this purpose.
+
+To suppress this warning and continue using 'matrix.org', admins should set
+'suppress_key_server_warning' to 'true' in homeserver.yaml.
+--------------------------------------------------------------------------------"""
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +92,40 @@ class TrustedKeyServer(object):
 
 
 class KeyConfig(Config):
-    def read_config(self, config):
+    section = "key"
+
+    def read_config(self, config, config_dir_path, **kwargs):
         # the signing key can be specified inline or in a separate file
         if "signing_key" in config:
             self.signing_key = read_signing_keys([config["signing_key"]])
         else:
-            self.signing_key_path = config["signing_key_path"]
-            self.signing_key = self.read_signing_key(self.signing_key_path)
+            signing_key_path = config.get("signing_key_path")
+            if signing_key_path is None:
+                signing_key_path = os.path.join(
+                    config_dir_path, config["server_name"] + ".signing.key"
+                )
+
+            self.signing_key = self.read_signing_keys(signing_key_path, "signing_key")
 
         self.old_signing_keys = self.read_old_signing_keys(
-            config.get("old_signing_keys", {})
+            config.get("old_signing_keys")
         )
         self.key_refresh_interval = self.parse_duration(
             config.get("key_refresh_interval", "1d")
         )
 
+        suppress_key_server_warning = config.get("suppress_key_server_warning", False)
+        key_server_signing_keys_path = config.get("key_server_signing_keys_path")
+        if key_server_signing_keys_path:
+            self.key_server_signing_keys = self.read_signing_keys(
+                key_server_signing_keys_path, "key_server_signing_keys_path"
+            )
+        else:
+            self.key_server_signing_keys = list(self.signing_key)
+
         # if neither trusted_key_servers nor perspectives are given, use the default.
         if "perspectives" not in config and "trusted_key_servers" not in config:
+            logger.warning(TRUSTED_KEY_SERVER_NOT_CONFIGURED_WARN)
             key_servers = [{"server_name": "matrix.org"}]
         else:
             key_servers = config.get("trusted_key_servers", [])
@@ -95,6 +139,11 @@ class KeyConfig(Config):
             # merge the 'perspectives' config into the 'trusted_key_servers' config.
             key_servers.extend(_perspectives_to_key_servers(config))
 
+            if not suppress_key_server_warning and "matrix.org" in (
+                s["server_name"] for s in key_servers
+            ):
+                logger.warning(TRUSTED_KEY_SERVER_CONFIGURED_AS_M_ORG_WARN)
+
         # list of TrustedKeyServer objects
         self.key_servers = list(
             _parse_key_servers(key_servers, self.federation_verify_certificates)
@@ -107,17 +156,15 @@ class KeyConfig(Config):
         if not self.macaroon_secret_key:
             # Unfortunately, there are people out there that don't have this
             # set. Lets just be "nice" and derive one from their secret key.
-            logger.warn("Config is missing macaroon_secret_key")
+            logger.warning("Config is missing macaroon_secret_key")
             seed = bytes(self.signing_key[0])
             self.macaroon_secret_key = hashlib.sha256(seed).digest()
-
-        self.expire_access_token = config.get("expire_access_token", False)
 
         # a secret which is used to calculate HMACs for form values, to stop
         # falsification of values
         self.form_secret = config.get("form_secret", None)
 
-    def default_config(
+    def generate_config_section(
         self, config_dir_path, server_name, generate_secrets=False, **kwargs
     ):
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -139,10 +186,6 @@ class KeyConfig(Config):
         #
         %(macaroon_secret_key)s
 
-        # Used to enable access token expiration.
-        #
-        #expire_access_token: False
-
         # a secret which is used to calculate HMACs for form values, to stop
         # falsification of values. Must be specified for the User Consent
         # forms to work.
@@ -156,14 +199,19 @@ class KeyConfig(Config):
         signing_key_path: "%(base_key_name)s.signing.key"
 
         # The keys that the server used to sign messages with but won't use
-        # to sign new messages. E.g. it has lost its private key
+        # to sign new messages.
         #
-        #old_signing_keys:
-        #  "ed25519:auto":
-        #    # Base64 encoded public key
-        #    key: "The public part of your old signing key."
-        #    # Millisecond POSIX timestamp when the key expired.
-        #    expired_ts: 123456789123
+        old_signing_keys:
+          # For each key, `key` should be the base64-encoded public key, and
+          # `expired_ts`should be the time (in milliseconds since the unix epoch) that
+          # it was last used.
+          #
+          # It is possible to build an entry from an old signing.key file using the
+          # `export_signing_key` script which is provided with synapse.
+          #
+          # For example:
+          #
+          #"ed25519:id": { key: "base64string", expired_ts: 123456789123 }
 
         # How long key response published by this server is valid for.
         # Used to set the valid_until_ts in /key/v2 APIs.
@@ -182,6 +230,10 @@ class KeyConfig(Config):
         #
         # This setting supercedes an older setting named `perspectives`. The old format
         # is still supported for backwards-compatibility, but it is deprecated.
+        #
+        # 'trusted_key_servers' defaults to matrix.org, but using it will generate a
+        # warning on start-up. To suppress this warning, set
+        # 'suppress_key_server_warning' to true.
         #
         # Options for each entry in the list include:
         #
@@ -207,22 +259,44 @@ class KeyConfig(Config):
         #      "ed25519:auto": "abcdefghijklmnopqrstuvwxyzabcdefghijklmopqr"
         #  - server_name: "my_other_trusted_server.example.com"
         #
-        # The default configuration is:
+        trusted_key_servers:
+          - server_name: "matrix.org"
+
+        # Uncomment the following to disable the warning that is emitted when the
+        # trusted_key_servers include 'matrix.org'. See above.
         #
-        #trusted_key_servers:
-        #  - server_name: "matrix.org"
+        #suppress_key_server_warning: true
+
+        # The signing keys to use when acting as a trusted key server. If not specified
+        # defaults to the server signing key.
+        #
+        # Can contain multiple keys, one per line.
+        #
+        #key_server_signing_keys_path: "key_server_signing_keys.key"
         """
             % locals()
         )
 
-    def read_signing_key(self, signing_key_path):
-        signing_keys = self.read_file(signing_key_path, "signing_key")
+    def read_signing_keys(self, signing_key_path, name):
+        """Read the signing keys in the given path.
+
+        Args:
+            signing_key_path (str)
+            name (str): Associated config key name
+
+        Returns:
+            list[SigningKey]
+        """
+
+        signing_keys = self.read_file(signing_key_path, name)
         try:
             return read_signing_keys(signing_keys.splitlines(True))
         except Exception as e:
-            raise ConfigError("Error reading signing_key: %s" % (str(e)))
+            raise ConfigError("Error reading %s: %s" % (name, str(e)))
 
     def read_old_signing_keys(self, old_signing_keys):
+        if old_signing_keys is None:
+            return {}
         keys = {}
         for key_id, key_data in old_signing_keys.items():
             if is_signing_algorithm_supported(key_id):
@@ -237,10 +311,18 @@ class KeyConfig(Config):
                 )
         return keys
 
-    def generate_files(self, config):
-        signing_key_path = config["signing_key_path"]
+    def generate_files(self, config, config_dir_path):
+        if "signing_key" in config:
+            return
+
+        signing_key_path = config.get("signing_key_path")
+        if signing_key_path is None:
+            signing_key_path = os.path.join(
+                config_dir_path, config["server_name"] + ".signing.key"
+            )
 
         if not self.path_exists(signing_key_path):
+            print("Generating signing key file %s" % (signing_key_path,))
             with open(signing_key_path, "w") as signing_key_file:
                 key_id = "a_" + random_string(4)
                 write_signing_keys(signing_key_file, (generate_signing_key(key_id),))
@@ -348,9 +430,8 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
 
                 result.verify_keys[key_id] = verify_key
 
-        if (
-            not federation_verify_certificates and
-            not server.get("accept_keys_insecurely")
+        if not federation_verify_certificates and not server.get(
+            "accept_keys_insecurely"
         ):
             _assert_keyserver_has_verify_keys(result)
 

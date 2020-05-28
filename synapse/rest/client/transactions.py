@@ -17,8 +17,8 @@
 to ensure idempotency when performing PUTs using the REST API."""
 import logging
 
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.util.async_helpers import ObservableDeferred
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,6 @@ CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
 
 
 class HttpTransactionCache(object):
-
     def __init__(self, hs):
         self.hs = hs
         self.auth = self.hs.get_auth()
@@ -53,7 +52,7 @@ class HttpTransactionCache(object):
             str: A transaction key
         """
         token = self.auth.get_access_token_from_request(request)
-        return request.path.decode('utf8') + "/" + token
+        return request.path.decode("utf8") + "/" + token
 
     def fetch_or_execute_request(self, request, fn, *args, **kwargs):
         """A helper function for fetch_or_execute which extracts

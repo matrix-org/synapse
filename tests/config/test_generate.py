@@ -17,6 +17,8 @@ import os.path
 import re
 import shutil
 import tempfile
+from contextlib import redirect_stdout
+from io import StringIO
 
 from synapse.config.homeserver import HomeServerConfig
 
@@ -32,20 +34,21 @@ class ConfigGenerationTestCase(unittest.TestCase):
         shutil.rmtree(self.dir)
 
     def test_generate_config_generates_files(self):
-        HomeServerConfig.load_or_generate_config(
-            "",
-            [
-                "--generate-config",
-                "-c",
-                self.file,
-                "--report-stats=yes",
-                "-H",
-                "lemurs.win",
-            ],
-        )
+        with redirect_stdout(StringIO()):
+            HomeServerConfig.load_or_generate_config(
+                "",
+                [
+                    "--generate-config",
+                    "-c",
+                    self.file,
+                    "--report-stats=yes",
+                    "-H",
+                    "lemurs.win",
+                ],
+            )
 
         self.assertSetEqual(
-            set(["homeserver.yaml", "lemurs.win.log.config", "lemurs.win.signing.key"]),
+            {"homeserver.yaml", "lemurs.win.log.config", "lemurs.win.signing.key"},
             set(os.listdir(self.dir)),
         )
 

@@ -17,7 +17,8 @@ import logging
 
 from twisted.internet import defer
 
-from synapse.events import event_type_from_format_version
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -37,6 +38,9 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         {
             "event": { .. serialized event .. },
+            "room_version": .., // "1", "2", "3", etc: the version of the room
+                                // containing the event
+            "event_format_version": .., // 1,2,3 etc: the event format version
             "internal_metadata": { .. serialized internal_metadata .. },
             "rejected_reason": ..,   // The event.rejected_reason field
             "context": { .. serialized event context .. },
@@ -45,6 +49,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "extra_users": [],
         }
     """
+
     NAME = "send_event"
     PATH_ARGS = ("event_id",)
 
@@ -53,12 +58,14 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.clock = hs.get_clock()
 
     @staticmethod
     @defer.inlineCallbacks
-    def _serialize_payload(event_id, store, event, context, requester,
-                           ratelimit, extra_users):
+    def _serialize_payload(
+        event_id, store, event, context, requester, ratelimit, extra_users
+    ):
         """
         Args:
             event_id (str)
@@ -74,6 +81,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
 
         payload = {
             "event": event.get_pdu_json(),
+            "room_version": event.room_version.identifier,
             "event_format_version": event.format_version,
             "internal_metadata": event.internal_metadata.get_dict(),
             "rejected_reason": event.rejected_reason,
@@ -83,23 +91,23 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "extra_users": [u.to_string() for u in extra_users],
         }
 
-        defer.returnValue(payload)
+        return payload
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, event_id):
+    async def _handle_request(self, request, event_id):
         with Measure(self.clock, "repl_send_event_parse"):
             content = parse_json_object_from_request(request)
 
             event_dict = content["event"]
-            format_ver = content["event_format_version"]
+            room_ver = KNOWN_ROOM_VERSIONS[content["room_version"]]
             internal_metadata = content["internal_metadata"]
             rejected_reason = content["rejected_reason"]
 
-            EventType = event_type_from_format_version(format_ver)
-            event = EventType(event_dict, internal_metadata, rejected_reason)
+            event = make_event_from_dict(
+                event_dict, room_ver, internal_metadata, rejected_reason
+            )
 
             requester = Requester.deserialize(self.store, content["requester"])
-            context = yield EventContext.deserialize(self.store, content["context"])
+            context = EventContext.deserialize(self.storage, content["context"])
 
             ratelimit = content["ratelimit"]
             extra_users = [UserID.from_string(u) for u in content["extra_users"]]
@@ -108,17 +116,14 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             request.authenticated_entity = requester.user.to_string()
 
         logger.info(
-            "Got event to send with ID: %s into room: %s",
-            event.event_id, event.room_id,
+            "Got event to send with ID: %s into room: %s", event.event_id, event.room_id
         )
 
-        yield self.event_creation_handler.persist_and_notify_client_event(
-            requester, event, context,
-            ratelimit=ratelimit,
-            extra_users=extra_users,
+        await self.event_creation_handler.persist_and_notify_client_event(
+            requester, event, context, ratelimit=ratelimit, extra_users=extra_users
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

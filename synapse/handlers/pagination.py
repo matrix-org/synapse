@@ -22,11 +22,11 @@ from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import SynapseError
+from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.types import RoomStreamToken
 from synapse.util.async_helpers import ReadWriteLock
-from synapse.util.logcontext import run_in_background
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
 
@@ -58,9 +58,7 @@ class PurgeStatus(object):
         self.status = PurgeStatus.STATUS_ACTIVE
 
     def asdict(self):
-        return {
-            "status": PurgeStatus.STATUS_TEXT[self.status]
-        }
+        return {"status": PurgeStatus.STATUS_TEXT[self.status]}
 
 
 class PaginationHandler(object):
@@ -74,7 +72,10 @@ class PaginationHandler(object):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
         self.clock = hs.get_clock()
+        self._server_name = hs.hostname
 
         self.pagination_lock = ReadWriteLock()
         self._purges_in_progress_by_room = set()
@@ -87,6 +88,8 @@ class PaginationHandler(object):
         if hs.config.retention_enabled:
             # Run the purge jobs described in the configuration file.
             for job in hs.config.retention_purge_jobs:
+                logger.info("Setting up purge job with config: %s", job)
+
                 self.clock.looping_call(
                     run_as_background_process,
                     job["interval"],
@@ -129,11 +132,22 @@ class PaginationHandler(object):
         else:
             include_null = False
 
+        logger.info(
+            "[purge] Running purge job for %s < max_lifetime <= %s (include NULLs = %s)",
+            min_ms,
+            max_ms,
+            include_null,
+        )
+
         rooms = yield self.store.get_rooms_for_retention_period_in_range(
             min_ms, max_ms, include_null
         )
 
+        logger.debug("[purge] Rooms to purge: %s", rooms)
+
         for room_id, retention_policy in iteritems(rooms):
+            logger.info("[purge] Attempting to purge messages in room %s", room_id)
+
             if room_id in self._purges_in_progress_by_room:
                 logger.warning(
                     "[purge] not purging room %s as there's an ongoing purge running"
@@ -153,20 +167,17 @@ class PaginationHandler(object):
             # Figure out what token we should start purging at.
             ts = self.clock.time_msec() - max_lifetime
 
-            stream_ordering = (
-                yield self.store.find_first_stream_ordering_after_ts(ts)
-            )
+            stream_ordering = yield self.store.find_first_stream_ordering_after_ts(ts)
 
-            r = (
-                yield self.store.get_room_event_after_stream_ordering(
-                    room_id, stream_ordering,
-                )
+            r = yield self.store.get_room_event_before_stream_ordering(
+                room_id, stream_ordering,
             )
             if not r:
                 logger.warning(
                     "[purge] purging events not possible: No event found "
                     "(ts %i => stream_ordering %i)",
-                    ts, stream_ordering,
+                    ts,
+                    stream_ordering,
                 )
                 continue
 
@@ -185,13 +196,10 @@ class PaginationHandler(object):
             # the background so that it's not blocking any other operation apart from
             # other purges in the same room.
             run_as_background_process(
-                "_purge_history",
-                self._purge_history,
-                purge_id, room_id, token, True,
+                "_purge_history", self._purge_history, purge_id, room_id, token, True,
             )
 
-    def start_purge_history(self, room_id, token,
-                            delete_local_events=False):
+    def start_purge_history(self, room_id, token, delete_local_events=False):
         """Start off a history purge on a room.
 
         Args:
@@ -206,8 +214,7 @@ class PaginationHandler(object):
         """
         if room_id in self._purges_in_progress_by_room:
             raise SynapseError(
-                400,
-                "History purge already in progress for %s" % (room_id, ),
+                400, "History purge already in progress for %s" % (room_id,)
             )
 
         purge_id = random_string(16)
@@ -218,14 +225,12 @@ class PaginationHandler(object):
 
         self._purges_by_id[purge_id] = PurgeStatus()
         run_in_background(
-            self._purge_history,
-            purge_id, room_id, token, delete_local_events,
+            self._purge_history, purge_id, room_id, token, delete_local_events
         )
         return purge_id
 
     @defer.inlineCallbacks
-    def _purge_history(self, purge_id, room_id, token,
-                       delete_local_events):
+    def _purge_history(self, purge_id, room_id, token, delete_local_events):
         """Carry out a history purge on a room.
 
         Args:
@@ -241,16 +246,15 @@ class PaginationHandler(object):
         self._purges_in_progress_by_room.add(room_id)
         try:
             with (yield self.pagination_lock.write(room_id)):
-                yield self.store.purge_history(
-                    room_id, token, delete_local_events,
+                yield self.storage.purge_events.purge_history(
+                    room_id, token, delete_local_events
                 )
             logger.info("[purge] complete")
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_COMPLETE
         except Exception:
             f = Failure()
             logger.error(
-                "[purge] failed",
-                exc_info=(f.type, f.value, f.getTracebackObject()),
+                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())
             )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
         finally:
@@ -259,6 +263,7 @@ class PaginationHandler(object):
             # remove the purge from the list 24 hours after it completes
             def clear_purge():
                 del self._purges_by_id[purge_id]
+
             self.hs.get_reactor().callLater(24 * 3600, clear_purge)
 
     def get_purge_status(self, purge_id):
@@ -272,9 +277,30 @@ class PaginationHandler(object):
         """
         return self._purges_by_id.get(purge_id)
 
-    @defer.inlineCallbacks
-    def get_messages(self, requester, room_id=None, pagin_config=None,
-                     as_client_event=True, event_filter=None):
+    async def purge_room(self, room_id):
+        """Purge the given room from the database"""
+        with (await self.pagination_lock.write(room_id)):
+            # check we know about the room
+            await self.store.get_room_version_id(room_id)
+
+            # first check that we have no users in this room
+            joined = await defer.maybeDeferred(
+                self.store.is_host_joined, room_id, self._server_name
+            )
+
+            if joined:
+                raise SynapseError(400, "Users are still joined to this room")
+
+            await self.storage.purge_events.purge_room(room_id)
+
+    async def get_messages(
+        self,
+        requester,
+        room_id=None,
+        pagin_config=None,
+        as_client_event=True,
+        event_filter=None,
+    ):
         """Get messages in a room.
 
         Args:
@@ -293,9 +319,7 @@ class PaginationHandler(object):
             room_token = pagin_config.from_token.room_key
         else:
             pagin_config.from_token = (
-                yield self.hs.get_event_sources().get_current_token_for_room(
-                    room_id=room_id
-                )
+                await self.hs.get_event_sources().get_current_token_for_pagination()
             )
             room_token = pagin_config.from_token.room_key
 
@@ -307,18 +331,21 @@ class PaginationHandler(object):
 
         source_config = pagin_config.get_source_config("room")
 
-        with (yield self.pagination_lock.read(room_id)):
-            membership, member_event_id = yield self.auth.check_in_room_or_world_readable(
-                room_id, user_id
+        with (await self.pagination_lock.read(room_id)):
+            (
+                membership,
+                member_event_id,
+            ) = await self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
             )
 
-            if source_config.direction == 'b':
+            if source_config.direction == "b":
                 # if we're going backwards, we might need to backfill. This
                 # requires that we have a topo token.
                 if room_token.topological:
                     max_topo = room_token.topological
                 else:
-                    max_topo = yield self.store.get_max_topological_token(
+                    max_topo = await self.store.get_max_topological_token(
                         room_id, room_token.stream
                     )
 
@@ -326,18 +353,18 @@ class PaginationHandler(object):
                     # If they have left the room then clamp the token to be before
                     # they left the room, to save the effort of loading from the
                     # database.
-                    leave_token = yield self.store.get_topological_token_for_event(
+                    leave_token = await self.store.get_topological_token_for_event(
                         member_event_id
                     )
                     leave_token = RoomStreamToken.parse(leave_token)
                     if leave_token.topological < max_topo:
                         source_config.from_key = str(leave_token)
 
-                yield self.hs.get_handlers().federation_handler.maybe_backfill(
+                await self.hs.get_handlers().federation_handler.maybe_backfill(
                     room_id, max_topo
                 )
 
-            events, next_key = yield self.store.paginate_room_events(
+            events, next_key = await self.store.paginate_room_events(
                 room_id=room_id,
                 from_key=source_config.from_key,
                 to_key=source_config.to_key,
@@ -346,27 +373,22 @@ class PaginationHandler(object):
                 event_filter=event_filter,
             )
 
-            next_token = pagin_config.from_token.copy_and_replace(
-                "room_key", next_key
-            )
+            next_token = pagin_config.from_token.copy_and_replace("room_key", next_key)
 
         if events:
             if event_filter:
                 events = event_filter.filter(events)
 
-            events = yield filter_events_for_client(
-                self.store,
-                user_id,
-                events,
-                is_peeking=(member_event_id is None),
+            events = await filter_events_for_client(
+                self.storage, user_id, events, is_peeking=(member_event_id is None)
             )
 
         if not events:
-            defer.returnValue({
+            return {
                 "chunk": [],
                 "start": pagin_config.from_token.to_string(),
                 "end": next_token.to_string(),
-            })
+            }
 
         state = None
         if event_filter and event_filter.lazy_load_members() and len(events) > 0:
@@ -374,25 +396,23 @@ class PaginationHandler(object):
 
             # FIXME: we also care about invite targets etc.
             state_filter = StateFilter.from_types(
-                (EventTypes.Member, event.sender)
-                for event in events
+                (EventTypes.Member, event.sender) for event in events
             )
 
-            state_ids = yield self.store.get_state_ids_for_event(
-                events[0].event_id, state_filter=state_filter,
+            state_ids = await self.state_store.get_state_ids_for_event(
+                events[0].event_id, state_filter=state_filter
             )
 
             if state_ids:
-                state = yield self.store.get_events(list(state_ids.values()))
+                state = await self.store.get_events(list(state_ids.values()))
                 state = state.values()
 
         time_now = self.clock.time_msec()
 
         chunk = {
             "chunk": (
-                yield self._event_serializer.serialize_events(
-                    events, time_now,
-                    as_client_event=as_client_event,
+                await self._event_serializer.serialize_events(
+                    events, time_now, as_client_event=as_client_event
                 )
             ),
             "start": pagin_config.from_token.to_string(),
@@ -400,11 +420,8 @@ class PaginationHandler(object):
         }
 
         if state:
-            chunk["state"] = (
-                yield self._event_serializer.serialize_events(
-                    state, time_now,
-                    as_client_event=as_client_event,
-                )
+            chunk["state"] = await self._event_serializer.serialize_events(
+                state, time_now, as_client_event=as_client_event
             )
 
-        defer.returnValue(chunk)
+        return chunk

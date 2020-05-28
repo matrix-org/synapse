@@ -25,7 +25,6 @@ import abc
 import logging
 import os
 
-from twisted.enterprise import adbapi
 from twisted.mail.smtp import sendmail
 
 from synapse.api.auth import Auth
@@ -33,6 +32,7 @@ from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
 from synapse.appservice.scheduler import ApplicationServiceScheduler
+from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
@@ -50,7 +50,7 @@ from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
-from synapse.groups.groups_server import GroupsServerHandler
+from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers import Handlers
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
@@ -62,7 +62,7 @@ from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
-from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
@@ -93,8 +93,11 @@ from synapse.rest.media.v1.media_repository import (
 from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
-from synapse.server_notices.worker_server_notices_sender import WorkerServerNoticesSender
+from synapse.server_notices.worker_server_notices_sender import (
+    WorkerServerNoticesSender,
+)
 from synapse.state import StateHandler, StateResolutionHandler
+from synapse.storage import DataStores, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -129,105 +132,108 @@ class HomeServer(object):
     __metaclass__ = abc.ABCMeta
 
     DEPENDENCIES = [
-        'http_client',
-        'db_pool',
-        'federation_client',
-        'federation_server',
-        'handlers',
-        'auth',
-        'room_creation_handler',
-        'state_handler',
-        'state_resolution_handler',
-        'presence_handler',
-        'sync_handler',
-        'typing_handler',
-        'room_list_handler',
-        'acme_handler',
-        'auth_handler',
-        'device_handler',
-        'stats_handler',
-        'e2e_keys_handler',
-        'e2e_room_keys_handler',
-        'event_handler',
-        'event_stream_handler',
-        'initial_sync_handler',
-        'application_service_api',
-        'application_service_scheduler',
-        'application_service_handler',
-        'device_message_handler',
-        'profile_handler',
-        'event_creation_handler',
-        'deactivate_account_handler',
-        'set_password_handler',
-        'notifier',
-        'event_sources',
-        'keyring',
-        'pusherpool',
-        'event_builder_factory',
-        'filtering',
-        'http_client_context_factory',
+        "http_client",
+        "federation_client",
+        "federation_server",
+        "handlers",
+        "auth",
+        "room_creation_handler",
+        "state_handler",
+        "state_resolution_handler",
+        "presence_handler",
+        "sync_handler",
+        "typing_handler",
+        "room_list_handler",
+        "acme_handler",
+        "auth_handler",
+        "device_handler",
+        "stats_handler",
+        "e2e_keys_handler",
+        "e2e_room_keys_handler",
+        "event_handler",
+        "event_stream_handler",
+        "initial_sync_handler",
+        "application_service_api",
+        "application_service_scheduler",
+        "application_service_handler",
+        "device_message_handler",
+        "profile_handler",
+        "event_creation_handler",
+        "deactivate_account_handler",
+        "set_password_handler",
+        "notifier",
+        "event_sources",
+        "keyring",
+        "pusherpool",
+        "event_builder_factory",
+        "filtering",
+        "http_client_context_factory",
         "proxied_http_client",
-        'simple_http_client',
-        'media_repository',
-        'media_repository_resource',
-        'federation_transport_client',
-        'federation_sender',
-        'receipts_handler',
-        'macaroon_generator',
-        'tcp_replication',
-        'read_marker_handler',
-        'action_generator',
-        'user_directory_handler',
-        'groups_local_handler',
-        'groups_server_handler',
-        'groups_attestation_signing',
-        'groups_attestation_renewer',
-        'secrets',
-        'spam_checker',
-        'third_party_event_rules',
-        'room_member_handler',
-        'federation_registry',
-        'server_notices_manager',
-        'server_notices_sender',
-        'message_handler',
-        'pagination_handler',
-        'room_context_handler',
-        'sendmail',
-        'registration_handler',
-        'account_validity_handler',
-        'event_client_serializer',
-        'password_policy_handler',
+        "simple_http_client",
+        "proxied_http_client",
+        "media_repository",
+        "media_repository_resource",
+        "federation_transport_client",
+        "federation_sender",
+        "receipts_handler",
+        "macaroon_generator",
+        "tcp_replication",
+        "read_marker_handler",
+        "action_generator",
+        "user_directory_handler",
+        "groups_local_handler",
+        "groups_server_handler",
+        "groups_attestation_signing",
+        "groups_attestation_renewer",
+        "secrets",
+        "spam_checker",
+        "third_party_event_rules",
+        "room_member_handler",
+        "federation_registry",
+        "server_notices_manager",
+        "server_notices_sender",
+        "message_handler",
+        "pagination_handler",
+        "room_context_handler",
+        "sendmail",
+        "registration_handler",
+        "account_validity_handler",
+        "saml_handler",
+        "event_client_serializer",
+        "storage",
+        "password_policy_handler",
     ]
 
-    REQUIRED_ON_MASTER_STARTUP = [
-        "user_directory_handler",
-        "stats_handler"
-    ]
+    REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
 
     # This is overridden in derived application classes
     # (such as synapse.app.homeserver.SynapseHomeServer) and gives the class to be
     # instantiated during setup() for future return by get_datastore()
     DATASTORE_CLASS = abc.abstractproperty()
 
-    def __init__(self, hostname, reactor=None, **kwargs):
+    def __init__(self, hostname: str, config: HomeServerConfig, reactor=None, **kwargs):
         """
         Args:
             hostname : The hostname for the server.
+            config: The full config for the homeserver.
         """
         if not reactor:
             from twisted.internet import reactor
 
         self._reactor = reactor
         self.hostname = hostname
+        self.config = config
         self._building = {}
         self._listening_services = []
+        self.start_time = None
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
+        self.admin_redaction_ratelimiter = Ratelimiter()
         self.registration_ratelimiter = Ratelimiter()
 
-        self.datastore = None
+        self.datastores = None
 
         # Other kwargs are explicit dependencies
         for depname in kwargs:
@@ -235,9 +241,8 @@ class HomeServer(object):
 
     def setup(self):
         logger.info("Setting up.")
-        with self.get_db_conn() as conn:
-            self.datastore = self.DATASTORE_CLASS(conn, self)
-            conn.commit()
+        self.start_time = int(self.get_clock().time())
+        self.datastores = DataStores(self.DATASTORE_CLASS, self)
         logger.info("Finished setting up.")
 
     def setup_master(self):
@@ -269,7 +274,10 @@ class HomeServer(object):
         return self.clock
 
     def get_datastore(self):
-        return self.datastore
+        return self.datastores.main
+
+    def get_datastores(self):
+        return self.datastores
 
     def get_config(self):
         return self.config
@@ -282,6 +290,9 @@ class HomeServer(object):
 
     def get_registration_ratelimiter(self):
         return self.registration_ratelimiter
+
+    def get_admin_redaction_ratelimiter(self):
+        return self.admin_redaction_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)
@@ -311,8 +322,8 @@ class HomeServer(object):
     def build_proxied_http_client(self):
         return SimpleHttpClient(
             self,
-            http_proxy=os.getenv("http_proxy"),
-            https_proxy=os.getenv("HTTPS_PROXY"),
+            http_proxy=os.getenvb(b"http_proxy"),
+            https_proxy=os.getenvb(b"HTTPS_PROXY"),
         )
 
     def build_room_creation_handler(self):
@@ -417,32 +428,6 @@ class HomeServer(object):
         )
         return MatrixFederationHttpClient(self, tls_client_options_factory)
 
-    def build_db_pool(self):
-        name = self.db_config["name"]
-
-        return adbapi.ConnectionPool(
-            name,
-            cp_reactor=self.get_reactor(),
-            **self.db_config.get("args", {})
-        )
-
-    def get_db_conn(self, run_new_connection=True):
-        """Makes a new connection to the database, skipping the db pool
-
-        Returns:
-            Connection: a connection object implementing the PEP-249 spec
-        """
-        # Any param beginning with cp_ is a parameter for adbapi, and should
-        # not be passed to the database engine.
-        db_params = {
-            k: v for k, v in self.db_config.get("args", {}).items()
-            if not k.startswith("cp_")
-        }
-        db_conn = self.database_engine.module.connect(**db_params)
-        if run_new_connection:
-            self.database_engine.on_new_connection(db_conn)
-        return db_conn
-
     def build_media_repository_resource(self):
         # build the media repo resource. This indirects through the HomeServer
         # to ensure that we only have a single instance of
@@ -478,10 +463,16 @@ class HomeServer(object):
         return UserDirectoryHandler(self)
 
     def build_groups_local_handler(self):
-        return GroupsLocalHandler(self)
+        if self.config.worker_app:
+            return GroupsLocalWorkerHandler(self)
+        else:
+            return GroupsLocalHandler(self)
 
     def build_groups_server_handler(self):
-        return GroupsServerHandler(self)
+        if self.config.worker_app:
+            return GroupsServerWorkerHandler(self)
+        else:
+            return GroupsServerHandler(self)
 
     def build_groups_attestation_signing(self):
         return GroupAttestationSigning(self)
@@ -537,8 +528,16 @@ class HomeServer(object):
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
 
+    def build_saml_handler(self):
+        from synapse.handlers.saml_handler import SamlHandler
+
+        return SamlHandler(self)
+
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
+
+    def build_storage(self) -> Storage:
+        return Storage(self, self.datastores)
 
     def build_password_policy_handler(self):
         return PasswordPolicyHandler(self)
@@ -569,9 +568,7 @@ def _make_dependency_method(depname):
         if builder:
             # Prevent cyclic dependencies from deadlocking
             if depname in hs._building:
-                raise ValueError("Cyclic dependency while building %s" % (
-                    depname,
-                ))
+                raise ValueError("Cyclic dependency while building %s" % (depname,))
             hs._building[depname] = 1
 
             dep = builder()
@@ -582,9 +579,7 @@ def _make_dependency_method(depname):
             return dep
 
         raise NotImplementedError(
-            "%s has no %s nor a builder for it" % (
-                type(hs).__name__, depname,
-            )
+            "%s has no %s nor a builder for it" % (type(hs).__name__, depname)
         )
 
     setattr(HomeServer, "get_%s" % (depname), _get)

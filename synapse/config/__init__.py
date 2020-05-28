@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import ConfigError
+from ._base import ConfigError, find_config_files
 
-# export ConfigError if somebody does import *
+# export ConfigError and find_config_files if somebody does
+# import *
 # this is largely a fudge to stop PEP8 moaning about the import
-__all__ = ["ConfigError"]
+__all__ = ["ConfigError", "find_config_files"]

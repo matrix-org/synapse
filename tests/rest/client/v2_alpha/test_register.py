@@ -38,19 +38,12 @@ from tests import unittest
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [register.register_servlets]
+    url = b"/_matrix/client/r0/register"
 
-    def make_homeserver(self, reactor, clock):
-
-        self.url = b"/_matrix/client/r0/register"
-
-        self.hs = self.setup_test_homeserver()
-        self.hs.config.enable_registration = True
-        self.hs.config.registrations_require_3pid = []
-        self.hs.config.auto_join_rooms = []
-        self.hs.config.enable_registration_captcha = False
-        self.hs.config.allow_guest_access = True
-
-        return self.hs
+    def default_config(self, name="test"):
+        config = super().default_config(name)
+        config["allow_guest_access"] = True
+        return config
 
     def test_POST_appservice_registration_valid(self):
         user_id = "@as_user_kermit:test"
@@ -203,12 +196,78 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    def test_advertised_flows(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        # with the stock config, we only expect the dummy flow
+        self.assertCountEqual([["m.login.dummy"]], (f["stages"] for f in flows))
+
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://test_server",
+            "enable_registration_captcha": True,
+            "user_consent": {
+                "version": "1",
+                "template_dir": "/",
+                "require_at_registration": True,
+            },
+            "account_threepid_delegates": {
+                "email": "https://id_server",
+                "msisdn": "https://id_server",
+            },
+        }
+    )
+    def test_advertised_flows_captcha_and_terms_and_3pids(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        self.assertCountEqual(
+            [
+                ["m.login.recaptcha", "m.login.terms", "m.login.dummy"],
+                ["m.login.recaptcha", "m.login.terms", "m.login.email.identity"],
+                ["m.login.recaptcha", "m.login.terms", "m.login.msisdn"],
+                [
+                    "m.login.recaptcha",
+                    "m.login.terms",
+                    "m.login.msisdn",
+                    "m.login.email.identity",
+                ],
+            ],
+            (f["stages"] for f in flows),
+        )
+
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://test_server",
+            "registrations_require_3pid": ["email"],
+            "disable_msisdn_registration": True,
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_advertised_flows_no_msisdn_email_required(self):
+        request, channel = self.make_request(b"POST", self.url, b"{}")
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        flows = channel.json_body["flows"]
+
+        # with the stock config, we expect all four combinations of 3pid
+        self.assertCountEqual(
+            [["m.login.email.identity"]], (f["stages"] for f in flows)
+        )
+
 
 class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
 
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-    ]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
 
@@ -219,15 +278,11 @@ class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
         config["show_users_in_user_directory"] = False
         config["replicate_user_profiles_to"] = ["fakeserver"]
 
-        mock_http_client = Mock(spec=[
-            "get_json",
-            "post_json_get_json",
-        ])
+        mock_http_client = Mock(spec=["get_json", "post_json_get_json"])
         mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
 
         self.hs = self.setup_test_homeserver(
-            config=config,
-            simple_http_client=mock_http_client,
+            config=config, simple_http_client=mock_http_client
         )
 
         return self.hs
@@ -376,14 +431,11 @@ class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
         config["replicate_user_profiles_to"] = "test.is"
 
         # Mock homeserver requests to an identity server
-        mock_http_client = Mock(spec=[
-            "post_json_get_json",
-        ])
+        mock_http_client = Mock(spec=["post_json_get_json"])
         mock_http_client.post_json_get_json.return_value = defer.succeed((200, "{}"))
 
         self.hs = self.setup_test_homeserver(
-            config=config,
-            simple_http_client=mock_http_client,
+            config=config, simple_http_client=mock_http_client
         )
 
         return self.hs
@@ -517,14 +569,13 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         # Email config.
         self.email_attempts = []
 
-        def sendmail(*args, **kwargs):
+        async def sendmail(*args, **kwargs):
             self.email_attempts.append((args, kwargs))
-            return
 
         config["email"] = {
             "enable_notifs": True,
             "template_dir": os.path.abspath(
-                pkg_resources.resource_filename('synapse', 'res/templates')
+                pkg_resources.resource_filename("synapse", "res/templates")
             ),
             "expiry_template_html": "notice_expiry.html",
             "expiry_template_text": "notice_expiry.txt",
@@ -624,19 +675,18 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         (user_id, tok) = self.create_user()
 
-        request_data = json.dumps({
-            "auth": {
-                "type": "m.login.password",
-                "user": user_id,
-                "password": "monkey",
-            },
-            "erase": False,
-        })
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "user": user_id,
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
         request, channel = self.make_request(
-            "POST",
-            "account/deactivate",
-            request_data,
-            access_token=tok,
+            "POST", "account/deactivate", request_data, access_token=tok
         )
         self.render(request)
         self.assertEqual(request.code, 200, channel.result)
@@ -660,7 +710,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
                 added_at=now,
             )
         )
-        return (user_id, tok)
+        return user_id, tok
 
     def test_manual_email_send_expired_account(self):
         user_id = self.register_user("kermit", "monkey")
@@ -700,20 +750,16 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
 class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
 
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-    ]
+    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
 
     def make_homeserver(self, reactor, clock):
         self.validity_period = 10
-        self.max_delta = self.validity_period * 10. / 100.
+        self.max_delta = self.validity_period * 10.0 / 100.0
 
         config = self.default_config()
 
         config["enable_registration"] = True
-        config["account_validity"] = {
-            "enabled": False,
-        }
+        config["account_validity"] = {"enabled": False}
 
         self.hs = self.setup_test_homeserver(config=config)
         self.hs.config.account_validity.period = self.validity_period

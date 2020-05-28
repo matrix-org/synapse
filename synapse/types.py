@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +15,46 @@
 # limitations under the License.
 import re
 import string
+import sys
 from collections import namedtuple
+from typing import Any, Dict, Tuple, TypeVar
 
 from six.moves import filter
 
 import attr
+from signedjson.key import decode_verify_key_bytes
+from unpaddedbase64 import decode_base64
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
+
+# define a version of typing.Collection that works on python 3.5
+if sys.version_info[:3] >= (3, 6, 0):
+    from typing import Collection
+else:
+    from typing import Sized, Iterable, Container
+
+    T_co = TypeVar("T_co", covariant=True)
+
+    class Collection(Iterable[T_co], Container[T_co], Sized):
+        __slots__ = ()
 
 
-class Requester(namedtuple("Requester", [
-    "user", "access_token_id", "is_guest", "device_id", "app_service",
-])):
+# Define a state map type from type/state_key to T (usually an event ID or
+# event)
+T = TypeVar("T")
+StateMap = Dict[Tuple[str, str], T]
+
+
+# the type of a JSON-serialisable dict. This could be made stronger, but it will
+# do for now.
+JsonDict = Dict[str, Any]
+
+
+class Requester(
+    namedtuple(
+        "Requester", ["user", "access_token_id", "is_guest", "device_id", "app_service"]
+    )
+):
     """
     Represents the user making a request
 
@@ -78,8 +107,9 @@ class Requester(namedtuple("Requester", [
         )
 
 
-def create_requester(user_id, access_token_id=None, is_guest=False,
-                     device_id=None, app_service=None):
+def create_requester(
+    user_id, access_token_id=None, is_guest=False, device_id=None, app_service=None
+):
     """
     Create a new ``Requester`` object
 
@@ -103,7 +133,7 @@ def get_domain_from_id(string):
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
-    return string[idx + 1:]
+    return string[idx + 1 :]
 
 
 def get_localpart_from_id(string):
@@ -113,9 +143,7 @@ def get_localpart_from_id(string):
     return string[1:idx]
 
 
-class DomainSpecificString(
-        namedtuple("DomainSpecificString", ("localpart", "domain"))
-):
+class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "domain"))):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
 
@@ -140,19 +168,22 @@ class DomainSpecificString(
         return self
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, s: str):
         """Parse the string given by 's' into a structure object."""
         if len(s) < 1 or s[0:1] != cls.SIGIL:
-            raise SynapseError(400, "Expected %s string to start with '%s'" % (
-                cls.__name__, cls.SIGIL,
-            ))
+            raise SynapseError(
+                400,
+                "Expected %s string to start with '%s'" % (cls.__name__, cls.SIGIL),
+                Codes.INVALID_PARAM,
+            )
 
-        parts = s[1:].split(':', 1)
+        parts = s[1:].split(":", 1)
         if len(parts) != 2:
             raise SynapseError(
-                400, "Expected %s of the form '%slocalname:domain'" % (
-                    cls.__name__, cls.SIGIL,
-                )
+                400,
+                "Expected %s of the form '%slocalname:domain'"
+                % (cls.__name__, cls.SIGIL),
+                Codes.INVALID_PARAM,
             )
 
         domain = parts[1]
@@ -178,47 +209,52 @@ class DomainSpecificString(
 
 class UserID(DomainSpecificString):
     """Structure representing a user ID."""
+
     SIGIL = "@"
 
 
 class RoomAlias(DomainSpecificString):
     """Structure representing a room name."""
+
     SIGIL = "#"
 
 
 class RoomID(DomainSpecificString):
     """Structure representing a room id. """
+
     SIGIL = "!"
 
 
 class EventID(DomainSpecificString):
     """Structure representing an event id. """
+
     SIGIL = "$"
 
 
 class GroupID(DomainSpecificString):
     """Structure representing a group ID."""
+
     SIGIL = "+"
 
     @classmethod
     def from_string(cls, s):
         group_id = super(GroupID, cls).from_string(s)
         if not group_id.localpart:
-            raise SynapseError(
-                400,
-                "Group ID cannot be empty",
-            )
+            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
 
         if contains_invalid_mxid_characters(group_id.localpart):
             raise SynapseError(
                 400,
                 "Group ID can only contain characters a-z, 0-9, or '=_-./'",
+                Codes.INVALID_PARAM,
             )
 
         return group_id
 
 
-mxid_localpart_allowed_characters = set("_-./=" + string.ascii_lowercase + string.digits)
+mxid_localpart_allowed_characters = set(
+    "_-./=" + string.ascii_lowercase + string.digits
+)
 
 
 def contains_invalid_mxid_characters(localpart):
@@ -260,9 +296,9 @@ UPPER_CASE_PATTERN = re.compile(b"[A-Z_]")
 #    bytes rather than strings
 #
 NON_MXID_CHARACTER_PATTERN = re.compile(
-    ("[^%s]" % (
-        re.escape("".join(mxid_localpart_allowed_characters - {"="}),),
-    )).encode("ascii"),
+    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters - {"="})),)).encode(
+        "ascii"
+    )
 )
 
 
@@ -281,10 +317,11 @@ def map_username_to_mxid_localpart(username, case_sensitive=False):
         unicode: string suitable for a mxid localpart
     """
     if not isinstance(username, bytes):
-        username = username.encode('utf-8')
+        username = username.encode("utf-8")
 
     # first we sort out upper-case characters
     if case_sensitive:
+
         def f1(m):
             return b"_" + m.group().lower()
 
@@ -304,27 +341,31 @@ def map_username_to_mxid_localpart(username, case_sensitive=False):
     username = NON_MXID_CHARACTER_PATTERN.sub(f2, username)
 
     # we also do the =-escaping to mxids starting with an underscore.
-    username = re.sub(b'^_', b'=5f', username)
+    username = re.sub(b"^_", b"=5f", username)
 
     # we should now only have ascii bytes left, so can decode back to a
     # unicode.
-    return username.decode('ascii')
+    return username.decode("ascii")
 
 
 class StreamToken(
-    namedtuple("Token", (
-        "room_key",
-        "presence_key",
-        "typing_key",
-        "receipt_key",
-        "account_data_key",
-        "push_rules_key",
-        "to_device_key",
-        "device_list_key",
-        "groups_key",
-    ))
+    namedtuple(
+        "Token",
+        (
+            "room_key",
+            "presence_key",
+            "typing_key",
+            "receipt_key",
+            "account_data_key",
+            "push_rules_key",
+            "to_device_key",
+            "device_list_key",
+            "groups_key",
+        ),
+    )
 ):
     _SEPARATOR = "_"
+    START = None  # type: StreamToken
 
     @classmethod
     def from_string(cls, string):
@@ -383,9 +424,7 @@ class StreamToken(
         return self._replace(**{key: new_value})
 
 
-StreamToken.START = StreamToken(
-    *(["s0"] + ["0"] * (len(StreamToken._fields) - 1))
-)
+StreamToken.START = StreamToken(*(["s0"] + ["0"] * (len(StreamToken._fields) - 1)))
 
 
 class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
@@ -410,15 +449,16 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     "topological_ordering" id of the event it comes after, followed by "-",
     followed by the "stream_ordering" id of the event it comes after.
     """
-    __slots__ = []
+
+    __slots__ = []  # type: list
 
     @classmethod
     def parse(cls, string):
         try:
-            if string[0] == 's':
+            if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
-            if string[0] == 't':
-                parts = string[1:].split('-', 1)
+            if string[0] == "t":
+                parts = string[1:].split("-", 1)
                 return cls(topological=int(parts[0]), stream=int(parts[1]))
         except Exception:
             pass
@@ -427,7 +467,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
     @classmethod
     def parse_stream_token(cls, string):
         try:
-            if string[0] == 's':
+            if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
         except Exception:
             pass
@@ -441,7 +481,7 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
 
 
 class ThirdPartyInstanceID(
-        namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
+    namedtuple("ThirdPartyInstanceID", ("appservice_id", "network_id"))
 ):
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
@@ -465,20 +505,42 @@ class ThirdPartyInstanceID(
         return cls(appservice_id=bits[0], network_id=bits[1])
 
     def to_string(self):
-        return "%s|%s" % (self.appservice_id, self.network_id,)
+        return "%s|%s" % (self.appservice_id, self.network_id)
 
     __str__ = to_string
 
     @classmethod
-    def create(cls, appservice_id, network_id,):
+    def create(cls, appservice_id, network_id):
         return cls(appservice_id=appservice_id, network_id=network_id)
 
 
 @attr.s(slots=True)
 class ReadReceipt(object):
     """Information about a read-receipt"""
+
     room_id = attr.ib()
     receipt_type = attr.ib()
     user_id = attr.ib()
     event_ids = attr.ib()
     data = attr.ib()
+
+
+def get_verify_key_from_cross_signing_key(key_info):
+    """Get the key ID and signedjson verify key from a cross-signing key dict
+
+    Args:
+        key_info (dict): a cross-signing key dict, which must have a "keys"
+            property that has exactly one item in it
+
+    Returns:
+        (str, VerifyKey): the key ID and verify key for the cross-signing key
+    """
+    # make sure that exactly one key is provided
+    if "keys" not in key_info:
+        raise ValueError("Invalid key")
+    keys = key_info["keys"]
+    if len(keys) != 1:
+        raise ValueError("Invalid key")
+    # and return that one key
+    for key_id, key_data in keys.items():
+        return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))

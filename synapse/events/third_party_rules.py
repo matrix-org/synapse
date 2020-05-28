@@ -36,8 +36,7 @@ class ThirdPartyEventRules(object):
 
         if module is not None:
             self.third_party_rules = module(
-                config=config,
-                http_client=hs.get_simple_http_client(),
+                config=config, http_client=hs.get_simple_http_client()
             )
 
     @defer.inlineCallbacks
@@ -52,9 +51,9 @@ class ThirdPartyEventRules(object):
             defer.Deferred[bool]: True if the event should be allowed, False if not.
         """
         if self.third_party_rules is None:
-            defer.returnValue(True)
+            return True
 
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
 
         # Retrieve the state events from the database.
         state_events = {}
@@ -62,7 +61,7 @@ class ThirdPartyEventRules(object):
             state_events[key] = yield self.store.get_event(event_id, allow_none=True)
 
         ret = yield self.third_party_rules.check_event_allowed(event, state_events)
-        defer.returnValue(ret)
+        return ret
 
     @defer.inlineCallbacks
     def on_create_room(self, requester, config, is_requester_admin):
@@ -75,15 +74,16 @@ class ThirdPartyEventRules(object):
             is_requester_admin (bool): If the requester is an admin
 
         Returns:
-            defer.Deferred
+            defer.Deferred[bool]: Whether room creation is allowed or denied.
         """
 
         if self.third_party_rules is None:
-            return
+            return True
 
-        yield self.third_party_rules.on_create_room(
+        ret = yield self.third_party_rules.on_create_room(
             requester, config, is_requester_admin
         )
+        return ret
 
     @defer.inlineCallbacks
     def check_threepid_can_be_invited(self, medium, address, room_id):
@@ -99,7 +99,7 @@ class ThirdPartyEventRules(object):
         """
 
         if self.third_party_rules is None:
-            defer.returnValue(True)
+            return True
 
         state_ids = yield self.store.get_filtered_current_state_ids(room_id)
         room_state_events = yield self.store.get_events(state_ids.values())
@@ -109,6 +109,6 @@ class ThirdPartyEventRules(object):
             state_events[key] = room_state_events[event_id]
 
         ret = yield self.third_party_rules.check_threepid_can_be_invited(
-            medium, address, state_events,
+            medium, address, state_events
         )
-        defer.returnValue(ret)
+        return ret

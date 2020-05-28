@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 
-if [[ "$BUILDKITE_BRANCH" == "dinsic" ]]; then
+if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs|release-.*)$ ]]; then
     echo "Not merging forward, as this is a release branch"
     exit 0
 fi
 
 if [[ -z $BUILDKITE_PULL_REQUEST_BASE_BRANCH ]]; then
-     echo "Can't figure out what the PR number is! Assuming merge target is dinsic."
+    echo "Not a pull request, or hasn't had a PR opened yet..."
 
-    # It probably hasn't had a PR opened yet. Since all PRs for dinsic land on
-    # dinsic, we can probably assume it's based on it and will be merged into
-    # it.
+    # It probably hasn't had a PR opened yet. Since all PRs land on develop, we
+    # can probably assume it's based on it and will be merged into it.
     GITBASE="dinsic"
 else
     # Get the reference, using the GitHub API
     GITBASE=$BUILDKITE_PULL_REQUEST_BASE_BRANCH
 fi
+
+echo "--- merge_base_branch $GITBASE"
 
 # Show what we are before
 git --no-pager show -s

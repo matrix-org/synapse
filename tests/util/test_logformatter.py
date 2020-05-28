@@ -14,7 +14,7 @@
 # limitations under the License.
 import sys
 
-from synapse.util.logformatter import LogFormatter
+from synapse.logging.formatter import LogFormatter
 
 from tests import unittest
 

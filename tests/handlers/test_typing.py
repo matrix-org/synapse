@@ -24,6 +24,7 @@ from synapse.api.errors import AuthError
 from synapse.types import UserID
 
 from tests import unittest
+from tests.unittest import override_config
 from tests.utils import register_federation_servlets
 
 # Some local users to test with
@@ -47,7 +48,7 @@ def _expect_edu_transaction(edu_type, content, origin="test"):
 
 
 def _make_edu_transaction_json(edu_type, content):
-    return json.dumps(_expect_edu_transaction(edu_type, content)).encode('utf8')
+    return json.dumps(_expect_edu_transaction(edu_type, content)).encode("utf8")
 
 
 class TypingNotificationsTestCase(unittest.HomeserverTestCase):
@@ -63,34 +64,36 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["put_json"])
         mock_federation_client.put_json.return_value = defer.succeed((200, "OK"))
 
-        hs = self.setup_test_homeserver(
-            datastore=(
-                Mock(
-                    spec=[
-                        # Bits that Federation needs
-                        "prep_send_transaction",
-                        "delivered_txn",
-                        "get_received_txn_response",
-                        "set_received_txn_response",
-                        "get_destination_retry_timings",
-                        "get_devices_by_remote",
-                        # Bits that user_directory needs
-                        "get_user_directory_stream_pos",
-                        "get_current_state_deltas",
-                    ]
-                )
-            ),
-            notifier=Mock(),
-            http_client=mock_federation_client,
-            keyring=mock_keyring,
+        datastores = Mock()
+        datastores.main = Mock(
+            spec=[
+                # Bits that Federation needs
+                "prep_send_transaction",
+                "delivered_txn",
+                "get_received_txn_response",
+                "set_received_txn_response",
+                "get_destination_retry_timings",
+                "get_devices_by_remote",
+                "maybe_store_room_on_invite",
+                # Bits that user_directory needs
+                "get_user_directory_stream_pos",
+                "get_current_state_deltas",
+                "get_device_updates_by_remote",
+            ]
         )
+
+        # the tests assume that we are starting at unix time 1000
+        reactor.pump((1000,))
+
+        hs = self.setup_test_homeserver(
+            notifier=Mock(), http_client=mock_federation_client, keyring=mock_keyring
+        )
+
+        hs.datastores = datastores
 
         return hs
 
     def prepare(self, reactor, clock, hs):
-        # the tests assume that we are starting at unix time 1000
-        reactor.pump((1000,))
-
         mock_notifier = hs.get_notifier()
         self.on_new_event = mock_notifier.on_new_event
 
@@ -99,12 +102,19 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.event_source = hs.get_event_sources().sources["typing"]
 
         self.datastore = hs.get_datastore()
-        retry_timings_res = {"destination": "", "retry_last_ts": 0, "retry_interval": 0}
+        retry_timings_res = {
+            "destination": "",
+            "retry_last_ts": 0,
+            "retry_interval": 0,
+            "failure_ts": None,
+        }
         self.datastore.get_destination_retry_timings.return_value = defer.succeed(
             retry_timings_res
         )
 
-        self.datastore.get_devices_by_remote.return_value = (0, [])
+        self.datastore.get_device_updates_by_remote.return_value = defer.succeed(
+            (0, [])
+        )
 
         def get_received_txn_response(*args):
             return defer.succeed(None)
@@ -113,19 +123,19 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.room_members = []
 
-        def check_joined_room(room_id, user_id):
+        def check_user_in_room(room_id, user_id):
             if user_id not in [u.to_string() for u in self.room_members]:
                 raise AuthError(401, "User is not in the room")
 
-        hs.get_auth().check_joined_room = check_joined_room
+        hs.get_auth().check_user_in_room = check_user_in_room
 
         def get_joined_hosts_for_room(room_id):
-            return set(member.domain for member in self.room_members)
+            return {member.domain for member in self.room_members}
 
         self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
         def get_current_users_in_room(room_id):
-            return set(str(u) for u in self.room_members)
+            return {str(u) for u in self.room_members}
 
         hs.get_state_handler().get_current_users_in_room = get_current_users_in_room
 
@@ -134,11 +144,16 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             defer.succeed(1)
         )
 
-        self.datastore.get_current_state_deltas.return_value = None
+        self.datastore.get_current_state_deltas.return_value = (0, None)
 
         self.datastore.get_to_device_stream_token = lambda: 0
-        self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: ([], 0)
+        self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: defer.succeed(
+            ([], 0)
+        )
         self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: None
+        self.datastore.set_received_txn_response = lambda *args, **kwargs: defer.succeed(
+            None
+        )
 
     def test_started_typing_local(self):
         self.room_members = [U_APPLE, U_BANANA]
@@ -151,10 +166,12 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        events = self.get_success(
+            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        )
         self.assertEquals(
             events[0],
             [
@@ -166,6 +183,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    @override_config({"send_federation": True})
     def test_started_typing_remote_send(self):
         self.room_members = [U_APPLE, U_ONION]
 
@@ -209,15 +227,17 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                     "typing": True,
                 },
             ),
-            federation_auth_origin=b'farm',
+            federation_auth_origin=b"farm",
         )
         self.render(request)
         self.assertEqual(channel.code, 200)
 
-        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        events = self.get_success(
+            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        )
         self.assertEquals(
             events[0],
             [
@@ -229,6 +249,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    @override_config({"send_federation": True})
     def test_stopped_typing(self):
         self.room_members = [U_APPLE, U_BANANA, U_ONION]
 
@@ -237,7 +258,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         member = RoomMember(ROOM_ID, U_APPLE.to_string())
         self.handler._member_typing_until[member] = 1002000
-        self.handler._room_typing[ROOM_ID] = set([U_APPLE.to_string()])
+        self.handler._room_typing[ROOM_ID] = {U_APPLE.to_string()}
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
@@ -247,7 +268,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
 
         put_json = self.hs.get_http_client().put_json
         put_json.assert_called_once_with(
@@ -268,7 +289,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        events = self.get_success(
+            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        )
         self.assertEquals(
             events[0],
             [{"type": "m.typing", "room_id": ROOM_ID, "content": {"user_ids": []}}],
@@ -285,11 +308,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call('typing_key', 1, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call("typing_key", 1, rooms=[ROOM_ID])])
         self.on_new_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        events = self.get_success(
+            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        )
         self.assertEquals(
             events[0],
             [
@@ -303,10 +328,12 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.reactor.pump([16])
 
-        self.on_new_event.assert_has_calls([call('typing_key', 2, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call("typing_key", 2, rooms=[ROOM_ID])])
 
         self.assertEquals(self.event_source.get_current_key(), 2)
-        events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=1)
+        events = self.get_success(
+            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=1)
+        )
         self.assertEquals(
             events[0],
             [{"type": "m.typing", "room_id": ROOM_ID, "content": {"user_ids": []}}],
@@ -320,11 +347,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.on_new_event.assert_has_calls([call('typing_key', 3, rooms=[ROOM_ID])])
+        self.on_new_event.assert_has_calls([call("typing_key", 3, rooms=[ROOM_ID])])
         self.on_new_event.reset_mock()
 
         self.assertEquals(self.event_source.get_current_key(), 3)
-        events = self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        events = self.get_success(
+            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+        )
         self.assertEquals(
             events[0],
             [

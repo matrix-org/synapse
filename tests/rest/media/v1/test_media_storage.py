@@ -22,27 +22,28 @@ from binascii import unhexlify
 from mock import Mock
 from six.moves.urllib import parse
 
-from twisted.internet import defer, reactor
 from twisted.internet.defer import Deferred
 
+from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
-from synapse.util.logcontext import make_deferred_yieldable
 
 from tests import unittest
 
 
-class MediaStorageTests(unittest.TestCase):
-    def setUp(self):
+class MediaStorageTests(unittest.HomeserverTestCase):
+
+    needs_threadpool = True
+
+    def prepare(self, reactor, clock, hs):
         self.test_dir = tempfile.mkdtemp(prefix="synapse-tests-")
+        self.addCleanup(shutil.rmtree, self.test_dir)
 
         self.primary_base_path = os.path.join(self.test_dir, "primary")
         self.secondary_base_path = os.path.join(self.test_dir, "secondary")
 
-        hs = Mock()
-        hs.get_reactor = Mock(return_value=reactor)
         hs.config.media_store_path = self.primary_base_path
 
         storage_providers = [FileStorageProviderBackend(hs, self.secondary_base_path)]
@@ -52,10 +53,6 @@ class MediaStorageTests(unittest.TestCase):
             hs, self.primary_base_path, self.filepaths, storage_providers
         )
 
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
-
-    @defer.inlineCallbacks
     def test_ensure_media_is_in_local_cache(self):
         media_id = "some_media_id"
         test_body = "Test\n"
@@ -73,7 +70,15 @@ class MediaStorageTests(unittest.TestCase):
         # Now we run ensure_media_is_in_local_cache, which should copy the file
         # to the local cache.
         file_info = FileInfo(None, media_id)
-        local_path = yield self.media_storage.ensure_media_is_in_local_cache(file_info)
+
+        # This uses a real blocking threadpool so we have to wait for it to be
+        # actually done :/
+        x = self.media_storage.ensure_media_is_in_local_cache(file_info)
+
+        # Hotloop until the threadpool does its job...
+        self.wait_on_thread(x)
+
+        local_path = self.get_success(x)
 
         self.assertTrue(os.path.exists(local_path))
 
@@ -143,7 +148,8 @@ class MediaRepoTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
 
         self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b'download']
+        self.download_resource = self.media_repo.children[b"download"]
+        self.thumbnail_resource = self.media_repo.children[b"thumbnail"]
 
         # smol png
         self.end_content = unhexlify(
@@ -152,11 +158,11 @@ class MediaRepoTests(unittest.HomeserverTestCase):
             b"0a2db40000000049454e44ae426082"
         )
 
+        self.media_id = "example.com/12345"
+
     def _req(self, content_disposition):
 
-        request, channel = self.make_request(
-            "GET", "example.com/12345", shorthand=False
-        )
+        request, channel = self.make_request("GET", self.media_id, shorthand=False)
         request.render(self.download_resource)
         self.pump()
 
@@ -165,13 +171,13 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(len(self.fetches), 1)
         self.assertEqual(self.fetches[0][1], "example.com")
         self.assertEqual(
-            self.fetches[0][2], "/_matrix/media/v1/download/example.com/12345"
+            self.fetches[0][2], "/_matrix/media/v1/download/" + self.media_id
         )
         self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
 
         headers = {
             b"Content-Length": [b"%d" % (len(self.end_content))],
-            b"Content-Type": [b'image/png'],
+            b"Content-Type": [b"image/png"],
         }
         if content_disposition:
             headers[b"Content-Disposition"] = [content_disposition]
@@ -204,7 +210,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         correctly decode it as the UTF-8 string, and use filename* in the
         response.
         """
-        filename = parse.quote(u"\u2603".encode('utf8')).encode('ascii')
+        filename = parse.quote("\u2603".encode("utf8")).encode("ascii")
         channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
 
         headers = channel.headers
@@ -224,3 +230,42 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         headers = channel.headers
         self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
         self.assertEqual(headers.getRawHeaders(b"Content-Disposition"), None)
+
+    def test_thumbnail_crop(self):
+        expected_body = unhexlify(
+            b"89504e470d0a1a0a0000000d4948445200000020000000200806"
+            b"000000737a7af40000001a49444154789cedc101010000008220"
+            b"ffaf6e484001000000ef0610200001194334ee0000000049454e"
+            b"44ae426082"
+        )
+
+        self._test_thumbnail("crop", expected_body)
+
+    def test_thumbnail_scale(self):
+        expected_body = unhexlify(
+            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+            b"0000001f15c4890000000d49444154789c636060606000000005"
+            b"0001a5f645400000000049454e44ae426082"
+        )
+
+        self._test_thumbnail("scale", expected_body)
+
+    def _test_thumbnail(self, method, expected_body):
+        params = "?width=32&height=32&method=" + method
+        request, channel = self.make_request(
+            "GET", self.media_id + params, shorthand=False
+        )
+        request.render(self.thumbnail_resource)
+        self.pump()
+
+        headers = {
+            b"Content-Length": [b"%d" % (len(self.end_content))],
+            b"Content-Type": [b"image/png"],
+        }
+        self.fetches[0][0].callback(
+            (self.end_content, (len(self.end_content), headers))
+        )
+        self.pump()
+
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(channel.result["body"], expected_body, channel.result["body"])

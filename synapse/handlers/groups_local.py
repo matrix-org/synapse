@@ -30,6 +30,7 @@ def _create_rerouter(func_name):
     """Returns a function that looks at the group id and calls the function
     on federation or the local group server if the group is local
     """
+
     def f(self, group_id, *args, **kwargs):
         if self.is_mine_id(group_id):
             return getattr(self.groups_server_handler, func_name)(
@@ -49,9 +50,7 @@ def _create_rerouter(func_name):
             def http_response_errback(failure):
                 failure.trap(HttpResponseException)
                 e = failure.value
-                if e.code == 403:
-                    raise e.to_synapse_error()
-                return failure
+                raise e.to_synapse_error()
 
             def request_failed_errback(failure):
                 failure.trap(RequestSendFailed)
@@ -60,10 +59,11 @@ def _create_rerouter(func_name):
             d.addErrback(http_response_errback)
             d.addErrback(request_failed_errback)
             return d
+
     return f
 
 
-class GroupsLocalHandler(object):
+class GroupsLocalWorkerHandler(object):
     def __init__(self, hs):
         self.hs = hs
         self.store = hs.get_datastore()
@@ -81,39 +81,16 @@ class GroupsLocalHandler(object):
 
         self.profile_handler = hs.get_profile_handler()
 
-        # Ensure attestations get renewed
-        hs.get_groups_attestation_renewer()
-
     # The following functions merely route the query to the local groups server
     # or federation depending on if the group is local or remote
 
     get_group_profile = _create_rerouter("get_group_profile")
-    update_group_profile = _create_rerouter("update_group_profile")
     get_rooms_in_group = _create_rerouter("get_rooms_in_group")
-
     get_invited_users_in_group = _create_rerouter("get_invited_users_in_group")
-
-    add_room_to_group = _create_rerouter("add_room_to_group")
-    update_room_in_group = _create_rerouter("update_room_in_group")
-    remove_room_from_group = _create_rerouter("remove_room_from_group")
-
-    update_group_summary_room = _create_rerouter("update_group_summary_room")
-    delete_group_summary_room = _create_rerouter("delete_group_summary_room")
-
-    update_group_category = _create_rerouter("update_group_category")
-    delete_group_category = _create_rerouter("delete_group_category")
     get_group_category = _create_rerouter("get_group_category")
     get_group_categories = _create_rerouter("get_group_categories")
-
-    update_group_summary_user = _create_rerouter("update_group_summary_user")
-    delete_group_summary_user = _create_rerouter("delete_group_summary_user")
-
-    update_group_role = _create_rerouter("update_group_role")
-    delete_group_role = _create_rerouter("delete_group_role")
     get_group_role = _create_rerouter("get_group_role")
     get_group_roles = _create_rerouter("get_group_roles")
-
-    set_group_join_policy = _create_rerouter("set_group_join_policy")
 
     @defer.inlineCallbacks
     def get_group_summary(self, group_id, requester_user_id):
@@ -126,9 +103,14 @@ class GroupsLocalHandler(object):
                 group_id, requester_user_id
             )
         else:
-            res = yield self.transport_client.get_group_summary(
-                get_domain_from_id(group_id), group_id, requester_user_id,
-            )
+            try:
+                res = yield self.transport_client.get_group_summary(
+                    get_domain_from_id(group_id), group_id, requester_user_id
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
             group_server_name = get_domain_from_id(group_id)
 
@@ -162,53 +144,7 @@ class GroupsLocalHandler(object):
 
         res.setdefault("user", {})["is_publicised"] = is_publicised
 
-        defer.returnValue(res)
-
-    @defer.inlineCallbacks
-    def create_group(self, group_id, user_id, content):
-        """Create a group
-        """
-
-        logger.info("Asking to create group with ID: %r", group_id)
-
-        if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.create_group(
-                group_id, user_id, content
-            )
-            local_attestation = None
-            remote_attestation = None
-        else:
-            local_attestation = self.attestations.create_attestation(group_id, user_id)
-            content["attestation"] = local_attestation
-
-            content["user_profile"] = yield self.profile_handler.get_profile(user_id)
-
-            res = yield self.transport_client.create_group(
-                get_domain_from_id(group_id), group_id, user_id, content,
-            )
-
-            remote_attestation = res["attestation"]
-            yield self.attestations.verify_attestation(
-                remote_attestation,
-                group_id=group_id,
-                user_id=user_id,
-                server_name=get_domain_from_id(group_id),
-            )
-
-        is_publicised = content.get("publicise", False)
-        token = yield self.store.register_user_group_membership(
-            group_id, user_id,
-            membership="join",
-            is_admin=True,
-            local_attestation=local_attestation,
-            remote_attestation=remote_attestation,
-            is_publicised=is_publicised,
-        )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
-
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def get_users_in_group(self, group_id, requester_user_id):
@@ -218,13 +154,18 @@ class GroupsLocalHandler(object):
             res = yield self.groups_server_handler.get_users_in_group(
                 group_id, requester_user_id
             )
-            defer.returnValue(res)
+            return res
 
         group_server_name = get_domain_from_id(group_id)
 
-        res = yield self.transport_client.get_users_in_group(
-            get_domain_from_id(group_id), group_id, requester_user_id,
-        )
+        try:
+            res = yield self.transport_client.get_users_in_group(
+                get_domain_from_id(group_id), group_id, requester_user_id
+            )
+        except HttpResponseException as e:
+            raise e.to_synapse_error()
+        except RequestSendFailed:
+            raise SynapseError(502, "Failed to contact group server")
 
         chunk = res["chunk"]
         valid_entries = []
@@ -245,25 +186,174 @@ class GroupsLocalHandler(object):
 
         res["chunk"] = valid_entries
 
-        defer.returnValue(res)
+        return res
+
+    @defer.inlineCallbacks
+    def get_joined_groups(self, user_id):
+        group_ids = yield self.store.get_joined_groups(user_id)
+        return {"groups": group_ids}
+
+    @defer.inlineCallbacks
+    def get_publicised_groups_for_user(self, user_id):
+        if self.hs.is_mine_id(user_id):
+            result = yield self.store.get_publicised_groups_for_user(user_id)
+
+            # Check AS associated groups for this user - this depends on the
+            # RegExps in the AS registration file (under `users`)
+            for app_service in self.store.get_app_services():
+                result.extend(app_service.get_groups_for_user(user_id))
+
+            return {"groups": result}
+        else:
+            try:
+                bulk_result = yield self.transport_client.bulk_get_publicised_groups(
+                    get_domain_from_id(user_id), [user_id]
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
+
+            result = bulk_result.get("users", {}).get(user_id)
+            # TODO: Verify attestations
+            return {"groups": result}
+
+    @defer.inlineCallbacks
+    def bulk_get_publicised_groups(self, user_ids, proxy=True):
+        destinations = {}
+        local_users = set()
+
+        for user_id in user_ids:
+            if self.hs.is_mine_id(user_id):
+                local_users.add(user_id)
+            else:
+                destinations.setdefault(get_domain_from_id(user_id), set()).add(user_id)
+
+        if not proxy and destinations:
+            raise SynapseError(400, "Some user_ids are not local")
+
+        results = {}
+        failed_results = []
+        for destination, dest_user_ids in iteritems(destinations):
+            try:
+                r = yield self.transport_client.bulk_get_publicised_groups(
+                    destination, list(dest_user_ids)
+                )
+                results.update(r["users"])
+            except Exception:
+                failed_results.extend(dest_user_ids)
+
+        for uid in local_users:
+            results[uid] = yield self.store.get_publicised_groups_for_user(uid)
+
+            # Check AS associated groups for this user - this depends on the
+            # RegExps in the AS registration file (under `users`)
+            for app_service in self.store.get_app_services():
+                results[uid].extend(app_service.get_groups_for_user(uid))
+
+        return {"users": results}
+
+
+class GroupsLocalHandler(GroupsLocalWorkerHandler):
+    def __init__(self, hs):
+        super(GroupsLocalHandler, self).__init__(hs)
+
+        # Ensure attestations get renewed
+        hs.get_groups_attestation_renewer()
+
+    # The following functions merely route the query to the local groups server
+    # or federation depending on if the group is local or remote
+
+    update_group_profile = _create_rerouter("update_group_profile")
+
+    add_room_to_group = _create_rerouter("add_room_to_group")
+    update_room_in_group = _create_rerouter("update_room_in_group")
+    remove_room_from_group = _create_rerouter("remove_room_from_group")
+
+    update_group_summary_room = _create_rerouter("update_group_summary_room")
+    delete_group_summary_room = _create_rerouter("delete_group_summary_room")
+
+    update_group_category = _create_rerouter("update_group_category")
+    delete_group_category = _create_rerouter("delete_group_category")
+
+    update_group_summary_user = _create_rerouter("update_group_summary_user")
+    delete_group_summary_user = _create_rerouter("delete_group_summary_user")
+
+    update_group_role = _create_rerouter("update_group_role")
+    delete_group_role = _create_rerouter("delete_group_role")
+
+    set_group_join_policy = _create_rerouter("set_group_join_policy")
+
+    @defer.inlineCallbacks
+    def create_group(self, group_id, user_id, content):
+        """Create a group
+        """
+
+        logger.info("Asking to create group with ID: %r", group_id)
+
+        if self.is_mine_id(group_id):
+            res = yield self.groups_server_handler.create_group(
+                group_id, user_id, content
+            )
+            local_attestation = None
+            remote_attestation = None
+        else:
+            local_attestation = self.attestations.create_attestation(group_id, user_id)
+            content["attestation"] = local_attestation
+
+            content["user_profile"] = yield self.profile_handler.get_profile(user_id)
+
+            try:
+                res = yield self.transport_client.create_group(
+                    get_domain_from_id(group_id), group_id, user_id, content
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
+
+            remote_attestation = res["attestation"]
+            yield self.attestations.verify_attestation(
+                remote_attestation,
+                group_id=group_id,
+                user_id=user_id,
+                server_name=get_domain_from_id(group_id),
+            )
+
+        is_publicised = content.get("publicise", False)
+        token = yield self.store.register_user_group_membership(
+            group_id,
+            user_id,
+            membership="join",
+            is_admin=True,
+            local_attestation=local_attestation,
+            remote_attestation=remote_attestation,
+            is_publicised=is_publicised,
+        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
+
+        return res
 
     @defer.inlineCallbacks
     def join_group(self, group_id, user_id, content):
         """Request to join a group
         """
         if self.is_mine_id(group_id):
-            yield self.groups_server_handler.join_group(
-                group_id, user_id, content
-            )
+            yield self.groups_server_handler.join_group(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
         else:
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content["attestation"] = local_attestation
 
-            res = yield self.transport_client.join_group(
-                get_domain_from_id(group_id), group_id, user_id, content,
-            )
+            try:
+                res = yield self.transport_client.join_group(
+                    get_domain_from_id(group_id), group_id, user_id, content
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
             remote_attestation = res["attestation"]
 
@@ -278,36 +368,38 @@ class GroupsLocalHandler(object):
         is_publicised = content.get("publicise", False)
 
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
+            group_id,
+            user_id,
             membership="join",
             is_admin=False,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
             is_publicised=is_publicised,
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def accept_invite(self, group_id, user_id, content):
         """Accept an invite to a group
         """
         if self.is_mine_id(group_id):
-            yield self.groups_server_handler.accept_invite(
-                group_id, user_id, content
-            )
+            yield self.groups_server_handler.accept_invite(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
         else:
             local_attestation = self.attestations.create_attestation(group_id, user_id)
             content["attestation"] = local_attestation
 
-            res = yield self.transport_client.accept_group_invite(
-                get_domain_from_id(group_id), group_id, user_id, content,
-            )
+            try:
+                res = yield self.transport_client.accept_group_invite(
+                    get_domain_from_id(group_id), group_id, user_id, content
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
             remote_attestation = res["attestation"]
 
@@ -322,38 +414,42 @@ class GroupsLocalHandler(object):
         is_publicised = content.get("publicise", False)
 
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
+            group_id,
+            user_id,
             membership="join",
             is_admin=False,
             local_attestation=local_attestation,
             remote_attestation=remote_attestation,
             is_publicised=is_publicised,
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
 
-        defer.returnValue({})
+        return {}
 
     @defer.inlineCallbacks
     def invite(self, group_id, user_id, requester_user_id, config):
         """Invite a user to a group
         """
-        content = {
-            "requester_user_id": requester_user_id,
-            "config": config,
-        }
+        content = {"requester_user_id": requester_user_id, "config": config}
         if self.is_mine_id(group_id):
             res = yield self.groups_server_handler.invite_to_group(
-                group_id, user_id, requester_user_id, content,
+                group_id, user_id, requester_user_id, content
             )
         else:
-            res = yield self.transport_client.invite_to_group(
-                get_domain_from_id(group_id), group_id, user_id, requester_user_id,
-                content,
-            )
+            try:
+                res = yield self.transport_client.invite_to_group(
+                    get_domain_from_id(group_id),
+                    group_id,
+                    user_id,
+                    requester_user_id,
+                    content,
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def on_invite(self, group_id, user_id, content):
@@ -372,20 +468,19 @@ class GroupsLocalHandler(object):
                 local_profile["avatar_url"] = content["profile"]["avatar_url"]
 
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
+            group_id,
+            user_id,
             membership="invite",
             content={"profile": local_profile, "inviter": content["inviter"]},
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
+        self.notifier.on_new_event("groups_key", token, users=[user_id])
         try:
             user_profile = yield self.profile_handler.get_profile(user_id)
         except Exception as e:
-            logger.warn("No profile for user %s: %s", user_id, e)
+            logger.warning("No profile for user %s: %s", user_id, e)
             user_profile = {}
 
-        defer.returnValue({"state": "invite", "user_profile": user_profile})
+        return {"state": "invite", "user_profile": user_profile}
 
     @defer.inlineCallbacks
     def remove_user_from_group(self, group_id, user_id, requester_user_id, content):
@@ -393,28 +488,33 @@ class GroupsLocalHandler(object):
         """
         if user_id == requester_user_id:
             token = yield self.store.register_user_group_membership(
-                group_id, user_id,
-                membership="leave",
+                group_id, user_id, membership="leave"
             )
-            self.notifier.on_new_event(
-                "groups_key", token, users=[user_id],
-            )
+            self.notifier.on_new_event("groups_key", token, users=[user_id])
 
             # TODO: Should probably remember that we tried to leave so that we can
             # retry if the group server is currently down.
 
         if self.is_mine_id(group_id):
             res = yield self.groups_server_handler.remove_user_from_group(
-                group_id, user_id, requester_user_id, content,
+                group_id, user_id, requester_user_id, content
             )
         else:
             content["requester_user_id"] = requester_user_id
-            res = yield self.transport_client.remove_user_from_group(
-                get_domain_from_id(group_id), group_id, requester_user_id,
-                user_id, content,
-            )
+            try:
+                res = yield self.transport_client.remove_user_from_group(
+                    get_domain_from_id(group_id),
+                    group_id,
+                    requester_user_id,
+                    user_id,
+                    content,
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to contact group server")
 
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def user_removed_from_group(self, group_id, user_id, content):
@@ -422,72 +522,6 @@ class GroupsLocalHandler(object):
         """
         # TODO: Check if user in group
         token = yield self.store.register_user_group_membership(
-            group_id, user_id,
-            membership="leave",
+            group_id, user_id, membership="leave"
         )
-        self.notifier.on_new_event(
-            "groups_key", token, users=[user_id],
-        )
-
-    @defer.inlineCallbacks
-    def get_joined_groups(self, user_id):
-        group_ids = yield self.store.get_joined_groups(user_id)
-        defer.returnValue({"groups": group_ids})
-
-    @defer.inlineCallbacks
-    def get_publicised_groups_for_user(self, user_id):
-        if self.hs.is_mine_id(user_id):
-            result = yield self.store.get_publicised_groups_for_user(user_id)
-
-            # Check AS associated groups for this user - this depends on the
-            # RegExps in the AS registration file (under `users`)
-            for app_service in self.store.get_app_services():
-                result.extend(app_service.get_groups_for_user(user_id))
-
-            defer.returnValue({"groups": result})
-        else:
-            bulk_result = yield self.transport_client.bulk_get_publicised_groups(
-                get_domain_from_id(user_id), [user_id],
-            )
-            result = bulk_result.get("users", {}).get(user_id)
-            # TODO: Verify attestations
-            defer.returnValue({"groups": result})
-
-    @defer.inlineCallbacks
-    def bulk_get_publicised_groups(self, user_ids, proxy=True):
-        destinations = {}
-        local_users = set()
-
-        for user_id in user_ids:
-            if self.hs.is_mine_id(user_id):
-                local_users.add(user_id)
-            else:
-                destinations.setdefault(
-                    get_domain_from_id(user_id), set()
-                ).add(user_id)
-
-        if not proxy and destinations:
-            raise SynapseError(400, "Some user_ids are not local")
-
-        results = {}
-        failed_results = []
-        for destination, dest_user_ids in iteritems(destinations):
-            try:
-                r = yield self.transport_client.bulk_get_publicised_groups(
-                    destination, list(dest_user_ids),
-                )
-                results.update(r["users"])
-            except Exception:
-                failed_results.extend(dest_user_ids)
-
-        for uid in local_users:
-            results[uid] = yield self.store.get_publicised_groups_for_user(
-                uid
-            )
-
-            # Check AS associated groups for this user - this depends on the
-            # RegExps in the AS registration file (under `users`)
-            for app_service in self.store.get_app_services():
-                results[uid].extend(app_service.get_groups_for_user(uid))
-
-        defer.returnValue({"users": results})
+        self.notifier.on_new_event("groups_key", token, users=[user_id])

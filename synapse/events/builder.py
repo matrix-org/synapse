@@ -12,8 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 import attr
+from nacl.signing import SigningKey
 
 from twisted.internet import defer
 
@@ -23,12 +25,13 @@ from synapse.api.room_versions import (
     KNOWN_EVENT_FORMAT_VERSIONS,
     KNOWN_ROOM_VERSIONS,
     EventFormatVersions,
+    RoomVersion,
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.types import EventID
+from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
+from synapse.types import EventID, JsonDict
+from synapse.util import Clock
 from synapse.util.stringutils import random_string
-
-from . import _EventInternalMetadata, event_type_from_format_version
 
 
 @attr.s(slots=True, cmp=False, frozen=True)
@@ -40,7 +43,7 @@ class EventBuilder(object):
     content/unsigned/internal_metadata fields are still mutable)
 
     Attributes:
-        format_version (int): Event format version
+        room_version: Version of the target room
         room_id (str)
         type (str)
         sender (str)
@@ -63,7 +66,7 @@ class EventBuilder(object):
     _hostname = attr.ib()
     _signing_key = attr.ib()
 
-    format_version = attr.ib()
+    room_version = attr.ib(type=RoomVersion)
 
     room_id = attr.ib()
     type = attr.ib()
@@ -78,7 +81,9 @@ class EventBuilder(object):
     _redacts = attr.ib(default=None)
     _origin_server_ts = attr.ib(default=None)
 
-    internal_metadata = attr.ib(default=attr.Factory(lambda: _EventInternalMetadata({})))
+    internal_metadata = attr.ib(
+        default=attr.Factory(lambda: _EventInternalMetadata({}))
+    )
 
     @property
     def state_key(self):
@@ -102,22 +107,19 @@ class EventBuilder(object):
         """
 
         state_ids = yield self._state.get_current_state_ids(
-            self.room_id, prev_event_ids,
+            self.room_id, prev_event_ids
         )
-        auth_ids = yield self._auth.compute_auth_events(
-            self, state_ids,
-        )
+        auth_ids = yield self._auth.compute_auth_events(self, state_ids)
 
-        if self.format_version == EventFormatVersions.V1:
+        format_version = self.room_version.event_format
+        if format_version == EventFormatVersions.V1:
             auth_events = yield self._store.add_event_hashes(auth_ids)
             prev_events = yield self._store.add_event_hashes(prev_event_ids)
         else:
             auth_events = auth_ids
             prev_events = prev_event_ids
 
-        old_depth = yield self._store.get_max_depth_of(
-            prev_event_ids,
-        )
+        old_depth = yield self._store.get_max_depth_of(prev_event_ids)
         depth = old_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
@@ -146,15 +148,13 @@ class EventBuilder(object):
         if self._origin_server_ts is not None:
             event_dict["origin_server_ts"] = self._origin_server_ts
 
-        defer.returnValue(
-            create_local_event_from_event_dict(
-                clock=self._clock,
-                hostname=self._hostname,
-                signing_key=self._signing_key,
-                format_version=self.format_version,
-                event_dict=event_dict,
-                internal_metadata_dict=self.internal_metadata.get_dict(),
-            )
+        return create_local_event_from_event_dict(
+            clock=self._clock,
+            hostname=self._hostname,
+            signing_key=self._signing_key,
+            room_version=self.room_version,
+            event_dict=event_dict,
+            internal_metadata_dict=self.internal_metadata.get_dict(),
         )
 
 
@@ -205,7 +205,7 @@ class EventBuilderFactory(object):
             clock=self.clock,
             hostname=self.hostname,
             signing_key=self.signing_key,
-            format_version=room_version.event_format,
+            room_version=room_version,
             type=key_values["type"],
             state_key=key_values.get("state_key"),
             room_id=key_values["room_id"],
@@ -217,29 +217,22 @@ class EventBuilderFactory(object):
         )
 
 
-def create_local_event_from_event_dict(clock, hostname, signing_key,
-                                       format_version, event_dict,
-                                       internal_metadata_dict=None):
+def create_local_event_from_event_dict(
+    clock: Clock,
+    hostname: str,
+    signing_key: SigningKey,
+    room_version: RoomVersion,
+    event_dict: JsonDict,
+    internal_metadata_dict: Optional[JsonDict] = None,
+) -> EventBase:
     """Takes a fully formed event dict, ensuring that fields like `origin`
     and `origin_server_ts` have correct values for a locally produced event,
     then signs and hashes it.
-
-    Args:
-        clock (Clock)
-        hostname (str)
-        signing_key
-        format_version (int)
-        event_dict (dict)
-        internal_metadata_dict (dict|None)
-
-    Returns:
-        FrozenEvent
     """
 
+    format_version = room_version.event_format
     if format_version not in KNOWN_EVENT_FORMAT_VERSIONS:
-        raise Exception(
-            "No event format defined for version %r" % (format_version,)
-        )
+        raise Exception("No event format defined for version %r" % (format_version,))
 
     if internal_metadata_dict is None:
         internal_metadata_dict = {}
@@ -258,13 +251,9 @@ def create_local_event_from_event_dict(clock, hostname, signing_key,
 
     event_dict.setdefault("signatures", {})
 
-    add_hashes_and_signatures(
-        event_dict,
-        hostname,
-        signing_key,
-    )
-    return event_type_from_format_version(format_version)(
-        event_dict, internal_metadata_dict=internal_metadata_dict,
+    add_hashes_and_signatures(room_version, event_dict, hostname, signing_key)
+    return make_event_from_dict(
+        event_dict, room_version, internal_metadata_dict=internal_metadata_dict
     )
 
 

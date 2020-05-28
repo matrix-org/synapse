@@ -19,8 +19,8 @@ import threading
 
 from prometheus_client.core import Counter, Histogram
 
+from synapse.logging.context import LoggingContext
 from synapse.metrics import LaterGauge
-from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ class RequestMetrics(object):
             tag = context.tag
 
             if context != self.start_context:
-                logger.warn(
+                logger.warning(
                     "Context have unexpectedly changed %r, %r",
                     context,
                     self.start_context,

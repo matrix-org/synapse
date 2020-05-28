@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
 from synapse.types import Requester, UserID
@@ -40,7 +38,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
     """
 
     NAME = "remote_join"
-    PATH_ARGS = ("room_id", "user_id",)
+    PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
         super(ReplicationRemoteJoinRestServlet, self).__init__(hs)
@@ -50,8 +48,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    def _serialize_payload(requester, room_id, user_id, remote_room_hosts,
-                           content):
+    def _serialize_payload(requester, room_id, user_id, remote_room_hosts, content):
         """
         Args:
             requester(Requester)
@@ -66,8 +63,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
             "content": content,
         }
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, room_id, user_id):
+    async def _handle_request(self, request, room_id, user_id):
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
@@ -78,19 +74,13 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
-        logger.info(
-            "remote_join: %s into room: %s",
-            user_id, room_id,
+        logger.info("remote_join: %s into room: %s", user_id, room_id)
+
+        await self.federation_handler.do_invite_join(
+            remote_room_hosts, room_id, user_id, event_content
         )
 
-        yield self.federation_handler.do_invite_join(
-            remote_room_hosts,
-            room_id,
-            user_id,
-            event_content,
-        )
-
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
@@ -103,11 +93,12 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         {
             "requester": ...,
             "remote_room_hosts": [...],
+            "content": { ... }
         }
     """
 
     NAME = "remote_reject_invite"
-    PATH_ARGS = ("room_id", "user_id",)
+    PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
         super(ReplicationRemoteRejectInviteRestServlet, self).__init__(hs)
@@ -117,7 +108,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    def _serialize_payload(requester, room_id, user_id, remote_room_hosts):
+    def _serialize_payload(requester, room_id, user_id, remote_room_hosts, content):
         """
         Args:
             requester(Requester)
@@ -128,29 +119,25 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         return {
             "requester": requester.serialize(),
             "remote_room_hosts": remote_room_hosts,
+            "content": content,
         }
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, room_id, user_id):
+    async def _handle_request(self, request, room_id, user_id):
         content = parse_json_object_from_request(request)
 
         remote_room_hosts = content["remote_room_hosts"]
+        event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
 
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
-        logger.info(
-            "remote_reject_invite: %s out of room: %s",
-            user_id, room_id,
-        )
+        logger.info("remote_reject_invite: %s out of room: %s", user_id, room_id)
 
         try:
-            event = yield self.federation_handler.do_remotely_reject_invite(
-                remote_room_hosts,
-                room_id,
-                user_id,
+            event = await self.federation_handler.do_remotely_reject_invite(
+                remote_room_hosts, room_id, user_id, event_content,
             )
             ret = event.get_pdu_json()
         except Exception as e:
@@ -160,78 +147,12 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             # The 'except' clause is very broad, but we need to
             # capture everything from DNS failures upwards
             #
-            logger.warn("Failed to reject invite: %s", e)
+            logger.warning("Failed to reject invite: %s", e)
 
-            yield self.store.locally_reject_invite(
-                user_id, room_id
-            )
+            await self.store.locally_reject_invite(user_id, room_id)
             ret = {}
 
-        defer.returnValue((200, ret))
-
-
-class ReplicationRegister3PIDGuestRestServlet(ReplicationEndpoint):
-    """Gets/creates a guest account for given 3PID.
-
-    Request format:
-
-        POST /_synapse/replication/get_or_register_3pid_guest/
-
-        {
-            "requester": ...,
-            "medium": ...,
-            "address": ...,
-            "inviter_user_id": ...
-        }
-    """
-
-    NAME = "get_or_register_3pid_guest"
-    PATH_ARGS = ()
-
-    def __init__(self, hs):
-        super(ReplicationRegister3PIDGuestRestServlet, self).__init__(hs)
-
-        self.registeration_handler = hs.get_registration_handler()
-        self.store = hs.get_datastore()
-        self.clock = hs.get_clock()
-
-    @staticmethod
-    def _serialize_payload(requester, medium, address, inviter_user_id):
-        """
-        Args:
-            requester(Requester)
-            medium (str)
-            address (str)
-            inviter_user_id (str): The user ID who is trying to invite the
-                3PID
-        """
-        return {
-            "requester": requester.serialize(),
-            "medium": medium,
-            "address": address,
-            "inviter_user_id": inviter_user_id,
-        }
-
-    @defer.inlineCallbacks
-    def _handle_request(self, request):
-        content = parse_json_object_from_request(request)
-
-        medium = content["medium"]
-        address = content["address"]
-        inviter_user_id = content["inviter_user_id"]
-
-        requester = Requester.deserialize(self.store, content["requester"])
-
-        if requester.user:
-            request.authenticated_entity = requester.user.to_string()
-
-        logger.info("get_or_register_3pid_guest: %r", content)
-
-        ret = yield self.registeration_handler.get_or_register_3pid_guest(
-            medium, address, inviter_user_id,
-        )
-
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
@@ -264,7 +185,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
             user_id (str)
             change (str): Either "joined" or "left"
         """
-        assert change in ("joined", "left",)
+        assert change in ("joined", "left")
 
         return {}
 
@@ -280,11 +201,10 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         else:
             raise Exception("Unrecognized change: %r", change)
 
-        return (200, {})
+        return 200, {}
 
 
 def register_servlets(hs, http_server):
     ReplicationRemoteJoinRestServlet(hs).register(http_server)
     ReplicationRemoteRejectInviteRestServlet(hs).register(http_server)
-    ReplicationRegister3PIDGuestRestServlet(hs).register(http_server)
     ReplicationUserJoinedLeftRoomRestServlet(hs).register(http_server)

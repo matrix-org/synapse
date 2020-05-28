@@ -21,7 +21,8 @@ import argparse
 import base64
 import json
 import sys
-from urlparse import urlparse, urlunparse
+
+from six.moves.urllib import parse as urlparse
 
 import nacl.signing
 import requests
@@ -62,7 +63,7 @@ def encode_canonical_json(value):
         # Encode code-points outside of ASCII as UTF-8 rather than \u escapes
         ensure_ascii=False,
         # Remove unecessary white space.
-        separators=(',', ':'),
+        separators=(",", ":"),
         # Sort the keys of dictionaries.
         sort_keys=True,
         # Encode the resulting unicode as UTF-8 bytes.
@@ -144,8 +145,8 @@ def request_json(method, origin_name, origin_key, destination, path, content):
     authorization_headers = []
 
     for key, sig in signed_json["signatures"][origin_name].items():
-        header = "X-Matrix origin=%s,key=\"%s\",sig=\"%s\"" % (origin_name, key, sig)
-        authorization_headers.append(bytes(header))
+        header = 'X-Matrix origin=%s,key="%s",sig="%s"' % (origin_name, key, sig)
+        authorization_headers.append(header.encode("ascii"))
         print("Authorization: %s" % header, file=sys.stderr)
 
     dest = "matrix://%s%s" % (destination, path)
@@ -160,11 +161,7 @@ def request_json(method, origin_name, origin_key, destination, path, content):
         headers["Content-Type"] = "application/json"
 
     result = s.request(
-        method=method,
-        url=dest,
-        headers=headers,
-        verify=False,
-        data=content,
+        method=method, url=dest, headers=headers, verify=False, data=content
     )
     sys.stderr.write("Status Code: %d\n" % (result.status_code,))
     return result.json()
@@ -240,18 +237,18 @@ def main():
 
 
 def read_args_from_config(args):
-    with open(args.config, 'r') as fh:
+    with open(args.config, "r") as fh:
         config = yaml.safe_load(fh)
         if not args.server_name:
-            args.server_name = config['server_name']
+            args.server_name = config["server_name"]
         if not args.signing_key_path:
-            args.signing_key_path = config['signing_key_path']
+            args.signing_key_path = config["signing_key_path"]
 
 
 class MatrixConnectionAdapter(HTTPAdapter):
     @staticmethod
-    def lookup(s):
-        if s[-1] == ']':
+    def lookup(s, skip_well_known=False):
+        if s[-1] == "]":
             # ipv6 literal (with no port)
             return s, 8448
 
@@ -263,19 +260,49 @@ class MatrixConnectionAdapter(HTTPAdapter):
                 raise ValueError("Invalid host:port '%s'" % s)
             return out[0], port
 
+        # try a .well-known lookup
+        if not skip_well_known:
+            well_known = MatrixConnectionAdapter.get_well_known(s)
+            if well_known:
+                return MatrixConnectionAdapter.lookup(well_known, skip_well_known=True)
+
         try:
             srv = srvlookup.lookup("matrix", "tcp", s)[0]
             return srv.host, srv.port
         except Exception:
             return s, 8448
 
+    @staticmethod
+    def get_well_known(server_name):
+        uri = "https://%s/.well-known/matrix/server" % (server_name,)
+        print("fetching %s" % (uri,), file=sys.stderr)
+
+        try:
+            resp = requests.get(uri)
+            if resp.status_code != 200:
+                print("%s gave %i" % (uri, resp.status_code), file=sys.stderr)
+                return None
+
+            parsed_well_known = resp.json()
+            if not isinstance(parsed_well_known, dict):
+                raise Exception("not a dict")
+            if "m.server" not in parsed_well_known:
+                raise Exception("Missing key 'm.server'")
+            new_name = parsed_well_known["m.server"]
+            print("well-known lookup gave %s" % (new_name,), file=sys.stderr)
+            return new_name
+
+        except Exception as e:
+            print("Invalid response from %s: %s" % (uri, e), file=sys.stderr)
+        return None
+
     def get_connection(self, url, proxies=None):
-        parsed = urlparse(url)
+        parsed = urlparse.urlparse(url)
 
         (host, port) = self.lookup(parsed.netloc)
         netloc = "%s:%d" % (host, port)
         print("Connecting to %s" % (netloc,), file=sys.stderr)
-        url = urlunparse(
+        url = urlparse.urlunparse(
             ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
         )
         return super(MatrixConnectionAdapter, self).get_connection(url, proxies)

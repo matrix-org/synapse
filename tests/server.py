@@ -11,11 +11,16 @@ from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.error import DNSLookupError
-from twisted.internet.interfaces import IReactorPluggableNameResolver, IResolverSimple
+from twisted.internet.interfaces import (
+    IReactorPluggableNameResolver,
+    IReactorTCP,
+    IResolverSimple,
+)
 from twisted.python.failure import Failure
-from twisted.test.proto_helpers import MemoryReactorClock
+from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
 from twisted.web.http import unquote
 from twisted.web.http_headers import Headers
+from twisted.web.server import Site
 
 from synapse.http.site import SynapseRequest
 from synapse.util import Clock
@@ -38,6 +43,7 @@ class FakeChannel(object):
     wire).
     """
 
+    site = attr.ib(type=Site)
     _reactor = attr.ib()
     result = attr.ib(default=attr.Factory(dict))
     _producer = None
@@ -46,7 +52,7 @@ class FakeChannel(object):
     def json_body(self):
         if not self.result:
             raise Exception("No result yet.")
-        return json.loads(self.result["body"].decode('utf8'))
+        return json.loads(self.result["body"].decode("utf8"))
 
     @property
     def code(self):
@@ -151,13 +157,17 @@ def make_request(
         Tuple[synapse.http.site.SynapseRequest, channel]
     """
     if not isinstance(method, bytes):
-        method = method.encode('ascii')
+        method = method.encode("ascii")
 
     if not isinstance(path, bytes):
-        path = path.encode('ascii')
+        path = path.encode("ascii")
 
     # Decorate it to be the full path, if we're using shorthand
-    if shorthand and not path.startswith(b"/_matrix"):
+    if (
+        shorthand
+        and not path.startswith(b"/_matrix")
+        and not path.startswith(b"/_synapse")
+    ):
         path = b"/_matrix/client/r0/" + path
         path = path.replace(b"//", b"/")
 
@@ -165,19 +175,19 @@ def make_request(
         path = b"/" + path
 
     if isinstance(content, text_type):
-        content = content.encode('utf8')
+        content = content.encode("utf8")
 
     site = FakeSite()
-    channel = FakeChannel(reactor)
+    channel = FakeChannel(site, reactor)
 
-    req = request(site, channel)
+    req = request(channel)
     req.process = lambda: b""
     req.content = BytesIO(content)
-    req.postpath = list(map(unquote, path[1:].split(b'/')))
+    req.postpath = list(map(unquote, path[1:].split(b"/")))
 
     if access_token:
         req.requestHeaders.addRawHeader(
-            b"Authorization", b"Bearer " + access_token.encode('ascii')
+            b"Authorization", b"Bearer " + access_token.encode("ascii")
         )
 
     if federation_auth_origin is not None:
@@ -242,7 +252,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super(ThreadedMemoryReactorClock, self).__init__()
 
-    def listenUDP(self, port, protocol, interface='', maxPacketSize=8196):
+    def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
         p.startListening()
         self._udp.append(p)
@@ -294,47 +304,48 @@ def setup_test_homeserver(cleanup_func, *args, **kwargs):
     Set up a synchronous test server, driven by the reactor used by
     the homeserver.
     """
-    d = _sth(cleanup_func, *args, **kwargs).result
+    server = _sth(cleanup_func, *args, **kwargs)
 
-    if isinstance(d, Failure):
-        d.raiseException()
+    database = server.config.database.get_single_database()
 
     # Make the thread pool synchronous.
-    clock = d.get_clock()
-    pool = d.get_db_pool()
+    clock = server.get_clock()
 
-    def runWithConnection(func, *args, **kwargs):
-        return threads.deferToThreadPool(
-            pool._reactor,
-            pool.threadpool,
-            pool._runWithConnection,
-            func,
-            *args,
-            **kwargs
-        )
+    for database in server.get_datastores().databases:
+        pool = database._db_pool
 
-    def runInteraction(interaction, *args, **kwargs):
-        return threads.deferToThreadPool(
-            pool._reactor,
-            pool.threadpool,
-            pool._runInteraction,
-            interaction,
-            *args,
-            **kwargs
-        )
+        def runWithConnection(func, *args, **kwargs):
+            return threads.deferToThreadPool(
+                pool._reactor,
+                pool.threadpool,
+                pool._runWithConnection,
+                func,
+                *args,
+                **kwargs
+            )
 
-    if pool:
+        def runInteraction(interaction, *args, **kwargs):
+            return threads.deferToThreadPool(
+                pool._reactor,
+                pool.threadpool,
+                pool._runInteraction,
+                interaction,
+                *args,
+                **kwargs
+            )
+
         pool.runWithConnection = runWithConnection
         pool.runInteraction = runInteraction
         pool.threadpool = ThreadPool(clock._reactor)
         pool.running = True
-    return d
+
+    return server
 
 
 def get_clock():
     clock = ThreadedMemoryReactorClock()
     hs_clock = Clock(clock)
-    return (clock, hs_clock)
+    return clock, hs_clock
 
 
 @attr.s(cmp=False)
@@ -371,7 +382,8 @@ class FakeTransport(object):
 
     disconnecting = False
     disconnected = False
-    buffer = attr.ib(default=b'')
+    connected = True
+    buffer = attr.ib(default=b"")
     producer = attr.ib(default=None)
     autoflush = attr.ib(default=True)
 
@@ -394,6 +406,7 @@ class FakeTransport(object):
                     "FakeTransport: Delaying disconnect until buffer is flushed"
                 )
             else:
+                self.connected = False
                 self.disconnected = True
 
     def abortConnection(self):
@@ -485,3 +498,22 @@ class FakeTransport(object):
         if not self.buffer and self.disconnecting:
             logger.info("FakeTransport: Buffer now empty, completing disconnect")
             self.disconnected = True
+
+
+def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:
+    """
+    Connect a client to a fake TCP transport.
+
+    Args:
+        reactor
+        factory: The connecting factory to build.
+    """
+    factory = reactor.tcpClients[client_id][2]
+    client = factory.buildProtocol(None)
+    server = AccumulatingProtocol()
+    server.makeConnection(FakeTransport(client, reactor))
+    client.makeConnection(FakeTransport(server, reactor))
+
+    reactor.tcpClients.pop(client_id)
+
+    return client, server

@@ -20,13 +20,16 @@ allowed to be sent by which side.
 
 import logging
 import platform
+from typing import Tuple, Type
 
 if platform.python_implementation() == "PyPy":
     import json
+
     _json_encoder = json.JSONEncoder()
 else:
-    import simplejson as json
-    _json_encoder = json.JSONEncoder(namedtuple_as_object=False)
+    import simplejson as json  # type: ignore[no-redef]  # noqa: F821
+
+    _json_encoder = json.JSONEncoder(namedtuple_as_object=False)  # type: ignore[call-arg]  # noqa: F821
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +44,8 @@ class Command(object):
 
     The default implementation creates a command of form `<NAME> <data>`
     """
-    NAME = None
+
+    NAME = None  # type: str
 
     def __init__(self, data):
         self.data = data
@@ -73,6 +77,7 @@ class ServerCommand(Command):
 
         SERVER <server_name>
     """
+
     NAME = "SERVER"
 
 
@@ -99,6 +104,7 @@ class RdataCommand(Command):
         RDATA presence batch ["@bar:example.com", "online", ...]
         RDATA presence 59 ["@baz:example.com", "online", ...]
     """
+
     NAME = "RDATA"
 
     def __init__(self, stream_name, token, row):
@@ -110,17 +116,17 @@ class RdataCommand(Command):
     def from_line(cls, line):
         stream_name, token, row_json = line.split(" ", 2)
         return cls(
-            stream_name,
-            None if token == "batch" else int(token),
-            json.loads(row_json)
+            stream_name, None if token == "batch" else int(token), json.loads(row_json)
         )
 
     def to_line(self):
-        return " ".join((
-            self.stream_name,
-            str(self.token) if self.token is not None else "batch",
-            _json_encoder.encode(self.row),
-        ))
+        return " ".join(
+            (
+                self.stream_name,
+                str(self.token) if self.token is not None else "batch",
+                _json_encoder.encode(self.row),
+            )
+        )
 
     def get_logcontext_id(self):
         return "RDATA-" + self.stream_name
@@ -133,6 +139,7 @@ class PositionCommand(Command):
     Sent to the client after all missing updates for a stream have been sent
     to the client and they're now up to date.
     """
+
     NAME = "POSITION"
 
     def __init__(self, stream_name, token):
@@ -145,19 +152,21 @@ class PositionCommand(Command):
         return cls(stream_name, int(token))
 
     def to_line(self):
-        return " ".join((self.stream_name, str(self.token),))
+        return " ".join((self.stream_name, str(self.token)))
 
 
 class ErrorCommand(Command):
     """Sent by either side if there was an ERROR. The data is a string describing
     the error.
     """
+
     NAME = "ERROR"
 
 
 class PingCommand(Command):
     """Sent by either side as a keep alive. The data is arbitary (often timestamp)
     """
+
     NAME = "PING"
 
 
@@ -165,6 +174,7 @@ class NameCommand(Command):
     """Sent by client to inform the server of the client's identity. The data
     is the name
     """
+
     NAME = "NAME"
 
 
@@ -184,6 +194,7 @@ class ReplicateCommand(Command):
 
         REPLICATE ALL NOW
     """
+
     NAME = "REPLICATE"
 
     def __init__(self, stream_name, token):
@@ -200,7 +211,7 @@ class ReplicateCommand(Command):
         return cls(stream_name, token)
 
     def to_line(self):
-        return " ".join((self.stream_name, str(self.token),))
+        return " ".join((self.stream_name, str(self.token)))
 
     def get_logcontext_id(self):
         return "REPLICATE-" + self.stream_name
@@ -218,6 +229,7 @@ class UserSyncCommand(Command):
 
     Where <state> is either "start" or "stop"
     """
+
     NAME = "USER_SYNC"
 
     def __init__(self, user_id, is_syncing, last_sync_ms):
@@ -235,9 +247,13 @@ class UserSyncCommand(Command):
         return cls(user_id, state == "start", int(last_sync_ms))
 
     def to_line(self):
-        return " ".join((
-            self.user_id, "start" if self.is_syncing else "end", str(self.last_sync_ms),
-        ))
+        return " ".join(
+            (
+                self.user_id,
+                "start" if self.is_syncing else "end",
+                str(self.last_sync_ms),
+            )
+        )
 
 
 class FederationAckCommand(Command):
@@ -251,6 +267,7 @@ class FederationAckCommand(Command):
 
         FEDERATION_ACK <token>
     """
+
     NAME = "FEDERATION_ACK"
 
     def __init__(self, token):
@@ -268,6 +285,7 @@ class SyncCommand(Command):
     """Used for testing. The client protocol implementation allows waiting
     on a SYNC command with a specified data.
     """
+
     NAME = "SYNC"
 
 
@@ -278,6 +296,7 @@ class RemovePusherCommand(Command):
 
         REMOVE_PUSHER <app_id> <push_key> <user_id>
     """
+
     NAME = "REMOVE_PUSHER"
 
     def __init__(self, app_id, push_key, user_id):
@@ -309,6 +328,7 @@ class InvalidateCacheCommand(Command):
 
     Where <keys_json> is a json list.
     """
+
     NAME = "INVALIDATE_CACHE"
 
     def __init__(self, cache_func, keys):
@@ -322,9 +342,7 @@ class InvalidateCacheCommand(Command):
         return cls(cache_func, json.loads(keys_json))
 
     def to_line(self):
-        return " ".join((
-            self.cache_func, _json_encoder.encode(self.keys),
-        ))
+        return " ".join((self.cache_func, _json_encoder.encode(self.keys)))
 
 
 class UserIpCommand(Command):
@@ -334,6 +352,7 @@ class UserIpCommand(Command):
 
         USER_IP <user_id>, <access_token>, <ip>, <device_id>, <last_seen>, <user_agent>
     """
+
     NAME = "USER_IP"
 
     def __init__(self, user_id, access_token, ip, user_agent, device_id, last_seen):
@@ -350,36 +369,57 @@ class UserIpCommand(Command):
 
         access_token, ip, user_agent, device_id, last_seen = json.loads(jsn)
 
-        return cls(
-            user_id, access_token, ip, user_agent, device_id, last_seen
-        )
+        return cls(user_id, access_token, ip, user_agent, device_id, last_seen)
 
     def to_line(self):
-        return self.user_id + " " + _json_encoder.encode((
-            self.access_token, self.ip, self.user_agent, self.device_id,
-            self.last_seen,
-        ))
+        return (
+            self.user_id
+            + " "
+            + _json_encoder.encode(
+                (
+                    self.access_token,
+                    self.ip,
+                    self.user_agent,
+                    self.device_id,
+                    self.last_seen,
+                )
+            )
+        )
 
+
+class RemoteServerUpCommand(Command):
+    """Sent when a worker has detected that a remote server is no longer
+    "down" and retry timings should be reset.
+
+    If sent from a client the server will relay to all other workers.
+
+    Format::
+
+        REMOTE_SERVER_UP <server>
+    """
+
+    NAME = "REMOTE_SERVER_UP"
+
+
+_COMMANDS = (
+    ServerCommand,
+    RdataCommand,
+    PositionCommand,
+    ErrorCommand,
+    PingCommand,
+    NameCommand,
+    ReplicateCommand,
+    UserSyncCommand,
+    FederationAckCommand,
+    SyncCommand,
+    RemovePusherCommand,
+    InvalidateCacheCommand,
+    UserIpCommand,
+    RemoteServerUpCommand,
+)  # type: Tuple[Type[Command], ...]
 
 # Map of command name to command type.
-COMMAND_MAP = {
-    cmd.NAME: cmd
-    for cmd in (
-        ServerCommand,
-        RdataCommand,
-        PositionCommand,
-        ErrorCommand,
-        PingCommand,
-        NameCommand,
-        ReplicateCommand,
-        UserSyncCommand,
-        FederationAckCommand,
-        SyncCommand,
-        RemovePusherCommand,
-        InvalidateCacheCommand,
-        UserIpCommand,
-    )
-}
+COMMAND_MAP = {cmd.NAME: cmd for cmd in _COMMANDS}
 
 # The commands the server is allowed to send
 VALID_SERVER_COMMANDS = (
@@ -389,6 +429,7 @@ VALID_SERVER_COMMANDS = (
     ErrorCommand.NAME,
     PingCommand.NAME,
     SyncCommand.NAME,
+    RemoteServerUpCommand.NAME,
 )
 
 # The commands the client is allowed to send
@@ -402,4 +443,5 @@ VALID_CLIENT_COMMANDS = (
     InvalidateCacheCommand.NAME,
     UserIpCommand.NAME,
     ErrorCommand.NAME,
+    RemoteServerUpCommand.NAME,
 )

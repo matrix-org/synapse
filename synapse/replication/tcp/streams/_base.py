@@ -14,90 +14,101 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import itertools
 import logging
 from collections import namedtuple
+from typing import Any, List, Optional
 
-from twisted.internet import defer
+import attr
 
 logger = logging.getLogger(__name__)
 
 
-MAX_EVENTS_BEHIND = 10000
+MAX_EVENTS_BEHIND = 500000
 
-BackfillStreamRow = namedtuple("BackfillStreamRow", (
-    "event_id",  # str
-    "room_id",  # str
-    "type",  # str
-    "state_key",  # str, optional
-    "redacts",  # str, optional
-    "relates_to",  # str, optional
-))
-PresenceStreamRow = namedtuple("PresenceStreamRow", (
-    "user_id",  # str
-    "state",  # str
-    "last_active_ts",  # int
-    "last_federation_update_ts",  # int
-    "last_user_sync_ts",  # int
-    "status_msg",   # str
-    "currently_active",  # bool
-))
-TypingStreamRow = namedtuple("TypingStreamRow", (
-    "room_id",  # str
-    "user_ids",  # list(str)
-))
-ReceiptsStreamRow = namedtuple("ReceiptsStreamRow", (
-    "room_id",  # str
-    "receipt_type",  # str
-    "user_id",  # str
-    "event_id",  # str
-    "data",  # dict
-))
-PushRulesStreamRow = namedtuple("PushRulesStreamRow", (
-    "user_id",  # str
-))
-PushersStreamRow = namedtuple("PushersStreamRow", (
-    "user_id",  # str
-    "app_id",  # str
-    "pushkey",  # str
-    "deleted",  # bool
-))
-CachesStreamRow = namedtuple("CachesStreamRow", (
-    "cache_func",  # str
-    "keys",  # list(str)
-    "invalidation_ts",  # int
-))
-PublicRoomsStreamRow = namedtuple("PublicRoomsStreamRow", (
-    "room_id",  # str
-    "visibility",  # str
-    "appservice_id",  # str, optional
-    "network_id",  # str, optional
-))
-DeviceListsStreamRow = namedtuple("DeviceListsStreamRow", (
-    "user_id",  # str
-    "destination",  # str
-))
-ToDeviceStreamRow = namedtuple("ToDeviceStreamRow", (
-    "entity",  # str
-))
-TagAccountDataStreamRow = namedtuple("TagAccountDataStreamRow", (
-    "user_id",  # str
-    "room_id",  # str
-    "data",  # dict
-))
-AccountDataStreamRow = namedtuple("AccountDataStream", (
-    "user_id",  # str
-    "room_id",  # str
-    "data_type",  # str
-    "data",  # dict
-))
-GroupsStreamRow = namedtuple("GroupsStreamRow", (
-    "group_id",  # str
-    "user_id",  # str
-    "type",  # str
-    "content",  # dict
-))
+BackfillStreamRow = namedtuple(
+    "BackfillStreamRow",
+    (
+        "event_id",  # str
+        "room_id",  # str
+        "type",  # str
+        "state_key",  # str, optional
+        "redacts",  # str, optional
+        "relates_to",  # str, optional
+    ),
+)
+PresenceStreamRow = namedtuple(
+    "PresenceStreamRow",
+    (
+        "user_id",  # str
+        "state",  # str
+        "last_active_ts",  # int
+        "last_federation_update_ts",  # int
+        "last_user_sync_ts",  # int
+        "status_msg",  # str
+        "currently_active",  # bool
+    ),
+)
+TypingStreamRow = namedtuple(
+    "TypingStreamRow", ("room_id", "user_ids")  # str  # list(str)
+)
+ReceiptsStreamRow = namedtuple(
+    "ReceiptsStreamRow",
+    (
+        "room_id",  # str
+        "receipt_type",  # str
+        "user_id",  # str
+        "event_id",  # str
+        "data",  # dict
+    ),
+)
+PushRulesStreamRow = namedtuple("PushRulesStreamRow", ("user_id",))  # str
+PushersStreamRow = namedtuple(
+    "PushersStreamRow",
+    ("user_id", "app_id", "pushkey", "deleted"),  # str  # str  # str  # bool
+)
+
+
+@attr.s
+class CachesStreamRow:
+    """Stream to inform workers they should invalidate their cache.
+
+    Attributes:
+        cache_func: Name of the cached function.
+        keys: The entry in the cache to invalidate. If None then will
+            invalidate all.
+        invalidation_ts: Timestamp of when the invalidation took place.
+    """
+
+    cache_func = attr.ib(type=str)
+    keys = attr.ib(type=Optional[List[Any]])
+    invalidation_ts = attr.ib(type=int)
+
+
+PublicRoomsStreamRow = namedtuple(
+    "PublicRoomsStreamRow",
+    (
+        "room_id",  # str
+        "visibility",  # str
+        "appservice_id",  # str, optional
+        "network_id",  # str, optional
+    ),
+)
+DeviceListsStreamRow = namedtuple(
+    "DeviceListsStreamRow", ("user_id", "destination")  # str  # str
+)
+ToDeviceStreamRow = namedtuple("ToDeviceStreamRow", ("entity",))  # str
+TagAccountDataStreamRow = namedtuple(
+    "TagAccountDataStreamRow", ("user_id", "room_id", "data")  # str  # str  # dict
+)
+AccountDataStreamRow = namedtuple(
+    "AccountDataStream", ("user_id", "room_id", "data_type")  # str  # str  # str
+)
+GroupsStreamRow = namedtuple(
+    "GroupsStreamRow",
+    ("group_id", "user_id", "type", "content"),  # str  # str  # str  # dict
+)
+UserSignatureStreamRow = namedtuple("UserSignatureStreamRow", ("user_id"))  # str
 
 
 class Stream(object):
@@ -106,8 +117,10 @@ class Stream(object):
     Provides a `get_updates()` function that returns new updates since the last
     time it was called up until the point `advance_current_token` was called.
     """
-    NAME = None  # The name of the stream
-    ROW_TYPE = None  # The type of the row. Used by the default impl of parse_row.
+
+    NAME = None  # type: str  # The name of the stream
+    # The type of the row. Used by the default impl of parse_row.
+    ROW_TYPE = None  # type: Any
     _LIMITED = True  # Whether the update function takes a limit
 
     @classmethod
@@ -145,8 +158,7 @@ class Stream(object):
         self.upto_token = self.current_token()
         self.last_token = self.upto_token
 
-    @defer.inlineCallbacks
-    def get_updates(self):
+    async def get_updates(self):
         """Gets all updates since the last time this function was called (or
         since the stream was constructed if it hadn't been called before),
         until the `upto_token`
@@ -157,13 +169,12 @@ class Stream(object):
                 list of ``(token, row)`` entries. ``row`` will be json-serialised and
                 sent over the replication steam.
         """
-        updates, current_token = yield self.get_updates_since(self.last_token)
+        updates, current_token = await self.get_updates_since(self.last_token)
         self.last_token = current_token
 
-        defer.returnValue((updates, current_token))
+        return updates, current_token
 
-    @defer.inlineCallbacks
-    def get_updates_since(self, from_token):
+    async def get_updates_since(self, from_token):
         """Like get_updates except allows specifying from when we should
         stream updates
 
@@ -174,27 +185,25 @@ class Stream(object):
                 sent over the replication steam.
         """
         if from_token in ("NOW", "now"):
-            defer.returnValue(([], self.upto_token))
+            return [], self.upto_token
 
         current_token = self.upto_token
 
         from_token = int(from_token)
 
         if from_token == current_token:
-            defer.returnValue(([], current_token))
+            return [], current_token
 
+        logger.info("get_updates_since: %s", self.__class__)
         if self._LIMITED:
-            rows = yield self.update_function(
-                from_token, current_token,
-                limit=MAX_EVENTS_BEHIND + 1,
+            rows = await self.update_function(
+                from_token, current_token, limit=MAX_EVENTS_BEHIND + 1
             )
 
             # never turn more than MAX_EVENTS_BEHIND + 1 into updates.
             rows = itertools.islice(rows, MAX_EVENTS_BEHIND + 1)
         else:
-            rows = yield self.update_function(
-                from_token, current_token,
-            )
+            rows = await self.update_function(from_token, current_token)
 
         updates = [(row[0], row[1:]) for row in rows]
 
@@ -203,7 +212,7 @@ class Stream(object):
         if self._LIMITED and len(updates) >= MAX_EVENTS_BEHIND:
             raise Exception("stream %s has fallen behind" % (self.NAME))
 
-        defer.returnValue((updates, current_token))
+        return updates, current_token
 
     def current_token(self):
         """Gets the current token of the underlying streams. Should be provided
@@ -230,13 +239,14 @@ class BackfillStream(Stream):
     """We fetched some old events and either we had never seen that event before
     or it went from being an outlier to not.
     """
+
     NAME = "backfill"
     ROW_TYPE = BackfillStreamRow
 
     def __init__(self, hs):
         store = hs.get_datastore()
-        self.current_token = store.get_current_backfill_token
-        self.update_function = store.get_all_new_backfill_event_rows
+        self.current_token = store.get_current_backfill_token  # type: ignore
+        self.update_function = store.get_all_new_backfill_event_rows  # type: ignore
 
         super(BackfillStream, self).__init__(hs)
 
@@ -250,8 +260,8 @@ class PresenceStream(Stream):
         store = hs.get_datastore()
         presence_handler = hs.get_presence_handler()
 
-        self.current_token = store.get_current_presence_token
-        self.update_function = presence_handler.get_all_presence_updates
+        self.current_token = store.get_current_presence_token  # type: ignore
+        self.update_function = presence_handler.get_all_presence_updates  # type: ignore
 
         super(PresenceStream, self).__init__(hs)
 
@@ -264,8 +274,8 @@ class TypingStream(Stream):
     def __init__(self, hs):
         typing_handler = hs.get_typing_handler()
 
-        self.current_token = typing_handler.get_current_token
-        self.update_function = typing_handler.get_all_typing_updates
+        self.current_token = typing_handler.get_current_token  # type: ignore
+        self.update_function = typing_handler.get_all_typing_updates  # type: ignore
 
         super(TypingStream, self).__init__(hs)
 
@@ -277,8 +287,8 @@ class ReceiptsStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_max_receipt_stream_id
-        self.update_function = store.get_all_updated_receipts
+        self.current_token = store.get_max_receipt_stream_id  # type: ignore
+        self.update_function = store.get_all_updated_receipts  # type: ignore
 
         super(ReceiptsStream, self).__init__(hs)
 
@@ -286,6 +296,7 @@ class ReceiptsStream(Stream):
 class PushRulesStream(Stream):
     """A user has changed their push rules
     """
+
     NAME = "push_rules"
     ROW_TYPE = PushRulesStreamRow
 
@@ -297,23 +308,23 @@ class PushRulesStream(Stream):
         push_rules_token, _ = self.store.get_push_rules_stream_token()
         return push_rules_token
 
-    @defer.inlineCallbacks
-    def update_function(self, from_token, to_token, limit):
-        rows = yield self.store.get_all_push_rule_updates(from_token, to_token, limit)
-        defer.returnValue([(row[0], row[2]) for row in rows])
+    async def update_function(self, from_token, to_token, limit):
+        rows = await self.store.get_all_push_rule_updates(from_token, to_token, limit)
+        return [(row[0], row[2]) for row in rows]
 
 
 class PushersStream(Stream):
     """A user has added/changed/removed a pusher
     """
+
     NAME = "pushers"
     ROW_TYPE = PushersStreamRow
 
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_pushers_stream_token
-        self.update_function = store.get_all_updated_pushers_rows
+        self.current_token = store.get_pushers_stream_token  # type: ignore
+        self.update_function = store.get_all_updated_pushers_rows  # type: ignore
 
         super(PushersStream, self).__init__(hs)
 
@@ -322,14 +333,15 @@ class CachesStream(Stream):
     """A cache was invalidated on the master and no other stream would invalidate
     the cache on the workers
     """
+
     NAME = "caches"
     ROW_TYPE = CachesStreamRow
 
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_cache_stream_token
-        self.update_function = store.get_all_updated_caches
+        self.current_token = store.get_cache_stream_token  # type: ignore
+        self.update_function = store.get_all_updated_caches  # type: ignore
 
         super(CachesStream, self).__init__(hs)
 
@@ -337,14 +349,15 @@ class CachesStream(Stream):
 class PublicRoomsStream(Stream):
     """The public rooms list changed
     """
+
     NAME = "public_rooms"
     ROW_TYPE = PublicRoomsStreamRow
 
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_current_public_room_stream_id
-        self.update_function = store.get_all_new_public_rooms
+        self.current_token = store.get_current_public_room_stream_id  # type: ignore
+        self.update_function = store.get_all_new_public_rooms  # type: ignore
 
         super(PublicRoomsStream, self).__init__(hs)
 
@@ -352,6 +365,7 @@ class PublicRoomsStream(Stream):
 class DeviceListsStream(Stream):
     """Someone added/changed/removed a device
     """
+
     NAME = "device_lists"
     _LIMITED = False
     ROW_TYPE = DeviceListsStreamRow
@@ -359,8 +373,8 @@ class DeviceListsStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_device_stream_token
-        self.update_function = store.get_all_device_list_changes_for_remotes
+        self.current_token = store.get_device_stream_token  # type: ignore
+        self.update_function = store.get_all_device_list_changes_for_remotes  # type: ignore
 
         super(DeviceListsStream, self).__init__(hs)
 
@@ -368,14 +382,15 @@ class DeviceListsStream(Stream):
 class ToDeviceStream(Stream):
     """New to_device messages for a client
     """
+
     NAME = "to_device"
     ROW_TYPE = ToDeviceStreamRow
 
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_to_device_stream_token
-        self.update_function = store.get_all_new_device_messages
+        self.current_token = store.get_to_device_stream_token  # type: ignore
+        self.update_function = store.get_all_new_device_messages  # type: ignore
 
         super(ToDeviceStream, self).__init__(hs)
 
@@ -383,14 +398,15 @@ class ToDeviceStream(Stream):
 class TagAccountDataStream(Stream):
     """Someone added/removed a tag for a room
     """
+
     NAME = "tag_account_data"
     ROW_TYPE = TagAccountDataStreamRow
 
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_max_account_data_stream_id
-        self.update_function = store.get_all_updated_tags
+        self.current_token = store.get_max_account_data_stream_id  # type: ignore
+        self.update_function = store.get_all_updated_tags  # type: ignore
 
         super(TagAccountDataStream, self).__init__(hs)
 
@@ -398,29 +414,29 @@ class TagAccountDataStream(Stream):
 class AccountDataStream(Stream):
     """Global or per room account data was changed
     """
+
     NAME = "account_data"
     ROW_TYPE = AccountDataStreamRow
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
 
-        self.current_token = self.store.get_max_account_data_stream_id
+        self.current_token = self.store.get_max_account_data_stream_id  # type: ignore
 
         super(AccountDataStream, self).__init__(hs)
 
-    @defer.inlineCallbacks
-    def update_function(self, from_token, to_token, limit):
-        global_results, room_results = yield self.store.get_all_updated_account_data(
+    async def update_function(self, from_token, to_token, limit):
+        global_results, room_results = await self.store.get_all_updated_account_data(
             from_token, from_token, to_token, limit
         )
 
         results = list(room_results)
         results.extend(
-            (stream_id, user_id, None, account_data_type, content,)
-            for stream_id, user_id, account_data_type, content in global_results
+            (stream_id, user_id, None, account_data_type)
+            for stream_id, user_id, account_data_type in global_results
         )
 
-        defer.returnValue(results)
+        return results
 
 
 class GroupServerStream(Stream):
@@ -430,7 +446,24 @@ class GroupServerStream(Stream):
     def __init__(self, hs):
         store = hs.get_datastore()
 
-        self.current_token = store.get_group_stream_token
-        self.update_function = store.get_all_groups_changes
+        self.current_token = store.get_group_stream_token  # type: ignore
+        self.update_function = store.get_all_groups_changes  # type: ignore
 
         super(GroupServerStream, self).__init__(hs)
+
+
+class UserSignatureStream(Stream):
+    """A user has signed their own device with their user-signing key
+    """
+
+    NAME = "user_signature"
+    _LIMITED = False
+    ROW_TYPE = UserSignatureStreamRow
+
+    def __init__(self, hs):
+        store = hs.get_datastore()
+
+        self.current_token = store.get_device_stream_token  # type: ignore
+        self.update_function = store.get_all_user_signature_changes_for_remotes  # type: ignore
+
+        super(UserSignatureStream, self).__init__(hs)

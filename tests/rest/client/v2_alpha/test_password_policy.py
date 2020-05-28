@@ -60,9 +60,7 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
         }
 
         config = self.default_config()
-        config["password_config"] = {
-            "policy": self.policy,
-        }
+        config["password_config"] = {"policy": self.policy}
 
         hs = self.setup_test_homeserver(config=config)
         return hs
@@ -70,17 +68,23 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
     def test_get_policy(self):
         """Tests if the /password_policy endpoint returns the configured policy."""
 
-        request, channel = self.make_request("GET", "/_matrix/client/r0/password_policy")
+        request, channel = self.make_request(
+            "GET", "/_matrix/client/r0/password_policy"
+        )
         self.render(request)
 
         self.assertEqual(channel.code, 200, channel.result)
-        self.assertEqual(channel.json_body, {
-            "m.minimum_length": 10,
-            "m.require_digit": True,
-            "m.require_symbol": True,
-            "m.require_lowercase": True,
-            "m.require_uppercase": True,
-        }, channel.result)
+        self.assertEqual(
+            channel.json_body,
+            {
+                "m.minimum_length": 10,
+                "m.require_digit": True,
+                "m.require_symbol": True,
+                "m.require_lowercase": True,
+                "m.require_uppercase": True,
+            },
+            channel.result,
+        )
 
     def test_password_too_short(self):
         request_data = json.dumps({"username": "kermit", "password": "shorty"})
@@ -89,9 +93,7 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"],
-            Codes.PASSWORD_TOO_SHORT,
-            channel.result,
+            channel.json_body["errcode"], Codes.PASSWORD_TOO_SHORT, channel.result
         )
 
     def test_password_no_digit(self):
@@ -101,9 +103,7 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"],
-            Codes.PASSWORD_NO_DIGIT,
-            channel.result,
+            channel.json_body["errcode"], Codes.PASSWORD_NO_DIGIT, channel.result
         )
 
     def test_password_no_symbol(self):
@@ -113,9 +113,7 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"],
-            Codes.PASSWORD_NO_SYMBOL,
-            channel.result,
+            channel.json_body["errcode"], Codes.PASSWORD_NO_SYMBOL, channel.result
         )
 
     def test_password_no_uppercase(self):
@@ -125,9 +123,7 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"],
-            Codes.PASSWORD_NO_UPPERCASE,
-            channel.result,
+            channel.json_body["errcode"], Codes.PASSWORD_NO_UPPERCASE, channel.result
         )
 
     def test_password_no_lowercase(self):
@@ -137,9 +133,7 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"],
-            Codes.PASSWORD_NO_LOWERCASE,
-            channel.result,
+            channel.json_body["errcode"], Codes.PASSWORD_NO_LOWERCASE, channel.result
         )
 
     def test_password_compliant(self):
@@ -161,14 +155,16 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
         user_id = self.register_user("kermit", compliant_password)
         tok = self.login("kermit", compliant_password)
 
-        request_data = json.dumps({
-            "new_password": not_compliant_password,
-            "auth": {
-                "password": compliant_password,
-                "type": LoginType.PASSWORD,
-                "user": user_id,
+        request_data = json.dumps(
+            {
+                "new_password": not_compliant_password,
+                "auth": {
+                    "password": compliant_password,
+                    "type": LoginType.PASSWORD,
+                    "user": user_id,
+                },
             }
-        })
+        )
         request, channel = self.make_request(
             "POST",
             "/_matrix/client/r0/account/password",

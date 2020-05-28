@@ -57,8 +57,8 @@ class PasswordPolicyHandler(object):
             )
 
         if (
-            self.policy.get("require_digit", False) and
-            self.regexp_digit.search(password) is None
+            self.policy.get("require_digit", False)
+            and self.regexp_digit.search(password) is None
         ):
             raise PasswordRefusedError(
                 msg="The password must include at least one digit",
@@ -66,8 +66,8 @@ class PasswordPolicyHandler(object):
             )
 
         if (
-            self.policy.get("require_symbol", False) and
-            self.regexp_symbol.search(password) is None
+            self.policy.get("require_symbol", False)
+            and self.regexp_symbol.search(password) is None
         ):
             raise PasswordRefusedError(
                 msg="The password must include at least one symbol",
@@ -75,8 +75,8 @@ class PasswordPolicyHandler(object):
             )
 
         if (
-            self.policy.get("require_uppercase", False) and
-            self.regexp_uppercase.search(password) is None
+            self.policy.get("require_uppercase", False)
+            and self.regexp_uppercase.search(password) is None
         ):
             raise PasswordRefusedError(
                 msg="The password must include at least one uppercase letter",
@@ -84,8 +84,8 @@ class PasswordPolicyHandler(object):
             )
 
         if (
-            self.policy.get("require_lowercase", False) and
-            self.regexp_lowercase.search(password) is None
+            self.policy.get("require_lowercase", False)
+            and self.regexp_lowercase.search(password) is None
         ):
             raise PasswordRefusedError(
                 msg="The password must include at least one lowercase letter",

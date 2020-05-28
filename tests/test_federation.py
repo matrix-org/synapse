@@ -1,11 +1,11 @@
 from mock import Mock
 
-from twisted.internet.defer import maybeDeferred, succeed
+from twisted.internet.defer import ensureDeferred, maybeDeferred, succeed
 
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
+from synapse.logging.context import LoggingContext
 from synapse.types import Requester, UserID
 from synapse.util import Clock
-from synapse.util.logcontext import LoggingContext
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
@@ -33,14 +33,17 @@ class MessageAcceptTests(unittest.TestCase):
         self.reactor.advance(0.1)
         self.room_id = self.successResultOf(room)["room_id"]
 
+        self.store = self.homeserver.get_datastore()
+
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
             maybeDeferred(
-                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
+                self.homeserver.get_datastore().get_latest_event_ids_in_room,
+                self.room_id,
             )
         )[0]
 
-        join_event = FrozenEvent(
+        join_event = make_event_from_dict(
             {
                 "room_id": self.room_id,
                 "sender": "@baduser:test.serv",
@@ -58,15 +61,19 @@ class MessageAcceptTests(unittest.TestCase):
         )
 
         self.handler = self.homeserver.get_handlers().federation_handler
-        self.handler.do_auth = lambda *a, **b: succeed(True)
+        self.handler.do_auth = lambda origin, event, context, auth_events: succeed(
+            context
+        )
         self.client = self.homeserver.get_federation_client()
         self.client._check_sigs_and_hash_and_fetch = lambda dest, pdus, **k: succeed(
             pdus
         )
 
         # Send the join, it should return None (which is not an error)
-        d = self.handler.on_receive_pdu(
-            "test.serv", join_event, sent_to_us_directly=True
+        d = ensureDeferred(
+            self.handler.on_receive_pdu(
+                "test.serv", join_event, sent_to_us_directly=True
+            )
         )
         self.reactor.advance(1)
         self.assertEqual(self.successResultOf(d), None)
@@ -74,9 +81,7 @@ class MessageAcceptTests(unittest.TestCase):
         # Make sure we actually joined the room
         self.assertEqual(
             self.successResultOf(
-                maybeDeferred(
-                    self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
-                )
+                maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
             )[0],
             "$join:test.serv",
         )
@@ -96,13 +101,11 @@ class MessageAcceptTests(unittest.TestCase):
 
         # Figure out what the most recent event is
         most_recent = self.successResultOf(
-            maybeDeferred(
-                self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
-            )
+            maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
         )[0]
 
         # Now lie about an event
-        lying_event = FrozenEvent(
+        lying_event = make_event_from_dict(
             {
                 "room_id": self.room_id,
                 "sender": "@baduser:test.serv",
@@ -118,8 +121,10 @@ class MessageAcceptTests(unittest.TestCase):
         )
 
         with LoggingContext(request="lying_event"):
-            d = self.handler.on_receive_pdu(
-                "test.serv", lying_event, sent_to_us_directly=True
+            d = ensureDeferred(
+                self.handler.on_receive_pdu(
+                    "test.serv", lying_event, sent_to_us_directly=True
+                )
             )
 
             # Step the reactor, so the database fetches come back
@@ -136,7 +141,5 @@ class MessageAcceptTests(unittest.TestCase):
         )
 
         # Make sure the invalid event isn't there
-        extrem = maybeDeferred(
-            self.homeserver.datastore.get_latest_event_ids_in_room, self.room_id
-        )
+        extrem = maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
         self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")

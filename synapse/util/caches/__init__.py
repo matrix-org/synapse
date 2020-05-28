@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +16,7 @@
 
 import logging
 import os
+from typing import Dict
 
 import six
 from six.moves import intern
@@ -36,7 +38,7 @@ def get_cache_factor_for(cache_name):
 
 
 caches_by_name = {}
-collectors_by_name = {}
+collectors_by_name = {}  # type: Dict
 
 cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
@@ -51,7 +53,19 @@ response_cache_evicted = Gauge(
 response_cache_total = Gauge("synapse_util_caches_response_cache:total", "", ["name"])
 
 
-def register_cache(cache_type, cache_name, cache):
+def register_cache(cache_type, cache_name, cache, collect_callback=None):
+    """Register a cache object for metric collection.
+
+    Args:
+        cache_type (str):
+        cache_name (str): name of the cache
+        cache (object): cache itself
+        collect_callback (callable|None): if not None, a function which is called during
+            metric collection to update additional metrics.
+
+    Returns:
+        CacheMetric: an object which provides inc_{hits,misses,evictions} methods
+    """
 
     # Check if the metric is already registered. Unregister it, if so.
     # This usually happens during tests, as at runtime these caches are
@@ -90,8 +104,10 @@ def register_cache(cache_type, cache_name, cache):
                     cache_hits.labels(cache_name).set(self.hits)
                     cache_evicted.labels(cache_name).set(self.evicted_size)
                     cache_total.labels(cache_name).set(self.hits + self.misses)
+                if collect_callback:
+                    collect_callback()
             except Exception as e:
-                logger.warn("Error calculating metrics for %s: %s", cache_name, e)
+                logger.warning("Error calculating metrics for %s: %s", cache_name, e)
                 raise
 
             yield GaugeMetricFamily("__unused", "")
@@ -104,8 +120,8 @@ def register_cache(cache_type, cache_name, cache):
 
 
 KNOWN_KEYS = {
-    key: key for key in
-    (
+    key: key
+    for key in (
         "auth_events",
         "content",
         "depth",
@@ -150,7 +166,7 @@ def intern_dict(dictionary):
 
 
 def _intern_known_values(key, value):
-    intern_keys = ("event_id", "room_id", "sender", "user_id", "type", "state_key",)
+    intern_keys = ("event_id", "room_id", "sender", "user_id", "type", "state_key")
 
     if key in intern_keys:
         return intern_string(value)

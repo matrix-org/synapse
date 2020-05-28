@@ -49,15 +49,11 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         config["third_party_event_rules"] = {
             "module": "synapse.third_party_rules.access_rules.RoomAccessRules",
             "config": {
-                "domains_forbidden_when_restricted": [
-                    "forbidden_domain"
-                ],
+                "domains_forbidden_when_restricted": ["forbidden_domain"],
                 "id_server": "testis",
-            }
+            },
         }
-        config["trusted_third_party_id_servers"] = [
-            "testis",
-        ]
+        config["trusted_third_party_id_servers"] = ["testis"]
 
         def send_invite(destination, room_id, event_id, pdu):
             return defer.succeed(pdu)
@@ -66,40 +62,44 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             address_domain = args["address"].split("@")[1]
             return defer.succeed({"hs": address_domain})
 
-        def post_urlencoded_get_json(uri, args={}, headers=None):
-            token = ''.join(random.choice(string.ascii_letters) for _ in range(10))
-            return defer.succeed({
-                "token": token,
-                "public_keys": [
-                    {
-                        "public_key": "serverpublickey",
-                        "key_validity_url": "https://testis/pubkey/isvalid",
-                    },
-                    {
-                        "public_key": "phemeralpublickey",
-                        "key_validity_url": "https://testis/pubkey/ephemeral/isvalid",
-                    },
-                ],
-                "display_name": "f...@b...",
-            })
+        def post_json_get_json(uri, post_json, args={}, headers=None):
+            token = "".join(random.choice(string.ascii_letters) for _ in range(10))
+            return defer.succeed(
+                {
+                    "token": token,
+                    "public_keys": [
+                        {
+                            "public_key": "serverpublickey",
+                            "key_validity_url": "https://testis/pubkey/isvalid",
+                        },
+                        {
+                            "public_key": "phemeralpublickey",
+                            "key_validity_url": "https://testis/pubkey/ephemeral/isvalid",
+                        },
+                    ],
+                    "display_name": "f...@b...",
+                }
+            )
 
-        mock_federation_client = Mock(spec=[
-            "send_invite",
-        ])
+        mock_federation_client = Mock(spec=["send_invite"])
         mock_federation_client.send_invite.side_effect = send_invite
 
-        mock_http_client = Mock(spec=[
-            "get_json",
-            "post_urlencoded_get_json"
-        ])
+        mock_http_client = Mock(spec=["get_json", "post_json_get_json"],)
         # Mocking the response for /info on the IS API.
         mock_http_client.get_json.side_effect = get_json
         # Mocking the response for /store-invite on the IS API.
-        mock_http_client.post_urlencoded_get_json.side_effect = post_urlencoded_get_json
+        mock_http_client.post_json_get_json.side_effect = post_json_get_json
         self.hs = self.setup_test_homeserver(
             config=config,
             federation_client=mock_federation_client,
             simple_http_client=mock_http_client,
+        )
+
+        # TODO: This class does not use a singleton to get it's http client
+        # This should be fixed for easier testing
+        # https://github.com/matrix-org/synapse-dinsic/issues/26
+        self.hs.get_handlers().identity_handler.blacklisting_http_client = (
+            mock_http_client
         )
 
         return self.hs
@@ -164,74 +164,80 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         # rule to restricted.
         preset_room_id = self.create_room(preset=RoomCreationPreset.PUBLIC_CHAT)
         self.assertEqual(
-            self.current_rule_in_room(preset_room_id), ACCESS_RULE_RESTRICTED,
+            self.current_rule_in_room(preset_room_id), ACCESS_RULE_RESTRICTED
         )
 
         # Creating a room with the public join rule in its initial state should succeed
         # and set the access rule to restricted.
-        init_state_room_id = self.create_room(initial_state=[{
-            "type": "m.room.join_rules",
-            "content": {
-                "join_rule": JoinRules.PUBLIC,
-            },
-        }])
+        init_state_room_id = self.create_room(
+            initial_state=[
+                {
+                    "type": "m.room.join_rules",
+                    "content": {"join_rule": JoinRules.PUBLIC},
+                }
+            ]
+        )
         self.assertEqual(
-            self.current_rule_in_room(init_state_room_id), ACCESS_RULE_RESTRICTED,
+            self.current_rule_in_room(init_state_room_id), ACCESS_RULE_RESTRICTED
         )
 
         # Changing access rule to unrestricted should fail.
         self.change_rule_in_room(
-            preset_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403,
+            preset_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403
         )
         self.change_rule_in_room(
-            init_state_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403,
+            init_state_room_id, ACCESS_RULE_UNRESTRICTED, expected_code=403
         )
 
         # Changing access rule to direct should fail.
+        self.change_rule_in_room(preset_room_id, ACCESS_RULE_DIRECT, expected_code=403)
         self.change_rule_in_room(
-            preset_room_id, ACCESS_RULE_DIRECT, expected_code=403,
-        )
-        self.change_rule_in_room(
-            init_state_room_id, ACCESS_RULE_DIRECT, expected_code=403,
+            init_state_room_id, ACCESS_RULE_DIRECT, expected_code=403
         )
 
         # Changing join rule to public in an unrestricted room should fail.
         self.change_join_rule_in_room(
-            self.unrestricted_room, JoinRules.PUBLIC, expected_code=403,
+            self.unrestricted_room, JoinRules.PUBLIC, expected_code=403
         )
         # Changing join rule to public in an direct room should fail.
         self.change_join_rule_in_room(
-            self.direct_rooms[0], JoinRules.PUBLIC, expected_code=403,
+            self.direct_rooms[0], JoinRules.PUBLIC, expected_code=403
         )
 
         # Creating a new room with the public_chat preset and an access rule that isn't
         # restricted should fail.
         self.create_room(
-            preset=RoomCreationPreset.PUBLIC_CHAT, rule=ACCESS_RULE_UNRESTRICTED,
+            preset=RoomCreationPreset.PUBLIC_CHAT,
+            rule=ACCESS_RULE_UNRESTRICTED,
             expected_code=400,
         )
         self.create_room(
-            preset=RoomCreationPreset.PUBLIC_CHAT, rule=ACCESS_RULE_DIRECT,
+            preset=RoomCreationPreset.PUBLIC_CHAT,
+            rule=ACCESS_RULE_DIRECT,
             expected_code=400,
         )
 
         # Creating a room with the public join rule in its initial state and an access
         # rule that isn't restricted should fail.
         self.create_room(
-            initial_state=[{
-                "type": "m.room.join_rules",
-                "content": {
-                    "join_rule": JoinRules.PUBLIC,
-                },
-            }], rule=ACCESS_RULE_UNRESTRICTED, expected_code=400,
+            initial_state=[
+                {
+                    "type": "m.room.join_rules",
+                    "content": {"join_rule": JoinRules.PUBLIC},
+                }
+            ],
+            rule=ACCESS_RULE_UNRESTRICTED,
+            expected_code=400,
         )
         self.create_room(
-            initial_state=[{
-                "type": "m.room.join_rules",
-                "content": {
-                    "join_rule": JoinRules.PUBLIC,
-                },
-            }], rule=ACCESS_RULE_DIRECT, expected_code=400,
+            initial_state=[
+                {
+                    "type": "m.room.join_rules",
+                    "content": {"join_rule": JoinRules.PUBLIC},
+                }
+            ],
+            rule=ACCESS_RULE_DIRECT,
+            expected_code=400,
         )
 
     def test_restricted(self):
@@ -405,12 +411,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.helper.send_state(
             room_id=self.unrestricted_room,
             event_type=EventTypes.PowerLevels,
-            body={
-                "users": {
-                    self.user_id: 100,
-                    "@test:not_forbidden_domain": 10,
-                },
-            },
+            body={"users": {self.user_id: 100, "@test:not_forbidden_domain": 10}},
             tok=self.tok,
             expect_code=200,
         )
@@ -421,10 +422,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             room_id=self.unrestricted_room,
             event_type=EventTypes.PowerLevels,
             body={
-                "users": {
-                    self.user_id: 100,
-                    "@test:not_forbidden_domain": 10,
-                },
+                "users": {self.user_id: 100, "@test:not_forbidden_domain": 10},
                 "users_default": 10,
             },
             tok=self.tok,
@@ -436,12 +434,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.helper.send_state(
             room_id=self.unrestricted_room,
             event_type=EventTypes.PowerLevels,
-            body={
-                "users": {
-                    self.user_id: 100,
-                    "@test:forbidden_domain": 10,
-                },
-            },
+            body={"users": {self.user_id: 100, "@test:forbidden_domain": 10}},
             tok=self.tok,
             expect_code=403,
         )
@@ -459,9 +452,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
         # We can't change the rule from restricted to direct.
         self.change_rule_in_room(
-            room_id=self.restricted_room,
-            new_rule=ACCESS_RULE_DIRECT,
-            expected_code=403,
+            room_id=self.restricted_room, new_rule=ACCESS_RULE_DIRECT, expected_code=403
         )
 
         # We can't change the rule from unrestricted to restricted.
@@ -498,12 +489,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         """
 
         avatar_content = {
-            "info": {
-                "h": 398,
-                "mimetype": "image/jpeg",
-                "size": 31037,
-                "w": 394
-            },
+            "info": {"h": 398, "mimetype": "image/jpeg", "size": 31037, "w": 394},
             "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
         }
 
@@ -536,9 +522,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         chat, in which case it's forbidden.
         """
 
-        name_content = {
-            "name": "My super room",
-        }
+        name_content = {"name": "My super room"}
 
         self.helper.send_state(
             room_id=self.restricted_room,
@@ -569,9 +553,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         direct chat, in which case it's forbidden.
         """
 
-        topic_content = {
-            "topic": "Welcome to this room",
-        }
+        topic_content = {"topic": "Welcome to this room"}
 
         self.helper.send_state(
             room_id=self.restricted_room,
@@ -608,15 +590,15 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             "public_keys": [
                 {
                     "key_validity_url": "https://validity_url",
-                    "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA"
+                    "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA",
                 },
                 {
                     "key_validity_url": "https://validity_url",
-                    "public_key": "4_9nzEeDwR5N9s51jPodBiLnqH43A2_g2InVT137t9I"
-                }
+                    "public_key": "4_9nzEeDwR5N9s51jPodBiLnqH43A2_g2InVT137t9I",
+                },
             ],
             "key_validity_url": "https://validity_url",
-            "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA"
+            "public_key": "ta8IQ0u1sp44HVpxYi7dFOdS/bfwDjcy4xLFlfY5KOA",
         }
 
         self.send_state_with_state_key(
@@ -646,22 +628,19 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         )
 
     def create_room(
-        self, direct=False, rule=None, preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
-        initial_state=None, expected_code=200,
+        self,
+        direct=False,
+        rule=None,
+        preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+        initial_state=None,
+        expected_code=200,
     ):
-        content = {
-            "is_direct": direct,
-            "preset": preset,
-        }
+        content = {"is_direct": direct, "preset": preset}
 
         if rule:
-            content["initial_state"] = [{
-                "type": ACCESS_RULES_TYPE,
-                "state_key": "",
-                "content": {
-                    "rule": rule,
-                }
-            }]
+            content["initial_state"] = [
+                {"type": ACCESS_RULES_TYPE, "state_key": "", "content": {"rule": rule}}
+            ]
 
         if initial_state:
             if "initial_state" not in content:
@@ -694,9 +673,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         return channel.json_body["rule"]
 
     def change_rule_in_room(self, room_id, new_rule, expected_code=200):
-        data = {
-            "rule": new_rule,
-        }
+        data = {"rule": new_rule}
         request, channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, ACCESS_RULES_TYPE),
@@ -708,9 +685,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def change_join_rule_in_room(self, room_id, new_join_rule, expected_code=200):
-        data = {
-            "join_rule": new_join_rule,
-        }
+        data = {"join_rule": new_join_rule}
         request, channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, EventTypes.JoinRules),
@@ -722,11 +697,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, expected_code, channel.result)
 
     def send_threepid_invite(self, address, room_id, expected_code=200):
-        params = {
-            "id_server": "testis",
-            "medium": "email",
-            "address": address,
-        }
+        params = {"id_server": "testis", "medium": "email", "address": address}
 
         request, channel = self.make_request(
             "POST",
@@ -741,7 +712,9 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self, room_id, event_type, state_key, body, tok, expect_code=200
     ):
         path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
-            room_id, event_type, state_key
+            room_id,
+            event_type,
+            state_key,
         )
 
         request, channel = self.make_request(

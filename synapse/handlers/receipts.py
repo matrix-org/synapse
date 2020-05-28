@@ -17,7 +17,8 @@ import logging
 from twisted.internet import defer
 
 from synapse.handlers._base import BaseHandler
-from synapse.types import ReadReceipt
+from synapse.types import ReadReceipt, get_domain_from_id
+from synapse.util.async_helpers import maybe_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -36,34 +37,41 @@ class ReceiptsHandler(BaseHandler):
         self.clock = self.hs.get_clock()
         self.state = hs.get_state_handler()
 
-    @defer.inlineCallbacks
-    def _received_remote_receipt(self, origin, content):
+    async def _received_remote_receipt(self, origin, content):
         """Called when we receive an EDU of type m.receipt from a remote HS.
         """
-        receipts = [
-            ReadReceipt(
-                room_id=room_id,
-                receipt_type=receipt_type,
-                user_id=user_id,
-                event_ids=user_values["event_ids"],
-                data=user_values.get("data", {}),
-            )
-            for room_id, room_values in content.items()
-            for receipt_type, users in room_values.items()
-            for user_id, user_values in users.items()
-        ]
+        receipts = []
+        for room_id, room_values in content.items():
+            for receipt_type, users in room_values.items():
+                for user_id, user_values in users.items():
+                    if get_domain_from_id(user_id) != origin:
+                        logger.info(
+                            "Received receipt for user %r from server %s, ignoring",
+                            user_id,
+                            origin,
+                        )
+                        continue
 
-        yield self._handle_new_receipts(receipts)
+                    receipts.append(
+                        ReadReceipt(
+                            room_id=room_id,
+                            receipt_type=receipt_type,
+                            user_id=user_id,
+                            event_ids=user_values["event_ids"],
+                            data=user_values.get("data", {}),
+                        )
+                    )
 
-    @defer.inlineCallbacks
-    def _handle_new_receipts(self, receipts):
+        await self._handle_new_receipts(receipts)
+
+    async def _handle_new_receipts(self, receipts):
         """Takes a list of receipts, stores them and informs the notifier.
         """
         min_batch_id = None
         max_batch_id = None
 
         for receipt in receipts:
-            res = yield self.store.insert_receipt(
+            res = await self.store.insert_receipt(
                 receipt.room_id,
                 receipt.receipt_type,
                 receipt.user_id,
@@ -84,23 +92,21 @@ class ReceiptsHandler(BaseHandler):
 
         if min_batch_id is None:
             # no new receipts
-            defer.returnValue(False)
+            return False
 
-        affected_room_ids = list(set([r.room_id for r in receipts]))
+        affected_room_ids = list({r.room_id for r in receipts})
 
-        self.notifier.on_new_event(
-            "receipt_key", max_batch_id, rooms=affected_room_ids
-        )
+        self.notifier.on_new_event("receipt_key", max_batch_id, rooms=affected_room_ids)
         # Note that the min here shouldn't be relied upon to be accurate.
-        yield self.hs.get_pusherpool().on_new_receipts(
-            min_batch_id, max_batch_id, affected_room_ids,
+        await maybe_awaitable(
+            self.hs.get_pusherpool().on_new_receipts(
+                min_batch_id, max_batch_id, affected_room_ids
+            )
         )
 
-        defer.returnValue(True)
+        return True
 
-    @defer.inlineCallbacks
-    def received_client_receipt(self, room_id, receipt_type, user_id,
-                                event_id):
+    async def received_client_receipt(self, room_id, receipt_type, user_id, event_id):
         """Called when a client tells us a local user has read up to the given
         event_id in the room.
         """
@@ -109,30 +115,14 @@ class ReceiptsHandler(BaseHandler):
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
-            data={
-                "ts": int(self.clock.time_msec()),
-            },
+            data={"ts": int(self.clock.time_msec())},
         )
 
-        is_new = yield self._handle_new_receipts([receipt])
+        is_new = await self._handle_new_receipts([receipt])
         if not is_new:
             return
 
-        yield self.federation.send_read_receipt(receipt)
-
-    @defer.inlineCallbacks
-    def get_receipts_for_room(self, room_id, to_key):
-        """Gets all receipts for a room, upto the given key.
-        """
-        result = yield self.store.get_linearized_receipts_for_room(
-            room_id,
-            to_key=to_key,
-        )
-
-        if not result:
-            defer.returnValue([])
-
-        defer.returnValue(result)
+        await self.federation.send_read_receipt(receipt)
 
 
 class ReceiptEventSource(object):
@@ -145,17 +135,15 @@ class ReceiptEventSource(object):
         to_key = yield self.get_current_key()
 
         if from_key == to_key:
-            defer.returnValue(([], to_key))
+            return [], to_key
 
         events = yield self.store.get_linearized_receipts_for_rooms(
-            room_ids,
-            from_key=from_key,
-            to_key=to_key,
+            room_ids, from_key=from_key, to_key=to_key
         )
 
-        defer.returnValue((events, to_key))
+        return (events, to_key)
 
-    def get_current_key(self, direction='f'):
+    def get_current_key(self, direction="f"):
         return self.store.get_max_receipt_stream_id()
 
     @defer.inlineCallbacks
@@ -169,9 +157,7 @@ class ReceiptEventSource(object):
 
         room_ids = yield self.store.get_rooms_for_user(user.to_string())
         events = yield self.store.get_linearized_receipts_for_rooms(
-            room_ids,
-            from_key=from_key,
-            to_key=to_key,
+            room_ids, from_key=from_key, to_key=to_key
         )
 
-        defer.returnValue((events, to_key))
+        return (events, to_key)

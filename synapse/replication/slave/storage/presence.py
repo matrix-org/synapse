@@ -14,7 +14,8 @@
 # limitations under the License.
 
 from synapse.storage import DataStore
-from synapse.storage.presence import PresenceStore
+from synapse.storage.data_stores.main.presence import PresenceStore
+from synapse.storage.database import Database
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from ._base import BaseSlavedStore, __func__
@@ -22,15 +23,13 @@ from ._slaved_id_tracker import SlavedIdTracker
 
 
 class SlavedPresenceStore(BaseSlavedStore):
-    def __init__(self, db_conn, hs):
-        super(SlavedPresenceStore, self).__init__(db_conn, hs)
-        self._presence_id_gen = SlavedIdTracker(
-            db_conn, "presence_stream", "stream_id",
-        )
+    def __init__(self, database: Database, db_conn, hs):
+        super(SlavedPresenceStore, self).__init__(database, db_conn, hs)
+        self._presence_id_gen = SlavedIdTracker(db_conn, "presence_stream", "stream_id")
 
         self._presence_on_startup = self._get_active_presence(db_conn)
 
-        self.presence_stream_cache = self.presence_stream_cache = StreamChangeCache(
+        self.presence_stream_cache = StreamChangeCache(
             "PresenceStreamChangeCache", self._presence_id_gen.get_current_token()
         )
 
@@ -55,9 +54,7 @@ class SlavedPresenceStore(BaseSlavedStore):
         if stream_name == "presence":
             self._presence_id_gen.advance(token)
             for row in rows:
-                self.presence_stream_cache.entity_has_changed(
-                    row.user_id, token
-                )
+                self.presence_stream_cache.entity_has_changed(row.user_id, token)
                 self._get_presence_for_user.invalidate((row.user_id,))
         return super(SlavedPresenceStore, self).process_replication_rows(
             stream_name, token, rows

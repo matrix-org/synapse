@@ -14,8 +14,6 @@
 # limitations under the License.
 import re
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
@@ -46,6 +44,7 @@ class SendServerNoticeServlet(RestServlet):
         "event_id": "$1895723857jgskldgujpious"
     }
     """
+
     def __init__(self, hs):
         """
         Args:
@@ -59,19 +58,17 @@ class SendServerNoticeServlet(RestServlet):
     def register(self, json_resource):
         PATTERN = "^/_synapse/admin/v1/send_server_notice"
         json_resource.register_paths(
-            "POST",
-            (re.compile(PATTERN + "$"), ),
-            self.on_POST,
+            "POST", (re.compile(PATTERN + "$"),), self.on_POST, self.__class__.__name__
         )
         json_resource.register_paths(
             "PUT",
-            (re.compile(PATTERN + "/(?P<txn_id>[^/]*)$",), ),
+            (re.compile(PATTERN + "/(?P<txn_id>[^/]*)$"),),
             self.on_PUT,
+            self.__class__.__name__,
         )
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, txn_id=None):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_POST(self, request, txn_id=None):
+        await assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("user_id", "content"))
         event_type = body.get("type", EventTypes.Message)
@@ -85,16 +82,16 @@ class SendServerNoticeServlet(RestServlet):
         if not self.hs.is_mine_id(user_id):
             raise SynapseError(400, "Server notices can only be sent to local users")
 
-        event = yield self.snm.send_notice(
+        event = await self.snm.send_notice(
             user_id=body["user_id"],
             type=event_type,
             state_key=state_key,
             event_content=body["content"],
         )
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        return 200, {"event_id": event.event_id}
 
     def on_PUT(self, request, txn_id):
         return self.txns.fetch_or_execute_request(
-            request, self.on_POST, request, txn_id,
+            request, self.on_POST, request, txn_id
         )

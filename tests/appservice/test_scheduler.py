@@ -22,7 +22,7 @@ from synapse.appservice.scheduler import (
     _ServiceQueuer,
     _TransactionController,
 )
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable
 
 from tests import unittest
 
@@ -37,11 +37,9 @@ class ApplicationServiceSchedulerTransactionCtrlTestCase(unittest.TestCase):
         self.recoverer = Mock()
         self.recoverer_fn = Mock(return_value=self.recoverer)
         self.txnctrl = _TransactionController(
-            clock=self.clock,
-            store=self.store,
-            as_api=self.as_api,
-            recoverer_fn=self.recoverer_fn,
+            clock=self.clock, store=self.store, as_api=self.as_api
         )
+        self.txnctrl.RECOVERER_CLASS = self.recoverer_fn
 
     def test_single_service_up_txn_sent(self):
         # Test: The AS is up and the txn is successfully sent.

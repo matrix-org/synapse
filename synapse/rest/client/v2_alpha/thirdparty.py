@@ -16,8 +16,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.constants import ThirdPartyEntityKind
 from synapse.http.servlet import RestServlet
 
@@ -35,12 +33,11 @@ class ThirdPartyProtocolsServlet(RestServlet):
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request):
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
-        protocols = yield self.appservice_handler.get_3pe_protocols()
-        defer.returnValue((200, protocols))
+        protocols = await self.appservice_handler.get_3pe_protocols()
+        return 200, protocols
 
 
 class ThirdPartyProtocolServlet(RestServlet):
@@ -52,17 +49,16 @@ class ThirdPartyProtocolServlet(RestServlet):
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, protocol):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, protocol):
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
-        protocols = yield self.appservice_handler.get_3pe_protocols(
-            only_protocol=protocol,
+        protocols = await self.appservice_handler.get_3pe_protocols(
+            only_protocol=protocol
         )
         if protocol in protocols:
-            defer.returnValue((200, protocols[protocol]))
+            return 200, protocols[protocol]
         else:
-            defer.returnValue((404, {"error": "Unknown protocol"}))
+            return 404, {"error": "Unknown protocol"}
 
 
 class ThirdPartyUserServlet(RestServlet):
@@ -74,18 +70,17 @@ class ThirdPartyUserServlet(RestServlet):
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, protocol):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, protocol):
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
         fields = request.args
         fields.pop(b"access_token", None)
 
-        results = yield self.appservice_handler.query_3pe(
+        results = await self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.USER, protocol, fields
         )
 
-        defer.returnValue((200, results))
+        return 200, results
 
 
 class ThirdPartyLocationServlet(RestServlet):
@@ -97,18 +92,17 @@ class ThirdPartyLocationServlet(RestServlet):
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, protocol):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request, protocol):
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
         fields = request.args
         fields.pop(b"access_token", None)
 
-        results = yield self.appservice_handler.query_3pe(
+        results = await self.appservice_handler.query_3pe(
             ThirdPartyEntityKind.LOCATION, protocol, fields
         )
 
-        defer.returnValue((200, results))
+        return 200, results
 
 
 def register_servlets(hs, http_server):

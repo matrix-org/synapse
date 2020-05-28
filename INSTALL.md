@@ -1,3 +1,4 @@
+- [Choosing your server name](#choosing-your-server-name)
 - [Installing Synapse](#installing-synapse)
   - [Installing from source](#installing-from-source)
     - [Platform-Specific Instructions](#platform-specific-instructions)
@@ -10,6 +11,22 @@
   - [Setting up a TURN server](#setting-up-a-turn-server)
   - [URL previews](#url-previews)
 
+# Choosing your server name
+
+It is important to choose the name for your server before you install Synapse,
+because it cannot be changed later.
+
+The server name determines the "domain" part of user-ids for users on your
+server: these will all be of the format `@user:my.domain.name`. It also
+determines how other matrix servers will reach yours for federation.
+
+For a test configuration, set this to the hostname of your server. For a more
+production-ready setup, you will probably want to specify your domain
+(`example.com`) rather than a matrix-specific hostname here (in the same way
+that your email address is probably `user@example.com` rather than
+`user@email.example.com`) - but doing so may require more advanced setup: see
+[Setting up Federation](docs/federate.md).
+
 # Installing Synapse
 
 ## Installing from source
@@ -19,7 +36,7 @@
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5, 3.6, 3.7, or 2.7
+- Python 3.5, 3.6, 3.7 or 3.8.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 Synapse is written in Python but some of the libraries it uses are written in
@@ -64,16 +81,7 @@ python -m synapse.app.homeserver \
     --report-stats=[yes|no]
 ```
 
-... substituting an appropriate value for `--server-name`. The server name
-determines the "domain" part of user-ids for users on your server: these will
-all be of the format `@user:my.domain.name`. It also determines how other
-matrix servers will reach yours for Federation. For a test configuration,
-set this to the hostname of your server. For a more production-ready setup, you
-will probably want to specify your domain (`example.com`) rather than a
-matrix-specific hostname here (in the same way that your email address is
-probably `user@example.com` rather than `user@email.example.com`) - but
-doing so may require more advanced setup: see [Setting up Federation](docs/federate.md).
-Beware that the server name cannot be changed later.
+... substituting an appropriate value for `--server-name`.
 
 This command will generate you a config file that you can then customise, but it will
 also generate a set of keys for you. These keys will allow your Home Server to
@@ -85,9 +93,6 @@ key in the `<server name>.signing.key` file (the second word) to something
 different. See the
 [spec](https://matrix.org/docs/spec/server_server/latest.html#retrieving-server-keys)
 for more information on key management.)
-
-You will need to give Synapse a TLS certficate before it will start - see [TLS
-certificates](#tls-certificates).
 
 To actually run your new homeserver, pick a working directory for Synapse to
 run (e.g. `~/synapse`), and::
@@ -104,8 +109,8 @@ Installing prerequisites on Ubuntu or Debian:
 
 ```
 sudo apt-get install build-essential python3-dev libffi-dev \
-                     python-pip python-setuptools sqlite3 \
-                     libssl-dev python-virtualenv libjpeg-dev libxslt1-dev
+                     python3-pip python3-setuptools sqlite3 \
+                     libssl-dev python3-virtualenv libjpeg-dev libxslt1-dev
 ```
 
 #### ArchLinux
@@ -119,24 +124,46 @@ sudo pacman -S base-devel python python-pip \
 
 #### CentOS/Fedora
 
-Installing prerequisites on CentOS 7 or Fedora 25:
+Installing prerequisites on CentOS 8 or Fedora>26:
+
+```
+sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
+                 libwebp-devel tk-devel redhat-rpm-config \
+                 python3-virtualenv libffi-devel openssl-devel
+sudo dnf groupinstall "Development Tools"
+```
+
+Installing prerequisites on CentOS 7 or Fedora<=25:
 
 ```
 sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
                  lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
-                 python-virtualenv libffi-devel openssl-devel
+                 python3-virtualenv libffi-devel openssl-devel
 sudo yum groupinstall "Development Tools"
 ```
 
-#### Mac OS X
+Note that Synapse does not support versions of SQLite before 3.11, and CentOS 7
+uses SQLite 3.7. You may be able to work around this by installing a more
+recent SQLite version, but it is recommended that you instead use a Postgres
+database: see [docs/postgres.md](docs/postgres.md).
 
-Installing prerequisites on Mac OS X:
+#### macOS
+
+Installing prerequisites on macOS:
 
 ```
 xcode-select --install
 sudo easy_install pip
 sudo pip install virtualenv
 brew install pkg-config libffi
+```
+
+On macOS Catalina (10.15) you may need to explicitly install OpenSSL
+via brew and inform `pip` about it so that `psycopg2` builds:
+
+```
+brew install openssl@1.1
+export LDFLAGS=-L/usr/local/Cellar/openssl\@1.1/1.1.1d/lib/
 ```
 
 #### OpenSUSE
@@ -344,6 +371,13 @@ sudo pip uninstall py-bcrypt
 sudo pip install py-bcrypt
 ```
 
+### Void Linux
+
+Synapse can be found in the void repositories as 'synapse':
+
+    xbps-install -Su
+    xbps-install -S synapse
+
 ### FreeBSD
 
 Synapse can be installed via FreeBSD Ports or Packages contributed by Brendan Molloy from:
@@ -363,15 +397,17 @@ Once you have installed synapse as above, you will need to configure it.
 
 ## TLS certificates
 
-The default configuration exposes a single HTTP port: http://localhost:8008. It
-is suitable for local testing, but for any practical use, you will either need
-to enable a reverse proxy, or configure Synapse to expose an HTTPS port.
+The default configuration exposes a single HTTP port on the local
+interface: `http://localhost:8008`. It is suitable for local testing,
+but for any practical use, you will need Synapse's APIs to be served
+over HTTPS.
 
-For information on using a reverse proxy, see
-[docs/reverse_proxy.rst](docs/reverse_proxy.rst).
+The recommended way to do so is to set up a reverse proxy on port
+`8448`. You can find documentation on doing so in
+[docs/reverse_proxy.md](docs/reverse_proxy.md).
 
-To configure Synapse to expose an HTTPS port, you will need to edit
-`homeserver.yaml`, as follows:
+Alternatively, you can configure Synapse to expose an HTTPS port. To do
+so, you will need to edit `homeserver.yaml`, as follows:
 
 * First, under the `listeners` section, uncomment the configuration for the
   TLS-enabled listener. (Remove the hash sign (`#`) at the start of
@@ -389,10 +425,13 @@ To configure Synapse to expose an HTTPS port, you will need to edit
   point these settings at an existing certificate and key, or you can
   enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
   for having Synapse automatically provision and renew federation
-  certificates through ACME can be found at [ACME.md](docs/ACME.md). If you
-  are using your own certificate, be sure to use a `.pem` file that includes
-  the full certificate chain including any intermediate certificates (for
-  instance, if using certbot, use `fullchain.pem` as your certificate, not
+  certificates through ACME can be found at [ACME.md](docs/ACME.md).
+  Note that, as pointed out in that document, this feature will not
+  work with installs set up after November 2019. 
+  
+  If you are using your own certificate, be sure to use a `.pem` file that
+  includes the full certificate chain including any intermediate certificates
+  (for instance, if using certbot, use `fullchain.pem` as your certificate, not
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
@@ -401,25 +440,26 @@ For a more detailed guide to configuring your server for federation, see
 
 ## Email
 
-It is desirable for Synapse to have the capability to send email. For example,
-this is required to support the 'password reset' feature.
+It is desirable for Synapse to have the capability to send email. This allows
+Synapse to send password reset emails, send verifications when an email address
+is added to a user's account, and send email notifications to users when they
+receive new messages.
 
 To configure an SMTP server for Synapse, modify the configuration section
-headed ``email``, and be sure to have at least the ``smtp_host``, ``smtp_port``
-and ``notif_from`` fields filled out. You may also need to set ``smtp_user``,
-``smtp_pass``, and ``require_transport_security``.
+headed `email`, and be sure to have at least the `smtp_host`, `smtp_port`
+and `notif_from` fields filled out.  You may also need to set `smtp_user`,
+`smtp_pass`, and `require_transport_security`.
 
-If Synapse is not configured with an SMTP server, password reset via email will
- be disabled by default.
+If email is not configured, password reset, registration and notifications via
+email will be disabled.
 
 ## Registering a user
 
-You will need at least one user on your server in order to use a Matrix
-client. Users can be registered either via a Matrix client, or via a
-commandline script.
+The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
 
-To get started, it is easiest to use the command line to register new
-users. This can be done as follows:
+Alternatively you can do so from the command line if you have installed via pip.
+
+This can be done as follows:
 
 ```
 $ source ~/synapse/env/bin/activate
@@ -442,7 +482,7 @@ on your server even if `enable_registration` is `false`.
 ## Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server.  See [docs/turn-howto.rst](docs/turn-howto.rst) for details.
+a TURN server.  See [docs/turn-howto.md](docs/turn-howto.md) for details.
 
 ## URL previews
 

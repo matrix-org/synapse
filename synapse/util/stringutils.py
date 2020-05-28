@@ -24,26 +24,25 @@ from six.moves import range
 
 from synapse.api.errors import Codes, SynapseError
 
-_string_with_symbols = (
-    string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
-)
+_string_with_symbols = string.digits + string.ascii_letters + ".,;:^&*-_+=#~@"
+
+# https://matrix.org/docs/spec/client_server/r0.6.0#post-matrix-client-r0-register-email-requesttoken
+# Note: The : character is allowed here for older clients, but will be removed in a
+# future release. Context: https://github.com/matrix-org/synapse/issues/6766
+client_secret_regex = re.compile(r"^[0-9a-zA-Z\.\=\_\-\:]+$")
 
 # random_string and random_string_with_symbols are used for a range of things,
 # some cryptographically important, some less so. We use SystemRandom to make sure
 # we get cryptographically-secure randoms.
 rand = random.SystemRandom()
 
-client_secret_regex = re.compile(r"^[0-9a-zA-Z.=_-]+$")
-
 
 def random_string(length):
-    return ''.join(rand.choice(string.ascii_letters) for _ in range(length))
+    return "".join(rand.choice(string.ascii_letters) for _ in range(length))
 
 
 def random_string_with_symbols(length):
-    return ''.join(
-        rand.choice(_string_with_symbols) for _ in range(length)
-    )
+    return "".join(rand.choice(_string_with_symbols) for _ in range(length))
 
 
 def is_ascii(s):
@@ -51,7 +50,7 @@ def is_ascii(s):
     if PY3:
         if isinstance(s, bytes):
             try:
-                s.decode('ascii').encode('ascii')
+                s.decode("ascii").encode("ascii")
             except UnicodeDecodeError:
                 return False
             except UnicodeEncodeError:
@@ -110,13 +109,13 @@ def exception_to_unicode(e):
     # and instead look at what is in the args member.
 
     if len(e.args) == 0:
-        return u""
+        return ""
     elif len(e.args) > 1:
         return six.text_type(repr(e.args))
 
     msg = e.args[0]
     if isinstance(msg, bytes):
-        return msg.decode('utf-8', errors='replace')
+        return msg.decode("utf-8", errors="replace")
     else:
         return msg
 

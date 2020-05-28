@@ -24,18 +24,15 @@ from synapse.types import (
 )
 
 from tests import unittest
-from tests.utils import TestHomeServer
-
-mock_homeserver = TestHomeServer(hostname="my.domain")
 
 
-class UserIDTestCase(unittest.TestCase):
+class UserIDTestCase(unittest.HomeserverTestCase):
     def test_parse(self):
-        user = UserID.from_string("@1234abcd:my.domain")
+        user = UserID.from_string("@1234abcd:test")
 
         self.assertEquals("1234abcd", user.localpart)
-        self.assertEquals("my.domain", user.domain)
-        self.assertEquals(True, mock_homeserver.is_mine(user))
+        self.assertEquals("test", user.domain)
+        self.assertEquals(True, self.hs.is_mine(user))
 
     def test_pase_empty(self):
         with self.assertRaises(SynapseError):
@@ -55,13 +52,13 @@ class UserIDTestCase(unittest.TestCase):
         self.assertTrue(userA != userB)
 
 
-class RoomAliasTestCase(unittest.TestCase):
+class RoomAliasTestCase(unittest.HomeserverTestCase):
     def test_parse(self):
-        room = RoomAlias.from_string("#channel:my.domain")
+        room = RoomAlias.from_string("#channel:test")
 
         self.assertEquals("channel", room.localpart)
-        self.assertEquals("my.domain", room.domain)
-        self.assertEquals(True, mock_homeserver.is_mine(room))
+        self.assertEquals("test", room.domain)
+        self.assertEquals(True, self.hs.is_mine(room))
 
     def test_build(self):
         room = RoomAlias("channel", "my.domain")
@@ -85,7 +82,7 @@ class GroupIDTestCase(unittest.TestCase):
                 self.fail("Parsing '%s' should raise exception" % id_string)
             except SynapseError as exc:
                 self.assertEqual(400, exc.code)
-                self.assertEqual("M_UNKNOWN", exc.errcode)
+                self.assertEqual("M_INVALID_PARAM", exc.errcode)
 
 
 class MapUsernameTestCase(unittest.TestCase):
@@ -109,9 +106,9 @@ class MapUsernameTestCase(unittest.TestCase):
 
     def testNonAscii(self):
         # this should work with either a unicode or a bytes
-        self.assertEqual(map_username_to_mxid_localpart(u'têst'), "t=c3=aast")
+        self.assertEqual(map_username_to_mxid_localpart("têst"), "t=c3=aast")
         self.assertEqual(
-            map_username_to_mxid_localpart(u'têst'.encode('utf-8')), "t=c3=aast"
+            map_username_to_mxid_localpart("têst".encode("utf-8")), "t=c3=aast"
         )
 
 
