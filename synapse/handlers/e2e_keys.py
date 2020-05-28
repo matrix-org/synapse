@@ -1303,22 +1303,9 @@ class SigningKeyEduUpdater(object):
             logger.info("pending updates: %r", pending_updates)
 
             for master_key, self_signing_key in pending_updates:
-                if master_key:
-                    yield self.store.set_e2e_cross_signing_key(
-                        user_id, "master", master_key
-                    )
-                    _, verify_key = get_verify_key_from_cross_signing_key(master_key)
-                    # verify_key is a VerifyKey from signedjson, which uses
-                    # .version to denote the portion of the key ID after the
-                    # algorithm and colon, which is the device ID
-                    device_ids.append(verify_key.version)
-                if self_signing_key:
-                    yield self.store.set_e2e_cross_signing_key(
-                        user_id, "self_signing", self_signing_key
-                    )
-                    _, verify_key = get_verify_key_from_cross_signing_key(
-                        self_signing_key
-                    )
-                    device_ids.append(verify_key.version)
+                new_device_ids = yield device_handler.process_cross_signing_key_update(
+                    user_id, master_key, self_signing_key,
+                )
+                device_ids = device_ids + new_device_ids
 
             yield device_handler.notify_device_update(user_id, device_ids)
