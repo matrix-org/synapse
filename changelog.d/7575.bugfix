@@ -1,0 +1,1 @@
+Fix str placeholders in an instance of `PrepareDatabaseException`. Introduced in Synapse v1.8.0.

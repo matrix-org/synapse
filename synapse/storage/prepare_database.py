@@ -366,9 +366,8 @@ def _upgrade_existing_database(
         if duplicates:
             # We don't support using the same file name in the same delta version.
             raise PrepareDatabaseException(
-                "Found multiple delta files with the same name in v%d: %s",
-                v,
-                duplicates,
+                "Found multiple delta files with the same name in v%d: %s"
+                % (v, duplicates,)
             )
 
         # We sort to ensure that we apply the delta files in a consistent
