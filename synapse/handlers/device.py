@@ -793,6 +793,11 @@ class DeviceListUpdater(object):
         log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]
+
+        # Get the master key and the self-signing key for this user if provided in the
+        # response (None if not in the response).
+        # The response will not contain the user signing key, as this key is only used by
+        # its owner, thus it doesn't make sense to send it over federation.
         master_key = result.get("master_key")
         self_signing_key = result.get("self_signing_key")
 
@@ -826,7 +831,7 @@ class DeviceListUpdater(object):
         yield self.store.update_remote_device_list_cache(user_id, devices, stream_id)
         device_ids = [device["device_id"] for device in devices]
 
-        # Also handle cross-signing keys.
+        # Handle cross-signing keys.
         cross_signing_device_ids = yield self.process_cross_signing_key_update(
             user_id, master_key, self_signing_key,
         )
