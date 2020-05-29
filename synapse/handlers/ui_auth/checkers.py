@@ -138,8 +138,7 @@ class _BaseThreepidAuthChecker:
         self.hs = hs
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def _check_threepid(self, medium, authdict):
+    async def _check_threepid(self, medium, authdict):
         if "threepid_creds" not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
@@ -155,18 +154,18 @@ class _BaseThreepidAuthChecker:
                 raise SynapseError(
                     400, "Phone number verification is not enabled on this homeserver"
                 )
-            threepid = yield identity_handler.threepid_from_creds(
+            threepid = await identity_handler.threepid_from_creds(
                 self.hs.config.account_threepid_delegate_msisdn, threepid_creds
             )
         elif medium == "email":
             if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
                 assert self.hs.config.account_threepid_delegate_email
-                threepid = yield identity_handler.threepid_from_creds(
+                threepid = await identity_handler.threepid_from_creds(
                     self.hs.config.account_threepid_delegate_email, threepid_creds
                 )
             elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 threepid = None
-                row = yield self.store.get_threepid_validation_session(
+                row = await self.store.get_threepid_validation_session(
                     medium,
                     threepid_creds["client_secret"],
                     sid=threepid_creds["sid"],
@@ -181,7 +180,7 @@ class _BaseThreepidAuthChecker:
                     }
 
                     # Valid threepid returned, delete from the db
-                    yield self.store.delete_threepid_session(threepid_creds["sid"])
+                    await self.store.delete_threepid_session(threepid_creds["sid"])
             else:
                 raise SynapseError(
                     400, "Email address verification is not enabled on this homeserver"
@@ -220,7 +219,7 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         )
 
     def check_auth(self, authdict, clientip):
-        return self._check_threepid("email", authdict)
+        return defer.ensureDeferred(self._check_threepid("email", authdict))
 
 
 class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
@@ -234,7 +233,7 @@ class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
         return bool(self.hs.config.account_threepid_delegate_msisdn)
 
     def check_auth(self, authdict, clientip):
-        return self._check_threepid("msisdn", authdict)
+        return defer.ensureDeferred(self._check_threepid("msisdn", authdict))
 
 
 INTERACTIVE_AUTH_CHECKERS = [
