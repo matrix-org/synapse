@@ -120,9 +120,8 @@ class _Collector(object):
             _background_processes_copy = _background_processes_active_since_last_scrape
             _background_processes_active_since_last_scrape = set()
 
-        for processes in _background_processes_copy:
-            for process in processes:
-                process.update_metrics()
+        for process in _background_processes_copy:
+            process.update_metrics()
 
         # now we need to run collect() over each of the static Counters, and
         # yield each metric they return.
