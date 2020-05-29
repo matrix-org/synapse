@@ -100,7 +100,7 @@ _background_process_counts = {}  # type: Dict[str, int]
 # actually been active and can ignore the idle ones.
 _background_processes_active_since_last_scrape = set()  # type: Set[_BackgroundProcess]
 
-# A lock that covers the above set and dict 
+# A lock that covers the above set and dict
 _bg_metrics_lock = threading.Lock()
 
 
