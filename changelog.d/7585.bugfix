@@ -1,1 +1,1 @@
-- Fix bug in automatic user creation on first time login with m.login.jwt. Regression in v1.6.0.
+Fix a bug in automatic user creation during first time login with `m.login.jwt`. Regression in v1.6.0. Contributed by @olof.
