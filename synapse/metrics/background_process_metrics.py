@@ -91,8 +91,9 @@ _background_process_db_sched_duration = Counter(
 # it's much simpler to do so than to try to combine them.)
 _background_process_counts = {}  # type: Dict[str, int]
 
-# Set of all running background processes that have been active since the last
-# time metrics were scraped.
+# Set of all running background processes that became active active since the
+# last time metrics were scraped (i.e. background processes that performed some
+# work since the last scrape.)
 #
 # We do it like this to handle the case where we have a large number of
 # background processes stacking up behind a lock or linearizer, where we then
