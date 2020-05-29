@@ -46,7 +46,6 @@ class BaseHandler(object):
         self.clock = hs.get_clock()
         self.hs = hs
 
-        self.ratelimiter = None
         self.request_ratelimiter = hs.get_request_ratelimiter()
         self._rc_message = self.hs.config.rc_message
 
@@ -103,14 +102,17 @@ class BaseHandler(object):
 
         if is_admin_redaction and self.admin_redaction_ratelimiter:
             # If we have separate config for admin redactions, use a separate
-            # ratelimiter as to not have user_id's clash
+            # ratelimiter as to not have user_ids clash
             self.admin_redaction_ratelimiter.ratelimit(user_id, time_now, update)
         else:
             # Override rate and burst count per-user
-            self.request_ratelimiter.rate_hz = messages_per_second
-            self.request_ratelimiter.burst_count = burst_count
-
-            self.request_ratelimiter.ratelimit(user_id, time_now, update)
+            self.request_ratelimiter.ratelimit(
+                user_id,
+                time_now,
+                update,
+                rate_hz=messages_per_second,
+                burst_count=burst_count,
+            )
 
     async def maybe_kick_guest_users(self, event, context=None):
         # Technically this function invalidates current_state by changing it.

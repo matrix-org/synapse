@@ -50,14 +50,12 @@ class RoomBase(unittest.HomeserverTestCase):
             http_client=None,
             federation_client=Mock(),
             request_ratelimiter=NonCallableMock(
-                # rate_hz and burst_count are overridden in BaseHandler
-                spec_set=["can_do_action", "ratelimit", "rate_hz", "burst_count"]
+                spec_set=["can_do_action", "ratelimit"]
             ),
             login_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
         )
         self.request_ratelimiter = self.hs.get_request_ratelimiter()
         self.request_ratelimiter.can_do_action.return_value = (True, 0)
-        self.request_ratelimiter.rate_hz = Mock()
 
         self.login_ratelimiter = self.hs.get_login_ratelimiter()
         self.login_ratelimiter.can_do_action.return_value = (True, 0)
