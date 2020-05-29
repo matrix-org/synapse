@@ -1291,6 +1291,7 @@ class SigningKeyEduUpdater(object):
         """
 
         device_handler = self.e2e_keys_handler.device_handler
+        device_list_updater = device_handler.device_list_updater
 
         with (yield self._remote_edu_linearizer.queue(user_id)):
             pending_updates = self._pending_updates.pop(user_id, [])
@@ -1303,7 +1304,7 @@ class SigningKeyEduUpdater(object):
             logger.info("pending updates: %r", pending_updates)
 
             for master_key, self_signing_key in pending_updates:
-                new_device_ids = yield device_handler.process_cross_signing_key_update(
+                new_device_ids = yield device_list_updater.process_cross_signing_key_update(
                     user_id, master_key, self_signing_key,
                 )
                 device_ids = device_ids + new_device_ids
