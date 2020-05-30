@@ -1,0 +1,1 @@
+Remove `user_id` from `GET /_matrix/client/r0/presence/{userId}/status` to match spec.
