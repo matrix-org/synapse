@@ -318,3 +318,88 @@ Response:
   "state_events": 93534
 }
 ```
+
+# Delete Room API
+
+The Delete Room admin API allows server admins to remove rooms from server
+and block these rooms.
+It is a combination and improvement of "[Shutdown room](shutdown_room.md)" 
+and "[Purge room](purge_room.md)" API.
+
+Shuts down a room. Moves all local users and room aliases automatically to a
+new room if `new_room_user_id` is set. Otherwise local users only
+leaves the room without any information.
+
+The new room will be created with the user specified by the `new_room_user_id` parameter
+as room administrator and will contain a message explaining what happened. Users invited
+to the new room will have power level `-10` by default, and thus be unable to speak.
+
+If `block` is `True` it preventing new joins to the old room.
+
+This API will remove all trace of the old room from your database after removing
+all local users.
+Depending on the amount of history being purged a call to the API may take
+several minutes or longer.
+
+The local server will only have the power to move local user and room aliases to
+the new room. Users on other servers will be unaffected.
+
+## Parameters
+
+The following query parameters are available:
+
+* `room_id` - The ID of the room.
+
+The following JSON body parameters are available:
+
+* `new_room_user_id` - Optional. A string representing the user ID of the user that will admin
+                       the new room that all users in the old room will be moved to. If not
+                       set the users will not be moved to a new room and only leave the old room
+                       without any information. Defaults to `None`.
+* `room_name` - Optional. A string representing the name of the room that new users will be
+                invited to. Defaults to `Content Violation Notification`
+* `message` - Optional. A string containing the first message that will be sent as
+              `new_room_user_id` in the new room. Ideally this will clearly convey why the
+               original room was shut down. Defaults to `Sharing illegal content on this server
+               is not permitted and rooms in violation will be blocked.`
+* `block` - Optional. A boolean if `room_id` will be set on blocking list. The room will be
+            blocked for this server and preventing new joins. Defaults to `True`.
+
+The following fields are possible in the JSON response body:
+
+* `kicked_users` - An array of users (`user_id`) that were kicked.
+* `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
+* `local_aliases` - An array of strings representing the local aliases that were migrated from
+                    the old room to the new.
+* `new_room_id` - A string representing the room ID of the new room.
+
+## Usage
+
+A standard request:
+
+```json
+DELETE /_synapse/admin/v1/rooms/<room_id>
+
+{
+    "new_room_user_id": "@someuser:example.com",
+    "room_name": "Content Violation Notification",
+    "message": "Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.",
+    "block": true
+}
+```
+
+Response:
+
+```json
+{
+    "kicked_users": [
+        "@foobar:example.com"
+    ],
+    "failed_to_kick_users": [],
+    "local_aliases": [
+        "#badroom:example.com",
+        "#evilsaloon:example.com"
+    ],
+    "new_room_id": "!newroomid:example.com"
+}
+```

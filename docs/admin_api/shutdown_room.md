@@ -10,6 +10,8 @@ disallow any further invites or joins.
 The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.
 
+See also: [Delete Room API](rooms.md#delete-room-api)
+
 ## API
 
 You will need to authenticate with an access token for an admin user.

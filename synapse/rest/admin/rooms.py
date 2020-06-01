@@ -15,6 +15,8 @@
 import logging
 from typing import List, Optional
 
+from six.moves import http_client
+
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -167,6 +169,194 @@ class ShutdownRoomRestServlet(RestServlet):
         await self.store.update_aliases_for_room(
             room_id, new_room_id, requester_user_id
         )
+
+        return (
+            200,
+            {
+                "kicked_users": kicked_users,
+                "failed_to_kick_users": failed_to_kick_users,
+                "local_aliases": aliases_for_room,
+                "new_room_id": new_room_id,
+            },
+        )
+
+
+class DeleteRoomRestServlet(RestServlet):
+    """Delete a room from server. It is a combination and improvement of
+    shut down and purge room.
+    Shuts down a room by removing all local users from the room.
+    Blocking all future invites and joins to the room is optional.
+    If desired any local aliases will be repointed to a new room
+    created by `new_room_user_id` and kicked users will be auto
+    joined to the new room.
+    It will remove all trace of a room from the database.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
+
+    DEFAULT_MESSAGE = (
+        "Sharing illegal content on this server is not permitted and rooms in"
+        " violation will be blocked."
+    )
+    DEFAULT_ROOM_NAME = "Content Violation Notification"
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.store = hs.get_datastore()
+        self.state = hs.get_state_handler()
+        self._room_creation_handler = hs.get_room_creation_handler()
+        self.event_creation_handler = hs.get_event_creation_handler()
+        self.room_member_handler = hs.get_room_member_handler()
+        self.auth = hs.get_auth()
+        self._replication = hs.get_replication_data_handler()
+        self.pagination_handler = hs.get_pagination_handler()
+        self.admin_handler = hs.get_handlers().admin_handler
+
+    async def on_DELETE(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        content = parse_json_object_from_request(request, allow_empty_body=True)
+        requester_user_id = requester.user.to_string()
+
+        # Check RoomID
+        if not RoomID.is_valid(room_id):
+            raise SynapseError(400, "%s was not legal room ID" % (room_id))
+
+        if not await self.store.get_room_with_stats(room_id):
+            raise NotFoundError("Room not found")
+
+        # Check parameter `block`
+        block = content.get("block", True)
+        if not isinstance(block, bool):
+            raise SynapseError(
+                http_client.BAD_REQUEST,
+                "Param 'block' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
+        # This will work even if the room is already blocked, but that is
+        # desirable in case the first attempt at blocking the room failed below.
+        if block:
+            await self.store.block_room(room_id, requester_user_id)
+
+        new_room_user_id = content.get("new_room_user_id")
+        if new_room_user_id:
+            if not self.hs.is_mine_id(new_room_user_id):
+                raise SynapseError(
+                    400, "This endpoint can only be used with local users"
+                )
+
+            if not await self.admin_handler.get_user(
+                UserID.from_string(new_room_user_id)
+            ):
+                raise NotFoundError("User not found")
+
+            room_creator_requester = create_requester(new_room_user_id)
+
+            message = content.get("message", self.DEFAULT_MESSAGE)
+            room_name = content.get("room_name", self.DEFAULT_ROOM_NAME)
+
+            info, stream_id = await self._room_creation_handler.create_room(
+                room_creator_requester,
+                config={
+                    "preset": "public_chat",
+                    "name": room_name,
+                    "power_level_content_override": {"users_default": -10},
+                },
+                ratelimit=False,
+            )
+            new_room_id = info["room_id"]
+
+            logger.info(
+                "Shutting down room %r, joining to new room: %r", room_id, new_room_id
+            )
+
+            # We now wait for the create room to come back in via replication so
+            # that we can assume that all the joins/invites have propogated before
+            # we try and auto join below.
+            #
+            # TODO: Currently the events stream is written to from master
+            await self._replication.wait_for_stream_position(
+                self.hs.config.worker.writers.events, "events", stream_id
+            )
+
+        users = await self.state.get_current_users_in_room(room_id)
+        kicked_users = []
+        failed_to_kick_users = []
+        for user_id in users:
+            if not self.hs.is_mine_id(user_id):
+                continue
+
+            logger.info("Kicking %r from %r...", user_id, room_id)
+
+            # Kick users from room
+            try:
+                target_requester = create_requester(user_id)
+                _, stream_id = await self.room_member_handler.update_membership(
+                    requester=target_requester,
+                    target=target_requester.user,
+                    room_id=room_id,
+                    action=Membership.LEAVE,
+                    content={},
+                    ratelimit=False,
+                    require_consent=False,
+                )
+
+                # Wait for leave to come in over replication before trying to forget.
+                await self._replication.wait_for_stream_position(
+                    self.hs.config.worker.writers.events, "events", stream_id
+                )
+
+                await self.room_member_handler.forget(target_requester.user, room_id)
+                kicked_users.append(user_id)
+            except Exception:
+                logger.exception("Failed to leave old room for %r", user_id)
+                failed_to_kick_users.append(user_id)
+
+            # Join users to new room
+            try:
+                if new_room_user_id:
+                    await self.room_member_handler.update_membership(
+                        requester=target_requester,
+                        target=target_requester.user,
+                        room_id=new_room_id,
+                        action=Membership.JOIN,
+                        content={},
+                        ratelimit=False,
+                        require_consent=False,
+                    )
+            except Exception:
+                logger.exception("Failed to join new room for %r", user_id)
+
+        # Send message in new room and move aliases
+        if new_room_user_id:
+            await self.event_creation_handler.create_and_send_nonmember_event(
+                room_creator_requester,
+                {
+                    "type": "m.room.message",
+                    "content": {"body": message, "msgtype": "m.text"},
+                    "room_id": new_room_id,
+                    "sender": new_room_user_id,
+                },
+                ratelimit=False,
+            )
+
+            aliases_for_room = await maybe_awaitable(
+                self.store.get_aliases_for_room(room_id)
+            )
+
+            await self.store.update_aliases_for_room(
+                room_id, new_room_id, requester_user_id
+            )
+
+        # Purge room
+        await self.pagination_handler.purge_room(room_id)
+
+        # Set empty values if no new room was created
+        if not new_room_user_id:
+            aliases_for_room = []
+            new_room_id = ""
 
         return (
             200,

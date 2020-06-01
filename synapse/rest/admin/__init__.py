@@ -30,6 +30,7 @@ from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.rooms import (
+    DeleteRoomRestServlet,
     JoinRoomAliasServlet,
     ListRoomRestServlet,
     RoomRestServlet,
@@ -195,6 +196,7 @@ def register_servlets(hs, http_server):
     register_servlets_for_client_rest_resource(hs, http_server)
     ListRoomRestServlet(hs).register(http_server)
     RoomRestServlet(hs).register(http_server)
+    DeleteRoomRestServlet(hs).register(http_server)
     JoinRoomAliasServlet(hs).register(http_server)
     PurgeRoomServlet(hs).register(http_server)
     SendServerNoticeServlet(hs).register(http_server)

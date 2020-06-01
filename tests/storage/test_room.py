@@ -66,6 +66,10 @@ class RoomStoreTestCase(unittest.TestCase):
             (yield self.store.get_room_with_stats(self.room.to_string())),
         )
 
+    @defer.inlineCallbacks
+    def test_get_room_with_stats_unknown_room(self):
+        self.assertIsNone((yield self.store.get_room_with_stats("!uknown:test")),)
+
 
 class RoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
