@@ -248,7 +248,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             "sender": requester.user.to_string(),
         }
 
-        if b"ts" in request.args and requester.app_service:
+        if b"ts" in request.args:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
         event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
