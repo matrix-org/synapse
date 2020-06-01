@@ -16,6 +16,7 @@ from collections import OrderedDict
 from typing import Any, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
+from synapse.util import Clock
 
 
 class Ratelimiter(object):
@@ -23,24 +24,30 @@ class Ratelimiter(object):
     Ratelimit actions marked by arbitrary keys.
 
     Args:
+        clock: A homeserver clock, for retrieving the current time
         rate_hz: The long term number of actions that can be performed in a second.
         burst_count: How many actions that can be performed before being limited.
     """
 
-    def __init__(self, rate_hz: float, burst_count: int):
+    def __init__(self, clock: Clock, rate_hz: float, burst_count: int):
+        self.clock = clock
+        self.rate_hz = rate_hz
+        self.burst_count = burst_count
+
         # A ordered dictionary keeping track of actions, when they were last
         # performed and how often. Each entry is a mapping from a key of arbitrary type
         # to a tuple representing:
         #   * How many times an action has occurred since a point in time
-        #   * That point in time
-        self.actions = OrderedDict()  # type: OrderedDict[Any, Tuple[float, int]]
-        self.rate_hz = rate_hz
-        self.burst_count = burst_count
+        #   * The point in time
+        #   * The rate_hz of this particular entry. This can vary per request
+        self.actions = (
+            OrderedDict()
+        )  # type: OrderedDict[Any, Tuple[float, int, Optional[float]]]
 
     def can_do_action(
         self,
         key: Any,
-        time_now_s: int,
+        time_now_s: Optional[int] = None,
         update: bool = True,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
@@ -50,7 +57,8 @@ class Ratelimiter(object):
         Args:
             key: The key we should use when rate limiting. Can be a user ID
                 (when sending events), an IP address, etc.
-            time_now_s: The time now
+            time_now_s: The current time. Optional, defaults to the current time according
+                to self.clock. Pretty much only used for tests.
             update: Whether to count this check as performing the action
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
@@ -64,14 +72,15 @@ class Ratelimiter(object):
                   -1 if a rate_hz has not been defined for this Ratelimiter
         """
         # Override default values if set
-        rate_hz = rate_hz or self.rate_hz
-        burst_count = burst_count or self.burst_count
+        time_now_s = time_now_s if time_now_s is not None else self.clock.time()
+        rate_hz = rate_hz if rate_hz is not None else self.rate_hz
+        burst_count = burst_count if burst_count is not None else self.burst_count
 
         # Remove any expired entries
-        self._prune_message_counts(time_now_s, rate_hz)
+        self._prune_message_counts(time_now_s)
 
         # Check if there is an existing count entry for this key
-        action_count, time_start, = self.actions.get(key, (0.0, time_now_s))
+        action_count, time_start, _ = self.actions.get(key, (0.0, time_now_s, None))
 
         # Check whether performing another action is allowed
         time_delta = time_now_s - time_start
@@ -90,7 +99,7 @@ class Ratelimiter(object):
             action_count += 1.0
 
         if update:
-            self.actions[key] = (action_count, time_start)
+            self.actions[key] = (action_count, time_start, rate_hz)
 
         # Figure out the time when an action can be performed again
         if self.rate_hz > 0:
@@ -105,18 +114,17 @@ class Ratelimiter(object):
 
         return allowed, time_allowed
 
-    def _prune_message_counts(self, time_now_s: int, rate_hz: float):
+    def _prune_message_counts(self, time_now_s: int):
         """Remove message count entries that have not exceeded their defined
         rate_hz limit
 
         Args:
             time_now_s: The current time
-            rate_hz: The long term number of actions that can be performed in a second.
         """
         # We create a copy of the key list here as the dictionary is modified during
         # the loop
         for key in list(self.actions.keys()):
-            action_count, time_start = self.actions[key]
+            action_count, time_start, rate_hz = self.actions[key]
 
             # Rate limit = "seconds since we started limiting this action" * rate_hz
             # If this limit has not been exceeded, wipe our record of this action
@@ -129,7 +137,7 @@ class Ratelimiter(object):
     def ratelimit(
         self,
         key: Any,
-        time_now_s: int,
+        time_now_s: Optional[int] = None,
         update: bool = True,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
@@ -138,7 +146,8 @@ class Ratelimiter(object):
 
         Args:
             key: An arbitrary key used to classify an action
-            time_now_s: The current time
+            time_now_s: The current time. Optional, defaults to the current time according
+                to self.clock. Pretty much only used for tests.
             update: Whether to count this check as performing the action
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
@@ -150,8 +159,9 @@ class Ratelimiter(object):
                 milliseconds until the action can be performed again
         """
         # Override default values if set
-        rate_hz = rate_hz or self.rate_hz
-        burst_count = burst_count or self.burst_count
+        time_now_s = time_now_s if time_now_s is not None else self.clock.time()
+        rate_hz = rate_hz if rate_hz is not None else self.rate_hz
+        burst_count = burst_count if burst_count is not None else self.burst_count
 
         allowed, time_allowed = self.can_do_action(
             key, time_now_s, update=update, rate_hz=rate_hz, burst_count=burst_count
