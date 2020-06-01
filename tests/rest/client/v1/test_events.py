@@ -15,9 +15,10 @@
 
 """ Tests REST events for /events paths."""
 
-from mock import Mock, NonCallableMock
+from mock import Mock, patch
 
 import synapse.rest.admin
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.rest.client.v1 import events, login, room
 
 from tests import unittest
@@ -40,19 +41,17 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         config["enable_registration"] = True
         config["auto_join_rooms"] = []
 
-        hs = self.setup_test_homeserver(
-            config=config,
-            request_ratelimiter=NonCallableMock(
-                # rate_hz and burst_count are overridden in BaseHandler
-                spec_set=["can_do_action", "ratelimit", "rate_hz", "burst_count"]
-            ),
-            login_ratelimiter=NonCallableMock(spec_set=["can_do_action", "ratelimit"]),
-        )
-        self.request_ratelimiter = hs.get_request_ratelimiter()
-        self.request_ratelimiter.can_do_action.return_value = (True, 0)
+        hs = self.setup_test_homeserver(config=config,)
 
-        self.login_ratelimiter = hs.get_login_ratelimiter()
-        self.login_ratelimiter.can_do_action.return_value = (True, 0)
+        # Patch Ratelimiter to allow all requests
+        patch.object(
+            Ratelimiter,
+            "can_do_action",
+            new_callable=lambda *args, **kwargs: (True, 0.0),
+        )
+        patch.object(
+            Ratelimiter, "ratelimit", new_callable=lambda *args, **kwargs: None
+        )
 
         hs.get_handlers().federation_handler = Mock()
 

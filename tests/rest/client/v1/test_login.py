@@ -26,7 +26,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-
         self.hs = self.setup_test_homeserver()
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
@@ -35,10 +34,20 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
+    @override_config(
+        {
+            "rc_login": {
+                "address": {"per_second": 0.17, "burst_count": 5,},
+                # Prevent the account login ratelimiter from raising first
+                #
+                # This is normally covered by the default test homeserver config
+                # which sets these values to 10000, but as we're overriding the entire
+                # rc_login dict here, we need to set this manually as well
+                "account": {"per_second": 10000, "burst_count": 10000,},
+            }
+        }
+    )
     def test_POST_ratelimiting_per_address(self):
-        self.hs.get_login_ratelimiter().burst_count = 5
-        self.hs.get_login_ratelimiter().rate_hz = 0.17
-
         # Create different users so we're sure not to be bothered by the per-user
         # ratelimiter.
         for i in range(0, 6):
@@ -77,10 +86,20 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config(
+        {
+            "rc_login": {
+                "account": {"per_second": 0.17, "burst_count": 5,},
+                # Prevent the address login ratelimiter from raising first
+                #
+                # This is normally covered by the default test homeserver config
+                # which sets these values to 10000, but as we're overriding the entire
+                # rc_login dict here, we need to set this manually as well
+                "address": {"per_second": 10000, "burst_count": 10000,},
+            }
+        }
+    )
     def test_POST_ratelimiting_per_account(self):
-        self.hs.get_login_ratelimiter().burst_count = 5
-        self.hs.get_login_ratelimiter().rate_hz = 0.17
-
         self.register_user("kermit", "monkey")
 
         for i in range(0, 6):
@@ -116,10 +135,21 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config(
+        {
+            "rc_login": {
+                # Prevent the address login ratelimiter from raising first
+                #
+                # This is normally covered by the default test homeserver config
+                # which sets these values to 10000, but as we're overriding the entire
+                # rc_login dict here, we need to set this manually as well
+                "address": {"per_second": 10000, "burst_count": 10000,},
+                "failed_attempts": {"per_second": 0.17, "burst_count": 5,},
+            }
+        }
+    )
+    @unittest.DEBUG
     def test_POST_ratelimiting_per_account_failed_attempts(self):
-        self.hs.get_login_failed_attempts_ratelimiter().burst_count = 5
-        self.hs.get_login_failed_attempts_ratelimiter().rate_hz = 0.17
-
         self.register_user("kermit", "monkey")
 
         for i in range(0, 6):
