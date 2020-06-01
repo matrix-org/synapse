@@ -704,22 +704,33 @@ class DeviceListUpdater(object):
             need_resync = yield self.store.get_user_ids_requiring_device_list_resync()
             # Iterate over the set of user IDs.
             for user_id in need_resync:
-                # Try to resync the current user's devices list. Exception handling
-                # isn't necessary here, since user_device_resync catches all instances
-                # of "Exception" that might be raised from the federation request. This
-                # means that if an exception is raised by this function, it must be
-                # because of a database issue, which means _maybe_retry_device_resync
-                # probably won't be able to go much further anyway.
-                result = yield self.user_device_resync(
-                    user_id=user_id, mark_failed_as_stale=False,
-                )
-                # user_device_resync only returns a result if it managed to successfully
-                # resync and update the database. Updating the table of users requiring
-                # resync isn't necessary here as user_device_resync already does it
-                # (through self.store.update_remote_device_list_cache).
-                if result:
+                try:
+                    # Try to resync the current user's devices list. Exception handling
+                    # isn't necessary here, since user_device_resync catches all
+                    # instances of "Exception" that might be raised from the federation
+                    # request. This means that if an exception is raised by this
+                    # function, it must be because of a database issue, which means
+                    # _maybe_retry_device_resync probably won't be able to go much
+                    # further anyway.
+                    result = yield self.user_device_resync(
+                        user_id=user_id, mark_failed_as_stale=False,
+                    )
+
+                    # user_device_resync only returns a result if it managed to
+                    # successfully resync and update the database. Updating the table
+                    # of users requiring resync isn't necessary here as
+                    # user_device_resync already does it (through
+                    # self.store.update_remote_device_list_cache).
+                    if result:
+                        logger.debug(
+                            "Successfully resynced the device list for %s", user_id,
+                        )
+                except Exception as e:
+                    # If there was an issue resyncing this user, e.g. if the remote
+                    # server sent a malformed result, just log the error instead of
+                    # aborting all the subsequent resyncs.
                     logger.debug(
-                        "Successfully resynced the device list for %s" % user_id,
+                        "Could not resync the device list for %s: %s", user_id, e,
                     )
         finally:
             # Allow future calls to retry resyncinc out of sync device lists.
