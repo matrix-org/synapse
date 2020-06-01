@@ -41,9 +41,7 @@ class Ratelimiter(object):
         #   * How many times an action has occurred since a point in time
         #   * The point in time
         #   * The rate_hz of this particular entry. This can vary per request
-        self.actions = (
-            OrderedDict()
-        )  # type: OrderedDict[Any, Tuple[float, int, Optional[float]]]
+        self.actions = OrderedDict()  # type: OrderedDict[Any, Tuple[float, int, float]]
 
     def can_do_action(
         self,
@@ -81,7 +79,7 @@ class Ratelimiter(object):
         self._prune_message_counts(time_now_s)
 
         # Check if there is an existing count entry for this key
-        action_count, time_start, _ = self.actions.get(key, (0.0, time_now_s, None))
+        action_count, time_start, _ = self.actions.get(key, (0.0, time_now_s, 0.0))
 
         # Check whether performing another action is allowed
         time_delta = time_now_s - time_start
