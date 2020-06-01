@@ -667,6 +667,81 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["admin"])
 
+    def test_create_user_email_notif_for_new_users(self):
+        """
+        Check that a new regular user is created successfully and
+        got an email pusher.
+        """
+        self.hs.config.registration_shared_secret = None
+        self.hs.config.email_enable_notifs = True
+        self.hs.config.email_notif_for_new_users = True
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            }
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+
+        pushers = self.get_success(
+            self.store.get_pushers_by({"user_name": "@bob:test"})
+        )
+        pushers = list(pushers)
+        self.assertEqual(len(pushers), 1)
+        self.assertEqual("@bob:test", pushers[0]["user_name"])
+
+    def test_create_user_email_no_notif_for_new_users(self):
+        """
+        Check that a new regular user is created successfully and
+        got not an email pusher.
+        """
+        self.hs.config.registration_shared_secret = None
+        self.hs.config.email_enable_notifs = False
+        self.hs.config.email_notif_for_new_users = False
+        url = "/_synapse/admin/v2/users/@bob:test"
+
+        # Create user
+        body = json.dumps(
+            {
+                "password": "abc123",
+                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            }
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+        self.render(request)
+
+        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@bob:test", channel.json_body["name"])
+        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
+        self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+
+        pushers = self.get_success(
+            self.store.get_pushers_by({"user_name": "@bob:test"})
+        )
+        pushers = list(pushers)
+        self.assertEqual(len(pushers), 0)
+
     def test_set_password(self):
         """
         Test setting a new password for another user.

@@ -132,7 +132,7 @@ class RegistrationHandler(BaseHandler):
     def register_user(
         self,
         localpart=None,
-        password=None,
+        password_hash=None,
         guest_access_token=None,
         make_guest=False,
         admin=False,
@@ -148,7 +148,7 @@ class RegistrationHandler(BaseHandler):
         Args:
             localpart: The local part of the user ID to register. If None,
               one will be generated.
-            password (unicode): The password to assign to this user so they can
+            password_hash (str|None): The hashed password to assign to this user so they can
               login again. This can be None which means they cannot login again
               via a password (e.g. the user is an application service user).
             user_type (str|None): type of user. One of the values from
@@ -169,11 +169,6 @@ class RegistrationHandler(BaseHandler):
         # do not check_auth_blocking if the call is coming through the Admin API
         if not by_admin:
             yield self.auth.check_auth_blocking(threepid=threepid)
-        password_hash = None
-        if password:
-            password_hash = yield defer.ensureDeferred(
-                self._auth_handler.hash(password)
-            )
 
         if localpart is not None:
             yield self.check_username(localpart, guest_access_token=guest_access_token)

@@ -322,22 +322,27 @@ listeners:
 # Used by phonehome stats to group together related servers.
 #server_context: context
 
-# Resource-constrained homeserver Settings
+# Resource-constrained homeserver settings
 #
-# If limit_remote_rooms.enabled is True, the room complexity will be
-# checked before a user joins a new remote room. If it is above
-# limit_remote_rooms.complexity, it will disallow joining or
-# instantly leave.
+# When this is enabled, the room "complexity" will be checked before a user
+# joins a new remote room. If it is above the complexity limit, the server will
+# disallow joining, or will instantly leave.
 #
-# limit_remote_rooms.complexity_error can be set to customise the text
-# displayed to the user when a room above the complexity threshold has
-# its join cancelled.
+# Room complexity is an arbitrary measure based on factors such as the number of
+# users in the room.
 #
-# Uncomment the below lines to enable:
-#limit_remote_rooms:
-#  enabled: true
-#  complexity: 1.0
-#  complexity_error: "This room is too complex."
+limit_remote_rooms:
+  # Uncomment to enable room complexity checking.
+  #
+  #enabled: true
+
+  # the limit above which rooms cannot be joined. The default is 1.0.
+  #
+  #complexity: 0.5
+
+  # override the error which is returned when the room is too complex.
+  #
+  #complexity_error: "This room is too complex."
 
 # Whether to require a user to be in the room to add an alias to it.
 # Defaults to 'true'.
@@ -637,6 +642,12 @@ caches:
    # letters and underscores. Setting by environment variable
    # takes priority over setting through the config file.
    # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
+   #
+   # Some caches have '*' and other characters that are not
+   # alphanumeric or underscores. These caches can be named with or
+   # without the special characters stripped. For example, to specify
+   # the cache factor for `*stateGroupCache*` via an environment
+   # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
    #
    per_cache_factors:
      #get_users_who_share_room_with_user: 2.0
@@ -942,25 +953,28 @@ url_preview_accept_language:
 
 
 ## Captcha ##
-# See docs/CAPTCHA_SETUP for full details of configuring this.
+# See docs/CAPTCHA_SETUP.md for full details of configuring this.
 
-# This homeserver's ReCAPTCHA public key.
+# This homeserver's ReCAPTCHA public key. Must be specified if
+# enable_registration_captcha is enabled.
 #
 #recaptcha_public_key: "YOUR_PUBLIC_KEY"
 
-# This homeserver's ReCAPTCHA private key.
+# This homeserver's ReCAPTCHA private key. Must be specified if
+# enable_registration_captcha is enabled.
 #
 #recaptcha_private_key: "YOUR_PRIVATE_KEY"
 
-# Enables ReCaptcha checks when registering, preventing signup
+# Uncomment to enable ReCaptcha checks when registering, preventing signup
 # unless a captcha is answered. Requires a valid ReCaptcha
-# public/private key.
+# public/private key. Defaults to 'false'.
 #
-#enable_registration_captcha: false
+#enable_registration_captcha: true
 
 # The API endpoint to use for verifying m.login.recaptcha responses.
+# Defaults to "https://www.recaptcha.net/recaptcha/api/siteverify".
 #
-#recaptcha_siteverify_api: "https://www.recaptcha.net/recaptcha/api/siteverify"
+#recaptcha_siteverify_api: "https://my.recaptcha.site"
 
 
 ## TURN ##
@@ -1104,7 +1118,7 @@ account_validity:
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
 #
-# registration_shared_secret: <PRIVATE STRING>
+#registration_shared_secret: <PRIVATE STRING>
 
 # Set the number of bcrypt rounds used to generate password hash.
 # Larger numbers increase the work factor needed to generate the hash.
@@ -1237,7 +1251,8 @@ metrics_flags:
     #known_servers: true
 
 # Whether or not to report anonymized homeserver usage statistics.
-# report_stats: true|false
+#
+#report_stats: true|false
 
 # The endpoint to report the anonymized homeserver usage statistics to.
 # Defaults to https://matrix.org/report-usage-stats/push
@@ -1273,13 +1288,13 @@ metrics_flags:
 # the registration_shared_secret is used, if one is given; otherwise,
 # a secret key is derived from the signing key.
 #
-# macaroon_secret_key: <PRIVATE STRING>
+#macaroon_secret_key: <PRIVATE STRING>
 
 # a secret which is used to calculate HMACs for form values, to stop
 # falsification of values. Must be specified for the User Consent
 # forms to work.
 #
-# form_secret: <PRIVATE STRING>
+#form_secret: <PRIVATE STRING>
 
 ## Signing Keys ##
 
@@ -1531,7 +1546,7 @@ oidc_config:
     # auth method to use when exchanging the token.
     # Valid values are "client_secret_basic" (default), "client_secret_post" and "none".
     #
-    #client_auth_method: "client_auth_basic"
+    #client_auth_method: "client_secret_basic"
 
     # list of scopes to ask. This should include the "openid" scope. Defaults to ["openid"].
     #
@@ -1764,8 +1779,8 @@ email:
   # Username/password for authentication to the SMTP server. By default, no
   # authentication is attempted.
   #
-  # smtp_user: "exampleusername"
-  # smtp_pass: "examplepassword"
+  #smtp_user: "exampleusername"
+  #smtp_pass: "examplepassword"
 
   # Uncomment the following to require TLS transport security for SMTP.
   # By default, Synapse will connect over plain text, and will then switch to

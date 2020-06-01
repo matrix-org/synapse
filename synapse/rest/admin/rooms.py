@@ -59,6 +59,7 @@ class ShutdownRoomRestServlet(RestServlet):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
+        self._replication = hs.get_replication_data_handler()
 
     async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
@@ -73,7 +74,7 @@ class ShutdownRoomRestServlet(RestServlet):
         message = content.get("message", self.DEFAULT_MESSAGE)
         room_name = content.get("room_name", "Content Violation Notification")
 
-        info = await self._room_creation_handler.create_room(
+        info, stream_id = await self._room_creation_handler.create_room(
             room_creator_requester,
             config={
                 "preset": "public_chat",
@@ -94,6 +95,15 @@ class ShutdownRoomRestServlet(RestServlet):
         # desirable in case the first attempt at blocking the room failed below.
         await self.store.block_room(room_id, requester_user_id)
 
+        # We now wait for the create room to come back in via replication so
+        # that we can assume that all the joins/invites have propogated before
+        # we try and auto join below.
+        #
+        # TODO: Currently the events stream is written to from master
+        await self._replication.wait_for_stream_position(
+            self.hs.config.worker.writers.events, "events", stream_id
+        )
+
         users = await self.state.get_current_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
@@ -105,7 +115,7 @@ class ShutdownRoomRestServlet(RestServlet):
 
             try:
                 target_requester = create_requester(user_id)
-                await self.room_member_handler.update_membership(
+                _, stream_id = await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,
                     room_id=room_id,
@@ -113,6 +123,11 @@ class ShutdownRoomRestServlet(RestServlet):
                     content={},
                     ratelimit=False,
                     require_consent=False,
+                )
+
+                # Wait for leave to come in over replication before trying to forget.
+                await self._replication.wait_for_stream_position(
+                    self.hs.config.worker.writers.events, "events", stream_id
                 )
 
                 await self.room_member_handler.forget(target_requester.user, room_id)

@@ -27,20 +27,33 @@ from synapse.server_notices.resource_limits_server_notices import (
 )
 
 from tests import unittest
+from tests.unittest import override_config
+from tests.utils import default_config
 
 
 class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
-        hs_config = self.default_config()
-        hs_config["server_notices"] = {
-            "system_mxid_localpart": "server",
-            "system_mxid_display_name": "test display name",
-            "system_mxid_avatar_url": None,
-            "room_name": "Server Notices",
-        }
+    def default_config(self):
+        config = default_config("test")
 
-        hs = self.setup_test_homeserver(config=hs_config)
-        return hs
+        config.update(
+            {
+                "admin_contact": "mailto:user@test.com",
+                "limit_usage_by_mau": True,
+                "server_notices": {
+                    "system_mxid_localpart": "server",
+                    "system_mxid_display_name": "test display name",
+                    "system_mxid_avatar_url": None,
+                    "room_name": "Server Notices",
+                },
+            }
+        )
+
+        # apply any additional config which was specified via the override_config
+        # decorator.
+        if self._extra_config is not None:
+            config.update(self._extra_config)
+
+        return config
 
     def prepare(self, reactor, clock, hs):
         self.server_notices_sender = self.hs.get_server_notices_sender()
@@ -60,7 +73,6 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         )
         self._send_notice = self._rlsn._server_notices_manager.send_notice
 
-        self.hs.config.limit_usage_by_mau = True
         self.user_id = "@user_id:test"
 
         self._rlsn._server_notices_manager.get_or_create_notice_room_for_user = Mock(
@@ -68,21 +80,17 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         )
         self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
         self._rlsn._store.get_tags_for_room = Mock(return_value=defer.succeed({}))
-        self.hs.config.admin_contact = "mailto:user@test.com"
 
-    def test_maybe_send_server_notice_to_user_flag_off(self):
-        """Tests cases where the flags indicate nothing to do"""
-        # test hs disabled case
-        self.hs.config.hs_disabled = True
-
+    @override_config({"hs_disabled": True})
+    def test_maybe_send_server_notice_disabled_hs(self):
+        """If the HS is disabled, we should not send notices"""
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
-
         self._send_notice.assert_not_called()
-        # Test when mau limiting disabled
-        self.hs.config.hs_disabled = False
-        self.hs.config.limit_usage_by_mau = False
-        self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 
+    @override_config({"limit_usage_by_mau": False})
+    def test_maybe_send_server_notice_to_user_flag_off(self):
+        """If mau limiting is disabled, we should not send notices"""
+        self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
         self._send_notice.assert_not_called()
 
     def test_maybe_send_server_notice_to_user_remove_blocked_notice(self):
@@ -153,13 +161,12 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
         self._send_notice.assert_not_called()
 
+    @override_config({"mau_limit_alerting": False})
     def test_maybe_send_server_notice_when_alerting_suppressed_room_unblocked(self):
         """
         Test that when server is over MAU limit and alerting is suppressed, then
         an alert message is not sent into the room
         """
-        self.hs.config.mau_limit_alerting = False
-
         self._rlsn._auth.check_auth_blocking = Mock(
             return_value=defer.succeed(None),
             side_effect=ResourceLimitError(
@@ -170,12 +177,11 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
 
         self.assertEqual(self._send_notice.call_count, 0)
 
+    @override_config({"mau_limit_alerting": False})
     def test_check_hs_disabled_unaffected_by_mau_alert_suppression(self):
         """
         Test that when a server is disabled, that MAU limit alerting is ignored.
         """
-        self.hs.config.mau_limit_alerting = False
-
         self._rlsn._auth.check_auth_blocking = Mock(
             return_value=defer.succeed(None),
             side_effect=ResourceLimitError(
@@ -187,12 +193,12 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
         # Would be better to check contents, but 2 calls == set blocking event
         self.assertEqual(self._send_notice.call_count, 2)
 
+    @override_config({"mau_limit_alerting": False})
     def test_maybe_send_server_notice_when_alerting_suppressed_room_blocked(self):
         """
         When the room is already in a blocked state, test that when alerting
         is suppressed that the room is returned to an unblocked state.
         """
-        self.hs.config.mau_limit_alerting = False
         self._rlsn._auth.check_auth_blocking = Mock(
             return_value=defer.succeed(None),
             side_effect=ResourceLimitError(

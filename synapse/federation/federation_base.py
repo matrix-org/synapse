@@ -29,7 +29,7 @@ from synapse.api.room_versions import EventFormatVersions, RoomVersion
 from synapse.crypto.event_signing import check_event_content_hash
 from synapse.crypto.keyring import Keyring
 from synapse.events import EventBase, make_event_from_dict
-from synapse.events.utils import prune_event
+from synapse.events.utils import prune_event, validate_canonicaljson
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
     PreserveLoggingContext,
@@ -301,6 +301,10 @@ def event_from_pdu_json(
         raise SynapseError(400, "Depth too small", Codes.BAD_JSON)
     elif depth > MAX_DEPTH:
         raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
+
+    # Validate that the JSON conforms to the specification.
+    if room_version.strict_canonicaljson:
+        validate_canonicaljson(pdu_json)
 
     event = make_event_from_dict(pdu_json, room_version)
     event.internal_metadata.outlier = outlier

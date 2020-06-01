@@ -148,9 +148,7 @@ class RegistrationConfig(Config):
                 random_string_with_symbols(50),
             )
         else:
-            registration_shared_secret = (
-                "# registration_shared_secret: <PRIVATE STRING>"
-            )
+            registration_shared_secret = "#registration_shared_secret: <PRIVATE STRING>"
 
         return (
             """\
