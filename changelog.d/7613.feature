@@ -1,0 +1,1 @@
+Add delete room admin endpoint (`DELETE /_synapse/admin/v1/rooms/<room_id>`).
