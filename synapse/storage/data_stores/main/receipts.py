@@ -391,7 +391,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             (user_id, room_id, receipt_type),
         )
 
-        self.db.simple_delete_txn(
+        self.db.simple_upsert_txn(
             txn,
             table="receipts_linearized",
             keyvalues={
@@ -399,19 +399,14 @@ class ReceiptsStore(ReceiptsWorkerStore):
                 "receipt_type": receipt_type,
                 "user_id": user_id,
             },
-        )
-
-        self.db.simple_insert_txn(
-            txn,
-            table="receipts_linearized",
             values={
                 "stream_id": stream_id,
-                "room_id": room_id,
-                "receipt_type": receipt_type,
-                "user_id": user_id,
                 "event_id": event_id,
                 "data": json.dumps(data),
             },
+            # receipts_linearized has a unique constraint on
+            # (user_id, room_id, receipt_type), so no need to lock
+            lock=False,
         )
 
         if receipt_type == "m.read" and stream_ordering is not None:
