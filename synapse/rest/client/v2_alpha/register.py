@@ -26,7 +26,6 @@ import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     Codes,
-    LimitExceededError,
     SynapseError,
     ThreepidValidationError,
     UnrecognizedRequestError,
@@ -396,16 +395,7 @@ class RegisterRestServlet(RestServlet):
 
         client_addr = request.getClientIP()
 
-        time_now = self.clock.time()
-
-        allowed, time_allowed = self.ratelimiter.can_do_action(
-            client_addr, time_now_s=time_now, update=False,
-        )
-
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now))
-            )
+        self.ratelimiter.ratelimit(client_addr, update=False)
 
         kind = b"user"
         if b"kind" in request.args:
