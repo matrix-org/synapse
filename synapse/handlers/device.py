@@ -705,13 +705,7 @@ class DeviceListUpdater(object):
             # Iterate over the set of user IDs.
             for user_id in need_resync:
                 try:
-                    # Try to resync the current user's devices list. Exception handling
-                    # isn't necessary here, since user_device_resync catches all
-                    # instances of "Exception" that might be raised from the federation
-                    # request. This means that if an exception is raised by this
-                    # function, it must be because of a database issue, which means
-                    # _maybe_retry_device_resync probably won't be able to go much
-                    # further anyway.
+                    # Try to resync the current user's devices list.
                     result = yield self.user_device_resync(
                         user_id=user_id, mark_failed_as_stale=False,
                     )
