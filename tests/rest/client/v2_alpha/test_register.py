@@ -147,14 +147,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
-    @override_config(
-        {
-            "rc_registration": {
-                "per_second": 0.17,
-                "burst_count": 5,
-            }
-        }
-    )
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5,}})
     def test_POST_ratelimiting_guest(self):
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
@@ -174,14 +167,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
-    @override_config(
-        {
-            "rc_registration": {
-                "per_second": 0.17,
-                "burst_count": 5,
-            }
-        }
-    )
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5,}})
     def test_POST_ratelimiting(self):
         for i in range(0, 6):
             params = {

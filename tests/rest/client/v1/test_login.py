@@ -37,13 +37,13 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "rc_login": {
-                "address": {"per_second": 0.17, "burst_count": 5,},
+                "address": {"per_second": 0.17, "burst_count": 5},
                 # Prevent the account login ratelimiter from raising first
                 #
                 # This is normally covered by the default test homeserver config
                 # which sets these values to 10000, but as we're overriding the entire
                 # rc_login dict here, we need to set this manually as well
-                "account": {"per_second": 10000, "burst_count": 10000,},
+                "account": {"per_second": 10000, "burst_count": 10000},
             }
         }
     )
@@ -89,13 +89,13 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     @override_config(
         {
             "rc_login": {
-                "account": {"per_second": 0.17, "burst_count": 5,},
+                "account": {"per_second": 0.17, "burst_count": 5},
                 # Prevent the address login ratelimiter from raising first
                 #
                 # This is normally covered by the default test homeserver config
                 # which sets these values to 10000, but as we're overriding the entire
                 # rc_login dict here, we need to set this manually as well
-                "address": {"per_second": 10000, "burst_count": 10000,},
+                "address": {"per_second": 10000, "burst_count": 10000},
             }
         }
     )
@@ -143,8 +143,8 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 # This is normally covered by the default test homeserver config
                 # which sets these values to 10000, but as we're overriding the entire
                 # rc_login dict here, we need to set this manually as well
-                "address": {"per_second": 10000, "burst_count": 10000,},
-                "failed_attempts": {"per_second": 0.17, "burst_count": 5,},
+                "address": {"per_second": 10000, "burst_count": 10000},
+                "failed_attempts": {"per_second": 0.17, "burst_count": 5},
             }
         }
     )
