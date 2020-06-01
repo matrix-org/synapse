@@ -18,13 +18,19 @@
 import datetime
 import json
 import os
+from typing import List, Optional
+
+from mock import Mock
 
 import pkg_resources
+
+from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
+from synapse.config.emailconfig import ThreepidService
 from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import account, account_validity, register, sync
 
@@ -35,6 +41,7 @@ from tests.unittest import override_config
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     servlets = [
+        account.register_servlets,
         login.register_servlets,
         register.register_servlets,
         synapse.rest.admin.register_servlets,
@@ -301,6 +308,183 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
         self.assertIsNotNone(channel.json_body.get("sid"))
+
+    def _test_delegate_for_option(
+        self, delegating_for: Optional[List[ThreepidService]]
+    ):
+        """Tests the account_threepid_delegates.delegate_for option"""
+        possible_delegated_services = [
+            ThreepidService.ADDING_THREEPID,
+            ThreepidService.PASSWORD_RESET,
+        ]
+
+        if delegating_for is None:
+            # The default value of delegate_for should be delegating *all* services
+            delegating_for = possible_delegated_services
+
+            # In contrast, an empty list means delegating *no* services
+
+        # Create a user and associated email address
+        email = "kermit@example.com"
+        user_id = self.register_user("kermit", "monkey")
+
+        identity_handler = self.hs.get_handlers().identity_handler
+
+        # Mock this method to learn when we attempt to validate a threepid via an account
+        # threepid delegate
+        identity_handler.requestEmailToken = Mock(
+            return_value=defer.succeed({"sid": 1234})
+        )
+        # We expect this many calls to be delegated to the account threepid delegate
+        expected_delegated_calls = len(delegating_for)
+
+        # Mock this method to learn when a local validation session is started, and
+        # with what service type
+        identity_handler.send_threepid_validation = Mock(
+            return_value=defer.succeed(1234)
+        )
+        # We expect this many calls to be handled by Synapse itself
+        expected_send_threepid_validation_calls = (
+            len(possible_delegated_services) - expected_delegated_calls
+        )
+
+        # Try to add a threepid to our account
+        body = {"client_secret": "somesecret", "email": email, "send_attempt": 0}
+        request, channel = self.make_request(
+            "POST", "/account/3pid/email/requestToken", body,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        if ThreepidService.ADDING_THREEPID not in delegating_for:
+            # Check that this is being handled locally, and was classified as the
+            # correct service
+            call_args_list = identity_handler.send_threepid_validation.call_args_list
+            args, kwargs = call_args_list[len(call_args_list) - 1]  # Get last call
+
+            self.assertEquals(kwargs["service"], ThreepidService.ADDING_THREEPID)
+
+        # Add a threepid that will be used for asking for our reset password
+        self.get_success(
+            self.hs.get_datastore().user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address=email,
+                validated_at=0,
+                added_at=0,
+            )
+        )
+
+        # Now let's test password reset
+        body = {"client_secret": "somesecret", "email": email, "send_attempt": 0}
+        request, channel = self.make_request(
+            "POST", "/account/password/email/requestToken", body,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        if ThreepidService.PASSWORD_RESET not in delegating_for:
+            # Check that this is being handled locally, and was classified as the
+            # correct service
+            call_args_list = identity_handler.send_threepid_validation.call_args_list
+            args, kwargs = call_args_list[len(call_args_list) - 1]  # Get last call
+
+            self.assertEquals(kwargs["service"], ThreepidService.PASSWORD_RESET)
+
+        # Check that we got the expected number of calls to each of our mocked methods
+        self.assertEqual(
+            len(identity_handler.requestEmailToken.mock_calls),
+            expected_delegated_calls,
+            "Expected calls to delegated threepid handler did not match actual call count",
+        )
+        self.assertEqual(
+            len(identity_handler.send_threepid_validation.mock_calls),
+            expected_send_threepid_validation_calls,
+            "Expected local threepid validation calls did not match actual call count",
+        )
+
+    @unittest.override_config(
+        {
+            "account_threepid_delegates": {
+                "email": "https://id_server",
+                "msisdn": "https://id_server",
+                "delegate_for": ["adding_threepid"],
+            },
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_threepid_delegate_request_token_adding_only(self):
+        """Tests that only adding a threepid to an account is delegated to an account
+        threepid delegate, and Synapse still handles other validation tasks itself
+        """
+        self._test_delegate_for_option(delegating_for=[ThreepidService.ADDING_THREEPID])
+
+    @unittest.override_config(
+        {
+            "account_threepid_delegates": {
+                "email": "https://id_server",
+                "msisdn": "https://id_server",
+                "delegate_for": ["password_reset"],
+            },
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_threepid_delegate_request_token_password_reset_only(self):
+        """Tests that only password reset is delegated to an account threepid delegate,
+        and Synapse still handles other validation tasks itself
+        """
+        self._test_delegate_for_option(delegating_for=[ThreepidService.PASSWORD_RESET])
+
+    @unittest.override_config(
+        {
+            "account_threepid_delegates": {
+                "email": "https://id_server",
+                "msisdn": "https://id_server",
+            },
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_threepid_delegate_request_token_default(self):
+        """Test the default values for account_threepid_delegates.delegate_for
+        (which should result in delegating all services to an identity server)
+        """
+        self._test_delegate_for_option(delegating_for=None)
+
+    @unittest.override_config(
+        {
+            "account_threepid_delegates": {
+                "email": "https://id_server",
+                "msisdn": "https://id_server",
+                "delegate_for": [],
+            },
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_threepid_delegate_request_token_none(self):
+        """Tests that providing no services in delegate_for results in Synapse executing
+        all threepid validation tasks itself
+        """
+        self._test_delegate_for_option(delegating_for=[])
 
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
