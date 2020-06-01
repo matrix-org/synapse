@@ -7,6 +7,7 @@ import synapse.rest.admin
 from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import devices
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
+from synapse.api.ratelimiting import Ratelimiter
 
 from tests import unittest
 from tests.unittest import override_config
@@ -26,7 +27,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-
         self.hs = self.setup_test_homeserver()
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
@@ -35,10 +35,17 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         return self.hs
 
+    @override_config(
+        {
+            "rc_login": {
+                "account": {
+                    "per_second": 0.17,
+                    "burst_count": 5,
+                }
+            }
+        }
+    )
     def test_POST_ratelimiting_per_address(self):
-        self.hs.get_login_ratelimiter().burst_count = 5
-        self.hs.get_login_ratelimiter().rate_hz = 0.17
-
         # Create different users so we're sure not to be bothered by the per-user
         # ratelimiter.
         for i in range(0, 6):
@@ -77,10 +84,17 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config(
+        {
+            "rc_login": {
+                "account": {
+                    "per_second": 0.17,
+                    "burst_count": 5,
+                }
+            }
+        }
+    )
     def test_POST_ratelimiting_per_account(self):
-        self.hs.get_login_ratelimiter().burst_count = 5
-        self.hs.get_login_ratelimiter().rate_hz = 0.17
-
         self.register_user("kermit", "monkey")
 
         for i in range(0, 6):
@@ -116,10 +130,23 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config(
+        {
+            "rc_login": {
+                # Prevent the generic login ratelimiter from raising first
+                "address": {
+                    "per_second": 1000,
+                    "burst_count": 1000,
+                },
+                "failed_attempts": {
+                    "per_second": 0.17,
+                    "burst_count": 5,
+                }
+            }
+        }
+    )
+    @unittest.DEBUG
     def test_POST_ratelimiting_per_account_failed_attempts(self):
-        self.hs.get_login_failed_attempts_ratelimiter().burst_count = 5
-        self.hs.get_login_failed_attempts_ratelimiter().rate_hz = 0.17
-
         self.register_user("kermit", "monkey")
 
         for i in range(0, 6):
@@ -128,8 +155,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
                 "identifier": {"type": "m.id.user", "user": "kermit"},
                 "password": "notamonkey",
             }
-            request_data = json.dumps(params)
-            request, channel = self.make_request(b"POST", LOGIN_URL, request_data)
+            request, channel = self.make_request(b"POST", LOGIN_URL, params)
             self.render(request)
 
             if i == 5:
@@ -149,7 +175,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             "identifier": {"type": "m.id.user", "user": "kermit"},
             "password": "notamonkey",
         }
-        request_data = json.dumps(params)
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
 

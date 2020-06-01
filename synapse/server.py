@@ -243,27 +243,11 @@ class HomeServer(object):
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
-        # The rate_hz and burst_count is overridden on a per-user basis
-        self.request_ratelimiter = Ratelimiter(rate_hz=0, burst_count=0,)
-        if config.rc_admin_redaction:
-            self.admin_redaction_ratelimiter = Ratelimiter(
-                rate_hz=config.rc_admin_redaction.per_second,
-                burst_count=config.rc_admin_redaction.burst_count,
-            )
-        else:
-            self.admin_redaction_ratelimiter = None
 
         self.registration_ratelimiter = Ratelimiter(
+            clock=self.clock,
             rate_hz=config.rc_registration.per_second,
             burst_count=config.rc_registration.burst_count,
-        )
-        self.login_ratelimiter = Ratelimiter(
-            rate_hz=config.rc_login_account.per_second,
-            burst_count=config.rc_login_account.burst_count,
-        )
-        self.login_failed_attempts_ratelimiter = Ratelimiter(
-            rate_hz=config.rc_login_failed_attempts.per_second,
-            burst_count=config.rc_login_failed_attempts.burst_count,
         )
 
         self.datastores = None
@@ -334,20 +318,8 @@ class HomeServer(object):
     def get_distributor(self):
         return self.distributor
 
-    def get_request_ratelimiter(self) -> Ratelimiter:
-        return self.request_ratelimiter
-
     def get_registration_ratelimiter(self) -> Ratelimiter:
         return self.registration_ratelimiter
-
-    def get_admin_redaction_ratelimiter(self) -> Optional[Ratelimiter]:
-        return self.admin_redaction_ratelimiter
-
-    def get_login_ratelimiter(self) -> Ratelimiter:
-        return self.login_ratelimiter
-
-    def get_login_failed_attempts_ratelimiter(self) -> Ratelimiter:
-        return self.login_failed_attempts_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)

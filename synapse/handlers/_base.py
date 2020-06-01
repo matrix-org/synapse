@@ -20,6 +20,7 @@ from twisted.internet import defer
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.types import UserID
+from synapse.api.ratelimiting import Ratelimiter
 
 logger = logging.getLogger(__name__)
 
@@ -46,11 +47,20 @@ class BaseHandler(object):
         self.clock = hs.get_clock()
         self.hs = hs
 
-        self.request_ratelimiter = hs.get_request_ratelimiter()
+        # The rate_hz and burst_count are overridden on a per-user basis
+        self.request_ratelimiter = Ratelimiter(clock=self.clock, rate_hz=0, burst_count=0)
         self._rc_message = self.hs.config.rc_message
 
-        # If special admin redaction ratelimiting is disabled, this will be None
-        self.admin_redaction_ratelimiter = hs.get_admin_redaction_ratelimiter()
+        # Check whether ratelimiting room admin message redaction is enabled
+        # by the presence of rate limits in the config
+        if self.hs.config.rc_admin_redaction:
+            self.admin_redaction_ratelimiter = Ratelimiter(
+                clock=self.clock,
+                rate_hz=self.hs.config.rc_admin_redaction.per_second,
+                burst_count=self.hs.config.rc_admin_redaction.burst_count,
+            )
+        else:
+            self.admin_redaction_ratelimiter = None
 
         self.server_name = hs.hostname
 
