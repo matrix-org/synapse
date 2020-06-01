@@ -148,7 +148,6 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
             }
         }
     )
-    @unittest.DEBUG
     def test_POST_ratelimiting_per_account_failed_attempts(self):
         self.register_user("kermit", "monkey")
 
