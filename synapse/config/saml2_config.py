@@ -15,7 +15,6 @@
 # limitations under the License.
 
 import logging
-import os
 
 import jinja2
 import pkg_resources
