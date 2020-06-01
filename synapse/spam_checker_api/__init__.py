@@ -18,6 +18,10 @@ from twisted.internet import defer
 
 from synapse.storage.state import StateFilter
 
+MYPY = False
+if MYPY:
+    import synapse.server
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,18 +30,18 @@ class SpamCheckerApi(object):
     access to rooms and other relevant information.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "synapse.server.HomeServer"):
         self.hs = hs
 
         self._store = hs.get_datastore()
 
     @defer.inlineCallbacks
-    def get_state_events_in_room(self, room_id, types):
+    def get_state_events_in_room(self, room_id: str, types: tuple) -> defer.Deferred:
         """Gets state events for the given room.
 
         Args:
-            room_id (string): The room ID to get state events in.
-            types (tuple): The event type and state key (using None
+            room_id: The room ID to get state events in.
+            types: The event type and state key (using None
                 to represent 'any') of the room state to acquire.
 
         Returns:

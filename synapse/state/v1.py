@@ -15,7 +15,7 @@
 
 import hashlib
 import logging
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 from six import iteritems, iterkeys, itervalues
 
@@ -26,6 +26,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
+from synapse.types import StateMap
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ POWER_KEY = (EventTypes.PowerLevels, "")
 @defer.inlineCallbacks
 def resolve_events_with_store(
     room_id: str,
-    state_sets: List[Dict[Tuple[str, str], str]],
+    state_sets: List[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_map_factory: Callable,
 ):
@@ -68,9 +69,9 @@ def resolve_events_with_store(
 
     unconflicted_state, conflicted_state = _seperate(state_sets)
 
-    needed_events = set(
+    needed_events = {
         event_id for event_ids in itervalues(conflicted_state) for event_id in event_ids
-    )
+    }
     needed_event_count = len(needed_events)
     if event_map is not None:
         needed_events -= set(iterkeys(event_map))
@@ -260,11 +261,11 @@ def _resolve_state_events(conflicted_state, auth_events):
 
 
 def _resolve_auth_events(events, auth_events):
-    reverse = [i for i in reversed(_ordered_events(events))]
+    reverse = list(reversed(_ordered_events(events)))
 
-    auth_keys = set(
+    auth_keys = {
         key for event in events for key in event_auth.auth_types_for_event(event)
-    )
+    }
 
     new_auth_events = {}
     for key in auth_keys:
@@ -280,7 +281,7 @@ def _resolve_auth_events(events, auth_events):
         try:
             # The signatures have already been checked at this point
             event_auth.check(
-                RoomVersions.V1.identifier,
+                RoomVersions.V1,
                 event,
                 auth_events,
                 do_sig_check=False,
@@ -298,7 +299,7 @@ def _resolve_normal_events(events, auth_events):
         try:
             # The signatures have already been checked at this point
             event_auth.check(
-                RoomVersions.V1.identifier,
+                RoomVersions.V1,
                 event,
                 auth_events,
                 do_sig_check=False,

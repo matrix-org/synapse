@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Tuple
+from typing import Optional
 
 from six import itervalues
 
@@ -22,21 +22,23 @@ import pymacaroons
 from netaddr import IPAddress
 
 from twisted.internet import defer
+from twisted.web.server import Request
 
 import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
-from synapse.api.constants import EventTypes, LimitBlockingTypes, Membership, UserTypes
+from synapse.api.auth_blocking import AuthBlocking
+from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidClientTokenError,
     MissingClientTokenError,
-    ResourceLimitError,
 )
-from synapse.config.server import is_threepid_reserved
-from synapse.types import UserID
-from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import EventBase
+from synapse.types import StateMap, UserID
+from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
@@ -72,38 +74,58 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
 
-        self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
+        self.token_cache = LruCache(10000)
         register_cache("cache", "token_cache", self.token_cache)
 
+        self._auth_blocking = AuthBlocking(self.hs)
+
         self._account_validity = hs.config.account_validity
+        self._track_appservice_user_ips = hs.config.track_appservice_user_ips
+        self._macaroon_secret_key = hs.config.macaroon_secret_key
 
     @defer.inlineCallbacks
-    def check_from_context(self, room_version, event, context, do_sig_check=True):
+    def check_from_context(self, room_version: str, event, context, do_sig_check=True):
         prev_state_ids = yield context.get_prev_state_ids()
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
         auth_events = yield self.store.get_events(auth_events_ids)
         auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
+
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
         event_auth.check(
-            room_version, event, auth_events=auth_events, do_sig_check=do_sig_check
+            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
         )
 
     @defer.inlineCallbacks
-    def check_joined_room(self, room_id, user_id, current_state=None):
-        """Check if the user is currently joined in the room
+    def check_user_in_room(
+        self,
+        room_id: str,
+        user_id: str,
+        current_state: Optional[StateMap[EventBase]] = None,
+        allow_departed_users: bool = False,
+    ):
+        """Check if the user is in the room, or was at some point.
         Args:
-            room_id(str): The room to check.
-            user_id(str): The user to check.
-            current_state(dict): Optional map of the current state of the room.
+            room_id: The room to check.
+
+            user_id: The user to check.
+
+            current_state: Optional map of the current state of the room.
                 If provided then that map is used to check whether they are a
                 member of the room. Otherwise the current membership is
                 loaded from the database.
+
+            allow_departed_users: if True, accept users that were previously
+                members but have now departed.
+
         Raises:
-            AuthError if the user is not in the room.
+            AuthError if the user is/was not in the room.
         Returns:
-            A deferred membership event for the user if the user is in
-            the room.
+            Deferred[Optional[EventBase]]:
+                Membership event for the user if the user was in the
+                room. This will be the join event if they are currently joined to
+                the room. This will be the leave event if they have left the room.
         """
         if current_state:
             member = current_state.get((EventTypes.Member, user_id), None)
@@ -111,49 +133,25 @@ class Auth(object):
             member = yield self.state.get_current_state(
                 room_id=room_id, event_type=EventTypes.Member, state_key=user_id
             )
-
-        self._check_joined_room(member, user_id, room_id)
-        return member
-
-    @defer.inlineCallbacks
-    def check_user_was_in_room(self, room_id, user_id):
-        """Check if the user was in the room at some point.
-        Args:
-            room_id(str): The room to check.
-            user_id(str): The user to check.
-        Raises:
-            AuthError if the user was never in the room.
-        Returns:
-            A deferred membership event for the user if the user was in the
-            room. This will be the join event if they are currently joined to
-            the room. This will be the leave event if they have left the room.
-        """
-        member = yield self.state.get_current_state(
-            room_id=room_id, event_type=EventTypes.Member, state_key=user_id
-        )
         membership = member.membership if member else None
 
-        if membership not in (Membership.JOIN, Membership.LEAVE):
-            raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+        if membership == Membership.JOIN:
+            return member
 
-        if membership == Membership.LEAVE:
+        # XXX this looks totally bogus. Why do we not allow users who have been banned,
+        # or those who were members previously and have been re-invited?
+        if allow_departed_users and membership == Membership.LEAVE:
             forgot = yield self.store.did_forget(user_id, room_id)
-            if forgot:
-                raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
+            if not forgot:
+                return member
 
-        return member
+        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
     @defer.inlineCallbacks
     def check_host_in_room(self, room_id, host):
         with Measure(self.clock, "check_host_in_room"):
             latest_event_ids = yield self.store.is_host_joined(room_id, host)
             return latest_event_ids
-
-    def _check_joined_room(self, member, user_id, room_id):
-        if not member or member.membership != Membership.JOIN:
-            raise AuthError(
-                403, "User %s not in room %s (%s)" % (user_id, room_id, repr(member))
-            )
 
     def can_federate(self, event, auth_events):
         creation_event = auth_events.get((EventTypes.Create, ""))
@@ -165,19 +163,25 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def get_user_by_req(
-        self, request, allow_guest=False, rights="access", allow_expired=False
+        self,
+        request: Request,
+        allow_guest: bool = False,
+        rights: str = "access",
+        allow_expired: bool = False,
     ):
         """ Get a registered user's ID.
 
         Args:
-            request - An HTTP request with an access_token query parameter.
-            allow_expired - Whether to allow the request through even if the account is
-                expired. If true, Synapse will still require an access token to be
-                provided but won't check if the account it belongs to has expired. This
-                works thanks to /login delivering access tokens regardless of accounts'
-                expiration.
+            request: An HTTP request with an access_token query parameter.
+            allow_guest: If False, will raise an AuthError if the user making the
+                request is a guest.
+            rights: The operation being performed; the access token must allow this
+            allow_expired: If True, allow the request through even if the account
+                is expired, or session token lifetime has ended. Note that
+                /login will deliver access tokens regardless of expiration.
+
         Returns:
-            defer.Deferred: resolves to a ``synapse.types.Requester`` object
+            defer.Deferred: resolves to a `synapse.types.Requester` object
         Raises:
             InvalidClientCredentialsError if no user by that token exists or the token
                 is invalid.
@@ -197,7 +201,7 @@ class Auth(object):
                 opentracing.set_tag("authenticated_entity", user_id)
                 opentracing.set_tag("appservice_id", app_service.id)
 
-                if ip_addr and self.hs.config.track_appservice_user_ips:
+                if ip_addr and self._track_appservice_user_ips:
                     yield self.store.insert_client_ip(
                         user_id=user_id,
                         access_token=access_token,
@@ -208,7 +212,9 @@ class Auth(object):
 
                 return synapse.types.create_requester(user_id, app_service=app_service)
 
-            user_info = yield self.get_user_by_access_token(access_token, rights)
+            user_info = yield self.get_user_by_access_token(
+                access_token, rights, allow_expired=allow_expired
+            )
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -283,13 +289,17 @@ class Auth(object):
         return user_id, app_service
 
     @defer.inlineCallbacks
-    def get_user_by_access_token(self, token, rights="access"):
+    def get_user_by_access_token(
+        self, token: str, rights: str = "access", allow_expired: bool = False,
+    ):
         """ Validate access token and get user_id from it
 
         Args:
-            token (str): The access token to get the user by.
-            rights (str): The operation being performed; the access token must
-                allow this.
+            token: The access token to get the user by
+            rights: The operation being performed; the access token must
+                allow this
+            allow_expired: If False, raises an InvalidClientTokenError
+                if the token is expired
         Returns:
             Deferred[dict]: dict that includes:
                `user` (UserID)
@@ -297,8 +307,10 @@ class Auth(object):
                `token_id` (int|None): access token id. May be None if guest
                `device_id` (str|None): device corresponding to access token
         Raises:
+            InvalidClientTokenError if a user by that token exists, but the token is
+                expired
             InvalidClientCredentialsError if no user by that token exists or the token
-                is invalid.
+                is invalid
         """
 
         if rights == "access":
@@ -307,7 +319,8 @@ class Auth(object):
             if r:
                 valid_until_ms = r["valid_until_ms"]
                 if (
-                    valid_until_ms is not None
+                    not allow_expired
+                    and valid_until_ms is not None
                     and valid_until_ms < self.clock.time_msec()
                 ):
                     # there was a valid access token, but it has expired.
@@ -460,7 +473,7 @@ class Auth(object):
         # access_tokens include a nonce for uniqueness: any value is acceptable
         v.satisfy_general(lambda c: c.startswith("nonce = "))
 
-        v.verify(macaroon, self.hs.config.macaroon_secret_key)
+        v.verify(macaroon, self._macaroon_secret_key)
 
     def _verify_expiry(self, caveat):
         prefix = "time < "
@@ -509,10 +522,7 @@ class Auth(object):
         return self.store.is_server_admin(user)
 
     def compute_auth_events(
-        self,
-        event,
-        current_state_ids: Dict[Tuple[str, str], str],
-        for_verification: bool = False,
+        self, event, current_state_ids: StateMap[str], for_verification: bool = False,
     ):
         """Given an event and current state return the list of event IDs used
         to auth an event.
@@ -546,27 +556,26 @@ class Auth(object):
 
         return defer.succeed(auth_ids)
 
-    @defer.inlineCallbacks
-    def check_can_change_room_list(self, room_id, user):
-        """Check if the user is allowed to edit the room's entry in the
+    async def check_can_change_room_list(self, room_id: str, user: UserID):
+        """Determine whether the user is allowed to edit the room's entry in the
         published room list.
 
         Args:
-            room_id (str)
-            user (UserID)
+            room_id
+            user
         """
 
-        is_admin = yield self.is_server_admin(user)
+        is_admin = await self.is_server_admin(user)
         if is_admin:
             return True
 
         user_id = user.to_string()
-        yield self.check_joined_room(room_id, user_id)
+        await self.check_user_in_room(room_id, user_id)
 
         # We currently require the user is a "moderator" in the room. We do this
         # by checking if they would (theoretically) be able to change the
-        # m.room.aliases events
-        power_level_event = yield self.state.get_current_state(
+        # m.room.canonical_alias events
+        power_level_event = await self.state.get_current_state(
             room_id, EventTypes.PowerLevels, ""
         )
 
@@ -575,19 +584,14 @@ class Auth(object):
             auth_events[(EventTypes.PowerLevels, "")] = power_level_event
 
         send_level = event_auth.get_send_level(
-            EventTypes.Aliases, "", power_level_event
+            EventTypes.CanonicalAlias, "", power_level_event
         )
         user_level = event_auth.get_user_power_level(user_id, auth_events)
 
-        if user_level < send_level:
-            raise AuthError(
-                403,
-                "This server requires you to be a moderator in the room to"
-                " edit its room list entry",
-            )
+        return user_level >= send_level
 
     @staticmethod
-    def has_access_token(request):
+    def has_access_token(request: Request):
         """Checks if the request has an access_token.
 
         Returns:
@@ -598,7 +602,7 @@ class Auth(object):
         return bool(query_params) or bool(auth_headers)
 
     @staticmethod
-    def get_access_token_from_request(request):
+    def get_access_token_from_request(request: Request):
         """Extracts the access_token from the request.
 
         Args:
@@ -634,9 +638,17 @@ class Auth(object):
             return query_params[0].decode("ascii")
 
     @defer.inlineCallbacks
-    def check_in_room_or_world_readable(self, room_id, user_id):
+    def check_user_in_room_or_world_readable(
+        self, room_id: str, user_id: str, allow_departed_users: bool = False
+    ):
         """Checks that the user is or was in the room or the room is world
         readable. If it isn't then an exception is raised.
+
+        Args:
+            room_id: room to check
+            user_id: user to check
+            allow_departed_users: if True, accept users that were previously
+                members but have now departed
 
         Returns:
             Deferred[tuple[str, str|None]]: Resolves to the current membership of
@@ -646,12 +658,14 @@ class Auth(object):
         """
 
         try:
-            # check_user_was_in_room will return the most recent membership
+            # check_user_in_room will return the most recent membership
             # event for the user if:
             #  * The user is a non-guest user, and was ever in the room
             #  * The user is a guest user, and has joined the room
             # else it will throw.
-            member_event = yield self.check_user_was_in_room(room_id, user_id)
+            member_event = yield self.check_user_in_room(
+                room_id, user_id, allow_departed_users=allow_departed_users
+            )
             return member_event.membership, member_event.event_id
         except AuthError:
             visibility = yield self.state.get_current_state(
@@ -663,74 +677,10 @@ class Auth(object):
             ):
                 return Membership.JOIN, None
             raise AuthError(
-                403, "Guest access not allowed", errcode=Codes.GUEST_ACCESS_FORBIDDEN
-            )
-
-    @defer.inlineCallbacks
-    def check_auth_blocking(self, user_id=None, threepid=None, user_type=None):
-        """Checks if the user should be rejected for some external reason,
-        such as monthly active user limiting or global disable flag
-
-        Args:
-            user_id(str|None): If present, checks for presence against existing
-                MAU cohort
-
-            threepid(dict|None): If present, checks for presence against configured
-                reserved threepid. Used in cases where the user is trying register
-                with a MAU blocked server, normally they would be rejected but their
-                threepid is on the reserved list. user_id and
-                threepid should never be set at the same time.
-
-            user_type(str|None): If present, is used to decide whether to check against
-                certain blocking reasons like MAU.
-        """
-
-        # Never fail an auth check for the server notices users or support user
-        # This can be a problem where event creation is prohibited due to blocking
-        if user_id is not None:
-            if user_id == self.hs.config.server_notices_mxid:
-                return
-            if (yield self.store.is_support_user(user_id)):
-                return
-
-        if self.hs.config.hs_disabled:
-            raise ResourceLimitError(
                 403,
-                self.hs.config.hs_disabled_message,
-                errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                admin_contact=self.hs.config.admin_contact,
-                limit_type=LimitBlockingTypes.HS_DISABLED,
+                "User %s not in room %s, and room previews are disabled"
+                % (user_id, room_id),
             )
-        if self.hs.config.limit_usage_by_mau is True:
-            assert not (user_id and threepid)
 
-            # If the user is already part of the MAU cohort or a trial user
-            if user_id:
-                timestamp = yield self.store.user_last_seen_monthly_active(user_id)
-                if timestamp:
-                    return
-
-                is_trial = yield self.store.is_trial_user(user_id)
-                if is_trial:
-                    return
-            elif threepid:
-                # If the user does not exist yet, but is signing up with a
-                # reserved threepid then pass auth check
-                if is_threepid_reserved(
-                    self.hs.config.mau_limits_reserved_threepids, threepid
-                ):
-                    return
-            elif user_type == UserTypes.SUPPORT:
-                # If the user does not exist yet and is of type "support",
-                # allow registration. Support users are excluded from MAU checks.
-                return
-            # Else if there is no room in the MAU bucket, bail
-            current_mau = yield self.store.get_monthly_active_count()
-            if current_mau >= self.hs.config.max_mau_value:
-                raise ResourceLimitError(
-                    403,
-                    "Monthly Active User Limit Exceeded",
-                    admin_contact=self.hs.config.admin_contact,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
-                    limit_type=LimitBlockingTypes.MONTHLY_ACTIVE_USER,
-                )
+    def check_auth_blocking(self, *args, **kwargs):
+        return self._auth_blocking.check_auth_blocking(*args, **kwargs)

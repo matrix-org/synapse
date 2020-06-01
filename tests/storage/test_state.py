@@ -45,7 +45,10 @@ class StateStoreTestCase(tests.unittest.TestCase):
         self.room = RoomID.from_string("!abc123:test")
 
         yield self.store.store_room(
-            self.room.to_string(), room_creator_user_id="@creator:text", is_public=True
+            self.room.to_string(),
+            room_creator_user_id="@creator:text",
+            is_public=True,
+            room_version=RoomVersions.V1,
         )
 
     @defer.inlineCallbacks
@@ -391,7 +394,7 @@ class StateStoreTestCase(tests.unittest.TestCase):
         ) = self.state_datastore._state_group_cache.get(group)
 
         self.assertEqual(is_all, False)
-        self.assertEqual(known_absent, set([(e1.type, e1.state_key)]))
+        self.assertEqual(known_absent, {(e1.type, e1.state_key)})
         self.assertDictEqual(state_dict_ids, {(e1.type, e1.state_key): e1.event_id})
 
         ############################################

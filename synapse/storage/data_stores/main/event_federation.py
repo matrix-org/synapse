@@ -14,12 +14,9 @@
 # limitations under the License.
 import itertools
 import logging
-import random
+from typing import Dict, List, Optional, Set, Tuple
 
-from six.moves import range
 from six.moves.queue import Empty, PriorityQueue
-
-from unpaddedbase64 import encode_base64
 
 from twisted.internet import defer
 
@@ -30,6 +27,7 @@ from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.data_stores.main.signatures import SignatureWorkerStore
 from synapse.storage.database import Database
 from synapse.util.caches.descriptors import cached
+from synapse.util.iterutils import batch_iter
 
 logger = logging.getLogger(__name__)
 
@@ -49,21 +47,37 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             event_ids, include_given=include_given
         ).addCallback(self.get_events_as_list)
 
-    def get_auth_chain_ids(self, event_ids, include_given=False):
+    def get_auth_chain_ids(
+        self,
+        event_ids: List[str],
+        include_given: bool = False,
+        ignore_events: Optional[Set[str]] = None,
+    ):
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
-            event_ids (list): state events
-            include_given (bool): include the given events in result
+            event_ids: state events
+            include_given: include the given events in result
+            ignore_events: Set of events to exclude from the returned auth
+                chain. This is useful if the caller will just discard the
+                given events anyway, and saves us from figuring out their auth
+                chains if not required.
 
         Returns:
             list of event_ids
         """
         return self.db.runInteraction(
-            "get_auth_chain_ids", self._get_auth_chain_ids_txn, event_ids, include_given
+            "get_auth_chain_ids",
+            self._get_auth_chain_ids_txn,
+            event_ids,
+            include_given,
+            ignore_events,
         )
 
-    def _get_auth_chain_ids_txn(self, txn, event_ids, include_given):
+    def _get_auth_chain_ids_txn(self, txn, event_ids, include_given, ignore_events):
+        if ignore_events is None:
+            ignore_events = set()
+
         if include_given:
             results = set(event_ids)
         else:
@@ -74,21 +88,177 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         front = set(event_ids)
         while front:
             new_front = set()
-            front_list = list(front)
-            chunks = [front_list[x : x + 100] for x in range(0, len(front), 100)]
-            for chunk in chunks:
+            for chunk in batch_iter(front, 100):
                 clause, args = make_in_list_sql_clause(
                     txn.database_engine, "event_id", chunk
                 )
-                txn.execute(base_sql + clause, list(args))
-                new_front.update([r[0] for r in txn])
+                txn.execute(base_sql + clause, args)
+                new_front.update(r[0] for r in txn)
 
+            new_front -= ignore_events
             new_front -= results
 
             front = new_front
             results.update(front)
 
         return list(results)
+
+    def get_auth_chain_difference(self, state_sets: List[Set[str]]):
+        """Given sets of state events figure out the auth chain difference (as
+        per state res v2 algorithm).
+
+        This equivalent to fetching the full auth chain for each set of state
+        and returning the events that don't appear in each and every auth
+        chain.
+
+        Returns:
+            Deferred[Set[str]]
+        """
+
+        return self.db.runInteraction(
+            "get_auth_chain_difference",
+            self._get_auth_chain_difference_txn,
+            state_sets,
+        )
+
+    def _get_auth_chain_difference_txn(
+        self, txn, state_sets: List[Set[str]]
+    ) -> Set[str]:
+
+        # Algorithm Description
+        # ~~~~~~~~~~~~~~~~~~~~~
+        #
+        # The idea here is to basically walk the auth graph of each state set in
+        # tandem, keeping track of which auth events are reachable by each state
+        # set. If we reach an auth event we've already visited (via a different
+        # state set) then we mark that auth event and all ancestors as reachable
+        # by the state set. This requires that we keep track of the auth chains
+        # in memory.
+        #
+        # Doing it in a such a way means that we can stop early if all auth
+        # events we're currently walking are reachable by all state sets.
+        #
+        # *Note*: We can't stop walking an event's auth chain if it is reachable
+        # by all state sets. This is because other auth chains we're walking
+        # might be reachable only via the original auth chain. For example,
+        # given the following auth chain:
+        #
+        #       A -> C -> D -> E
+        #           /         /
+        #       B -´---------´
+        #
+        # and state sets {A} and {B} then walking the auth chains of A and B
+        # would immediately show that C is reachable by both. However, if we
+        # stopped at C then we'd only reach E via the auth chain of B and so E
+        # would errornously get included in the returned difference.
+        #
+        # The other thing that we do is limit the number of auth chains we walk
+        # at once, due to practical limits (i.e. we can only query the database
+        # with a limited set of parameters). We pick the auth chains we walk
+        # each iteration based on their depth, in the hope that events with a
+        # lower depth are likely reachable by those with higher depths.
+        #
+        # We could use any ordering that we believe would give a rough
+        # topological ordering, e.g. origin server timestamp. If the ordering
+        # chosen is not topological then the algorithm still produces the right
+        # result, but perhaps a bit more inefficiently. This is why it is safe
+        # to use "depth" here.
+
+        initial_events = set(state_sets[0]).union(*state_sets[1:])
+
+        # Dict from events in auth chains to which sets *cannot* reach them.
+        # I.e. if the set is empty then all sets can reach the event.
+        event_to_missing_sets = {
+            event_id: {i for i, a in enumerate(state_sets) if event_id not in a}
+            for event_id in initial_events
+        }
+
+        # The sorted list of events whose auth chains we should walk.
+        search = []  # type: List[Tuple[int, str]]
+
+        # We need to get the depth of the initial events for sorting purposes.
+        sql = """
+            SELECT depth, event_id FROM events
+            WHERE %s
+        """
+        # the list can be huge, so let's avoid looking them all up in one massive
+        # query.
+        for batch in batch_iter(initial_events, 1000):
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "event_id", batch
+            )
+            txn.execute(sql % (clause,), args)
+
+            # I think building a temporary list with fetchall is more efficient than
+            # just `search.extend(txn)`, but this is unconfirmed
+            search.extend(txn.fetchall())
+
+        # sort by depth
+        search.sort()
+
+        # Map from event to its auth events
+        event_to_auth_events = {}  # type: Dict[str, Set[str]]
+
+        base_sql = """
+            SELECT a.event_id, auth_id, depth
+            FROM event_auth AS a
+            INNER JOIN events AS e ON (e.event_id = a.auth_id)
+            WHERE
+        """
+
+        while search:
+            # Check whether all our current walks are reachable by all state
+            # sets. If so we can bail.
+            if all(not event_to_missing_sets[eid] for _, eid in search):
+                break
+
+            # Fetch the auth events and their depths of the N last events we're
+            # currently walking
+            search, chunk = search[:-100], search[-100:]
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "a.event_id", [e_id for _, e_id in chunk]
+            )
+            txn.execute(base_sql + clause, args)
+
+            for event_id, auth_event_id, auth_event_depth in txn:
+                event_to_auth_events.setdefault(event_id, set()).add(auth_event_id)
+
+                sets = event_to_missing_sets.get(auth_event_id)
+                if sets is None:
+                    # First time we're seeing this event, so we add it to the
+                    # queue of things to fetch.
+                    search.append((auth_event_depth, auth_event_id))
+
+                    # Assume that this event is unreachable from any of the
+                    # state sets until proven otherwise
+                    sets = event_to_missing_sets[auth_event_id] = set(
+                        range(len(state_sets))
+                    )
+                else:
+                    # We've previously seen this event, so look up its auth
+                    # events and recursively mark all ancestors as reachable
+                    # by the current event's state set.
+                    a_ids = event_to_auth_events.get(auth_event_id)
+                    while a_ids:
+                        new_aids = set()
+                        for a_id in a_ids:
+                            event_to_missing_sets[a_id].intersection_update(
+                                event_to_missing_sets[event_id]
+                            )
+
+                            b = event_to_auth_events.get(a_id)
+                            if b:
+                                new_aids.update(b)
+
+                        a_ids = new_aids
+
+                # Mark that the auth event is reachable by the approriate sets.
+                sets.intersection_update(event_to_missing_sets[event_id])
+
+            search.sort()
+
+        # Return all events where not all sets can reach them.
+        return {eid for eid, n in event_to_missing_sets.items() if n}
 
     def get_oldest_events_in_room(self, room_id):
         return self.db.runInteraction(
@@ -148,8 +318,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             retcol="event_id",
         )
 
-    @defer.inlineCallbacks
-    def get_prev_events_for_room(self, room_id):
+    def get_prev_events_for_room(self, room_id: str):
         """
         Gets a subset of the current forward extremities in the given room.
 
@@ -160,40 +329,29 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             room_id (str): room_id
 
         Returns:
-            Deferred[list[(str, dict[str, str], int)]]
-                for each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
-        """
-        res = yield self.get_latest_event_ids_and_hashes_in_room(room_id)
-        if len(res) > 10:
-            # Sort by reverse depth, so we point to the most recent.
-            res.sort(key=lambda a: -a[2])
+            Deferred[List[str]]: the event ids of the forward extremites
 
-            # we use half of the limit for the actual most recent events, and
-            # the other half to randomly point to some of the older events, to
-            # make sure that we don't completely ignore the older events.
-            res = res[0:5] + random.sample(res[5:], 5)
-
-        return res
-
-    def get_latest_event_ids_and_hashes_in_room(self, room_id):
-        """
-        Gets the current forward extremities in the given room
-
-        Args:
-            room_id (str): room_id
-
-        Returns:
-            Deferred[list[(str, dict[str, str], int)]]
-                for each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
         """
 
         return self.db.runInteraction(
-            "get_latest_event_ids_and_hashes_in_room",
-            self._get_latest_event_ids_and_hashes_in_room,
-            room_id,
+            "get_prev_events_for_room", self._get_prev_events_for_room_txn, room_id
         )
+
+    def _get_prev_events_for_room_txn(self, txn, room_id: str):
+        # we just use the 10 newest events. Older events will become
+        # prev_events of future events.
+
+        sql = """
+            SELECT e.event_id FROM event_forward_extremities AS f
+            INNER JOIN events AS e USING (event_id)
+            WHERE f.room_id = ?
+            ORDER BY e.depth DESC
+            LIMIT 10
+        """
+
+        txn.execute(sql, (room_id,))
+
+        return [row[0] for row in txn]
 
     def get_rooms_with_many_extremities(self, min_count, limit, room_id_filter):
         """Get the top rooms with at least N extremities.
@@ -242,27 +400,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             retcol="event_id",
             desc="get_latest_event_ids_in_room",
         )
-
-    def _get_latest_event_ids_and_hashes_in_room(self, txn, room_id):
-        sql = (
-            "SELECT e.event_id, e.depth FROM events as e "
-            "INNER JOIN event_forward_extremities as f "
-            "ON e.event_id = f.event_id "
-            "AND e.room_id = f.room_id "
-            "WHERE f.room_id = ?"
-        )
-
-        txn.execute(sql, (room_id,))
-
-        results = []
-        for event_id, depth in txn.fetchall():
-            hashes = self._get_event_reference_hashes_txn(txn, event_id)
-            prev_hashes = {
-                k: encode_base64(v) for k, v in hashes.items() if k == "sha256"
-            }
-            results.append((event_id, prev_hashes, depth))
-
-        return results
 
     def get_min_depth(self, room_id):
         """ For hte given room, get the minimum depth we have seen for it.
@@ -446,7 +583,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     query, (room_id, event_id, False, limit - len(event_results))
                 )
 
-                new_results = set(t[0] for t in txn) - seen_events
+                new_results = {t[0] for t in txn} - seen_events
 
                 new_front |= new_results
                 seen_events |= new_results
@@ -501,89 +638,6 @@ class EventFederationStore(EventFederationWorkerStore):
 
         hs.get_clock().looping_call(
             self._delete_old_forward_extrem_cache, 60 * 60 * 1000
-        )
-
-    def _update_min_depth_for_room_txn(self, txn, room_id, depth):
-        min_depth = self._get_min_depth_interaction(txn, room_id)
-
-        if min_depth and depth >= min_depth:
-            return
-
-        self.db.simple_upsert_txn(
-            txn,
-            table="room_depth",
-            keyvalues={"room_id": room_id},
-            values={"min_depth": depth},
-        )
-
-    def _handle_mult_prev_events(self, txn, events):
-        """
-        For the given event, update the event edges table and forward and
-        backward extremities tables.
-        """
-        self.db.simple_insert_many_txn(
-            txn,
-            table="event_edges",
-            values=[
-                {
-                    "event_id": ev.event_id,
-                    "prev_event_id": e_id,
-                    "room_id": ev.room_id,
-                    "is_state": False,
-                }
-                for ev in events
-                for e_id in ev.prev_event_ids()
-            ],
-        )
-
-        self._update_backward_extremeties(txn, events)
-
-    def _update_backward_extremeties(self, txn, events):
-        """Updates the event_backward_extremities tables based on the new/updated
-        events being persisted.
-
-        This is called for new events *and* for events that were outliers, but
-        are now being persisted as non-outliers.
-
-        Forward extremities are handled when we first start persisting the events.
-        """
-        events_by_room = {}
-        for ev in events:
-            events_by_room.setdefault(ev.room_id, []).append(ev)
-
-        query = (
-            "INSERT INTO event_backward_extremities (event_id, room_id)"
-            " SELECT ?, ? WHERE NOT EXISTS ("
-            " SELECT 1 FROM event_backward_extremities"
-            " WHERE event_id = ? AND room_id = ?"
-            " )"
-            " AND NOT EXISTS ("
-            " SELECT 1 FROM events WHERE event_id = ? AND room_id = ? "
-            " AND outlier = ?"
-            " )"
-        )
-
-        txn.executemany(
-            query,
-            [
-                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
-                for ev in events
-                for e_id in ev.prev_event_ids()
-                if not ev.internal_metadata.is_outlier()
-            ],
-        )
-
-        query = (
-            "DELETE FROM event_backward_extremities"
-            " WHERE event_id = ? AND room_id = ?"
-        )
-        txn.executemany(
-            query,
-            [
-                (ev.event_id, ev.room_id)
-                for ev in events
-                if not ev.internal_metadata.is_outlier()
-            ],
         )
 
     def _delete_old_forward_extrem_cache(self):

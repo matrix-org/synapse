@@ -16,21 +16,21 @@
 # limitations under the License.
 import logging
 import random
-
-from six import PY2
-from six.moves import builtins
+from abc import ABCMeta
+from typing import Any, Optional
 
 from canonicaljson import json
 
 from synapse.storage.database import LoggingTransaction  # noqa: F401
 from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
 from synapse.storage.database import Database
-from synapse.types import get_domain_from_id
+from synapse.types import Collection, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
 
-class SQLBaseStore(object):
+# some of our subclasses have abstract methods, so we use the ABCMeta metaclass.
+class SQLBaseStore(metaclass=ABCMeta):
     """Base class for data stores that holds helper functions.
 
     Note that multiple instances of this class will exist as there will be one
@@ -44,6 +44,9 @@ class SQLBaseStore(object):
         self.db = database
         self.rand = random.SystemRandom()
 
+    def process_replication_rows(self, stream_name, instance_name, token, rows):
+        pass
+
     def _invalidate_state_caches(self, room_id, members_changed):
         """Invalidates caches that are based on the current state, but does
         not stream invalidations down replication.
@@ -53,7 +56,7 @@ class SQLBaseStore(object):
             members_changed (iterable[str]): The user_ids of members that have
                 changed
         """
-        for host in set(get_domain_from_id(u) for u in members_changed):
+        for host in {get_domain_from_id(u) for u in members_changed}:
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
             self._attempt_to_invalidate_cache("was_host_joined", (room_id, host))
 
@@ -61,17 +64,24 @@ class SQLBaseStore(object):
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))
         self._attempt_to_invalidate_cache("get_current_state_ids", (room_id,))
 
-    def _attempt_to_invalidate_cache(self, cache_name, key):
+    def _attempt_to_invalidate_cache(
+        self, cache_name: str, key: Optional[Collection[Any]]
+    ):
         """Attempts to invalidate the cache of the given name, ignoring if the
         cache doesn't exist. Mainly used for invalidating caches on workers,
         where they may not have the cache.
 
         Args:
-            cache_name (str)
-            key (tuple)
+            cache_name
+            key: Entry to invalidate. If None then invalidates the entire
+                cache.
         """
+
         try:
-            getattr(self, cache_name).invalidate(key)
+            if key is None:
+                getattr(self, cache_name).invalidate_all()
+            else:
+                getattr(self, cache_name).invalidate(tuple(key))
         except AttributeError:
             # We probably haven't pulled in the cache in this worker,
             # which is fine.
@@ -89,11 +99,6 @@ def db_to_json(db_content):
     # cast to bytes to decode
     if isinstance(db_content, memoryview):
         db_content = db_content.tobytes()
-
-    # psycopg2 on Python 2 returns buffer objects, which we need to cast to
-    # bytes to decode
-    if PY2 and isinstance(db_content, builtins.buffer):
-        db_content = bytes(db_content)
 
     # Decode it to a Unicode string before feeding it to json.loads, so we
     # consistenty get a Unicode-containing object out.

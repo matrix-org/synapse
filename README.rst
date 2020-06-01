@@ -1,3 +1,11 @@
+================
+Synapse |shield|
+================
+
+.. |shield| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
+  :alt: (get support on #synapse:matrix.org)
+  :target: https://matrix.to/#/#synapse:matrix.org
+
 .. contents::
 
 Introduction
@@ -75,6 +83,17 @@ at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 Thanks for using Matrix!
 
 [1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`_.
+
+
+Support
+=======
+
+For support installing or managing Synapse, please join |room|_ (from a matrix.org
+account if necessary) and ask questions there. We do not use GitHub issues for
+support requests, only for bug reports and feature requests.
+
+.. |room| replace:: ``#synapse:matrix.org``
+.. _room: https://matrix.to/#/#synapse:matrix.org
 
 
 Synapse Installation
@@ -272,7 +291,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python3 env
     source env/bin/activate
-    python -m pip install --no-use-pep517 -e .[all]
+    python -m pip install --no-use-pep517 -e ".[all]"
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -393,4 +412,4 @@ something like the following in their logs::
     2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
 
 This is normally caused by a misconfiguration in your reverse-proxy. See
-`<docs/reverse_proxy.rst>`_ and double-check that your settings are correct.
+`<docs/reverse_proxy.md>`_ and double-check that your settings are correct.

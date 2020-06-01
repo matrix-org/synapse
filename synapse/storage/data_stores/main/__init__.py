@@ -20,18 +20,20 @@ import logging
 import time
 
 from synapse.api.constants import PresenceState
+from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
-    ChainedIdGenerator,
     IdGenerator,
+    MultiWriterIdGenerator,
     StreamIdGenerator,
 )
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from .account_data import AccountDataStore
 from .appservice import ApplicationServiceStore, ApplicationServiceTransactionStore
-from .cache import CacheInvalidationStore
+from .cache import CacheInvalidationWorkerStore
+from .censor_events import CensorEventsStore
 from .client_ips import ClientIpStore
 from .deviceinbox import DeviceInboxStore
 from .devices import DeviceStore
@@ -40,16 +42,17 @@ from .e2e_room_keys import EndToEndRoomKeyStore
 from .end_to_end_keys import EndToEndKeyStore
 from .event_federation import EventFederationStore
 from .event_push_actions import EventPushActionsStore
-from .events import EventsStore
 from .events_bg_updates import EventsBackgroundUpdatesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
 from .media_repository import MediaRepositoryStore
+from .metrics import ServerMetricsStore
 from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
 from .presence import PresenceStore, UserPresenceState
 from .profile import ProfileStore
+from .purge_events import PurgeEventsStore
 from .push_rule import PushRuleStore
 from .pusher import PusherStore
 from .receipts import ReceiptsStore
@@ -65,6 +68,7 @@ from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
 from .transactions import TransactionStore
+from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
 
@@ -85,7 +89,7 @@ class DataStore(
     StateStore,
     SignatureStore,
     ApplicationServiceStore,
-    EventsStore,
+    PurgeEventsStore,
     EventFederationStore,
     MediaRepositoryStore,
     RejectionsStore,
@@ -110,36 +114,16 @@ class DataStore(
     MonthlyActiveUsersStore,
     StatsStore,
     RelationsStore,
-    CacheInvalidationStore,
+    CensorEventsStore,
+    UIAuthStore,
+    CacheInvalidationWorkerStore,
+    ServerMetricsStore,
 ):
     def __init__(self, database: Database, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        all_users_native = are_all_users_on_domain(
-            db_conn.cursor(), database.engine, hs.hostname
-        )
-        if not all_users_native:
-            raise Exception(
-                "Found users in database not native to %s!\n"
-                "You cannot changed a synapse server_name after it's been configured"
-                % (hs.hostname,)
-            )
-
-        self._stream_id_gen = StreamIdGenerator(
-            db_conn,
-            "events",
-            "stream_ordering",
-            extra_tables=[("local_invites", "stream_id")],
-        )
-        self._backfill_id_gen = StreamIdGenerator(
-            db_conn,
-            "events",
-            "stream_ordering",
-            step=-1,
-            extra_tables=[("ex_outlier_stream", "event_stream_ordering")],
-        )
         self._presence_id_gen = StreamIdGenerator(
             db_conn, "presence_stream", "stream_id"
         )
@@ -153,7 +137,10 @@ class DataStore(
             db_conn,
             "device_lists_stream",
             "stream_id",
-            extra_tables=[("user_signature_stream", "stream_id")],
+            extra_tables=[
+                ("user_signature_stream", "stream_id"),
+                ("device_lists_outbound_pokes", "stream_id"),
+            ],
         )
         self._cross_signing_id_gen = StreamIdGenerator(
             db_conn, "e2e_cross_signing_keys", "stream_id"
@@ -163,9 +150,6 @@ class DataStore(
         self._event_reports_id_gen = IdGenerator(db_conn, "event_reports", "id")
         self._push_rule_id_gen = IdGenerator(db_conn, "push_rules", "id")
         self._push_rules_enable_id_gen = IdGenerator(db_conn, "push_rules_enable", "id")
-        self._push_rules_stream_id_gen = ChainedIdGenerator(
-            self._stream_id_gen, db_conn, "push_rules_stream", "stream_id"
-        )
         self._pushers_id_gen = StreamIdGenerator(
             db_conn, "pushers", "id", extra_tables=[("deleted_pushers", "stream_id")]
         )
@@ -174,8 +158,14 @@ class DataStore(
         )
 
         if isinstance(self.database_engine, PostgresEngine):
-            self._cache_id_gen = StreamIdGenerator(
-                db_conn, "cache_invalidation_stream", "stream_id"
+            self._cache_id_gen = MultiWriterIdGenerator(
+                db_conn,
+                database,
+                instance_name="master",
+                table="cache_invalidation_stream_by_instance",
+                instance_column="instance_name",
+                id_column="stream_id",
+                sequence_name="cache_invalidation_stream_seq",
             )
         else:
             self._cache_id_gen = None
@@ -509,7 +499,8 @@ class DataStore(
         self, start, limit, name=None, guests=True, deactivated=False
     ):
         """Function to retrieve a paginated list of users from
-        users list. This will return a json list of users.
+        users list. This will return a json list of users and the
+        total number of users matching the filter criteria.
 
         Args:
             start (int): start number to begin the query from
@@ -518,35 +509,44 @@ class DataStore(
             guests (bool): whether to in include guest users
             deactivated (bool): whether to include deactivated users
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            defer.Deferred: resolves to list[dict[str, Any]], int
         """
-        name_filter = {}
-        if name:
-            name_filter["name"] = "%" + name + "%"
 
-        attr_filter = {}
-        if not guests:
-            attr_filter["is_guest"] = False
-        if not deactivated:
-            attr_filter["deactivated"] = False
+        def get_users_paginate_txn(txn):
+            filters = []
+            args = []
 
-        return self.db.simple_select_list_paginate(
-            desc="get_users_paginate",
-            table="users",
-            orderby="name",
-            start=start,
-            limit=limit,
-            filters=name_filter,
-            keyvalues=attr_filter,
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "user_type",
-                "deactivated",
-            ],
-        )
+            if name:
+                filters.append("name LIKE ?")
+                args.append("%" + name + "%")
+
+            if not guests:
+                filters.append("is_guest = 0")
+
+            if not deactivated:
+                filters.append("deactivated = 0")
+
+            where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
+
+            sql = "SELECT COUNT(*) as total_users FROM users %s" % (where_clause)
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            args = [self.hs.config.server_name] + args + [limit, start]
+            sql = """
+                SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url
+                FROM users as u
+                LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
+                {}
+                ORDER BY u.name LIMIT ? OFFSET ?
+                """.format(
+                where_clause
+            )
+            txn.execute(sql, args)
+            users = self.db.cursor_to_dict(txn)
+            return users, count
+
+        return self.db.runInteraction("get_users_paginate_txn", get_users_paginate_txn)
 
     def search_users(self, term):
         """Function to search users list for one or more users with
@@ -567,13 +567,26 @@ class DataStore(
         )
 
 
-def are_all_users_on_domain(txn, database_engine, domain):
+def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig):
+    """Called before upgrading an existing database to check that it is broadly sane
+    compared with the configuration.
+    """
+    domain = config.server_name
+
     sql = database_engine.convert_param_style(
         "SELECT COUNT(*) FROM users WHERE name NOT LIKE ?"
     )
     pat = "%:" + domain
-    txn.execute(sql, (pat,))
-    num_not_matching = txn.fetchall()[0][0]
+    cur.execute(sql, (pat,))
+    num_not_matching = cur.fetchall()[0][0]
     if num_not_matching == 0:
-        return True
-    return False
+        return
+
+    raise Exception(
+        "Found users in database not native to %s!\n"
+        "You cannot changed a synapse server_name after it's been configured"
+        % (domain,)
+    )
+
+
+__all__ = ["DataStore", "check_database_before_upgrade"]

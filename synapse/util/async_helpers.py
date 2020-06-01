@@ -73,6 +73,10 @@ class ObservableDeferred(object):
         def errback(f):
             object.__setattr__(self, "_result", (False, f))
             while self._observers:
+                # This is a little bit of magic to correctly propagate stack
+                # traces when we `await` on one of the observer deferreds.
+                f.value.__failure__ = f
+
                 try:
                     # TODO: Handle errors here.
                     self._observers.pop().errback(f)
@@ -220,6 +224,18 @@ class Linearizer(object):
         self.key_to_defer = (
             {}
         )  # type: Dict[str, Sequence[Union[int, Dict[defer.Deferred, int]]]]
+
+    def is_queued(self, key) -> bool:
+        """Checks whether there is a process queued up waiting
+        """
+        entry = self.key_to_defer.get(key)
+        if not entry:
+            # No entry so nothing is waiting.
+            return False
+
+        # There are waiting deferreds only in the OrderedDict of deferreds is
+        # non-empty.
+        return bool(entry[1])
 
     def queue(self, key):
         # we avoid doing defer.inlineCallbacks here, so that cancellation works correctly.

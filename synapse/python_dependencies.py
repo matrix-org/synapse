@@ -1,6 +1,7 @@
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,7 +44,8 @@ REQUIREMENTS = [
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
     "canonicaljson>=1.1.3",
-    "signedjson>=1.0.0",
+    # we use the type definitions added in signedjson 1.1.
+    "signedjson>=1.1.0",
     "pynacl>=1.2.1",
     "idna>=2.5",
     # validating SSL certs for IP addresses requires service_identity 18.1.
@@ -90,12 +92,16 @@ CONDITIONAL_REQUIREMENTS = {
         'eliot<1.8.0;python_version<"3.5.3"',
     ],
     "saml2": ["pysaml2>=4.5.0"],
+    "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
     "test": ["mock>=2.0", "parameterized"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
+    # hiredis is not a *strict* dependency, but it makes things much faster.
+    # (if it is not installed, we fall back to slow code.)
+    "redis": ["txredisapi>=1.4.7", "hiredis"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]

@@ -19,94 +19,106 @@ from twisted.internet import defer
 from synapse.api.constants import UserTypes
 
 from tests import unittest
+from tests.unittest import default_config, override_config
 
 FORTY_DAYS = 40 * 24 * 60 * 60
 
 
+def gen_3pids(count):
+    """Generate `count` threepids as a list."""
+    return [
+        {"medium": "email", "address": "user%i@matrix.org" % i} for i in range(count)
+    ]
+
+
 class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
+    def default_config(self):
+        config = default_config("test")
 
-        hs = self.setup_test_homeserver()
-        self.store = hs.get_datastore()
-        hs.config.limit_usage_by_mau = True
-        hs.config.max_mau_value = 50
+        config.update({"limit_usage_by_mau": True, "max_mau_value": 50})
 
+        # apply any additional config which was specified via the override_config
+        # decorator.
+        if self._extra_config is not None:
+            config.update(self._extra_config)
+
+        return config
+
+    def prepare(self, reactor, clock, homeserver):
+        self.store = homeserver.get_datastore()
         # Advance the clock a bit
         reactor.advance(FORTY_DAYS)
 
-        return hs
-
+    @override_config({"max_mau_value": 3, "mau_limit_reserved_threepids": gen_3pids(3)})
     def test_initialise_reserved_users(self):
-        self.hs.config.max_mau_value = 5
+        threepids = self.hs.config.mau_limits_reserved_threepids
+
+        # register three users, of which two have reserved 3pids, and a third
+        # which is a support user.
         user1 = "@user1:server"
-        user1_email = "user1@matrix.org"
+        user1_email = threepids[0]["address"]
         user2 = "@user2:server"
-        user2_email = "user2@matrix.org"
+        user2_email = threepids[1]["address"]
         user3 = "@user3:server"
-        user3_email = "user3@matrix.org"
 
-        threepids = [
-            {"medium": "email", "address": user1_email},
-            {"medium": "email", "address": user2_email},
-            {"medium": "email", "address": user3_email},
-        ]
-        self.hs.config.mau_limits_reserved_threepids = threepids
-        # -1 because user3 is a support user and does not count
-        user_num = len(threepids) - 1
-
-        self.store.register_user(user_id=user1, password_hash=None)
-        self.store.register_user(user_id=user2, password_hash=None)
-        self.store.register_user(
-            user_id=user3, password_hash=None, user_type=UserTypes.SUPPORT
-        )
+        self.store.register_user(user_id=user1)
+        self.store.register_user(user_id=user2)
+        self.store.register_user(user_id=user3, user_type=UserTypes.SUPPORT)
         self.pump()
 
         now = int(self.hs.get_clock().time_msec())
         self.store.user_add_threepid(user1, "email", user1_email, now, now)
         self.store.user_add_threepid(user2, "email", user2_email, now, now)
 
+        # XXX why are we doing this here? this function is only run at startup
+        # so it is odd to re-run it here.
         self.store.db.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         self.pump()
 
-        active_count = self.store.get_monthly_active_count()
+        # the number of users we expect will be counted against the mau limit
+        # -1 because user3 is a support user and does not count
+        user_num = len(threepids) - 1
 
-        # Test total counts, ensure user3 (support user) is not counted
-        self.assertEquals(self.get_success(active_count), user_num)
+        # Check the number of active users. Ensure user3 (support user) is not counted
+        active_count = self.get_success(self.store.get_monthly_active_count())
+        self.assertEquals(active_count, user_num)
 
-        # Test user is marked as active
+        # Test each of the registered users is marked as active
         timestamp = self.store.user_last_seen_monthly_active(user1)
         self.assertTrue(self.get_success(timestamp))
         timestamp = self.store.user_last_seen_monthly_active(user2)
         self.assertTrue(self.get_success(timestamp))
 
-        # Test that users are never removed from the db.
+        # Test that users with reserved 3pids are not removed from the MAU table
+        # XXX some of this is redundant. poking things into the config shouldn't
+        # work, and in any case it's not obvious what we expect to happen when
+        # we advance the reactor.
         self.hs.config.max_mau_value = 0
-
         self.reactor.advance(FORTY_DAYS)
         self.hs.config.max_mau_value = 5
-
         self.store.reap_monthly_active_users()
         self.pump()
 
         active_count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(active_count), user_num)
 
-        # Test that regular users are removed from the db
+        # Add some more users and check they are counted as active
         ru_count = 2
         self.store.upsert_monthly_active_user("@ru1:server")
         self.store.upsert_monthly_active_user("@ru2:server")
         self.pump()
-
         active_count = self.store.get_monthly_active_count()
         self.assertEqual(self.get_success(active_count), user_num + ru_count)
-        self.hs.config.max_mau_value = user_num
+
+        # now run the reaper and check that the number of active users is reduced
+        # to max_mau_value
         self.store.reap_monthly_active_users()
         self.pump()
 
         active_count = self.store.get_monthly_active_count()
-        self.assertEquals(self.get_success(active_count), user_num)
+        self.assertEquals(self.get_success(active_count), 3)
 
     def test_can_insert_and_count_mau(self):
         count = self.store.get_monthly_active_count()
@@ -136,8 +148,8 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         result = self.store.user_last_seen_monthly_active(user_id3)
         self.assertNotEqual(self.get_success(result), 0)
 
+    @override_config({"max_mau_value": 5})
     def test_reap_monthly_active_users(self):
-        self.hs.config.max_mau_value = 5
         initial_users = 10
         for i in range(initial_users):
             self.store.upsert_monthly_active_user("@user%d:server" % i)
@@ -158,19 +170,19 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.store.get_monthly_active_count()
         self.assertEquals(self.get_success(count), 0)
 
+    # Note that below says mau_limit (no s), this is the name of the config
+    # value, although it gets stored on the config object as mau_limits.
+    @override_config({"max_mau_value": 5, "mau_limit_reserved_threepids": gen_3pids(5)})
     def test_reap_monthly_active_users_reserved_users(self):
         """ Tests that reaping correctly handles reaping where reserved users are
         present"""
-
-        self.hs.config.max_mau_value = 5
-        initial_users = 5
+        threepids = self.hs.config.mau_limits_reserved_threepids
+        initial_users = len(threepids)
         reserved_user_number = initial_users - 1
-        threepids = []
         for i in range(initial_users):
             user = "@user%d:server" % i
-            email = "user%d@example.com" % i
+            email = "user%d@matrix.org" % i
             self.get_success(self.store.upsert_monthly_active_user(user))
-            threepids.append({"medium": "email", "address": email})
             # Need to ensure that the most recent entries in the
             # monthly_active_users table are reserved
             now = int(self.hs.get_clock().time_msec())
@@ -182,7 +194,6 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
                     self.store.user_add_threepid(user, "email", email, now, now)
                 )
 
-        self.hs.config.mau_limits_reserved_threepids = threepids
         self.store.db.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
@@ -279,11 +290,11 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(self.get_success(count), 0)
 
+    # Note that the max_mau_value setting should not matter.
+    @override_config(
+        {"limit_usage_by_mau": False, "mau_stats_only": True, "max_mau_value": 1}
+    )
     def test_track_monthly_users_without_cap(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.mau_stats_only = True
-        self.hs.config.max_mau_value = 1  # should not matter
-
         count = self.store.get_monthly_active_count()
         self.assertEqual(0, self.get_success(count))
 
@@ -294,12 +305,53 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         count = self.store.get_monthly_active_count()
         self.assertEqual(2, self.get_success(count))
 
+    @override_config({"limit_usage_by_mau": False, "mau_stats_only": False})
     def test_no_users_when_not_tracking(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.mau_stats_only = False
         self.store.upsert_monthly_active_user = Mock()
 
         self.store.populate_monthly_active_users("@user:sever")
         self.pump()
 
         self.store.upsert_monthly_active_user.assert_not_called()
+
+    def test_get_monthly_active_count_by_service(self):
+        appservice1_user1 = "@appservice1_user1:example.com"
+        appservice1_user2 = "@appservice1_user2:example.com"
+
+        appservice2_user1 = "@appservice2_user1:example.com"
+        native_user1 = "@native_user1:example.com"
+
+        service1 = "service1"
+        service2 = "service2"
+        native = "native"
+
+        self.store.register_user(
+            user_id=appservice1_user1, password_hash=None, appservice_id=service1
+        )
+        self.store.register_user(
+            user_id=appservice1_user2, password_hash=None, appservice_id=service1
+        )
+        self.store.register_user(
+            user_id=appservice2_user1, password_hash=None, appservice_id=service2
+        )
+        self.store.register_user(user_id=native_user1, password_hash=None)
+        self.pump()
+
+        count = self.store.get_monthly_active_count_by_service()
+        self.assertEqual({}, self.get_success(count))
+
+        self.store.upsert_monthly_active_user(native_user1)
+        self.store.upsert_monthly_active_user(appservice1_user1)
+        self.store.upsert_monthly_active_user(appservice1_user2)
+        self.store.upsert_monthly_active_user(appservice2_user1)
+        self.pump()
+
+        count = self.store.get_monthly_active_count()
+        self.assertEqual(4, self.get_success(count))
+
+        count = self.store.get_monthly_active_count_by_service()
+        result = self.get_success(count)
+
+        self.assertEqual(2, result[service1])
+        self.assertEqual(1, result[service2])
+        self.assertEqual(1, result[native])

@@ -14,9 +14,11 @@
 # limitations under the License.
 
 import logging
+from typing import List
 
 from synapse.api.constants import Membership
-from synapse.types import RoomStreamToken
+from synapse.events import FrozenEvent
+from synapse.types import RoomStreamToken, StateMap
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -51,67 +53,16 @@ class AdminHandler(BaseHandler):
 
         return ret
 
-    async def get_users(self):
-        """Function to retrieve a list of users in users table.
-
-        Args:
-        Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
-        """
-        ret = await self.store.get_users()
-
+    async def get_user(self, user):
+        """Function to get user details"""
+        ret = await self.store.get_user_by_id(user.to_string())
+        if ret:
+            profile = await self.store.get_profileinfo(user.localpart)
+            threepids = await self.store.user_get_threepids(user.to_string())
+            ret["displayname"] = profile.display_name
+            ret["avatar_url"] = profile.avatar_url
+            ret["threepids"] = threepids
         return ret
-
-    async def get_users_paginate(self, start, limit, name, guests, deactivated):
-        """Function to retrieve a paginated list of users from
-        users list. This will return a json list of users.
-
-        Args:
-            start (int): start number to begin the query from
-            limit (int): number of rows to retrieve
-            name (string): filter for user names
-            guests (bool): whether to in include guest users
-            deactivated (bool): whether to include deactivated users
-        Returns:
-            defer.Deferred: resolves to json list[dict[str, Any]]
-        """
-        ret = await self.store.get_users_paginate(
-            start, limit, name, guests, deactivated
-        )
-
-        return ret
-
-    async def search_users(self, term):
-        """Function to search users list for one or more users with
-        the matched term.
-
-        Args:
-            term (str): search term
-        Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
-        """
-        ret = await self.store.search_users(term)
-
-        return ret
-
-    def get_user_server_admin(self, user):
-        """
-        Get the admin bit on a user.
-
-        Args:
-            user_id (UserID): the (necessarily local) user to manipulate
-        """
-        return self.store.is_server_admin(user)
-
-    def set_user_server_admin(self, user, admin):
-        """
-        Set the admin bit on a user.
-
-        Args:
-            user_id (UserID): the (necessarily local) user to manipulate
-            admin (bool): whether or not the user should be an admin of this server
-        """
-        return self.store.set_server_admin(user, admin)
 
     async def export_user_data(self, user_id, writer):
         """Write all data we have on the user to the given writer.
@@ -125,7 +76,7 @@ class AdminHandler(BaseHandler):
             The returned value is that returned by `writer.finished()`.
         """
         # Get all rooms the user is in or has been in
-        rooms = await self.store.get_rooms_for_user_where_membership_is(
+        rooms = await self.store.get_rooms_for_local_user_where_membership_is(
             user_id,
             membership_list=(
                 Membership.JOIN,
@@ -250,35 +201,26 @@ class ExfiltrationWriter(object):
     """Interface used to specify how to write exported data.
     """
 
-    def write_events(self, room_id, events):
+    def write_events(self, room_id: str, events: List[FrozenEvent]):
         """Write a batch of events for a room.
-
-        Args:
-            room_id (str)
-            events (list[FrozenEvent])
         """
         pass
 
-    def write_state(self, room_id, event_id, state):
+    def write_state(self, room_id: str, event_id: str, state: StateMap[FrozenEvent]):
         """Write the state at the given event in the room.
 
         This only gets called for backward extremities rather than for each
         event.
-
-        Args:
-            room_id (str)
-            event_id (str)
-            state (dict[tuple[str, str], FrozenEvent])
         """
         pass
 
-    def write_invite(self, room_id, event, state):
+    def write_invite(self, room_id: str, event: FrozenEvent, state: StateMap[dict]):
         """Write an invite for the room, with associated invite state.
 
         Args:
-            room_id (str)
-            event (FrozenEvent)
-            state (dict[tuple[str, str], dict]): A subset of the state at the
+            room_id
+            event
+            state: A subset of the state at the
                 invite, with a subset of the event keys (type, state_key
                 content and sender)
         """

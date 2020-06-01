@@ -15,8 +15,6 @@
 # limitations under the License.
 import json
 
-from mock import Mock
-
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.rest.client.v1 import login, room
@@ -36,29 +34,20 @@ class FilterTestCase(unittest.HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
-
-        hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock()
-        )
-        return hs
-
     def test_sync_argless(self):
         request, channel = self.make_request("GET", "/sync")
         self.render(request)
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
-            set(
-                [
-                    "next_batch",
-                    "rooms",
-                    "presence",
-                    "account_data",
-                    "to_device",
-                    "device_lists",
-                ]
-            ).issubset(set(channel.json_body.keys()))
+            {
+                "next_batch",
+                "rooms",
+                "presence",
+                "account_data",
+                "to_device",
+                "device_lists",
+            }.issubset(set(channel.json_body.keys()))
         )
 
     def test_sync_presence_disabled(self):
@@ -72,9 +61,13 @@ class FilterTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
-            set(
-                ["next_batch", "rooms", "account_data", "to_device", "device_lists"]
-            ).issubset(set(channel.json_body.keys()))
+            {
+                "next_batch",
+                "rooms",
+                "account_data",
+                "to_device",
+                "device_lists",
+            }.issubset(set(channel.json_body.keys()))
         )
 
 

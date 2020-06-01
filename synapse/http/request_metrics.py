@@ -19,7 +19,7 @@ import threading
 
 from prometheus_client.core import Counter, Histogram
 
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import current_context
 from synapse.metrics import LaterGauge
 
 logger = logging.getLogger(__name__)
@@ -148,7 +148,7 @@ LaterGauge(
 class RequestMetrics(object):
     def start(self, time_sec, name, method):
         self.start = time_sec
-        self.start_context = LoggingContext.current_context()
+        self.start_context = current_context()
         self.name = name
         self.method = method
 
@@ -163,7 +163,7 @@ class RequestMetrics(object):
         with _in_flight_requests_lock:
             _in_flight_requests.discard(self)
 
-        context = LoggingContext.current_context()
+        context = current_context()
 
         tag = ""
         if context:

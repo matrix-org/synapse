@@ -77,6 +77,9 @@ class StorageProviderWrapper(StorageProvider):
         self.store_synchronous = store_synchronous
         self.store_remote = store_remote
 
+    def __str__(self):
+        return "StorageProviderWrapper[%s]" % (self.backend,)
+
     def store_file(self, path, file_info):
         if not file_info.server_name and not self.store_local:
             return defer.succeed(None)
@@ -113,6 +116,9 @@ class FileStorageProviderBackend(StorageProvider):
         self.hs = hs
         self.cache_directory = hs.config.media_store_path
         self.base_directory = config
+
+    def __str__(self):
+        return "FileStorageProviderBackend[%s]" % (self.base_directory,)
 
     def store_file(self, path, file_info):
         """See StorageProvider.store_file"""

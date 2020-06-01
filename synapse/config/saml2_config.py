@@ -15,6 +15,9 @@
 # limitations under the License.
 
 import logging
+import os
+
+import pkg_resources
 
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
@@ -121,6 +124,7 @@ class SAML2Config(Config):
         required_methods = [
             "get_saml_attributes",
             "saml_response_to_user_attributes",
+            "get_remote_user_id",
         ]
         missing_methods = [
             method
@@ -157,6 +161,14 @@ class SAML2Config(Config):
         # session lifetime: in milliseconds
         self.saml2_session_lifetime = self.parse_duration(
             saml2_config.get("saml_session_lifetime", "5m")
+        )
+
+        template_dir = saml2_config.get("template_dir")
+        if not template_dir:
+            template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
+
+        self.saml2_error_html_content = self.read_file(
+            os.path.join(template_dir, "saml_error.html"), "saml2_config.saml_error",
         )
 
     def _default_saml_config_dict(
@@ -236,32 +248,32 @@ class SAML2Config(Config):
           #    remote:
           #      - url: https://our_idp/metadata.xml
           #
-          #    # By default, the user has to go to our login page first. If you'd like
-          #    # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
-          #    # 'service.sp' section:
-          #    #
-          #    #service:
-          #    #  sp:
-          #    #    allow_unsolicited: true
+          #  # By default, the user has to go to our login page first. If you'd like
+          #  # to allow IdP-initiated login, set 'allow_unsolicited: true' in a
+          #  # 'service.sp' section:
+          #  #
+          #  #service:
+          #  #  sp:
+          #  #    allow_unsolicited: true
           #
-          #    # The examples below are just used to generate our metadata xml, and you
-          #    # may well not need them, depending on your setup. Alternatively you
-          #    # may need a whole lot more detail - see the pysaml2 docs!
+          #  # The examples below are just used to generate our metadata xml, and you
+          #  # may well not need them, depending on your setup. Alternatively you
+          #  # may need a whole lot more detail - see the pysaml2 docs!
           #
-          #    description: ["My awesome SP", "en"]
-          #    name: ["Test SP", "en"]
+          #  description: ["My awesome SP", "en"]
+          #  name: ["Test SP", "en"]
           #
-          #    organization:
-          #      name: Example com
-          #      display_name:
-          #        - ["Example co", "en"]
-          #      url: "http://example.com"
+          #  organization:
+          #    name: Example com
+          #    display_name:
+          #      - ["Example co", "en"]
+          #    url: "http://example.com"
           #
-          #    contact_person:
-          #      - given_name: Bob
-          #        sur_name: "the Sysadmin"
-          #        email_address": ["admin@example.com"]
-          #        contact_type": technical
+          #  contact_person:
+          #    - given_name: Bob
+          #      sur_name: "the Sysadmin"
+          #      email_address": ["admin@example.com"]
+          #      contact_type": technical
 
           # Instead of putting the config inline as above, you can specify a
           # separate pysaml2 configuration file:
@@ -324,6 +336,25 @@ class SAML2Config(Config):
           # The default is 'uid'.
           #
           #grandfathered_mxid_source_attribute: upn
+
+          # Directory in which Synapse will try to find the template files below.
+          # If not set, default templates from within the Synapse package will be used.
+          #
+          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
+          # If you *do* uncomment it, you will need to make sure that all the templates
+          # below are in the directory.
+          #
+          # Synapse will look for the following templates in this directory:
+          #
+          # * HTML page to display to users if something goes wrong during the
+          #   authentication process: 'saml_error.html'.
+          #
+          #   This template doesn't currently need any variable to render.
+          #
+          # You can see the default templates at:
+          # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
+          #
+          #template_dir: "res/templates"
         """ % {
             "config_dir_path": config_dir_path
         }

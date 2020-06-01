@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,18 +17,27 @@ import logging
 
 from twisted.internet import defer
 
+from synapse.http.site import SynapseRequest
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import UserID
+
+"""
+This package defines the 'stable' API which can be used by extension modules which
+are loaded into Synapse.
+"""
+
+__all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"]
 
 logger = logging.getLogger(__name__)
 
 
 class ModuleApi(object):
-    """A proxy object that gets passed to password auth providers so they
+    """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
     """
 
     def __init__(self, hs, auth_handler):
-        self.hs = hs
+        self._hs = hs
 
         self._store = hs.get_datastore()
         self._auth = hs.get_auth()
@@ -64,7 +74,7 @@ class ModuleApi(object):
         """
         if username.startswith("@"):
             return username
-        return UserID(username, self.hs.hostname).to_string()
+        return UserID(username, self._hs.hostname).to_string()
 
     def check_user_exists(self, user_id):
         """Check if user exists.
@@ -76,7 +86,7 @@ class ModuleApi(object):
             Deferred[str|None]: Canonical (case-corrected) user_id, or None
                if the user is not registered.
         """
-        return self._auth_handler.check_user_exists(user_id)
+        return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
     def register(self, localpart, displayname=None, emails=[]):
@@ -111,10 +121,14 @@ class ModuleApi(object):
             displayname (str|None): The displayname of the new user.
             emails (List[str]): Emails to bind to the new user.
 
+        Raises:
+            SynapseError if there is an error performing the registration. Check the
+                'errcode' property for more information on the reason for failure
+
         Returns:
             Deferred[str]: user_id
         """
-        return self.hs.get_registration_handler().register_user(
+        return self._hs.get_registration_handler().register_user(
             localpart=localpart, default_display_name=displayname, bind_emails=emails
         )
 
@@ -131,10 +145,32 @@ class ModuleApi(object):
         Returns:
             defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
         """
-        return self.hs.get_registration_handler().register_device(
+        return self._hs.get_registration_handler().register_device(
             user_id=user_id,
             device_id=device_id,
             initial_display_name=initial_display_name,
+        )
+
+    def record_user_external_id(
+        self, auth_provider_id: str, remote_user_id: str, registered_user_id: str
+    ) -> defer.Deferred:
+        """Record a mapping from an external user id to a mxid
+
+        Args:
+            auth_provider: identifier for the remote auth provider
+            external_id: id on that system
+            user_id: complete mxid that it is mapped to
+        """
+        return self._store.record_user_external_id(
+            auth_provider_id, remote_user_id, registered_user_id
+        )
+
+    def generate_short_term_login_token(
+        self, user_id: str, duration_in_ms: int = (2 * 60 * 1000)
+    ) -> str:
+        """Generate a login token suitable for m.login.token authentication"""
+        return self._hs.get_macaroon_generator().generate_short_term_login_token(
+            user_id, duration_in_ms
         )
 
     @defer.inlineCallbacks
@@ -157,10 +193,12 @@ class ModuleApi(object):
         user_id = user_info["user"].to_string()
         if device_id:
             # delete the device, which will also delete its access tokens
-            yield self.hs.get_device_handler().delete_device(user_id, device_id)
+            yield self._hs.get_device_handler().delete_device(user_id, device_id)
         else:
             # no associated device. Just delete the access token.
-            yield self._auth_handler.delete_access_token(access_token)
+            yield defer.ensureDeferred(
+                self._auth_handler.delete_access_token(access_token)
+            )
 
     def run_db_interaction(self, desc, func, *args, **kwargs):
         """Run a function with a database connection
@@ -176,3 +214,41 @@ class ModuleApi(object):
             Deferred[object]: result of func
         """
         return self._store.db.runInteraction(desc, func, *args, **kwargs)
+
+    def complete_sso_login(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Complete a SSO login by redirecting the user to a page to confirm whether they
+        want their access token sent to `client_redirect_url`, or redirect them to that
+        URL with a token directly if the URL matches with one of the whitelisted clients.
+
+        This is deprecated in favor of complete_sso_login_async.
+
+        Args:
+            registered_user_id: The MXID that has been registered as a previous step of
+                of this SSO login.
+            request: The request to respond to.
+            client_redirect_url: The URL to which to offer to redirect the user (or to
+                redirect them directly if whitelisted).
+        """
+        self._auth_handler._complete_sso_login(
+            registered_user_id, request, client_redirect_url,
+        )
+
+    async def complete_sso_login_async(
+        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+    ):
+        """Complete a SSO login by redirecting the user to a page to confirm whether they
+        want their access token sent to `client_redirect_url`, or redirect them to that
+        URL with a token directly if the URL matches with one of the whitelisted clients.
+
+        Args:
+            registered_user_id: The MXID that has been registered as a previous step of
+                of this SSO login.
+            request: The request to respond to.
+            client_redirect_url: The URL to which to offer to redirect the user (or to
+                redirect them directly if whitelisted).
+        """
+        await self._auth_handler.complete_sso_login(
+            registered_user_id, request, client_redirect_url,
+        )
