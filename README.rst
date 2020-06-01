@@ -335,7 +335,7 @@ Building internal API documentation::
 Troubleshooting
 ===============
 
-Need help? Join our community support room on matrix:
+Need help? Join our community support room on Matrix:
 `#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_
 
 Running out of File Handles
