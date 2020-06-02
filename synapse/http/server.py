@@ -168,7 +168,7 @@ def return_html_error(
         f: the error to report
         request: the failing request
         error_template: the HTML template. Can be either a string (with `{code}`,
-            `{msg}` placeholders), or a jinja2 template (
+            `{msg}` placeholders), or a jinja2 template
     """
     if f.check(CodeMessageException):
         cme = f.value
