@@ -1,0 +1,1 @@
+Check that called deferred methods succeed and general cleanup of `MonthlyActiveUsersTestCase` and `TestMauLimit`.
