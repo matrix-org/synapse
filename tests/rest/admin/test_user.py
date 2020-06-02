@@ -335,9 +335,7 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         store = self.hs.get_datastore()
 
         # Set monthly active users to the limit
-        store.get_monthly_active_count = Mock(
-            return_value=self.hs.config.max_mau_value
-        )
+        store.get_monthly_active_count = Mock(return_value=self.hs.config.max_mau_value)
         # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
         self.get_failure(
