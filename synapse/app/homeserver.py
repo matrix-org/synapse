@@ -617,18 +617,17 @@ def run(hs):
     clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
     reap_monthly_active_users()
 
-    @defer.inlineCallbacks
-    def generate_monthly_active_users():
+    async def generate_monthly_active_users():
         current_mau_count = 0
         current_mau_count_by_service = {}
         reserved_users = ()
         store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
-            current_mau_count = yield store.get_monthly_active_count()
+            current_mau_count = await store.get_monthly_active_count()
             current_mau_count_by_service = (
-                yield store.get_monthly_active_count_by_service()
+                await store.get_monthly_active_count_by_service()
             )
-            reserved_users = yield store.get_registered_reserved_users()
+            reserved_users = await store.get_registered_reserved_users()
         current_mau_gauge.set(float(current_mau_count))
 
         for app_service, count in current_mau_count_by_service.items():
