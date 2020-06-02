@@ -98,13 +98,6 @@ class LoginRestServlet(RestServlet):
             rate_hz=self.hs.config.rc_login_account.per_second,
             burst_count=self.hs.config.rc_login_account.burst_count,
         )
-        print(
-            "Creating fail ratelimiter: %s %s"
-            % (
-                self.hs.config.rc_login_failed_attempts.per_second,
-                self.hs.config.rc_login_failed_attempts.burst_count,
-            ),
-        )
         self._failed_attempts_ratelimiter = Ratelimiter(
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
