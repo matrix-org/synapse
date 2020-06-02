@@ -157,20 +157,15 @@ class Ratelimiter(object):
             LimitExceededError: If an action could not be performed, along with the time in
                 milliseconds until the action can be performed again
         """
-        # Override default values if set
-        time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
-        rate_hz = rate_hz if rate_hz is not None else self.rate_hz
-        burst_count = burst_count if burst_count is not None else self.burst_count
-
         allowed, time_allowed = self.can_do_action(
             key,
             rate_hz=rate_hz,
             burst_count=burst_count,
             update=update,
-            _time_now_s=time_now_s,
+            _time_now_s=_time_now_s,
         )
 
         if not allowed:
             raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                retry_after_ms=int(1000 * (time_allowed - _time_now_s))
             )
