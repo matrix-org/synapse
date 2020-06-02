@@ -1,1 +1,1 @@
-Fix inconsistent handling of upper and lower cases of email addresses that is use only case folding (MSC2265).
+Fix inconsistent handling of upper and lower case in email addresses when used as identifiers for login, etc. Contributed by @dklimpel.
