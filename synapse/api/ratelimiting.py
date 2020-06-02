@@ -47,9 +47,9 @@ class Ratelimiter(object):
         self,
         key: Any,
         time_now_s: Optional[int] = None,
-        update: bool = True,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
+        update: bool = True,
     ) -> Tuple[bool, float]:
         """Can the entity (e.g. user or IP address) perform the action?
 
@@ -58,11 +58,11 @@ class Ratelimiter(object):
                 (when sending events), an IP address, etc.
             time_now_s: The current time. Optional, defaults to the current time according
                 to self.clock. Pretty much only used for tests.
-            update: Whether to count this check as performing the action
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
             burst_count: How many actions that can be performed before being limited.
                 Overrides the value set during instantiation if set.
+            update: Whether to count this check as performing the action
 
         Returns:
             A tuple containing:
@@ -137,9 +137,9 @@ class Ratelimiter(object):
         self,
         key: Any,
         time_now_s: Optional[int] = None,
-        update: bool = True,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
+        update: bool = True,
     ):
         """Checks if an action can be performed. If not, raises a LimitExceededError
 
@@ -147,11 +147,11 @@ class Ratelimiter(object):
             key: An arbitrary key used to classify an action
             time_now_s: The current time. Optional, defaults to the current time according
                 to self.clock. Pretty much only used for tests.
-            update: Whether to count this check as performing the action
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
             burst_count: How many actions that can be performed before being limited.
                 Overrides the value set during instantiation if set.
+            update: Whether to count this check as performing the action
 
         Raises:
             LimitExceededError: If an action could not be performed, along with the time in
@@ -163,7 +163,7 @@ class Ratelimiter(object):
         burst_count = burst_count if burst_count is not None else self.burst_count
 
         allowed, time_allowed = self.can_do_action(
-            key, time_now_s, update=update, rate_hz=rate_hz, burst_count=burst_count
+            key, time_now_s, rate_hz=rate_hz, burst_count=burst_count, update=update
         )
 
         if not allowed:
