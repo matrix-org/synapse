@@ -20,15 +20,14 @@ import urllib.parse
 
 from mock import Mock
 
-from twisted.internet import defer
-
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
+from synapse.api.errors import HttpResponseException, ResourceLimitError
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import sync
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class UserRegisterTestCase(unittest.HomeserverTestCase):
@@ -324,23 +323,22 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual("Invalid user type", channel.json_body["error"])
 
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
+    )
     def test_register_mau_limit_reached(self):
         """
-        Register user with Admin API if MAU limit is reached.
+        Check we can register a user via the shared secret registration API
+        even if the MAU limit is reached.
         """
         handler = self.hs.get_registration_handler()
         store = self.hs.get_datastore()
-        auth_blocking = self.hs.get_auth()._auth_blocking
-
-        # Configure MAU limit
-        auth_blocking._limit_usage_by_mau = True
-        auth_blocking._max_mau_value = 2
-        auth_blocking._mau_trial_days = 0
 
         # Set monthly active users to the limit
         store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(auth_blocking._max_mau_value)
+            return_value=self.hs.config.max_mau_value
         )
+        # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
         self.get_failure(
             handler.register_user(localpart="local_part"), ResourceLimitError
@@ -397,7 +395,7 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
+        self.assertEqual("M_MISSING_TOKEN", channel.json_body["errcode"])
 
     def test_all_users(self):
         """
@@ -424,6 +422,11 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         sync.register_servlets,
     ]
 
+    def default_config(self):
+        config = super().default_config()
+        config.update({"registration_shared_secret": None})
+        return config
+
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
@@ -440,7 +443,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         If the user is not a server admin, an error is returned.
         """
-        self.hs.config.registration_shared_secret = None
         url = "/_synapse/admin/v2/users/@bob:test"
 
         request, channel = self.make_request(
@@ -463,7 +465,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that a lookup for a user that does not exist returns a 404
         """
-        self.hs.config.registration_shared_secret = None
 
         request, channel = self.make_request(
             "GET",
@@ -473,13 +474,12 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         self.assertEqual(404, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+        self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
 
     def test_create_server_admin(self):
         """
         Check that a new admin user is created successfully.
         """
-        self.hs.config.registration_shared_secret = None
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user (server admin)
@@ -527,7 +527,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Check that a new regular user is created successfully.
         """
-        self.hs.config.registration_shared_secret = None
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
@@ -570,20 +569,17 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(False, channel.json_body["is_guest"])
         self.assertEqual(False, channel.json_body["deactivated"])
 
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
+    )
     def test_create_user_mau_limit_reached_active_admin(self):
         """
-        Check that a new regular user is created successfully if MAU limit is reached.
+        Check that an admin can register a new user via the admin API
+        even if the MAU limit is reached.
         Admin user was active before creating user.
         """
-        self.hs.config.registration_shared_secret = None
 
         handler = self.hs.get_registration_handler()
-        auth_blocking = self.hs.get_auth()._auth_blocking
-
-        # Configure MAU limit
-        auth_blocking._limit_usage_by_mau = True
-        auth_blocking._max_mau_value = 2
-        auth_blocking._mau_trial_days = 0
 
         # Sync to set admin user to active
         # before limit of monthly active users is reached
@@ -595,12 +591,13 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         if channel.code != 200:
             raise HttpResponseException(
                 channel.code, channel.result["reason"], channel.result["body"]
-            ).to_synapse_error()
+            )
 
         # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(auth_blocking._max_mau_value)
+            return_value=self.hs.config.max_mau_value
         )
+        # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
         self.get_failure(
             handler.register_user(localpart="local_part"), ResourceLimitError
@@ -624,25 +621,23 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["admin"])
 
-    def test_create_user_mau_limit_reached_passiv_admin(self):
+    @override_config(
+        {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
+    )
+    def test_create_user_mau_limit_reached_passive_admin(self):
         """
-        Try to create a new regular user if MAU limit is reached.
+        Check that an admin can register a new user via the admin API
+        even if the MAU limit is reached.
         Admin user was not active before creating user.
         """
-        self.hs.config.registration_shared_secret = None
 
         handler = self.hs.get_registration_handler()
-        auth_blocking = self.hs.get_auth()._auth_blocking
-
-        # Configure MAU limit
-        auth_blocking._limit_usage_by_mau = True
-        auth_blocking._max_mau_value = 2
-        auth_blocking._mau_trial_days = 0
 
         # Set monthly active users to the limit
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(auth_blocking._max_mau_value)
+            return_value=self.hs.config.max_mau_value
         )
+        # Check that the blocking of monthly active users is working as expected
         # The registration of a new user fails due to the limit
         self.get_failure(
             handler.register_user(localpart="local_part"), ResourceLimitError
@@ -667,14 +662,21 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["admin"])
 
+    @override_config(
+        {
+            "email": {
+                "enable_notifs": True,
+                "notif_for_new_users": True,
+                "notif_from": "test@example.com",
+            },
+            "public_baseurl": "https://example.com",
+        }
+    )
     def test_create_user_email_notif_for_new_users(self):
         """
         Check that a new regular user is created successfully and
         got an email pusher.
         """
-        self.hs.config.registration_shared_secret = None
-        self.hs.config.email_enable_notifs = True
-        self.hs.config.email_notif_for_new_users = True
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
@@ -705,14 +707,21 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(pushers), 1)
         self.assertEqual("@bob:test", pushers[0]["user_name"])
 
+    @override_config(
+        {
+            "email": {
+                "enable_notifs": False,
+                "notif_for_new_users": False,
+                "notif_from": "test@example.com",
+            },
+            "public_baseurl": "https://example.com",
+        }
+    )
     def test_create_user_email_no_notif_for_new_users(self):
         """
         Check that a new regular user is created successfully and
         got not an email pusher.
         """
-        self.hs.config.registration_shared_secret = None
-        self.hs.config.email_enable_notifs = False
-        self.hs.config.email_notif_for_new_users = False
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
@@ -746,7 +755,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Test setting a new password for another user.
         """
-        self.hs.config.registration_shared_secret = None
 
         # Change password
         body = json.dumps({"password": "hahaha"})
@@ -765,7 +773,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Test setting the displayname of another user.
         """
-        self.hs.config.registration_shared_secret = None
 
         # Modify user
         body = json.dumps({"displayname": "foobar"})
@@ -796,7 +803,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Test setting threepid for an other user.
         """
-        self.hs.config.registration_shared_secret = None
 
         # Delete old and add new threepid to user
         body = json.dumps(
@@ -862,7 +868,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
         Test setting the admin flag on a user.
         """
-        self.hs.config.registration_shared_secret = None
 
         # Set a user as an admin
         body = json.dumps({"admin": True})
@@ -894,7 +899,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         Ensure an account can't accidentally be deactivated by using a str value
         for the deactivated body parameter
         """
-        self.hs.config.registration_shared_secret = None
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
