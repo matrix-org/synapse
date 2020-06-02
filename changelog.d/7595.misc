@@ -1,1 +1,1 @@
-Refactor `Ratelimiter` and try to limit the amount of related, expensive config value accesses.
+Refactor `Ratelimiter` to limit the amount of expensive config value accesses.
