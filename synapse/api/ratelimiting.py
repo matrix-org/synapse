@@ -46,23 +46,23 @@ class Ratelimiter(object):
     def can_do_action(
         self,
         key: Any,
-        time_now_s: Optional[int] = None,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,
+        _time_now_s: Optional[int] = None,
     ) -> Tuple[bool, float]:
         """Can the entity (e.g. user or IP address) perform the action?
 
         Args:
             key: The key we should use when rate limiting. Can be a user ID
                 (when sending events), an IP address, etc.
-            time_now_s: The current time. Optional, defaults to the current time according
-                to self.clock. Pretty much only used for tests.
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
             burst_count: How many actions that can be performed before being limited.
                 Overrides the value set during instantiation if set.
             update: Whether to count this check as performing the action
+            _time_now_s: The current time. Optional, defaults to the current time according
+                to self.clock. Only used by tests.
 
         Returns:
             A tuple containing:
@@ -71,7 +71,7 @@ class Ratelimiter(object):
                   -1 if a rate_hz has not been defined for this Ratelimiter
         """
         # Override default values if set
-        time_now_s = time_now_s if time_now_s is not None else self.clock.time()
+        time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
         rate_hz = rate_hz if rate_hz is not None else self.rate_hz
         burst_count = burst_count if burst_count is not None else self.burst_count
 
@@ -136,34 +136,38 @@ class Ratelimiter(object):
     def ratelimit(
         self,
         key: Any,
-        time_now_s: Optional[int] = None,
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,
+        _time_now_s: Optional[int] = None,
     ):
         """Checks if an action can be performed. If not, raises a LimitExceededError
 
         Args:
             key: An arbitrary key used to classify an action
-            time_now_s: The current time. Optional, defaults to the current time according
-                to self.clock. Pretty much only used for tests.
             rate_hz: The long term number of actions that can be performed in a second.
                 Overrides the value set during instantiation if set.
             burst_count: How many actions that can be performed before being limited.
                 Overrides the value set during instantiation if set.
             update: Whether to count this check as performing the action
+            _time_now_s: The current time. Optional, defaults to the current time according
+                to self.clock. Only used by tests.
 
         Raises:
             LimitExceededError: If an action could not be performed, along with the time in
                 milliseconds until the action can be performed again
         """
         # Override default values if set
-        time_now_s = time_now_s if time_now_s is not None else self.clock.time()
+        time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
         rate_hz = rate_hz if rate_hz is not None else self.rate_hz
         burst_count = burst_count if burst_count is not None else self.burst_count
 
         allowed, time_allowed = self.can_do_action(
-            key, time_now_s, rate_hz=rate_hz, burst_count=burst_count, update=update
+            key,
+            rate_hz=rate_hz,
+            burst_count=burst_count,
+            update=update,
+            _time_now_s=time_now_s,
         )
 
         if not allowed:
