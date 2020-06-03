@@ -501,7 +501,7 @@ class FederationHandler(BaseHandler):
                 min_depth=min_depth,
                 timeout=60000,
             )
-        except RequestSendFailed as e:
+        except (RequestSendFailed, HttpResponseException, NotRetryingDestination) as e:
             # We failed to get the missing events, but since we need to handle
             # the case of `get_missing_events` not returning the necessary
             # events anyway, it is safe to simply log the error and continue.
