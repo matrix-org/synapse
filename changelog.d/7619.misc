@@ -1,1 +1,1 @@
-Check that called deferred methods succeed and general cleanup of `MonthlyActiveUsersTestCase` and `TestMauLimit`.
+Check that all asynchronous tasks succeed and general cleanup of `MonthlyActiveUsersTestCase` and `TestMauLimit`.
