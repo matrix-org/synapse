@@ -100,13 +100,14 @@ class Ratelimiter(object):
         if update:
             self.actions[key] = (action_count, time_start, rate_hz)
 
-        if self.rate_hz > 0:
+        if rate_hz > 0:
             # Find out when the count of existing actions expires
             time_allowed = time_start + (action_count - burst_count + 1) / rate_hz
 
             # Don't give back a time in the past
             if time_allowed < time_now_s:
                 time_allowed = time_now_s
+
         else:
             # XXX: Why is this -1? This seems to only be used in
             # self.ratelimit. I guess so that clients get a time in the past and don't
