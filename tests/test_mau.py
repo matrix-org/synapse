@@ -85,7 +85,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         # Advance time by 31 days
         self.reactor.advance(31 * 24 * 60 * 60)
 
-        self.store.reap_monthly_active_users()
+        self.get_success(self.store.reap_monthly_active_users())
 
         self.reactor.advance(0)
 
@@ -147,8 +147,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
 
         # Advance by 2 months so everyone falls out of MAU
         self.reactor.advance(60 * 24 * 60 * 60)
-        self.store.reap_monthly_active_users()
-        self.reactor.advance(0)
+        self.get_success(self.store.reap_monthly_active_users())
 
         # We can create as many new users as we want
         token4 = self.create_user("kermit4")
