@@ -1512,7 +1512,13 @@ saml2_config:
   # * HTML page to display to users if something goes wrong during the
   #   authentication process: 'saml_error.html'.
   #
-  #   This template doesn't currently need any variable to render.
+  #   When rendering, this template is given the following variables:
+  #     * code: an HTML error code corresponding to the error that is being
+  #       returned (typically 400 or 500)
+  #
+  #     * msg: a textual message describing the error.
+  #
+  #   The variables will automatically be HTML-escaped.
   #
   # You can see the default templates at:
   # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
