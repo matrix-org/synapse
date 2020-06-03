@@ -316,9 +316,7 @@ class TypingStream(Stream):
 
         if hs.config.worker_app is None:
             # on the master, query the typing handler
-            update_function = db_query_to_update_function(
-                typing_handler.get_all_typing_updates
-            )
+            update_function = typing_handler.get_all_typing_updates
         else:
             # Query master process
             update_function = make_http_update_function(hs, self.NAME)
