@@ -16,7 +16,7 @@
 
 import abc
 import logging
-from typing import List
+from typing import List, Tuple
 
 from canonicaljson import json
 
@@ -291,26 +291,34 @@ class ReceiptsWorkerStore(SQLBaseStore):
             "get_users_sent_receipts_between", _get_users_sent_receipts_between_txn
         )
 
-    def get_all_updated_receipts(self, last_id, current_id, limit=None):
+    async def get_all_updated_receipts(
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, list]], int, bool]:
         if last_id == current_id:
-            return defer.succeed([])
+            return [], current_id, False
 
         def get_all_updated_receipts_txn(txn):
-            sql = (
-                "SELECT stream_id, room_id, receipt_type, user_id, event_id, data"
-                " FROM receipts_linearized"
-                " WHERE ? < stream_id AND stream_id <= ?"
-                " ORDER BY stream_id ASC"
-            )
-            args = [last_id, current_id]
-            if limit is not None:
-                sql += " LIMIT ?"
-                args.append(limit)
-            txn.execute(sql, args)
+            sql = """
+                SELECT stream_id, room_id, receipt_type, user_id, event_id, data
+                FROM receipts_linearized
+                WHERE ? < stream_id AND stream_id <= ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """
+            txn.execute(sql, (last_id, current_id, limit))
 
-            return [r[0:5] + (json.loads(r[5]),) for r in txn]
+            updates = [(r[0], r[1:5] + (json.loads(r[5]),)) for r in txn]
 
-        return self.db.runInteraction(
+            limited = False
+            upper_bound = current_id
+
+            if len(updates) == limit:
+                limited = True
+                upper_bound = updates[-1][0]
+
+            return updates, upper_bound, limited
+
+        return await self.db.runInteraction(
             "get_all_updated_receipts", get_all_updated_receipts_txn
         )
 
