@@ -51,6 +51,7 @@ class OIDCConfig(Config):
             "client_auth_method", "client_secret_basic"
         )
         self.oidc_scopes = oidc_config.get("scopes", ["openid"])
+        self.oidc_uses_userinfo = oidc_config.get("uses_userinfo", False)
         self.oidc_authorization_endpoint = oidc_config.get("authorization_endpoint")
         self.oidc_token_endpoint = oidc_config.get("token_endpoint")
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
@@ -117,6 +118,11 @@ class OIDCConfig(Config):
             # list of scopes to ask. This should include the "openid" scope. Defaults to ["openid"].
             #
             #scopes: ["openid"]
+
+            # always use userinfo endpoint. This is required for providers that don't include user
+            # information in the token response, e.g. Gitlab.
+            #
+            #uses_userinfo: false
 
             # the oauth2 authorization endpoint. Required if provider discovery is disabled.
             #
