@@ -7,26 +7,19 @@ window.matrixLogin = {
 var title_pre_auth = "Log in with one of the following methods";
 var title_post_auth = "Logging in...";
 
-var submitPassword = function(user, pwd) {
-    console.log("Logging in with password...");
+var submitLogin = function(type, data) {
+    console.log("Logging in with " + type);
     set_title(title_post_auth);
-    var data = {
-        type: "m.login.password",
-        user: user,
-        password: pwd,
-    };
-    $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
-        matrixLogin.onLogin(response);
-    }).fail(errorFunc);
-};
 
-var submitToken = function(loginToken) {
-    console.log("Logging in with login token...");
-    set_title(title_post_auth);
-    var data = {
-        type: "m.login.token",
-        token: loginToken
-    };
+    // Add the login type.
+    data.type = type;
+
+    // Add the device ID, if one was provided.
+    var qs = parseQsFromUrl();
+    if (qs.device_id) {
+        data.device_id = qs.device_id;
+    }
+
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
         matrixLogin.onLogin(response);
     }).fail(errorFunc);
@@ -50,8 +43,9 @@ var setFeedbackString = function(text) {
 };
 
 var show_login = function(inhibit_redirect) {
-    var this_page = window.location.origin + window.location.pathname;
-    $("#sso_redirect_url").val(this_page);
+    // Set the redirect to come back to this page, a login token will get added
+    // and handled after the redirect.
+    $("#sso_redirect_url").val(window.location.href);
 
     // If inhibit_redirect is false, and SSO is the only supported login method, we can
     // redirect straight to the SSO page
@@ -123,7 +117,7 @@ matrixLogin.password_login = function() {
     setFeedbackString("");
 
     show_spinner();
-    submitPassword(user, pwd);
+    submitLogin("m.login.password", {user: user, password: pwd});
 };
 
 matrixLogin.onLogin = function(response) {
@@ -131,7 +125,16 @@ matrixLogin.onLogin = function(response) {
     console.warn("onLogin - This function should be replaced to proceed.");
 };
 
-var parseQsFromUrl = function(query) {
+/*
+ * Process the query parameters from the current URL into an object.
+ */
+var parseQsFromUrl = function() {
+    var pos = window.location.href.indexOf("?");
+    if (pos == -1) {
+        return {};
+    }
+    var query = window.location.href.substr(pos + 1);
+
     var result = {};
     query.split("&").forEach(function(part) {
         var item = part.split("=");
@@ -146,20 +149,19 @@ var parseQsFromUrl = function(query) {
     return result;
 };
 
+/*
+ * Submits the login token if one is found in the query parameters. Returns a
+ * boolean of whether the login token was found or not.
+ */
 var try_token = function() {
-    var pos = window.location.href.indexOf("?");
-    if (pos == -1) {
-        return false;
-    }
-    var qs = parseQsFromUrl(window.location.href.substr(pos+1));
+    var qs = parseQsFromUrl();
 
     var loginToken = qs.loginToken;
-
     if (!loginToken) {
         return false;
     }
 
-    submitToken(loginToken);
+    submitLogin("m.login.token", {token: loginToken});
 
     return true;
 };
