@@ -68,7 +68,7 @@ class Ratelimiter(object):
             A tuple containing:
                 * A bool indicating if they can perform the action now
                 * The time in seconds of when it can next be performed.
-                  -1 if a rate_hz has not been defined for this Ratelimiter
+                  -1 if rate_hz is less than or equal to zero
         """
         # Override default values if set
         time_now_s = _time_now_s if _time_now_s is not None else self.clock.time()
@@ -100,15 +100,17 @@ class Ratelimiter(object):
         if update:
             self.actions[key] = (action_count, time_start, rate_hz)
 
-        # Figure out the time when an action can be performed again
         if self.rate_hz > 0:
+            # Find out when the count of existing actions expires
             time_allowed = time_start + (action_count - burst_count + 1) / rate_hz
 
             # Don't give back a time in the past
             if time_allowed < time_now_s:
                 time_allowed = time_now_s
         else:
-            # This does not apply
+            # XXX: Why is this -1? This seems to only be used in
+            # self.ratelimit. I guess so that clients get a time in the past and don't
+            # feel afraid to try again immediately
             time_allowed = -1
 
         return allowed, time_allowed
