@@ -218,6 +218,8 @@ class SAML2Config(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
+        ## Single sign-on integration ##
+
         # Enable SAML2 for registration and login. Uses pysaml2.
         #
         # At least one of `sp_config` or `config_path` must be set in this section to
