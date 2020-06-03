@@ -1,0 +1,1 @@
+Check if the localpart is reserved for guests users earlier in the registration flow, as well as when responding to requests on `/register/available`.
