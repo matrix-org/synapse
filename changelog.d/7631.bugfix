@@ -1,1 +1,1 @@
-Support the `m.login.token` login flow when OpenID Connect is enabled.
+Advertise the `m.login.token` login flow when OpenID Connect is enabled.
