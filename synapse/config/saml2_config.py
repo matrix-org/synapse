@@ -15,8 +15,8 @@
 # limitations under the License.
 
 import logging
-import os
 
+import jinja2
 import pkg_resources
 
 from synapse.python_dependencies import DependencyException, check_requirements
@@ -167,9 +167,11 @@ class SAML2Config(Config):
         if not template_dir:
             template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
 
-        self.saml2_error_html_content = self.read_file(
-            os.path.join(template_dir, "saml_error.html"), "saml2_config.saml_error",
-        )
+        loader = jinja2.FileSystemLoader(template_dir)
+        # enable auto-escape here, to having to remember to escape manually in the
+        # template
+        env = jinja2.Environment(loader=loader, autoescape=True)
+        self.saml2_error_html_template = env.get_template("saml_error.html")
 
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set
@@ -349,7 +351,13 @@ class SAML2Config(Config):
           # * HTML page to display to users if something goes wrong during the
           #   authentication process: 'saml_error.html'.
           #
-          #   This template doesn't currently need any variable to render.
+          #   When rendering, this template is given the following variables:
+          #     * code: an HTML error code corresponding to the error that is being
+          #       returned (typically 400 or 500)
+          #
+          #     * msg: a textual message describing the error.
+          #
+          #   The variables will automatically be HTML-escaped.
           #
           # You can see the default templates at:
           # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
