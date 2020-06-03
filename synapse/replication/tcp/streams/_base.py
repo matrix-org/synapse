@@ -264,7 +264,7 @@ class BackfillStream(Stream):
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_current_backfill_token),
-            db_query_to_update_function(store.get_all_new_backfill_event_rows),
+            store.get_all_new_backfill_event_rows,
         )
 
 
