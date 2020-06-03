@@ -128,6 +128,15 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.FORBIDDEN,
                 )
 
+        if guest_access_token is None:
+            try:
+                int(localpart)
+                raise SynapseError(
+                    400, "Numeric user IDs are reserved for guest users."
+                )
+            except ValueError:
+                pass
+
     @defer.inlineCallbacks
     def register_user(
         self,
@@ -169,15 +178,6 @@ class RegistrationHandler(BaseHandler):
             yield self.check_username(localpart, guest_access_token=guest_access_token)
 
             was_guest = guest_access_token is not None
-
-            if not was_guest:
-                try:
-                    int(localpart)
-                    raise SynapseError(
-                        400, "Numeric user IDs are reserved for guest users."
-                    )
-                except ValueError:
-                    pass
 
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
