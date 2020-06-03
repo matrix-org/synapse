@@ -291,9 +291,7 @@ class PresenceStream(Stream):
         if hs.config.worker_app is None:
             # on the master, query the presence handler
             presence_handler = hs.get_presence_handler()
-            update_function = db_query_to_update_function(
-                presence_handler.get_all_presence_updates
-            )
+            update_function = presence_handler.get_all_presence_updates
         else:
             # Query master process
             update_function = make_http_update_function(hs, self.NAME)
