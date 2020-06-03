@@ -16,6 +16,7 @@
 
 import abc
 import logging
+from typing import List
 
 from canonicaljson import json
 
@@ -265,6 +266,30 @@ class ReceiptsWorkerStore(SQLBaseStore):
             for room_id in room_ids
         }
         return results
+
+    def get_users_sent_receipts_between(self, last_id: int, current_id: int):
+        """Get all users who sent receipts between `last_id` exclusive and
+        `current_id` inclusive.
+
+        Returns:
+            Deferred[List[str]]
+        """
+
+        if last_id == current_id:
+            return defer.succeed([])
+
+        def _get_users_sent_receipts_between_txn(txn):
+            sql = """
+                SELECT DISTINCT user_id FROM receipts_linearized
+                WHERE ? < stream_id AND stream_id <= ?
+            """
+            txn.execute(sql, (last_id, current_id))
+
+            return [r[0] for r in txn]
+
+        return self.db.runInteraction(
+            "get_users_sent_receipts_between", _get_users_sent_receipts_between_txn
+        )
 
     def get_all_updated_receipts(self, last_id, current_id, limit=None):
         if last_id == current_id:
