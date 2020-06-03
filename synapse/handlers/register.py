@@ -128,7 +128,7 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.FORBIDDEN,
                 )
 
-        if guest_access_token is not None:
+        if guest_access_token is None:
             try:
                 int(localpart)
                 raise SynapseError(
