@@ -210,7 +210,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         self.get_success(d)
 
         count = self.get_success(self.store.get_monthly_active_count())
-        self.assertTrue(count, initial_users)
+        self.assertEqual(count, initial_users)
 
         users = self.get_success(self.store.get_registered_reserved_users())
         self.assertEqual(len(users), reserved_user_number)
