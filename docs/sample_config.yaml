@@ -1608,6 +1608,9 @@ oidc_config:
     # The custom module's class. Uncomment to use a custom module.
     # Default is 'synapse.handlers.oidc_handler.JinjaOidcMappingProvider'.
     #
+    # See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
+    # for information on implementing a custom mapping provider.
+    #
     #module: mapping_provider.OidcMappingProvider
 
     # Custom configuration values for the module. This section will be passed as

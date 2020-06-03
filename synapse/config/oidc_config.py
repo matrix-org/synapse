@@ -165,6 +165,9 @@ class OIDCConfig(Config):
             # The custom module's class. Uncomment to use a custom module.
             # Default is {mapping_provider!r}.
             #
+            # See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
+            # for information on implementing a custom mapping provider.
+            #
             #module: mapping_provider.OidcMappingProvider
 
             # Custom configuration values for the module. This section will be passed as
