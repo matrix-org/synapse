@@ -58,6 +58,7 @@ class OIDCConfig(Config):
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_subject_claim = oidc_config.get("subject_claim", "sub")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
+        self.oidc_merge_with_existing_users = oidc_config.get("merge_with_existing_users", False)
 
         ump_config = oidc_config.get("user_mapping_provider", {})
         ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
@@ -145,6 +146,10 @@ class OIDCConfig(Config):
             # Avoid this in production.
             #
             #skip_verification: false
+
+            # if user already exists, add oidc token to that account instead of failing. Defaults to false.
+            #
+            #merge_with_existing_users: false
 
 
             # An external module can be provided here as a custom solution to mapping

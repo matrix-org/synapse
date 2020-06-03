@@ -113,6 +113,7 @@ class OidcHandler:
             hs.config.oidc_user_mapping_provider_config
         )  # type: OidcMappingProvider
         self._skip_verification = hs.config.oidc_skip_verification  # type: bool
+        self._merge_with_existing_users = hs.config.oidc_merge_with_existing_users  # type: bool
 
         self._http_client = hs.get_proxied_http_client()
         self._auth_handler = hs.get_auth_handler()
@@ -884,16 +885,19 @@ class OidcHandler:
 
         user_id = UserID(localpart, self._hostname)
         if await self._datastore.get_users_by_id_case_insensitive(user_id.to_string()):
-            # This mxid is taken
-            raise MappingException(
-                "mxid '{}' is already taken".format(user_id.to_string())
+            if self._merge_with_existing_users:
+                registered_user_id = user_id.to_string()
+            else:
+                # This mxid is taken
+                raise MappingException(
+                    "mxid '{}' is already taken".format(user_id.to_string())
+                )
+        else:
+            # It's the first time this user is logging in and the mapped mxid was
+            # not taken, register the user
+            registered_user_id = await self._registration_handler.register_user(
+                localpart=localpart, default_display_name=attributes["display_name"],
             )
-
-        # It's the first time this user is logging in and the mapped mxid was
-        # not taken, register the user
-        registered_user_id = await self._registration_handler.register_user(
-            localpart=localpart, default_display_name=attributes["display_name"],
-        )
 
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
