@@ -363,25 +363,16 @@ class PushRulesStream(Stream):
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
+
         super(PushRulesStream, self).__init__(
-            hs.get_instance_name(), self._current_token, self._update_function
+            hs.get_instance_name(),
+            self._current_token,
+            self.store.get_all_push_rule_updates,
         )
 
     def _current_token(self, instance_name: str) -> int:
         push_rules_token, _ = self.store.get_push_rules_stream_token()
         return push_rules_token
-
-    async def _update_function(
-        self, instance_name: str, from_token: Token, to_token: Token, limit: int
-    ):
-        rows = await self.store.get_all_push_rule_updates(from_token, to_token, limit)
-
-        limited = False
-        if len(rows) == limit:
-            to_token = rows[-1][0]
-            limited = True
-
-        return [(row[0], (row[2],)) for row in rows], to_token, limited
 
 
 class PushersStream(Stream):
