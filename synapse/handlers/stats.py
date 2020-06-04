@@ -16,8 +16,6 @@
 import logging
 from collections import Counter
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -66,20 +64,18 @@ class StatsHandler:
 
         self._is_processing = True
 
-        @defer.inlineCallbacks
-        def process():
+        async def process():
             try:
-                yield self._unsafe_process()
+                await self._unsafe_process()
             finally:
                 self._is_processing = False
 
         run_as_background_process("stats.notify_new_event", process)
 
-    @defer.inlineCallbacks
-    def _unsafe_process(self):
+    async def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
-            self.pos = yield self.store.get_stats_positions()
+            self.pos = await self.store.get_stats_positions()
 
         # Loop round handling deltas until we're up to date
 
@@ -94,13 +90,13 @@ class StatsHandler:
             logger.debug(
                 "Processing room stats %s->%s", self.pos, room_max_stream_ordering
             )
-            max_pos, deltas = yield self.store.get_current_state_deltas(
+            max_pos, deltas = await self.store.get_current_state_deltas(
                 self.pos, room_max_stream_ordering
             )
 
             if deltas:
                 logger.debug("Handling %d state deltas", len(deltas))
-                room_deltas, user_deltas = yield self._handle_deltas(deltas)
+                room_deltas, user_deltas = await self._handle_deltas(deltas)
             else:
                 room_deltas = {}
                 user_deltas = {}
@@ -109,7 +105,7 @@ class StatsHandler:
             (
                 room_count,
                 user_count,
-            ) = yield self.store.get_changes_room_total_events_and_bytes(
+            ) = await self.store.get_changes_room_total_events_and_bytes(
                 self.pos, max_pos
             )
 
@@ -123,7 +119,7 @@ class StatsHandler:
             logger.debug("user_deltas: %s", user_deltas)
 
             # Always call this so that we update the stats position.
-            yield self.store.bulk_update_stats_delta(
+            await self.store.bulk_update_stats_delta(
                 self.clock.time_msec(),
                 updates={"room": room_deltas, "user": user_deltas},
                 stream_id=max_pos,
@@ -135,13 +131,12 @@ class StatsHandler:
 
             self.pos = max_pos
 
-    @defer.inlineCallbacks
-    def _handle_deltas(self, deltas):
+    async def _handle_deltas(self, deltas):
         """Called with the state deltas to process
 
         Returns:
-            Deferred[tuple[dict[str, Counter], dict[str, counter]]]
-            Resovles to two dicts, the room deltas and the user deltas,
+            tuple[dict[str, Counter], dict[str, counter]]
+            Resolves to two dicts, the room deltas and the user deltas,
             mapping from room/user ID to changes in the various fields.
         """
 
@@ -160,7 +155,7 @@ class StatsHandler:
 
             logger.debug("Handling: %r, %r %r, %s", room_id, typ, state_key, event_id)
 
-            token = yield self.store.get_earliest_token_for_stats("room", room_id)
+            token = await self.store.get_earliest_token_for_stats("room", room_id)
 
             # If the earliest token to begin from is larger than our current
             # stream ID, skip processing this delta.
@@ -182,7 +177,7 @@ class StatsHandler:
 
             sender = None
             if event_id is not None:
-                event = yield self.store.get_event(event_id, allow_none=True)
+                event = await self.store.get_event(event_id, allow_none=True)
                 if event:
                     event_content = event.content or {}
                     sender = event.sender
@@ -207,7 +202,7 @@ class StatsHandler:
                 # reduce the leave count when a new-to-the-room user joins.
                 prev_membership = None
                 if prev_event_id is not None:
-                    prev_event = yield self.store.get_event(
+                    prev_event = await self.store.get_event(
                         prev_event_id, allow_none=True
                     )
                     if prev_event:
@@ -299,6 +294,6 @@ class StatsHandler:
 
         for room_id, state in room_to_state_updates.items():
             logger.debug("Updating room_stats_state for %s: %s", room_id, state)
-            yield self.store.update_room_state(room_id, state)
+            await self.store.update_room_state(room_id, state)
 
         return room_to_stats_deltas, user_to_stats_deltas
