@@ -99,25 +99,20 @@ class LoginRestServlet(RestServlet):
             flows.append({"type": LoginRestServlet.JWT_TYPE})
 
         if self.cas_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
-
             # we advertise CAS for backwards compat, though MSC1721 renamed it
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
+        if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
             # While its valid for us to advertise this login type generally,
             # synapse currently only gives out these tokens as part of the
-            # CAS login flow.
+            # SSO login flow.
             # Generally we don't want to advertise login flows that clients
             # don't know how to implement, since they (currently) will always
             # fall back to the fallback API if they don't understand one of the
             # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
-        elif self.saml2_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
-            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
-        elif self.oidc_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
 
         flows.extend(
             ({"type": t} for t in self.auth_handler.get_supported_login_types())
