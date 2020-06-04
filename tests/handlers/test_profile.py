@@ -14,13 +14,12 @@
 # limitations under the License.
 
 
-from mock import Mock, patch
+from mock import Mock
 
 from twisted.internet import defer
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.profile import MasterProfileHandler
 from synapse.types import UserID
 
@@ -56,16 +55,6 @@ class ProfileTestCase(unittest.TestCase):
             federation_client=self.mock_federation,
             federation_server=Mock(),
             federation_registry=self.mock_registry,
-        )
-
-        # Patch Ratelimiter to allow all requests
-        patch.object(
-            Ratelimiter,
-            "can_do_action",
-            new_callable=lambda *args, **kwargs: (True, 0.0),
-        )
-        patch.object(
-            Ratelimiter, "ratelimit", new_callable=lambda *args, **kwargs: None
         )
 
         self.store = hs.get_datastore()

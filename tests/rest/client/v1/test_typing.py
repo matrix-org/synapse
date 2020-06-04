@@ -16,11 +16,10 @@
 
 """Tests REST events for /rooms paths."""
 
-from mock import Mock, patch
+from mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.rest.client.v1 import room
 from synapse.types import UserID
 
@@ -41,16 +40,6 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         hs = self.setup_test_homeserver(
             "red", http_client=None, federation_client=Mock(),
-        )
-
-        # Patch Ratelimiter to allow all requests
-        patch.object(
-            Ratelimiter,
-            "can_do_action",
-            new_callable=lambda *args, **kwargs: (True, 0.0),
-        )
-        patch.object(
-            Ratelimiter, "ratelimit", new_callable=lambda *args, **kwargs: None
         )
 
         self.event_source = hs.get_event_sources().sources["typing"]

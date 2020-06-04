@@ -15,10 +15,9 @@
 
 """ Tests REST events for /events paths."""
 
-from mock import Mock, patch
+from mock import Mock
 
 import synapse.rest.admin
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.rest.client.v1 import events, login, room
 
 from tests import unittest
@@ -41,17 +40,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         config["enable_registration"] = True
         config["auto_join_rooms"] = []
 
-        hs = self.setup_test_homeserver(config=config,)
-
-        # Patch Ratelimiter to allow all requests
-        patch.object(
-            Ratelimiter,
-            "can_do_action",
-            new_callable=lambda *args, **kwargs: (True, 0.0),
-        )
-        patch.object(
-            Ratelimiter, "ratelimit", new_callable=lambda *args, **kwargs: None
-        )
+        hs = self.setup_test_homeserver(config=config)
 
         hs.get_handlers().federation_handler = Mock()
 
