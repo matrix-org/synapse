@@ -88,10 +88,10 @@ class TestRatelimiter(unittest.TestCase):
 
     def test_pruning(self):
         limiter = Ratelimiter(clock=None, rate_hz=0.1, burst_count=1)
-        _, _ = limiter.can_do_action(key="test_id_1", _time_now_s=0)
+        limiter.can_do_action(key="test_id_1", _time_now_s=0)
 
         self.assertIn("test_id_1", limiter.actions)
 
-        _, _ = limiter.can_do_action(key="test_id_2", _time_now_s=10)
+        limiter.can_do_action(key="test_id_2", _time_now_s=10)
 
         self.assertNotIn("test_id_1", limiter.actions)
