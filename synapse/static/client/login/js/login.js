@@ -14,10 +14,13 @@ var submitLogin = function(type, data) {
     // Add the login type.
     data.type = type;
 
-    // Add the device ID, if one was provided.
+    // Add the device information, if it was provided.
     var qs = parseQsFromUrl();
     if (qs.device_id) {
         data.device_id = qs.device_id;
+    }
+    if (qs.initial_device_display_name) {
+        data.initial_device_display_name = qs.initial_device_display_name;
     }
 
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
