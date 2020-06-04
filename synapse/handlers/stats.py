@@ -19,14 +19,13 @@ from collections import Counter
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics import event_processing_positions
 from synapse.metrics.background_process_metrics import run_as_background_process
 
 logger = logging.getLogger(__name__)
 
 
-class StatsHandler(StateDeltasHandler):
+class StatsHandler:
     """Handles keeping the *_stats tables updated with a simple time-series of
     information about the users, rooms and media on the server, such that admins
     have some idea of who is consuming their resources.
@@ -35,7 +34,6 @@ class StatsHandler(StateDeltasHandler):
     """
 
     def __init__(self, hs):
-        super(StatsHandler, self).__init__(hs)
         self.hs = hs
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
@@ -200,10 +198,10 @@ class StatsHandler(StateDeltasHandler):
                 room_stats_delta["current_state_events"] += 1
 
             if typ == EventTypes.Member:
-                # we could use _get_key_change here but it's a bit inefficient
-                # given we're not testing for a specific result; might as well
-                # just grab the prev_membership and membership strings and
-                # compare them.
+                # we could use StateDeltasHandler._get_key_change here but it's
+                # a bit inefficient given we're not testing for a specific
+                # result; might as well just grab the prev_membership and
+                # membership strings and compare them.
                 # We take None rather than leave as a previous membership
                 # in the absence of a previous event because we do not want to
                 # reduce the leave count when a new-to-the-room user joins.
