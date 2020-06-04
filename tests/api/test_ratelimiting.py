@@ -57,13 +57,12 @@ class TestRatelimiter(unittest.TestCase):
         expected_allowed = 10.0
 
         # We expect a LimitExceededError to be raised
-        try:
+        with self.assertRaises(LimitExceededError) as limit_exception:
             limiter.ratelimit(("test_id",), _time_now_s=time_now, update=False)
 
-            # We shouldn't reach here
-            self.assertTrue(False, "LimitExceededError was not raised")
-        except LimitExceededError as e:
-            self.assertEquals(e.retry_after_ms / 1000, expected_allowed - time_now)
+        self.assertEquals(
+            limit_exception.retry_after_ms / 1000, expected_allowed - time_now,
+        )
 
         allowed, time_allowed = limiter.can_do_action(
             key=("test_id",), _time_now_s=time_now,
