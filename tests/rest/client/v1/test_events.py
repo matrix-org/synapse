@@ -15,7 +15,7 @@
 
 """ Tests REST events for /events paths."""
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 import synapse.rest.admin
 from synapse.rest.client.v1 import events, login, room
@@ -40,9 +40,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         config["enable_registration"] = True
         config["auto_join_rooms"] = []
 
-        hs = self.setup_test_homeserver(
-            config=config, ratelimiter=NonCallableMock(spec_set=["can_do_action"])
-        )
+        hs = self.setup_test_homeserver(config=config)
 
         hs.get_handlers().federation_handler = Mock()
 
