@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock, patch
-
-from synapse.api.ratelimiting import Ratelimiter
+from mock import Mock, NonCallableMock
 
 from tests.replication._base import BaseStreamTestCase
 
@@ -23,16 +21,9 @@ from tests.replication._base import BaseStreamTestCase
 class BaseSlavedStoreTestCase(BaseStreamTestCase):
     def make_homeserver(self, reactor, clock):
 
-        hs = self.setup_test_homeserver(federation_client=Mock(),)
-
-        # Patch Ratelimiter to allow all requests
-        patch.object(
-            Ratelimiter,
-            "can_do_action",
-            new_callable=lambda *args, **kwargs: (True, 0.0),
-        )
-        patch.object(
-            Ratelimiter, "ratelimit", new_callable=lambda *args, **kwargs: None
+        hs = self.setup_test_homeserver(
+            federation_client=Mock(),
+            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
         return hs
