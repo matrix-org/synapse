@@ -67,7 +67,7 @@ class Ratelimiter(object):
         Returns:
             A tuple containing:
                 * A bool indicating if they can perform the action now
-                * The time in seconds of when it can next be performed.
+                * The reactor timestamp for when the action can be performed next.
                   -1 if rate_hz is less than or equal to zero
         """
         # Override default values if set
