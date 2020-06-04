@@ -202,8 +202,10 @@ class RegistrationHandler(BaseHandler):
 
             if self.hs.config.user_directory_search_all_users:
                 profile = yield self.store.get_profileinfo(localpart)
-                yield self.user_directory_handler.handle_local_profile_change(
-                    user_id, profile
+                yield defer.ensureDeferred(
+                    self.user_directory_handler.handle_local_profile_change(
+                        user_id, profile
+                    )
                 )
 
         else:
