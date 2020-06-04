@@ -286,7 +286,7 @@ class SignaturesUploadServlet(RestServlet):
           "device_id": "<device_id>",
           "algorithms": [
             "m.olm.curve25519-aes-sha256",
-            "m.megolm.v1.aes-sha"
+            "m.megolm.v1.aes-sha2"
           ],
           "keys": {
             "<algorithm>:<device_id>": "<key_base64>",
