@@ -73,7 +73,11 @@ from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
-from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
+from synapse.handlers.room import (
+    RoomContextHandler,
+    RoomCreationHandler,
+    RoomShutdownHandler,
+)
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
@@ -144,6 +148,7 @@ class HomeServer(object):
         "handlers",
         "auth",
         "room_creation_handler",
+        "room_shutdown_handler",
         "state_handler",
         "state_resolution_handler",
         "presence_handler",
@@ -357,6 +362,9 @@ class HomeServer(object):
 
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
+
+    def build_room_shutdown_handler(self):
+        return RoomShutdownHandler(self)
 
     def build_sendmail(self):
         return sendmail

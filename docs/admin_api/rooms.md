@@ -328,13 +328,13 @@ and "[Purge room](purge_room.md)" API.
 
 Shuts down a room. Moves all local users and room aliases automatically to a
 new room if `new_room_user_id` is set. Otherwise local users only
-leaves the room without any information.
+leave the room without any information.
 
 The new room will be created with the user specified by the `new_room_user_id` parameter
 as room administrator and will contain a message explaining what happened. Users invited
 to the new room will have power level `-10` by default, and thus be unable to speak.
 
-If `block` is `True` it preventing new joins to the old room.
+If `block` is `True` it prevents new joins to the old room.
 
 This API will remove all trace of the old room from your database after removing
 all local users.
@@ -346,7 +346,7 @@ the new room. Users on other servers will be unaffected.
 
 ## Parameters
 
-The following query parameters are available:
+The following parameters should be set in the URL:
 
 * `room_id` - The ID of the room.
 
@@ -373,9 +373,7 @@ The following fields are possible in the JSON response body:
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
 
-## Usage
-
-A standard request:
+The API is:
 
 ```json
 DELETE /_synapse/admin/v1/rooms/<room_id>
@@ -388,7 +386,10 @@ DELETE /_synapse/admin/v1/rooms/<room_id>
 }
 ```
 
-Response:
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
 
 ```json
 {

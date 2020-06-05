@@ -260,8 +260,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
-            "This endpoint can only be used with local users",
-            channel.json_body["error"],
+            "User must be our own: @not:exist.bla", channel.json_body["error"],
         )
 
     def test_block_is_not_bool(self):
