@@ -64,10 +64,6 @@ class LoginType(object):
     SSO = "org.matrix.login.sso"
     DUMMY = "m.login.dummy"
 
-    # Only for C/S API v1
-    APPLICATION_SERVICE = "m.login.application_service"
-    SHARED_SECRET = "org.matrix.login.shared_secret"
-
 
 class EventTypes(object):
     Member = "m.room.member"
