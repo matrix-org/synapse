@@ -403,7 +403,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # Essentially repeat the above, but move the stream position forward (as
         # if the stream jumped).
-        command_handler.get_streams()['events'].last_token = token + 100
+        command_handler.get_streams()["events"].last_token = token + 100
         # Reset the data.
         self.test_handler.received_rdata_rows = []
 
