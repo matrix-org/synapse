@@ -22,7 +22,6 @@ from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import get_localpart_from_id
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
