@@ -363,6 +363,63 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         self.assertEqual([], received_rows)
 
+    def test_backwards_stream_id(self):
+        """
+        Test that RDATA that comes after the current position should be discarded.
+        """
+        # Get a direct reference to the ReplicationCommandHandler.
+        command_handler = self.server.command_handler
+
+        # disconnect, so that we can stack up some changes
+        self.disconnect()
+
+        # Generate an events. We inject them using inject_event so that they are
+        # not send out over replication until we call self.replicate().
+        event = self._inject_test_event()
+
+        # check we're testing what we think we are: no rows should yet have been
+        # received
+        self.assertEqual([], self.test_handler.received_rdata_rows)
+
+        # now reconnect to pull the updates
+        self.reconnect()
+        self.replicate()
+
+        # We should have received the expected single row (as well as various
+        # cache invalidation updates which we ignore).
+        received_rows = [
+            row for row in self.test_handler.received_rdata_rows if row[0] == "events"
+        ]
+
+        # There should be a single received row.
+        self.assertEqual(len(received_rows), 1)
+
+        stream_name, token, row = received_rows[0]
+        self.assertEqual("events", stream_name)
+        self.assertIsInstance(row, EventsStreamRow)
+        self.assertEqual(row.type, "ev")
+        self.assertIsInstance(row.data, EventsStreamEventRow)
+        self.assertEqual(row.data.event_id, event.event_id)
+
+        # Essentially repeat the above, but move the stream position forward (as
+        # if the stream jumped).
+        command_handler.get_streams()['events'].last_token = token + 100
+        # Reset the data.
+        self.test_handler.received_rdata_rows = []
+
+        # Generate an events. We inject them using inject_event so that they are
+        # not send out over replication until we call self.replicate().
+        self._inject_test_event()
+
+        # Send the updates.
+        self.replicate()
+
+        # No updates have been received (because it was discard as old).
+        received_rows = [
+            row for row in self.test_handler.received_rdata_rows if row[0] == "events"
+        ]
+        self.assertEqual(len(received_rows), 0)
+
     event_count = 0
 
     def _inject_test_event(
