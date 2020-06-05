@@ -420,11 +420,6 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         sync.register_servlets,
     ]
 
-    def default_config(self):
-        config = super().default_config()
-        config.update({"registration_shared_secret": None})
-        return config
-
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
