@@ -15,6 +15,7 @@ server admin: see `README.rst <README.rst>`_.
 It returns a JSON body like the following:
 
 .. code:: json
+
     {
         "displayname": "User",
         "threepids": [
