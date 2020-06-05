@@ -327,7 +327,7 @@ class ReplicationCommandHandler:
                         "Discarding RDATA from stream %s at POSITION %s before previous POSITION %s",
                         stream_name,
                         cmd.token,
-                        current_token
+                        current_token,
                     )
                 else:
                     await self.on_rdata(stream_name, cmd.instance_name, cmd.token, rows)
