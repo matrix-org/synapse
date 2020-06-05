@@ -1370,7 +1370,7 @@ class SyncHandler(object):
             sync_result_builder.now_token = now_token
 
         # We check up front if anything has changed, if it hasn't then there is
-        # no point in going futher.
+        # no point in going further.
         since_token = sync_result_builder.since_token
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:
