@@ -33,19 +33,20 @@ with a body of:
         "deactivated": false
     }
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
 Parameters:
 
 - ``password``, optional. If provided, the user's password is updated and all
   devices are logged out.
-  
+
 - ``displayname``, optional, defaults to the value of ``user_id``.
 
 - ``threepids``, optional, allows setting the third-party IDs (email, msisdn)
   belonging to a user.
 
-- ``avatar_url``, optional, must be a 
+- ``avatar_url``, optional, must be a
   `MXC URI <https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris>`_.
 
 - ``admin``, optional, defaults to ``false``.
@@ -63,7 +64,8 @@ The api is::
 
     GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: see `README.rst <README.rst>`_.
 
 The parameter ``from`` is optional but used for pagination, denoting the
 offset in the returned results. This should be treated as an opaque value and
@@ -125,10 +127,10 @@ This API returns information about a specific user account.
 
 The api is::
 
-    GET /_synapse/admin/v1/whois/<user_id> (deprecated)
     GET /_synapse/admin/v2/users/<user_id>
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
 It returns a JSON body like the following:
 
@@ -181,9 +183,10 @@ with a body of:
         "erase": true
     }
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
-The erase parameter is optional and defaults to 'false'.
+The erase parameter is optional and defaults to ``false``.
 An empty body may be passed for backwards compatibility.
 
 
@@ -205,7 +208,8 @@ with a body of:
        "logout_devices": true,
    }
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
 The parameter ``new_password`` is required.
 The parameter ``logout_devices`` is optional and defaults to ``true``.
@@ -218,7 +222,8 @@ The api is::
 
     GET /_synapse/admin/v1/users/<user_id>/admin
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
 A response body like the following is returned:
 
@@ -246,7 +251,8 @@ with a body of:
         "admin": true
     }
 
-including an ``access_token`` of a server admin.
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
 
 User devices
@@ -256,17 +262,14 @@ List all devices
 ----------------
 Gets information about all devices for a specific ``user_id``.
 
-**Usage**
+The API is::
 
-A standard request to query the devices of an user:
+  GET /_synapse/admin/v2/users/<user_id>/devices
 
-::
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
-    GET /_synapse/admin/v2/users/<user_id>/devices
-
-    {}
-
-Response:
+A response body like the following is returned:
 
 .. code:: json
 
@@ -291,11 +294,13 @@ Response:
 
 **Parameters**
 
-The following query parameters are available:
+The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 
-The following fields are possible in the JSON response body:
+**Response**
+
+The following fields are returned in the JSON response body:
 
 - ``devices`` - An array of objects, each containing information about a device.
   Device objects contain the following fields:
@@ -314,11 +319,7 @@ Delete multiple devices
 Deletes the given devices for a specific ``user_id``, and invalidates
 any access token associated with them.
 
-**Usage**
-
-A standard request to delete devices:
-
-::
+The API is::
 
     POST /_synapse/admin/v2/users/<user_id>/delete_devices
 
@@ -329,16 +330,14 @@ A standard request to delete devices:
       ],
     }
 
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
-Response:
-
-.. code:: json
-
-    {}
+An empty JSON dict is returned.
 
 **Parameters**
 
-The following query parameters are available:
+The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 
@@ -350,18 +349,14 @@ Show a device
 ---------------
 Gets information on a single device, by ``device_id`` for a specific ``user_id``.
 
-**Usage**
-
-A standard request to get a device:
-
-::
+The API is::
 
     GET /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 
-    {}
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
-
-Response:
+A response body like the following is returned:
 
 .. code:: json
 
@@ -375,12 +370,14 @@ Response:
 
 **Parameters**
 
-The following query parameters are available:
+The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 - ``device_id`` - The device to retrieve.
 
-The following fields are possible in the JSON response body:
+**Response**
+
+The following fields are returned in the JSON response body:
 
 - ``device_id`` - Identifier of device.
 - ``display_name`` - Display name set by the user for this device.
@@ -395,11 +392,7 @@ Update a device
 ---------------
 Updates the metadata on the given ``device_id`` for a specific ``user_id``.
 
-**Usage**
-
-A standard request to update a device:
-
-::
+The API is::
 
     PUT /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 
@@ -407,16 +400,14 @@ A standard request to update a device:
       "display_name": "My other phone"
     }
 
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
-Response:
-
-.. code:: json
-
-    {}
+An empty JSON dict is returned.
 
 **Parameters**
 
-The following query parameters are available:
+The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 - ``device_id`` - The device to update.
@@ -431,26 +422,20 @@ Delete a device
 Deletes the given ``device_id`` for a specific ``user_id``,
 and invalidates any access token associated with it.
 
-**Usage**
-
-A standard request for delete a device:
-
-::
+The API is::
 
     DELETE /_synapse/admin/v2/users/<user_id>/devices/<device_id>
 
     {}
 
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
 
-Response:
-
-.. code:: json
-
-    {}
+An empty JSON dict is returned.
 
 **Parameters**
 
-The following query parameters are available:
+The following parameters should be set in the URL:
 
 - ``user_id`` - fully qualified: for example, ``@user:server.com``.
 - ``device_id`` - The device to delete.
