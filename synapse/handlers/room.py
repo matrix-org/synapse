@@ -26,9 +26,15 @@ from typing import Tuple
 
 from six import iteritems, string_types
 
-from synapse.api.constants import EventTypes, JoinRules, RoomCreationPreset
+from synapse.api.constants import (
+    EventTypes,
+    JoinRules,
+    RoomCreationPreset,
+    RoomEncryptionAlgorithms,
+)
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.config.server import RoomDefaultEncryptionTypes
 from synapse.events.utils import copy_power_levels_contents
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
@@ -56,31 +62,6 @@ FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
 class RoomCreationHandler(BaseHandler):
-
-    PRESETS_DICT = {
-        RoomCreationPreset.PRIVATE_CHAT: {
-            "join_rules": JoinRules.INVITE,
-            "history_visibility": "shared",
-            "original_invitees_have_ops": False,
-            "guest_can_join": True,
-            "power_level_content_override": {"invite": 0},
-        },
-        RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
-            "join_rules": JoinRules.INVITE,
-            "history_visibility": "shared",
-            "original_invitees_have_ops": True,
-            "guest_can_join": True,
-            "power_level_content_override": {"invite": 0},
-        },
-        RoomCreationPreset.PUBLIC_CHAT: {
-            "join_rules": JoinRules.PUBLIC,
-            "history_visibility": "shared",
-            "original_invitees_have_ops": False,
-            "guest_can_join": False,
-            "power_level_content_override": {},
-        },
-    }
-
     def __init__(self, hs):
         super(RoomCreationHandler, self).__init__(hs)
 
@@ -88,6 +69,54 @@ class RoomCreationHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
+
+        self._presets_dict = {
+            RoomCreationPreset.PRIVATE_CHAT: {
+                "join_rules": JoinRules.INVITE,
+                "history_visibility": "shared",
+                "original_invitees_have_ops": False,
+                "guest_can_join": True,
+                "power_level_content_override": {"invite": 0},
+                "encryption_algorithm": (
+                    RoomEncryptionAlgorithms.DEFAULT
+                    if hs.config.encryption_enabled_by_default_for_room_type
+                    in [
+                        RoomDefaultEncryptionTypes.ALL,
+                        RoomDefaultEncryptionTypes.INVITE,
+                    ]
+                    else None
+                ),
+            },
+            RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
+                "join_rules": JoinRules.INVITE,
+                "history_visibility": "shared",
+                "original_invitees_have_ops": True,
+                "guest_can_join": True,
+                "power_level_content_override": {"invite": 0},
+                "encryption_algorithm": (
+                    RoomEncryptionAlgorithms.DEFAULT
+                    if hs.config.encryption_enabled_by_default_for_room_type
+                    in [
+                        RoomDefaultEncryptionTypes.ALL,
+                        RoomDefaultEncryptionTypes.INVITE,
+                    ]
+                    else None
+                ),
+            },
+            RoomCreationPreset.PUBLIC_CHAT: {
+                "join_rules": JoinRules.PUBLIC,
+                "history_visibility": "shared",
+                "original_invitees_have_ops": False,
+                "guest_can_join": False,
+                "power_level_content_override": {},
+                "encryption_algorithm": (
+                    RoomEncryptionAlgorithms.DEFAULT
+                    if hs.config.encryption_enabled_by_default_for_room_type
+                    in [RoomDefaultEncryptionTypes.ALL]
+                    else None
+                ),
+            },
+        }
 
         self._replication = hs.get_replication_data_handler()
 
@@ -798,7 +827,7 @@ class RoomCreationHandler(BaseHandler):
             )
             return last_stream_id
 
-        config = RoomCreationHandler.PRESETS_DICT[preset_config]
+        config = self._presets_dict[preset_config]
 
         creator_id = creator.user.to_string()
 
@@ -886,6 +915,13 @@ class RoomCreationHandler(BaseHandler):
         for (etype, state_key), content in initial_state.items():
             last_sent_stream_id = await send(
                 etype=etype, state_key=state_key, content=content
+            )
+
+        if config["encryption_algorithm"]:
+            last_sent_stream_id = await send(
+                etype=EventTypes.RoomEncryption,
+                state_key="",
+                content={"algorithm": config["encryption_algorithm"]},
             )
 
         return last_sent_stream_id

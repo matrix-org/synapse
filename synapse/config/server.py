@@ -57,6 +57,14 @@ on how to configure the new listener.
 --------------------------------------------------------------------------------"""
 
 
+class RoomDefaultEncryptionTypes(object):
+    """Possible values for the encryption_enabled_by_default_for_room_type config option"""
+
+    ALL = "all"
+    INVITE = "invite"
+    OFF = "off"
+
+
 class ServerConfig(Config):
     section = "server"
 
@@ -519,6 +527,12 @@ class ServerConfig(Config):
         # which one isn't.
         self.request_token_inhibit_3pid_errors = config.get(
             "request_token_inhibit_3pid_errors", False,
+        )
+
+        # Whether new, locally-created rooms should have encryption enabled
+        self.encryption_enabled_by_default_for_room_type = config.get(
+            "encryption_enabled_by_default_for_room_type",
+            RoomDefaultEncryptionTypes.OFF,
         )
 
     def has_tls_listener(self) -> bool:
@@ -1013,6 +1027,20 @@ class ServerConfig(Config):
         # act as if no error happened and return a fake session ID ('sid') to clients.
         #
         #request_token_inhibit_3pid_errors: true
+
+        # Controls whether locally-created rooms should be end-to-end encrypted by
+        # default.
+        #
+        # Possible options are "all", "invite", and "off". They are defined as:
+        #
+        # * "all": any locally-created room
+        # * "invite": any locally-created room that requires an invite to join
+        # * "off": this option will take no effect
+        #
+        # Note that this option will only affect rooms created after it is set. It
+        # will also not affect rooms created by another, federated server.
+        #
+        #encryption_enabled_by_default_for_room_type: "off"
         """
             % locals()
         )
