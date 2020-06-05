@@ -1,11 +1,46 @@
 .. contents::
 
+Query User Account
+==================
+
+This API returns information about a specific user account.
+
+The api is::
+
+    GET /_synapse/admin/v2/users/<user_id>
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+It returns a JSON body like the following:
+
+.. code:: json
+    {
+        "displayname": "User",
+        "threepids": [
+            {
+                "medium": "email",
+                "address": "<user_mail_1>"
+            },
+            {
+                "medium": "email",
+                "address": "<user_mail_2>"
+            }
+        ],
+        "avatar_url": "<avatar_url>",
+        "admin": false,
+        "deactivated": false
+    }
+
+URL parameters:
+
+- ``user_id``: fully-qualified user id: for example, ``@user:server.com``.
+
 Create or modify Account
 ========================
 
 This API allows an administrator to create or modify a user account with a
-specific ``user_id``. Be aware that ``user_id`` is fully qualified: for example,
-``@user:server.com``.
+specific ``user_id``.
 
 This api is::
 
@@ -36,7 +71,11 @@ with a body of:
 To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
 
-Parameters:
+URL parameters:
+
+- ``user_id``: fully-qualified user id: for example, ``@user:server.com``.
+
+Body parameters:
 
 - ``password``, optional. If provided, the user's password is updated and all
   devices are logged out.
@@ -120,14 +159,14 @@ with ``from`` set to the value of ``next_token``. This will return a new page.
 If the endpoint does not return a ``next_token`` then there are no more users
 to paginate through.
 
-Query Account
-=============
+Query current sessions for a user
+=================================
 
-This API returns information about a specific user account.
+This API returns information about the active sessions for a specific user.
 
 The api is::
 
-    GET /_synapse/admin/v2/users/<user_id>
+    GET /_synapse/admin/v1/whois/<user_id>
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
