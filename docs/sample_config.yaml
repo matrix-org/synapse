@@ -1223,9 +1223,11 @@ account_threepid_delegates:
 #
 #autocreate_auto_join_rooms: true
 
-# When auto_join_rooms is specified, setting this flag to False prevents
-# guest accounts from being automatically joined to the rooms. Default
-# true when auto_join_rooms is specified.
+# When auto_join_rooms is specified, setting this flag to false prevents
+# guest accounts from being automatically joined to the rooms.
+#
+# Defaults to true.
+#
 #auto_join_rooms_for_guests: false
 
 
