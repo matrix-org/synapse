@@ -129,6 +129,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         def check_user_in_room(room_id, user_id):
             if user_id not in [u.to_string() for u in self.room_members]:
                 raise AuthError(401, "User is not in the room")
+            return defer.succeed(None)
 
         hs.get_auth().check_user_in_room = check_user_in_room
 
@@ -138,7 +139,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
         def get_current_users_in_room(room_id):
-            return {str(u) for u in self.room_members}
+            return defer.succeed({str(u) for u in self.room_members})
 
         hs.get_state_handler().get_current_users_in_room = get_current_users_in_room
 
