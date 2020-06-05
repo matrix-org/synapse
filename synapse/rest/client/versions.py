@@ -53,7 +53,6 @@ class VersionsRestServlet(RestServlet):
                 ],
                 # as per MSC1497:
                 "unstable_features": {
-                    "m.lazy_load_members": True,
                     # Implements support for label-based filtering as described in
                     # MSC2326.
                     "org.matrix.label_based_filtering": True,
