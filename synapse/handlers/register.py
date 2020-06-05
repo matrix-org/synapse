@@ -425,14 +425,7 @@ class RegistrationHandler(BaseHandler):
         if not address:
             return
 
-        time_now = self.clock.time()
-
-        self.ratelimiter.ratelimit(
-            address,
-            time_now_s=time_now,
-            rate_hz=self.hs.config.rc_registration.per_second,
-            burst_count=self.hs.config.rc_registration.burst_count,
-        )
+        self.ratelimiter.ratelimit(address)
 
     def register_with_store(
         self,
