@@ -136,7 +136,7 @@ class StatsHandler:
 
         Returns:
             tuple[dict[str, Counter], dict[str, counter]]
-            Resolves to two dicts, the room deltas and the user deltas,
+            Two dicts: the room deltas and the user deltas,
             mapping from room/user ID to changes in the various fields.
         """
 
