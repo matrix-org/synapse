@@ -302,21 +302,6 @@ class UserDirectoryHandler(StateDeltasHandler):
         for user_id, profile in iteritems(users_with_profile):
             await self._handle_new_user(room_id, user_id, profile)
 
-    async def _handle_local_user(self, user_id):
-        """Adds a new local roomless user into the user_directory_search table.
-        Used to populate up the user index when we have an
-        user_directory_search_all_users specified.
-        """
-        logger.debug("Adding new local user to dir, %r", user_id)
-
-        profile = await self.store.get_profileinfo(get_localpart_from_id(user_id))
-
-        row = await self.store.get_user_in_directory(user_id)
-        if not row:
-            await self.store.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
-            )
-
     async def _handle_new_user(self, room_id, user_id, profile):
         """Called when we might need to add user to directory
 
