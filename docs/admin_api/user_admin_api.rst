@@ -257,7 +257,7 @@ Gets information about all devices for a specific ``user_id``.
 
 **Usage**
 
-A standard request for query devices of an user:
+A standard request to query the devices of an user:
 
 ::
 
@@ -297,7 +297,7 @@ The following query parameters are available:
 The following fields are possible in the JSON response body:
 
 - ``devices`` - An array of objects, each containing information about a device.
-  Devices objects contain the following fields:
+  Device objects contain the following fields:
 
   - ``device_id`` - Identifier of device.
   - ``display_name`` - Display name set by the user for this device.
@@ -315,7 +315,7 @@ any access token associated with them.
 
 **Usage**
 
-A standard request for delete devices:
+A standard request to delete devices:
 
 ::
 
@@ -351,7 +351,7 @@ Gets information on a single device, by ``device_id`` for a specific ``user_id``
 
 **Usage**
 
-A standard request for get a device:
+A standard request to get a device:
 
 ::
 
@@ -396,7 +396,7 @@ Updates the metadata on the given ``device_id`` for a specific ``user_id``.
 
 **Usage**
 
-A standard request for update a device:
+A standard request to update a device:
 
 ::
 

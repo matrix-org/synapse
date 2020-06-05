@@ -1,1 +1,1 @@
-Add admin APIs to allow server admins to list users' devices, and log out specific devices.
+Add admin APIs to allow server admins to manage users' devices. Contributed by @dklimpel.
