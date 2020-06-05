@@ -61,7 +61,7 @@ class LoginType(object):
     MSISDN = "m.login.msisdn"
     RECAPTCHA = "m.login.recaptcha"
     TERMS = "m.login.terms"
-    SSO = "org.matrix.login.sso"
+    SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
 
 
