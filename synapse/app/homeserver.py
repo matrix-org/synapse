@@ -489,7 +489,7 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
         uptime = 0
 
     #
-    # Performance statistics
+    # Performance statistics. Keep this early in the function to maintain reliability of `test_performance_100` test.
     #
     old = stats_process[0]
     new = (now, resource.getrusage(resource.RUSAGE_SELF))
