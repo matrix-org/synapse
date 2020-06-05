@@ -66,11 +66,6 @@ class EventsStreamTestCase(BaseStreamTestCase):
         # also one state event
         state_event = self._inject_state_event()
 
-        # tell the notifier to catch up to avoid duplicate rows.
-        # workaround for https://github.com/matrix-org/synapse/issues/7360
-        # FIXME remove this when the above is fixed
-        self.replicate()
-
         # check we're testing what we think we are: no rows should yet have been
         # received
         self.assertEqual([], self.test_handler.received_rdata_rows)
@@ -173,11 +168,6 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # one more bit of state that doesn't get rolled back
         state2 = self._inject_state_event()
-
-        # tell the notifier to catch up to avoid duplicate rows.
-        # workaround for https://github.com/matrix-org/synapse/issues/7360
-        # FIXME remove this when the above is fixed
-        self.replicate()
 
         # check we're testing what we think we are: no rows should yet have been
         # received
@@ -326,11 +316,6 @@ class EventsStreamTestCase(BaseStreamTestCase):
             )
             prev_events = [e.event_id]
             pl_events.append(e)
-
-        # tell the notifier to catch up to avoid duplicate rows.
-        # workaround for https://github.com/matrix-org/synapse/issues/7360
-        # FIXME remove this when the above is fixed
-        self.replicate()
 
         # check we're testing what we think we are: no rows should yet have been
         # received
