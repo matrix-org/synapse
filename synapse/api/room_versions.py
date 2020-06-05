@@ -57,6 +57,17 @@ class RoomVersion(object):
     state_res = attr.ib()  # int; one of the StateResolutionVersions
     enforce_key_validity = attr.ib()  # bool
 
+    # bool: before MSC2261/MSC2432, m.room.aliases had special auth rules and redaction rules
+    special_case_aliases_auth = attr.ib(type=bool)
+    # Strictly enforce canonicaljson, do not allow:
+    # * Integers outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
+    # * Floats
+    # * NaN, Infinity, -Infinity
+    strict_canonicaljson = attr.ib(type=bool)
+    # bool: MSC2209: Check 'notifications' key while verifying
+    # m.room.power_levels auth rules.
+    limit_notifications_power_levels = attr.ib(type=bool)
+
 
 class RoomVersions(object):
     V1 = RoomVersion(
@@ -65,6 +76,9 @@ class RoomVersions(object):
         EventFormatVersions.V1,
         StateResolutionVersions.V1,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
+        strict_canonicaljson=False,
+        limit_notifications_power_levels=False,
     )
     V2 = RoomVersion(
         "2",
@@ -72,6 +86,9 @@ class RoomVersions(object):
         EventFormatVersions.V1,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
+        strict_canonicaljson=False,
+        limit_notifications_power_levels=False,
     )
     V3 = RoomVersion(
         "3",
@@ -79,6 +96,9 @@ class RoomVersions(object):
         EventFormatVersions.V2,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
+        strict_canonicaljson=False,
+        limit_notifications_power_levels=False,
     )
     V4 = RoomVersion(
         "4",
@@ -86,6 +106,9 @@ class RoomVersions(object):
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=False,
+        special_case_aliases_auth=True,
+        strict_canonicaljson=False,
+        limit_notifications_power_levels=False,
     )
     V5 = RoomVersion(
         "5",
@@ -93,6 +116,19 @@ class RoomVersions(object):
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
+        special_case_aliases_auth=True,
+        strict_canonicaljson=False,
+        limit_notifications_power_levels=False,
+    )
+    V6 = RoomVersion(
+        "6",
+        RoomDisposition.STABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
     )
 
 
@@ -104,5 +140,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V3,
         RoomVersions.V4,
         RoomVersions.V5,
+        RoomVersions.V6,
     )
 }  # type: Dict[str, RoomVersion]

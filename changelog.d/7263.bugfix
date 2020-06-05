@@ -1,0 +1,1 @@
+Allow new users to be registered via the admin API even if the monthly active user limit has been reached. Contributed by @dkimpel.

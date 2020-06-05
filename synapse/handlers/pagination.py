@@ -88,6 +88,8 @@ class PaginationHandler(object):
         if hs.config.retention_enabled:
             # Run the purge jobs described in the configuration file.
             for job in hs.config.retention_purge_jobs:
+                logger.info("Setting up purge job with config: %s", job)
+
                 self.clock.looping_call(
                     run_as_background_process,
                     job["interval"],
@@ -130,11 +132,22 @@ class PaginationHandler(object):
         else:
             include_null = False
 
+        logger.info(
+            "[purge] Running purge job for %s < max_lifetime <= %s (include NULLs = %s)",
+            min_ms,
+            max_ms,
+            include_null,
+        )
+
         rooms = yield self.store.get_rooms_for_retention_period_in_range(
             min_ms, max_ms, include_null
         )
 
+        logger.debug("[purge] Rooms to purge: %s", rooms)
+
         for room_id, retention_policy in iteritems(rooms):
+            logger.info("[purge] Attempting to purge messages in room %s", room_id)
+
             if room_id in self._purges_in_progress_by_room:
                 logger.warning(
                     "[purge] not purging room %s as there's an ongoing purge running"
@@ -156,7 +169,7 @@ class PaginationHandler(object):
 
             stream_ordering = yield self.store.find_first_stream_ordering_after_ts(ts)
 
-            r = yield self.store.get_room_event_after_stream_ordering(
+            r = yield self.store.get_room_event_before_stream_ordering(
                 room_id, stream_ordering,
             )
             if not r:
@@ -268,7 +281,7 @@ class PaginationHandler(object):
         """Purge the given room from the database"""
         with (await self.pagination_lock.write(room_id)):
             # check we know about the room
-            await self.store.get_room_version(room_id)
+            await self.store.get_room_version_id(room_id)
 
             # first check that we have no users in this room
             joined = await defer.maybeDeferred(
@@ -322,7 +335,9 @@ class PaginationHandler(object):
             (
                 membership,
                 member_event_id,
-            ) = await self.auth.check_in_room_or_world_readable(room_id, user_id)
+            ) = await self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
+            )
 
             if source_config.direction == "b":
                 # if we're going backwards, we might need to backfill. This

@@ -86,17 +86,18 @@ class MetricsConfig(Config):
         # enabled by default, either for performance reasons or limited use.
         #
         metrics_flags:
-            # Publish synapse_federation_known_servers, a g auge of the number of
+            # Publish synapse_federation_known_servers, a gauge of the number of
             # servers this homeserver knows about, including itself. May cause
             # performance problems on large homeservers.
             #
             #known_servers: true
 
         # Whether or not to report anonymized homeserver usage statistics.
+        #
         """
 
         if report_stats is None:
-            res += "# report_stats: true|false\n"
+            res += "#report_stats: true|false\n"
         else:
             res += "report_stats: %s\n" % ("true" if report_stats else "false")
 

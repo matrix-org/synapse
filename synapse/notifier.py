@@ -15,11 +15,13 @@
 
 import logging
 from collections import namedtuple
+from typing import Callable, Iterable, List, TypeVar
 
 from prometheus_client import Counter
 
 from twisted.internet import defer
 
+import synapse.server
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
 from synapse.handlers.presence import format_user_presence_state
@@ -40,12 +42,14 @@ users_woken_by_stream_counter = Counter(
     "synapse_notifier_users_woken_by_stream", "", ["stream"]
 )
 
+T = TypeVar("T")
+
 
 # TODO(paul): Should be shared somewhere
-def count(func, l):
-    """Return the number of items in l for which func returns true."""
+def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
+    """Return the number of items in it for which func returns true."""
     n = 0
-    for x in l:
+    for x in it:
         if func(x):
             n += 1
     return n
@@ -154,7 +158,7 @@ class Notifier(object):
 
     UNUSED_STREAM_EXPIRY_MS = 10 * 60 * 1000
 
-    def __init__(self, hs):
+    def __init__(self, hs: "synapse.server.HomeServer"):
         self.user_to_user_stream = {}
         self.room_to_user_streams = {}
 
@@ -164,7 +168,12 @@ class Notifier(object):
         self.store = hs.get_datastore()
         self.pending_new_room_events = []
 
-        self.replication_callbacks = []
+        # Called when there are new things to stream over replication
+        self.replication_callbacks = []  # type: List[Callable[[], None]]
+
+        # Called when remote servers have come back online after having been
+        # down.
+        self.remote_server_up_callbacks = []  # type: List[Callable[[str], None]]
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
@@ -205,7 +214,7 @@ class Notifier(object):
             "synapse_notifier_users", "", [], lambda: len(self.user_to_user_stream)
         )
 
-    def add_replication_callback(self, cb):
+    def add_replication_callback(self, cb: Callable[[], None]):
         """Add a callback that will be called when some new data is available.
         Callback is not given any arguments. It should *not* return a Deferred - if
         it needs to do any asynchronous work, a background thread should be started and
@@ -266,10 +275,9 @@ class Notifier(object):
             "room_key", room_stream_id, users=extra_users, rooms=[event.room_id]
         )
 
-    @defer.inlineCallbacks
-    def _notify_app_services(self, room_stream_id):
+    async def _notify_app_services(self, room_stream_id):
         try:
-            yield self.appservice_handler.notify_interested_services(room_stream_id)
+            await self.appservice_handler.notify_interested_services(room_stream_id)
         except Exception:
             logger.exception("Error notifying application services of event")
 
@@ -468,20 +476,18 @@ class Notifier(object):
 
         return result
 
-    @defer.inlineCallbacks
-    def _get_room_ids(self, user, explicit_room_id):
-        joined_room_ids = yield self.store.get_rooms_for_user(user.to_string())
+    async def _get_room_ids(self, user, explicit_room_id):
+        joined_room_ids = await self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
                 return [explicit_room_id], True
-            if (yield self._is_world_readable(explicit_room_id)):
+            if await self._is_world_readable(explicit_room_id):
                 return [explicit_room_id], False
             raise AuthError(403, "Non-joined access not allowed")
         return joined_room_ids, True
 
-    @defer.inlineCallbacks
-    def _is_world_readable(self, room_id):
-        state = yield self.state_handler.get_current_state(
+    async def _is_world_readable(self, room_id):
+        state = await self.state_handler.get_current_state(
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:
@@ -522,3 +528,12 @@ class Notifier(object):
         """Notify the any replication listeners that there's a new event"""
         for cb in self.replication_callbacks:
             cb()
+
+    def notify_remote_server_up(self, server: str):
+        """Notify any replication that a remote server has come back up
+        """
+        # We call federation_sender directly rather than registering as a
+        # callback as a) we already have a reference to it and b) it introduces
+        # circular dependencies.
+        if self.federation_sender:
+            self.federation_sender.wake_destination(server)

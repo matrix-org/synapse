@@ -33,8 +33,8 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self, name="test"):
-        config = super().default_config(name=name)
+    def default_config(self):
+        config = super().default_config()
         config["limit_remote_rooms"] = {"enabled": True, "complexity": 0.05}
         return config
 
@@ -79,7 +79,9 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=defer.succeed({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=defer.succeed(("", 1))
+        )
 
         d = handler._remote_join(
             None,
@@ -115,7 +117,9 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=defer.succeed(None))
-        handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=defer.succeed(("", 1))
+        )
 
         # Artificially raise the complexity
         self.hs.get_datastore().get_current_state_event_counts = lambda x: defer.succeed(

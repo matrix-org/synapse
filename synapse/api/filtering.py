@@ -15,6 +15,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List
+
 from six import text_type
 
 import jsonschema
@@ -293,7 +295,7 @@ class Filter(object):
             room_id = None
             ev_type = "m.presence"
             contains_url = False
-            labels = []
+            labels = []  # type: List[str]
         else:
             sender = event.get("sender", None)
             if not sender:

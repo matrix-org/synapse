@@ -1,0 +1,1 @@
+Convert `get_user_id_by_threepid` to async/await.

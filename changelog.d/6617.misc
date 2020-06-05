@@ -1,1 +1,0 @@
-Reduce the reconnect time when worker replication fails, to make it easier to catch up.

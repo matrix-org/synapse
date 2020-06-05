@@ -39,7 +39,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         # Create a test user and room
         self.user = UserID("alice", "test")
         self.requester = Requester(self.user, None, False, None, None)
-        info = self.get_success(self.room_creator.create_room(self.requester, {}))
+        info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
 
     def run_background_update(self):
@@ -134,7 +134,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         latest_event_ids = self.get_success(
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
-        self.assertEqual(set(latest_event_ids), set((event_id_a, event_id_b)))
+        self.assertEqual(set(latest_event_ids), {event_id_a, event_id_b})
 
         # Run the background update and check it did the right thing
         self.run_background_update()
@@ -172,7 +172,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         latest_event_ids = self.get_success(
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
-        self.assertEqual(set(latest_event_ids), set((event_id_a, event_id_b)))
+        self.assertEqual(set(latest_event_ids), {event_id_a, event_id_b})
 
         # Run the background update and check it did the right thing
         self.run_background_update()
@@ -227,9 +227,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         latest_event_ids = self.get_success(
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
-        self.assertEqual(
-            set(latest_event_ids), set((event_id_a, event_id_b, event_id_c))
-        )
+        self.assertEqual(set(latest_event_ids), {event_id_a, event_id_b, event_id_c})
 
         # Run the background update and check it did the right thing
         self.run_background_update()
@@ -237,7 +235,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         latest_event_ids = self.get_success(
             self.store.get_latest_event_ids_in_room(self.room_id)
         )
-        self.assertEqual(set(latest_event_ids), set([event_id_b, event_id_c]))
+        self.assertEqual(set(latest_event_ids), {event_id_b, event_id_c})
 
 
 class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
@@ -263,7 +261,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.user = UserID.from_string(self.register_user("user1", "password"))
         self.token1 = self.login("user1", "password")
         self.requester = Requester(self.user, None, False, None, None)
-        info = self.get_success(self.room_creator.create_room(self.requester, {}))
+        info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
         self.event_creator = homeserver.get_event_creation_handler()
         homeserver.config.user_consent_version = self.CONSENT_VERSION

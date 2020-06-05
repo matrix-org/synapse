@@ -18,8 +18,11 @@
 
 import json
 import time
+from typing import Any, Dict, Optional
 
 import attr
+
+from twisted.web.resource import Resource
 
 from synapse.api.constants import Membership
 
@@ -36,7 +39,7 @@ class RestHelper(object):
     resource = attr.ib()
     auth_user_id = attr.ib()
 
-    def create_room_as(self, room_creator, is_public=True, tok=None):
+    def create_room_as(self, room_creator=None, is_public=True, tok=None):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
@@ -140,7 +143,34 @@ class RestHelper(object):
 
         return channel.json_body
 
-    def send_state(self, room_id, event_type, body, tok, expect_code=200, state_key=""):
+    def _read_write_state(
+        self,
+        room_id: str,
+        event_type: str,
+        body: Optional[Dict[str, Any]],
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+        method: str = "GET",
+    ) -> Dict:
+        """Read or write some state from a given room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            body: Body that is sent when making the request. The content of the state event.
+                If None, the request to the server will have an empty body
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+            method: "GET" or "PUT" for reading or writing state, respectively
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
         path = "/_matrix/client/r0/rooms/%s/state/%s/%s" % (
             room_id,
             event_type,
@@ -149,14 +179,109 @@ class RestHelper(object):
         if tok:
             path = path + "?access_token=%s" % tok
 
-        request, channel = make_request(
-            self.hs.get_reactor(), "PUT", path, json.dumps(body).encode("utf8")
-        )
+        # Set request body if provided
+        content = b""
+        if body is not None:
+            content = json.dumps(body).encode("utf8")
+
+        request, channel = make_request(self.hs.get_reactor(), method, path, content)
+
         render(request, self.resource, self.hs.get_reactor())
 
         assert int(channel.result["code"]) == expect_code, (
             "Expected: %d, got: %d, resp: %r"
             % (expect_code, int(channel.result["code"]), channel.result["body"])
+        )
+
+        return channel.json_body
+
+    def get_state(
+        self,
+        room_id: str,
+        event_type: str,
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+    ):
+        """Gets some state from a room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
+        return self._read_write_state(
+            room_id, event_type, None, tok, expect_code, state_key, method="GET"
+        )
+
+    def send_state(
+        self,
+        room_id: str,
+        event_type: str,
+        body: Dict[str, Any],
+        tok: str,
+        expect_code: int = 200,
+        state_key: str = "",
+    ):
+        """Set some state in a room
+
+        Args:
+            room_id:
+            event_type: The type of state event
+            body: Body that is sent when making the request. The content of the state event.
+            tok: The access token to use
+            expect_code: The HTTP code to expect in the response
+            state_key:
+
+        Returns:
+            The response body from the server
+
+        Raises:
+            AssertionError: if expect_code doesn't match the HTTP code we received
+        """
+        return self._read_write_state(
+            room_id, event_type, body, tok, expect_code, state_key, method="PUT"
+        )
+
+    def upload_media(
+        self,
+        resource: Resource,
+        image_data: bytes,
+        tok: str,
+        filename: str = "test.png",
+        expect_code: int = 200,
+    ) -> dict:
+        """Upload a piece of test media to the media repo
+        Args:
+            resource: The resource that will handle the upload request
+            image_data: The image data to upload
+            tok: The user token to use during the upload
+            filename: The filename of the media to be uploaded
+            expect_code: The return code to expect from attempting to upload the media
+        """
+        image_length = len(image_data)
+        path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
+        request, channel = make_request(
+            self.hs.get_reactor(), "POST", path, content=image_data, access_token=tok
+        )
+        request.requestHeaders.addRawHeader(
+            b"Content-Length", str(image_length).encode("UTF-8")
+        )
+        request.render(resource)
+        self.hs.get_reactor().pump([100])
+
+        assert channel.code == expect_code, "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         return channel.json_body

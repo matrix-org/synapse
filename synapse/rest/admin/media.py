@@ -32,21 +32,83 @@ class QuarantineMediaInRoom(RestServlet):
     this server.
     """
 
-    PATTERNS = historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
+    PATTERNS = (
+        historical_admin_path_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
+        +
+        # This path kept around for legacy reasons
+        historical_admin_path_patterns("/quarantine_media/(?P<room_id>[^/]+)")
+    )
 
     def __init__(self, hs):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request, room_id):
+    async def on_POST(self, request, room_id: str):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
+        logging.info("Quarantining room: %s", room_id)
+
+        # Quarantine all media in this room
         num_quarantined = await self.store.quarantine_media_ids_in_room(
             room_id, requester.user.to_string()
         )
 
         return 200, {"num_quarantined": num_quarantined}
+
+
+class QuarantineMediaByUser(RestServlet):
+    """Quarantines all local media by a given user so that no one can download it via
+    this server.
+    """
+
+    PATTERNS = historical_admin_path_patterns(
+        "/user/(?P<user_id>[^/]+)/media/quarantine"
+    )
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_POST(self, request, user_id: str):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        logging.info("Quarantining local media by user: %s", user_id)
+
+        # Quarantine all media this user has uploaded
+        num_quarantined = await self.store.quarantine_media_ids_by_user(
+            user_id, requester.user.to_string()
+        )
+
+        return 200, {"num_quarantined": num_quarantined}
+
+
+class QuarantineMediaByID(RestServlet):
+    """Quarantines local or remote media by a given ID so that no one can download
+    it via this server.
+    """
+
+    PATTERNS = historical_admin_path_patterns(
+        "/media/quarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+    )
+
+    def __init__(self, hs):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_POST(self, request, server_name: str, media_id: str):
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        logging.info("Quarantining local media by ID: %s/%s", server_name, media_id)
+
+        # Quarantine this media id
+        await self.store.quarantine_media_by_id(
+            server_name, media_id, requester.user.to_string()
+        )
+
+        return 200, {}
 
 
 class ListMediaInRoom(RestServlet):
@@ -94,4 +156,6 @@ def register_servlets_for_media_repo(hs, http_server):
     """
     PurgeMediaCacheRestServlet(hs).register(http_server)
     QuarantineMediaInRoom(hs).register(http_server)
+    QuarantineMediaByID(hs).register(http_server)
+    QuarantineMediaByUser(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)

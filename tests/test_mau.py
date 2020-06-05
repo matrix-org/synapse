@@ -17,40 +17,44 @@
 
 import json
 
-from mock import Mock
-
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.rest.client.v2_alpha import register, sync
 
 from tests import unittest
+from tests.unittest import override_config
+from tests.utils import default_config
 
 
 class TestMauLimit(unittest.HomeserverTestCase):
 
     servlets = [register.register_servlets, sync.register_servlets]
 
-    def make_homeserver(self, reactor, clock):
+    def default_config(self):
+        config = default_config("test")
 
-        self.hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock()
+        config.update(
+            {
+                "registrations_require_3pid": [],
+                "limit_usage_by_mau": True,
+                "max_mau_value": 2,
+                "mau_trial_days": 0,
+                "server_notices": {
+                    "system_mxid_localpart": "server",
+                    "room_name": "Test Server Notice Room",
+                },
+            }
         )
 
-        self.store = self.hs.get_datastore()
+        # apply any additional config which was specified via the override_config
+        # decorator.
+        if self._extra_config is not None:
+            config.update(self._extra_config)
 
-        self.hs.config.registrations_require_3pid = []
-        self.hs.config.enable_registration_captcha = False
-        self.hs.config.recaptcha_public_key = []
+        return config
 
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.hs_disabled = False
-        self.hs.config.max_mau_value = 2
-        self.hs.config.mau_trial_days = 0
-        self.hs.config.server_notices_mxid = "@server:red"
-        self.hs.config.server_notices_mxid_display_name = None
-        self.hs.config.server_notices_mxid_avatar_url = None
-        self.hs.config.server_notices_room_name = "Test Server Notice Room"
-        return self.hs
+    def prepare(self, reactor, clock, homeserver):
+        self.store = homeserver.get_datastore()
 
     def test_simple_deny_mau(self):
         # Create and sync so that the MAU counts get updated
@@ -58,6 +62,9 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.do_sync_for_user(token1)
         token2 = self.create_user("kermit2")
         self.do_sync_for_user(token2)
+
+        # check we're testing what we think we are: there should be two active users
+        self.assertEqual(self.get_success(self.store.get_monthly_active_count()), 2)
 
         # We've created and activated two users, we shouldn't be able to
         # register new users
@@ -78,7 +85,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         # Advance time by 31 days
         self.reactor.advance(31 * 24 * 60 * 60)
 
-        self.store.reap_monthly_active_users()
+        self.get_success(self.store.reap_monthly_active_users())
 
         self.reactor.advance(0)
 
@@ -86,9 +93,8 @@ class TestMauLimit(unittest.HomeserverTestCase):
         token3 = self.create_user("kermit3")
         self.do_sync_for_user(token3)
 
+    @override_config({"mau_trial_days": 1})
     def test_trial_delay(self):
-        self.hs.config.mau_trial_days = 1
-
         # We should be able to register more than the limit initially
         token1 = self.create_user("kermit1")
         self.do_sync_for_user(token1)
@@ -120,6 +126,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.assertEqual(e.code, 403)
         self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
+    @override_config({"mau_trial_days": 1})
     def test_trial_users_cant_come_back(self):
         self.hs.config.mau_trial_days = 1
 
@@ -140,8 +147,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
 
         # Advance by 2 months so everyone falls out of MAU
         self.reactor.advance(60 * 24 * 60 * 60)
-        self.store.reap_monthly_active_users()
-        self.reactor.advance(0)
+        self.get_success(self.store.reap_monthly_active_users())
 
         # We can create as many new users as we want
         token4 = self.create_user("kermit4")
@@ -168,11 +174,11 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.assertEqual(e.code, 403)
         self.assertEqual(e.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
+    @override_config(
+        # max_mau_value should not matter
+        {"max_mau_value": 1, "limit_usage_by_mau": False, "mau_stats_only": True}
+    )
     def test_tracked_but_not_limited(self):
-        self.hs.config.max_mau_value = 1  # should not matter
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.mau_stats_only = True
-
         # Simply being able to create 2 users indicates that the
         # limit was not reached.
         token1 = self.create_user("kermit1")

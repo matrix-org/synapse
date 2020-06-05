@@ -31,7 +31,7 @@ from prometheus_client import Gauge
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
-from twisted.web.resource import EncodingResourceWrapper, NoResource
+from twisted.web.resource import EncodingResourceWrapper, IResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 
@@ -52,7 +52,11 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
-from synapse.http.server import RootRedirect
+from synapse.http.server import (
+    OptionsResource,
+    RootOptionsRedirectResource,
+    RootRedirect,
+)
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
@@ -69,7 +73,6 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.prepare_database import UpgradeDatabaseException
-from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
@@ -109,15 +112,24 @@ class SynapseHomeServer(HomeServer):
         for path, resmodule in additional_resources.items():
             handler_cls, config = load_module(resmodule)
             handler = handler_cls(config, module_api)
-            resources[path] = AdditionalResource(self, handler.handle_request)
+            if IResource.providedBy(handler):
+                resource = handler
+            elif hasattr(handler, "handle_request"):
+                resource = AdditionalResource(self, handler.handle_request)
+            else:
+                raise ConfigError(
+                    "additional_resource %s does not implement a known interface"
+                    % (resmodule["module"],)
+                )
+            resources[path] = resource
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
-            root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
-            root_resource = RootRedirect(STATIC_PREFIX)
+            root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
-            root_resource = NoResource()
+            root_resource = OptionsResource()
 
         root_resource = create_resource_tree(resources, root_resource)
 
@@ -183,6 +195,11 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
+            if self.get_config().oidc_enabled:
+                from synapse.rest.oidc import OIDCResource
+
+                resources["/_synapse/oidc"] = OIDCResource(self)
+
             if self.get_config().saml2_enabled:
                 from synapse.rest.saml2 import SAML2Resource
 
@@ -232,16 +249,26 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_path = self.get_config().web_client_location
+            webclient_loc = self.get_config().web_client_location
 
-            if webclient_path is None:
+            if webclient_loc is None:
                 logger.warning(
                     "Not enabling webclient resource, as web_client_location is unset."
                 )
+            elif webclient_loc.startswith("http://") or webclient_loc.startswith(
+                "https://"
+            ):
+                resources[WEB_CLIENT_PREFIX] = RootRedirect(webclient_loc)
             else:
+                logger.warning(
+                    "Running webclient on the same domain is not recommended: "
+                    "https://github.com/matrix-org/synapse#security-note - "
+                    "after you move webclient to different host you can set "
+                    "web_client_location to its full URL to enable redirection."
+                )
                 # GZip is disabled here due to
                 # https://twistedmatrix.com/trac/ticket/7678
-                resources[WEB_CLIENT_PREFIX] = File(webclient_path)
+                resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
@@ -253,6 +280,12 @@ class SynapseHomeServer(HomeServer):
 
     def start_listening(self, listeners):
         config = self.get_config()
+
+        if config.redis_enabled:
+            # If redis is enabled we connect via the replication command handler
+            # in the same way as the workers (since we're effectively a client
+            # rather than a server).
+            self.get_tcp_replication().start_replication(self)
 
         for listener in listeners:
             if listener["type"] == "http":
@@ -289,6 +322,11 @@ class SynapseHomeServer(HomeServer):
 
 # Gauges to expose monthly active user control metrics
 current_mau_gauge = Gauge("synapse_admin_mau:current", "Current MAU")
+current_mau_by_service_gauge = Gauge(
+    "synapse_admin_mau_current_mau_by_service",
+    "Current MAU by service",
+    ["app_service"],
+)
 max_mau_gauge = Gauge("synapse_admin_mau:max", "MAU Limit")
 registered_reserved_users_mau_gauge = Gauge(
     "synapse_admin_mau:registered_reserved_users",
@@ -392,9 +430,15 @@ def setup(config_options):
                 # Check if it needs to be reprovisioned every day.
                 hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
 
+            # Load the OIDC provider metadatas, if OIDC is enabled.
+            if hs.config.oidc_enabled:
+                oidc = hs.get_oidc_handler()
+                # Loading the provider metadata also ensures the provider config is valid.
+                yield defer.ensureDeferred(oidc.load_metadata())
+                yield defer.ensureDeferred(oidc.load_jwks())
+
             _base.start(hs, config.listeners)
 
-            hs.get_pusherpool().start()
             hs.get_datastore().db.updates.start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.
@@ -444,6 +488,29 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     if uptime < 0:
         uptime = 0
 
+    #
+    # Performance statistics. Keep this early in the function to maintain reliability of `test_performance_100` test.
+    #
+    old = stats_process[0]
+    new = (now, resource.getrusage(resource.RUSAGE_SELF))
+    stats_process[0] = new
+
+    # Get RSS in bytes
+    stats["memory_rss"] = new[1].ru_maxrss
+
+    # Get CPU time in % of a single core, not % of all cores
+    used_cpu_time = (new[1].ru_utime + new[1].ru_stime) - (
+        old[1].ru_utime + old[1].ru_stime
+    )
+    if used_cpu_time == 0 or new[0] == old[0]:
+        stats["cpu_average"] = 0
+    else:
+        stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
+
+    #
+    # General statistics
+    #
+
     stats["homeserver"] = hs.config.server_name
     stats["server_context"] = hs.config.server_context
     stats["timestamp"] = now
@@ -475,27 +542,8 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
-    stats["cache_factor"] = CACHE_SIZE_FACTOR
-    stats["event_cache_size"] = hs.config.event_cache_size
-
-    #
-    # Performance statistics
-    #
-    old = stats_process[0]
-    new = (now, resource.getrusage(resource.RUSAGE_SELF))
-    stats_process[0] = new
-
-    # Get RSS in bytes
-    stats["memory_rss"] = new[1].ru_maxrss
-
-    # Get CPU time in % of a single core, not % of all cores
-    used_cpu_time = (new[1].ru_utime + new[1].ru_stime) - (
-        old[1].ru_utime + old[1].ru_stime
-    )
-    if used_cpu_time == 0 or new[0] == old[0]:
-        stats["cpu_average"] = 0
-    else:
-        stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
+    stats["cache_factor"] = hs.config.caches.global_factor
+    stats["event_cache_size"] = hs.config.caches.event_cache_size
 
     #
     # Database version
@@ -573,15 +621,22 @@ def run(hs):
     clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
     reap_monthly_active_users()
 
-    @defer.inlineCallbacks
-    def generate_monthly_active_users():
+    async def generate_monthly_active_users():
         current_mau_count = 0
+        current_mau_count_by_service = {}
         reserved_users = ()
         store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
-            current_mau_count = yield store.get_monthly_active_count()
-            reserved_users = yield store.get_registered_reserved_users()
+            current_mau_count = await store.get_monthly_active_count()
+            current_mau_count_by_service = (
+                await store.get_monthly_active_count_by_service()
+            )
+            reserved_users = await store.get_registered_reserved_users()
         current_mau_gauge.set(float(current_mau_count))
+
+        for app_service, count in current_mau_count_by_service.items():
+            current_mau_by_service_gauge.labels(app_service).set(float(count))
+
         registered_reserved_users_mau_gauge.set(float(len(reserved_users)))
         max_mau_gauge.set(float(hs.config.max_mau_value))
 

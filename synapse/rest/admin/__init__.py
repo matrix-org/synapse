@@ -26,10 +26,20 @@ from synapse.rest.admin._base import (
     assert_requester_is_admin,
     historical_admin_path_patterns,
 )
+from synapse.rest.admin.devices import (
+    DeleteDevicesRestServlet,
+    DeviceRestServlet,
+    DevicesRestServlet,
+)
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
-from synapse.rest.admin.rooms import ShutdownRoomRestServlet
+from synapse.rest.admin.rooms import (
+    JoinRoomAliasServlet,
+    ListRoomRestServlet,
+    RoomRestServlet,
+    ShutdownRoomRestServlet,
+)
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
@@ -38,6 +48,7 @@ from synapse.rest.admin.users import (
     SearchUsersRestServlet,
     UserAdminServlet,
     UserRegisterServlet,
+    UserRestServletV2,
     UsersRestServlet,
     UsersRestServletV2,
     WhoisRestServlet,
@@ -106,7 +117,7 @@ class PurgeHistoryRestServlet(RestServlet):
 
             stream_ordering = await self.store.find_first_stream_ordering_after_ts(ts)
 
-            r = await self.store.get_room_event_after_stream_ordering(
+            r = await self.store.get_room_event_before_stream_ordering(
                 room_id, stream_ordering
             )
             if not r:
@@ -187,11 +198,18 @@ def register_servlets(hs, http_server):
     Register all the admin servlets.
     """
     register_servlets_for_client_rest_resource(hs, http_server)
+    ListRoomRestServlet(hs).register(http_server)
+    RoomRestServlet(hs).register(http_server)
+    JoinRoomAliasServlet(hs).register(http_server)
     PurgeRoomServlet(hs).register(http_server)
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
+    UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
+    DeviceRestServlet(hs).register(http_server)
+    DevicesRestServlet(hs).register(http_server)
+    DeleteDevicesRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):

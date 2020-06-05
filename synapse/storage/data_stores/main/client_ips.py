@@ -21,8 +21,7 @@ from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import Database
-from synapse.util.caches import CACHE_SIZE_FACTOR
+from synapse.storage.database import Database, make_tuple_comparison_clause
 from synapse.util.caches.descriptors import Cache
 
 logger = logging.getLogger(__name__)
@@ -303,16 +302,10 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
             #      we'll just end up updating the same device row multiple
             #      times, which is fine.
 
-            if self.database_engine.supports_tuple_comparison:
-                where_clause = "(user_id, device_id) > (?, ?)"
-                where_args = [last_user_id, last_device_id]
-            else:
-                # We explicitly do a `user_id >= ? AND (...)` here to ensure
-                # that an index is used, as doing `user_id > ? OR (user_id = ? AND ...)`
-                # makes it hard for query optimiser to tell that it can use the
-                # index on user_id
-                where_clause = "user_id >= ? AND (user_id > ? OR device_id > ?)"
-                where_args = [last_user_id, last_user_id, last_device_id]
+            where_clause, where_args = make_tuple_comparison_clause(
+                self.database_engine,
+                [("user_id", last_user_id), ("device_id", last_device_id)],
+            )
 
             sql = """
                 SELECT
@@ -367,7 +360,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
     def __init__(self, database: Database, db_conn, hs):
 
         self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
+            name="client_ip_last_seen", keylen=4, max_entries=50000
         )
 
         super(ClientIpStore, self).__init__(database, db_conn, hs)
@@ -530,7 +523,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
             for row in rows
         )
-        return list(
+        return [
             {
                 "access_token": access_token,
                 "ip": ip,
@@ -538,7 +531,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 "last_seen": last_seen,
             }
             for (access_token, ip), (user_agent, last_seen) in iteritems(results)
-        )
+        ]
 
     @wrap_as_background_process("prune_old_user_ips")
     async def _prune_old_user_ips(self):

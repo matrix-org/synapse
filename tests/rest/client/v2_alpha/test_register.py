@@ -25,19 +25,24 @@ import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v1 import login
+from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import account, account_validity, register, sync
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
-    servlets = [register.register_servlets]
+    servlets = [
+        login.register_servlets,
+        register.register_servlets,
+        synapse.rest.admin.register_servlets,
+    ]
     url = b"/_matrix/client/r0/register"
 
-    def default_config(self, name="test"):
-        config = super().default_config(name)
+    def default_config(self):
+        config = super().default_config()
         config["allow_guest_access"] = True
         return config
 
@@ -142,10 +147,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting_guest(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
-
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
             request, channel = self.make_request(b"POST", url, b"{}")
@@ -164,10 +167,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
-
         for i in range(0, 6):
             params = {
                 "username": "kermit" + str(i),
@@ -260,6 +261,47 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             [["m.login.email.identity"]], (f["stages"] for f in flows)
         )
 
+    @unittest.override_config(
+        {
+            "request_token_inhibit_3pid_errors": True,
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_request_token_existing_email_inhibit_error(self):
+        """Test that requesting a token via this endpoint doesn't leak existing
+        associations if configured that way.
+        """
+        user_id = self.register_user("kermit", "monkey")
+        self.login("kermit", "monkey")
+
+        email = "test@example.com"
+
+        # Add a threepid
+        self.get_success(
+            self.hs.get_datastore().user_add_threepid(
+                user_id=user_id,
+                medium="email",
+                address=email,
+                validated_at=0,
+                added_at=0,
+            )
+        )
+
+        request, channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": email, "send_attempt": 1},
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+        self.assertIsNotNone(channel.json_body.get("sid"))
+
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
 
@@ -268,6 +310,7 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         sync.register_servlets,
+        logout.register_servlets,
         account_validity.register_servlets,
     ]
 
@@ -359,6 +402,39 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
         self.assertEquals(
             channel.json_body["errcode"], Codes.EXPIRED_ACCOUNT, channel.result
         )
+
+    def test_logging_out_expired_user(self):
+        user_id = self.register_user("kermit", "monkey")
+        tok = self.login("kermit", "monkey")
+
+        self.register_user("admin", "adminpassword", admin=True)
+        admin_tok = self.login("admin", "adminpassword")
+
+        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        params = {
+            "user_id": user_id,
+            "expiration_ts": 0,
+            "enable_renewal_emails": False,
+        }
+        request_data = json.dumps(params)
+        request, channel = self.make_request(
+            b"POST", url, request_data, access_token=admin_tok
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Try to log the user out
+        request, channel = self.make_request(b"POST", "/logout", access_token=tok)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Log the user in again (allowed for expired accounts)
+        tok = self.login("kermit", "monkey")
+
+        # Try to log out all of the user's sessions
+        request, channel = self.make_request(b"POST", "/logout/all", access_token=tok)
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
 
 
 class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):

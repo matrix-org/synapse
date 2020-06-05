@@ -43,7 +43,6 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
 from synapse.util.logcontext import LoggingContext
 from synapse.util.versionstring import get_version_string
@@ -78,18 +77,6 @@ class AdminCmdServer(HomeServer):
 
     def start_listening(self, listeners):
         pass
-
-    def build_tcp_replication(self):
-        return AdminCmdReplicationHandler(self)
-
-
-class AdminCmdReplicationHandler(ReplicationClientHandler):
-    @defer.inlineCallbacks
-    def on_rdata(self, stream_name, token, rows):
-        pass
-
-    def get_streams_to_replicate(self):
-        return {}
 
 
 @defer.inlineCallbacks

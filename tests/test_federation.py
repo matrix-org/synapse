@@ -2,16 +2,17 @@ from mock import Mock
 
 from twisted.internet.defer import ensureDeferred, maybeDeferred, succeed
 
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
 from synapse.types import Requester, UserID
 from synapse.util import Clock
+from synapse.util.retryutils import NotRetryingDestination
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
 
 
-class MessageAcceptTests(unittest.TestCase):
+class MessageAcceptTests(unittest.HomeserverTestCase):
     def setUp(self):
 
         self.http_client = Mock()
@@ -27,11 +28,13 @@ class MessageAcceptTests(unittest.TestCase):
         user_id = UserID("us", "test")
         our_user = Requester(user_id, None, False, None, None)
         room_creator = self.homeserver.get_room_creation_handler()
-        room = room_creator.create_room(
-            our_user, room_creator.PRESETS_DICT["public_chat"], ratelimit=False
+        room_deferred = ensureDeferred(
+            room_creator.create_room(
+                our_user, room_creator.PRESETS_DICT["public_chat"], ratelimit=False
+            )
         )
         self.reactor.advance(0.1)
-        self.room_id = self.successResultOf(room)["room_id"]
+        self.room_id = self.successResultOf(room_deferred)[0]["room_id"]
 
         self.store = self.homeserver.get_datastore()
 
@@ -43,7 +46,7 @@ class MessageAcceptTests(unittest.TestCase):
             )
         )[0]
 
-        join_event = FrozenEvent(
+        join_event = make_event_from_dict(
             {
                 "room_id": self.room_id,
                 "sender": "@baduser:test.serv",
@@ -105,7 +108,7 @@ class MessageAcceptTests(unittest.TestCase):
         )[0]
 
         # Now lie about an event
-        lying_event = FrozenEvent(
+        lying_event = make_event_from_dict(
             {
                 "room_id": self.room_id,
                 "sender": "@baduser:test.serv",
@@ -143,3 +146,119 @@ class MessageAcceptTests(unittest.TestCase):
         # Make sure the invalid event isn't there
         extrem = maybeDeferred(self.store.get_latest_event_ids_in_room, self.room_id)
         self.assertEqual(self.successResultOf(extrem)[0], "$join:test.serv")
+
+    def test_retry_device_list_resync(self):
+        """Tests that device lists are marked as stale if they couldn't be synced, and
+        that stale device lists are retried periodically.
+        """
+        remote_user_id = "@john:test_remote"
+        remote_origin = "test_remote"
+
+        # Track the number of attempts to resync the user's device list.
+        self.resync_attempts = 0
+
+        # When this function is called, increment the number of resync attempts (only if
+        # we're querying devices for the right user ID), then raise a
+        # NotRetryingDestination error to fail the resync gracefully.
+        def query_user_devices(destination, user_id):
+            if user_id == remote_user_id:
+                self.resync_attempts += 1
+
+            raise NotRetryingDestination(0, 0, destination)
+
+        # Register the mock on the federation client.
+        federation_client = self.homeserver.get_federation_client()
+        federation_client.query_user_devices = Mock(side_effect=query_user_devices)
+
+        # Register a mock on the store so that the incoming update doesn't fail because
+        # we don't share a room with the user.
+        store = self.homeserver.get_datastore()
+        store.get_rooms_for_user = Mock(return_value=["!someroom:test"])
+
+        # Manually inject a fake device list update. We need this update to include at
+        # least one prev_id so that the user's device list will need to be retried.
+        device_list_updater = self.homeserver.get_device_handler().device_list_updater
+        self.get_success(
+            device_list_updater.incoming_device_list_update(
+                origin=remote_origin,
+                edu_content={
+                    "deleted": False,
+                    "device_display_name": "Mobile",
+                    "device_id": "QBUAZIFURK",
+                    "prev_id": [5],
+                    "stream_id": 6,
+                    "user_id": remote_user_id,
+                },
+            )
+        )
+
+        # Check that there was one resync attempt.
+        self.assertEqual(self.resync_attempts, 1)
+
+        # Check that the resync attempt failed and caused the user's device list to be
+        # marked as stale.
+        need_resync = self.get_success(
+            store.get_user_ids_requiring_device_list_resync()
+        )
+        self.assertIn(remote_user_id, need_resync)
+
+        # Check that waiting for 30 seconds caused Synapse to retry resyncing the device
+        # list.
+        self.reactor.advance(30)
+        self.assertEqual(self.resync_attempts, 2)
+
+    def test_cross_signing_keys_retry(self):
+        """Tests that resyncing a device list correctly processes cross-signing keys from
+        the remote server.
+        """
+        remote_user_id = "@john:test_remote"
+        remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
+        remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
+
+        # Register mock device list retrieval on the federation client.
+        federation_client = self.homeserver.get_federation_client()
+        federation_client.query_user_devices = Mock(
+            return_value={
+                "user_id": remote_user_id,
+                "stream_id": 1,
+                "devices": [],
+                "master_key": {
+                    "user_id": remote_user_id,
+                    "usage": ["master"],
+                    "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                },
+                "self_signing_key": {
+                    "user_id": remote_user_id,
+                    "usage": ["self_signing"],
+                    "keys": {
+                        "ed25519:" + remote_self_signing_key: remote_self_signing_key
+                    },
+                },
+            }
+        )
+
+        # Resync the device list.
+        device_handler = self.homeserver.get_device_handler()
+        self.get_success(
+            device_handler.device_list_updater.user_device_resync(remote_user_id),
+        )
+
+        # Retrieve the cross-signing keys for this user.
+        keys = self.get_success(
+            self.store.get_e2e_cross_signing_keys_bulk(user_ids=[remote_user_id]),
+        )
+        self.assertTrue(remote_user_id in keys)
+
+        # Check that the master key is the one returned by the mock.
+        master_key = keys[remote_user_id]["master"]
+        self.assertEqual(len(master_key["keys"]), 1)
+        self.assertTrue("ed25519:" + remote_master_key in master_key["keys"].keys())
+        self.assertTrue(remote_master_key in master_key["keys"].values())
+
+        # Check that the self-signing key is the one returned by the mock.
+        self_signing_key = keys[remote_user_id]["self_signing"]
+        self.assertEqual(len(self_signing_key["keys"]), 1)
+        self.assertTrue(
+            "ed25519:" + remote_self_signing_key in self_signing_key["keys"].keys(),
+        )
+        self.assertTrue(remote_self_signing_key in self_signing_key["keys"].values())

@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Any, Dict, Optional
 
 from six import iteritems
 
@@ -89,7 +90,11 @@ class RoomListHandler(BaseHandler):
             logger.info("Bypassing cache as search request.")
 
             return self._get_public_room_list(
-                limit, since_token, search_filter, network_tuple=network_tuple
+                limit,
+                since_token,
+                search_filter,
+                network_tuple=network_tuple,
+                from_federation=from_federation,
             )
 
         key = (limit, since_token, network_tuple)
@@ -105,22 +110,22 @@ class RoomListHandler(BaseHandler):
     @defer.inlineCallbacks
     def _get_public_room_list(
         self,
-        limit=None,
-        since_token=None,
-        search_filter=None,
-        network_tuple=EMPTY_THIRD_PARTY_ID,
-        from_federation=False,
-    ):
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        network_tuple: ThirdPartyInstanceID = EMPTY_THIRD_PARTY_ID,
+        from_federation: bool = False,
+    ) -> Dict[str, Any]:
         """Generate a public room list.
         Args:
-            limit (int|None): Maximum amount of rooms to return.
-            since_token (str|None)
-            search_filter (dict|None): Dictionary to filter rooms by.
-            network_tuple (ThirdPartyInstanceID): Which public list to use.
+            limit: Maximum amount of rooms to return.
+            since_token:
+            search_filter: Dictionary to filter rooms by.
+            network_tuple: Which public list to use.
                 This can be (None, None) to indicate the main list, or a particular
                 appservice and network id to use an appservice specific one.
                 Setting to None returns all public rooms across all lists.
-            from_federation (bool): Whether this request originated from a
+            from_federation: Whether this request originated from a
                 federating server or a client. Used for room filtering.
         """
 
@@ -216,15 +221,6 @@ class RoomListHandler(BaseHandler):
                         direction_is_forward=False,
                     ).to_token()
 
-        for room in results:
-            # populate search result entries with additional fields, namely
-            # 'aliases'
-            room_id = room["room_id"]
-
-            aliases = yield self.store.get_aliases_for_room(room_id)
-            if aliases:
-                room["aliases"] = aliases
-
         response["chunk"] = results
 
         response["total_room_count_estimate"] = yield self.store.count_public_rooms(
@@ -257,9 +253,20 @@ class RoomListHandler(BaseHandler):
         """
         result = {"room_id": room_id, "num_joined_members": num_joined_users}
 
+        if with_alias:
+            aliases = yield self.store.get_aliases_for_room(
+                room_id, on_invalidate=cache_context.invalidate
+            )
+            if aliases:
+                result["aliases"] = aliases
+
         current_state_ids = yield self.store.get_current_state_ids(
             room_id, on_invalidate=cache_context.invalidate
         )
+
+        if not current_state_ids:
+            # We're not in the room, so may as well bail out here.
+            return result
 
         event_map = yield self.store.get_events(
             [
@@ -293,14 +300,7 @@ class RoomListHandler(BaseHandler):
         create_event = current_state.get((EventTypes.Create, ""))
         result["m.federate"] = create_event.content.get("m.federate", True)
 
-        if with_alias:
-            aliases = yield self.store.get_aliases_for_room(
-                room_id, on_invalidate=cache_context.invalidate
-            )
-            if aliases:
-                result["aliases"] = aliases
-
-        name_event = yield current_state.get((EventTypes.Name, ""))
+        name_event = current_state.get((EventTypes.Name, ""))
         if name_event:
             name = name_event.content.get("name", None)
             if name:
