@@ -12,12 +12,12 @@ server admin. (Note that a server admin is distinct from a room admin.)
 
 A user can be marked as a server admin by updating the database directly, e.g.:
 
-```sql
-UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
-```
+.. code-block:: sql
+
+    UPDATE users SET admin = 1 WHERE name = '@foo:bar.com';
 
 A new server admin user can also be created using the
-`register_new_matrix_user` script.
+``register_new_matrix_user`` script.
 
 Finding your user's `access_token` is client-dependent, but will usually be shown in the client's settings.
 
