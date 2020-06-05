@@ -123,9 +123,9 @@ class ReplicationCommandHandler:
         # outgoing replication commands to.)
         self._connections = []  # type: List[AbstractConnection]
 
-        # For each connection, a map of the incoming stream names that are
-        # coming from that connection to the position in that stream.
-        self._streams_by_connection = {}  # type: Dict[AbstractConnection, Dict[str, int]]
+        # For each connection, the incoming stream names that are coming from
+        # that connection.
+        self._streams_by_connection = {}  # type: Dict[AbstractConnection, Set[str]]
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",
@@ -312,17 +312,24 @@ class ReplicationCommandHandler:
                 rows = self._pending_batches.pop(stream_name, [])
                 rows.append(row)
 
-                prev_position = sbc[stream_name]
-                logger.debug("Processing stream %s from %s to %s", stream_name, prev_position, cmd.token)
-                if cmd.token < prev_position:
+                stream = self._streams.get(stream_name)
+                if not stream:
+                    logger.error("Got RDATA for unknown stream: %s", stream_name)
+                    return
+
+                # Find where we previously streamed up to.
+                current_token = stream.current_token(cmd.instance_name)
+
+                # Discard this data if this token is earlier than the current
+                # position.
+                if cmd.token <= current_token:
                     logger.debug(
                         "Discarding RDATA from stream %s at POSITION %s before previous POSITION %s",
                         stream_name,
                         cmd.token,
-                        sbc[stream_name]
+                        current_token
                     )
                 else:
-                    sbc[stream_name] = cmd.token
                     await self.on_rdata(stream_name, cmd.instance_name, cmd.token, rows)
 
     async def on_rdata(
@@ -361,7 +368,7 @@ class ReplicationCommandHandler:
             # We're about to go and catch up with the stream, so remove from set
             # of connected streams.
             for streams in self._streams_by_connection.values():
-                streams.pop(stream_name, None)
+                streams.discard(stream_name)
 
             # We clear the pending batches for the stream as the fetching of the
             # missing updates below will fetch all rows in the batch.
@@ -409,8 +416,7 @@ class ReplicationCommandHandler:
                 cmd.stream_name, cmd.instance_name, cmd.token
             )
 
-            logger.debug("Setting final position for stream %s to %s", stream_name, cmd.token)
-            self._streams_by_connection.setdefault(conn, {})[stream_name] = cmd.token
+            self._streams_by_connection.setdefault(conn, set()).add(stream_name)
 
     async def on_REMOTE_SERVER_UP(
         self, conn: AbstractConnection, cmd: RemoteServerUpCommand
