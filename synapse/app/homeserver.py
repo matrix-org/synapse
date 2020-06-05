@@ -488,6 +488,29 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     if uptime < 0:
         uptime = 0
 
+    #
+    # Performance statistics. Keep this early in the function to maintain reliability of `test_performance_100` test.
+    #
+    old = stats_process[0]
+    new = (now, resource.getrusage(resource.RUSAGE_SELF))
+    stats_process[0] = new
+
+    # Get RSS in bytes
+    stats["memory_rss"] = new[1].ru_maxrss
+
+    # Get CPU time in % of a single core, not % of all cores
+    used_cpu_time = (new[1].ru_utime + new[1].ru_stime) - (
+        old[1].ru_utime + old[1].ru_stime
+    )
+    if used_cpu_time == 0 or new[0] == old[0]:
+        stats["cpu_average"] = 0
+    else:
+        stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
+
+    #
+    # General statistics
+    #
+
     stats["homeserver"] = hs.config.server_name
     stats["server_context"] = hs.config.server_context
     stats["timestamp"] = now
@@ -521,25 +544,6 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     stats["daily_sent_messages"] = daily_sent_messages
     stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.caches.event_cache_size
-
-    #
-    # Performance statistics
-    #
-    old = stats_process[0]
-    new = (now, resource.getrusage(resource.RUSAGE_SELF))
-    stats_process[0] = new
-
-    # Get RSS in bytes
-    stats["memory_rss"] = new[1].ru_maxrss
-
-    # Get CPU time in % of a single core, not % of all cores
-    used_cpu_time = (new[1].ru_utime + new[1].ru_stime) - (
-        old[1].ru_utime + old[1].ru_stime
-    )
-    if used_cpu_time == 0 or new[0] == old[0]:
-        stats["cpu_average"] = 0
-    else:
-        stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
 
     #
     # Database version
