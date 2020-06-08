@@ -15,6 +15,7 @@
 from mock import Mock
 
 from synapse.handlers.typing import RoomMember
+from synapse.replication.tcp.commands import PositionCommand
 from synapse.replication.tcp.streams import TypingStream
 
 from tests.replication._base import BaseStreamTestCase
@@ -48,6 +49,68 @@ class TypingStreamTestCase(BaseStreamTestCase):
         row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
         self.assertEqual(room_id, row.room_id)
         self.assertEqual([USER_ID], row.user_ids)
+
+        # Now let's disconnect and insert some data.
+        self.disconnect()
+
+        self.test_handler.on_rdata.reset_mock()
+
+        typing._push_update(member=RoomMember(room_id, USER_ID), typing=False)
+
+        self.test_handler.on_rdata.assert_not_called()
+
+        self.reconnect()
+        self.pump(0.1)
+
+        # We should now see an attempt to connect to the master
+        request = self.handle_http_replication_attempt()
+        self.assert_request_is_get_repl_stream_updates(request, "typing")
+
+        # The from token should be the token from the last RDATA we got.
+        self.assertEqual(int(request.args[b"from_token"][0]), token)
+
+        self.test_handler.on_rdata.assert_called_once()
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        self.assertEqual(stream_name, "typing")
+        self.assertEqual(1, len(rdata_rows))
+        row = rdata_rows[0]
+        self.assertEqual(room_id, row.room_id)
+        self.assertEqual([], row.user_ids)
+
+    def test_reset(self):
+        """
+        Test what happens when a typing stream resets.
+
+        This is emulated by jumping the stream ahead, then reconnecting (which
+        sends the proper position and RDATA).
+        """
+        typing = self.hs.get_typing_handler()
+
+        room_id = "!bar:blue"
+
+        self.reconnect()
+
+        typing._push_update(member=RoomMember(room_id, USER_ID), typing=True)
+
+        self.reactor.advance(0)
+
+        # We should now see an attempt to connect to the master
+        request = self.handle_http_replication_attempt()
+        self.assert_request_is_get_repl_stream_updates(request, "typing")
+
+        self.test_handler.on_rdata.assert_called_once()
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        self.assertEqual(stream_name, "typing")
+        self.assertEqual(1, len(rdata_rows))
+        row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
+        self.assertEqual(room_id, row.room_id)
+        self.assertEqual([USER_ID], row.user_ids)
+
+        # Jump the stream ahead manually, the state of the master is not
+        # modified, however.
+        self.hs.get_tcp_replication().send_command(
+            PositionCommand("typing", "master", 100)
+        )
 
         # Now let's disconnect and insert some data.
         self.disconnect()
