@@ -1601,6 +1601,11 @@ oidc_config:
   #
   #skip_verification: true
 
+  # Always use userinfo endpoint. Required for providers that don't include
+  # user information in the token response, e.g. Gitlab.
+  #
+  #uses_userinfo: true
+
   # An external module can be provided here as a custom solution to mapping
   # attributes returned from a OIDC provider onto a matrix user.
   #
