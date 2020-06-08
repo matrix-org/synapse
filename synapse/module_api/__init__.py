@@ -128,8 +128,12 @@ class ModuleApi(object):
         Returns:
             Deferred[str]: user_id
         """
-        return self._hs.get_registration_handler().register_user(
-            localpart=localpart, default_display_name=displayname, bind_emails=emails
+        return defer.ensureDeferred(
+            self._hs.get_registration_handler().register_user(
+                localpart=localpart,
+                default_display_name=displayname,
+                bind_emails=emails,
+            )
         )
 
     def register_device(self, user_id, device_id=None, initial_display_name=None):
