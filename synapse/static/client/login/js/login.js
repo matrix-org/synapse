@@ -22,7 +22,7 @@ const COOKIE_KEY = "synapse_login_fallback_qs";
  */
 function submitLogin(type, data, extra, callback) {
     console.log("Logging in with " + type);
-    set_title(TITLE_POST_AUTH);
+    setTitle(TITLE_POST_AUTH);
 
     // Add the login type.
     data.type = type;
@@ -49,7 +49,7 @@ function submitLogin(type, data, extra, callback) {
 function errorFunc(err) {
     // We want to show the error to the user rather than redirecting immediately to the
     // SSO portal (if SSO is the only login option), so we inhibit the redirect.
-    show_login(true);
+    showLogin(true);
 
     if (err.responseJSON && err.responseJSON.error) {
         setFeedbackString(err.responseJSON.error + " (" + err.responseJSON.errcode + ")");
@@ -75,10 +75,10 @@ function setFeedbackString(text) {
  * * Configures and shows the SSO form, if the server supports SSO.
  * * Otherwise, shows the password form.
  */
-function show_login(inhibit_redirect) {
-    set_title(TITLE_PRE_AUTH);
+function showLogin(inhibitRedirect) {
+    setTitle(TITLE_PRE_AUTH);
 
-    // If inhibit_redirect is false, and SSO is the only supported login method,
+    // If inhibitRedirect is false, and SSO is the only supported login method,
     // we can redirect straight to the SSO page.
     if (matrixLogin.serverAcceptsSso) {
         // Set the redirect to come back to this page, a login token will get
@@ -92,7 +92,7 @@ function show_login(inhibit_redirect) {
 
         // If password is not supported and redirects are allowed, then submit
         // the form (redirecting to the SSO provider).
-        if (!inhibit_redirect && !matrixLogin.serverAcceptsPassword) {
+        if (!inhibitRedirect && !matrixLogin.serverAcceptsPassword) {
             $("#sso_form").submit();
             return;
         }
@@ -116,7 +116,7 @@ function show_login(inhibit_redirect) {
 /*
  * Hides the forms and shows a loading throbber.
  */
-function show_spinner() {
+function showSpinner() {
     $("#password_flow").hide();
     $("#sso_flow").hide();
     $("#no_login_types").hide();
@@ -126,7 +126,7 @@ function show_spinner() {
 /*
  * Helper to show the page's main title.
  */
-function set_title(title) {
+function setTitle(title) {
     $("#title").text(title);
 }
 
@@ -135,7 +135,7 @@ function set_title(title) {
  *
  * This populates matrixLogin.serverAccepts* variables.
  */
-function fetch_login_flows(cb) {
+function fetchLoginFlows(cb) {
     $.get(matrixLogin.endpoint, function(response) {
         for (var i = 0; i < response.flows.length; i++) {
             var flow = response.flows[i];
@@ -157,10 +157,10 @@ function fetch_login_flows(cb) {
  * Called on load to fetch login flows and attempt SSO login (if a token is available).
  */
 matrixLogin.onLoad = function() {
-    fetch_login_flows(function() {
+    fetchLoginFlows(function() {
         // (Maybe) attempt logging in via SSO if a token is available.
-        if (!try_token()) {
-            show_login(false);
+        if (!tryTokenLogin()) {
+            showLogin(false);
         }
     });
 };
@@ -168,13 +168,13 @@ matrixLogin.onLoad = function() {
 /*
  * Submit simple user & password login.
  */
-matrixLogin.password_login = function() {
+matrixLogin.passwordLogin = function() {
     var user = $("#user_id").val();
     var pwd = $("#password").val();
 
     setFeedbackString("");
 
-    show_spinner();
+    showSpinner();
     submitLogin(
         "m.login.password",
         {user: user, password: pwd},
@@ -262,7 +262,7 @@ function deleteCookie(key) {
  * Submits the login token if one is found in the query parameters. Returns a
  * boolean of whether the login token was found or not.
  */
-function try_token() {
+function tryTokenLogin() {
     // Check if the login token is in the query parameters.
     var qs = parseQsFromUrl();
 
@@ -274,7 +274,7 @@ function try_token() {
     // Retrieve the original query parameters (from before the SSO redirect).
     // They are stored as JSON in a cookie.
     var cookies = parseCookies();
-    var original_query_params = JSON.parse(cookies[COOKIE_KEY] || "{}")
+    var originalQueryParams = JSON.parse(cookies[COOKIE_KEY] || "{}")
 
     // If the login is successful, delete the cookie.
     function callback() {
@@ -284,7 +284,7 @@ function try_token() {
     submitLogin(
         "m.login.token",
         {token: loginToken},
-        original_query_params,
+        originalQueryParams,
         callback);
 
     return true;
