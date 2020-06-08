@@ -69,7 +69,7 @@ var show_login = function(inhibit_redirect) {
     // If inhibit_redirect is false, and SSO is the only supported login method,
     // we can redirect straight to the SSO page.
     if (matrixLogin.serverAcceptsSso) {
-        // Before submitted SSO, set the current query parameters into a cookie
+        // Before submitting SSO, set the current query parameters into a cookie
         // for retrieval later.
         var qs = parseQsFromUrl();
         setCookie(COOKIE_KEY, JSON.stringify(qs));
