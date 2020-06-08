@@ -402,6 +402,10 @@ class EventsStreamTestCase(BaseStreamTestCase):
         # Reset the data.
         self.test_handler.received_rdata_rows = []
 
+        # Save the current token for later.
+        worker_events_stream = self.worker_hs.get_replication_streams()["events"]
+        prev_token = worker_events_stream.current_token("master")
+
         # Manually send an old RDATA command, which should get dropped. This
         # re-uses the row from above, but with an earlier stream token.
         self.hs.get_tcp_replication().send_command(
@@ -413,6 +417,10 @@ class EventsStreamTestCase(BaseStreamTestCase):
             row for row in self.test_handler.received_rdata_rows if row[0] == "events"
         ]
         self.assertEqual(len(received_rows), 0)
+
+        # Ensure the stream has not gone backwards.
+        current_token = worker_events_stream.current_token("master")
+        self.assertGreaterEqual(current_token, prev_token)
 
     event_count = 0
 
