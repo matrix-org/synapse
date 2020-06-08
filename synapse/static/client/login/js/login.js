@@ -20,7 +20,7 @@ const COOKIE_KEY = "synapse_login_fallback_qs";
  *     login request, e.g. device_id.
  * callback: (Optional) Function to call on successful login.
  */
-var submitLogin = function(type, data, extra, callback) {
+function submitLogin(type, data, extra, callback) {
     console.log("Logging in with " + type);
     set_title(TITLE_POST_AUTH);
 
@@ -41,9 +41,9 @@ var submitLogin = function(type, data, extra, callback) {
         }
         matrixLogin.onLogin(response);
     }).fail(errorFunc);
-};
+}
 
-var errorFunc = function(err) {
+function errorFunc(err) {
     // We want to show the error to the user rather than redirecting immediately to the
     // SSO portal (if SSO is the only login option), so we inhibit the redirect.
     show_login(true);
@@ -54,13 +54,13 @@ var errorFunc = function(err) {
     else {
         setFeedbackString("Request failed: " + err.status);
     }
-};
+}
 
-var setFeedbackString = function(text) {
+function setFeedbackString(text) {
     $("#feedback").text(text);
-};
+}
 
-var show_login = function(inhibit_redirect) {
+function show_login(inhibit_redirect) {
     // Set the redirect to come back to this page, a login token will get added
     // and handled after the redirect.
     var this_page = window.location.origin + window.location.pathname;
@@ -94,20 +94,20 @@ var show_login = function(inhibit_redirect) {
     set_title(TITLE_PRE_AUTH);
 
     $("#loading").hide();
-};
+}
 
-var show_spinner = function() {
+function show_spinner() {
     $("#password_flow").hide();
     $("#sso_flow").hide();
     $("#no_login_types").hide();
     $("#loading").show();
-};
+}
 
-var set_title = function(title) {
+function set_title(title) {
     $("#title").text(title);
-};
+}
 
-var fetch_info = function(cb) {
+function fetch_info(cb) {
     $.get(matrixLogin.endpoint, function(response) {
         var serverAcceptsPassword = false;
         for (var i=0; i<response.flows.length; i++) {
@@ -155,7 +155,7 @@ matrixLogin.onLogin = function(response) {
 /*
  * Process the query parameters from the current URL into an object.
  */
-var parseQsFromUrl = function() {
+function parseQsFromUrl() {
     var pos = window.location.href.indexOf("?");
     if (pos == -1) {
         return {};
@@ -174,12 +174,12 @@ var parseQsFromUrl = function() {
         result[key] = val;
     });
     return result;
-};
+}
 
 /*
  * Process the cookies and return an object.
  */
-var parseCookies = function() {
+function parseCookies() {
     var allCookies = document.cookie;
     var result = {};
     allCookies.split(";").forEach(function(part) {
@@ -196,32 +196,32 @@ var parseCookies = function() {
         result[key] = val;
     });
     return result;
-};
+}
 
 /*
  * Set a cookie that is valid for 1 hour.
  */
-var setCookie = function(key, value) {
+function setCookie(key, value) {
     // The maximum age is set in seconds.
     var maxAge = 60 * 60;
     // Set the cookie, this defaults to the current domain and path.
     document.cookie = key + "=" + encodeURIComponent(value) + ";max-age=" + maxAge + ";sameSite=lax";
-};
+}
 
 /*
  * Removes a cookie by key.
  */
-var deleteCookie = function(key) {
+function deleteCookie(key) {
     // Delete a cookie by setting the expiration to 0. (Note that the value
     // doesn't matter.)
     document.cookie = key + "=deleted;expires=0";
-};
+}
 
 /*
  * Submits the login token if one is found in the query parameters. Returns a
  * boolean of whether the login token was found or not.
  */
-var try_token = function() {
+function try_token() {
     // Check if the login token is in the query parameters.
     var qs = parseQsFromUrl();
 
@@ -236,7 +236,7 @@ var try_token = function() {
     var original_query_params = JSON.parse(cookies[COOKIE_KEY] || "{}")
 
     // If the login is successful, delete the cookie.
-    var callback = function() {
+    function callback() {
         deleteCookie(COOKIE_KEY);
     }
 
@@ -247,4 +247,4 @@ var try_token = function() {
         callback);
 
     return true;
-};
+}
