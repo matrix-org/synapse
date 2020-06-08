@@ -5,11 +5,11 @@ window.matrixLogin = {
 };
 
 // Titles get updated through the process to give users feedback.
-var TITLE_PRE_AUTH = "Log in with one of the following methods";
-var TITLE_POST_AUTH = "Logging in...";
+const TITLE_PRE_AUTH = "Log in with one of the following methods";
+const TITLE_POST_AUTH = "Logging in...";
 
 // The cookie used to store the original query parameters when using SSO.
-var COOKIE_KEY = "synapse_login_fallback_qs";
+const COOKIE_KEY = "synapse_login_fallback_qs";
 
 /*
  * Submit a login request.
