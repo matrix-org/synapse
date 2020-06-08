@@ -31,6 +31,22 @@ form {
     margin: 10px 0 0 0;
 }
 
+/*
+ * Add some padding to the viewport.
+ */
+#container {
+    padding: 10px;
+}
+/*
+ * Center all direct children of the main form.
+ */
+#container > * {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
 .login_flow {
     width: 300px;
     text-align: left;
