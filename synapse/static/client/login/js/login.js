@@ -43,6 +43,9 @@ function submitLogin(type, data, extra, callback) {
     }).fail(errorFunc);
 }
 
+/*
+ * Display an error to the user and show the login form again.
+ */
 function errorFunc(err) {
     // We want to show the error to the user rather than redirecting immediately to the
     // SSO portal (if SSO is the only login option), so we inhibit the redirect.
@@ -56,10 +59,22 @@ function errorFunc(err) {
     }
 }
 
+/*
+ * Display an error to the user.
+ */
 function setFeedbackString(text) {
     $("#feedback").text(text);
 }
 
+/*
+ * (Maybe) Show the login forms.
+ *
+ * This actually does a few unrelated functions:
+ *
+ * * Configures the SSO redirect URL to come back to this page.
+ * * Configures and shows the SSO form, if the server supports SSO.
+ * * Otherwise, shows the password form.
+ */
 function show_login(inhibit_redirect) {
     // Set the redirect to come back to this page, a login token will get added
     // and handled after the redirect.
@@ -74,6 +89,8 @@ function show_login(inhibit_redirect) {
         var qs = parseQsFromUrl();
         setCookie(COOKIE_KEY, JSON.stringify(qs));
 
+        // If password is not supported and redirects are allowed, then submit
+        // the form (redirecting to the SSO provider).
         if (!inhibit_redirect && !matrixLogin.serverAcceptsPassword) {
             $("#sso_form").submit();
             return;
@@ -87,6 +104,7 @@ function show_login(inhibit_redirect) {
         $("#password_flow").show();
     }
 
+    // If neither password or SSO are supported, show an error to the user.
     if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
@@ -96,6 +114,9 @@ function show_login(inhibit_redirect) {
     $("#loading").hide();
 }
 
+/*
+ * Hides the forms and shows a loading throbber.
+ */
 function show_spinner() {
     $("#password_flow").hide();
     $("#sso_flow").hide();
@@ -103,14 +124,21 @@ function show_spinner() {
     $("#loading").show();
 }
 
+/*
+ * Helper to show the page's main title.
+ */
 function set_title(title) {
     $("#title").text(title);
 }
 
-function fetch_info(cb) {
+/*
+ * Query the login endpoint for the homeserver's supported flows.
+ *
+ * This populates matrixLogin.serverAccepts* variables.
+ */
+function fetch_login_flows(cb) {
     $.get(matrixLogin.endpoint, function(response) {
-        var serverAcceptsPassword = false;
-        for (var i=0; i<response.flows.length; i++) {
+        for (var i = 0; i < response.flows.length; i++) {
             var flow = response.flows[i];
             if ("m.login.sso" === flow.type) {
                 matrixLogin.serverAcceptsSso = true;
@@ -126,14 +154,21 @@ function fetch_info(cb) {
     }).fail(errorFunc);
 }
 
+/*
+ * Called on load to fetch login flows and attempt SSO login (if a token is available).
+ */
 matrixLogin.onLoad = function() {
-    fetch_info(function() {
+    fetch_login_flows(function() {
+        // (Maybe) attempt logging in via SSO if a token is available.
         if (!try_token()) {
             show_login(false);
         }
     });
 };
 
+/*
+ * Submit simple user & password login.
+ */
 matrixLogin.password_login = function() {
     var user = $("#user_id").val();
     var pwd = $("#password").val();
@@ -147,6 +182,13 @@ matrixLogin.password_login = function() {
         parseQsFromUrl());
 };
 
+/*
+ * The onLogin function gets called after a succesful login.
+ *
+ * It is expected that implementations override this to be notified when the
+ * login is complete. The response to the login call is provided as the single
+ * parameter.
+ */
 matrixLogin.onLogin = function(response) {
     // clobber this function
     console.warn("onLogin - This function should be replaced to proceed.");
