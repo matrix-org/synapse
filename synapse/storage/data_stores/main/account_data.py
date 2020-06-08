@@ -297,7 +297,13 @@ class AccountDataWorkerStore(SQLBaseStore):
 class AccountDataStore(AccountDataWorkerStore):
     def __init__(self, database: Database, db_conn, hs):
         self._account_data_id_gen = StreamIdGenerator(
-            db_conn, "account_data_max_stream_id", "stream_id"
+            db_conn,
+            "account_data_max_stream_id",
+            "stream_id",
+            extra_tables=[
+                ("room_account_data", "stream_id"),
+                ("room_tags_revisions", "stream_id"),
+            ],
         )
 
         super(AccountDataStore, self).__init__(database, db_conn, hs)
@@ -339,14 +345,6 @@ class AccountDataStore(AccountDataWorkerStore):
                 lock=False,
             )
 
-            # it's theoretically possible for the above to succeed and the
-            # below to fail - in which case we might reuse a stream id on
-            # restart, and the above update might not get propagated. That
-            # doesn't sound any worse than the whole update getting lost,
-            # which is what would happen if we combined the two into one
-            # transaction.
-            yield self._update_max_stream_id(next_id)
-
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
             self.get_account_data_for_room.invalidate((user_id, room_id))
@@ -381,14 +379,6 @@ class AccountDataStore(AccountDataWorkerStore):
                 lock=False,
             )
 
-            # it's theoretically possible for the above to succeed and the
-            # below to fail - in which case we might reuse a stream id on
-            # restart, and the above update might not get propagated. That
-            # doesn't sound any worse than the whole update getting lost,
-            # which is what would happen if we combined the two into one
-            # transaction.
-            yield self._update_max_stream_id(next_id)
-
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
             self.get_account_data_for_user.invalidate((user_id,))
             self.get_global_account_data_by_type_for_user.invalidate(
@@ -397,20 +387,3 @@ class AccountDataStore(AccountDataWorkerStore):
 
         result = self._account_data_id_gen.get_current_token()
         return result
-
-    def _update_max_stream_id(self, next_id):
-        """Update the max stream_id
-
-        Args:
-            next_id(int): The the revision to advance to.
-        """
-
-        def _update(txn):
-            update_max_id_sql = (
-                "UPDATE account_data_max_stream_id"
-                " SET stream_id = ?"
-                " WHERE stream_id < ?"
-            )
-            txn.execute(update_max_id_sql, (next_id, next_id))
-
-        return self.db.runInteraction("update_account_data_max_stream_id", _update)
