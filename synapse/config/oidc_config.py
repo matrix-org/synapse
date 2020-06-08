@@ -56,6 +56,7 @@ class OIDCConfig(Config):
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
+        self.oidc_uses_userinfo = oidc_config.get("uses_userinfo", False)
 
         ump_config = oidc_config.get("user_mapping_provider", {})
         ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
@@ -157,6 +158,11 @@ class OIDCConfig(Config):
           # Avoid this in production.
           #
           #skip_verification: true
+
+          # Always use userinfo endpoint. Required for providers that don't include user
+          # information in the token response, e.g. Gitlab.
+          #
+          #uses_userinfo: false
 
           # An external module can be provided here as a custom solution to mapping
           # attributes returned from a OIDC provider onto a matrix user.
