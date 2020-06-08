@@ -21,6 +21,10 @@ from synapse.replication.tcp.streams import TypingStream
 from tests.replication._base import BaseStreamTestCase
 
 USER_ID = "@feeling:blue"
+USER_ID_2 = "@da-ba-dee:blue"
+
+ROOM_ID = "!bar:blue"
+ROOM_ID_2 = "!foo:blue"
 
 
 class TypingStreamTestCase(BaseStreamTestCase):
@@ -30,11 +34,9 @@ class TypingStreamTestCase(BaseStreamTestCase):
     def test_typing(self):
         typing = self.hs.get_typing_handler()
 
-        room_id = "!bar:blue"
-
         self.reconnect()
 
-        typing._push_update(member=RoomMember(room_id, USER_ID), typing=True)
+        typing._push_update(member=RoomMember(ROOM_ID, USER_ID), typing=True)
 
         self.reactor.advance(0)
 
@@ -47,7 +49,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
-        self.assertEqual(room_id, row.room_id)
+        self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([USER_ID], row.user_ids)
 
         # Now let's disconnect and insert some data.
@@ -55,7 +57,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
         self.test_handler.on_rdata.reset_mock()
 
-        typing._push_update(member=RoomMember(room_id, USER_ID), typing=False)
+        typing._push_update(member=RoomMember(ROOM_ID, USER_ID), typing=False)
 
         self.test_handler.on_rdata.assert_not_called()
 
@@ -74,7 +76,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]
-        self.assertEqual(room_id, row.room_id)
+        self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([], row.user_ids)
 
     def test_reset(self):
@@ -86,11 +88,9 @@ class TypingStreamTestCase(BaseStreamTestCase):
         """
         typing = self.hs.get_typing_handler()
 
-        room_id = "!bar:blue"
-
         self.reconnect()
 
-        typing._push_update(member=RoomMember(room_id, USER_ID), typing=True)
+        typing._push_update(member=RoomMember(ROOM_ID, USER_ID), typing=True)
 
         self.reactor.advance(0)
 
@@ -103,7 +103,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
-        self.assertEqual(room_id, row.room_id)
+        self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([USER_ID], row.user_ids)
 
         # Jump the stream ahead manually, the state of the master is not
@@ -117,7 +117,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
         self.test_handler.on_rdata.reset_mock()
 
-        typing._push_update(member=RoomMember(room_id, USER_ID), typing=False)
+        typing._push_update(member=RoomMember(ROOM_ID_2, USER_ID_2), typing=False)
 
         self.test_handler.on_rdata.assert_not_called()
 
@@ -136,5 +136,5 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]
-        self.assertEqual(room_id, row.room_id)
+        self.assertEqual(ROOM_ID_2, row.room_id)
         self.assertEqual([], row.user_ids)
