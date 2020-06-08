@@ -17,6 +17,7 @@ from typing import List, Optional
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
+from synapse.replication.tcp.commands import RdataCommand
 from synapse.replication.tcp.streams._base import _STREAM_UPDATE_TARGET_ROW_COUNT
 from synapse.replication.tcp.streams.events import (
     EventsStreamCurrentStateRow,
@@ -367,9 +368,6 @@ class EventsStreamTestCase(BaseStreamTestCase):
         """
         Test that RDATA that comes after the current position should be discarded.
         """
-        # Get a direct reference to the ReplicationCommandHandler.
-        command_handler = self.server.command_handler
-
         # disconnect, so that we can stack up some changes
         self.disconnect()
 
@@ -401,18 +399,14 @@ class EventsStreamTestCase(BaseStreamTestCase):
         self.assertIsInstance(row.data, EventsStreamEventRow)
         self.assertEqual(row.data.event_id, event.event_id)
 
-        # Essentially repeat the above, but move the stream position forward (as
-        # if the stream jumped).
-        command_handler.get_streams()["events"].last_token = token + 100
         # Reset the data.
         self.test_handler.received_rdata_rows = []
 
-        # Generate an events. We inject them using inject_event so that they are
-        # not send out over replication until we call self.replicate().
-        self._inject_test_event()
-
-        # Send the updates.
-        self.replicate()
+        # Manually send an old RDATA command, which should get dropped. This
+        # re-uses the row from above, but with an earlier stream token.
+        self.hs.get_tcp_replication().send_command(
+            RdataCommand("events", "master", 1, row)
+        )
 
         # No updates have been received (because it was discard as old).
         received_rows = [
