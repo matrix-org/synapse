@@ -62,3 +62,10 @@ form {
     background-color: #f8f8f8;
     border: 1px #ccc solid;
 }
+
+/*
+ * Used to show error content.
+ */
+#feedback {
+    color: #ff0000;  /* Red */
+}

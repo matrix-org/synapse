@@ -10,16 +10,15 @@
 </head>
 <body onload="matrixLogin.onLoad()">
     <div id="container">
-        <br/>
         <h1 id="title"></h1>
 
-        <span id="feedback" style="color: #f00"></span>
+        <span id="feedback"></span>
 
         <div id="loading">
             <img src="spinner.gif" />
         </div>
 
-        <div id="sso_flow" class="login_flow" style="display:none">
+        <div id="sso_flow" class="login_flow" style="display: none;">
             Single-sign on:
             <form id="sso_form" action="/_matrix/client/r0/login/sso/redirect" method="get">
                 <input id="sso_redirect_url" type="hidden" name="redirectUrl" value=""/>
@@ -27,7 +26,7 @@
             </form>
         </div>
 
-        <div id="password_flow" class="login_flow" style="display:none">
+        <div id="password_flow" class="login_flow" style="display: none;">
             Password Authentication:
             <form onsubmit="matrixLogin.passwordLogin(); return false;">
                 <input id="user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)" autocapitalize="off" autocorrect="off" />
@@ -39,7 +38,7 @@
             </form>
         </div>
 
-        <div id="no_login_types" type="button" class="login_flow" style="display:none">
+        <div id="no_login_types" type="button" class="login_flow" style="display: none;">
             Log in currently unavailable.
         </div>
     </div>
