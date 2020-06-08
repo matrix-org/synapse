@@ -76,14 +76,15 @@ function setFeedbackString(text) {
  * * Otherwise, shows the password form.
  */
 function show_login(inhibit_redirect) {
-    // Set the redirect to come back to this page, a login token will get added
-    // and handled after the redirect.
-    var this_page = window.location.origin + window.location.pathname;
-    $("#sso_redirect_url").val(this_page);
+    set_title(TITLE_PRE_AUTH);
 
     // If inhibit_redirect is false, and SSO is the only supported login method,
     // we can redirect straight to the SSO page.
     if (matrixLogin.serverAcceptsSso) {
+        // Set the redirect to come back to this page, a login token will get
+        // added as a query parameter and handled after the redirect.
+        $("#sso_redirect_url").val(window.location.origin + window.location.pathname);
+
         // Before submitting SSO, set the current query parameters into a cookie
         // for retrieval later.
         var qs = parseQsFromUrl();
@@ -108,8 +109,6 @@ function show_login(inhibit_redirect) {
     if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
-
-    set_title(TITLE_PRE_AUTH);
 
     $("#loading").hide();
 }
