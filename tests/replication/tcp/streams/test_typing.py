@@ -15,7 +15,7 @@
 from mock import Mock
 
 from synapse.handlers.typing import RoomMember
-from synapse.replication.tcp.commands import PositionCommand
+from synapse.replication.tcp.commands import RdataCommand
 from synapse.replication.tcp.streams import TypingStream
 
 from tests.replication._base import BaseStreamTestCase
@@ -106,21 +106,25 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([USER_ID], row.user_ids)
 
-        # Jump the stream ahead manually, the state of the master is not
-        # modified, however.
-        self.hs.get_tcp_replication().send_command(
-            PositionCommand("typing", "master", 100)
-        )
+        # Push the stream forward a bunch so it can be reset.
+        for i in range(100):
+            self.hs.get_tcp_replication().send_command(
+                RdataCommand("typing", "master", token + i, row)
+            )
+        self.reactor.advance(0)
 
-        # Now let's disconnect and insert some data.
+        # Disconnect.
         self.disconnect()
 
+        # Reset the typing handler
+        typing._latest_room_serial = 0
+        typing._reset()
+
+        # Reset the test code.
         self.test_handler.on_rdata.reset_mock()
-
-        typing._push_update(member=RoomMember(ROOM_ID_2, USER_ID_2), typing=False)
-
         self.test_handler.on_rdata.assert_not_called()
 
+        # Reconnect.
         self.reconnect()
         self.pump(0.1)
 
@@ -128,8 +132,9 @@ class TypingStreamTestCase(BaseStreamTestCase):
         request = self.handle_http_replication_attempt()
         self.assert_request_is_get_repl_stream_updates(request, "typing")
 
-        # The from token should be the token from the last RDATA we got.
-        self.assertEqual(int(request.args[b"from_token"][0]), token)
+        # Push additional data.
+        typing._push_update(member=RoomMember(ROOM_ID_2, USER_ID_2), typing=False)
+        self.reactor.advance(0)
 
         self.test_handler.on_rdata.assert_called_once()
         stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
@@ -138,3 +143,6 @@ class TypingStreamTestCase(BaseStreamTestCase):
         row = rdata_rows[0]
         self.assertEqual(ROOM_ID_2, row.room_id)
         self.assertEqual([], row.user_ids)
+
+        # The token should have been reset.
+        self.asserEqual(token, 0)
