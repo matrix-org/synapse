@@ -1,1 +1,0 @@
-Prevent an entire iteration of the device list resync loop from failing if one server responds with a malformed result.

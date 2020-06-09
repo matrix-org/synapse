@@ -1,1 +1,0 @@
-Make `synctl restart` start synapse if it wasn't running.
