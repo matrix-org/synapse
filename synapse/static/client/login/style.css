@@ -67,5 +67,8 @@ form {
  * Used to show error content.
  */
 #feedback {
-    color: #ff0000;  /* Red */
+    /* Red text. */
+    color: #ff0000;
+    /* A little space to not overlap the box-shadow. */
+    margin-bottom: 20px;
 }
