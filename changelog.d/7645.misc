@@ -1,0 +1,1 @@
+Fix type information on `assert_*_is_admin` methods.
