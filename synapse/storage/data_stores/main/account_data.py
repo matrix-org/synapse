@@ -297,7 +297,13 @@ class AccountDataWorkerStore(SQLBaseStore):
 class AccountDataStore(AccountDataWorkerStore):
     def __init__(self, database: Database, db_conn, hs):
         self._account_data_id_gen = StreamIdGenerator(
-            db_conn, "account_data_max_stream_id", "stream_id"
+            db_conn,
+            "account_data_max_stream_id",
+            "stream_id",
+            extra_tables=[
+                ("room_account_data", "stream_id"),
+                ("room_tags_revisions", "stream_id"),
+            ],
         )
 
         super(AccountDataStore, self).__init__(database, db_conn, hs)
@@ -387,6 +393,10 @@ class AccountDataStore(AccountDataWorkerStore):
             # doesn't sound any worse than the whole update getting lost,
             # which is what would happen if we combined the two into one
             # transaction.
+            #
+            # Note: This is only here for backwards compat to allow admins to
+            # roll back to a previous Synapse version. Next time we update the
+            # database version we can remove this table.
             yield self._update_max_stream_id(next_id)
 
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
@@ -404,6 +414,10 @@ class AccountDataStore(AccountDataWorkerStore):
         Args:
             next_id(int): The the revision to advance to.
         """
+
+        # Note: This is only here for backwards compat to allow admins to
+        # roll back to a previous Synapse version. Next time we update the
+        # database version we can remove this table.
 
         def _update(txn):
             update_max_id_sql = (
