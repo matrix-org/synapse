@@ -15,8 +15,8 @@
 from mock import Mock
 
 from synapse.handlers.typing import RoomMember
-from synapse.replication.tcp.commands import RdataCommand
 from synapse.replication.tcp.streams import TypingStream
+from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from tests.replication._base import BaseStreamTestCase
 
@@ -108,8 +108,8 @@ class TypingStreamTestCase(BaseStreamTestCase):
 
         # Push the stream forward a bunch so it can be reset.
         for i in range(100):
-            self.hs.get_tcp_replication().send_command(
-                RdataCommand("typing", "master", token + i, row)
+            typing._push_update(
+                member=RoomMember(ROOM_ID, "@test%s:blue" % i), typing=True
             )
         self.reactor.advance(0)
 
@@ -117,7 +117,12 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.disconnect()
 
         # Reset the typing handler
+        self.hs.get_replication_streams()["typing"].last_token = 0
+        self.hs.get_tcp_replication()._streams["typing"].last_token = 0
         typing._latest_room_serial = 0
+        typing._typing_stream_change_cache = StreamChangeCache(
+            "TypingStreamChangeCache", typing._latest_room_serial
+        )
         typing._reset()
 
         # Reset the test code.
@@ -145,4 +150,4 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assertEqual([], row.user_ids)
 
         # The token should have been reset.
-        self.asserEqual(token, 0)
+        self.assertEqual(token, 1)
