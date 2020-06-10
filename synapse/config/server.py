@@ -530,10 +530,25 @@ class ServerConfig(Config):
         )
 
         # Whether new, locally-created rooms should have encryption enabled
-        self.encryption_enabled_by_default_for_room_type = config.get(
+        encryption_for_room_type = config.get(
             "encryption_enabled_by_default_for_room_type",
             RoomDefaultEncryptionTypes.OFF,
         )
+        if encryption_for_room_type == RoomDefaultEncryptionTypes.ALL:
+            self.encryption_enabled_by_default_for_room_presets = [
+                RoomCreationPreset.PRIVATE_CHAT,
+                RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+                RoomCreationPreset.PUBLIC_CHAT,
+            ]
+        elif encryption_for_room_type == RoomDefaultEncryptionTypes.INVITE:
+            self.encryption_enabled_by_default_for_room_presets = [
+                RoomCreationPreset.PRIVATE_CHAT,
+                RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+            ]
+        elif encryption_for_room_type == RoomDefaultEncryptionTypes.OFF:
+            self.encryption_enabled_by_default_for_room_presets = []
+        else:
+            raise ConfigError("Invalid value for encryption_enabled_by_default_for_room_type")
 
     def has_tls_listener(self) -> bool:
         return any(listener["tls"] for listener in self.listeners)

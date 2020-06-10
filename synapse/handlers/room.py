@@ -34,7 +34,6 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
-from synapse.config.server import RoomDefaultEncryptionTypes
 from synapse.events.utils import copy_power_levels_contents
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
@@ -70,6 +69,7 @@ class RoomCreationHandler(BaseHandler):
         self.room_member_handler = hs.get_room_member_handler()
         self.config = hs.config
 
+        # Room state based off defined presets
         self._presets_dict = {
             RoomCreationPreset.PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
@@ -77,15 +77,6 @@ class RoomCreationHandler(BaseHandler):
                 "original_invitees_have_ops": False,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
-                "encryption_algorithm": (
-                    RoomEncryptionAlgorithms.DEFAULT
-                    if hs.config.encryption_enabled_by_default_for_room_type
-                    in [
-                        RoomDefaultEncryptionTypes.ALL,
-                        RoomDefaultEncryptionTypes.INVITE,
-                    ]
-                    else None
-                ),
             },
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
@@ -93,15 +84,6 @@ class RoomCreationHandler(BaseHandler):
                 "original_invitees_have_ops": True,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
-                "encryption_algorithm": (
-                    RoomEncryptionAlgorithms.DEFAULT
-                    if hs.config.encryption_enabled_by_default_for_room_type
-                    in [
-                        RoomDefaultEncryptionTypes.ALL,
-                        RoomDefaultEncryptionTypes.INVITE,
-                    ]
-                    else None
-                ),
             },
             RoomCreationPreset.PUBLIC_CHAT: {
                 "join_rules": JoinRules.PUBLIC,
@@ -109,14 +91,16 @@ class RoomCreationHandler(BaseHandler):
                 "original_invitees_have_ops": False,
                 "guest_can_join": False,
                 "power_level_content_override": {},
-                "encryption_algorithm": (
-                    RoomEncryptionAlgorithms.DEFAULT
-                    if hs.config.encryption_enabled_by_default_for_room_type
-                    in [RoomDefaultEncryptionTypes.ALL]
-                    else None
-                ),
             },
         }
+
+        # Modify presets to selectively enable encryption by default per homeserver config
+        for preset_name, preset_config in self._presets_dict.items():
+            encrypted = (
+                preset_name
+                in self.config.encryption_enabled_by_default_for_room_presets
+            )
+            preset_config["encrypted"] = encrypted
 
         self._replication = hs.get_replication_data_handler()
 
@@ -917,11 +901,11 @@ class RoomCreationHandler(BaseHandler):
                 etype=etype, state_key=state_key, content=content
             )
 
-        if config["encryption_algorithm"]:
+        if config["encrypted"]:
             last_sent_stream_id = await send(
                 etype=EventTypes.RoomEncryption,
                 state_key="",
-                content={"algorithm": config["encryption_algorithm"]},
+                content={"algorithm": RoomEncryptionAlgorithms.DEFAULT},
             )
 
         return last_sent_stream_id
