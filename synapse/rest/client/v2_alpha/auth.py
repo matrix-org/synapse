@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
@@ -132,7 +130,22 @@ class AuthRestServlet(RestServlet):
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
 
-    def on_GET(self, request, stagetype):
+        # SSO configuration.
+        self._cas_enabled = hs.config.cas_enabled
+        if self._cas_enabled:
+            self._cas_handler = hs.get_cas_handler()
+            self._cas_server_url = hs.config.cas_server_url
+            self._cas_service_url = hs.config.cas_service_url
+        self._saml_enabled = hs.config.saml2_enabled
+        if self._saml_enabled:
+            self._saml_handler = hs.get_saml_handler()
+        self._oidc_enabled = hs.config.oidc_enabled
+        if self._oidc_enabled:
+            self._oidc_handler = hs.get_oidc_handler()
+            self._cas_server_url = hs.config.cas_server_url
+            self._cas_service_url = hs.config.cas_service_url
+
+    async def on_GET(self, request, stagetype):
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
@@ -144,14 +157,6 @@ class AuthRestServlet(RestServlet):
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                 "sitekey": self.hs.config.recaptcha_public_key,
             }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-            request.write(html_bytes)
-            finish_request(request)
-            return None
         elif stagetype == LoginType.TERMS:
             html = TERMS_TEMPLATE % {
                 "session": session,
@@ -160,19 +165,51 @@ class AuthRestServlet(RestServlet):
                 "myurl": "%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
             }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
 
-            request.write(html_bytes)
-            finish_request(request)
-            return None
+        elif stagetype == LoginType.SSO:
+            # Display a confirmation page which prompts the user to
+            # re-authenticate with their SSO provider.
+            if self._cas_enabled:
+                # Generate a request to CAS that redirects back to an endpoint
+                # to verify the successful authentication.
+                sso_redirect_url = self._cas_handler.get_redirect_url(
+                    {"session": session},
+                )
+
+            elif self._saml_enabled:
+                # Some SAML identity providers (e.g. Google) require a
+                # RelayState parameter on requests. It is not necessary here, so
+                # pass in a dummy redirect URL (which will never get used).
+                client_redirect_url = b"unused"
+                sso_redirect_url = self._saml_handler.handle_redirect_request(
+                    client_redirect_url, session
+                )
+
+            elif self._oidc_enabled:
+                client_redirect_url = b""
+                sso_redirect_url = await self._oidc_handler.handle_redirect_request(
+                    request, client_redirect_url, session
+                )
+
+            else:
+                raise SynapseError(400, "Homeserver not configured for SSO.")
+
+            html = await self.auth_handler.start_sso_ui_auth(sso_redirect_url, session)
+
         else:
             raise SynapseError(404, "Unknown auth stage type")
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, stagetype):
+        # Render the HTML and return.
+        html_bytes = html.encode("utf8")
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+        request.write(html_bytes)
+        finish_request(request)
+        return None
+
+    async def on_POST(self, request, stagetype):
 
         session = parse_string(request, "session")
         if not session:
@@ -186,7 +223,7 @@ class AuthRestServlet(RestServlet):
 
             authdict = {"response": response, "session": session}
 
-            success = yield self.auth_handler.add_oob_auth(
+            success = await self.auth_handler.add_oob_auth(
                 LoginType.RECAPTCHA, authdict, self.hs.get_ip_from_request(request)
             )
 
@@ -199,23 +236,10 @@ class AuthRestServlet(RestServlet):
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                     "sitekey": self.hs.config.recaptcha_public_key,
                 }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-            request.write(html_bytes)
-            finish_request(request)
-
-            return None
         elif stagetype == LoginType.TERMS:
-            if ("session" not in request.args or len(request.args["session"])) == 0:
-                raise SynapseError(400, "No session supplied")
-
-            session = request.args["session"][0]
             authdict = {"session": session}
 
-            success = yield self.auth_handler.add_oob_auth(
+            success = await self.auth_handler.add_oob_auth(
                 LoginType.TERMS, authdict, self.hs.get_ip_from_request(request)
             )
 
@@ -232,16 +256,21 @@ class AuthRestServlet(RestServlet):
                     "myurl": "%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
                 }
-            html_bytes = html.encode("utf8")
-            request.setResponseCode(200)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-            request.write(html_bytes)
-            finish_request(request)
-            return None
+        elif stagetype == LoginType.SSO:
+            # The SSO fallback workflow should not post here,
+            raise SynapseError(404, "Fallback SSO auth does not support POST requests.")
         else:
             raise SynapseError(404, "Unknown auth stage type")
+
+        # Render the HTML and return.
+        html_bytes = html.encode("utf8")
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+        request.write(html_bytes)
+        finish_request(request)
+        return None
 
     def on_OPTIONS(self, _):
         return 200, {}

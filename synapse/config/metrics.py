@@ -34,6 +34,8 @@ class MetricsFlags(object):
 
 
 class MetricsConfig(Config):
+    section = "metrics"
+
     def read_config(self, config, **kwargs):
         self.enable_metrics = config.get("enable_metrics", False)
         self.report_stats = config.get("report_stats", None)
@@ -68,7 +70,7 @@ class MetricsConfig(Config):
 
         # Enable collection and rendering of performance metrics
         #
-        #enable_metrics: False
+        #enable_metrics: false
 
         # Enable sentry integration
         # NOTE: While attempts are made to ensure that the logs don't contain
@@ -84,17 +86,18 @@ class MetricsConfig(Config):
         # enabled by default, either for performance reasons or limited use.
         #
         metrics_flags:
-            # Publish synapse_federation_known_servers, a g auge of the number of
+            # Publish synapse_federation_known_servers, a gauge of the number of
             # servers this homeserver knows about, including itself. May cause
             # performance problems on large homeservers.
             #
             #known_servers: true
 
         # Whether or not to report anonymized homeserver usage statistics.
+        #
         """
 
         if report_stats is None:
-            res += "# report_stats: true|false\n"
+            res += "#report_stats: true|false\n"
         else:
             res += "report_stats: %s\n" % ("true" if report_stats else "false")
 

@@ -20,6 +20,8 @@ class PasswordConfig(Config):
     """Password login configuration
     """
 
+    section = "password"
+
     def read_config(self, config, **kwargs):
         password_config = config.get("password_config", {})
         if password_config is None:
@@ -28,6 +30,10 @@ class PasswordConfig(Config):
         self.password_enabled = password_config.get("enabled", True)
         self.password_localdb_enabled = password_config.get("localdb_enabled", True)
         self.password_pepper = password_config.get("pepper", "")
+
+        # Password policy
+        self.password_policy = password_config.get("policy") or {}
+        self.password_policy_enabled = self.password_policy.get("enabled", False)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -46,4 +52,39 @@ class PasswordConfig(Config):
            # DO NOT CHANGE THIS AFTER INITIAL SETUP!
            #
            #pepper: "EVEN_MORE_SECRET"
+
+           # Define and enforce a password policy. Each parameter is optional.
+           # This is an implementation of MSC2000.
+           #
+           policy:
+              # Whether to enforce the password policy.
+              # Defaults to 'false'.
+              #
+              #enabled: true
+
+              # Minimum accepted length for a password.
+              # Defaults to 0.
+              #
+              #minimum_length: 15
+
+              # Whether a password must contain at least one digit.
+              # Defaults to 'false'.
+              #
+              #require_digit: true
+
+              # Whether a password must contain at least one symbol.
+              # A symbol is any character that's not a number or a letter.
+              # Defaults to 'false'.
+              #
+              #require_symbol: true
+
+              # Whether a password must contain at least one lowercase letter.
+              # Defaults to 'false'.
+              #
+              #require_lowercase: true
+
+              # Whether a password must contain at least one lowercase letter.
+              # Defaults to 'false'.
+              #
+              #require_uppercase: true
         """

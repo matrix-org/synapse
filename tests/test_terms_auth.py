@@ -28,6 +28,21 @@ from tests import unittest
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
+    def default_config(self):
+        config = super().default_config()
+        config.update(
+            {
+                "public_baseurl": "https://example.org/",
+                "user_consent": {
+                    "version": "1.0",
+                    "policy_name": "My Cool Privacy Policy",
+                    "template_dir": "/",
+                    "require_at_registration": True,
+                },
+            }
+        )
+        return config
+
     def prepare(self, reactor, clock, hs):
         self.clock = MemoryReactorClock()
         self.hs_clock = Clock(self.clock)
@@ -35,19 +50,11 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.registration_handler = Mock()
         self.auth_handler = Mock()
         self.device_handler = Mock()
-        hs.config.enable_registration = True
-        hs.config.registrations_require_3pid = []
-        hs.config.auto_join_rooms = []
-        hs.config.enable_registration_captcha = False
 
     def test_ui_auth(self):
-        self.hs.config.user_consent_at_registration = True
-        self.hs.config.user_consent_policy_name = "My Cool Privacy Policy"
-        self.hs.config.public_baseurl = "https://example.org/"
-        self.hs.config.user_consent_version = "1.0"
-
         # Do a UI auth request
-        request, channel = self.make_request(b"POST", self.url, b"{}")
+        request_data = json.dumps({"username": "kermit", "password": "monkey"})
+        request, channel = self.make_request(b"POST", self.url, request_data)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)

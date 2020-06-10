@@ -13,14 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING, List
 
 from canonicaljson import json
 
-from twisted.internet import defer
-
 from synapse.api.errors import HttpResponseException
+from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
-from synapse.federation.units import Transaction
+from synapse.federation.units import Edu, Transaction
 from synapse.logging.opentracing import (
     extract_text_map,
     set_tag,
@@ -29,6 +29,9 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.util.metrics import measure_func
+
+if TYPE_CHECKING:
+    import synapse.server
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +42,7 @@ class TransactionManager(object):
     shared between PerDestinationQueue objects
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "synapse.server.HomeServer"):
         self._server_name = hs.hostname
         self.clock = hs.get_clock()  # nb must be called this for @measure_func
         self._store = hs.get_datastore()
@@ -50,8 +53,9 @@ class TransactionManager(object):
         self._next_txn_id = int(self.clock.time_msec())
 
     @measure_func("_send_new_transaction")
-    @defer.inlineCallbacks
-    def send_new_transaction(self, destination, pending_pdus, pending_edus):
+    async def send_new_transaction(
+        self, destination: str, pending_pdus: List[EventBase], pending_edus: List[Edu]
+    ):
 
         # Make a transaction-sending opentracing span. This span follows on from
         # all the edus in that transaction. This needs to be done since there is
@@ -84,7 +88,7 @@ class TransactionManager(object):
             txn_id = str(self._next_txn_id)
 
             logger.debug(
-                "TX [%s] {%s} Attempting new transaction" " (pdus: %d, edus: %d)",
+                "TX [%s] {%s} Attempting new transaction (pdus: %d, edus: %d)",
                 destination,
                 txn_id,
                 len(pdus),
@@ -103,7 +107,7 @@ class TransactionManager(object):
             self._next_txn_id += 1
 
             logger.info(
-                "TX [%s] {%s} Sending transaction [%s]," " (PDUs: %d, EDUs: %d)",
+                "TX [%s] {%s} Sending transaction [%s], (PDUs: %d, EDUs: %d)",
                 destination,
                 txn_id,
                 transaction.transaction_id,
@@ -127,7 +131,7 @@ class TransactionManager(object):
                 return data
 
             try:
-                response = yield self._transport_layer.send_transaction(
+                response = await self._transport_layer.send_transaction(
                     transaction, json_data_cb
                 )
                 code = 200
@@ -146,7 +150,7 @@ class TransactionManager(object):
             if code == 200:
                 for e_id, r in response.get("pdus", {}).items():
                     if "error" in r:
-                        logger.warn(
+                        logger.warning(
                             "TX [%s] {%s} Remote returned error for %s: %s",
                             destination,
                             txn_id,
@@ -155,7 +159,7 @@ class TransactionManager(object):
                         )
             else:
                 for p in pdus:
-                    logger.warn(
+                    logger.warning(
                         "TX [%s] {%s} Failed to send event %s",
                         destination,
                         txn_id,

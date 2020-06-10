@@ -13,52 +13,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
-from synapse.replication.tcp.client import (
-    ReplicationClientFactory,
-    ReplicationClientHandler,
-)
-from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
-
-from tests import unittest
-from tests.server import FakeTransport
+from tests.replication._base import BaseStreamTestCase
 
 
-class BaseSlavedStoreTestCase(unittest.HomeserverTestCase):
+class BaseSlavedStoreTestCase(BaseStreamTestCase):
     def make_homeserver(self, reactor, clock):
 
-        hs = self.setup_test_homeserver(
-            "blue",
-            federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
-        )
-
-        hs.get_ratelimiter().can_do_action.return_value = (True, 0)
+        hs = self.setup_test_homeserver(federation_client=Mock())
 
         return hs
 
     def prepare(self, reactor, clock, hs):
+        super().prepare(reactor, clock, hs)
 
-        self.master_store = self.hs.get_datastore()
-        self.slaved_store = self.STORE_TYPE(self.hs.get_db_conn(), self.hs)
-        self.event_id = 0
+        self.reconnect()
 
-        server_factory = ReplicationStreamProtocolFactory(self.hs)
-        self.streamer = server_factory.streamer
-
-        self.replication_handler = ReplicationClientHandler(self.slaved_store)
-        client_factory = ReplicationClientFactory(
-            self.hs, "client_name", self.replication_handler
-        )
-
-        server = server_factory.buildProtocol(None)
-        client = client_factory.buildProtocol(None)
-
-        client.makeConnection(FakeTransport(server, reactor))
-
-        self.server_to_client_transport = FakeTransport(client, reactor)
-        server.makeConnection(self.server_to_client_transport)
+        self.master_store = hs.get_datastore()
+        self.slaved_store = self.worker_hs.get_datastore()
+        self.storage = hs.get_storage()
 
     def replicate(self):
         """Tell the master side of replication that something has happened, and then

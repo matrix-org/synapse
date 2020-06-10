@@ -74,6 +74,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
         config["url_preview_ip_range_whitelist"] = ("1.1.1.1",)
         config["url_preview_url_blacklist"] = []
+        config["url_preview_accept_language"] = [
+            "en-UK",
+            "en-US;q=0.9",
+            "fr;q=0.8",
+            "*;q=0.7",
+        ]
 
         self.storage_path = self.mktemp()
         self.media_store_path = self.mktemp()
@@ -246,6 +252,41 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
+
+    def test_overlong_title(self):
+        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+
+        end_content = (
+            b"<html><head>"
+            b"<title>" + b"x" * 2000 + b"</title>"
+            b'<meta property="og:description" content="hi" />'
+            b"</head></html>"
+        )
+
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://matrix.org", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: text/html; charset="windows-1251"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        res = channel.json_body
+        # We should only see the `og:description` field, as `title` is too long and should be stripped out
+        self.assertCountEqual(["og:description"], res.keys())
 
     def test_ipaddr(self):
         """
@@ -472,3 +513,52 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {})
+
+    def test_accept_language_config_option(self):
+        """
+        Accept-Language header is sent to the remote server
+        """
+        self.lookups["example.com"] = [(IPv4Address, "8.8.8.8")]
+
+        # Build and make a request to the server
+        request, channel = self.make_request(
+            "GET", "url_preview?url=http://example.com", shorthand=False
+        )
+        request.render(self.preview_url)
+        self.pump()
+
+        # Extract Synapse's tcp client
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+
+        # Build a fake remote server to reply with
+        server = AccumulatingProtocol()
+
+        # Connect the two together
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+
+        # Tell Synapse that it has received some data from the remote server
+        client.dataReceived(
+            b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nContent-Type: text/html\r\n\r\n"
+            % (len(self.end_content),)
+            + self.end_content
+        )
+
+        # Move the reactor along until we get a response on our original channel
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body, {"og:title": "~matrix~", "og:description": "hi"}
+        )
+
+        # Check that the server received the Accept-Language header as part
+        # of the request from Synapse
+        self.assertIn(
+            (
+                b"Accept-Language: en-UK\r\n"
+                b"Accept-Language: en-US;q=0.9\r\n"
+                b"Accept-Language: fr;q=0.8\r\n"
+                b"Accept-Language: *;q=0.7"
+            ),
+            server.data,
+        )

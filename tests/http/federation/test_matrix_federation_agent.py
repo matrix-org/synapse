@@ -31,14 +31,14 @@ from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
 from synapse.config.homeserver import HomeServerConfig
-from synapse.crypto.context_factory import ClientTLSOptionsFactory
+from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.http.federation.srv_resolver import Server
 from synapse.http.federation.well_known_resolver import (
     WellKnownResolver,
     _cache_period_from_headers,
 )
-from synapse.logging.context import LoggingContext
+from synapse.logging.context import SENTINEL_CONTEXT, LoggingContext, current_context
 from synapse.util.caches.ttlcache import TTLCache
 
 from tests import unittest
@@ -79,7 +79,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self._config = config = HomeServerConfig()
         config.parse_config_dict(config_dict, "", "")
 
-        self.tls_factory = ClientTLSOptionsFactory(config)
+        self.tls_factory = FederationPolicyForHTTPS(config)
 
         self.well_known_cache = TTLCache("test_cache", timer=self.reactor.seconds)
         self.had_well_known_cache = TTLCache("test_cache", timer=self.reactor.seconds)
@@ -124,19 +124,24 @@ class MatrixFederationAgentTests(unittest.TestCase):
             FakeTransport(client_protocol, self.reactor, server_tls_protocol)
         )
 
+        # grab a hold of the TLS connection, in case it gets torn down
+        server_tls_connection = server_tls_protocol._tlsConnection
+
+        # fish the test server back out of the server-side TLS protocol.
+        http_protocol = server_tls_protocol.wrappedProtocol
+
         # give the reactor a pump to get the TLS juices flowing.
         self.reactor.pump((0.1,))
 
         # check the SNI
-        server_name = server_tls_protocol._tlsConnection.get_servername()
+        server_name = server_tls_connection.get_servername()
         self.assertEqual(
             server_name,
             expected_sni,
             "Expected SNI %s but got %s" % (expected_sni, server_name),
         )
 
-        # fish the test server back out of the server-side TLS protocol.
-        return server_tls_protocol.wrappedProtocol
+        return http_protocol
 
     @defer.inlineCallbacks
     def _make_get_request(self, uri):
@@ -150,7 +155,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             self.assertNoResult(fetch_d)
 
             # should have reset logcontext to the sentinel
-            _check_logcontext(LoggingContext.sentinel)
+            _check_logcontext(SENTINEL_CONTEXT)
 
             try:
                 fetch_res = yield fetch_d
@@ -710,7 +715,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         config = default_config("test", parse=True)
 
         # Build a new agent and WellKnownResolver with a different tls factory
-        tls_factory = ClientTLSOptionsFactory(config)
+        tls_factory = FederationPolicyForHTTPS(config)
         agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=tls_factory,
@@ -1192,7 +1197,7 @@ class TestCachePeriodFromHeaders(unittest.TestCase):
 
 
 def _check_logcontext(context):
-    current = LoggingContext.current_context()
+    current = current_context()
     if current is not context:
         raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 

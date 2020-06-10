@@ -33,7 +33,7 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         events = [(3, 2), (6, 2), (4, 6)]
 
         for event_count, extrems in events:
-            info = self.get_success(room_creator.create_room(requester, {}))
+            info, _ = self.get_success(room_creator.create_room(requester, {}))
             room_id = info["room_id"]
 
             last_event = None
@@ -59,24 +59,22 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
             )
         )
 
-        expected = set(
-            [
-                b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
-                b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
-                b'synapse_forward_extremities_bucket{le="3.0"} 2.0',
-                b'synapse_forward_extremities_bucket{le="5.0"} 2.0',
-                b'synapse_forward_extremities_bucket{le="7.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="10.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="15.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="20.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="50.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="100.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="200.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="500.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="+Inf"} 3.0',
-                b"synapse_forward_extremities_count 3.0",
-                b"synapse_forward_extremities_sum 10.0",
-            ]
-        )
+        expected = {
+            b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
+            b'synapse_forward_extremities_bucket{le="3.0"} 2.0',
+            b'synapse_forward_extremities_bucket{le="5.0"} 2.0',
+            b'synapse_forward_extremities_bucket{le="7.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="10.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="15.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="20.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="50.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="100.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="200.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="500.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="+Inf"} 3.0',
+            b"synapse_forward_extremities_count 3.0",
+            b"synapse_forward_extremities_sum 10.0",
+        }
 
         self.assertEqual(items, expected)

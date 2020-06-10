@@ -1,34 +1,8 @@
-Erik Johnston <erik at matrix.org>
- * HS core
- * Federation API impl
+The following is an incomplete list of people outside the core team who have
+contributed to Synapse. It is no longer maintained: more recent contributions
+are listed in the `changelog <CHANGES.md>`_.
 
-Mark Haines <mark at matrix.org>
- * HS core
- * Crypto
- * Content repository
- * CS v2 API impl
-
-Kegan Dougal <kegan at matrix.org>
- * HS core
- * CS v1 API impl
- * AS API impl
-
-Paul "LeoNerd" Evans <paul at matrix.org>
- * HS core
- * Presence
- * Typing Notifications
- * Performance metrics and caching layer
-
-Dave Baker <dave at matrix.org>
- * Push notifications
- * Auth CS v2 impl
-
-Matthew Hodgson <matthew at matrix.org>
- * General doc & housekeeping
- * Vertobot/vertobridge matrix<->verto PoC
-
-Emmanuel Rohee <manu at matrix.org>
- * Supporting iOS clients (testability and fallback registration)
+----
 
 Turned to Dust <dwinslow86 at gmail.com>
  * ArchLinux installation instructions
@@ -62,16 +36,16 @@ Christoph Witzany <christoph at web.crofting.com>
  * Add LDAP support for authentication
 
 Pierre Jaury <pierre at jaury.eu>
-* Docker packaging
+ * Docker packaging
 
 Serban Constantin <serban.constantin at gmail dot com>
  * Small bug fix
 
-Jason Robinson <jasonr at matrix.org>
- * Minor fixes
-
 Joseph Weston <joseph at weston.cloud>
- + Add admin API for querying HS version
+ * Add admin API for querying HS version
 
 Benjamin Saunders <ben.e.saunders at gmail dot com>
  * Documentation improvements
+
+Werner Sembach <werner.sembach at fau dot de>
+ * Automatically remove a group/community when it is empty

@@ -169,11 +169,11 @@ def run_generate_config(environ, ownership):
     # log("running %s" % (args, ))
 
     if ownership is not None:
-        args = ["su-exec", ownership] + args
-        os.execv("/sbin/su-exec", args)
-
         # make sure that synapse has perms to write to the data dir.
         subprocess.check_output(["chown", ownership, data_dir])
+
+        args = ["su-exec", ownership] + args
+        os.execv("/sbin/su-exec", args)
     else:
         os.execv("/usr/local/bin/python", args)
 
@@ -182,15 +182,11 @@ def main(args, environ):
     mode = args[1] if len(args) > 1 else None
     desired_uid = int(environ.get("UID", "991"))
     desired_gid = int(environ.get("GID", "991"))
+    synapse_worker = environ.get("SYNAPSE_WORKER", "synapse.app.homeserver")
     if (desired_uid == os.getuid()) and (desired_gid == os.getgid()):
         ownership = None
     else:
         ownership = "{}:{}".format(desired_uid, desired_gid)
-
-    log(
-        "Container running as UserID %s:%s, ENV (or defaults) requests %s:%s"
-        % (os.getuid(), os.getgid(), desired_uid, desired_gid)
-    )
 
     if ownership is None:
         log("Will not perform chmod/su-exec as UserID already matches request")
@@ -212,40 +208,33 @@ def main(args, environ):
     if mode is not None:
         error("Unknown execution mode '%s'" % (mode,))
 
-    if "SYNAPSE_SERVER_NAME" in environ:
-        # backwards-compatibility generate-a-config-on-the-fly mode
-        if "SYNAPSE_CONFIG_PATH" in environ:
-            error(
-                "SYNAPSE_SERVER_NAME and SYNAPSE_CONFIG_PATH are mutually exclusive "
-                "except in `generate` or `migrate_config` mode."
-            )
+    config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
+    config_path = environ.get("SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml")
 
-        config_path = "/compiled/homeserver.yaml"
-        log(
-            "Generating config file '%s' on-the-fly from environment variables.\n"
-            "Note that this mode is deprecated. You can migrate to a static config\n"
-            "file by running with 'migrate_config'. See the README for more details."
-            % (config_path,)
-        )
-
-        generate_config_from_template("/compiled", config_path, environ, ownership)
-    else:
-        config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
-        config_path = environ.get(
-            "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
-        )
-        if not os.path.exists(config_path):
+    if not os.path.exists(config_path):
+        if "SYNAPSE_SERVER_NAME" in environ:
             error(
-                "Config file '%s' does not exist. You should either create a new "
-                "config file by running with the `generate` argument (and then edit "
-                "the resulting file before restarting) or specify the path to an "
-                "existing config file with the SYNAPSE_CONFIG_PATH variable."
+                """\
+Config file '%s' does not exist.
+
+The synapse docker image no longer supports generating a config file on-the-fly
+based on environment variables. You can migrate to a static config file by
+running with 'migrate_config'. See the README for more details.
+"""
                 % (config_path,)
             )
 
+        error(
+            "Config file '%s' does not exist. You should either create a new "
+            "config file by running with the `generate` argument (and then edit "
+            "the resulting file before restarting) or specify the path to an "
+            "existing config file with the SYNAPSE_CONFIG_PATH variable."
+            % (config_path,)
+        )
+
     log("Starting synapse with config file " + config_path)
 
-    args = ["python", "-m", "synapse.app.homeserver", "--config-path", config_path]
+    args = ["python", "-m", synapse_worker, "--config-path", config_path]
     if ownership is not None:
         args = ["su-exec", ownership] + args
         os.execv("/sbin/su-exec", args)

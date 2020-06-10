@@ -16,7 +16,7 @@ from mock import Mock, patch
 
 from parameterized import parameterized
 
-from synapse.app.federation_reader import FederationReaderServer
+from synapse.app.generic_worker import GenericWorkerServer
 from synapse.app.homeserver import SynapseHomeServer
 
 from tests.unittest import HomeserverTestCase
@@ -25,9 +25,17 @@ from tests.unittest import HomeserverTestCase
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            http_client=None, homeserverToUse=FederationReaderServer
+            http_client=None, homeserverToUse=GenericWorkerServer
         )
         return hs
+
+    def default_config(self):
+        conf = super().default_config()
+        # we're using FederationReaderServer, which uses a SlavedStore, so we
+        # have to tell the FederationHandler not to try to access stuff that is only
+        # in the primary store.
+        conf["worker_app"] = "yes"
+        return conf
 
     @parameterized.expand(
         [

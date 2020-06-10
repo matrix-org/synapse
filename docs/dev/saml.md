@@ -18,9 +18,13 @@ To make Synapse (and therefore Riot) use it:
        metadata:
          local: ["samling.xml"]   
    ```
-5. Run `apt-get install xmlsec1` and `pip install --upgrade --force 'pysaml2>=4.5.0'` to ensure
+5. Ensure that your `homeserver.yaml` has a setting for `public_baseurl`:
+   ```yaml
+   public_baseurl: http://localhost:8080/
+   ```
+6. Run `apt-get install xmlsec1` and `pip install --upgrade --force 'pysaml2>=4.5.0'` to ensure
    the dependencies are installed and ready to go.
-6. Restart Synapse.
+7. Restart Synapse.
 
 Then in Riot:
 

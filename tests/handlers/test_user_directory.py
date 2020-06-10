@@ -14,6 +14,8 @@
 # limitations under the License.
 from mock import Mock
 
+from twisted.internet import defer
+
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.rest.client.v1 import login, room
@@ -75,18 +77,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.store.remove_from_user_dir = Mock()
-        self.store.remove_from_user_in_public_room = Mock()
+        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_user_deactivated(s_user_id))
         self.store.remove_from_user_dir.not_called()
-        self.store.remove_from_user_in_public_room.not_called()
 
     def test_handle_user_deactivated_regular_user(self):
         r_user_id = "@regular:test"
         self.get_success(
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
-        self.store.remove_from_user_dir = Mock()
+        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
 
@@ -114,7 +114,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         public_users = self.get_users_in_public_rooms()
 
         self.assertEqual(
-            self._compress_shared(shares_private), set([(u1, u2, room), (u2, u1, room)])
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
         )
         self.assertEqual(public_users, [])
 
@@ -147,6 +147,98 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
 
+    def test_spam_checker(self):
+        """
+        A user which fails to the spam checks will not appear in search results.
+        """
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
+        u2 = self.register_user("user2", "pass")
+        u2_token = self.login(u2, "pass")
+
+        # We do not add users to the directory until they join a room.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+        room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
+        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        # Check we have populated the database correctly.
+        shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
+
+        self.assertEqual(
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+        )
+        self.assertEqual(public_users, [])
+
+        # We get one search result when searching for user2 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 1)
+
+        # Configure a spam checker that does not filter any users.
+        spam_checker = self.hs.get_spam_checker()
+
+        class AllowAll(object):
+            def check_username_for_spam(self, user_profile):
+                # Allow all users.
+                return False
+
+        spam_checker.spam_checkers = [AllowAll()]
+
+        # The results do not change:
+        # We get one search result when searching for user2 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 1)
+
+        # Configure a spam checker that filters all users.
+        class BlockAll(object):
+            def check_username_for_spam(self, user_profile):
+                # All users are spammy.
+                return True
+
+        spam_checker.spam_checkers = [BlockAll()]
+
+        # User1 now gets no search results for any of the other users.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+    def test_legacy_spam_checker(self):
+        """
+        A spam checker without the expected method should be ignored.
+        """
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
+        u2 = self.register_user("user2", "pass")
+        u2_token = self.login(u2, "pass")
+
+        # We do not add users to the directory until they join a room.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 0)
+
+        room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
+        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
+
+        # Check we have populated the database correctly.
+        shares_private = self.get_users_who_share_private_rooms()
+        public_users = self.get_users_in_public_rooms()
+
+        self.assertEqual(
+            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+        )
+        self.assertEqual(public_users, [])
+
+        # Configure a spam checker.
+        spam_checker = self.hs.get_spam_checker()
+        # The spam checker doesn't need any methods, so create a bare object.
+        spam_checker.spam_checker = object()
+
+        # We get one search result when searching for user2 by user1.
+        s = self.get_success(self.handler.search_users(u1, "user2", 10))
+        self.assertEqual(len(s["results"]), 1)
+
     def _compress_shared(self, shared):
         """
         Compress a list of users who share rooms dicts to a list of tuples.
@@ -158,7 +250,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def get_users_in_public_rooms(self):
         r = self.get_success(
-            self.store._simple_select_list(
+            self.store.db.simple_select_list(
                 "users_in_public_rooms", None, ("user_id", "room_id")
             )
         )
@@ -169,7 +261,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def get_users_who_share_private_rooms(self):
         return self.get_success(
-            self.store._simple_select_list(
+            self.store.db.simple_select_list(
                 "users_who_share_private_rooms",
                 None,
                 ["user_id", "other_user_id", "room_id"],
@@ -181,10 +273,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         Add the background updates we need to run.
         """
         # Ugh, have to reset this flag
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
 
         self.get_success(
-            self.store._simple_insert(
+            self.store.db.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_createtables",
@@ -193,7 +285,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.db.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_process_rooms",
@@ -203,7 +295,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.db.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_process_users",
@@ -213,7 +305,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
         self.get_success(
-            self.store._simple_insert(
+            self.store.db.simple_insert(
                 "background_updates",
                 {
                     "update_name": "populate_user_directory_cleanup",
@@ -255,19 +347,23 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Do the initial population of the user directory via the background update
         self._add_background_updates()
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()
 
         # User 1 and User 2 are in the same public room
-        self.assertEqual(set(public_users), set([(u1, room), (u2, room)]))
+        self.assertEqual(set(public_users), {(u1, room), (u2, room)})
 
         # User 1 and User 3 share private rooms
         self.assertEqual(
             self._compress_shared(shares_private),
-            set([(u1, u3, private_room), (u3, u1, private_room)]),
+            {(u1, u3, private_room), (u3, u1, private_room)},
         )
 
     def test_initial_share_all_users(self):
@@ -290,15 +386,19 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Do the initial population of the user directory via the background update
         self._add_background_updates()
 
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()
 
         # No users share rooms
         self.assertEqual(public_users, [])
-        self.assertEqual(self._compress_shared(shares_private), set([]))
+        self.assertEqual(self._compress_shared(shares_private), set())
 
         # Despite not sharing a room, search_all_users means we get a search
         # result.

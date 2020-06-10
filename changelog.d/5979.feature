@@ -1,1 +1,0 @@
-Use the v2 Identity Service API for 3PID invites.

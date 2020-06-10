@@ -16,8 +16,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.http.server import (
     DirectServeResource,
     set_cors_headers,
@@ -79,11 +77,10 @@ class ThumbnailResource(DirectServeResource):
                 )
             self.media_repo.mark_recently_accessed(server_name, media_id)
 
-    @defer.inlineCallbacks
-    def _respond_local_thumbnail(
+    async def _respond_local_thumbnail(
         self, request, media_id, width, height, method, m_type
     ):
-        media_info = yield self.store.get_local_media(media_id)
+        media_info = await self.store.get_local_media(media_id)
 
         if not media_info:
             respond_404(request)
@@ -93,7 +90,7 @@ class ThumbnailResource(DirectServeResource):
             respond_404(request)
             return
 
-        thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
+        thumbnail_infos = await self.store.get_local_media_thumbnails(media_id)
 
         if thumbnail_infos:
             thumbnail_info = self._select_thumbnail(
@@ -114,14 +111,13 @@ class ThumbnailResource(DirectServeResource):
             t_type = file_info.thumbnail_type
             t_length = thumbnail_info["thumbnail_length"]
 
-            responder = yield self.media_storage.fetch_media(file_info)
-            yield respond_with_responder(request, responder, t_type, t_length)
+            responder = await self.media_storage.fetch_media(file_info)
+            await respond_with_responder(request, responder, t_type, t_length)
         else:
             logger.info("Couldn't find any generated thumbnails")
             respond_404(request)
 
-    @defer.inlineCallbacks
-    def _select_or_generate_local_thumbnail(
+    async def _select_or_generate_local_thumbnail(
         self,
         request,
         media_id,
@@ -130,7 +126,7 @@ class ThumbnailResource(DirectServeResource):
         desired_method,
         desired_type,
     ):
-        media_info = yield self.store.get_local_media(media_id)
+        media_info = await self.store.get_local_media(media_id)
 
         if not media_info:
             respond_404(request)
@@ -140,7 +136,7 @@ class ThumbnailResource(DirectServeResource):
             respond_404(request)
             return
 
-        thumbnail_infos = yield self.store.get_local_media_thumbnails(media_id)
+        thumbnail_infos = await self.store.get_local_media_thumbnails(media_id)
         for info in thumbnail_infos:
             t_w = info["thumbnail_width"] == desired_width
             t_h = info["thumbnail_height"] == desired_height
@@ -162,15 +158,15 @@ class ThumbnailResource(DirectServeResource):
                 t_type = file_info.thumbnail_type
                 t_length = info["thumbnail_length"]
 
-                responder = yield self.media_storage.fetch_media(file_info)
+                responder = await self.media_storage.fetch_media(file_info)
                 if responder:
-                    yield respond_with_responder(request, responder, t_type, t_length)
+                    await respond_with_responder(request, responder, t_type, t_length)
                     return
 
         logger.debug("We don't have a thumbnail of that size. Generating")
 
         # Okay, so we generate one.
-        file_path = yield self.media_repo.generate_local_exact_thumbnail(
+        file_path = await self.media_repo.generate_local_exact_thumbnail(
             media_id,
             desired_width,
             desired_height,
@@ -180,13 +176,12 @@ class ThumbnailResource(DirectServeResource):
         )
 
         if file_path:
-            yield respond_with_file(request, desired_type, file_path)
+            await respond_with_file(request, desired_type, file_path)
         else:
-            logger.warn("Failed to generate thumbnail")
+            logger.warning("Failed to generate thumbnail")
             respond_404(request)
 
-    @defer.inlineCallbacks
-    def _select_or_generate_remote_thumbnail(
+    async def _select_or_generate_remote_thumbnail(
         self,
         request,
         server_name,
@@ -196,9 +191,9 @@ class ThumbnailResource(DirectServeResource):
         desired_method,
         desired_type,
     ):
-        media_info = yield self.media_repo.get_remote_media_info(server_name, media_id)
+        media_info = await self.media_repo.get_remote_media_info(server_name, media_id)
 
-        thumbnail_infos = yield self.store.get_remote_media_thumbnails(
+        thumbnail_infos = await self.store.get_remote_media_thumbnails(
             server_name, media_id
         )
 
@@ -224,15 +219,15 @@ class ThumbnailResource(DirectServeResource):
                 t_type = file_info.thumbnail_type
                 t_length = info["thumbnail_length"]
 
-                responder = yield self.media_storage.fetch_media(file_info)
+                responder = await self.media_storage.fetch_media(file_info)
                 if responder:
-                    yield respond_with_responder(request, responder, t_type, t_length)
+                    await respond_with_responder(request, responder, t_type, t_length)
                     return
 
         logger.debug("We don't have a thumbnail of that size. Generating")
 
         # Okay, so we generate one.
-        file_path = yield self.media_repo.generate_remote_exact_thumbnail(
+        file_path = await self.media_repo.generate_remote_exact_thumbnail(
             server_name,
             file_id,
             media_id,
@@ -243,21 +238,20 @@ class ThumbnailResource(DirectServeResource):
         )
 
         if file_path:
-            yield respond_with_file(request, desired_type, file_path)
+            await respond_with_file(request, desired_type, file_path)
         else:
-            logger.warn("Failed to generate thumbnail")
+            logger.warning("Failed to generate thumbnail")
             respond_404(request)
 
-    @defer.inlineCallbacks
-    def _respond_remote_thumbnail(
+    async def _respond_remote_thumbnail(
         self, request, server_name, media_id, width, height, method, m_type
     ):
         # TODO: Don't download the whole remote file
         # We should proxy the thumbnail from the remote server instead of
         # downloading the remote file and generating our own thumbnails.
-        media_info = yield self.media_repo.get_remote_media_info(server_name, media_id)
+        media_info = await self.media_repo.get_remote_media_info(server_name, media_id)
 
-        thumbnail_infos = yield self.store.get_remote_media_thumbnails(
+        thumbnail_infos = await self.store.get_remote_media_thumbnails(
             server_name, media_id
         )
 
@@ -278,8 +272,8 @@ class ThumbnailResource(DirectServeResource):
             t_type = file_info.thumbnail_type
             t_length = thumbnail_info["thumbnail_length"]
 
-            responder = yield self.media_storage.fetch_media(file_info)
-            yield respond_with_responder(request, responder, t_type, t_length)
+            responder = await self.media_storage.fetch_media(file_info)
+            await respond_with_responder(request, responder, t_type, t_length)
         else:
             logger.info("Failed to find any generated thumbnails")
             respond_404(request)
@@ -296,8 +290,8 @@ class ThumbnailResource(DirectServeResource):
         d_h = desired_height
 
         if desired_method.lower() == "crop":
-            info_list = []
-            info_list2 = []
+            crop_info_list = []
+            crop_info_list2 = []
             for info in thumbnail_infos:
                 t_w = info["thumbnail_width"]
                 t_h = info["thumbnail_height"]
@@ -309,7 +303,7 @@ class ThumbnailResource(DirectServeResource):
                     type_quality = desired_type != info["thumbnail_type"]
                     length_quality = info["thumbnail_length"]
                     if t_w >= d_w or t_h >= d_h:
-                        info_list.append(
+                        crop_info_list.append(
                             (
                                 aspect_quality,
                                 min_quality,
@@ -320,7 +314,7 @@ class ThumbnailResource(DirectServeResource):
                             )
                         )
                     else:
-                        info_list2.append(
+                        crop_info_list2.append(
                             (
                                 aspect_quality,
                                 min_quality,
@@ -330,10 +324,10 @@ class ThumbnailResource(DirectServeResource):
                                 info,
                             )
                         )
-            if info_list:
-                return min(info_list)[-1]
+            if crop_info_list:
+                return min(crop_info_list)[-1]
             else:
-                return min(info_list2)[-1]
+                return min(crop_info_list2)[-1]
         else:
             info_list = []
             info_list2 = []

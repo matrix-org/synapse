@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any, List
+
 from synapse.util.module_loader import load_module
 
 from ._base import Config
@@ -21,8 +23,10 @@ LDAP_PROVIDER = "ldap_auth_provider.LdapAuthProvider"
 
 
 class PasswordAuthProviderConfig(Config):
+    section = "authproviders"
+
     def read_config(self, config, **kwargs):
-        self.password_providers = []
+        self.password_providers = []  # type: List[Any]
         providers = []
 
         # We want to be backwards compatible with the old `ldap_config`
@@ -31,7 +35,7 @@ class PasswordAuthProviderConfig(Config):
         if ldap_config.get("enabled", False):
             providers.append({"module": LDAP_PROVIDER, "config": ldap_config})
 
-        providers.extend(config.get("password_providers", []))
+        providers.extend(config.get("password_providers") or [])
         for provider in providers:
             mod_name = provider["module"]
 
@@ -48,7 +52,19 @@ class PasswordAuthProviderConfig(Config):
 
     def generate_config_section(self, **kwargs):
         return """\
-        #password_providers:
+        # Password providers allow homeserver administrators to integrate
+        # their Synapse installation with existing authentication methods
+        # ex. LDAP, external tokens, etc.
+        #
+        # For more information and known implementations, please see
+        # https://github.com/matrix-org/synapse/blob/master/docs/password_auth_providers.md
+        #
+        # Note: instances wishing to use SAML or CAS authentication should
+        # instead use the `saml2_config` or `cas_config` options,
+        # respectively.
+        #
+        password_providers:
+        #    # Example config for an LDAP auth provider
         #    - module: "ldap_auth_provider.LdapAuthProvider"
         #      config:
         #        enabled: true

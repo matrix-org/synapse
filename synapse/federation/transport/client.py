@@ -15,12 +15,14 @@
 # limitations under the License.
 
 import logging
+from typing import Any, Dict, Optional
 
 from six.moves import urllib
 
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.api.urls import (
     FEDERATION_UNSTABLE_PREFIX,
     FEDERATION_V1_PREFIX,
@@ -39,36 +41,12 @@ class TransportLayerClient(object):
         self.client = hs.get_http_client()
 
     @log_function
-    def get_room_state(self, destination, room_id, event_id):
-        """ Requests all state for a given room from the given server at the
-        given event.
-
-        Args:
-            destination (str): The host name of the remote home server we want
-                to get the state from.
-            context (str): The name of the context we want the state of
-            event_id (str): The event we want the context at.
-
-        Returns:
-            Deferred: Results in a dict received from the remote homeserver.
-        """
-        logger.debug("get_room_state dest=%s, room=%s", destination, room_id)
-
-        path = _create_v1_path("/state/%s", room_id)
-        return self.client.get_json(
-            destination,
-            path=path,
-            args={"event_id": event_id},
-            try_trailing_slash_on_400=True,
-        )
-
-    @log_function
     def get_room_state_ids(self, destination, room_id, event_id):
         """ Requests all state for a given room from the given server at the
         given event. Returns the state's event_id's
 
         Args:
-            destination (str): The host name of the remote home server we want
+            destination (str): The host name of the remote homeserver we want
                 to get the state from.
             context (str): The name of the context we want the state of
             event_id (str): The event we want the context at.
@@ -91,7 +69,7 @@ class TransportLayerClient(object):
         """ Requests the pdu with give id and origin from the given server.
 
         Args:
-            destination (str): The host name of the remote home server we want
+            destination (str): The host name of the remote homeserver we want
                 to get the state from.
             event_id (str): The id of the event being requested.
             timeout (int): How long to try (in ms) the destination for before
@@ -122,10 +100,10 @@ class TransportLayerClient(object):
             Deferred: Results in a dict received from the remote homeserver.
         """
         logger.debug(
-            "backfill dest=%s, room_id=%s, event_tuples=%s, limit=%s",
+            "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
             destination,
             room_id,
-            repr(event_tuples),
+            event_tuples,
             str(limit),
         )
 
@@ -267,7 +245,7 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_join(self, destination, room_id, event_id, content):
+    def send_join_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/send_join/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
@@ -278,8 +256,37 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_leave(self, destination, room_id, event_id, content):
+    def send_join_v2(self, destination, room_id, event_id, content):
+        path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
+
+        response = yield self.client.put_json(
+            destination=destination, path=path, data=content
+        )
+
+        return response
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_leave_v1(self, destination, room_id, event_id, content):
         path = _create_v1_path("/send_leave/%s/%s", room_id, event_id)
+
+        response = yield self.client.put_json(
+            destination=destination,
+            path=path,
+            data=content,
+            # we want to do our best to send this through. The problem is
+            # that if it fails, we won't retry it later, so if the remote
+            # server was just having a momentary blip, the room will be out of
+            # sync.
+            ignore_backoff=True,
+        )
+
+        return response
+
+    @defer.inlineCallbacks
+    @log_function
+    def send_leave_v2(self, destination, room_id, event_id, content):
+        path = _create_v2_path("/send_leave/%s/%s", room_id, event_id)
 
         response = yield self.client.put_json(
             destination=destination,
@@ -320,18 +327,25 @@ class TransportLayerClient(object):
     @log_function
     def get_public_rooms(
         self,
-        remote_server,
-        limit,
-        since_token,
-        search_filter=None,
-        include_all_networks=False,
-        third_party_instance_id=None,
+        remote_server: str,
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        include_all_networks: bool = False,
+        third_party_instance_id: Optional[str] = None,
     ):
+        """Get the list of public rooms from a remote homeserver
+
+        See synapse.federation.federation_client.FederationClient.get_public_rooms for
+        more information.
+        """
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
             path = _create_v1_path("/publicRooms")
 
-            data = {"include_all_networks": "true" if include_all_networks else "false"}
+            data = {
+                "include_all_networks": "true" if include_all_networks else "false"
+            }  # type: Dict[str, Any]
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
@@ -341,13 +355,25 @@ class TransportLayerClient(object):
 
             data["filter"] = search_filter
 
-            response = yield self.client.post_json(
-                destination=remote_server, path=path, data=data, ignore_backoff=True
-            )
+            try:
+                response = yield self.client.post_json(
+                    destination=remote_server, path=path, data=data, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                    )
+                raise
         else:
             path = _create_v1_path("/publicRooms")
 
-            args = {"include_all_networks": "true" if include_all_networks else "false"}
+            args = {
+                "include_all_networks": "true" if include_all_networks else "false"
+            }  # type: Dict[str, Any]
             if third_party_instance_id:
                 args["third_party_instance_id"] = (third_party_instance_id,)
             if limit:
@@ -355,9 +381,19 @@ class TransportLayerClient(object):
             if since_token:
                 args["since"] = [since_token]
 
-            response = yield self.client.get_json(
-                destination=remote_server, path=path, args=args, ignore_backoff=True
-            )
+            try:
+                response = yield self.client.get_json(
+                    destination=remote_server, path=path, args=args, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                    )
+                raise
 
         return response
 
@@ -383,17 +419,6 @@ class TransportLayerClient(object):
 
     @defer.inlineCallbacks
     @log_function
-    def send_query_auth(self, destination, room_id, event_id, content):
-        path = _create_v1_path("/query_auth/%s/%s", room_id, event_id)
-
-        content = yield self.client.post_json(
-            destination=destination, path=path, data=content
-        )
-
-        return content
-
-    @defer.inlineCallbacks
-    @log_function
     def query_client_keys(self, destination, query_content, timeout):
         """Query the device keys for a list of user ids hosted on a remote
         server.
@@ -402,20 +427,30 @@ class TransportLayerClient(object):
             {
               "device_keys": {
                 "<user_id>": ["<device_id>"]
-            } }
+              }
+            }
 
         Response:
             {
               "device_keys": {
                 "<user_id>": {
                   "<device_id>": {...}
-            } } }
+                }
+              },
+              "master_key": {
+                "<user_id>": {...}
+                }
+              },
+              "self_signing_key": {
+                "<user_id>": {...}
+              }
+            }
 
         Args:
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containg the device keys.
+            A dict containing device and cross-signing keys.
         """
         path = _create_v1_path("/user/keys/query")
 
@@ -432,14 +467,30 @@ class TransportLayerClient(object):
         Response:
             {
               "stream_id": "...",
-              "devices": [ { ... } ]
+              "devices": [ { ... } ],
+              "master_key": {
+                "user_id": "<user_id>",
+                "usage": [...],
+                "keys": {...},
+                "signatures": {
+                  "<user_id>": {...}
+                }
+              },
+              "self_signing_key": {
+                "user_id": "<user_id>",
+                "usage": [...],
+                "keys": {...},
+                "signatures": {
+                  "<user_id>": {...}
+                }
+              }
             }
 
         Args:
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containg the device keys.
+            A dict containing device and cross-signing keys.
         """
         path = _create_v1_path("/user/devices/%s", user_id)
 
@@ -457,8 +508,10 @@ class TransportLayerClient(object):
             {
               "one_time_keys": {
                 "<user_id>": {
-                    "<device_id>": "<algorithm>"
-            } } }
+                  "<device_id>": "<algorithm>"
+                }
+              }
+            }
 
         Response:
             {
@@ -466,13 +519,16 @@ class TransportLayerClient(object):
                 "<user_id>": {
                   "<device_id>": {
                     "<algorithm>:<key_id>": "<key_base64>"
-            } } } }
+                  }
+                }
+              }
+            }
 
         Args:
             destination(str): The server to query.
             query_content(dict): The user ids to query.
         Returns:
-            A dict containg the one-time keys.
+            A dict containing the one-time keys.
         """
 
         path = _create_v1_path("/user/keys/claim")

@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import logging
 import string
+from typing import Iterable, List, Optional
 
 from twisted.internet import defer
 
@@ -28,7 +28,8 @@ from synapse.api.errors import (
     StoreError,
     SynapseError,
 )
-from synapse.types import RoomAlias, UserID, get_domain_from_id
+from synapse.appservice import ApplicationService
+from synapse.types import Requester, RoomAlias, UserID, get_domain_from_id
 
 from ._base import BaseHandler
 
@@ -55,7 +56,13 @@ class DirectoryHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
 
     @defer.inlineCallbacks
-    def _create_association(self, room_alias, room_id, servers=None, creator=None):
+    def _create_association(
+        self,
+        room_alias: RoomAlias,
+        room_id: str,
+        servers: Optional[Iterable[str]] = None,
+        creator: Optional[str] = None,
+    ):
         # general association creation for both human users and app services
 
         for wchar in string.whitespace:
@@ -70,7 +77,7 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Check if there is a current association.
         if not servers:
             users = yield self.state.get_current_users_in_room(room_id)
-            servers = set(get_domain_from_id(u) for u in users)
+            servers = {get_domain_from_id(u) for u in users}
 
         if not servers:
             raise SynapseError(400, "Failed to get server list")
@@ -79,26 +86,22 @@ class DirectoryHandler(BaseHandler):
             room_alias, room_id, servers, creator=creator
         )
 
-    @defer.inlineCallbacks
-    def create_association(
+    async def create_association(
         self,
-        requester,
-        room_alias,
-        room_id,
-        servers=None,
-        send_event=True,
-        check_membership=True,
+        requester: Requester,
+        room_alias: RoomAlias,
+        room_id: str,
+        servers: Optional[List[str]] = None,
+        check_membership: bool = True,
     ):
         """Attempt to create a new alias
 
         Args:
-            requester (Requester)
-            room_alias (RoomAlias)
-            room_id (str)
-            servers (list[str]|None): List of servers that others servers
-                should try and join via
-            send_event (bool): Whether to send an updated m.room.aliases event
-            check_membership (bool): Whether to check if the user is in the room
+            requester
+            room_alias
+            room_id
+            servers: Iterable of servers that others servers should try and join via
+            check_membership: Whether to check if the user is in the room
                 before the alias can be set (if the server's config requires it).
 
         Returns:
@@ -119,12 +122,16 @@ class DirectoryHandler(BaseHandler):
             if not service.is_interested_in_alias(room_alias.to_string()):
                 raise SynapseError(
                     400,
-                    "This application service has not reserved" " this kind of alias.",
+                    "This application service has not reserved this kind of alias.",
                     errcode=Codes.EXCLUSIVE,
                 )
         else:
-            if self.require_membership and check_membership:
-                rooms_for_user = yield self.store.get_rooms_for_user(user_id)
+            # Server admins are not subject to the same constraints as normal
+            # users when creating an alias (e.g. being in the room).
+            is_admin = await self.auth.is_server_admin(requester.user)
+
+            if (self.require_membership and check_membership) and not is_admin:
+                rooms_for_user = await self.store.get_rooms_for_user(user_id)
                 if room_id not in rooms_for_user:
                     raise AuthError(
                         403, "You must be in the room to create an alias for it"
@@ -141,7 +148,7 @@ class DirectoryHandler(BaseHandler):
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to create alias")
 
-            can_create = yield self.can_modify_alias(room_alias, user_id=user_id)
+            can_create = await self.can_modify_alias(room_alias, user_id=user_id)
             if not can_create:
                 raise AuthError(
                     400,
@@ -149,23 +156,17 @@ class DirectoryHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE,
                 )
 
-        yield self._create_association(room_alias, room_id, servers, creator=user_id)
-        if send_event:
-            yield self.send_room_alias_update_event(requester, room_id)
+        await self._create_association(room_alias, room_id, servers, creator=user_id)
 
-    @defer.inlineCallbacks
-    def delete_association(self, requester, room_alias, send_event=True):
+    async def delete_association(self, requester: Requester, room_alias: RoomAlias):
         """Remove an alias from the directory
 
         (this is only meant for human users; AS users should call
         delete_appservice_association)
 
         Args:
-            requester (Requester):
-            room_alias (RoomAlias):
-            send_event (bool): Whether to send an updated m.room.aliases event.
-                Note that, if we delete the canonical alias, we will always attempt
-                to send an m.room.canonical_alias event
+            requester
+            room_alias
 
         Returns:
             Deferred[unicode]: room id that the alias used to point to
@@ -181,7 +182,7 @@ class DirectoryHandler(BaseHandler):
         user_id = requester.user.to_string()
 
         try:
-            can_delete = yield self._user_can_delete_alias(room_alias, user_id)
+            can_delete = await self._user_can_delete_alias(room_alias, user_id)
         except StoreError as e:
             if e.code == 404:
                 raise NotFoundError("Unknown room alias")
@@ -190,7 +191,7 @@ class DirectoryHandler(BaseHandler):
         if not can_delete:
             raise AuthError(403, "You don't have permission to delete the alias.")
 
-        can_delete = yield self.can_modify_alias(room_alias, user_id=user_id)
+        can_delete = await self.can_modify_alias(room_alias, user_id=user_id)
         if not can_delete:
             raise SynapseError(
                 400,
@@ -198,22 +199,19 @@ class DirectoryHandler(BaseHandler):
                 errcode=Codes.EXCLUSIVE,
             )
 
-        room_id = yield self._delete_association(room_alias)
+        room_id = await self._delete_association(room_alias)
 
         try:
-            if send_event:
-                yield self.send_room_alias_update_event(requester, room_id)
-
-            yield self._update_canonical_alias(
-                requester, requester.user.to_string(), room_id, room_alias
-            )
+            await self._update_canonical_alias(requester, user_id, room_id, room_alias)
         except AuthError as e:
             logger.info("Failed to update alias events: %s", e)
 
         return room_id
 
     @defer.inlineCallbacks
-    def delete_appservice_association(self, service, room_alias):
+    def delete_appservice_association(
+        self, service: ApplicationService, room_alias: RoomAlias
+    ):
         if not service.is_interested_in_alias(room_alias.to_string()):
             raise SynapseError(
                 400,
@@ -223,7 +221,7 @@ class DirectoryHandler(BaseHandler):
         yield self._delete_association(room_alias)
 
     @defer.inlineCallbacks
-    def _delete_association(self, room_alias):
+    def _delete_association(self, room_alias: RoomAlias):
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
@@ -232,7 +230,7 @@ class DirectoryHandler(BaseHandler):
         return room_id
 
     @defer.inlineCallbacks
-    def get_association(self, room_alias):
+    def get_association(self, room_alias: RoomAlias):
         room_id = None
         if self.hs.is_mine(room_alias):
             result = yield self.get_association_from_room_alias(room_alias)
@@ -250,7 +248,7 @@ class DirectoryHandler(BaseHandler):
                     ignore_backoff=True,
                 )
             except CodeMessageException as e:
-                logging.warn("Error retrieving alias")
+                logging.warning("Error retrieving alias")
                 if e.code == 404:
                     result = None
                 else:
@@ -268,7 +266,7 @@ class DirectoryHandler(BaseHandler):
             )
 
         users = yield self.state.get_current_users_in_room(room_id)
-        extra_servers = set(get_domain_from_id(u) for u in users)
+        extra_servers = {get_domain_from_id(u) for u in users}
         servers = set(extra_servers) | set(servers)
 
         # If this server is in the list of servers, return it first.
@@ -283,7 +281,7 @@ class DirectoryHandler(BaseHandler):
     def on_directory_query(self, args):
         room_alias = RoomAlias.from_string(args["room_alias"])
         if not self.hs.is_mine(room_alias):
-            raise SynapseError(400, "Room Alias is not hosted on this Home Server")
+            raise SynapseError(400, "Room Alias is not hosted on this homeserver")
 
         result = yield self.get_association_from_room_alias(room_alias)
 
@@ -296,46 +294,58 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND,
             )
 
-    @defer.inlineCallbacks
-    def send_room_alias_update_event(self, requester, room_id):
-        aliases = yield self.store.get_aliases_for_room(room_id)
-
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.Aliases,
-                "state_key": self.hs.hostname,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "content": {"aliases": aliases},
-            },
-            ratelimit=False,
-        )
-
-    @defer.inlineCallbacks
-    def _update_canonical_alias(self, requester, user_id, room_id, room_alias):
-        alias_event = yield self.state.get_current_state(
+    async def _update_canonical_alias(
+        self, requester: Requester, user_id: str, room_id: str, room_alias: RoomAlias
+    ):
+        """
+        Send an updated canonical alias event if the removed alias was set as
+        the canonical alias or listed in the alt_aliases field.
+        """
+        alias_event = await self.state.get_current_state(
             room_id, EventTypes.CanonicalAlias, ""
         )
 
-        alias_str = room_alias.to_string()
-        if not alias_event or alias_event.content.get("alias", "") != alias_str:
+        # There is no canonical alias, nothing to do.
+        if not alias_event:
             return
 
-        yield self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.CanonicalAlias,
-                "state_key": "",
-                "room_id": room_id,
-                "sender": user_id,
-                "content": {},
-            },
-            ratelimit=False,
-        )
+        # Obtain a mutable version of the event content.
+        content = dict(alias_event.content)
+        send_update = False
+
+        # Remove the alias property if it matches the removed alias.
+        alias_str = room_alias.to_string()
+        if alias_event.content.get("alias", "") == alias_str:
+            send_update = True
+            content.pop("alias", "")
+
+        # Filter the alt_aliases property for the removed alias. Note that the
+        # value is not modified if alt_aliases is of an unexpected form.
+        alt_aliases = content.get("alt_aliases")
+        if isinstance(alt_aliases, (list, tuple)) and alias_str in alt_aliases:
+            send_update = True
+            alt_aliases = [alias for alias in alt_aliases if alias != alias_str]
+
+            if alt_aliases:
+                content["alt_aliases"] = alt_aliases
+            else:
+                del content["alt_aliases"]
+
+        if send_update:
+            await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.CanonicalAlias,
+                    "state_key": "",
+                    "room_id": room_id,
+                    "sender": user_id,
+                    "content": content,
+                },
+                ratelimit=False,
+            )
 
     @defer.inlineCallbacks
-    def get_association_from_room_alias(self, room_alias):
+    def get_association_from_room_alias(self, room_alias: RoomAlias):
         result = yield self.store.get_association_from_room_alias(room_alias)
         if not result:
             # Query AS to see if it exists
@@ -343,7 +353,7 @@ class DirectoryHandler(BaseHandler):
             result = yield as_handler.query_room_alias_exists(room_alias)
         return result
 
-    def can_modify_alias(self, alias, user_id=None):
+    def can_modify_alias(self, alias: RoomAlias, user_id: Optional[str] = None):
         # Any application service "interested" in an alias they are regexing on
         # can modify the alias.
         # Users can only modify the alias if ALL the interested services have
@@ -363,23 +373,41 @@ class DirectoryHandler(BaseHandler):
         # either no interested services, or no service with an exclusive lock
         return defer.succeed(True)
 
-    @defer.inlineCallbacks
-    def _user_can_delete_alias(self, alias, user_id):
-        creator = yield self.store.get_room_alias_creator(alias.to_string())
+    async def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
+        """Determine whether a user can delete an alias.
+
+        One of the following must be true:
+
+        1. The user created the alias.
+        2. The user is a server administrator.
+        3. The user has a power-level sufficient to send a canonical alias event
+           for the current room.
+
+        """
+        creator = await self.store.get_room_alias_creator(alias.to_string())
 
         if creator is not None and creator == user_id:
             return True
 
-        is_admin = yield self.auth.is_server_admin(UserID.from_string(user_id))
-        return is_admin
+        # Resolve the alias to the corresponding room.
+        room_mapping = await self.get_association(alias)
+        room_id = room_mapping["room_id"]
+        if not room_id:
+            return False
 
-    @defer.inlineCallbacks
-    def edit_published_room_list(self, requester, room_id, visibility):
+        res = await self.auth.check_can_change_room_list(
+            room_id, UserID.from_string(user_id)
+        )
+        return res
+
+    async def edit_published_room_list(
+        self, requester: Requester, room_id: str, visibility: str
+    ):
         """Edit the entry of the room in the published room list.
 
         requester
-        room_id (str)
-        visibility (str): "public" or "private"
+        room_id
+        visibility: "public" or "private"
         """
         user_id = requester.user.to_string()
 
@@ -400,16 +428,24 @@ class DirectoryHandler(BaseHandler):
                 403, "This user is not permitted to publish rooms to the room list"
             )
 
-        room = yield self.store.get_room(room_id)
+        room = await self.store.get_room(room_id)
         if room is None:
             raise SynapseError(400, "Unknown room")
 
-        yield self.auth.check_can_change_room_list(room_id, requester.user)
+        can_change_room_list = await self.auth.check_can_change_room_list(
+            room_id, requester.user
+        )
+        if not can_change_room_list:
+            raise AuthError(
+                403,
+                "This server requires you to be a moderator in the room to"
+                " edit its room list entry",
+            )
 
         making_public = visibility == "public"
         if making_public:
-            room_aliases = yield self.store.get_aliases_for_room(room_id)
-            canonical_alias = yield self.store.get_canonical_alias_for_room(room_id)
+            room_aliases = await self.store.get_aliases_for_room(room_id)
+            canonical_alias = await self.store.get_canonical_alias_for_room(room_id)
             if canonical_alias:
                 room_aliases.append(canonical_alias)
 
@@ -421,20 +457,20 @@ class DirectoryHandler(BaseHandler):
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to publish room")
 
-        yield self.store.set_room_is_public(room_id, making_public)
+        await self.store.set_room_is_public(room_id, making_public)
 
     @defer.inlineCallbacks
     def edit_published_appservice_room_list(
-        self, appservice_id, network_id, room_id, visibility
+        self, appservice_id: str, network_id: str, room_id: str, visibility: str
     ):
         """Add or remove a room from the appservice/network specific public
         room list.
 
         Args:
-            appservice_id (str): ID of the appservice that owns the list
-            network_id (str): The ID of the network the list is associated with
-            room_id (str)
-            visibility (str): either "public" or "private"
+            appservice_id: ID of the appservice that owns the list
+            network_id: The ID of the network the list is associated with
+            room_id
+            visibility: either "public" or "private"
         """
         if visibility not in ["public", "private"]:
             raise SynapseError(400, "Invalid visibility setting")
@@ -442,3 +478,19 @@ class DirectoryHandler(BaseHandler):
         yield self.store.set_room_is_public_appservice(
             room_id, appservice_id, network_id, visibility == "public"
         )
+
+    async def get_aliases_for_room(
+        self, requester: Requester, room_id: str
+    ) -> List[str]:
+        """
+        Get a list of the aliases that currently point to this room on this server
+        """
+        # allow access to server admins and current members of the room
+        is_admin = await self.auth.is_server_admin(requester.user)
+        if not is_admin:
+            await self.auth.check_user_in_room_or_world_readable(
+                room_id, requester.user.to_string()
+            )
+
+        aliases = await self.store.get_aliases_for_room(room_id)
+        return aliases

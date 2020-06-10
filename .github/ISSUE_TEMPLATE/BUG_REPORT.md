@@ -4,11 +4,13 @@ about: Create a report to help us improve
 
 ---
 
+**THIS IS NOT A SUPPORT CHANNEL!**
+**IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**,
+please ask in **#synapse:matrix.org** (using a matrix.org account if necessary)
+
 <!--
 
-**IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**:
-You will likely get better support more quickly if you ask in ** #matrix:matrix.org ** ;)
-
+If you want to report a security issue, please see https://matrix.org/security-disclosure-policy/
 
 This is a bug report template. By following the instructions below and
 filling out the sections with your information, you will help the us to get all
@@ -44,22 +46,26 @@ those (please be careful to remove any personal or private data). Please surroun
 <!-- IMPORTANT: please answer the following questions, to help us narrow down the problem -->
 
 <!-- Was this issue identified on matrix.org or another homeserver? -->
-- **Homeserver**: 
+- **Homeserver**:
 
 If not matrix.org:
 
 <!--
-What version of Synapse is running?
-You can find the Synapse version by inspecting the server headers (replace matrix.org with
-your own homeserver domain):
-$ curl -v https://matrix.org/_matrix/client/versions 2>&1 | grep "Server:"
--->
-- **Version**: 
+ What version of Synapse is running?
 
-- **Install method**: 
+You can find the Synapse version with this command:
+
+$ curl http://localhost:8008/_synapse/admin/v1/server_version
+
+(You may need to replace `localhost:8008` if Synapse is not configured to
+listen on that port.)
+-->
+- **Version**:
+
+- **Install method**:
 <!-- examples: package manager/git clone/pip  -->
 
-- **Platform**: 
+- **Platform**:
 <!--
 Tell us about the environment in which your homeserver is operating
 distro, hardware, if it's running in a vm/container, etc.

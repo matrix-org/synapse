@@ -21,15 +21,22 @@ import yaml
 
 from OpenSSL import SSL
 
+from synapse.config._base import Config, RootConfig
 from synapse.config.tls import ConfigError, TlsConfig
-from synapse.crypto.context_factory import ClientTLSOptionsFactory
+from synapse.crypto.context_factory import FederationPolicyForHTTPS
 
 from tests.unittest import TestCase
 
 
-class TestConfig(TlsConfig):
+class FakeServer(Config):
+    section = "server"
+
     def has_tls_listener(self):
         return False
+
+
+class TestConfig(RootConfig):
+    config_classes = [FakeServer, TlsConfig]
 
 
 class TLSConfigTests(TestCase):
@@ -173,12 +180,13 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        cf = ClientTLSOptionsFactory(t)
+        cf = FederationPolicyForHTTPS(t)
+        options = _get_ssl_context_options(cf._verify_ssl_context)
 
         # The context has had NO_TLSv1_1 and NO_TLSv1_0 set, but not NO_TLSv1_2
-        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
-        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+        self.assertNotEqual(options & SSL.OP_NO_TLSv1, 0)
+        self.assertNotEqual(options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
 
     def test_tls_client_minimum_set_passed_through_1_0(self):
         """
@@ -188,12 +196,13 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        cf = ClientTLSOptionsFactory(t)
+        cf = FederationPolicyForHTTPS(t)
+        options = _get_ssl_context_options(cf._verify_ssl_context)
 
         # The context has not had any of the NO_TLS set.
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
 
     def test_acme_disabled_in_generated_config_no_acme_domain_provied(self):
         """
@@ -202,13 +211,13 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         conf = TestConfig()
         conf.read_config(
             yaml.safe_load(
-                TestConfig().generate_config_section(
+                TestConfig().generate_config(
                     "/config_dir_path",
                     "my_super_secure_server",
                     "/data_dir_path",
-                    "/tls_cert_path",
-                    "tls_private_key",
-                    None,  # This is the acme_domain
+                    tls_certificate_path="/tls_cert_path",
+                    tls_private_key_path="tls_private_key",
+                    acme_domain=None,  # This is the acme_domain
                 )
             ),
             "/config_dir_path",
@@ -223,13 +232,13 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         conf = TestConfig()
         conf.read_config(
             yaml.safe_load(
-                TestConfig().generate_config_section(
+                TestConfig().generate_config(
                     "/config_dir_path",
                     "my_super_secure_server",
                     "/data_dir_path",
-                    "/tls_cert_path",
-                    "tls_private_key",
-                    "my_supe_secure_server",  # This is the acme_domain
+                    tls_certificate_path="/tls_cert_path",
+                    tls_private_key_path="tls_private_key",
+                    acme_domain="my_supe_secure_server",  # This is the acme_domain
                 )
             ),
             "/config_dir_path",
@@ -266,7 +275,7 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        cf = ClientTLSOptionsFactory(t)
+        cf = FederationPolicyForHTTPS(t)
 
         # Not in the whitelist
         opts = cf.get_options(b"notexample.com")
@@ -275,3 +284,10 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         # Caught by the wildcard
         opts = cf.get_options(idna.encode("テスト.ドメイン.テスト"))
         self.assertFalse(opts._verifier._verify_certs)
+
+
+def _get_ssl_context_options(ssl_context: SSL.Context) -> int:
+    """get the options bits from an openssl context object"""
+    # the OpenSSL.SSL.Context wrapper doesn't expose get_options, so we have to
+    # use the low-level interface
+    return SSL._lib.SSL_CTX_get_options(ssl_context._context)

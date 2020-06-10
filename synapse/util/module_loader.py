@@ -14,12 +14,13 @@
 # limitations under the License.
 
 import importlib
+import importlib.util
 
 from synapse.config._base import ConfigError
 
 
 def load_module(provider):
-    """ Loads a module with its config
+    """ Loads a synapse module with its config
     Take a dict with keys 'module' (the module name) and 'config'
     (the config dict).
 
@@ -33,8 +34,25 @@ def load_module(provider):
     provider_class = getattr(module, clz)
 
     try:
-        provider_config = provider_class.parse_config(provider["config"])
+        provider_config = provider_class.parse_config(provider.get("config"))
     except Exception as e:
         raise ConfigError("Failed to parse config for %r: %r" % (provider["module"], e))
 
     return provider_class, provider_config
+
+
+def load_python_module(location: str):
+    """Load a python module, and return a reference to its global namespace
+
+    Args:
+        location (str): path to the module
+
+    Returns:
+        python module object
+    """
+    spec = importlib.util.spec_from_file_location(location, location)
+    if spec is None:
+        raise Exception("Unable to load module at %s" % (location,))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)  # type: ignore
+    return mod

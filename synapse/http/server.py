@@ -14,20 +14,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import cgi
 import collections
+import html
 import http.client
 import logging
 import types
 import urllib
 from io import BytesIO
+from typing import Awaitable, Callable, TypeVar, Union
 
+import jinja2
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
 
 from twisted.internet import defer
 from twisted.python import failure
 from twisted.web import resource
-from twisted.web.server import NOT_DONE_YET
+from twisted.web.server import NOT_DONE_YET, Request
 from twisted.web.static import NoRangeStaticProducer
 from twisted.web.util import redirectTo
 
@@ -36,9 +38,11 @@ import synapse.metrics
 from synapse.api.errors import (
     CodeMessageException,
     Codes,
+    RedirectException,
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import preserve_fn
 from synapse.logging.opentracing import trace_servlet
 from synapse.util.caches import intern_dict
@@ -129,7 +133,12 @@ def wrap_json_request_handler(h):
     return wrap_async_request_handler(wrapped_request_handler)
 
 
-def wrap_html_request_handler(h):
+TV = TypeVar("TV")
+
+
+def wrap_html_request_handler(
+    h: Callable[[TV, SynapseRequest], Awaitable]
+) -> Callable[[TV, SynapseRequest], Awaitable[None]]:
     """Wraps a request handler method with exception handling.
 
     Also does the wrapping with request.processing as per wrap_async_request_handler.
@@ -140,27 +149,37 @@ def wrap_html_request_handler(h):
 
     async def wrapped_request_handler(self, request):
         try:
-            return await h(self, request)
+            await h(self, request)
         except Exception:
             f = failure.Failure()
-            return _return_html_error(f, request)
+            return_html_error(f, request, HTML_ERROR_TEMPLATE)
 
     return wrap_async_request_handler(wrapped_request_handler)
 
 
-def _return_html_error(f, request):
-    """Sends an HTML error page corresponding to the given failure
+def return_html_error(
+    f: failure.Failure, request: Request, error_template: Union[str, jinja2.Template],
+) -> None:
+    """Sends an HTML error page corresponding to the given failure.
+
+    Handles RedirectException and other CodeMessageExceptions (such as SynapseError)
 
     Args:
-        f (twisted.python.failure.Failure):
-        request (twisted.web.iweb.IRequest):
+        f: the error to report
+        request: the failing request
+        error_template: the HTML template. Can be either a string (with `{code}`,
+            `{msg}` placeholders), or a jinja2 template
     """
     if f.check(CodeMessageException):
         cme = f.value
         code = cme.code
         msg = cme.msg
 
-        if isinstance(cme, SynapseError):
+        if isinstance(cme, RedirectException):
+            logger.info("%s redirect to %s", request, cme.location)
+            request.setHeader(b"location", cme.location)
+            request.cookies.extend(cme.cookies)
+        elif isinstance(cme, SynapseError):
             logger.info("%s SynapseError: %s - %s", request, code, msg)
         else:
             logger.error(
@@ -169,7 +188,7 @@ def _return_html_error(f, request):
                 exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
-        code = http.client.INTERNAL_SERVER_ERROR
+        code = http.HTTPStatus.INTERNAL_SERVER_ERROR
         msg = "Internal server error"
 
         logger.error(
@@ -178,11 +197,16 @@ def _return_html_error(f, request):
             exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
-    body = HTML_ERROR_TEMPLATE.format(code=code, msg=cgi.escape(msg)).encode("utf-8")
+    if isinstance(error_template, str):
+        body = error_template.format(code=code, msg=html.escape(msg))
+    else:
+        body = error_template.render(code=code, msg=msg)
+
+    body_bytes = body.encode("utf-8")
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-    request.setHeader(b"Content-Length", b"%i" % (len(body),))
-    request.write(body)
+    request.setHeader(b"Content-Length", b"%i" % (len(body_bytes),))
+    request.write(body_bytes)
     finish_request(request)
 
 
@@ -345,13 +369,12 @@ class JsonResource(HttpServer, resource.Resource):
                 register_paths, so will return (possibly via Deferred) either
                 None, or a tuple of (http code, response body).
         """
-        if request.method == b"OPTIONS":
-            return _options_handler, "options_request_handler", {}
+        request_path = request.path.decode("ascii")
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
         for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request.path.decode("ascii"))
+            m = path_entry.pattern.match(request_path)
             if m:
                 # We found a match!
                 return path_entry.callback, path_entry.servlet_classname, m.groupdict()
@@ -388,7 +411,7 @@ class DirectServeResource(resource.Resource):
         if not callback:
             return super().render(request)
 
-        resp = callback(request)
+        resp = trace_servlet(self.__class__.__name__)(callback)(request)
 
         # If it's a coroutine, turn it into a Deferred
         if isinstance(resp, types.CoroutineType):
@@ -441,6 +464,26 @@ class RootRedirect(resource.Resource):
         return resource.Resource.getChild(self, name, request)
 
 
+class OptionsResource(resource.Resource):
+    """Responds to OPTION requests for itself and all children."""
+
+    def render_OPTIONS(self, request):
+        code, response_json_object = _options_handler(request)
+
+        return respond_with_json(
+            request, code, response_json_object, send_cors=True, canonical_json=False,
+        )
+
+    def getChildWithDefault(self, path, request):
+        if request.method == b"OPTIONS":
+            return self  # select ourselves as the child to render
+        return resource.Resource.getChildWithDefault(self, path, request)
+
+
+class RootOptionsRedirectResource(OptionsResource, RootRedirect):
+    pass
+
+
 def respond_with_json(
     request,
     code,
@@ -454,7 +497,7 @@ def respond_with_json(
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
     if request._disconnected:
-        logger.warn(
+        logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
         return

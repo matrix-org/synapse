@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014, 2015 matrix.org
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 
 import os
 from collections import namedtuple
+from typing import Dict, List
 
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
@@ -61,7 +62,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         Dictionary mapping from media type string to list of
         ThumbnailRequirement tuples.
     """
-    requirements = {}
+    requirements = {}  # type: Dict[str, List]
     for size in thumbnail_sizes:
         width = size["width"]
         height = size["height"]
@@ -69,6 +70,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {
@@ -77,6 +79,8 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 
 class ContentRepositoryConfig(Config):
+    section = "media"
+
     def read_config(self, config, **kwargs):
 
         # Only enable the media repo if either the media repo is enabled or the
@@ -130,7 +134,7 @@ class ContentRepositoryConfig(Config):
         #
         # We don't create the storage providers here as not all workers need
         # them to be started.
-        self.media_storage_providers = []
+        self.media_storage_providers = []  # type: List[tuple]
 
         for provider_config in storage_providers:
             # We special case the module "file_system" so as not to need to
@@ -153,7 +157,6 @@ class ContentRepositoryConfig(Config):
                 (provider_class, parsed_config, wrapper_config)
             )
 
-        self.uploads_path = self.ensure_directory(config.get("uploads_path", "uploads"))
         self.dynamic_thumbnails = config.get("dynamic_thumbnails", False)
         self.thumbnail_requirements = parse_thumbnail_requirements(
             config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES)
@@ -190,6 +193,10 @@ class ContentRepositoryConfig(Config):
 
             self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
 
+            self.url_preview_accept_language = config.get(
+                "url_preview_accept_language"
+            ) or ["en"]
+
     def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
         uploads_path = os.path.join(data_dir_path, "uploads")
@@ -218,19 +225,14 @@ class ContentRepositoryConfig(Config):
         #
         #media_storage_providers:
         #  - module: file_system
-        #    # Whether to write new local files.
+        #    # Whether to store newly uploaded local files
         #    store_local: false
-        #    # Whether to write new remote media
+        #    # Whether to store newly downloaded remote files
         #    store_remote: false
-        #    # Whether to block upload requests waiting for write to this
-        #    # provider to complete
+        #    # Whether to wait for successful storage for local uploads
         #    store_synchronous: false
         #    config:
         #       directory: /mnt/some/other/directory
-
-        # Directory where in-progress uploads are stored.
-        #
-        uploads_path: "%(uploads_path)s"
 
         # The largest allowed upload size in bytes
         #
@@ -331,6 +333,31 @@ class ContentRepositoryConfig(Config):
         # The largest allowed URL preview spidering size in bytes
         #
         #max_spider_size: 10M
+
+        # A list of values for the Accept-Language HTTP header used when
+        # downloading webpages during URL preview generation. This allows
+        # Synapse to specify the preferred languages that URL previews should
+        # be in when communicating with remote servers.
+        #
+        # Each value is a IETF language tag; a 2-3 letter identifier for a
+        # language, optionally followed by subtags separated by '-', specifying
+        # a country or region variant.
+        #
+        # Multiple values can be provided, and a weight can be added to each by
+        # using quality value syntax (;q=). '*' translates to any language.
+        #
+        # Defaults to "en".
+        #
+        # Example:
+        #
+        # url_preview_accept_language:
+        #   - en-UK
+        #   - en-US;q=0.9
+        #   - fr;q=0.8
+        #   - *;q=0.7
+        #
+        url_preview_accept_language:
+        #   - en
         """
             % locals()
         )

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,14 +20,18 @@
 
 import json
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import Membership
-from synapse.rest.client.v1 import login, profile, room
+from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.handlers.pagination import PurgeStatus
+from synapse.rest.client.v1 import directory, login, profile, room
+from synapse.rest.client.v2_alpha import account
+from synapse.types import JsonDict, RoomAlias
+from synapse.util.stringutils import random_string
 
 from tests import unittest
 
@@ -40,13 +46,8 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red",
-            http_client=None,
-            federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
+            "red", http_client=None, federation_client=Mock(),
         )
-        self.ratelimiter = self.hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         self.hs.get_federation_handler = Mock(return_value=Mock())
 
@@ -484,6 +485,15 @@ class RoomsCreateTestCase(RoomBase):
         self.render(request)
         self.assertEquals(400, channel.code)
 
+    def test_post_room_invitees_invalid_mxid(self):
+        # POST with invalid invitee, see https://github.com/matrix-org/synapse/issues/4088
+        # Note the trailing space in the MXID here!
+        request, channel = self.make_request(
+            "POST", "/createRoom", b'{"invite":["@alice:example.com "]}'
+        )
+        self.render(request)
+        self.assertEquals(400, channel.code)
+
 
 class RoomTopicTestCase(RoomBase):
     """ Tests /rooms/$room_id/topic REST events. """
@@ -802,6 +812,78 @@ class RoomMessageListTestCase(RoomBase):
         self.assertTrue("chunk" in channel.json_body)
         self.assertTrue("end" in channel.json_body)
 
+    def test_room_messages_purge(self):
+        store = self.hs.get_datastore()
+        pagination_handler = self.hs.get_pagination_handler()
+
+        # Send a first message in the room, which will be removed by the purge.
+        first_event_id = self.helper.send(self.room_id, "message 1")["event_id"]
+        first_token = self.get_success(
+            store.get_topological_token_for_event(first_event_id)
+        )
+
+        # Send a second message in the room, which won't be removed, and which we'll
+        # use as the marker to purge events before.
+        second_event_id = self.helper.send(self.room_id, "message 2")["event_id"]
+        second_token = self.get_success(
+            store.get_topological_token_for_event(second_event_id)
+        )
+
+        # Send a third event in the room to ensure we don't fall under any edge case
+        # due to our marker being the latest forward extremity in the room.
+        self.helper.send(self.room_id, "message 3")
+
+        # Check that we get the first and second message when querying /messages.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
+            % (self.room_id, second_token, json.dumps({"types": [EventTypes.Message]})),
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 2, [event["content"] for event in chunk])
+
+        # Purge every event before the second event.
+        purge_id = random_string(16)
+        pagination_handler._purges_by_id[purge_id] = PurgeStatus()
+        self.get_success(
+            pagination_handler._purge_history(
+                purge_id=purge_id,
+                room_id=self.room_id,
+                token=second_token,
+                delete_local_events=True,
+            )
+        )
+
+        # Check that we only get the second message through /message now that the first
+        # has been purged.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
+            % (self.room_id, second_token, json.dumps({"types": [EventTypes.Message]})),
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 1, [event["content"] for event in chunk])
+
+        # Check that we get no event, but also no error, when querying /messages with
+        # the token that was pointing at the first event, because we don't have it
+        # anymore.
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=x&from=%s&dir=b&filter=%s"
+            % (self.room_id, first_token, json.dumps({"types": [EventTypes.Message]})),
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        chunk = channel.json_body["chunk"]
+        self.assertEqual(len(chunk), 0, [event["content"] for event in chunk])
+
 
 class RoomSearchTestCase(unittest.HomeserverTestCase):
     servlets = [
@@ -998,3 +1080,899 @@ class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
 
         res_displayname = channel.json_body["content"]["displayname"]
         self.assertEqual(res_displayname, self.displayname, channel.result)
+
+
+class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
+    """Tests that clients can add a "reason" field to membership events and
+    that they get correctly added to the generated events and propagated.
+    """
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.creator = self.register_user("creator", "test")
+        self.creator_tok = self.login("creator", "test")
+
+        self.second_user_id = self.register_user("second", "test")
+        self.second_tok = self.login("second", "test")
+
+        self.room_id = self.helper.create_room_as(self.creator, tok=self.creator_tok)
+
+    def test_join_reason(self):
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            content={"reason": reason},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_leave_reason(self):
+        self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            content={"reason": reason},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_kick_reason(self):
+        self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_ban_reason(self):
+        self.helper.join(self.room_id, user=self.second_user_id, tok=self.second_tok)
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/ban".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_unban_reason(self):
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/unban".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_invite_reason(self):
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/invite".format(self.room_id),
+            content={"reason": reason, "user_id": self.second_user_id},
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def test_reject_invite_reason(self):
+        self.helper.invite(
+            self.room_id,
+            src=self.creator,
+            targ=self.second_user_id,
+            tok=self.creator_tok,
+        )
+
+        reason = "hello"
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            content={"reason": reason},
+            access_token=self.second_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self._check_for_reason(reason)
+
+    def _check_for_reason(self, reason):
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/{}/state/m.room.member/{}".format(
+                self.room_id, self.second_user_id
+            ),
+            access_token=self.creator_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        event_content = channel.json_body
+
+        self.assertEqual(event_content.get("reason"), reason, channel.result)
+
+
+class LabelsTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+        profile.register_servlets,
+    ]
+
+    # Filter that should only catch messages with the label "#fun".
+    FILTER_LABELS = {
+        "types": [EventTypes.Message],
+        "org.matrix.labels": ["#fun"],
+    }
+    # Filter that should only catch messages without the label "#fun".
+    FILTER_NOT_LABELS = {
+        "types": [EventTypes.Message],
+        "org.matrix.not_labels": ["#fun"],
+    }
+    # Filter that should only catch messages with the label "#work" but without the label
+    # "#notfun".
+    FILTER_LABELS_NOT_LABELS = {
+        "types": [EventTypes.Message],
+        "org.matrix.labels": ["#work"],
+        "org.matrix.not_labels": ["#notfun"],
+    }
+
+    def prepare(self, reactor, clock, homeserver):
+        self.user_id = self.register_user("test", "test")
+        self.tok = self.login("test", "test")
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
+    def test_context_filter_labels(self):
+        """Test that we can filter by a label on a /context request."""
+        event_id = self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/context/%s?filter=%s"
+            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS)),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events_before = channel.json_body["events_before"]
+
+        self.assertEqual(
+            len(events_before), 1, [event["content"] for event in events_before]
+        )
+        self.assertEqual(
+            events_before[0]["content"]["body"], "with right label", events_before[0]
+        )
+
+        events_after = channel.json_body["events_before"]
+
+        self.assertEqual(
+            len(events_after), 1, [event["content"] for event in events_after]
+        )
+        self.assertEqual(
+            events_after[0]["content"]["body"], "with right label", events_after[0]
+        )
+
+    def test_context_filter_not_labels(self):
+        """Test that we can filter by the absence of a label on a /context request."""
+        event_id = self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/context/%s?filter=%s"
+            % (self.room_id, event_id, json.dumps(self.FILTER_NOT_LABELS)),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events_before = channel.json_body["events_before"]
+
+        self.assertEqual(
+            len(events_before), 1, [event["content"] for event in events_before]
+        )
+        self.assertEqual(
+            events_before[0]["content"]["body"], "without label", events_before[0]
+        )
+
+        events_after = channel.json_body["events_after"]
+
+        self.assertEqual(
+            len(events_after), 2, [event["content"] for event in events_after]
+        )
+        self.assertEqual(
+            events_after[0]["content"]["body"], "with wrong label", events_after[0]
+        )
+        self.assertEqual(
+            events_after[1]["content"]["body"], "with two wrong labels", events_after[1]
+        )
+
+    def test_context_filter_labels_not_labels(self):
+        """Test that we can filter by both a label and the absence of another label on a
+        /context request.
+        """
+        event_id = self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/context/%s?filter=%s"
+            % (self.room_id, event_id, json.dumps(self.FILTER_LABELS_NOT_LABELS)),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events_before = channel.json_body["events_before"]
+
+        self.assertEqual(
+            len(events_before), 0, [event["content"] for event in events_before]
+        )
+
+        events_after = channel.json_body["events_after"]
+
+        self.assertEqual(
+            len(events_after), 1, [event["content"] for event in events_after]
+        )
+        self.assertEqual(
+            events_after[0]["content"]["body"], "with wrong label", events_after[0]
+        )
+
+    def test_messages_filter_labels(self):
+        """Test that we can filter by a label on a /messages request."""
+        self._send_labelled_messages_in_room()
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_LABELS)),
+        )
+        self.render(request)
+
+        events = channel.json_body["chunk"]
+
+        self.assertEqual(len(events), 2, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "with right label", events[0])
+        self.assertEqual(events[1]["content"]["body"], "with right label", events[1])
+
+    def test_messages_filter_not_labels(self):
+        """Test that we can filter by the absence of a label on a /messages request."""
+        self._send_labelled_messages_in_room()
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
+            % (self.room_id, self.tok, token, json.dumps(self.FILTER_NOT_LABELS)),
+        )
+        self.render(request)
+
+        events = channel.json_body["chunk"]
+
+        self.assertEqual(len(events), 4, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "without label", events[0])
+        self.assertEqual(events[1]["content"]["body"], "without label", events[1])
+        self.assertEqual(events[2]["content"]["body"], "with wrong label", events[2])
+        self.assertEqual(
+            events[3]["content"]["body"], "with two wrong labels", events[3]
+        )
+
+    def test_messages_filter_labels_not_labels(self):
+        """Test that we can filter by both a label and the absence of another label on a
+        /messages request.
+        """
+        self._send_labelled_messages_in_room()
+
+        token = "s0_0_0_0_0_0_0_0_0"
+        request, channel = self.make_request(
+            "GET",
+            "/rooms/%s/messages?access_token=%s&from=%s&filter=%s"
+            % (
+                self.room_id,
+                self.tok,
+                token,
+                json.dumps(self.FILTER_LABELS_NOT_LABELS),
+            ),
+        )
+        self.render(request)
+
+        events = channel.json_body["chunk"]
+
+        self.assertEqual(len(events), 1, [event["content"] for event in events])
+        self.assertEqual(events[0]["content"]["body"], "with wrong label", events[0])
+
+    def test_search_filter_labels(self):
+        """Test that we can filter by a label on a /search request."""
+        request_data = json.dumps(
+            {
+                "search_categories": {
+                    "room_events": {
+                        "search_term": "label",
+                        "filter": self.FILTER_LABELS,
+                    }
+                }
+            }
+        )
+
+        self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "POST", "/search?access_token=%s" % self.tok, request_data
+        )
+        self.render(request)
+
+        results = channel.json_body["search_categories"]["room_events"]["results"]
+
+        self.assertEqual(
+            len(results), 2, [result["result"]["content"] for result in results],
+        )
+        self.assertEqual(
+            results[0]["result"]["content"]["body"],
+            "with right label",
+            results[0]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[1]["result"]["content"]["body"],
+            "with right label",
+            results[1]["result"]["content"]["body"],
+        )
+
+    def test_search_filter_not_labels(self):
+        """Test that we can filter by the absence of a label on a /search request."""
+        request_data = json.dumps(
+            {
+                "search_categories": {
+                    "room_events": {
+                        "search_term": "label",
+                        "filter": self.FILTER_NOT_LABELS,
+                    }
+                }
+            }
+        )
+
+        self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "POST", "/search?access_token=%s" % self.tok, request_data
+        )
+        self.render(request)
+
+        results = channel.json_body["search_categories"]["room_events"]["results"]
+
+        self.assertEqual(
+            len(results), 4, [result["result"]["content"] for result in results],
+        )
+        self.assertEqual(
+            results[0]["result"]["content"]["body"],
+            "without label",
+            results[0]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[1]["result"]["content"]["body"],
+            "without label",
+            results[1]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[2]["result"]["content"]["body"],
+            "with wrong label",
+            results[2]["result"]["content"]["body"],
+        )
+        self.assertEqual(
+            results[3]["result"]["content"]["body"],
+            "with two wrong labels",
+            results[3]["result"]["content"]["body"],
+        )
+
+    def test_search_filter_labels_not_labels(self):
+        """Test that we can filter by both a label and the absence of another label on a
+        /search request.
+        """
+        request_data = json.dumps(
+            {
+                "search_categories": {
+                    "room_events": {
+                        "search_term": "label",
+                        "filter": self.FILTER_LABELS_NOT_LABELS,
+                    }
+                }
+            }
+        )
+
+        self._send_labelled_messages_in_room()
+
+        request, channel = self.make_request(
+            "POST", "/search?access_token=%s" % self.tok, request_data
+        )
+        self.render(request)
+
+        results = channel.json_body["search_categories"]["room_events"]["results"]
+
+        self.assertEqual(
+            len(results), 1, [result["result"]["content"] for result in results],
+        )
+        self.assertEqual(
+            results[0]["result"]["content"]["body"],
+            "with wrong label",
+            results[0]["result"]["content"]["body"],
+        )
+
+    def _send_labelled_messages_in_room(self):
+        """Sends several messages to a room with different labels (or without any) to test
+        filtering by label.
+        Returns:
+            The ID of the event to use if we're testing filtering on /context.
+        """
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun"],
+            },
+            tok=self.tok,
+        )
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "without label"},
+            tok=self.tok,
+        )
+
+        res = self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "without label"},
+            tok=self.tok,
+        )
+        # Return this event's ID when we test filtering in /context requests.
+        event_id = res["event_id"]
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with wrong label",
+                EventContentFields.LABELS: ["#work"],
+            },
+            tok=self.tok,
+        )
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with two wrong labels",
+                EventContentFields.LABELS: ["#work", "#notfun"],
+            },
+            tok=self.tok,
+        )
+
+        self.helper.send_event(
+            room_id=self.room_id,
+            type=EventTypes.Message,
+            content={
+                "msgtype": "m.text",
+                "body": "with right label",
+                EventContentFields.LABELS: ["#fun"],
+            },
+            tok=self.tok,
+        )
+
+        return event_id
+
+
+class ContextTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+        account.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.user_id = self.register_user("user", "password")
+        self.tok = self.login("user", "password")
+        self.room_id = self.helper.create_room_as(
+            self.user_id, tok=self.tok, is_public=False
+        )
+
+        self.other_user_id = self.register_user("user2", "password")
+        self.other_tok = self.login("user2", "password")
+
+        self.helper.invite(self.room_id, self.user_id, self.other_user_id, tok=self.tok)
+        self.helper.join(self.room_id, self.other_user_id, tok=self.other_tok)
+
+    def test_erased_sender(self):
+        """Test that an erasure request results in the requester's events being hidden
+        from any new member of the room.
+        """
+
+        # Send a bunch of events in the room.
+
+        self.helper.send(self.room_id, "message 1", tok=self.tok)
+        self.helper.send(self.room_id, "message 2", tok=self.tok)
+        event_id = self.helper.send(self.room_id, "message 3", tok=self.tok)["event_id"]
+        self.helper.send(self.room_id, "message 4", tok=self.tok)
+        self.helper.send(self.room_id, "message 5", tok=self.tok)
+
+        # Check that we can still see the messages before the erasure request.
+
+        request, channel = self.make_request(
+            "GET",
+            '/rooms/%s/context/%s?filter={"types":["m.room.message"]}'
+            % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events_before = channel.json_body["events_before"]
+
+        self.assertEqual(len(events_before), 2, events_before)
+        self.assertEqual(
+            events_before[0].get("content", {}).get("body"),
+            "message 2",
+            events_before[0],
+        )
+        self.assertEqual(
+            events_before[1].get("content", {}).get("body"),
+            "message 1",
+            events_before[1],
+        )
+
+        self.assertEqual(
+            channel.json_body["event"].get("content", {}).get("body"),
+            "message 3",
+            channel.json_body["event"],
+        )
+
+        events_after = channel.json_body["events_after"]
+
+        self.assertEqual(len(events_after), 2, events_after)
+        self.assertEqual(
+            events_after[0].get("content", {}).get("body"),
+            "message 4",
+            events_after[0],
+        )
+        self.assertEqual(
+            events_after[1].get("content", {}).get("body"),
+            "message 5",
+            events_after[1],
+        )
+
+        # Deactivate the first account and erase the user's data.
+
+        deactivate_account_handler = self.hs.get_deactivate_account_handler()
+        self.get_success(
+            deactivate_account_handler.deactivate_account(self.user_id, erase_data=True)
+        )
+
+        # Invite another user in the room. This is needed because messages will be
+        # pruned only if the user wasn't a member of the room when the messages were
+        # sent.
+
+        invited_user_id = self.register_user("user3", "password")
+        invited_tok = self.login("user3", "password")
+
+        self.helper.invite(
+            self.room_id, self.other_user_id, invited_user_id, tok=self.other_tok
+        )
+        self.helper.join(self.room_id, invited_user_id, tok=invited_tok)
+
+        # Check that a user that joined the room after the erasure request can't see
+        # the messages anymore.
+
+        request, channel = self.make_request(
+            "GET",
+            '/rooms/%s/context/%s?filter={"types":["m.room.message"]}'
+            % (self.room_id, event_id),
+            access_token=invited_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+
+        events_before = channel.json_body["events_before"]
+
+        self.assertEqual(len(events_before), 2, events_before)
+        self.assertDictEqual(events_before[0].get("content"), {}, events_before[0])
+        self.assertDictEqual(events_before[1].get("content"), {}, events_before[1])
+
+        self.assertDictEqual(
+            channel.json_body["event"].get("content"), {}, channel.json_body["event"]
+        )
+
+        events_after = channel.json_body["events_after"]
+
+        self.assertEqual(len(events_after), 2, events_after)
+        self.assertDictEqual(events_after[0].get("content"), {}, events_after[0])
+        self.assertEqual(events_after[1].get("content"), {}, events_after[1])
+
+
+class RoomAliasListTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+        self.room_id = self.helper.create_room_as(
+            self.room_owner, tok=self.room_owner_tok
+        )
+
+    def test_no_aliases(self):
+        res = self._get_aliases(self.room_owner_tok)
+        self.assertEqual(res["aliases"], [])
+
+    def test_not_in_room(self):
+        self.register_user("user", "test")
+        user_tok = self.login("user", "test")
+        res = self._get_aliases(user_tok, expected_code=403)
+        self.assertEqual(res["errcode"], "M_FORBIDDEN")
+
+    def test_admin_user(self):
+        alias1 = self._random_alias()
+        self._set_alias_via_directory(alias1)
+
+        self.register_user("user", "test", admin=True)
+        user_tok = self.login("user", "test")
+
+        res = self._get_aliases(user_tok)
+        self.assertEqual(res["aliases"], [alias1])
+
+    def test_with_aliases(self):
+        alias1 = self._random_alias()
+        alias2 = self._random_alias()
+
+        self._set_alias_via_directory(alias1)
+        self._set_alias_via_directory(alias2)
+
+        res = self._get_aliases(self.room_owner_tok)
+        self.assertEqual(set(res["aliases"]), {alias1, alias2})
+
+    def test_peekable_room(self):
+        alias1 = self._random_alias()
+        self._set_alias_via_directory(alias1)
+
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": "world_readable"},
+            tok=self.room_owner_tok,
+        )
+
+        self.register_user("user", "test")
+        user_tok = self.login("user", "test")
+
+        res = self._get_aliases(user_tok)
+        self.assertEqual(res["aliases"], [alias1])
+
+    def _get_aliases(self, access_token: str, expected_code: int = 200) -> JsonDict:
+        """Calls the endpoint under test. returns the json response object."""
+        request, channel = self.make_request(
+            "GET",
+            "/_matrix/client/unstable/org.matrix.msc2432/rooms/%s/aliases"
+            % (self.room_id,),
+            access_token=access_token,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+        res = channel.json_body
+        self.assertIsInstance(res, dict)
+        if expected_code == 200:
+            self.assertIsInstance(res["aliases"], list)
+        return res
+
+    def _random_alias(self) -> str:
+        return RoomAlias(random_string(5), self.hs.hostname).to_string()
+
+    def _set_alias_via_directory(self, alias: str, expected_code: int = 200):
+        url = "/_matrix/client/r0/directory/room/" + alias
+        data = {"room_id": self.room_id}
+        request_data = json.dumps(data)
+
+        request, channel = self.make_request(
+            "PUT", url, request_data, access_token=self.room_owner_tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+
+
+class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.room_owner = self.register_user("room_owner", "test")
+        self.room_owner_tok = self.login("room_owner", "test")
+
+        self.room_id = self.helper.create_room_as(
+            self.room_owner, tok=self.room_owner_tok
+        )
+
+        self.alias = "#alias:test"
+        self._set_alias_via_directory(self.alias)
+
+    def _set_alias_via_directory(self, alias: str, expected_code: int = 200):
+        url = "/_matrix/client/r0/directory/room/" + alias
+        data = {"room_id": self.room_id}
+        request_data = json.dumps(data)
+
+        request, channel = self.make_request(
+            "PUT", url, request_data, access_token=self.room_owner_tok
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+
+    def _get_canonical_alias(self, expected_code: int = 200) -> JsonDict:
+        """Calls the endpoint under test. returns the json response object."""
+        request, channel = self.make_request(
+            "GET",
+            "rooms/%s/state/m.room.canonical_alias" % (self.room_id,),
+            access_token=self.room_owner_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+        res = channel.json_body
+        self.assertIsInstance(res, dict)
+        return res
+
+    def _set_canonical_alias(self, content: str, expected_code: int = 200) -> JsonDict:
+        """Calls the endpoint under test. returns the json response object."""
+        request, channel = self.make_request(
+            "PUT",
+            "rooms/%s/state/m.room.canonical_alias" % (self.room_id,),
+            json.dumps(content),
+            access_token=self.room_owner_tok,
+        )
+        self.render(request)
+        self.assertEqual(channel.code, expected_code, channel.result)
+        res = channel.json_body
+        self.assertIsInstance(res, dict)
+        return res
+
+    def test_canonical_alias(self):
+        """Test a basic alias message."""
+        # There is no canonical alias to start with.
+        self._get_canonical_alias(expected_code=404)
+
+        # Create an alias.
+        self._set_canonical_alias({"alias": self.alias})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias})
+
+        # Now remove the alias.
+        self._set_canonical_alias({})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {})
+
+    def test_alt_aliases(self):
+        """Test a canonical alias message with alt_aliases."""
+        # Create an alias.
+        self._set_canonical_alias({"alt_aliases": [self.alias]})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alt_aliases": [self.alias]})
+
+        # Now remove the alt_aliases.
+        self._set_canonical_alias({})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {})
+
+    def test_alias_alt_aliases(self):
+        """Test a canonical alias message with an alias and alt_aliases."""
+        # Create an alias.
+        self._set_canonical_alias({"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Now remove the alias and alt_aliases.
+        self._set_canonical_alias({})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {})
+
+    def test_partial_modify(self):
+        """Test removing only the alt_aliases."""
+        # Create an alias.
+        self._set_canonical_alias({"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Now remove the alt_aliases.
+        self._set_canonical_alias({"alias": self.alias})
+
+        # There is an alias event, but it is empty.
+        res = self._get_canonical_alias()
+        self.assertEqual(res, {"alias": self.alias})
+
+    def test_add_alias(self):
+        """Test removing only the alt_aliases."""
+        # Create an additional alias.
+        second_alias = "#second:test"
+        self._set_alias_via_directory(second_alias)
+
+        # Add the canonical alias.
+        self._set_canonical_alias({"alias": self.alias, "alt_aliases": [self.alias]})
+
+        # Then add the second alias.
+        self._set_canonical_alias(
+            {"alias": self.alias, "alt_aliases": [self.alias, second_alias]}
+        )
+
+        # Canonical alias now exists!
+        res = self._get_canonical_alias()
+        self.assertEqual(
+            res, {"alias": self.alias, "alt_aliases": [self.alias, second_alias]}
+        )
+
+    def test_bad_data(self):
+        """Invalid data for alt_aliases should cause errors."""
+        self._set_canonical_alias({"alt_aliases": "@bad:test"}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": None}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": 0}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": 1}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": False}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": True}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": {}}, expected_code=400)
+
+    def test_bad_alias(self):
+        """An alias which does not point to the room raises a SynapseError."""
+        self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
+        self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)

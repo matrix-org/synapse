@@ -18,17 +18,14 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.config.ratelimiting import FederationRateLimitConfig
-from synapse.federation.transport import server
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.types import UserID
-from synapse.util.ratelimitutils import FederationRateLimiter
 
 from tests import unittest
 
 
-class RoomComplexityTests(unittest.HomeserverTestCase):
+class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
 
     servlets = [
         admin.register_servlets,
@@ -36,29 +33,10 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def default_config(self, name="test"):
-        config = super().default_config(name=name)
+    def default_config(self):
+        config = super().default_config()
         config["limit_remote_rooms"] = {"enabled": True, "complexity": 0.05}
         return config
-
-    def prepare(self, reactor, clock, homeserver):
-        class Authenticator(object):
-            def authenticate_request(self, request, content):
-                return defer.succeed("otherserver.nottld")
-
-        ratelimiter = FederationRateLimiter(
-            clock,
-            FederationRateLimitConfig(
-                window_size=1,
-                sleep_limit=1,
-                sleep_msec=1,
-                reject_limit=1000,
-                concurrent_requests=1000,
-            ),
-        )
-        server.register_servlets(
-            homeserver, self.resource, Authenticator(), ratelimiter
-        )
 
     def test_complexity_simple(self):
 
@@ -101,11 +79,13 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=defer.succeed({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=defer.succeed(("", 1))
+        )
 
         d = handler._remote_join(
             None,
-            ["otherserver.example"],
+            ["other.example.com"],
             "roomid",
             UserID.from_string(u1),
             {"membership": "join"},
@@ -137,7 +117,9 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         # Mock out some things, because we don't want to test the whole join
         fed_transport.client.get_json = Mock(return_value=defer.succeed(None))
-        handler.federation_handler.do_invite_join = Mock(return_value=defer.succeed(1))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=defer.succeed(("", 1))
+        )
 
         # Artificially raise the complexity
         self.hs.get_datastore().get_current_state_event_counts = lambda x: defer.succeed(
@@ -146,7 +128,7 @@ class RoomComplexityTests(unittest.HomeserverTestCase):
 
         d = handler._remote_join(
             None,
-            ["otherserver.example"],
+            ["other.example.com"],
             room_1,
             UserID.from_string(u1),
             {"membership": "join"},

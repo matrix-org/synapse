@@ -53,7 +53,7 @@ class ThirdPartyEventRules(object):
         if self.third_party_rules is None:
             return True
 
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = yield context.get_prev_state_ids()
 
         # Retrieve the state events from the database.
         state_events = {}
@@ -74,15 +74,16 @@ class ThirdPartyEventRules(object):
             is_requester_admin (bool): If the requester is an admin
 
         Returns:
-            defer.Deferred
+            defer.Deferred[bool]: Whether room creation is allowed or denied.
         """
 
         if self.third_party_rules is None:
-            return
+            return True
 
-        yield self.third_party_rules.on_create_room(
+        ret = yield self.third_party_rules.on_create_room(
             requester, config, is_requester_admin
         )
+        return ret
 
     @defer.inlineCallbacks
     def check_threepid_can_be_invited(self, medium, address, room_id):

@@ -16,13 +16,14 @@
 
 from unittest.mock import Mock
 
-from synapse.api.constants import EventTypes, Membership
-from synapse.api.room_versions import RoomVersions
+from synapse.api.constants import Membership
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client.v1 import login, room
 from synapse.types import Requester, UserID
 
 from tests import unittest
+from tests.test_utils import event_injection
+from tests.utils import TestHomeServer
 
 
 class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
@@ -39,13 +40,11 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         )
         return hs
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor, clock, hs: TestHomeServer):
 
         # We can't test the RoomMemberStore on its own without the other event
         # storage logic
         self.store = hs.get_datastore()
-        self.event_builder_factory = hs.get_event_builder_factory()
-        self.event_creation_handler = hs.get_event_creation_handler()
 
         self.u_alice = self.register_user("alice", "pass")
         self.t_alice = self.login("alice", "pass")
@@ -54,33 +53,13 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # User elsewhere on another host
         self.u_charlie = UserID.from_string("@charlie:elsewhere")
 
-    def inject_room_member(self, room, user, membership, replaces_state=None):
-        builder = self.event_builder_factory.for_room_version(
-            RoomVersions.V1,
-            {
-                "type": EventTypes.Member,
-                "sender": user,
-                "state_key": user,
-                "room_id": room,
-                "content": {"membership": membership},
-            },
-        )
-
-        event, context = self.get_success(
-            self.event_creation_handler.create_new_client_event(builder)
-        )
-
-        self.get_success(self.store.persist_event(event, context))
-
-        return event
-
     def test_one_member(self):
 
         # Alice creates the room, and is automatically joined
         self.room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
 
         rooms_for_user = self.get_success(
-            self.store.get_rooms_for_user_where_membership_is(
+            self.store.get_rooms_for_local_user_where_membership_is(
                 self.u_alice, [Membership.JOIN]
             )
         )
@@ -137,6 +116,52 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # It now knows about Charlie's server.
         self.assertEqual(self.store._known_servers_count, 2)
 
+    def test_get_joined_users_from_context(self):
+        room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
+        bob_event = event_injection.inject_member_event(
+            self.hs, room, self.u_bob, Membership.JOIN
+        )
+
+        # first, create a regular event
+        event, context = event_injection.create_event(
+            self.hs,
+            room_id=room,
+            sender=self.u_alice,
+            prev_event_ids=[bob_event.event_id],
+            type="m.test.1",
+            content={},
+        )
+
+        users = self.get_success(
+            self.store.get_joined_users_from_context(event, context)
+        )
+        self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
+
+        # Regression test for #7376: create a state event whose key matches bob's
+        # user_id, but which is *not* a membership event, and persist that; then check
+        # that `get_joined_users_from_context` returns the correct users for the next event.
+        non_member_event = event_injection.inject_event(
+            self.hs,
+            room_id=room,
+            sender=self.u_bob,
+            prev_event_ids=[bob_event.event_id],
+            type="m.test.2",
+            state_key=self.u_bob,
+            content={},
+        )
+        event, context = event_injection.create_event(
+            self.hs,
+            room_id=room,
+            sender=self.u_alice,
+            prev_event_ids=[non_member_event.event_id],
+            type="m.test.3",
+            content={},
+        )
+        users = self.get_success(
+            self.store.get_joined_users_from_context(event, context)
+        )
+        self.assertEqual(users.keys(), {self.u_alice, self.u_bob})
+
 
 class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
@@ -145,8 +170,12 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
 
     def test_can_rerun_update(self):
         # First make sure we have completed all updates.
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )
 
         # Now let's create a room, which will insert a membership
         user = UserID("alice", "test")
@@ -155,7 +184,7 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
 
         # Register the background update to run again.
         self.get_success(
-            self.store._simple_insert(
+            self.store.db.simple_insert(
                 table="background_updates",
                 values={
                     "update_name": "current_state_events_membership",
@@ -166,8 +195,12 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         # ... and tell the DataStore that it hasn't finished all updates yet
-        self.store._all_done = False
+        self.store.db.updates._all_done = False
 
         # Now let's actually drive the updates to completion
-        while not self.get_success(self.store.has_completed_background_updates()):
-            self.get_success(self.store.do_next_background_update(100), by=0.1)
+        while not self.get_success(
+            self.store.db.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db.updates.do_next_background_update(100), by=0.1
+            )

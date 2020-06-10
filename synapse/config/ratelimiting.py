@@ -12,11 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict
+
 from ._base import Config
 
 
 class RateLimitConfig(object):
-    def __init__(self, config, defaults={"per_second": 0.17, "burst_count": 3.0}):
+    def __init__(
+        self,
+        config: Dict[str, float],
+        defaults={"per_second": 0.17, "burst_count": 3.0},
+    ):
         self.per_second = config.get("per_second", defaults["per_second"])
         self.burst_count = config.get("burst_count", defaults["burst_count"])
 
@@ -36,6 +42,8 @@ class FederationRateLimitConfig(object):
 
 
 class RatelimitConfig(Config):
+    section = "ratelimiting"
+
     def read_config(self, config, **kwargs):
 
         # Load the new-style messages config if it exists. Otherwise fall back
@@ -81,10 +89,9 @@ class RatelimitConfig(Config):
         )
 
         rc_admin_redaction = config.get("rc_admin_redaction")
+        self.rc_admin_redaction = None
         if rc_admin_redaction:
             self.rc_admin_redaction = RateLimitConfig(rc_admin_redaction)
-        else:
-            self.rc_admin_redaction = None
 
     def generate_config_section(self, **kwargs):
         return """\

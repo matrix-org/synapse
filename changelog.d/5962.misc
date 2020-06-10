@@ -1,1 +1,0 @@
-Remove unnecessary return statements in the codebase which were the result of a regex run.

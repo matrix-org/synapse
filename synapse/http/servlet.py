@@ -96,7 +96,7 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             return {b"true": True, b"false": False}[args[name][0]]
         except Exception:
             message = (
-                "Boolean query parameter %r must be one of" " ['true', 'false']"
+                "Boolean query parameter %r must be one of ['true', 'false']"
             ) % (name,)
             raise SynapseError(400, message)
     else:
@@ -219,13 +219,13 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     try:
         content_unicode = content_bytes.decode("utf8")
     except UnicodeDecodeError:
-        logger.warn("Unable to decode UTF-8")
+        logger.warning("Unable to decode UTF-8")
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
     try:
         content = json.loads(content_unicode)
     except Exception as e:
-        logger.warn("Unable to parse JSON: %s", e)
+        logger.warning("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
     return content

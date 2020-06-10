@@ -43,9 +43,7 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.tcp.client import ReplicationClientHandler
 from synapse.server import HomeServer
-from synapse.storage.engines import create_engine
 from synapse.util.logcontext import LoggingContext
 from synapse.util.versionstring import get_version_string
 
@@ -80,18 +78,6 @@ class AdminCmdServer(HomeServer):
     def start_listening(self, listeners):
         pass
 
-    def build_tcp_replication(self):
-        return AdminCmdReplicationHandler(self)
-
-
-class AdminCmdReplicationHandler(ReplicationClientHandler):
-    @defer.inlineCallbacks
-    def on_rdata(self, stream_name, token, rows):
-        pass
-
-    def get_streams_to_replicate(self):
-        return {}
-
 
 @defer.inlineCallbacks
 def export_data_command(hs, args):
@@ -105,8 +91,10 @@ def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = yield hs.get_handlers().admin_handler.export_user_data(
-        user_id, FileExfiltrationWriter(user_id, directory=directory)
+    res = yield defer.ensureDeferred(
+        hs.get_handlers().admin_handler.export_user_data(
+            user_id, FileExfiltrationWriter(user_id, directory=directory)
+        )
     )
     print(res)
 
@@ -229,14 +217,10 @@ def start(config_options):
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
-    database_engine = create_engine(config.database_config)
-
     ss = AdminCmdServer(
         config.server_name,
-        db_config=config.database_config,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
-        database_engine=database_engine,
     )
 
     setup_logging(ss, config, use_worker_options=True)

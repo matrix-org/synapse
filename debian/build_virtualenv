@@ -36,7 +36,6 @@ esac
 dh_virtualenv \
     --install-suffix "matrix-synapse" \
     --builtin-venv \
-    --setuptools \
     --python "$SNAKE" \
     --upgrade-pip \
     --preinstall="lxml" \
@@ -85,6 +84,9 @@ PYTHONPATH="$tmpdir" \
 
 ' > "${PACKAGE_BUILD_DIR}/etc/matrix-synapse/homeserver.yaml"
 
+# build the log config file
+"${TARGET_PYTHON}" -B "${VIRTUALENV_DIR}/bin/generate_log_config" \
+        --output-file="${PACKAGE_BUILD_DIR}/etc/matrix-synapse/log.yaml"
 
 # add a dependency on the right version of python to substvars.
 PYPKG=`basename $SNAKE`

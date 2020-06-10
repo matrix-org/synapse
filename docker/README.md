@@ -89,6 +89,8 @@ The following environment variables are supported in run mode:
   `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the config file. Defaults to
   `<SYNAPSE_CONFIG_DIR>/homeserver.yaml`.
+* `SYNAPSE_WORKER`: module to execute, used when running synapse with workers.
+   Defaults to `synapse.app.homeserver`, which is suitable for non-worker mode.
 * `UID`, `GID`: the user and group id to run Synapse as. Defaults to `991`, `991`.
 * `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
 
@@ -99,7 +101,7 @@ is suitable for local testing, but for any practical use, you will either need
 to use a reverse proxy, or configure Synapse to expose an HTTPS port.
 
 For documentation on using a reverse proxy, see
-https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst.
+https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
 
 For more information on enabling TLS support in synapse itself, see
 https://github.com/matrix-org/synapse/blob/master/INSTALL.md#tls-certificates. Of
@@ -108,12 +110,12 @@ argument to `docker run`.
 
 ## Legacy dynamic configuration file support
 
-For backwards-compatibility only, the docker image supports creating a dynamic
-configuration file based on environment variables. This is now deprecated, but
-is enabled when the `SYNAPSE_SERVER_NAME` variable is set (and `generate` is
-not given).
+The docker image used to support creating a dynamic configuration file based
+on environment variables. This is no longer supported, and an error will be
+raised if you try to run synapse without a config file.
 
-To migrate from a dynamic configuration file to a static one, run the docker
+It is, however, possible to generate a static configuration file based on
+the environment variables that were previously used. To do this, run the docker
 container once with the environment variables set, and `migrate_config`
 command line option. For example:
 
@@ -125,6 +127,23 @@ docker run -it --rm \
     matrixdotorg/synapse:latest migrate_config
 ```
 
-This will generate the same configuration file as the legacy mode used, but
-will store it in `/data/homeserver.yaml` instead of a temporary location. You
-can then use it as shown above at [Running synapse](#running-synapse).
+This will generate the same configuration file as the legacy mode used, and
+will store it in `/data/homeserver.yaml`. You can then use it as shown above at
+[Running synapse](#running-synapse).
+
+Note that the defaults used in this configuration file may be different to
+those when generating a new config file with `generate`: for example, TLS is
+enabled by default in this mode. You are encouraged to inspect the generated
+configuration file and edit it to ensure it meets your needs.
+
+## Building the image
+
+If you need to build the image from a Synapse checkout, use the following `docker
+ build` command from the repo's root:
+
+```
+docker build -t matrixdotorg/synapse -f docker/Dockerfile .
+```
+
+You can choose to build a different docker image by changing the value of the `-f` flag to
+point to another Dockerfile.

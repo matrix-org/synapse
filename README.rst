@@ -1,3 +1,11 @@
+================
+Synapse |shield|
+================
+
+.. |shield| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
+  :alt: (get support on #synapse:matrix.org)
+  :target: https://matrix.to/#/#synapse:matrix.org
+
 .. contents::
 
 Introduction
@@ -75,6 +83,17 @@ at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 Thanks for using Matrix!
 
 [1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`_.
+
+
+Support
+=======
+
+For support installing or managing Synapse, please join |room|_ (from a matrix.org
+account if necessary) and ask questions there. We do not use GitHub issues for
+support requests, only for bug reports and feature requests.
+
+.. |room| replace:: ``#synapse:matrix.org``
+.. _room: https://matrix.to/#/#synapse:matrix.org
 
 
 Synapse Installation
@@ -248,7 +267,7 @@ First calculate the hash of the new password::
     Confirm password:
     $2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-Then update the `users` table in the database::
+Then update the ``users`` table in the database::
 
     UPDATE users SET password_hash='$2a$12$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
         WHERE name='@test:test.com';
@@ -272,7 +291,7 @@ to install using pip and a virtualenv::
 
     virtualenv -p python3 env
     source env/bin/activate
-    python -m pip install --no-use-pep517 -e .[all]
+    python -m pip install --no-use-pep517 -e ".[all]"
 
 This will run a process of downloading and installing all the needed
 dependencies into a virtual env.
@@ -315,6 +334,9 @@ Building internal API documentation::
 
 Troubleshooting
 ===============
+
+Need help? Join our community support room on Matrix:
+`#synapse:matrix.org <https://matrix.to/#/#synapse:matrix.org>`_
 
 Running out of File Handles
 ---------------------------
@@ -381,3 +403,16 @@ indicate that your server is also issuing far more outgoing federation
 requests than can be accounted for by your users' activity, this is a
 likely cause. The misbehavior can be worked around by setting
 ``use_presence: false`` in the Synapse config file.
+
+People can't accept room invitations from me
+--------------------------------------------
+
+The typical failure mode here is that you send an invitation to someone 
+to join a room or direct chat, but when they go to accept it, they get an
+error (typically along the lines of "Invalid signature"). They might see
+something like the following in their logs::
+
+    2019-09-11 19:32:04,271 - synapse.federation.transport.server - 288 - WARNING - GET-11752 - authenticate_request failed: 401: Invalid signature for server <server> with key ed25519:a_EqML: Unable to verify signature for <server>
+
+This is normally caused by a misconfiguration in your reverse-proxy. See
+`<docs/reverse_proxy.md>`_ and double-check that your settings are correct.

@@ -72,7 +72,7 @@ def move_media(origin_server, file_id, src_paths, dest_paths):
     # check that the original exists
     original_file = src_paths.remote_media_filepath(origin_server, file_id)
     if not os.path.exists(original_file):
-        logger.warn(
+        logger.warning(
             "Original for %s/%s (%s) does not exist",
             origin_server,
             file_id,

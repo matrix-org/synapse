@@ -16,8 +16,6 @@ import logging
 
 from six import iteritems, string_types
 
-from twisted.internet import defer
-
 from synapse.api.errors import SynapseError
 from synapse.api.urls import ConsentURIBuilder
 from synapse.config import ConfigError
@@ -54,13 +52,12 @@ class ConsentServerNotices(object):
                 )
             if "body" not in self._server_notice_content:
                 raise ConfigError(
-                    "user_consent server_notice_consent must contain a 'body' " "key."
+                    "user_consent server_notice_consent must contain a 'body' key."
                 )
 
             self._consent_uri_builder = ConsentURIBuilder(hs.config)
 
-    @defer.inlineCallbacks
-    def maybe_send_server_notice_to_user(self, user_id):
+    async def maybe_send_server_notice_to_user(self, user_id):
         """Check if we need to send a notice to this user, and does so if so
 
         Args:
@@ -78,7 +75,7 @@ class ConsentServerNotices(object):
             return
         self._users_in_progress.add(user_id)
         try:
-            u = yield self._store.get_user_by_id(user_id)
+            u = await self._store.get_user_by_id(user_id)
 
             if u["is_guest"] and not self._send_to_guests:
                 # don't send to guests
@@ -100,8 +97,8 @@ class ConsentServerNotices(object):
                 content = copy_with_str_subst(
                     self._server_notice_content, {"consent_uri": consent_uri}
                 )
-                yield self._server_notices_manager.send_notice(user_id, content)
-                yield self._store.user_set_consent_server_notice_sent(
+                await self._server_notices_manager.send_notice(user_id, content)
+                await self._store.user_set_consent_server_notice_sent(
                     user_id, self._current_consent_version
                 )
             except SynapseError as e:

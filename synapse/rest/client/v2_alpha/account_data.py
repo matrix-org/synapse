@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
@@ -40,16 +38,19 @@ class AccountDataServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
+        self._is_worker = hs.config.worker_app is not None
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, user_id, account_data_type):
+        if self._is_worker:
+            raise Exception("Cannot handle PUT /account_data on worker")
+
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
         body = parse_json_object_from_request(request)
 
-        max_id = yield self.store.add_account_data_for_user(
+        max_id = await self.store.add_account_data_for_user(
             user_id, account_data_type, body
         )
 
@@ -57,13 +58,12 @@ class AccountDataServlet(RestServlet):
 
         return 200, {}
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, user_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
-        event = yield self.store.get_global_account_data_by_type_for_user(
+        event = await self.store.get_global_account_data_by_type_for_user(
             account_data_type, user_id
         )
 
@@ -90,10 +90,13 @@ class RoomAccountDataServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
+        self._is_worker = hs.config.worker_app is not None
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id, room_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, user_id, room_id, account_data_type):
+        if self._is_worker:
+            raise Exception("Cannot handle PUT /account_data on worker")
+
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -106,7 +109,7 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers",
             )
 
-        max_id = yield self.store.add_account_data_to_room(
+        max_id = await self.store.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )
 
@@ -114,13 +117,12 @@ class RoomAccountDataServlet(RestServlet):
 
         return 200, {}
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id, room_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, user_id, room_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
-        event = yield self.store.get_account_data_for_room_and_type(
+        event = await self.store.get_account_data_for_room_and_type(
             user_id, room_id, account_data_type
         )
 

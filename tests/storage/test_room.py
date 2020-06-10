@@ -17,6 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
+from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
 from tests import unittest
@@ -40,6 +41,7 @@ class RoomStoreTestCase(unittest.TestCase):
             self.room.to_string(),
             room_creator_user_id=self.u_creator.to_string(),
             is_public=True,
+            room_version=RoomVersions.V1,
         )
 
     @defer.inlineCallbacks
@@ -53,6 +55,17 @@ class RoomStoreTestCase(unittest.TestCase):
             (yield self.store.get_room(self.room.to_string())),
         )
 
+    @defer.inlineCallbacks
+    def test_get_room_with_stats(self):
+        self.assertDictContainsSubset(
+            {
+                "room_id": self.room.to_string(),
+                "creator": self.u_creator.to_string(),
+                "public": True,
+            },
+            (yield self.store.get_room_with_stats(self.room.to_string())),
+        )
+
 
 class RoomEventsStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
@@ -62,17 +75,21 @@ class RoomEventsStoreTestCase(unittest.TestCase):
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.event_factory = hs.get_event_factory()
 
         self.room = RoomID.from_string("!abcde:test")
 
         yield self.store.store_room(
-            self.room.to_string(), room_creator_user_id="@creator:text", is_public=True
+            self.room.to_string(),
+            room_creator_user_id="@creator:text",
+            is_public=True,
+            room_version=RoomVersions.V1,
         )
 
     @defer.inlineCallbacks
     def inject_room_event(self, **kwargs):
-        yield self.store.persist_event(
+        yield self.storage.persistence.persist_event(
             self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
         )
 

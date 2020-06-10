@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,9 +22,10 @@ import jsonschema
 
 from twisted.internet import defer
 
+from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 
 from tests import unittest
 from tests.utils import DeferredMockCallable, MockHttpResource, setup_test_homeserver
@@ -34,7 +38,7 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return make_event_from_dict(kwargs)
 
 
 class FilteringTestCase(unittest.TestCase):
@@ -95,6 +99,8 @@ class FilteringTestCase(unittest.TestCase):
                         "types": ["m.room.message"],
                         "not_rooms": ["!726s6s6q:example.com"],
                         "not_senders": ["@spam:example.com"],
+                        "org.matrix.labels": ["#fun"],
+                        "org.matrix.not_labels": ["#work"],
                     },
                     "ephemeral": {
                         "types": ["m.receipt", "m.typing"],
@@ -319,6 +325,46 @@ class FilteringTestCase(unittest.TestCase):
             room_id="!stage:unknown",  # yup
         )
         self.assertFalse(Filter(definition).check(event))
+
+    def test_filter_labels(self):
+        definition = {"org.matrix.labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#fun"]},
+        )
+
+        self.assertTrue(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#notfun"]},
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+    def test_filter_not_labels(self):
+        definition = {"org.matrix.not_labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#fun"]},
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#notfun"]},
+        )
+
+        self.assertTrue(Filter(definition).check(event))
 
     @defer.inlineCallbacks
     def test_filter_presence_match(self):

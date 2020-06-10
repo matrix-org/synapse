@@ -1,0 +1,57 @@
+name: matrix-synapse
+base: core18
+version: git
+summary: Reference Matrix homeserver
+description: |
+  Synapse is the reference Matrix homeserver.
+  Matrix is a federated and decentralised instant messaging and VoIP system.
+
+grade: stable
+confinement: strict
+
+apps:
+  matrix-synapse:
+    command: synctl --no-daemonize start $SNAP_COMMON/homeserver.yaml
+    stop-command: synctl -c $SNAP_COMMON stop
+    plugs: [network-bind, network]
+    daemon: simple
+  hash-password:
+    command: hash_password
+  generate-config:
+    command: generate_config
+  generate-signing-key:
+    command: generate_signing_key.py
+  register-new-matrix-user:
+    command: register_new_matrix_user
+    plugs: [network]
+  synctl:
+    command: synctl
+parts:
+  matrix-synapse:
+    source: .
+    plugin: python
+    python-version: python3
+    python-packages:
+      - '.[all]'
+      - pip
+      - setuptools
+      - setuptools-scm
+      - wheel
+    build-packages:
+      - libffi-dev
+      - libturbojpeg0-dev
+      - libssl-dev
+      - libxslt1-dev
+      - libpq-dev
+      - zlib1g-dev
+    stage-packages:
+      - libasn1-8-heimdal
+      - libgssapi3-heimdal
+      - libhcrypto4-heimdal
+      - libheimbase1-heimdal
+      - libheimntlm0-heimdal
+      - libhx509-5-heimdal
+      - libkrb5-26-heimdal
+      - libldap-2.4-2
+      - libpq5
+      - libsasl2-2

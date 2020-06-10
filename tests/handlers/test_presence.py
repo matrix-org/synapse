@@ -19,9 +19,10 @@ from mock import Mock, call
 from signedjson.key import generate_signing_key
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
-from synapse.events import room_version_to_event_format
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events.builder import EventBuilder
 from synapse.handlers.presence import (
+    EXTERNAL_PROCESS_EXPIRY,
     FEDERATION_PING_INTERVAL,
     FEDERATION_TIMEOUT,
     IDLE_TIMER,
@@ -337,7 +338,7 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         )
 
         new_state = handle_timeout(
-            state, is_mine=True, syncing_user_ids=set([user_id]), now=now
+            state, is_mine=True, syncing_user_ids={user_id}, now=now
         )
 
         self.assertIsNotNone(new_state)
@@ -413,6 +414,44 @@ class PresenceTimeoutTestCase(unittest.TestCase):
         self.assertEquals(state, new_state)
 
 
+class PresenceHandlerTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.presence_handler = hs.get_presence_handler()
+        self.clock = hs.get_clock()
+
+    def test_external_process_timeout(self):
+        """Test that if an external process doesn't update the records for a while
+        we time out their syncing users presence.
+        """
+        process_id = 1
+        user_id = "@test:server"
+
+        # Notify handler that a user is now syncing.
+        self.get_success(
+            self.presence_handler.update_external_syncs_row(
+                process_id, user_id, True, self.clock.time_msec()
+            )
+        )
+
+        # Check that if we wait a while without telling the handler the user has
+        # stopped syncing that their presence state doesn't get timed out.
+        self.reactor.advance(EXTERNAL_PROCESS_EXPIRY / 2)
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        self.assertEqual(state.state, PresenceState.ONLINE)
+
+        # Check that if the external process timeout fires, then the syncing
+        # user gets timed out
+        self.reactor.advance(EXTERNAL_PROCESS_EXPIRY)
+
+        state = self.get_success(
+            self.presence_handler.get_state(UserID.from_string(user_id))
+        )
+        self.assertEqual(state.state, PresenceState.OFFLINE)
+
+
 class PresenceJoinTestCase(unittest.HomeserverTestCase):
     """Tests remote servers get told about presence of users in the room when
     they join and when new local users join.
@@ -455,8 +494,10 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.helper.join(room_id, "@test2:server")
 
         # Mark test2 as online, test will be offline with a last_active of 0
-        self.presence_handler.set_state(
-            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
         )
         self.reactor.pump([0])  # Wait for presence updates to be handled
 
@@ -504,14 +545,18 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         room_id = self.helper.create_room_as(self.user_id)
 
         # Mark test as online
-        self.presence_handler.set_state(
-            UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test:server"), {"presence": PresenceState.ONLINE}
+            )
         )
 
         # Mark test2 as online, test will be offline with a last_active of 0.
         # Note we don't join them to the room yet
-        self.presence_handler.set_state(
-            UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+        self.get_success(
+            self.presence_handler.set_state(
+                UserID.from_string("@test2:server"), {"presence": PresenceState.ONLINE}
+            )
         )
 
         # Add servers to the room
@@ -540,7 +585,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=set(("server2", "server3")), states=[expected_state]
+            destinations={"server2", "server3"}, states=[expected_state]
         )
 
     def _add_new_user(self, room_id, user_id):
@@ -549,7 +594,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         hostname = get_domain_from_id(user_id)
 
-        room_version = self.get_success(self.store.get_room_version(room_id))
+        room_version = self.get_success(self.store.get_room_version_id(room_id))
 
         builder = EventBuilder(
             state=self.state,
@@ -558,7 +603,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             clock=self.clock,
             hostname=hostname,
             signing_key=self.random_signing_key,
-            format_version=room_version_to_event_format(room_version),
+            room_version=KNOWN_ROOM_VERSIONS[room_version],
             room_id=room_id,
             type=EventTypes.Member,
             sender=user_id,

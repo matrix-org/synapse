@@ -42,6 +42,7 @@ def get_version_string(module):
     try:
         null = open(os.devnull, "w")
         cwd = os.path.dirname(os.path.abspath(module.__file__))
+
         try:
             git_branch = (
                 subprocess.check_output(
@@ -51,7 +52,8 @@ def get_version_string(module):
                 .decode("ascii")
             )
             git_branch = "b=" + git_branch
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # FileNotFoundError can arise when git is not installed
             git_branch = ""
 
         try:
@@ -63,7 +65,7 @@ def get_version_string(module):
                 .decode("ascii")
             )
             git_tag = "t=" + git_tag
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             git_tag = ""
 
         try:
@@ -74,7 +76,7 @@ def get_version_string(module):
                 .strip()
                 .decode("ascii")
             )
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             git_commit = ""
 
         try:
@@ -89,7 +91,7 @@ def get_version_string(module):
             )
 
             git_dirty = "dirty" if is_dirty else ""
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             git_dirty = ""
 
         if git_branch or git_tag or git_commit or git_dirty:

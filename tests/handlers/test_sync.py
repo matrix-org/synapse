@@ -12,54 +12,56 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
 
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
-from synapse.handlers.sync import SyncConfig, SyncHandler
+from synapse.handlers.sync import SyncConfig
 from synapse.types import UserID
 
 import tests.unittest
 import tests.utils
-from tests.utils import setup_test_homeserver
 
 
-class SyncTestCase(tests.unittest.TestCase):
+class SyncTestCase(tests.unittest.HomeserverTestCase):
     """ Tests Sync Handler. """
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
-        self.sync_handler = SyncHandler(self.hs)
+    def prepare(self, reactor, clock, hs):
+        self.hs = hs
+        self.sync_handler = self.hs.get_sync_handler()
         self.store = self.hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def test_wait_for_sync_for_user_auth_blocking(self):
+        # AuthBlocking reads from the hs' config on initialization. We need to
+        # modify its config instead of the hs'
+        self.auth_blocking = self.hs.get_auth()._auth_blocking
 
-        user_id1 = "@user1:server"
-        user_id2 = "@user2:server"
+    def test_wait_for_sync_for_user_auth_blocking(self):
+        user_id1 = "@user1:test"
+        user_id2 = "@user2:test"
         sync_config = self._generate_sync_config(user_id1)
 
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 1
+        self.reactor.advance(100)  # So we get not 0 time
+        self.auth_blocking._limit_usage_by_mau = True
+        self.auth_blocking._max_mau_value = 1
 
         # Check that the happy case does not throw errors
-        yield self.store.upsert_monthly_active_user(user_id1)
-        yield self.sync_handler.wait_for_sync_for_user(sync_config)
+        self.get_success(self.store.upsert_monthly_active_user(user_id1))
+        self.get_success(self.sync_handler.wait_for_sync_for_user(sync_config))
 
         # Test that global lock works
-        self.hs.config.hs_disabled = True
-        with self.assertRaises(ResourceLimitError) as e:
-            yield self.sync_handler.wait_for_sync_for_user(sync_config)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        self.auth_blocking._hs_disabled = True
+        e = self.get_failure(
+            self.sync_handler.wait_for_sync_for_user(sync_config), ResourceLimitError
+        )
+        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-        self.hs.config.hs_disabled = False
+        self.auth_blocking._hs_disabled = False
 
         sync_config = self._generate_sync_config(user_id2)
 
-        with self.assertRaises(ResourceLimitError) as e:
-            yield self.sync_handler.wait_for_sync_for_user(sync_config)
-        self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+        e = self.get_failure(
+            self.sync_handler.wait_for_sync_for_user(sync_config), ResourceLimitError
+        )
+        self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def _generate_sync_config(self, user_id):
         return SyncConfig(

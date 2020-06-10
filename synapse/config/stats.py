@@ -25,6 +25,8 @@ class StatsConfig(Config):
     Configuration for the behaviour of synapse's stats engine
     """
 
+    section = "stats"
+
     def read_config(self, config, **kwargs):
         self.stats_enabled = True
         self.stats_bucket_size = 86400 * 1000

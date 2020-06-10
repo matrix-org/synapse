@@ -13,17 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import hashlib
-import hmac
 import json
+import os
+import urllib.parse
+from binascii import unhexlify
 
 from mock import Mock
 
+from twisted.internet.defer import Deferred
+
 import synapse.rest.admin
-from synapse.api.constants import UserTypes
 from synapse.http.server import JsonResource
+from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
-from synapse.rest.client.v1 import events, login, room
+from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import groups
 
 from tests import unittest
@@ -44,423 +47,6 @@ class VersionTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(
             {"server_version", "python_version"}, set(channel.json_body.keys())
-        )
-
-
-class UserRegisterTestCase(unittest.HomeserverTestCase):
-
-    servlets = [synapse.rest.admin.register_servlets_for_client_rest_resource]
-
-    def make_homeserver(self, reactor, clock):
-
-        self.url = "/_matrix/client/r0/admin/register"
-
-        self.registration_handler = Mock()
-        self.identity_handler = Mock()
-        self.login_handler = Mock()
-        self.device_handler = Mock()
-        self.device_handler.check_device_registered = Mock(return_value="FAKE")
-
-        self.datastore = Mock(return_value=Mock())
-        self.datastore.get_current_state_deltas = Mock(return_value=[])
-
-        self.secrets = Mock()
-
-        self.hs = self.setup_test_homeserver()
-
-        self.hs.config.registration_shared_secret = "shared"
-
-        self.hs.get_media_repository = Mock()
-        self.hs.get_deactivate_account_handler = Mock()
-
-        return self.hs
-
-    def test_disabled(self):
-        """
-        If there is no shared secret, registration through this method will be
-        prevented.
-        """
-        self.hs.config.registration_shared_secret = None
-
-        request, channel = self.make_request("POST", self.url, b"{}")
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(
-            "Shared secret registration is not enabled", channel.json_body["error"]
-        )
-
-    def test_get_nonce(self):
-        """
-        Calling GET on the endpoint will return a randomised nonce, using the
-        homeserver's secrets provider.
-        """
-        secrets = Mock()
-        secrets.token_hex = Mock(return_value="abcd")
-
-        self.hs.get_secrets = Mock(return_value=secrets)
-
-        request, channel = self.make_request("GET", self.url)
-        self.render(request)
-
-        self.assertEqual(channel.json_body, {"nonce": "abcd"})
-
-    def test_expired_nonce(self):
-        """
-        Calling GET on the endpoint will return a randomised nonce, which will
-        only last for SALT_TIMEOUT (60s).
-        """
-        request, channel = self.make_request("GET", self.url)
-        self.render(request)
-        nonce = channel.json_body["nonce"]
-
-        # 59 seconds
-        self.reactor.advance(59)
-
-        body = json.dumps({"nonce": nonce})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("username must be specified", channel.json_body["error"])
-
-        # 61 seconds
-        self.reactor.advance(2)
-
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("unrecognised nonce", channel.json_body["error"])
-
-    def test_register_incorrect_nonce(self):
-        """
-        Only the provided nonce can be used, as it's checked in the MAC.
-        """
-        request, channel = self.make_request("GET", self.url)
-        self.render(request)
-        nonce = channel.json_body["nonce"]
-
-        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(b"notthenonce\x00bob\x00abc123\x00admin")
-        want_mac = want_mac.hexdigest()
-
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": "bob",
-                "password": "abc123",
-                "admin": True,
-                "mac": want_mac,
-            }
-        )
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("HMAC incorrect", channel.json_body["error"])
-
-    def test_register_correct_nonce(self):
-        """
-        When the correct nonce is provided, and the right key is provided, the
-        user is registered.
-        """
-        request, channel = self.make_request("GET", self.url)
-        self.render(request)
-        nonce = channel.json_body["nonce"]
-
-        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(
-            nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin\x00support"
-        )
-        want_mac = want_mac.hexdigest()
-
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": "bob",
-                "password": "abc123",
-                "admin": True,
-                "user_type": UserTypes.SUPPORT,
-                "mac": want_mac,
-            }
-        )
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob:test", channel.json_body["user_id"])
-
-    def test_nonce_reuse(self):
-        """
-        A valid unrecognised nonce.
-        """
-        request, channel = self.make_request("GET", self.url)
-        self.render(request)
-        nonce = channel.json_body["nonce"]
-
-        want_mac = hmac.new(key=b"shared", digestmod=hashlib.sha1)
-        want_mac.update(nonce.encode("ascii") + b"\x00bob\x00abc123\x00admin")
-        want_mac = want_mac.hexdigest()
-
-        body = json.dumps(
-            {
-                "nonce": nonce,
-                "username": "bob",
-                "password": "abc123",
-                "admin": True,
-                "mac": want_mac,
-            }
-        )
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("@bob:test", channel.json_body["user_id"])
-
-        # Now, try and reuse it
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("unrecognised nonce", channel.json_body["error"])
-
-    def test_missing_parts(self):
-        """
-        Synapse will complain if you don't give nonce, username, password, and
-        mac.  Admin and user_types are optional.  Additional checks are done for length
-        and type.
-        """
-
-        def nonce():
-            request, channel = self.make_request("GET", self.url)
-            self.render(request)
-            return channel.json_body["nonce"]
-
-        #
-        # Nonce check
-        #
-
-        # Must be present
-        body = json.dumps({})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("nonce must be specified", channel.json_body["error"])
-
-        #
-        # Username checks
-        #
-
-        # Must be present
-        body = json.dumps({"nonce": nonce()})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("username must be specified", channel.json_body["error"])
-
-        # Must be a string
-        body = json.dumps({"nonce": nonce(), "username": 1234})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Invalid username", channel.json_body["error"])
-
-        # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": "abcd\u0000"})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Invalid username", channel.json_body["error"])
-
-        # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": "a" * 1000})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Invalid username", channel.json_body["error"])
-
-        #
-        # Password checks
-        #
-
-        # Must be present
-        body = json.dumps({"nonce": nonce(), "username": "a"})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("password must be specified", channel.json_body["error"])
-
-        # Must be a string
-        body = json.dumps({"nonce": nonce(), "username": "a", "password": 1234})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Invalid password", channel.json_body["error"])
-
-        # Must not have null bytes
-        body = json.dumps({"nonce": nonce(), "username": "a", "password": "abcd\u0000"})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Invalid password", channel.json_body["error"])
-
-        # Super long
-        body = json.dumps({"nonce": nonce(), "username": "a", "password": "A" * 1000})
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Invalid password", channel.json_body["error"])
-
-        #
-        # user_type check
-        #
-
-        # Invalid user_type
-        body = json.dumps(
-            {
-                "nonce": nonce(),
-                "username": "a",
-                "password": "1234",
-                "user_type": "invalid",
-            }
-        )
-        request, channel = self.make_request("POST", self.url, body.encode("utf8"))
-        self.render(request)
-
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual("Invalid user type", channel.json_body["error"])
-
-
-class ShutdownRoomTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        login.register_servlets,
-        events.register_servlets,
-        room.register_servlets,
-        room.register_deprecated_servlets,
-    ]
-
-    def prepare(self, reactor, clock, hs):
-        self.event_creation_handler = hs.get_event_creation_handler()
-        hs.config.user_consent_version = "1"
-
-        consent_uri_builder = Mock()
-        consent_uri_builder.build_user_consent_uri.return_value = "http://example.com"
-        self.event_creation_handler._consent_uri_builder = consent_uri_builder
-
-        self.store = hs.get_datastore()
-
-        self.admin_user = self.register_user("admin", "pass", admin=True)
-        self.admin_user_tok = self.login("admin", "pass")
-
-        self.other_user = self.register_user("user", "pass")
-        self.other_user_token = self.login("user", "pass")
-
-        # Mark the admin user as having consented
-        self.get_success(self.store.user_set_consent_version(self.admin_user, "1"))
-
-    def test_shutdown_room_consent(self):
-        """Test that we can shutdown rooms with local users who have not
-        yet accepted the privacy policy. This used to fail when we tried to
-        force part the user from the old room.
-        """
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Assert one user in room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([self.other_user], users_in_room)
-
-        # Enable require consent to send events
-        self.event_creation_handler._block_events_without_consent_error = "Error"
-
-        # Assert that the user is getting consent error
-        self.helper.send(
-            room_id, body="foo", tok=self.other_user_token, expect_code=403
-        )
-
-        # Test that the admin can still send shutdown
-        url = "admin/shutdown_room/" + room_id
-        request, channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-        self.render(request)
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert there is now no longer anyone in the room
-        users_in_room = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertEqual([], users_in_room)
-
-    def test_shutdown_room_block_peek(self):
-        """Test that a world_readable room can no longer be peeked into after
-        it has been shut down.
-        """
-
-        self.event_creation_handler._block_events_without_consent_error = None
-
-        room_id = self.helper.create_room_as(self.other_user, tok=self.other_user_token)
-
-        # Enable world readable
-        url = "rooms/%s/state/m.room.history_visibility" % (room_id,)
-        request, channel = self.make_request(
-            "PUT",
-            url.encode("ascii"),
-            json.dumps({"history_visibility": "world_readable"}),
-            access_token=self.other_user_token,
-        )
-        self.render(request)
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Test that the admin can still send shutdown
-        url = "admin/shutdown_room/" + room_id
-        request, channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
-            json.dumps({"new_room_user_id": self.admin_user}),
-            access_token=self.admin_user_tok,
-        )
-        self.render(request)
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-
-        # Assert we can no longer peek into the room
-        self._assert_peek(room_id, expect_code=403)
-
-    def _assert_peek(self, room_id, expect_code):
-        """Assert that the admin user can (or cannot) peek into the room.
-        """
-
-        url = "rooms/%s/initialSync" % (room_id,)
-        request, channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.render(request)
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
-        )
-
-        url = "events?timeout=0&room_id=" + room_id
-        request, channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok
-        )
-        self.render(request)
-        self.assertEqual(
-            expect_code, int(channel.result["code"]), msg=channel.result["body"]
         )
 
 
@@ -561,3 +147,343 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
         return channel.json_body["groups"]
+
+
+class QuarantineMediaTestCase(unittest.HomeserverTestCase):
+    """Test /quarantine_media admin API.
+    """
+
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        synapse.rest.admin.register_servlets_for_media_repo,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.hs = hs
+
+        # Allow for uploading and downloading to/from the media repo
+        self.media_repo = hs.get_media_repository_resource()
+        self.download_resource = self.media_repo.children[b"download"]
+        self.upload_resource = self.media_repo.children[b"upload"]
+        self.image_data = unhexlify(
+            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+            b"0000001f15c4890000000a49444154789c63000100000500010d"
+            b"0a2db40000000049454e44ae426082"
+        )
+
+    def make_homeserver(self, reactor, clock):
+
+        self.fetches = []
+
+        def get_file(destination, path, output_stream, args=None, max_size=None):
+            """
+            Returns tuple[int,dict,str,int] of file length, response headers,
+            absolute URI, and response code.
+            """
+
+            def write_to(r):
+                data, response = r
+                output_stream.write(data)
+                return response
+
+            d = Deferred()
+            d.addCallback(write_to)
+            self.fetches.append((d, destination, path, args))
+            return make_deferred_yieldable(d)
+
+        client = Mock()
+        client.get_file = get_file
+
+        self.storage_path = self.mktemp()
+        self.media_store_path = self.mktemp()
+        os.mkdir(self.storage_path)
+        os.mkdir(self.media_store_path)
+
+        config = self.default_config()
+        config["media_store_path"] = self.media_store_path
+        config["thumbnail_requirements"] = {}
+        config["max_image_pixels"] = 2000000
+
+        provider_config = {
+            "module": "synapse.rest.media.v1.storage_provider.FileStorageProviderBackend",
+            "store_local": True,
+            "store_synchronous": False,
+            "store_remote": True,
+            "config": {"directory": self.storage_path},
+        }
+        config["media_storage_providers"] = [provider_config]
+
+        hs = self.setup_test_homeserver(config=config, http_client=client)
+
+        return hs
+
+    def test_quarantine_media_requires_admin(self):
+        self.register_user("nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("nonadmin", "pass")
+
+        # Attempt quarantine media APIs as non-admin
+        url = "/_synapse/admin/v1/media/quarantine/example.org/abcde12345"
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=non_admin_user_tok,
+        )
+        self.render(request)
+
+        # Expect a forbidden error
+        self.assertEqual(
+            403,
+            int(channel.result["code"]),
+            msg="Expected forbidden on quarantining media as a non-admin",
+        )
+
+        # And the roomID/userID endpoint
+        url = "/_synapse/admin/v1/room/!room%3Aexample.com/media/quarantine"
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=non_admin_user_tok,
+        )
+        self.render(request)
+
+        # Expect a forbidden error
+        self.assertEqual(
+            403,
+            int(channel.result["code"]),
+            msg="Expected forbidden on quarantining media as a non-admin",
+        )
+
+    def test_quarantine_media_by_id(self):
+        self.register_user("id_admin", "pass", admin=True)
+        admin_user_tok = self.login("id_admin", "pass")
+
+        self.register_user("id_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("id_nonadmin", "pass")
+
+        # Upload some media into the room
+        response = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=admin_user_tok
+        )
+
+        # Extract media ID from the response
+        server_name_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
+        server_name, media_id = server_name_and_media_id.split("/")
+
+        # Attempt to access the media
+        request, channel = self.make_request(
+            "GET",
+            server_name_and_media_id,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be successful
+        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+
+        # Quarantine the media
+        url = "/_synapse/admin/v1/media/quarantine/%s/%s" % (
+            urllib.parse.quote(server_name),
+            urllib.parse.quote(media_id),
+        )
+        request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
+        self.render(request)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+
+        # Attempt to access the media
+        request, channel = self.make_request(
+            "GET",
+            server_name_and_media_id,
+            shorthand=False,
+            access_token=admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_name_and_media_id
+            ),
+        )
+
+    def test_quarantine_all_media_in_room(self, override_url_template=None):
+        self.register_user("room_admin", "pass", admin=True)
+        admin_user_tok = self.login("room_admin", "pass")
+
+        non_admin_user = self.register_user("room_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("room_nonadmin", "pass")
+
+        room_id = self.helper.create_room_as(non_admin_user, tok=admin_user_tok)
+        self.helper.join(room_id, non_admin_user, tok=non_admin_user_tok)
+
+        # Upload some media
+        response_1 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+        response_2 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+
+        # Extract mxcs
+        mxc_1 = response_1["content_uri"]
+        mxc_2 = response_2["content_uri"]
+
+        # Send it into the room
+        self.helper.send_event(
+            room_id,
+            "m.room.message",
+            content={"body": "image-1", "msgtype": "m.image", "url": mxc_1},
+            txn_id="111",
+            tok=non_admin_user_tok,
+        )
+        self.helper.send_event(
+            room_id,
+            "m.room.message",
+            content={"body": "image-2", "msgtype": "m.image", "url": mxc_2},
+            txn_id="222",
+            tok=non_admin_user_tok,
+        )
+
+        # Quarantine all media in the room
+        if override_url_template:
+            url = override_url_template % urllib.parse.quote(room_id)
+        else:
+            url = "/_synapse/admin/v1/room/%s/media/quarantine" % urllib.parse.quote(
+                room_id
+            )
+        request, channel = self.make_request("POST", url, access_token=admin_user_tok,)
+        self.render(request)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.code), msg=channel.result["body"])
+        self.assertEqual(
+            json.loads(channel.result["body"].decode("utf-8")),
+            {"num_quarantined": 2},
+            "Expected 2 quarantined items",
+        )
+
+        # Convert mxc URLs to server/media_id strings
+        server_and_media_id_1 = mxc_1[6:]
+        server_and_media_id_2 = mxc_2[6:]
+
+        # Test that we cannot download any of the media anymore
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_1,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_1
+            ),
+        )
+
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_2,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_2
+            ),
+        )
+
+    def test_quaraantine_all_media_in_room_deprecated_api_path(self):
+        # Perform the above test with the deprecated API path
+        self.test_quarantine_all_media_in_room("/_synapse/admin/v1/quarantine_media/%s")
+
+    def test_quarantine_all_media_by_user(self):
+        self.register_user("user_admin", "pass", admin=True)
+        admin_user_tok = self.login("user_admin", "pass")
+
+        non_admin_user = self.register_user("user_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("user_nonadmin", "pass")
+
+        # Upload some media
+        response_1 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+        response_2 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+
+        # Extract media IDs
+        server_and_media_id_1 = response_1["content_uri"][6:]
+        server_and_media_id_2 = response_2["content_uri"][6:]
+
+        # Quarantine all media by this user
+        url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
+            non_admin_user
+        )
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=admin_user_tok,
+        )
+        self.render(request)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            json.loads(channel.result["body"].decode("utf-8")),
+            {"num_quarantined": 2},
+            "Expected 2 quarantined items",
+        )
+
+        # Attempt to access each piece of media
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_1,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_1,
+            ),
+        )
+
+        # Attempt to access each piece of media
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_2,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id_2
+            ),
+        )
