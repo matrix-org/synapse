@@ -123,22 +123,31 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
     def _get_unread_counts_by_pos_txn(self, txn, room_id, user_id, stream_ordering):
 
-        # First get number of notifications.
-        # We ignore the notif column, given we want unread counts irrespective of
-        # whether the notification actually sent a push or not.
+        # First get number of actions, grouped on whether the action notifies.
         sql = (
-            "SELECT count(*)"
+            "SELECT count(*), notif"
             " FROM event_push_actions ea"
             " WHERE"
             " user_id = ?"
             " AND room_id = ?"
             " AND stream_ordering > ?"
-            " AND notif = 1"
+            " GROUP BY notif"
         )
-
         txn.execute(sql, (user_id, room_id, stream_ordering))
-        row = txn.fetchone()
-        notify_count = row[0] if row else 0
+        rows = txn.fetchall()
+
+        # We should get a maximum number of two rows: one for notif = 0, which is the
+        # number of actions that contribute to the unread_count but not to the
+        # notify_count, and one for notif = 1, which is the number of actions that
+        # contribute to both counters. If one or both rows don't appear, then the
+        # value for the matching counter should be 0.
+        unread_count = 0
+        notify_count = 0
+        for row in rows:
+            if row[1] == 0:
+                unread_count = row[0]
+            if row[1] == 1:
+                notify_count = row[0]
 
         txn.execute(
             """
@@ -151,20 +160,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         if rows:
             notify_count += rows[0][0]
 
-        # Now get the number of unread messages in the room, i.e. messages that matched
-        # both a mark_unread rule and a notify one.
-        sql = (
-            "SELECT count(*)"
-            " FROM event_push_actions ea"
-            " WHERE"
-            " user_id = ?"
-            " AND room_id = ?"
-            " AND stream_ordering > ?"
-            " AND notif = 0"
-        )
-        txn.execute(sql, (user_id, room_id, stream_ordering))
-        row = txn.fetchone()
-        unread_count = row[0] if row else 0
+        # Now that we've got the final notify_count, add it to unread_count, as notify
+        # actions also contribute to the unread count.
         unread_count += notify_count
 
         # Now get the number of highlights
@@ -183,9 +180,9 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         highlight_count = row[0] if row else 0
 
         return {
+            "unread_count": unread_count,
             "notify_count": notify_count,
             "highlight_count": highlight_count,
-            "unread_count": unread_count,
         }
 
     @defer.inlineCallbacks
