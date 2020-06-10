@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2015-2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -437,7 +436,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # can be used to insert into the `event_push_actions_staging` table.
         def _gen_entry(user_id, actions):
             is_highlight = 1 if _action_has_highlight(actions) else 0
-            notif = 0 if "dont_push" in actions else 1
+            notif = 0 if "mark_unread" in actions else 1
             return (
                 event_id,  # event_id column
                 user_id,  # user_id column

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2014-2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -267,7 +267,7 @@ def _check_actions(actions):
         raise InvalidRuleException("No actions found")
 
     for a in actions:
-        if a in ["notify", "dont_notify", "coalesce"]:
+        if a in ["notify", "dont_notify", "coalesce", "mark_unread"]:
             pass
         elif isinstance(a, dict) and "set_tweak" in a:
             pass
