@@ -324,7 +324,7 @@ class ReplicationCommandHandler:
                 # position.
                 if cmd.token <= current_token:
                     logger.debug(
-                        "Discarding RDATA from stream %s at POSITION %s before previous POSITION %s",
+                        "Discarding RDATA from stream %s at position %s before previous position %s",
                         stream_name,
                         cmd.token,
                         current_token,
