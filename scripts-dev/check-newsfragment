@@ -7,7 +7,9 @@ set -e
 
 # make sure that origin/develop is up to date
 git remote set-branches --add origin develop
-git fetch origin develop
+git fetch -q origin develop
+
+pr="$BUILDKITE_PULL_REQUEST"
 
 # if there are changes in the debian directory, check that the debian changelog
 # has been updated
@@ -20,20 +22,30 @@ fi
 
 # if there are changes *outside* the debian directory, check that the
 # newsfragments have been updated.
-if git diff --name-only FETCH_HEAD... | grep -qv '^debian/'; then
-    tox -e check-newsfragment
+if ! git diff --name-only FETCH_HEAD... | grep -qv '^debian/'; then
+    exit 0
 fi
+
+tox -qe check-newsfragment
 
 echo
 echo "--------------------------"
 echo
 
-# check that any new newsfiles on this branch end with a full stop.
+matched=0
 for f in `git diff --name-only FETCH_HEAD... -- changelog.d`; do
+    # check that any modified newsfiles on this branch end with a full stop.
     lastchar=`tr -d '\n' < $f | tail -c 1`
     if [ $lastchar != '.' -a $lastchar != '!' ]; then
         echo -e "\e[31mERROR: newsfragment $f does not end with a '.' or '!'\e[39m" >&2
         exit 1
     fi
+
+    # see if this newsfile corresponds to the right PR
+    [[ -n "$pr" && "$f" == changelog.d/"$pr".* ]] && matched=1
 done
 
+if [[ -n "$pr" && "$matched" -eq 0 ]]; then
+    echo -e "\e[31mERROR: Did not find a news fragment with the right number: expected changelog.d/$pr.*.\e[39m" >&2
+    exit 1
+fi

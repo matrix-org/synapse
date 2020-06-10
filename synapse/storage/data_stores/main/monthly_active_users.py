@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import List
 
 from twisted.internet import defer
 
@@ -77,20 +78,19 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
         return self.db.runInteraction("count_users_by_service", _count_users_by_service)
 
-    @defer.inlineCallbacks
-    def get_registered_reserved_users(self):
-        """Of the reserved threepids defined in config, which are associated
-        with registered users?
+    async def get_registered_reserved_users(self) -> List[str]:
+        """Of the reserved threepids defined in config, retrieve those that are associated
+        with registered users
 
         Returns:
-            Defered[list]: Real reserved users
+            User IDs of actual users that are reserved
         """
         users = []
 
         for tp in self.hs.config.mau_limits_reserved_threepids[
             : self.hs.config.max_mau_value
         ]:
-            user_id = yield self.hs.get_datastore().get_user_id_by_threepid(
+            user_id = await self.hs.get_datastore().get_user_id_by_threepid(
                 tp["medium"], tp["address"]
             )
             if user_id:
@@ -171,13 +171,9 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             else:
                 logger.warning("mau limit reserved threepid %s not found in db" % tp)
 
-    @defer.inlineCallbacks
-    def reap_monthly_active_users(self):
+    async def reap_monthly_active_users(self):
         """Cleans out monthly active user table to ensure that no stale
         entries exist.
-
-        Returns:
-            Deferred[]
         """
 
         def _reap_users(txn, reserved_users):
@@ -249,8 +245,8 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
 
-        reserved_users = yield self.get_registered_reserved_users()
-        yield self.db.runInteraction(
+        reserved_users = await self.get_registered_reserved_users()
+        await self.db.runInteraction(
             "reap_monthly_active_users", _reap_users, reserved_users
         )
 
@@ -261,6 +257,9 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
 
         Args:
             user_id (str): user to add/update
+
+        Returns:
+            Deferred
         """
         # Support user never to be included in MAU stats. Note I can't easily call this
         # from upsert_monthly_active_user_txn because then I need a _txn form of
