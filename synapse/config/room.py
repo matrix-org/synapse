@@ -76,5 +76,5 @@ class RoomConfig(Config):
         # Note that this option will only affect rooms created after it is set. It
         # will also not affect rooms created by another, federated server.
         #
-        #encryption_enabled_by_default_for_room_type: private
+        #encryption_enabled_by_default_for_room_type: invite
         """
