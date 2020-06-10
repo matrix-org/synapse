@@ -67,7 +67,8 @@ class RoomConfig(Config):
         # Possible options are "all", "invite", and "off". They are defined as:
         #
         # * "all": any locally-created room
-        # * "invite": any locally-created room that requires an invite to join
+        # * "invite": any room created with the "private_chat" or "trusted_private_chat"
+        #             room creation presets
         # * "off": this option will take no effect
         #
         # The default value is "off".
