@@ -74,7 +74,7 @@ class RoomConfig(Config):
         # The default value is "off".
         #
         # Note that this option will only affect rooms created after it is set. It
-        # will also not affect rooms created by another, federated server.
+        # will also not affect rooms created by other servers.
         #
         #encryption_enabled_by_default_for_room_type: invite
         """
