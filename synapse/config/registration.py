@@ -154,8 +154,9 @@ class RegistrationConfig(Config):
                 raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
 
-        self.disable_set_displayname = config.get("disable_set_displayname", False)
-        self.disable_set_avatar_url = config.get("disable_set_avatar_url", False)
+        self.enable_set_displayname = config.get("enable_set_displayname", True)
+        self.enable_set_avatar_url = config.get("enable_set_avatar_url", True)
+        self.enable_3pid_changes = config.get("enable_3pid_changes", True)
 
         self.replicate_user_profiles_to = config.get("replicate_user_profiles_to", [])
         if not isinstance(self.replicate_user_profiles_to, list):
@@ -418,6 +419,29 @@ class RegistrationConfig(Config):
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
+
+        # Whether users are allowed to change their displayname after it has
+        # been initially set. Useful when provisioning users based on the
+        # contents of a third-party directory.
+        #
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_displayname: false
+
+        # Whether users are allowed to change their avatar after it has been
+        # initially set. Useful when provisioning users based on the contents
+        # of a third-party directory.
+        #
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_avatar_url: false
+
+        # Whether users can change the 3PIDs associated with their accounts
+        # (email address and msisdn).
+        #
+        # Defaults to 'true'
+        #
+        #enable_3pid_changes: false
 
         # Users who register on this homeserver will automatically be joined
         # to these rooms

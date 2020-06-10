@@ -56,6 +56,7 @@ from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
+from synapse.handlers.cas_handler import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
@@ -86,6 +87,9 @@ from synapse.http.matrixfederationclient import MatrixFederationHttpClient
 from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
+from synapse.replication.tcp.client import ReplicationDataHandler
+from synapse.replication.tcp.handler import ReplicationCommandHandler
+from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
@@ -101,6 +105,7 @@ from synapse.storage import DataStores, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
+from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
 
@@ -198,9 +203,13 @@ class HomeServer(object):
         "sendmail",
         "registration_handler",
         "account_validity_handler",
+        "cas_handler",
         "saml_handler",
         "event_client_serializer",
+        "password_policy_handler",
         "storage",
+        "replication_streamer",
+        "replication_data_handler",
         "password_policy_handler",
     ]
 
@@ -227,6 +236,9 @@ class HomeServer(object):
         self._listening_services = []
         self.start_time = None
 
+        self._instance_id = random_string(5)
+        self._instance_name = config.worker_name or "master"
+
         self.clock = Clock(reactor)
         self.distributor = Distributor()
         self.ratelimiter = Ratelimiter()
@@ -238,6 +250,22 @@ class HomeServer(object):
         # Other kwargs are explicit dependencies
         for depname in kwargs:
             setattr(self, depname, kwargs[depname])
+
+    def get_instance_id(self):
+        """A unique ID for this synapse process instance.
+
+        This is used to distinguish running instances in worker-based
+        deployments.
+        """
+        return self._instance_id
+
+    def get_instance_name(self) -> str:
+        """A unique name for this synapse process.
+
+        Used to identify the process over replication and in config. Does not
+        change over restarts.
+        """
+        return self._instance_name
 
     def setup(self):
         logger.info("Setting up.")
@@ -454,7 +482,7 @@ class HomeServer(object):
         return ReadMarkerHandler(self)
 
     def build_tcp_replication(self):
-        raise NotImplementedError()
+        return ReplicationCommandHandler(self)
 
     def build_action_generator(self):
         return ActionGenerator(self)
@@ -528,6 +556,9 @@ class HomeServer(object):
     def build_account_validity_handler(self):
         return AccountValidityHandler(self)
 
+    def build_cas_handler(self):
+        return CasHandler(self)
+
     def build_saml_handler(self):
         from synapse.handlers.saml_handler import SamlHandler
 
@@ -538,6 +569,12 @@ class HomeServer(object):
 
     def build_storage(self) -> Storage:
         return Storage(self, self.datastores)
+
+    def build_replication_streamer(self) -> ReplicationStreamer:
+        return ReplicationStreamer(self)
+
+    def build_replication_data_handler(self):
+        return ReplicationDataHandler(self.get_datastore())
 
     def build_password_policy_handler(self):
         return PasswordPolicyHandler(self)
@@ -563,24 +600,22 @@ def _make_dependency_method(depname):
         try:
             builder = getattr(hs, "build_%s" % (depname))
         except AttributeError:
-            builder = None
+            raise NotImplementedError(
+                "%s has no %s nor a builder for it" % (type(hs).__name__, depname)
+            )
 
-        if builder:
-            # Prevent cyclic dependencies from deadlocking
-            if depname in hs._building:
-                raise ValueError("Cyclic dependency while building %s" % (depname,))
-            hs._building[depname] = 1
+        # Prevent cyclic dependencies from deadlocking
+        if depname in hs._building:
+            raise ValueError("Cyclic dependency while building %s" % (depname,))
 
+        hs._building[depname] = 1
+        try:
             dep = builder()
             setattr(hs, depname, dep)
-
+        finally:
             del hs._building[depname]
 
-            return dep
-
-        raise NotImplementedError(
-            "%s has no %s nor a builder for it" % (type(hs).__name__, depname)
-        )
+        return dep
 
     setattr(HomeServer, "get_%s" % (depname), _get)
 

@@ -39,8 +39,13 @@ class AuthTestCase(unittest.TestCase):
         self.hs.handlers = AuthHandlers(self.hs)
         self.auth_handler = self.hs.handlers.auth_handler
         self.macaroon_generator = self.hs.get_macaroon_generator()
+
         # MAU tests
-        self.hs.config.max_mau_value = 50
+        # AuthBlocking reads from the hs' config on initialization. We need to
+        # modify its config instead of the hs'
+        self.auth_blocking = self.hs.get_auth()._auth_blocking
+        self.auth_blocking._max_mau_value = 50
+
         self.small_number_of_users = 1
         self.large_number_of_users = 100
 
@@ -82,16 +87,16 @@ class AuthTestCase(unittest.TestCase):
         self.hs.clock.now = 1000
 
         token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
-        user_id = yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-            token
+        user_id = yield defer.ensureDeferred(
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(token)
         )
         self.assertEqual("a_user", user_id)
 
         # when we advance the clock, the token should be rejected
         self.hs.clock.now = 6000
         with self.assertRaises(synapse.api.errors.AuthError):
-            yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-                token
+            yield defer.ensureDeferred(
+                self.auth_handler.validate_short_term_login_token_and_get_user_id(token)
             )
 
     @defer.inlineCallbacks
@@ -99,8 +104,10 @@ class AuthTestCase(unittest.TestCase):
         token = self.macaroon_generator.generate_short_term_login_token("a_user", 5000)
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
-        user_id = yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-            macaroon.serialize()
+        user_id = yield defer.ensureDeferred(
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                macaroon.serialize()
+            )
         )
         self.assertEqual("a_user", user_id)
 
@@ -109,99 +116,121 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("user_id = b_user")
 
         with self.assertRaises(synapse.api.errors.AuthError):
-            yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-                macaroon.serialize()
+            yield defer.ensureDeferred(
+                self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                    macaroon.serialize()
+                )
             )
 
     @defer.inlineCallbacks
     def test_mau_limits_disabled(self):
-        self.hs.config.limit_usage_by_mau = False
+        self.auth_blocking._limit_usage_by_mau = False
         # Ensure does not throw exception
-        yield self.auth_handler.get_access_token_for_user_id(
-            "user_a", device_id=None, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.auth_handler.get_access_token_for_user_id(
+                "user_a", device_id=None, valid_until_ms=None
+            )
         )
 
-        yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-            self._get_macaroon().serialize()
+        yield defer.ensureDeferred(
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
         )
 
     @defer.inlineCallbacks
     def test_mau_limits_exceeded_large(self):
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.large_number_of_users)
         )
 
         with self.assertRaises(ResourceLimitError):
-            yield self.auth_handler.get_access_token_for_user_id(
-                "user_a", device_id=None, valid_until_ms=None
+            yield defer.ensureDeferred(
+                self.auth_handler.get_access_token_for_user_id(
+                    "user_a", device_id=None, valid_until_ms=None
+                )
             )
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.large_number_of_users)
         )
         with self.assertRaises(ResourceLimitError):
-            yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-                self._get_macaroon().serialize()
+            yield defer.ensureDeferred(
+                self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                    self._get_macaroon().serialize()
+                )
             )
 
     @defer.inlineCallbacks
     def test_mau_limits_parity(self):
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
 
         # If not in monthly active cohort
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
         with self.assertRaises(ResourceLimitError):
-            yield self.auth_handler.get_access_token_for_user_id(
-                "user_a", device_id=None, valid_until_ms=None
+            yield defer.ensureDeferred(
+                self.auth_handler.get_access_token_for_user_id(
+                    "user_a", device_id=None, valid_until_ms=None
+                )
             )
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
         with self.assertRaises(ResourceLimitError):
-            yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-                self._get_macaroon().serialize()
+            yield defer.ensureDeferred(
+                self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                    self._get_macaroon().serialize()
+                )
             )
         # If in monthly active cohort
         self.hs.get_datastore().user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
-        yield self.auth_handler.get_access_token_for_user_id(
-            "user_a", device_id=None, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.auth_handler.get_access_token_for_user_id(
+                "user_a", device_id=None, valid_until_ms=None
+            )
         )
         self.hs.get_datastore().user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
-        yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-            self._get_macaroon().serialize()
+        yield defer.ensureDeferred(
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
         )
 
     @defer.inlineCallbacks
     def test_mau_limits_not_exceeded(self):
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.small_number_of_users)
         )
         # Ensure does not raise exception
-        yield self.auth_handler.get_access_token_for_user_id(
-            "user_a", device_id=None, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.auth_handler.get_access_token_for_user_id(
+                "user_a", device_id=None, valid_until_ms=None
+            )
         )
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.small_number_of_users)
         )
-        yield self.auth_handler.validate_short_term_login_token_and_get_user_id(
-            self._get_macaroon().serialize()
+        yield defer.ensureDeferred(
+            self.auth_handler.validate_short_term_login_token_and_get_user_id(
+                self._get_macaroon().serialize()
+            )
         )
 
     def _get_macaroon(self):

@@ -120,6 +120,7 @@ class ClientRestResource(JsonResource):
         account_validity.register_servlets(hs, client_resource)
         password_policy.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)
+        password_policy.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
         synapse.rest.admin.register_servlets_for_client_rest_resource(

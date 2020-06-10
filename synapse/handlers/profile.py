@@ -229,8 +229,9 @@ class BaseProfileHandler(BaseHandler):
 
             return result["displayname"]
 
-    @defer.inlineCallbacks
-    def set_displayname(self, target_user, requester, new_displayname, by_admin=False):
+    async def set_displayname(
+        self, target_user, requester, new_displayname, by_admin=False
+    ):
         """Set the displayname of a user
 
         Args:
@@ -245,11 +246,13 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and requester and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's displayname")
 
-        if not by_admin and self.hs.config.disable_set_displayname:
-            profile = yield self.store.get_profileinfo(target_user.localpart)
+        if not by_admin and not self.hs.config.enable_set_displayname:
+            profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.display_name:
                 raise SynapseError(
-                    400, "Changing displayname is disabled on this server"
+                    400,
+                    "Changing display name is disabled on this server",
+                    Codes.FORBIDDEN,
                 )
 
         if len(new_displayname) > MAX_DISPLAYNAME_LEN:
@@ -262,7 +265,7 @@ class BaseProfileHandler(BaseHandler):
 
         if len(self.hs.config.replicate_user_profiles_to) > 0:
             cur_batchnum = (
-                yield self.store.get_latest_profile_replication_batch_number()
+                await self.store.get_latest_profile_replication_batch_number()
             )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
         else:
@@ -274,18 +277,17 @@ class BaseProfileHandler(BaseHandler):
         if by_admin:
             requester = create_requester(target_user)
 
-        yield self.store.set_profile_displayname(
+        await self.store.set_profile_displayname(
             target_user.localpart, new_displayname, new_batchnum
         )
 
         if self.hs.config.user_directory_search_all_users:
-            profile = yield self.store.get_profileinfo(target_user.localpart)
-            yield self.user_directory_handler.handle_local_profile_change(
+            profile = await self.store.get_profileinfo(target_user.localpart)
+            await self.user_directory_handler.handle_local_profile_change(
                 target_user.to_string(), profile
             )
 
-        if requester:
-            yield self._update_join_states(requester, target_user)
+        await self._update_join_states(requester, target_user)
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)
@@ -345,8 +347,9 @@ class BaseProfileHandler(BaseHandler):
 
             return result["avatar_url"]
 
-    @defer.inlineCallbacks
-    def set_avatar_url(self, target_user, requester, new_avatar_url, by_admin=False):
+    async def set_avatar_url(
+        self, target_user, requester, new_avatar_url, by_admin=False
+    ):
         """target_user is the user whose avatar_url is to be changed;
         auth_user is the user attempting to make this change."""
         if not self.hs.is_mine(target_user):
@@ -355,20 +358,12 @@ class BaseProfileHandler(BaseHandler):
         if not by_admin and target_user != requester.user:
             raise AuthError(400, "Cannot set another user's avatar_url")
 
-        if not by_admin and self.hs.config.disable_set_avatar_url:
-            profile = yield self.store.get_profileinfo(target_user.localpart)
+        if not by_admin and not self.hs.config.enable_set_avatar_url:
+            profile = await self.store.get_profileinfo(target_user.localpart)
             if profile.avatar_url:
                 raise SynapseError(
-                    400, "Changing avatar url is disabled on this server"
+                    400, "Changing avatar is disabled on this server", Codes.FORBIDDEN
                 )
-
-        if len(self.hs.config.replicate_user_profiles_to) > 0:
-            cur_batchnum = (
-                yield self.store.get_latest_profile_replication_batch_number()
-            )
-            new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
-        else:
-            new_batchnum = None
 
         if len(new_avatar_url) > MAX_AVATAR_URL_LEN:
             raise SynapseError(
@@ -380,7 +375,7 @@ class BaseProfileHandler(BaseHandler):
             media_id = self._validate_and_parse_media_id_from_avatar_url(new_avatar_url)
 
             # Check that this media exists locally
-            media_info = yield self.store.get_local_media(media_id)
+            media_info = await self.store.get_local_media(media_id)
             if not media_info:
                 raise SynapseError(
                     400, "Unknown media id supplied", errcode=Codes.NOT_FOUND
@@ -409,17 +404,25 @@ class BaseProfileHandler(BaseHandler):
         if by_admin:
             requester = create_requester(target_user)
 
-        yield self.store.set_profile_avatar_url(
+        if len(self.hs.config.replicate_user_profiles_to) > 0:
+            cur_batchnum = (
+                await self.store.get_latest_profile_replication_batch_number()
+            )
+            new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
+        else:
+            new_batchnum = None
+
+        await self.store.set_profile_avatar_url(
             target_user.localpart, new_avatar_url, new_batchnum
         )
 
         if self.hs.config.user_directory_search_all_users:
-            profile = yield self.store.get_profileinfo(target_user.localpart)
-            yield self.user_directory_handler.handle_local_profile_change(
+            profile = await self.store.get_profileinfo(target_user.localpart)
+            await self.user_directory_handler.handle_local_profile_change(
                 target_user.to_string(), profile
             )
 
-        yield self._update_join_states(requester, target_user)
+        await self._update_join_states(requester, target_user)
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)
@@ -464,21 +467,20 @@ class BaseProfileHandler(BaseHandler):
 
         return response
 
-    @defer.inlineCallbacks
-    def _update_join_states(self, requester, target_user):
+    async def _update_join_states(self, requester, target_user):
         if not self.hs.is_mine(target_user):
             return
 
-        yield self.ratelimit(requester)
+        await self.ratelimit(requester)
 
-        room_ids = yield self.store.get_rooms_for_user(target_user.to_string())
+        room_ids = await self.store.get_rooms_for_user(target_user.to_string())
 
         for room_id in room_ids:
             handler = self.hs.get_room_member_handler()
             try:
                 # Assume the target_user isn't a guest,
                 # because we don't let guests set profile or avatar data.
-                yield handler.update_membership(
+                await handler.update_membership(
                     requester,
                     target_user,
                     room_id,

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 from collections import namedtuple
+from typing import Optional
 
 from twisted.internet import defer
 
@@ -159,10 +160,29 @@ class DirectoryStore(DirectoryWorkerStore):
 
         return room_id
 
-    def update_aliases_for_room(self, old_room_id, new_room_id, creator):
+    def update_aliases_for_room(
+        self, old_room_id: str, new_room_id: str, creator: Optional[str] = None,
+    ):
+        """Repoint all of the aliases for a given room, to a different room.
+
+        Args:
+            old_room_id:
+            new_room_id:
+            creator: The user to record as the creator of the new mapping.
+                If None, the creator will be left unchanged.
+        """
+
         def _update_aliases_for_room_txn(txn):
-            sql = "UPDATE room_aliases SET room_id = ?, creator = ? WHERE room_id = ?"
-            txn.execute(sql, (new_room_id, creator, old_room_id))
+            update_creator_sql = ""
+            sql_params = (new_room_id, old_room_id)
+            if creator:
+                update_creator_sql = ", creator = ?"
+                sql_params = (new_room_id, creator, old_room_id)
+
+            sql = "UPDATE room_aliases SET room_id = ? %s WHERE room_id = ?" % (
+                update_creator_sql,
+            )
+            txn.execute(sql, sql_params)
             self._invalidate_cache_and_stream(
                 txn, self.get_aliases_for_room, (old_room_id,)
             )

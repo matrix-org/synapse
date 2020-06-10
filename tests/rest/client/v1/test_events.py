@@ -50,7 +50,7 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
 
         return hs
 
-    def prepare(self, hs, reactor, clock):
+    def prepare(self, reactor, clock, hs):
 
         # register an account
         self.user_id = self.register_user("sid1", "pass")

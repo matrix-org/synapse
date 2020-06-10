@@ -52,12 +52,28 @@ class RoomSortOrder(Enum):
     """
     Enum to define the sorting method used when returning rooms with get_rooms_paginate
 
-    ALPHABETICAL = sort rooms alphabetically by name
-    SIZE = sort rooms by membership size, highest to lowest
+    NAME = sort rooms alphabetically by name
+    JOINED_MEMBERS = sort rooms by membership size, highest to lowest
     """
 
+    # ALPHABETICAL and SIZE are deprecated.
+    # ALPHABETICAL is the same as NAME.
     ALPHABETICAL = "alphabetical"
+    # SIZE is the same as JOINED_MEMBERS.
     SIZE = "size"
+    NAME = "name"
+    CANONICAL_ALIAS = "canonical_alias"
+    JOINED_MEMBERS = "joined_members"
+    JOINED_LOCAL_MEMBERS = "joined_local_members"
+    VERSION = "version"
+    CREATOR = "creator"
+    ENCRYPTION = "encryption"
+    FEDERATABLE = "federatable"
+    PUBLIC = "public"
+    JOIN_RULES = "join_rules"
+    GUEST_ACCESS = "guest_access"
+    HISTORY_VISIBILITY = "history_visibility"
+    STATE_EVENTS = "state_events"
 
 
 class RoomWorkerStore(SQLBaseStore):
@@ -347,12 +363,52 @@ class RoomWorkerStore(SQLBaseStore):
 
         # Set ordering
         if RoomSortOrder(order_by) == RoomSortOrder.SIZE:
+            # Deprecated in favour of RoomSortOrder.JOINED_MEMBERS
             order_by_column = "curr.joined_members"
             order_by_asc = False
         elif RoomSortOrder(order_by) == RoomSortOrder.ALPHABETICAL:
-            # Sort alphabetically
+            # Deprecated in favour of RoomSortOrder.NAME
             order_by_column = "state.name"
             order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.NAME:
+            order_by_column = "state.name"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.CANONICAL_ALIAS:
+            order_by_column = "state.canonical_alias"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOINED_MEMBERS:
+            order_by_column = "curr.joined_members"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOINED_LOCAL_MEMBERS:
+            order_by_column = "curr.local_users_in_room"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.VERSION:
+            order_by_column = "rooms.room_version"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.CREATOR:
+            order_by_column = "rooms.creator"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.ENCRYPTION:
+            order_by_column = "state.encryption"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.FEDERATABLE:
+            order_by_column = "state.is_federatable"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.PUBLIC:
+            order_by_column = "rooms.is_public"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOIN_RULES:
+            order_by_column = "state.join_rules"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.GUEST_ACCESS:
+            order_by_column = "state.guest_access"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.HISTORY_VISIBILITY:
+            order_by_column = "state.history_visibility"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.STATE_EVENTS:
+            order_by_column = "curr.current_state_events"
+            order_by_asc = False
         else:
             raise StoreError(
                 500, "Incorrect value for order_by provided: %s" % order_by
@@ -367,9 +423,13 @@ class RoomWorkerStore(SQLBaseStore):
         # for, and another query for getting the total number of events that could be
         # returned. Thus allowing us to see if there are more events to paginate through
         info_sql = """
-            SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members
+            SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members,
+              curr.local_users_in_room, rooms.room_version, rooms.creator,
+              state.encryption, state.is_federatable, rooms.is_public, state.join_rules,
+              state.guest_access, state.history_visibility, curr.current_state_events
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
+            INNER JOIN rooms USING (room_id)
             %s
             ORDER BY %s %s
             LIMIT ?
@@ -407,6 +467,16 @@ class RoomWorkerStore(SQLBaseStore):
                         "name": room[1],
                         "canonical_alias": room[2],
                         "joined_members": room[3],
+                        "joined_local_members": room[4],
+                        "version": room[5],
+                        "creator": room[6],
+                        "encryption": room[7],
+                        "federatable": room[8],
+                        "public": room[9],
+                        "join_rules": room[10],
+                        "guest_access": room[11],
+                        "history_visibility": room[12],
+                        "state_events": room[13],
                     }
                 )
 
@@ -754,6 +824,26 @@ class RoomWorkerStore(SQLBaseStore):
         total_media_quarantined += len(remote_mxcs)
 
         return total_media_quarantined
+
+    def get_all_new_public_rooms(self, prev_id, current_id, limit):
+        def get_all_new_public_rooms(txn):
+            sql = """
+                SELECT stream_id, room_id, visibility, appservice_id, network_id
+                FROM public_room_list_stream
+                WHERE stream_id > ? AND stream_id <= ?
+                ORDER BY stream_id ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (prev_id, current_id, limit))
+            return txn.fetchall()
+
+        if prev_id == current_id:
+            return defer.succeed([])
+
+        return self.db.runInteraction(
+            "get_all_new_public_rooms", get_all_new_public_rooms
+        )
 
 
 class RoomBackgroundUpdateStore(SQLBaseStore):
@@ -1271,26 +1361,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
     def get_current_public_room_stream_id(self):
         return self._public_room_id_gen.get_current_token()
-
-    def get_all_new_public_rooms(self, prev_id, current_id, limit):
-        def get_all_new_public_rooms(txn):
-            sql = """
-                SELECT stream_id, room_id, visibility, appservice_id, network_id
-                FROM public_room_list_stream
-                WHERE stream_id > ? AND stream_id <= ?
-                ORDER BY stream_id ASC
-                LIMIT ?
-            """
-
-            txn.execute(sql, (prev_id, current_id, limit))
-            return txn.fetchall()
-
-        if prev_id == current_id:
-            return defer.succeed([])
-
-        return self.db.runInteraction(
-            "get_all_new_public_rooms", get_all_new_public_rooms
-        )
 
     @defer.inlineCallbacks
     def block_room(self, room_id, user_id):

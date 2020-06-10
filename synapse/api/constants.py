@@ -61,6 +61,7 @@ class LoginType(object):
     MSISDN = "m.login.msisdn"
     RECAPTCHA = "m.login.recaptcha"
     TERMS = "m.login.terms"
+    SSO = "org.matrix.login.sso"
     DUMMY = "m.login.dummy"
 
     # Only for C/S API v1
@@ -95,6 +96,8 @@ class EventTypes(object):
     Pinned = "m.room.pinned_events"
 
     Retention = "m.room.retention"
+
+    Presence = "m.presence"
 
 
 class RejectedReason(object):

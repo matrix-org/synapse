@@ -34,7 +34,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.stringutils import assert_valid_client_secret
+from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -104,6 +104,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is None:
+            if self.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -243,13 +248,21 @@ class PasswordRestServlet(RestServlet):
                 params = body
             else:
                 params = await self.auth_handler.validate_user_via_ui_auth(
-                    requester, body, self.hs.get_ip_from_request(request)
+                    requester,
+                    request,
+                    body,
+                    self.hs.get_ip_from_request(request),
+                    "modify your account password",
                 )
             user_id = requester.user.to_string()
         else:
             requester = None
             result, params, _ = await self.auth_handler.check_auth(
-                [[LoginType.EMAIL_IDENTITY]], body, self.hs.get_ip_from_request(request)
+                [[LoginType.EMAIL_IDENTITY]],
+                request,
+                body,
+                self.hs.get_ip_from_request(request),
+                "modify your account password",
             )
 
             if LoginType.EMAIL_IDENTITY in result:
@@ -335,7 +348,11 @@ class DeactivateAccountRestServlet(RestServlet):
             return 200, {}
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "deactivate your account",
         )
         result = await self._deactivate_account_handler.deactivate_account(
             requester.user.to_string(), erase, id_server=body.get("id_server")
@@ -407,6 +424,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
+            if self.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -472,6 +494,11 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         existing_user_id = await self.store.get_user_id_by_threepid("msisdn", msisdn)
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.account_threepid_delegate_msisdn:
@@ -634,8 +661,10 @@ class ThreepidRestServlet(RestServlet):
         return 200, {"threepids": threepids}
 
     async def on_POST(self, request):
-        if self.hs.config.disable_3pid_changes:
-            raise SynapseError(400, "3PID changes disabled on this server")
+        if not self.hs.config.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
 
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
@@ -729,6 +758,11 @@ class ThreepidAddRestServlet(RestServlet):
 
     @interactive_auth_handler
     async def on_POST(self, request):
+        if not self.hs.config.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
+
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -739,7 +773,11 @@ class ThreepidAddRestServlet(RestServlet):
         assert_valid_client_secret(client_secret)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, body, self.hs.get_ip_from_request(request)
+            requester,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "add a third-party identifier to your account",
         )
 
         validation_session = await self.identity_handler.validate_threepid_session(
@@ -852,8 +890,10 @@ class ThreepidDeleteRestServlet(RestServlet):
         self.http_client = hs.get_simple_http_client()
 
     async def on_POST(self, request):
-        if self.hs.config.disable_3pid_changes:
-            raise SynapseError(400, "3PID changes disabled on this server")
+        if not self.hs.config.enable_3pid_changes:
+            raise SynapseError(
+                400, "3PID changes are disabled on this server", Codes.FORBIDDEN
+            )
 
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["medium", "address"])
