@@ -454,7 +454,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # can be used to insert into the `event_push_actions_staging` table.
         def _gen_entry(user_id, actions):
             is_highlight = 1 if _action_has_highlight(actions) else 0
-            notif = 0 if "mark_unread" in actions else 1
+            notif = 0 if "org.matrix.msc2625.mark_unread" in actions else 1
             return (
                 event_id,  # event_id column
                 user_id,  # user_id column

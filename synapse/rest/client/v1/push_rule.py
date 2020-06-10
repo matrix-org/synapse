@@ -267,7 +267,7 @@ def _check_actions(actions):
         raise InvalidRuleException("No actions found")
 
     for a in actions:
-        if a in ["notify", "dont_notify", "coalesce", "mark_unread"]:
+        if a in ["notify", "dont_notify", "coalesce", "org.matrix.msc2625.mark_unread"]:
             pass
         elif isinstance(a, dict) and "set_tweak" in a:
             pass

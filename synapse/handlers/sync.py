@@ -1895,7 +1895,9 @@ class SyncHandler(object):
                 if notifs is not None:
                     unread_notifications["notification_count"] = notifs["notify_count"]
                     unread_notifications["highlight_count"] = notifs["highlight_count"]
-                    unread_notifications["unread_count"] = notifs["unread_count"]
+                    unread_notifications["org.matrix.msc2625.unread_count"] = (
+                        notifs["unread_count"]
+                    )
 
                 sync_result_builder.joined.append(room_sync)
 
