@@ -36,7 +36,9 @@ class DataStoreTestCase(unittest.TestCase):
     def test_get_users_paginate(self):
         yield self.store.register_user(self.user.to_string(), "pass")
         yield self.store.create_profile(self.user.localpart)
-        yield self.store.set_profile_displayname(self.user.localpart, self.displayname, 1)
+        yield self.store.set_profile_displayname(
+            self.user.localpart, self.displayname, 1
+        )
 
         users, total = yield self.store.get_users_paginate(
             0, 10, name="bc", guests=False

@@ -39,7 +39,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         # Create a test user and room
         self.user = UserID("alice", "test")
         self.requester = Requester(self.user, None, False, None, None)
-        info = self.get_success(self.room_creator.create_room(self.requester, {}))
+        info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
 
     def run_background_update(self):
@@ -261,7 +261,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         self.user = UserID.from_string(self.register_user("user1", "password"))
         self.token1 = self.login("user1", "password")
         self.requester = Requester(self.user, None, False, None, None)
-        info = self.get_success(self.room_creator.create_room(self.requester, {}))
+        info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
         self.event_creator = homeserver.get_event_creation_handler()
         homeserver.config.user_consent_version = self.CONSENT_VERSION

@@ -19,16 +19,20 @@ import logging
 import os
 import re
 from collections import Counter
+from typing import TextIO
 
 import attr
 
 from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
 
 # Remember to update this number every time a change is made to database
 # schema files, so the users will be informed on server restarts.
+# XXX: If you're about to bump this to 59 (or higher) please create an update
+# that drops the unused `cache_invalidation_stream` table, as per #7436!
 SCHEMA_VERSION = 58
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
@@ -477,8 +481,7 @@ def _apply_module_schema_files(cur, database_engine, modname, names_and_streams)
             )
 
         logger.info("applying schema %s for %s", name, modname)
-        for statement in get_statements(stream):
-            cur.execute(statement)
+        execute_statements_from_stream(cur, stream)
 
         # Mark as done.
         cur.execute(
@@ -536,8 +539,12 @@ def get_statements(f):
 
 def executescript(txn, schema_path):
     with open(schema_path, "r") as f:
-        for statement in get_statements(f):
-            txn.execute(statement)
+        execute_statements_from_stream(txn, f)
+
+
+def execute_statements_from_stream(cur: Cursor, f: TextIO):
+    for statement in get_statements(f):
+        cur.execute(statement)
 
 
 def _get_or_create_schema_state(txn, database_engine):

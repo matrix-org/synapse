@@ -440,7 +440,7 @@ class ServerConfig(Config):
             )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
-            **config.get("limit_remote_rooms", {})
+            **(config.get("limit_remote_rooms") or {})
         )
 
         bind_port = config.get("bind_port")
@@ -901,22 +901,27 @@ class ServerConfig(Config):
         # Used by phonehome stats to group together related servers.
         #server_context: context
 
-        # Resource-constrained homeserver Settings
+        # Resource-constrained homeserver settings
         #
-        # If limit_remote_rooms.enabled is True, the room complexity will be
-        # checked before a user joins a new remote room. If it is above
-        # limit_remote_rooms.complexity, it will disallow joining or
-        # instantly leave.
+        # When this is enabled, the room "complexity" will be checked before a user
+        # joins a new remote room. If it is above the complexity limit, the server will
+        # disallow joining, or will instantly leave.
         #
-        # limit_remote_rooms.complexity_error can be set to customise the text
-        # displayed to the user when a room above the complexity threshold has
-        # its join cancelled.
+        # Room complexity is an arbitrary measure based on factors such as the number of
+        # users in the room.
         #
-        # Uncomment the below lines to enable:
-        #limit_remote_rooms:
-        #  enabled: true
-        #  complexity: 1.0
-        #  complexity_error: "This room is too complex."
+        limit_remote_rooms:
+          # Uncomment to enable room complexity checking.
+          #
+          #enabled: true
+
+          # the limit above which rooms cannot be joined. The default is 1.0.
+          #
+          #complexity: 0.5
+
+          # override the error which is returned when the room is too complex.
+          #
+          #complexity_error: "This room is too complex."
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.

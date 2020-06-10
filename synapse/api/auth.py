@@ -22,6 +22,7 @@ import pymacaroons
 from netaddr import IPAddress
 
 from twisted.internet import defer
+from twisted.web.server import Request
 
 import synapse.logging.opentracing as opentracing
 import synapse.types
@@ -37,7 +38,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.types import StateMap, UserID
-from synapse.util.caches import CACHE_SIZE_FACTOR, register_cache
+from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.metrics import Measure
 
@@ -73,7 +74,7 @@ class Auth(object):
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
 
-        self.token_cache = LruCache(CACHE_SIZE_FACTOR * 10000)
+        self.token_cache = LruCache(10000)
         register_cache("cache", "token_cache", self.token_cache)
 
         self._auth_blocking = AuthBlocking(self.hs)
@@ -162,19 +163,25 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def get_user_by_req(
-        self, request, allow_guest=False, rights="access", allow_expired=False
+        self,
+        request: Request,
+        allow_guest: bool = False,
+        rights: str = "access",
+        allow_expired: bool = False,
     ):
         """ Get a registered user's ID.
 
         Args:
-            request - An HTTP request with an access_token query parameter.
-            allow_expired - Whether to allow the request through even if the account is
-                expired. If true, Synapse will still require an access token to be
-                provided but won't check if the account it belongs to has expired. This
-                works thanks to /login delivering access tokens regardless of accounts'
-                expiration.
+            request: An HTTP request with an access_token query parameter.
+            allow_guest: If False, will raise an AuthError if the user making the
+                request is a guest.
+            rights: The operation being performed; the access token must allow this
+            allow_expired: If True, allow the request through even if the account
+                is expired, or session token lifetime has ended. Note that
+                /login will deliver access tokens regardless of expiration.
+
         Returns:
-            defer.Deferred: resolves to a ``synapse.types.Requester`` object
+            defer.Deferred: resolves to a `synapse.types.Requester` object
         Raises:
             InvalidClientCredentialsError if no user by that token exists or the token
                 is invalid.
@@ -206,7 +213,9 @@ class Auth(object):
 
                 return synapse.types.create_requester(user_id, app_service=app_service)
 
-            user_info = yield self.get_user_by_access_token(access_token, rights)
+            user_info = yield self.get_user_by_access_token(
+                access_token, rights, allow_expired=allow_expired
+            )
             user = user_info["user"]
             token_id = user_info["token_id"]
             is_guest = user_info["is_guest"]
@@ -285,13 +294,17 @@ class Auth(object):
         return user_id, app_service
 
     @defer.inlineCallbacks
-    def get_user_by_access_token(self, token, rights="access"):
+    def get_user_by_access_token(
+        self, token: str, rights: str = "access", allow_expired: bool = False,
+    ):
         """ Validate access token and get user_id from it
 
         Args:
-            token (str): The access token to get the user by.
-            rights (str): The operation being performed; the access token must
-                allow this.
+            token: The access token to get the user by
+            rights: The operation being performed; the access token must
+                allow this
+            allow_expired: If False, raises an InvalidClientTokenError
+                if the token is expired
         Returns:
             Deferred[dict]: dict that includes:
                `user` (UserID)
@@ -299,8 +312,10 @@ class Auth(object):
                `token_id` (int|None): access token id. May be None if guest
                `device_id` (str|None): device corresponding to access token
         Raises:
+            InvalidClientTokenError if a user by that token exists, but the token is
+                expired
             InvalidClientCredentialsError if no user by that token exists or the token
-                is invalid.
+                is invalid
         """
 
         if rights == "access":
@@ -309,7 +324,8 @@ class Auth(object):
             if r:
                 valid_until_ms = r["valid_until_ms"]
                 if (
-                    valid_until_ms is not None
+                    not allow_expired
+                    and valid_until_ms is not None
                     and valid_until_ms < self.clock.time_msec()
                 ):
                     # there was a valid access token, but it has expired.
@@ -580,7 +596,7 @@ class Auth(object):
         return user_level >= send_level
 
     @staticmethod
-    def has_access_token(request):
+    def has_access_token(request: Request):
         """Checks if the request has an access_token.
 
         Returns:
@@ -591,7 +607,7 @@ class Auth(object):
         return bool(query_params) or bool(auth_headers)
 
     @staticmethod
-    def get_access_token_from_request(request):
+    def get_access_token_from_request(request: Request):
         """Extracts the access_token from the request.
 
         Args:

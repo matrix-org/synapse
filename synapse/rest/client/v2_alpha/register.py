@@ -436,8 +436,8 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(password)
 
-            # If the password is valid, hash it and store it back on the request.
-            # This ensures the hashed password is handled everywhere.
+            # If the password is valid, hash it and store it back on the body.
+            # This ensures that only the hashed password is handled everywhere.
             if "password_hash" in body:
                 raise SynapseError(400, "Unexpected property: password_hash")
             body["password_hash"] = await self.auth_handler.hash(password)

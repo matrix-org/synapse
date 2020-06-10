@@ -17,17 +17,15 @@
 import contextlib
 import logging
 import sys
-from typing import Dict, Iterable
+from typing import Dict, Iterable, Optional, Set
 
 from typing_extensions import ContextManager
 
 from twisted.internet import defer, reactor
-from twisted.web.resource import NoResource
 
 import synapse
 import synapse.events
-from synapse.api.constants import EventTypes
-from synapse.api.errors import HttpResponseException, SynapseError
+from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.api.urls import (
     CLIENT_API_PREFIX,
     FEDERATION_PREFIX,
@@ -41,13 +39,22 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
-from synapse.handlers.presence import BasePresenceHandler, get_interested_parties
-from synapse.http.server import JsonResource
+from synapse.handlers.presence import (
+    BasePresenceHandler,
+    PresenceState,
+    get_interested_parties,
+)
+from synapse.http.server import JsonResource, OptionsResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
+from synapse.replication.http.presence import (
+    ReplicationBumpPresenceActiveTime,
+    ReplicationPresenceSetState,
+)
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage.account_data import SlavedAccountDataStore
 from synapse.replication.slave.storage.appservice import SlavedApplicationServiceStore
@@ -80,11 +87,6 @@ from synapse.replication.tcp.streams import (
     TagAccountDataStream,
     ToDeviceStream,
     TypingStream,
-)
-from synapse.replication.tcp.streams.events import (
-    EventsStream,
-    EventsStreamEventRow,
-    EventsStreamRow,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events
@@ -122,11 +124,13 @@ from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer
+from synapse.storage.data_stores.main.censor_events import CensorEventsStore
 from synapse.storage.data_stores.main.media_repository import MediaRepositoryStore
 from synapse.storage.data_stores.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.data_stores.main.presence import UserPresenceState
+from synapse.storage.data_stores.main.search import SearchWorkerStore
 from synapse.storage.data_stores.main.ui_auth import UIAuthWorkerStore
 from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
@@ -140,31 +144,18 @@ logger = logging.getLogger("synapse.app.generic_worker")
 
 class PresenceStatusStubServlet(RestServlet):
     """If presence is disabled this servlet can be used to stub out setting
-    presence status, while proxying the getters to the master instance.
+    presence status.
     """
 
     PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
 
     def __init__(self, hs):
         super(PresenceStatusStubServlet, self).__init__()
-        self.http_client = hs.get_simple_http_client()
         self.auth = hs.get_auth()
-        self.main_uri = hs.config.worker_main_http_uri
 
     async def on_GET(self, request, user_id):
-        # Pass through the auth headers, if any, in case the access token
-        # is there.
-        auth_headers = request.requestHeaders.getRawHeaders("Authorization", [])
-        headers = {"Authorization": auth_headers}
-
-        try:
-            result = await self.http_client.get_json(
-                self.main_uri + request.uri.decode("ascii"), headers=headers
-            )
-        except HttpResponseException as e:
-            raise e.to_synapse_error()
-
-        return 200, result
+        await self.auth.get_user_by_req(request)
+        return 200, {"presence": "offline"}
 
     async def on_PUT(self, request, user_id):
         await self.auth.get_user_by_req(request)
@@ -218,9 +209,14 @@ class KeyUploadServlet(RestServlet):
             # is there.
             auth_headers = request.requestHeaders.getRawHeaders(b"Authorization", [])
             headers = {"Authorization": auth_headers}
-            result = await self.http_client.post_json_get_json(
-                self.main_uri + request.uri.decode("ascii"), body, headers=headers
-            )
+            try:
+                result = await self.http_client.post_json_get_json(
+                    self.main_uri + request.uri.decode("ascii"), body, headers=headers
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error() from e
+            except RequestSendFailed as e:
+                raise SynapseError(502, "Failed to talk to master") from e
 
             return 200, result
         else:
@@ -258,6 +254,9 @@ class GenericWorkerPresence(BasePresenceHandler):
         # user_id -> last_sync_ms. Lists the users that have stopped syncing
         # but we haven't notified the master of that yet
         self.users_going_offline = {}
+
+        self._bump_active_client = ReplicationBumpPresenceActiveTime.make_client(hs)
+        self._set_state_client = ReplicationPresenceSetState.make_client(hs)
 
         self._send_stop_syncing_loop = self.clock.looping_call(
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
@@ -315,10 +314,6 @@ class GenericWorkerPresence(BasePresenceHandler):
             if now - last_sync_ms > UPDATE_SYNCING_USERS_MS:
                 self.users_going_offline.pop(user_id, None)
                 self.send_user_sync(user_id, False, last_sync_ms)
-
-    def set_state(self, user, state, ignore_status_msg=False):
-        # TODO Hows this supposed to work?
-        return defer.succeed(None)
 
     async def user_syncing(
         self, user_id: str, affect_presence: bool
@@ -398,6 +393,42 @@ class GenericWorkerPresence(BasePresenceHandler):
             if count > 0
         ]
 
+    async def set_state(self, target_user, state, ignore_status_msg=False):
+        """Set the presence state of the user.
+        """
+        presence = state["presence"]
+
+        valid_presence = (
+            PresenceState.ONLINE,
+            PresenceState.UNAVAILABLE,
+            PresenceState.OFFLINE,
+        )
+        if presence not in valid_presence:
+            raise SynapseError(400, "Invalid presence state")
+
+        user_id = target_user.to_string()
+
+        # If presence is disabled, no-op
+        if not self.hs.config.use_presence:
+            return
+
+        # Proxy request to master
+        await self._set_state_client(
+            user_id=user_id, state=state, ignore_status_msg=ignore_status_msg
+        )
+
+    async def bump_presence_active_time(self, user):
+        """We've seen the user do something that indicates they're interacting
+        with the app.
+        """
+        # If presence is disabled, no-op
+        if not self.hs.config.use_presence:
+            return
+
+        # Proxy request to master
+        user_id = user.to_string()
+        await self._bump_active_client(user_id=user_id)
+
 
 class GenericWorkerTyping(object):
     def __init__(self, hs):
@@ -442,6 +473,7 @@ class GenericWorkerSlavedStore(
     SlavedGroupServerStore,
     SlavedAccountDataStore,
     SlavedPusherStore,
+    CensorEventsStore,
     SlavedEventStore,
     SlavedKeyStore,
     RoomStore,
@@ -455,6 +487,7 @@ class GenericWorkerSlavedStore(
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
+    SearchWorkerStore,
     BaseSlavedStore,
 ):
     def __init__(self, database, db_conn, hs):
@@ -572,7 +605,10 @@ class GenericWorkerServer(HomeServer):
                 if name in ["keys", "federation"]:
                     resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
-        root_resource = create_resource_tree(resources, NoResource())
+                if name == "replication":
+                    resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
+
+        root_resource = create_resource_tree(resources, OptionsResource())
 
         _base.listen_tcp(
             bind_addresses,
@@ -631,7 +667,7 @@ class GenericWorkerServer(HomeServer):
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
-        super(GenericWorkerReplicationHandler, self).__init__(hs.get_datastore())
+        super(GenericWorkerReplicationHandler, self).__init__(hs)
 
         self.store = hs.get_datastore()
         self.typing_handler = hs.get_typing_handler()
@@ -641,10 +677,9 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
         self.notify_pushers = hs.config.start_pushers
         self.pusher_pool = hs.get_pusherpool()
 
+        self.send_handler = None  # type: Optional[FederationSenderHandler]
         if hs.config.send_federation:
-            self.send_handler = FederationSenderHandler(hs, self)
-        else:
-            self.send_handler = None
+            self.send_handler = FederationSenderHandler(hs)
 
     async def on_rdata(self, stream_name, instance_name, token, rows):
         await super().on_rdata(stream_name, instance_name, token, rows)
@@ -657,30 +692,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
                     stream_name, token, rows
                 )
 
-            if stream_name == EventsStream.NAME:
-                # We shouldn't get multiple rows per token for events stream, so
-                # we don't need to optimise this for multiple rows.
-                for row in rows:
-                    if row.type != EventsStreamEventRow.TypeId:
-                        continue
-                    assert isinstance(row, EventsStreamRow)
-
-                    event = await self.store.get_event(
-                        row.data.event_id, allow_rejected=True
-                    )
-                    if event.rejected_reason:
-                        continue
-
-                    extra_users = ()
-                    if event.type == EventTypes.Member:
-                        extra_users = (event.state_key,)
-                    max_token = self.store.get_room_max_stream_ordering()
-                    self.notifier.on_new_room_event(
-                        event, token, max_token, extra_users
-                    )
-
-                await self.pusher_pool.on_new_notifications(token, token)
-            elif stream_name == PushRulesStream.NAME:
+            if stream_name == PushRulesStream.NAME:
                 self.notifier.on_new_event(
                     "push_rules_key", token, users=[row.user_id for row in rows]
                 )
@@ -705,7 +717,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
                 if entities:
                     self.notifier.on_new_event("to_device_key", token, users=entities)
             elif stream_name == DeviceListsStream.NAME:
-                all_room_ids = set()
+                all_room_ids = set()  # type: Set[str]
                 for row in rows:
                     if row.entity.startswith("@"):
                         room_ids = await self.store.get_rooms_for_user(row.entity)
@@ -756,23 +768,32 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
 
 
 class FederationSenderHandler(object):
-    """Processes the replication stream and forwards the appropriate entries
-    to the federation sender.
+    """Processes the fedration replication stream
+
+    This class is only instantiate on the worker responsible for sending outbound
+    federation transactions. It receives rows from the replication stream and forwards
+    the appropriate entries to the FederationSender class.
     """
 
-    def __init__(self, hs: GenericWorkerServer, replication_client):
+    def __init__(self, hs: GenericWorkerServer):
         self.store = hs.get_datastore()
         self._is_mine_id = hs.is_mine_id
         self.federation_sender = hs.get_federation_sender()
-        self.replication_client = replication_client
+        self._hs = hs
 
+        # if the worker is restarted, we want to pick up where we left off in
+        # the replication stream, so load the position from the database.
+        #
+        # XXX is this actually worthwhile? Whenever the master is restarted, we'll
+        # drop some rows anyway (which is mostly fine because we're only dropping
+        # typing and presence notifications). If the replication stream is
+        # unreliable, why do we do all this hoop-jumping to store the position in the
+        # database? See also https://github.com/matrix-org/synapse/issues/7535.
+        #
         self.federation_position = self.store.federation_out_pos_startup
+
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
-
         self._last_ack = self.federation_position
-
-        self._room_serials = {}
-        self._room_typing = {}
 
     def on_start(self):
         # There may be some events that are persisted but haven't been sent,
@@ -836,22 +857,34 @@ class FederationSenderHandler(object):
             await self.federation_sender.send_read_receipt(receipt_info)
 
     async def update_token(self, token):
+        """Update the record of where we have processed to in the federation stream.
+
+        Called after we have processed a an update received over replication. Sends
+        a FEDERATION_ACK back to the master, and stores the token that we have processed
+         in `federation_stream_position` so that we can restart where we left off.
+        """
         try:
             self.federation_position = token
 
             # We linearize here to ensure we don't have races updating the token
-            with (await self._fed_position_linearizer.queue(None)):
-                if self._last_ack < self.federation_position:
-                    await self.store.update_federation_out_pos(
-                        "federation", self.federation_position
-                    )
+            #
+            # XXX this appears to be redundant, since the ReplicationCommandHandler
+            # has a linearizer which ensures that we only process one line of
+            # replication data at a time. Should we remove it, or is it doing useful
+            # service for robustness? Or could we replace it with an assertion that
+            # we're not being re-entered?
 
-                    # We ACK this token over replication so that the master can drop
-                    # its in memory queues
-                    self.replication_client.send_federation_ack(
-                        self.federation_position
-                    )
-                    self._last_ack = self.federation_position
+            with (await self._fed_position_linearizer.queue(None)):
+                await self.store.update_federation_out_pos(
+                    "federation", self.federation_position
+                )
+
+                # We ACK this token over replication so that the master can drop
+                # its in memory queues
+                self._hs.get_tcp_replication().send_federation_ack(
+                    self.federation_position
+                )
+                self._last_ack = self.federation_position
         except Exception:
             logger.exception("Error updating federation stream position")
 

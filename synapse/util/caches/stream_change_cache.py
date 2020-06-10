@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import math
 from typing import Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 from six import integer_types
@@ -46,7 +47,8 @@ class StreamChangeCache:
         max_size=10000,
         prefilled_cache: Optional[Mapping[EntityType, int]] = None,
     ):
-        self._max_size = int(max_size * caches.CACHE_SIZE_FACTOR)
+        self._original_max_size = max_size
+        self._max_size = math.floor(max_size)
         self._entity_to_key = {}  # type: Dict[EntityType, int]
 
         # map from stream id to the a set of entities which changed at that stream id.
@@ -58,11 +60,30 @@ class StreamChangeCache:
         #
         self._earliest_known_stream_pos = current_stream_pos
         self.name = name
-        self.metrics = caches.register_cache("cache", self.name, self._cache)
+        self.metrics = caches.register_cache(
+            "cache", self.name, self._cache, resize_callback=self.set_cache_factor
+        )
 
         if prefilled_cache:
             for entity, stream_pos in prefilled_cache.items():
                 self.entity_has_changed(entity, stream_pos)
+
+    def set_cache_factor(self, factor: float) -> bool:
+        """
+        Set the cache factor for this individual cache.
+
+        This will trigger a resize if it changes, which may require evicting
+        items from the cache.
+
+        Returns:
+            bool: Whether the cache changed size or not.
+        """
+        new_size = math.floor(self._original_max_size * factor)
+        if new_size != self._max_size:
+            self.max_size = new_size
+            self._evict()
+            return True
+        return False
 
     def has_entity_changed(self, entity: EntityType, stream_pos: int) -> bool:
         """Returns True if the entity may have been updated since stream_pos
@@ -171,6 +192,7 @@ class StreamChangeCache:
             e1 = self._cache[stream_pos] = set()
         e1.add(entity)
         self._entity_to_key[entity] = stream_pos
+        self._evict()
 
         # if the cache is too big, remove entries
         while len(self._cache) > self._max_size:
@@ -178,6 +200,13 @@ class StreamChangeCache:
             self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
             for entity in r:
                 del self._entity_to_key[entity]
+
+    def _evict(self):
+        while len(self._cache) > self._max_size:
+            k, r = self._cache.popitem(0)
+            self._earliest_known_stream_pos = max(k, self._earliest_known_stream_pos)
+            for entity in r:
+                self._entity_to_key.pop(entity, None)
 
     def get_max_pos_of_last_change(self, entity: EntityType) -> int:
 

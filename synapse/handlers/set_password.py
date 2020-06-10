@@ -36,15 +36,12 @@ class SetPasswordHandler(BaseHandler):
     async def set_password(
         self,
         user_id: str,
-        new_password: str,
+        password_hash: str,
         logout_devices: bool,
         requester: Optional[Requester] = None,
     ):
         if not self.hs.config.password_localdb_enabled:
             raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
-
-        self._password_policy_handler.validate_password(new_password)
-        password_hash = await self._auth_handler.hash(new_password)
 
         try:
             await self.store.user_set_password_hash(user_id, password_hash)

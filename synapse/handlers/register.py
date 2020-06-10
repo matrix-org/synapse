@@ -204,9 +204,11 @@ class RegistrationHandler(BaseHandler):
             )
 
             if default_display_name:
-                yield defer.ensureDeferred(self.profile_handler.set_displayname(
-                    user, None, default_display_name, by_admin=True
-                ))
+                yield defer.ensureDeferred(
+                    self.profile_handler.set_displayname(
+                        user, None, default_display_name, by_admin=True
+                    )
+                )
 
             if self.hs.config.user_directory_search_all_users:
                 profile = yield self.store.get_profileinfo(localpart)
@@ -238,9 +240,11 @@ class RegistrationHandler(BaseHandler):
                         address=address,
                     )
 
-                    yield defer.ensureDeferred(self.profile_handler.set_displayname(
-                        user, None, default_display_name, by_admin=True
-                    ))
+                    yield defer.ensureDeferred(
+                        self.profile_handler.set_displayname(
+                            user, None, default_display_name, by_admin=True
+                        )
+                    )
 
                     # Successfully registered
                     break
@@ -343,7 +347,9 @@ class RegistrationHandler(BaseHandler):
         await self._auto_join_rooms(user_id)
 
     @defer.inlineCallbacks
-    def appservice_register(self, user_localpart, as_token, password_hash, display_name):
+    def appservice_register(
+        self, user_localpart, as_token, password_hash, display_name
+    ):
         # FIXME: this should be factored out and merged with normal register()
 
         user = UserID(user_localpart, self.hs.hostname)
@@ -373,9 +379,11 @@ class RegistrationHandler(BaseHandler):
             create_profile_with_displayname=display_name,
         )
 
-        yield defer.ensureDeferred(self.profile_handler.set_displayname(
-            user, None, display_name, by_admin=True
-        ))
+        yield defer.ensureDeferred(
+            self.profile_handler.set_displayname(
+                user, None, display_name, by_admin=True
+            )
+        )
 
         if self.hs.config.user_directory_search_all_users:
             profile = yield self.store.get_profileinfo(user_localpart)
