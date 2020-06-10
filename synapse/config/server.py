@@ -57,14 +57,6 @@ on how to configure the new listener.
 --------------------------------------------------------------------------------"""
 
 
-class RoomDefaultEncryptionTypes(object):
-    """Possible values for the encryption_enabled_by_default_for_room_type config option"""
-
-    ALL = "all"
-    INVITE = "invite"
-    OFF = "off"
-
-
 class ServerConfig(Config):
     section = "server"
 
@@ -528,27 +520,6 @@ class ServerConfig(Config):
         self.request_token_inhibit_3pid_errors = config.get(
             "request_token_inhibit_3pid_errors", False,
         )
-
-        # Whether new, locally-created rooms should have encryption enabled
-        encryption_for_room_type = config.get(
-            "encryption_enabled_by_default_for_room_type",
-            RoomDefaultEncryptionTypes.OFF,
-        )
-        if encryption_for_room_type == RoomDefaultEncryptionTypes.ALL:
-            self.encryption_enabled_by_default_for_room_presets = [
-                RoomCreationPreset.PRIVATE_CHAT,
-                RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
-                RoomCreationPreset.PUBLIC_CHAT,
-            ]
-        elif encryption_for_room_type == RoomDefaultEncryptionTypes.INVITE:
-            self.encryption_enabled_by_default_for_room_presets = [
-                RoomCreationPreset.PRIVATE_CHAT,
-                RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
-            ]
-        elif encryption_for_room_type == RoomDefaultEncryptionTypes.OFF:
-            self.encryption_enabled_by_default_for_room_presets = []
-        else:
-            raise ConfigError("Invalid value for encryption_enabled_by_default_for_room_type")
 
     def has_tls_listener(self) -> bool:
         return any(listener["tls"] for listener in self.listeners)
@@ -1042,22 +1013,6 @@ class ServerConfig(Config):
         # act as if no error happened and return a fake session ID ('sid') to clients.
         #
         #request_token_inhibit_3pid_errors: true
-
-        # Controls whether locally-created rooms should be end-to-end encrypted by
-        # default.
-        #
-        # Possible options are "all", "invite", and "off". They are defined as:
-        #
-        # * "all": any locally-created room
-        # * "invite": any locally-created room that requires an invite to join
-        # * "off": this option will take no effect
-        #
-        # The default value is "off".
-        #
-        # Note that this option will only affect rooms created after it is set. It
-        # will also not affect rooms created by another, federated server.
-        #
-        #encryption_enabled_by_default_for_room_type: private
         """
             % locals()
         )
