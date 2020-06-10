@@ -133,6 +133,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             " user_id = ?"
             " AND room_id = ?"
             " AND stream_ordering > ?"
+            " AND notif = 1"
         )
 
         txn.execute(sql, (user_id, room_id, stream_ordering))
@@ -150,6 +151,22 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         if rows:
             notify_count += rows[0][0]
 
+        # Now get the number of unread messages in the room, i.e. messages that matched
+        # both a mark_unread rule and a notify one.
+        sql = (
+            "SELECT count(*)"
+            " FROM event_push_actions ea"
+            " WHERE"
+            " user_id = ?"
+            " AND room_id = ?"
+            " AND stream_ordering > ?"
+            " AND notif = 0"
+        )
+        txn.execute(sql, (user_id, room_id, stream_ordering))
+        row = txn.fetchone()
+        unread_count = row[0] if row else 0
+        unread_count += notify_count
+
         # Now get the number of highlights
         sql = (
             "SELECT count(*)"
@@ -165,7 +182,11 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         row = txn.fetchone()
         highlight_count = row[0] if row else 0
 
-        return {"notify_count": notify_count, "highlight_count": highlight_count}
+        return {
+            "notify_count": notify_count,
+            "highlight_count": highlight_count,
+            "unread_count": unread_count,
+        }
 
     @defer.inlineCallbacks
     def get_push_action_users_in_range(self, min_stream_ordering, max_stream_ordering):
@@ -831,7 +852,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                     max(stream_ordering) as stream_ordering
                 FROM event_push_actions
                 WHERE ? <= stream_ordering AND stream_ordering < ?
-                    AND highlight = 0
+                    AND highlight = 0 AND notif = 1
                 GROUP BY user_id, room_id
             ) AS upd
             LEFT JOIN event_push_summary AS old USING (user_id, room_id)
