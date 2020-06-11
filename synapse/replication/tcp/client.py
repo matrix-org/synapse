@@ -171,7 +171,7 @@ class ReplicationDataHandler:
                     pass
             else:
                 # The list is sorted by position so we don't need to continue
-                # checking any futher entries in the list.
+                # checking any further entries in the list.
                 index_of_first_deferred_not_called = idx
                 break
 

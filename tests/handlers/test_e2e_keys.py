@@ -25,6 +25,7 @@ from twisted.internet import defer
 import synapse.handlers.e2e_keys
 import synapse.storage
 from synapse.api import errors
+from synapse.api.constants import RoomEncryptionAlgorithms
 
 from tests import unittest, utils
 
@@ -222,7 +223,10 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         device_key_1 = {
             "user_id": local_user,
             "device_id": "abc",
-            "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
             "keys": {
                 "ed25519:abc": "base64+ed25519+key",
                 "curve25519:abc": "base64+curve25519+key",
@@ -232,7 +236,10 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         device_key_2 = {
             "user_id": local_user,
             "device_id": "def",
-            "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
             "keys": {
                 "ed25519:def": "base64+ed25519+key",
                 "curve25519:def": "base64+curve25519+key",
@@ -315,7 +322,10 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         device_key = {
             "user_id": local_user,
             "device_id": device_id,
-            "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+            "algorithms": [
+                "m.olm.curve25519-aes-sha2",
+                RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+            ],
             "keys": {"curve25519:xyz": "curve25519+key", "ed25519:xyz": device_pubkey},
             "signatures": {local_user: {"ed25519:xyz": "something"}},
         }
@@ -391,8 +401,8 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                         "user_id": local_user,
                         "device_id": device_id,
                         "algorithms": [
-                            "m.olm.curve25519-aes-sha256",
-                            "m.megolm.v1.aes-sha",
+                            "m.olm.curve25519-aes-sha2",
+                            RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
                         ],
                         "keys": {
                             "curve25519:xyz": "curve25519+key",

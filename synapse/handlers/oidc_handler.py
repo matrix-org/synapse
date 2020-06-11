@@ -37,6 +37,7 @@ from twisted.web.client import readBody
 from synapse.config import ConfigError
 from synapse.http.server import finish_request
 from synapse.http.site import SynapseRequest
+from synapse.logging.context import make_deferred_yieldable
 from synapse.push.mailer import load_jinja2_templates
 from synapse.server import HomeServer
 from synapse.types import UserID, map_username_to_mxid_localpart
@@ -99,7 +100,6 @@ class OidcHandler:
             hs.config.oidc_client_auth_method,
         )  # type: ClientAuth
         self._client_auth_method = hs.config.oidc_client_auth_method  # type: str
-        self._subject_claim = hs.config.oidc_subject_claim
         self._provider_metadata = OpenIDProviderMetadata(
             issuer=hs.config.oidc_issuer,
             authorization_endpoint=hs.config.oidc_authorization_endpoint,
@@ -310,6 +310,10 @@ class OidcHandler:
         received in the callback to exchange it for a token. The call uses the
         ``ClientAuth`` to authenticate with the client with its ID and secret.
 
+        See:
+           https://tools.ietf.org/html/rfc6749#section-3.2
+           https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint
+
         Args:
             code: The authorization code we got from the callback.
 
@@ -362,7 +366,7 @@ class OidcHandler:
             code=response.code, phrase=response.phrase.decode("utf-8")
         )
 
-        resp_body = await readBody(response)
+        resp_body = await make_deferred_yieldable(readBody(response))
 
         if response.code >= 500:
             # In case of a server error, we should first try to decode the body
@@ -484,6 +488,7 @@ class OidcHandler:
                 claims_params=claims_params,
             )
         except ValueError:
+            logger.info("Reloading JWKS after decode error")
             jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
             claims = jwt.decode(
                 token["id_token"],
@@ -592,6 +597,9 @@ class OidcHandler:
         # The provider might redirect with an error.
         # In that case, just display it as-is.
         if b"error" in request.args:
+            # error response from the auth server. see:
+            #  https://tools.ietf.org/html/rfc6749#section-4.1.2.1
+            #  https://openid.net/specs/openid-connect-core-1_0.html#AuthError
             error = request.args[b"error"][0].decode()
             description = request.args.get(b"error_description", [b""])[0].decode()
 
@@ -605,8 +613,11 @@ class OidcHandler:
             self._render_error(request, error, description)
             return
 
+        # otherwise, it is presumably a successful response. see:
+        #   https://tools.ietf.org/html/rfc6749#section-4.1.2
+
         # Fetch the session cookie
-        session = request.getCookie(SESSION_COOKIE_NAME)
+        session = request.getCookie(SESSION_COOKIE_NAME)  # type: Optional[bytes]
         if session is None:
             logger.info("No session cookie found")
             self._render_error(request, "missing_session", "No session cookie found")
@@ -654,7 +665,7 @@ class OidcHandler:
             self._render_error(request, "invalid_request", "Code parameter is missing")
             return
 
-        logger.info("Exchanging code")
+        logger.debug("Exchanging code")
         code = request.args[b"code"][0].decode()
         try:
             token = await self._exchange_code(code)
@@ -663,10 +674,12 @@ class OidcHandler:
             self._render_error(request, e.error, e.error_description)
             return
 
+        logger.debug("Successfully obtained OAuth2 access token")
+
         # Now that we have a token, get the userinfo, either by decoding the
         # `id_token` or by fetching the `userinfo_endpoint`.
         if self._uses_userinfo:
-            logger.info("Fetching userinfo")
+            logger.debug("Fetching userinfo")
             try:
                 userinfo = await self._fetch_userinfo(token)
             except Exception as e:
@@ -674,7 +687,7 @@ class OidcHandler:
                 self._render_error(request, "fetch_error", str(e))
                 return
         else:
-            logger.info("Extracting userinfo from id_token")
+            logger.debug("Extracting userinfo from id_token")
             try:
                 userinfo = await self._parse_id_token(token, nonce=nonce)
             except Exception as e:
@@ -750,7 +763,7 @@ class OidcHandler:
         return macaroon.serialize()
 
     def _verify_oidc_session_token(
-        self, session: str, state: str
+        self, session: bytes, state: str
     ) -> Tuple[str, str, Optional[str]]:
         """Verifies and extract an OIDC session token.
 

@@ -14,13 +14,16 @@
 # limitations under the License.
 from mock import Mock
 
+from twisted.internet import defer
+
 import synapse.rest.admin
-from synapse.api.constants import UserTypes
+from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class UserDirectoryTestCase(unittest.HomeserverTestCase):
@@ -75,18 +78,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.store.remove_from_user_dir = Mock()
-        self.store.remove_from_user_in_public_room = Mock()
+        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_user_deactivated(s_user_id))
         self.store.remove_from_user_dir.not_called()
-        self.store.remove_from_user_in_public_room.not_called()
 
     def test_handle_user_deactivated_regular_user(self):
         r_user_id = "@regular:test"
         self.get_success(
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
-        self.store.remove_from_user_dir = Mock()
+        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
 
@@ -146,6 +147,94 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
+
+    @override_config({"encryption_enabled_by_default_for_room_type": "all"})
+    def test_encrypted_by_default_config_option_all(self):
+        """Tests that invite-only and non-invite-only rooms have encryption enabled by
+        default when the config option encryption_enabled_by_default_for_room_type is "all".
+        """
+        # Create a user
+        user = self.register_user("user", "pass")
+        user_token = self.login(user, "pass")
+
+        # Create an invite-only room as that user
+        room_id = self.helper.create_room_as(user, is_public=False, tok=user_token)
+
+        # Check that the room has an encryption state event
+        event_content = self.helper.get_state(
+            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+        )
+        self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
+
+        # Create a non invite-only room as that user
+        room_id = self.helper.create_room_as(user, is_public=True, tok=user_token)
+
+        # Check that the room has an encryption state event
+        event_content = self.helper.get_state(
+            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+        )
+        self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
+
+    @override_config({"encryption_enabled_by_default_for_room_type": "invite"})
+    def test_encrypted_by_default_config_option_invite(self):
+        """Tests that only new, invite-only rooms have encryption enabled by default when
+        the config option encryption_enabled_by_default_for_room_type is "invite".
+        """
+        # Create a user
+        user = self.register_user("user", "pass")
+        user_token = self.login(user, "pass")
+
+        # Create an invite-only room as that user
+        room_id = self.helper.create_room_as(user, is_public=False, tok=user_token)
+
+        # Check that the room has an encryption state event
+        event_content = self.helper.get_state(
+            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+        )
+        self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
+
+        # Create a non invite-only room as that user
+        room_id = self.helper.create_room_as(user, is_public=True, tok=user_token)
+
+        # Check that the room does not have an encryption state event
+        self.helper.get_state(
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
+            expect_code=404,
+        )
+
+    @override_config({"encryption_enabled_by_default_for_room_type": "off"})
+    def test_encrypted_by_default_config_option_off(self):
+        """Tests that neither new invite-only nor non-invite-only rooms have encryption
+        enabled by default when the config option
+        encryption_enabled_by_default_for_room_type is "off".
+        """
+        # Create a user
+        user = self.register_user("user", "pass")
+        user_token = self.login(user, "pass")
+
+        # Create an invite-only room as that user
+        room_id = self.helper.create_room_as(user, is_public=False, tok=user_token)
+
+        # Check that the room does not have an encryption state event
+        self.helper.get_state(
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
+            expect_code=404,
+        )
+
+        # Create a non invite-only room as that user
+        room_id = self.helper.create_room_as(user, is_public=True, tok=user_token)
+
+        # Check that the room does not have an encryption state event
+        self.helper.get_state(
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
+            expect_code=404,
+        )
 
     def test_spam_checker(self):
         """
