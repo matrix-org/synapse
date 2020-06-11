@@ -94,7 +94,7 @@ oidc_config:
 
 [Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat. 
 
-Follow the [Getting Started Guide](https://www.keycloak.org/getting-started/) to install Keycloak and set up a realm.
+Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to install Keycloak and set up a realm.
 
 1. `Clients -> Create`
 
