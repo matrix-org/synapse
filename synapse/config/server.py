@@ -443,13 +443,14 @@ class ServerConfig(Config):
         # here.
         if config.get("no_tls", False):
             l2 = []
-            for l in self.listeners:
-                if l.tls:
+            for listener in self.listeners:
+                if listener.tls:
                     logger.info(
-                        "Ignoring TLS-enabled listener on port %i due to no_tls", l.port
+                        "Ignoring TLS-enabled listener on port %i due to no_tls",
+                        listener.port,
                     )
                 else:
-                    l2.append(l)
+                    l2.append(listener)
             self.listeners = l2
 
         if not self.web_client_location:
@@ -533,7 +534,7 @@ class ServerConfig(Config):
                     bind_addresses=[config.get("metrics_bind_host", "127.0.0.1")],
                     type="http",
                     http_options=HttpListenerConfig(
-                        resources=[HttpResourceConfig(names=["metrics"]),]
+                        resources=[HttpResourceConfig(names=["metrics"])]
                     ),
                 )
             )

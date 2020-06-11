@@ -34,7 +34,6 @@ from twisted.trial import unittest
 from synapse.api.constants import EventTypes, Membership
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.ratelimiting import FederationRateLimitConfig
-from synapse.config.server import ListenerConfig
 from synapse.federation.transport import server as federation_server
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite

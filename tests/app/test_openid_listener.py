@@ -20,7 +20,7 @@ from synapse.app.generic_worker import GenericWorkerServer
 from synapse.app.homeserver import SynapseHomeServer
 from synapse.config.server import parse_listener_def
 
-from tests.unittest import HomeserverTestCase, override_config
+from tests.unittest import HomeserverTestCase
 
 
 class FederationReaderOpenIDListenerTests(HomeserverTestCase):
