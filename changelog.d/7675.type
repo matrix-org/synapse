@@ -1,0 +1,1 @@
+Rename m.login.jwt to org.matrix.login.jwt as that is not in the spec.
