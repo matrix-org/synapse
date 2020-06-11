@@ -321,7 +321,9 @@ class ReplicationCommandHandler:
                 current_token = stream.current_token(cmd.instance_name)
 
                 # Discard this data if this token is earlier than the current
-                # position.
+                # position. Note that streams can be reset (in which case you
+                # expect an earlier token), but that must be preceded by a
+                # POSITION command.
                 if cmd.token <= current_token:
                     logger.debug(
                         "Discarding RDATA from stream %s at position %s before previous position %s",
