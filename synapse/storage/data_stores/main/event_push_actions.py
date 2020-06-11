@@ -843,7 +843,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 upd.stream_ordering,
                 old.user_id
             FROM (
-                SELECT user_id, room_id, count(*) as unread_count,
+                SELECT user_id, room_id, count(*) as %s,
                     max(stream_ordering) as stream_ordering
                 FROM event_push_actions
                 WHERE ? <= stream_ordering AND stream_ordering < ?
@@ -856,14 +856,14 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
 
         # First get the count of unread messages.
         txn.execute(
-            sql % ("unread_count", "unread_count", ""),
+            sql % ("unread_count", "unread_count", "unread_count", ""),
             (old_rotate_stream_ordering, rotate_to_stream_ordering),
         )
         rows = txn.fetchall()
 
         # Then get the count of notifications.
         txn.execute(
-            sql % ("notify_count", "notify_count", "notif = 1"),
+            sql % ("notif_count", "notif_count", "notif_count", "AND notif = 1"),
             (old_rotate_stream_ordering, rotate_to_stream_ordering),
         )
         notif_rows = txn.fetchall()
