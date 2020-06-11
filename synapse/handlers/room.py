@@ -1128,9 +1128,8 @@ class RoomShutdownHandler(object):
         if not message:
             message = self.DEFAULT_MESSAGE
 
-        # Check RoomID
         if not RoomID.is_valid(room_id):
-            raise SynapseError(400, "%s was not legal room ID" % (room_id,))
+            raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
         if not await self.store.get_room_with_stats(room_id):
             raise NotFoundError("Unknown room id %s" % (room_id,))
@@ -1177,7 +1176,7 @@ class RoomShutdownHandler(object):
                 self.hs.config.worker.writers.events, "events", stream_id
             )
         else:
-            new_room_id = ""
+            new_room_id = None
             logger.info("Shutting down room %r", room_id)
 
         users = await self.state.get_current_users_in_room(room_id)

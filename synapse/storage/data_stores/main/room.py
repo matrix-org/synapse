@@ -124,7 +124,7 @@ class RoomWorkerStore(SQLBaseStore):
                 res["public"] = bool(res["public"])
                 return res
             except IndexError:
-                return
+                return None
 
         return self.db.runInteraction(
             "get_room_with_stats", get_room_with_stats_txn, room_id

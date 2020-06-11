@@ -352,20 +352,20 @@ The following parameters should be set in the URL:
 
 The following JSON body parameters are available:
 
-* `new_room_user_id` - Optional. A string representing the user ID of the user that will admin
-                       the new room that all users in the old room will be moved to. If not
-                       set the users will not be moved to a new room and only leave the old room
-                       without any information. Defaults to `None`.
+* `new_room_user_id` - Optional. If set, a new room will be created with this user ID
+      as the creator and admin, and all users in the old room will be moved into that
+      room. If not set, no new room will be created and the users will just be removed
+      from the old room.
 * `room_name` - Optional. A string representing the name of the room that new users will be
                 invited to. Defaults to `Content Violation Notification`
 * `message` - Optional. A string containing the first message that will be sent as
               `new_room_user_id` in the new room. Ideally this will clearly convey why the
                original room was shut down. Defaults to `Sharing illegal content on this server
                is not permitted and rooms in violation will be blocked.`
-* `block` - Optional. A boolean if `room_id` will be set on blocking list. The room will be
-            blocked for this server and preventing new joins. Defaults to `True`.
+* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing future attempts to
+  join the room. Defaults to `true`.
 
-The following fields are possible in the JSON response body:
+The following fields are returned in the JSON response body:
 
 * `kicked_users` - An array of users (`user_id`) that were kicked.
 * `failed_to_kick_users` - An array of users (`user_id`) that that were not kicked.
