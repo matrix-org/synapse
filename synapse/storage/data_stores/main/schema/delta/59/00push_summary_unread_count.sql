@@ -15,4 +15,4 @@
 
 -- Store the number of unread messages, i.e. messages that triggered either a notify
 -- action or a mark_unread one.
-ALTER TABLE event_push_summary ADD COLUMN unread_count BIGINT NOT NULL;
+ALTER TABLE event_push_summary ADD COLUMN unread_count BIGINT NOT NULL DEFAULT 0;
