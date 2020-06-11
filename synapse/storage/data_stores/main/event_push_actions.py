@@ -897,7 +897,8 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             """,
             (
                 (notif_rows[i][2], rows[i][2], rows[i][3], rows[i][0], rows[i][1])
-                for i, _ in enumerate(rows) if rows[i][4] is not None
+                for i, _ in enumerate(rows)
+                if rows[i][4] is not None
             ),
         )
 
