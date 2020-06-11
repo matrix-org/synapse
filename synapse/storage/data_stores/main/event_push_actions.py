@@ -149,6 +149,12 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             unread_count += row[0]
             if row[1] == 1:
                 notify_count = row[0]
+            elif row[1] != 0:
+                logger.warning(
+                    "Unexpected value %d for column 'notif' in table"
+                    " 'event_push_actions'",
+                    row[1],
+                )
 
         txn.execute(
             """
