@@ -144,14 +144,15 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         unread_count = 0
         notify_count = 0
         for row in rows:
-            if row[1] == 0:
-                unread_count = row[0]
+            # We always increment unread_count because actions that notify also
+            # contribute to it.
+            unread_count += row[0]
             if row[1] == 1:
                 notify_count = row[0]
 
         txn.execute(
             """
-            SELECT notif_count FROM event_push_summary
+            SELECT notif_count, unread_count FROM event_push_summary
             WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
         """,
             (room_id, user_id, stream_ordering),
@@ -159,10 +160,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         rows = txn.fetchall()
         if rows:
             notify_count += rows[0][0]
-
-        # Now that we've got the final notify_count, add it to unread_count, as notify
-        # actions also contribute to the unread count.
-        unread_count += notify_count
+            unread_count += rows[0][1]
 
         # Now get the number of highlights
         sql = (
@@ -841,22 +839,34 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         # Calculate the new counts that should be upserted into event_push_summary
         sql = """
             SELECT user_id, room_id,
-                coalesce(old.notif_count, 0) + upd.notif_count,
+                coalesce(old.%s, 0) + upd.%s,
                 upd.stream_ordering,
                 old.user_id
             FROM (
-                SELECT user_id, room_id, count(*) as notif_count,
+                SELECT user_id, room_id, count(*) as unread_count,
                     max(stream_ordering) as stream_ordering
                 FROM event_push_actions
                 WHERE ? <= stream_ordering AND stream_ordering < ?
-                    AND highlight = 0 AND notif = 1
+                    AND highlight = 0
+                    %s
                 GROUP BY user_id, room_id
             ) AS upd
             LEFT JOIN event_push_summary AS old USING (user_id, room_id)
         """
 
-        txn.execute(sql, (old_rotate_stream_ordering, rotate_to_stream_ordering))
+        # First get the count of unread messages.
+        txn.execute(
+            sql % ("unread_count", "unread_count", ""),
+            (old_rotate_stream_ordering, rotate_to_stream_ordering),
+        )
         rows = txn.fetchall()
+
+        # Then get the count of notifications.
+        txn.execute(
+            sql % ("notify_count", "notify_count", "notif = 1"),
+            (old_rotate_stream_ordering, rotate_to_stream_ordering),
+        )
+        notif_rows = txn.fetchall()
 
         logger.info("Rotating notifications, handling %d rows", len(rows))
 
@@ -868,22 +878,27 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             table="event_push_summary",
             values=[
                 {
-                    "user_id": row[0],
-                    "room_id": row[1],
-                    "notif_count": row[2],
-                    "stream_ordering": row[3],
+                    "user_id": rows[i][0],
+                    "room_id": rows[i][1],
+                    "notif_count": notif_rows[i][2],
+                    "unread_count": rows[i][2],
+                    "stream_ordering": rows[i][3],
                 }
-                for row in rows
-                if row[4] is None
+                for i, _ in enumerate(rows)
+                if rows[i][4] is None
             ],
         )
 
         txn.executemany(
             """
-                UPDATE event_push_summary SET notif_count = ?, stream_ordering = ?
+                UPDATE event_push_summary
+                SET notif_count = ?, unread_count = ?, stream_ordering = ?
                 WHERE user_id = ? AND room_id = ?
             """,
-            ((row[2], row[3], row[0], row[1]) for row in rows if row[4] is not None),
+            (
+                (notif_rows[i][2], rows[i][2], rows[i][3], rows[i][0], rows[i][1])
+                for i, _ in enumerate(rows) if rows[i][4] is not None
+            ),
         )
 
         txn.execute(

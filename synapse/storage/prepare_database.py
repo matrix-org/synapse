@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 # XXX: If you're about to bump this to 59 (or higher) please create an update
 # that drops the unused `cache_invalidation_stream` table, as per #7436!
 # XXX: Also add an update to drop `account_data_max_stream_id` as per #7656!
-SCHEMA_VERSION = 58
+SCHEMA_VERSION = 59
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
 
