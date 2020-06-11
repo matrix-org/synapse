@@ -61,6 +61,7 @@ class MatrixFederationAgent(object):
         self,
         reactor,
         tls_client_options_factory,
+        user_agent,
         _srv_resolver=None,
         _well_known_resolver=None,
     ):
@@ -87,6 +88,7 @@ class MatrixFederationAgent(object):
                     pool=self._pool,
                     contextFactory=tls_client_options_factory,
                 ),
+                user_agent=user_agent,
             )
 
         self._well_known_resolver = _well_known_resolver

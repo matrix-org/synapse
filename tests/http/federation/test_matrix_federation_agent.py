@@ -86,6 +86,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.well_known_resolver = WellKnownResolver(
             self.reactor,
             Agent(self.reactor, contextFactory=self.tls_factory),
+            b"test-agent",
             well_known_cache=self.well_known_cache,
             had_well_known_cache=self.had_well_known_cache,
         )
@@ -93,6 +94,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=self.tls_factory,
+            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=self.well_known_resolver,
         )
@@ -719,10 +721,12 @@ class MatrixFederationAgentTests(unittest.TestCase):
         agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=tls_factory,
+            user_agent=b"test-agent",  # This is unused since _well_known_resolver is passed below.
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=WellKnownResolver(
                 self.reactor,
                 Agent(self.reactor, contextFactory=tls_factory),
+                b"test-agent",
                 well_known_cache=self.well_known_cache,
                 had_well_known_cache=self.had_well_known_cache,
             ),
