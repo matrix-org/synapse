@@ -96,7 +96,7 @@ oidc_config:
 
 Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to install Keycloak and set up a realm.
 
-1. `Clients -> Create`
+1. Click `Clients` in the sidebar and click `Create`
 
 2. Fill Fields
 
@@ -105,8 +105,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 | Client ID | `synapse` |
 | Client Protocol | `openid-connect` |
 
-3. `Save`
-
+3. Click `Save`
 4. Fill Fields
 
 | Field | Value |
@@ -117,14 +116,14 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 | Access Type | `confidential` |
 | Valid Redirect URIs | `[synapse public baseurl]/_synapse/oidc/callback` |
 
-5. Save
+5. Click `Save`
 6. Credential Tab
 
 | Field | Value |
 |-------|-------|
 | Client Authenticator | `Client ID and Secret` |
 
-7. Regenerate Secret
+7. Click `Regenerate Secret`
 8. Copy Secret
 
 ```yaml
@@ -132,7 +131,7 @@ oidc_config:
    enabled: true
    issuer: "https://127.0.0.1:8443/auth/realms/{realm_name}"
    client_id: "synapse"
-   client_secret: "copy secret from Step 8"
+   client_secret: "copy secret generated from above"
    scopes: ["openid", "profile"]
 ```
 ### [Auth0][auth0]
