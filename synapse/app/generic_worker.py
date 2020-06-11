@@ -740,8 +740,7 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
 
     async def on_position(self, stream_name: str, instance_name: str, token: int):
         await super().on_position(stream_name, instance_name, token)
-        if stream_name == TypingStream.NAME:
-            self.typing_handler.process_replication_rows(token, [])
+        await self.on_rdata(stream_name, instance_name, token, [])
 
     def stop_pusher(self, user_id, app_id, pushkey):
         if not self.notify_pushers:
