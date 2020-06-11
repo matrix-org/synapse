@@ -79,6 +79,7 @@ class MatrixFederationAgent(object):
             ),
             pool=self._pool,
         )
+        self.user_agent = user_agent
 
         if _well_known_resolver is None:
             _well_known_resolver = WellKnownResolver(
@@ -88,7 +89,7 @@ class MatrixFederationAgent(object):
                     pool=self._pool,
                     contextFactory=tls_client_options_factory,
                 ),
-                user_agent=user_agent,
+                user_agent=self.user_agent,
             )
 
         self._well_known_resolver = _well_known_resolver
@@ -151,7 +152,7 @@ class MatrixFederationAgent(object):
             parsed_uri = urllib.parse.urlparse(uri)
 
         # We need to make sure the host header is set to the netloc of the
-        # server.
+        # server and that a user-agent is provided.
         if headers is None:
             headers = Headers()
         else:
@@ -159,6 +160,8 @@ class MatrixFederationAgent(object):
 
         if not headers.hasHeader(b"host"):
             headers.addRawHeader(b"host", parsed_uri.netloc)
+        if not headers.hasHeader(b"user-agent"):
+            headers.addRawHeader(b"user-agent", self.user_agent)
 
         res = yield make_deferred_yieldable(
             self._agent.request(method, uri, headers, bodyProducer)
