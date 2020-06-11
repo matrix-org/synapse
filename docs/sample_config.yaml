@@ -1454,7 +1454,7 @@ saml2_config:
 
   # The lifetime of a SAML session. This defines how long a user has to
   # complete the authentication process, if allow_unsolicited is unset.
-  # The default is 5 minutes.
+  # The default is 15 minutes.
   #
   #saml_session_lifetime: 5m
 

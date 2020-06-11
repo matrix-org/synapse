@@ -160,7 +160,7 @@ class SAML2Config(Config):
 
         # session lifetime: in milliseconds
         self.saml2_session_lifetime = self.parse_duration(
-            saml2_config.get("saml_session_lifetime", "5m")
+            saml2_config.get("saml_session_lifetime", "15m")
         )
 
         template_dir = saml2_config.get("template_dir")
@@ -286,7 +286,7 @@ class SAML2Config(Config):
 
           # The lifetime of a SAML session. This defines how long a user has to
           # complete the authentication process, if allow_unsolicited is unset.
-          # The default is 5 minutes.
+          # The default is 15 minutes.
           #
           #saml_session_lifetime: 5m
 
