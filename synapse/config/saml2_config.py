@@ -288,7 +288,7 @@ class SAML2Config(Config):
           # complete the authentication process, if allow_unsolicited is unset.
           # The default is 15 minutes.
           #
-          #saml_session_lifetime: 15m
+          #saml_session_lifetime: 5m
 
           # An external module can be provided here as a custom solution to
           # mapping attributes returned from a saml provider onto a matrix user.
