@@ -73,7 +73,7 @@ class LoginRestServlet(RestServlet):
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
-    JWT_TYPE = "m.login.jwt"
+    JWT_TYPE = "org.matrix.login.jwt"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__()
