@@ -119,9 +119,11 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 
 5. Save
 6. Credential Tab
+
 | Field | Value |
-|-----------|-----------|
+|-------|-------|
 | Client Authenticator | `Client ID and Secret` |
+
 7. Regenerate Secret
 8. Copy Secret
 
