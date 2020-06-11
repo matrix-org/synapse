@@ -125,10 +125,6 @@ class TypingStreamTestCase(BaseStreamTestCase):
         )
         typing._reset()
 
-        # Reset the test code.
-        self.test_handler.on_rdata.reset_mock()
-        self.test_handler.on_rdata.assert_not_called()
-
         # Reconnect.
         self.reconnect()
         self.pump(0.1)
@@ -136,6 +132,10 @@ class TypingStreamTestCase(BaseStreamTestCase):
         # We should now see an attempt to connect to the master
         request = self.handle_http_replication_attempt()
         self.assert_request_is_get_repl_stream_updates(request, "typing")
+
+        # Reset the test code.
+        self.test_handler.on_rdata.reset_mock()
+        self.test_handler.on_rdata.assert_not_called()
 
         # Push additional data.
         typing._push_update(member=RoomMember(ROOM_ID_2, USER_ID_2), typing=False)
