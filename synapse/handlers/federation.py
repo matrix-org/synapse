@@ -21,8 +21,6 @@ import itertools
 import logging
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-import six
-from six import iteritems, itervalues
 from six.moves import http_client, zip
 
 import attr
@@ -398,7 +396,7 @@ class FederationHandler(BaseHandler):
                     )
                     event_map.update(evs)
 
-                    state = [event_map[e] for e in six.itervalues(state_map)]
+                    state = [event_map[e] for e in state_map.values()]
                 except Exception:
                     logger.warning(
                         "[%s %s] Error attempting to resolve state at missing "
@@ -1009,7 +1007,7 @@ class FederationHandler(BaseHandler):
             """
             joined_users = [
                 (state_key, int(event.depth))
-                for (e_type, state_key), event in iteritems(state)
+                for (e_type, state_key), event in state.items()
                 if e_type == EventTypes.Member and event.membership == Membership.JOIN
             ]
 
@@ -1099,16 +1097,16 @@ class FederationHandler(BaseHandler):
         states = dict(zip(event_ids, [s.state for s in states]))
 
         state_map = await self.store.get_events(
-            [e_id for ids in itervalues(states) for e_id in itervalues(ids)],
+            [e_id for ids in states.values() for e_id in ids.values()],
             get_prev_content=False,
         )
         states = {
             key: {
                 k: state_map[e_id]
-                for k, e_id in iteritems(state_dict)
+                for k, e_id in state_dict.items()
                 if e_id in state_map
             }
-            for key, state_dict in iteritems(states)
+            for key, state_dict in states.items()
         }
 
         for e_id, _ in sorted_extremeties_tuple:
@@ -1733,7 +1731,7 @@ class FederationHandler(BaseHandler):
         state_groups = await self.state_store.get_state_groups(room_id, [event_id])
 
         if state_groups:
-            _, state = list(iteritems(state_groups)).pop()
+            _, state = list(state_groups.items()).pop()
             results = {(e.type, e.state_key): e for e in state}
 
             if event.is_state():
@@ -2096,7 +2094,7 @@ class FederationHandler(BaseHandler):
                     room_version, state_sets, event
                 )
                 current_state_ids = {
-                    k: e.event_id for k, e in iteritems(current_state_ids)
+                    k: e.event_id for k, e in current_state_ids.items()
                 }
             else:
                 current_state_ids = await self.state_handler.get_current_state_ids(
@@ -2112,7 +2110,7 @@ class FederationHandler(BaseHandler):
             # Now check if event pass auth against said current state
             auth_types = auth_types_for_event(event)
             current_state_ids = [
-                e for k, e in iteritems(current_state_ids) if k in auth_types
+                e for k, e in current_state_ids.items() if k in auth_types
             ]
 
             current_auth_events = await self.store.get_events(current_state_ids)
@@ -2428,7 +2426,7 @@ class FederationHandler(BaseHandler):
         else:
             event_key = None
         state_updates = {
-            k: a.event_id for k, a in iteritems(auth_events) if k != event_key
+            k: a.event_id for k, a in auth_events.items() if k != event_key
         }
 
         current_state_ids = await context.get_current_state_ids()
@@ -2439,7 +2437,7 @@ class FederationHandler(BaseHandler):
         prev_state_ids = await context.get_prev_state_ids()
         prev_state_ids = dict(prev_state_ids)
 
-        prev_state_ids.update({k: a.event_id for k, a in iteritems(auth_events)})
+        prev_state_ids.update({k: a.event_id for k, a in auth_events.items()})
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
