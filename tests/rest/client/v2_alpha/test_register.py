@@ -593,6 +593,89 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(len(self.email_attempts), 0)
 
+    def test_deactivated_user_using_user_identifier(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {"type": "m.id.user", "user": user_id},
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
+        request, channel = self.make_request(
+            "POST", "account/deactivate", request_data, access_token=tok
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+    def test_deactivated_user_using_thirdparty_identifier(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {
+                        "type": "m.id.thirdparty",
+                        "medium": "email",
+                        "address": "kermit@example.com",
+                    },
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
+        request, channel = self.make_request(
+            "POST", "account/deactivate", request_data, access_token=tok
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        self.assertEqual(len(self.email_attempts), 0)
+
+    def test_deactivated_user_using_phone_identifier(self):
+        self.email_attempts = []
+
+        (user_id, tok) = self.create_user()
+
+        request_data = json.dumps(
+            {
+                "auth": {
+                    "type": "m.login.password",
+                    "identifier": {
+                        "type": "m.id.phone",
+                        "country": "GB",
+                        "phone": "077-009-00001",
+                    },
+                    "password": "monkey",
+                },
+                "erase": False,
+            }
+        )
+        request, channel = self.make_request(
+            "POST", "account/deactivate", request_data, access_token=tok
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
+
+        self.reactor.advance(datetime.timedelta(days=8).total_seconds())
+
+        self.assertEqual(len(self.email_attempts), 0)
+
     def create_user(self):
         user_id = self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
@@ -604,6 +687,15 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
                 user_id=user_id,
                 medium="email",
                 address="kermit@example.com",
+                validated_at=now,
+                added_at=now,
+            )
+        )
+        self.get_success(
+            self.store.user_add_threepid(
+                user_id=user_id,
+                medium="msisdn",
+                address="447700900001",
                 validated_at=now,
                 added_at=now,
             )
