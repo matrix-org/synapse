@@ -1,0 +1,1 @@
+Correct Synapse's definition of `m.id.phone`, changing `number` to `phone`. Bug introduced in #1994.
