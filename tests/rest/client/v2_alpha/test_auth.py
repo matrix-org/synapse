@@ -38,11 +38,6 @@ class DummyRecaptchaChecker(UserInteractiveAuthChecker):
         return succeed(True)
 
 
-class DummyPasswordChecker(UserInteractiveAuthChecker):
-    def check_auth(self, authdict, clientip):
-        return succeed(authdict["identifier"]["user"])
-
-
 class FallbackAuthTests(unittest.HomeserverTestCase):
 
     servlets = [
@@ -166,9 +161,6 @@ class UIAuthTests(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
-        auth_handler = hs.get_auth_handler()
-        auth_handler.checkers[LoginType.PASSWORD] = DummyPasswordChecker(hs)
-
         self.user_pass = "pass"
         self.user = self.register_user("test", self.user_pass)
         self.user_tok = self.login("test", self.user_pass)

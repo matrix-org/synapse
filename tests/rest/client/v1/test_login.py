@@ -273,9 +273,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
 
         auth = {
             "type": "m.login.password",
-            # https://github.com/matrix-org/synapse/issues/5665
-            # "identifier": {"type": "m.id.user", "user": user_id},
-            "user": user_id,
+            "identifier": {"type": "m.id.user", "user": user_id},
             "password": password,
             "session": channel.json_body["session"],
         }
