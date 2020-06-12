@@ -593,14 +593,42 @@ class AuthHandler(BaseHandler):
             res = await checker.check_auth(authdict, clientip=clientip)
             return res
 
-        # build a v1-login-style dict out of the authdict and fall back to the
-        # v1 code
-        user_id = authdict.get("user")
+        # We don't have a checker for the auth type provided by the client
+        # Assume that it is `m.login.password`.
+        if login_type != LoginType.PASSWORD:
+            raise SynapseError(
+                400, "Unknown authentication type", errcode=Codes.INVALID_PARAM,
+            )
 
-        if user_id is None:
-            raise SynapseError(400, "", Codes.MISSING_PARAM)
+        password = authdict.get("password")
+        if password is None:
+            raise SynapseError(
+                400,
+                "Missing parameter for m.login.password dict: 'password'",
+                errcode=Codes.INVALID_PARAM,
+            )
 
-        (canonical_id, callback) = await self.validate_login(user_id, authdict)
+        # Retrieve the user ID using details provided in the authdict
+
+        # Deprecation notice: Clients used to be able to simply provide a
+        # `user` field which pointed to a user_id or localpart. This has
+        # been deprecated in favour of an `identifier` key, which is a
+        # dictionary providing information on how to identify a single
+        # user.
+        # https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
+        #
+        # We convert old-style dicts to new ones here
+        client_dict_convert_legacy_fields_to_identifier(authdict)
+
+        # Extract a user ID from the values in the identifier
+        username = await self.username_from_identifier(authdict["identifier"], password)
+
+        if username is None:
+            raise SynapseError(400, "Valid username not found")
+
+        # Now that we've found the username, validate that the password is correct
+        canonical_id, _ = await self.validate_login(username, authdict)
+
         return canonical_id
 
     async def username_from_identifier(
