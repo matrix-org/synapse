@@ -1,0 +1,1 @@
+Ensure the log context is kept during user interactive authentication. The bug was introduced in 1.13.0rc1.
