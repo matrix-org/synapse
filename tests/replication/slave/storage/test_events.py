@@ -195,9 +195,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
             type="m.room.message",
             msgtype="m.text",
             body="world",
-            push_actions=[
-                (USER_ID_2, ["org.matrix.msc2625.mark_unread"])
-            ],
+            push_actions=[(USER_ID_2, ["org.matrix.msc2625.mark_unread"])],
         )
         self.replicate()
         self.check(
