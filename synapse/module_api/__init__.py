@@ -110,7 +110,7 @@ class ModuleApi(object):
             "Using deprecated ModuleApi.register which creates a dummy user device."
         )
         user_id = yield self.register_user(localpart, displayname, emails)
-        _, access_token = yield self.register_device(user_id)
+        _, access_token = yield defer.ensureDeferred(self.register_device(user_id))
         return user_id, access_token
 
     def register_user(self, localpart, displayname=None, emails=[]):
