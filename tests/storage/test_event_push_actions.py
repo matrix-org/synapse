@@ -17,7 +17,6 @@ from mock import Mock
 
 from twisted.internet import defer
 
-from tests import unittest
 import tests.unittest
 import tests.utils
 
@@ -54,7 +53,6 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             USER_ID, 0, 1000, 20
         )
 
-    @unittest.DEBUG
     @defer.inlineCallbacks
     def test_count_aggregation(self):
         room_id = "!foo:example.com"
