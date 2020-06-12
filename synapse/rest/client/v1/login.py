@@ -17,6 +17,10 @@ import logging
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.handlers.auth import (
+    client_dict_convert_legacy_fields_to_identifier,
+    login_id_phone_to_thirdparty,
+)
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -27,45 +31,8 @@ from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID
-from synapse.util.msisdn import phone_number_to_msisdn
 
 logger = logging.getLogger(__name__)
-
-
-def login_submission_legacy_convert(submission):
-    """
-    If the input login submission is an old style object
-    (ie. with top-level user / medium / address) convert it
-    to a typed object.
-    """
-    if "user" in submission:
-        submission["identifier"] = {"type": "m.id.user", "user": submission["user"]}
-        del submission["user"]
-
-    if "medium" in submission and "address" in submission:
-        submission["identifier"] = {
-            "type": "m.id.thirdparty",
-            "medium": submission["medium"],
-            "address": submission["address"],
-        }
-        del submission["medium"]
-        del submission["address"]
-
-
-def login_id_thirdparty_from_phone(identifier):
-    """
-    Convert a phone login identifier type to a generic threepid identifier
-    Args:
-        identifier(dict): Login identifier dict of type 'm.id.phone'
-
-    Returns: Login identifier dict of type 'm.id.threepid'
-    """
-    if "country" not in identifier or "number" not in identifier:
-        raise SynapseError(400, "Invalid phone-type identifier")
-
-    msisdn = phone_number_to_msisdn(identifier["country"], identifier["number"])
-
-    return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
 
 
 class LoginRestServlet(RestServlet):
@@ -174,7 +141,8 @@ class LoginRestServlet(RestServlet):
             login_submission.get("address"),
             login_submission.get("user"),
         )
-        login_submission_legacy_convert(login_submission)
+        # Convert deprecated authdict formats to the current scheme
+        client_dict_convert_legacy_fields_to_identifier(login_submission)
 
         if "identifier" not in login_submission:
             raise SynapseError(400, "Missing param: identifier")
@@ -185,7 +153,7 @@ class LoginRestServlet(RestServlet):
 
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
-            identifier = login_id_thirdparty_from_phone(identifier)
+            identifier = login_id_phone_to_thirdparty(identifier)
 
         # convert threepid identifiers to user IDs
         if identifier["type"] == "m.id.thirdparty":
