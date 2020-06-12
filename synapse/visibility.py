@@ -408,11 +408,7 @@ def filter_events_for_server(
         return state_key[idx + 1 :] == server_name
 
     event_map = yield storage.main.get_events(
-        [
-            e_id
-            for e_id, key in event_id_to_state_key.items()
-            if include(key[0], key[1])
-        ]
+        [e_id for e_id, key in event_id_to_state_key.items() if include(key[0], key[1])]
     )
 
     event_to_state = {
