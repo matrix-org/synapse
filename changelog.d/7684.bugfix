@@ -1,0 +1,1 @@
+Fix a bug that would crash Synapse on start when using certain password auth providers. Broke in #7649.
