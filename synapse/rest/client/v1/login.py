@@ -17,10 +17,7 @@ import logging
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.handlers.auth import (
-    client_dict_convert_legacy_fields_to_identifier,
-    login_id_phone_to_thirdparty,
-)
+from synapse.handlers.auth import client_dict_convert_legacy_fields_to_identifier
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -144,99 +141,49 @@ class LoginRestServlet(RestServlet):
         # Convert deprecated authdict formats to the current scheme
         client_dict_convert_legacy_fields_to_identifier(login_submission)
 
-        if "identifier" not in login_submission:
-            raise SynapseError(400, "Missing param: identifier")
-
-        identifier = login_submission["identifier"]
-        if "type" not in identifier:
-            raise SynapseError(400, "Login identifier has no type")
-
-        # convert phone type identifiers to generic threepids
-        if identifier["type"] == "m.id.phone":
-            identifier = login_id_phone_to_thirdparty(identifier)
-
-        # convert threepid identifiers to user IDs
-        if identifier["type"] == "m.id.thirdparty":
-            address = identifier.get("address")
-            medium = identifier.get("medium")
-
-            if medium is None or address is None:
-                raise SynapseError(400, "Invalid thirdparty identifier")
-
-            if medium == "email":
-                # For emails, transform the address to lowercase.
-                # We store all email addreses as lowercase in the DB.
-                # (See add_threepid in synapse/handlers/auth.py)
-                address = address.lower()
-
-            # We also apply account rate limiting using the 3PID as a key, as
-            # otherwise using 3PID bypasses the ratelimiting based on user ID.
-            self._failed_attempts_ratelimiter.ratelimit((medium, address), update=False)
-
-            # Check for login providers that support 3pid login types
-            (
-                canonical_user_id,
-                callback_3pid,
-            ) = await self.auth_handler.check_password_provider_3pid(
-                medium, address, login_submission["password"]
-            )
-            if canonical_user_id:
-                # Authentication through password provider and 3pid succeeded
-
-                result = await self._complete_login(
-                    canonical_user_id, login_submission, callback_3pid
-                )
-                return result
-
-            # No password providers were able to handle this 3pid
-            # Check local store
-            user_id = await self.hs.get_datastore().get_user_id_by_threepid(
-                medium, address
-            )
-            if not user_id:
-                logger.warning(
-                    "unknown 3pid identifier medium %s, address %r", medium, address
-                )
-                # We mark that we've failed to log in here, as
-                # `check_password_provider_3pid` might have returned `None` due
-                # to an incorrect password, rather than the account not
-                # existing.
-                #
-                # If it returned None but the 3PID was bound then we won't hit
-                # this code path, which is fine as then the per-user ratelimit
-                # will kick in below.
-                self._failed_attempts_ratelimiter.can_do_action((medium, address))
-                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
-
-            identifier = {"type": "m.id.user", "user": user_id}
-
-        # by this point, the identifier should be an m.id.user: if it's anything
-        # else, we haven't understood it.
-        if identifier["type"] != "m.id.user":
-            raise SynapseError(400, "Unknown login identifier type")
-        if "user" not in identifier:
-            raise SynapseError(400, "User identifier is missing 'user' key")
-
-        if identifier["user"].startswith("@"):
-            qualified_user_id = identifier["user"]
-        else:
-            qualified_user_id = UserID(identifier["user"], self.hs.hostname).to_string()
-
-        # Check if we've hit the failed ratelimit (but don't update it)
-        self._failed_attempts_ratelimiter.ratelimit(
-            qualified_user_id.lower(), update=False
+        # Check whether this attempt uses a threepid, if so, check if our failed attempt
+        # ratelimiter allows another attempt at this time
+        medium, address = (
+            login_submission.get("medium"),
+            login_submission.get("address"),
         )
+        if medium and address:
+            self._failed_attempts_ratelimiter.ratelimit(
+                (medium.lower(), address.lower()), update=False
+            )
+
+        # Extract a localpart or user ID from the values in the identifier
+        username = await self.auth_handler.username_from_identifier(
+            login_submission["identifier"], login_submission.get("password")
+        )
+
+        if not username:
+            if medium and address:
+                # The user attempted to login via threepid and failed
+                # Record this failed attempt
+                self._failed_attempts_ratelimiter.can_do_action(
+                    (medium.lower(), address.lower())
+                )
+
+                raise LoginError(403, "Unauthorized threepid", errcode=Codes.FORBIDDEN)
+
+            # The login failed for another reason
+            raise LoginError(403, "Invalid login", errcode=Codes.FORBIDDEN)
+
+        # We were able to extract a username successfully
+        # Check if we've hit the failed ratelimit for this user ID
+        self._failed_attempts_ratelimiter.ratelimit(username.lower(), update=False)
 
         try:
             canonical_user_id, callback = await self.auth_handler.validate_login(
-                identifier["user"], login_submission
+                username, login_submission
             )
         except LoginError:
             # The user has failed to log in, so we need to update the rate
             # limiter. Using `can_do_action` avoids us raising a ratelimit
             # exception and masking the LoginError. The actual ratelimiting
             # should have happened above.
-            self._failed_attempts_ratelimiter.can_do_action(qualified_user_id.lower())
+            self._failed_attempts_ratelimiter.can_do_action(username.lower())
             raise
 
         result = await self._complete_login(

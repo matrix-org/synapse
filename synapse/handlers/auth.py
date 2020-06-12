@@ -603,6 +603,87 @@ class AuthHandler(BaseHandler):
         (canonical_id, callback) = await self.validate_login(user_id, authdict)
         return canonical_id
 
+    async def username_from_identifier(
+        self, identifier: Dict[str, str], password: Optional[str] = None
+    ) -> Optional[str]:
+        """Given a dictionary containing an identifier from a client, extract the
+        possibly unqualified username of the user that it identifies. Does *not*
+        guarantee that the user exists.
+        If this identifier dict contains a threepid, we attempt to ask password
+        auth providers about it or, failing that, look up an associated user in
+        the database.
+        Args:
+            identifier: The identifier dictionary provided by the client
+            password: The user provided password if one exists. Used for asking
+                password auth providers for usernames from 3pid+password combos.
+        Returns:
+            A username if one was found, or None otherwise
+        Raises:
+            SynapseError: If the identifier dict is invalid
+        """
+
+        # Convert phone type identifiers to generic threepid identifiers, which
+        # will be handled in the next step
+        if identifier["type"] == "m.id.phone":
+            login_id_phone_to_thirdparty(identifier)
+
+        # Convert a threepid identifier to an user identifier
+        if identifier["type"] == "m.id.thirdparty":
+            address = identifier.get("address")
+            medium = identifier.get("medium")
+
+            if not medium or not address:
+                # An error would've already been raised in
+                # `login_id_thirdparty_from_phone` if the original submission
+                # was a phone identifier
+                raise SynapseError(
+                    400, "Invalid thirdparty identifier", errcode=Codes.INVALID_PARAM,
+                )
+
+            if medium == "email":
+                # For emails, transform the address to lowercase.
+                # We store all email addresses as lowercase in the DB.
+                # (See add_threepid in synapse/handlers/auth.py)
+                address = address.lower()
+
+            # Check for auth providers that support 3pid login types
+            if password is not None:
+                canonical_user_id, _ = await self.check_password_provider_3pid(
+                    medium, address, password,
+                )
+                if canonical_user_id:
+                    # Authentication through password provider and 3pid succeeded
+                    return canonical_user_id
+
+            # Check local store
+            user_id = await self.hs.get_datastore().get_user_id_by_threepid(
+                medium, address
+            )
+            if not user_id:
+                # We were unable to find a user_id that belonged to the threepid returned
+                # by the password auth provider
+                return None
+
+            identifier = {"type": "m.id.user", "user": user_id}
+
+        # By this point, the identifier should be a `m.id.user`: if it's anything
+        # else, we haven't understood it.
+        if identifier["type"] != "m.id.user":
+            raise SynapseError(
+                400, "Unknown login identifier type", errcode=Codes.INVALID_PARAM,
+            )
+
+        # User identifiers have a "user" key
+        user = identifier.get("user")
+        if user is None:
+            raise SynapseError(
+                400,
+                "User identifier is missing 'user' key",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        return user
+
     def _get_params_recaptcha(self) -> dict:
         return {"public_key": self.hs.config.recaptcha_public_key}
 
