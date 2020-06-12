@@ -17,11 +17,16 @@ from mock import Mock
 
 from twisted.internet import defer
 
+from tests import unittest
 import tests.unittest
 import tests.utils
 
 USER_ID = "@user:example.com"
 
+MARK_UNREAD = [
+    "org.matrix.msc2625.mark_unread",
+    {"set_tweak": "highlight", "value": False},
+]
 PlAIN_NOTIF = ["notify", {"set_tweak": "highlight", "value": False}]
 HIGHLIGHT = [
     "notify",
@@ -49,6 +54,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             USER_ID, 0, 1000, 20
         )
 
+    @unittest.DEBUG
     @defer.inlineCallbacks
     def test_count_aggregation(self):
         room_id = "!foo:example.com"
@@ -130,12 +136,17 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         yield _mark_read(7, 7)
         yield _assert_counts(0, 0, 0)
 
-        yield _inject_actions(8, HIGHLIGHT)
-        yield _assert_counts(1, 1, 1)
+        yield _inject_actions(8, MARK_UNREAD)
+        yield _assert_counts(1, 0, 0)
         yield _rotate(9)
-        yield _assert_counts(1, 1, 1)
-        yield _rotate(10)
-        yield _assert_counts(1, 1, 1)
+        yield _assert_counts(1, 0, 0)
+
+        yield _inject_actions(10, HIGHLIGHT)
+        yield _assert_counts(2, 1, 1)
+        yield _rotate(11)
+        yield _assert_counts(2, 1, 1)
+        yield _rotate(12)
+        yield _assert_counts(2, 1, 1)
 
     @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):
