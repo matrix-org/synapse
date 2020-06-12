@@ -16,9 +16,9 @@
 import logging
 from typing import Dict, Tuple
 
-import attr
 from six import iteritems
 
+import attr
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -42,6 +42,7 @@ DEFAULT_HIGHLIGHT_ACTION = [
 @attr.s
 class EventPushSummary(object):
     """Summary of pending event push actions for a given user in a given room."""
+
     user_id = attr.ib()
     room_id = attr.ib()
     unread_count = attr.ib()
@@ -885,8 +886,12 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         summaries = {}  # type: Dict[Tuple[str, str], EventPushSummary]
         for row in txn:
             summaries[(row[0], row[1])] = EventPushSummary(
-                user_id=row[0], room_id=row[1], unread_count=row[2],
-                stream_ordering=row[3], old_user_id=row[4], notif_count=0,
+                user_id=row[0],
+                room_id=row[1],
+                unread_count=row[2],
+                stream_ordering=row[3],
+                old_user_id=row[4],
+                notif_count=0,
             )
 
         # Then get the count of notifications.
