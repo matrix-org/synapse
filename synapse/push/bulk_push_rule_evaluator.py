@@ -191,13 +191,12 @@ class BulkPushRuleEvaluator(object):
                 )
                 if matches:
                     actions = [x for x in rule["actions"] if x != "dont_notify"]
-                    if actions:
-                        if (
-                            "notify" in actions
-                            or "org.matrix.msc2625.mark_unread" in actions
-                        ):
-                            # Push rules say we should act on this event.
-                            actions_by_user[uid] = actions
+                    if (
+                        "notify" in actions
+                        or "org.matrix.msc2625.mark_unread" in actions
+                    ):
+                        # Push rules say we should act on this event.
+                        actions_by_user[uid] = actions
                     break
 
         # Mark in the DB staging area the push actions for users who should be

@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Dict, Tuple
 
 import attr
 from six import iteritems
@@ -857,11 +858,11 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         # Calculate the new counts that should be upserted into event_push_summary
         sql = """
             SELECT user_id, room_id,
-                coalesce(old.%s, 0) + upd.%s,
+                coalesce(old.%s, 0) + upd.cnt,
                 upd.stream_ordering,
                 old.user_id
             FROM (
-                SELECT user_id, room_id, count(*) as %s,
+                SELECT user_id, room_id, count(*) as cnt,
                     max(stream_ordering) as stream_ordering
                 FROM event_push_actions
                 WHERE ? <= stream_ordering AND stream_ordering < ?
@@ -874,31 +875,29 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
 
         # First get the count of unread messages.
         txn.execute(
-            sql % ("unread_count", "unread_count", "unread_count", ""),
+            sql % ("unread_count", ""),
             (old_rotate_stream_ordering, rotate_to_stream_ordering),
         )
-        unread_rows = txn.fetchall()
-
-        # Then get the count of notifications.
-        txn.execute(
-            sql % ("notif_count", "notif_count", "notif_count", "AND notif = 1"),
-            (old_rotate_stream_ordering, rotate_to_stream_ordering),
-        )
-        notif_rows = txn.fetchall()
 
         # We need to merge both lists into a single object because we might not have the
         # same amount of rows in each of them. In this case we use a dict indexed on the
         # user ID and room ID to make it easier to populate.
-        summaries = {}
-        for row in unread_rows:
+        summaries = {}  # type: Dict[Tuple[str, str], EventPushSummary]
+        for row in txn:
             summaries[(row[0], row[1])] = EventPushSummary(
                 user_id=row[0], room_id=row[1], unread_count=row[2],
                 stream_ordering=row[3], old_user_id=row[4], notif_count=0,
             )
 
+        # Then get the count of notifications.
+        txn.execute(
+            sql % ("notif_count", "AND notif = 1"),
+            (old_rotate_stream_ordering, rotate_to_stream_ordering),
+        )
+
         # notif_rows is populated based on a subset of the query used to populate
         # unread_rows, so we can be sure that there will be no KeyError here.
-        for row in notif_rows:
+        for row in txn:
             summaries[(row[0], row[1])].notif_count = row[2]
 
         logger.info("Rotating notifications, handling %d rows", len(summaries))
