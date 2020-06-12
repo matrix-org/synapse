@@ -396,7 +396,7 @@ class AuthHandler(BaseHandler):
             # otherwise use whatever was last provided.
             #
             # This was designed to allow the client to omit the parameters
-            # and just supply the session in subsequent calls so it split
+            # and just supply the session in subsequent calls. So it splits
             # auth between devices by just sharing the session, (eg. so you
             # could continue registration from your phone having clicked the
             # email auth link on there). It's probably too open to abuse
@@ -876,7 +876,8 @@ class AuthHandler(BaseHandler):
         m.login.password auth types.
 
         Args:
-            username: username supplied by the user
+            username: a localpart or fully qualified user ID - what is provided by the
+                client
             login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
         Returns:
@@ -888,10 +889,10 @@ class AuthHandler(BaseHandler):
             LoginError if there was an authentication problem.
         """
 
-        if username.startswith("@"):
-            qualified_user_id = username
-        else:
-            qualified_user_id = UserID(username, self.hs.hostname).to_string()
+        # We need a fully qualified User ID for some method calls here
+        qualified_user_id = username
+        if not qualified_user_id.startswith("@"):
+            qualified_user_id = UserID(qualified_user_id, self.hs.hostname).to_string()
 
         login_type = login_submission.get("type")
         known_login_type = False

@@ -111,7 +111,8 @@ class LoginRestServlet(RestServlet):
                 result = await self.do_token_login(login_submission)
             else:
                 result = await self._do_other_login(login_submission)
-        except KeyError:
+        except KeyError as e:
+            logger.debug("KeyError during login: %s", e)
             raise SynapseError(400, "Missing JSON keys.")
 
         well_known_data = self._well_known_builder.get_well_known()
@@ -181,8 +182,8 @@ class LoginRestServlet(RestServlet):
         except LoginError:
             # The user has failed to log in, so we need to update the rate
             # limiter. Using `can_do_action` avoids us raising a ratelimit
-            # exception and masking the LoginError. The actual ratelimiting
-            # should have happened above.
+            # exception and masking the LoginError. This just records the attempt.
+            # The actual rate-limiting happens above
             self._failed_attempts_ratelimiter.can_do_action(username.lower())
             raise
 
@@ -195,10 +196,10 @@ class LoginRestServlet(RestServlet):
         self, user_id, login_submission, callback=None, create_non_existent_users=False
     ):
         """Called when we've successfully authed the user and now need to
-        actually login them in (e.g. create devices). This gets called on
-        all succesful logins.
+        actually log them in (e.g. create devices). This gets called on
+        all successful logins.
 
-        Applies the ratelimiting for succesful login attempts against an
+        Applies the ratelimiting for successful login attempts against an
         account.
 
         Args:
