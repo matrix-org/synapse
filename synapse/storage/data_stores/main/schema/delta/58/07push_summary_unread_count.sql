@@ -16,3 +16,8 @@
 -- Store the number of unread messages, i.e. messages that triggered either a notify
 -- action or a mark_unread one.
 ALTER TABLE event_push_summary ADD COLUMN unread_count BIGINT NOT NULL DEFAULT 0;
+
+-- Pre-populate the new column with the count of pending notifications.
+-- We expect event_push_summary to be relatively small, so we can do this update
+-- synchronously without impacting Synapse's startup time too much.
+UPDATE event_push_summary SET unread_count = notif_count;
