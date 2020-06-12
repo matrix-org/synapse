@@ -15,6 +15,7 @@
 
 import logging
 
+import attr
 from six import iteritems
 
 from canonicaljson import json
@@ -35,6 +36,17 @@ DEFAULT_HIGHLIGHT_ACTION = [
     {"set_tweak": "sound", "value": "default"},
     {"set_tweak": "highlight"},
 ]
+
+
+@attr.s
+class EventPushSummary(object):
+    """Summary of pending event push actions for a given user in a given room."""
+    user_id = attr.ib()
+    room_id = attr.ib()
+    unread_count = attr.ib()
+    stream_ordering = attr.ib()
+    old_user_id = attr.ib()
+    notif_count = attr.ib()
 
 
 def _serialize_action(actions, is_highlight):
@@ -879,17 +891,15 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         # user ID and room ID to make it easier to populate.
         summaries = {}
         for row in unread_rows:
-            summaries[(row[0], row[1])] = {
-                "unread_count": row[2],
-                "stream_ordering": row[3],
-                "old_user_id": row[4],
-                "notif_count": 0,
-            }
+            summaries[(row[0], row[1])] = EventPushSummary(
+                user_id=row[0], room_id=row[1], unread_count=row[2],
+                stream_ordering=row[3], old_user_id=row[4], notif_count=0,
+            )
 
         # notif_rows is populated based on a subset of the query used to populate
         # unread_rows, so we can be sure that there will be no KeyError here.
         for row in notif_rows:
-            summaries[(row[0], row[1])]["notif_count"] = row[2]
+            summaries[(row[0], row[1])].notif_count = row[2]
 
         logger.info("Rotating notifications, handling %d rows", len(summaries))
 
@@ -901,14 +911,14 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             table="event_push_summary",
             values=[
                 {
-                    "user_id": key[0],
-                    "room_id": key[1],
-                    "notif_count": summary["notif_count"],
-                    "unread_count": summary["unread_count"],
-                    "stream_ordering": summary["stream_ordering"],
+                    "user_id": summary.user_id,
+                    "room_id": summary.room_id,
+                    "notif_count": summary.notif_count,
+                    "unread_count": summary.unread_count,
+                    "stream_ordering": summary.stream_ordering,
                 }
-                for key, summary in summaries.items()
-                if summary["old_user_id"] is None
+                for summary in summaries.values()
+                if summary.old_user_id is None
             ],
         )
 
@@ -920,14 +930,14 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             """,
             (
                 (
-                    summary["notif_count"],
-                    summary["unread_count"],
-                    summary["stream_ordering"],
-                    key[0],
-                    key[1],
+                    summary.notif_count,
+                    summary.unread_count,
+                    summary.stream_ordering,
+                    summary.user_id,
+                    summary.room_id,
                 )
-                for key, summary in summaries.items()
-                if summary["old_user_id"] is not None
+                for summary in summaries.values()
+                if summary.old_user_id is not None
             ),
         )
 
