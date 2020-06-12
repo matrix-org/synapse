@@ -188,6 +188,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # check the .well-known request and send a response
         self.assertEqual(len(well_known_server.requests), 1)
         request = well_known_server.requests[0]
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
+        )
         self._send_well_known_response(request, content, headers=response_headers)
         return well_known_server
 
@@ -232,6 +235,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"host"), [b"testserv:8448"]
+        )
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
         )
         content = request.content.read()
         self.assertEqual(content, b"")
