@@ -1,0 +1,1 @@
+Fix intermittent exception during startup, introduced in Synapse 1.14.0.
