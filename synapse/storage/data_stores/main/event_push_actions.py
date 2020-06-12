@@ -865,7 +865,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             sql % ("unread_count", "unread_count", "unread_count", ""),
             (old_rotate_stream_ordering, rotate_to_stream_ordering),
         )
-        rows = txn.fetchall()
+        unread_rows = txn.fetchall()
 
         # Then get the count of notifications.
         txn.execute(
@@ -874,7 +874,24 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         )
         notif_rows = txn.fetchall()
 
-        logger.info("Rotating notifications, handling %d rows", len(rows))
+        # We need to merge both lists into a single object because we might not have the
+        # same amount of rows in each of them. In this case we use a dict indexed on the
+        # user ID and room ID to make it easier to populate.
+        summaries = {}
+        for row in unread_rows:
+            summaries[(row[0], row[1])] = {
+                "unread_count": row[2],
+                "stream_ordering": row[3],
+                "old_user_id": row[4],
+                "notif_count": 0,
+            }
+
+        # notif_rows is populated based on a subset of the query used to populate
+        # unread_rows, so we can be sure that there will be no KeyError here.
+        for row in notif_rows:
+            summaries[(row[0], row[1])]["notif_count"] = row[2]
+
+        logger.info("Rotating notifications, handling %d rows", len(summaries))
 
         # If the `old.user_id` above is NULL then we know there isn't already an
         # entry in the table, so we simply insert it. Otherwise we update the
@@ -884,14 +901,14 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             table="event_push_summary",
             values=[
                 {
-                    "user_id": rows[i][0],
-                    "room_id": rows[i][1],
-                    "notif_count": notif_rows[i][2],
-                    "unread_count": rows[i][2],
-                    "stream_ordering": rows[i][3],
+                    "user_id": key[0],
+                    "room_id": key[1],
+                    "notif_count": summary["notif_count"],
+                    "unread_count": summary["unread_count"],
+                    "stream_ordering": summary["stream_ordering"],
                 }
-                for i, _ in enumerate(rows)
-                if rows[i][4] is None
+                for key, summary in summaries.items()
+                if summary["old_user_id"] is None
             ],
         )
 
@@ -902,9 +919,15 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 WHERE user_id = ? AND room_id = ?
             """,
             (
-                (notif_rows[i][2], rows[i][2], rows[i][3], rows[i][0], rows[i][1])
-                for i, _ in enumerate(rows)
-                if rows[i][4] is not None
+                (
+                    summary["notif_count"],
+                    summary["unread_count"],
+                    summary["stream_ordering"],
+                    key[0],
+                    key[1],
+                )
+                for key, summary in summaries.items()
+                if summary["old_user_id"] is not None
             ),
         )
 
