@@ -48,6 +48,9 @@ class MatrixFederationAgent(object):
         tls_client_options_factory (FederationPolicyForHTTPS|None):
             factory to use for fetching client tls options, or none to disable TLS.
 
+        user_agent (bytes):
+            The user agent header to use for federation requests.
+
         _srv_resolver (SrvResolver|None):
             SRVResolver impl to use for looking up SRV records. None to use a default
             implementation.
