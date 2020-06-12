@@ -60,10 +60,10 @@ def login_id_thirdparty_from_phone(identifier):
 
     Returns: Login identifier dict of type 'm.id.threepid'
     """
-    if "country" not in identifier or "number" not in identifier:
+    if "country" not in identifier or "phone" not in identifier:
         raise SynapseError(400, "Invalid phone-type identifier")
 
-    msisdn = phone_number_to_msisdn(identifier["country"], identifier["number"])
+    msisdn = phone_number_to_msisdn(identifier["country"], identifier["phone"])
 
     return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
 
