@@ -171,8 +171,9 @@ import logging
 import re
 import types
 from functools import wraps
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Optional, Type
 
+import attr
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -230,6 +231,30 @@ try:
 except ImportError:
     JaegerConfig = None  # type: ignore
     LogContextScopeManager = None  # type: ignore
+
+
+try:
+    from rust_python_jaeger_reporter import Reporter
+
+    @attr.s(slots=True, frozen=True)
+    class _WrappedRustReporter:
+        """Wrap the reporter to ensure `report_span` never throws.
+        """
+
+        _reporter = attr.ib(type=Reporter, default=lambda: Reporter())
+
+        def set_process(self, *args, **kwargs):
+            return self._reporter.set_process(*args, **kwargs)
+
+        def report_span(self, span):
+            try:
+                return self._reporter.report_span(span)
+            except Exception:
+                logger.exception("Failed to report span")
+
+    RustReporter = _WrappedRustReporter  # type: Optional[Type[_WrappedRustReporter]]
+except ImportError:
+    RustReporter = None
 
 
 logger = logging.getLogger(__name__)
@@ -320,11 +345,18 @@ def init_tracer(hs: "HomeServer"):
 
     set_homeserver_whitelist(hs.config.opentracer_whitelist)
 
-    JaegerConfig(
+    config = JaegerConfig(
         config=hs.config.jaeger_config,
         service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
         scope_manager=LogContextScopeManager(hs.config),
-    ).initialize_tracer()
+    )
+
+    # If we have the rust jaeger reporter available let's use that.
+    if RustReporter:
+        tracer = config.create_tracer(RustReporter(), config.sampler)
+        opentracing.set_global_tracer(tracer)
+    else:
+        config.initialize_tracer()
 
 
 # Whitelisting
