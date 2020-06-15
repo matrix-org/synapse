@@ -1,1 +1,1 @@
-Correct Synapse's definition of `m.id.phone`, changing `number` to `phone`. Bug introduced in v0.20.0-rc1.
+Accept the proper field (`phone`) for the `m.id.phone` identifier type. The legacy field of `number` is still accepted as a fallback. Bug introduced in v0.20.0-rc1.
