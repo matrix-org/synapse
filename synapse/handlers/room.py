@@ -24,7 +24,7 @@ import string
 from collections import OrderedDict
 from typing import Tuple
 
-from six import iteritems, string_types
+from six import string_types
 
 from synapse.api.constants import (
     EventTypes,
@@ -377,7 +377,7 @@ class RoomCreationHandler(BaseHandler):
         # map from event_id to BaseEvent
         old_room_state_events = await self.store.get_events(old_room_state_ids.values())
 
-        for k, old_event_id in iteritems(old_room_state_ids):
+        for k, old_event_id in old_room_state_ids.items():
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
                 initial_state[k] = old_event.content
@@ -430,7 +430,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_member_state_events = await self.store.get_events(
             old_room_member_state_ids.values()
         )
-        for k, old_event in iteritems(old_room_member_state_events):
+        for k, old_event in old_room_member_state_events.items():
             # Only transfer ban events
             if (
                 "membership" in old_event.content

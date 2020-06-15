@@ -16,8 +16,6 @@
 # limitations under the License.
 from typing import Dict, List
 
-from six import iteritems
-
 from canonicaljson import encode_canonical_json, json
 
 from twisted.enterprise.adbapi import Connection
@@ -64,9 +62,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         # Build the result structure, un-jsonify the results, and add the
         # "unsigned" section
         rv = {}
-        for user_id, device_keys in iteritems(results):
+        for user_id, device_keys in results.items():
             rv[user_id] = {}
-            for device_id, device_info in iteritems(device_keys):
+            for device_id, device_info in device_keys.items():
                 r = db_to_json(device_info.pop("key_json"))
                 r["unsigned"] = {}
                 display_name = device_info["device_display_name"]

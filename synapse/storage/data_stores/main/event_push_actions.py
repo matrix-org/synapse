@@ -16,8 +16,6 @@
 import logging
 from typing import Dict, Tuple
 
-from six import iteritems
-
 import attr
 from canonicaljson import json
 
@@ -493,7 +491,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 sql,
                 (
                     _gen_entry(user_id, actions)
-                    for user_id, actions in iteritems(user_id_actions)
+                    for user_id, actions in user_id_actions.items()
                 ),
             )
 

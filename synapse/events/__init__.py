@@ -20,8 +20,6 @@ import os
 from distutils.util import strtobool
 from typing import Dict, Optional, Type
 
-import six
-
 from unpaddedbase64 import encode_base64
 
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
@@ -290,7 +288,7 @@ class EventBase(metaclass=abc.ABCMeta):
         return list(self._dict.items())
 
     def keys(self):
-        return six.iterkeys(self._dict)
+        return self._dict.keys()
 
     def prev_event_ids(self):
         """Returns the list of prev event IDs. The order matches the order

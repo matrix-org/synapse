@@ -20,8 +20,6 @@ import os
 import shutil
 from typing import Dict, Tuple
 
-from six import iteritems
-
 import twisted.internet.error
 import twisted.web.http
 from twisted.web.resource import Resource
@@ -606,7 +604,7 @@ class MediaRepository(object):
                 thumbnails[(t_width, t_height, r_type)] = r_method
 
         # Now we generate the thumbnails for each dimension, store it
-        for (t_width, t_height, t_type), t_method in iteritems(thumbnails):
+        for (t_width, t_height, t_type), t_method in thumbnails.items():
             # Generate the thumbnail
             if t_method == "crop":
                 t_byte_source = await defer_to_thread(
