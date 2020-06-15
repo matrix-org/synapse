@@ -1,1 +1,1 @@
-Fix an incorrect type in the `GET room_keys/version` endpoint.
+Fix a long standing bug where the response to the `GET room_keys/version` endpoint had the incorrect type for the `etag` field.
