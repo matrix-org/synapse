@@ -691,6 +691,7 @@ class DeviceListUpdater(object):
 
         return False
 
+    @trace
     @defer.inlineCallbacks
     def _maybe_retry_device_resync(self):
         """Retry to resync device lists that are out of sync, except if another retry is
