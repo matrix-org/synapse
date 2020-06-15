@@ -15,7 +15,6 @@
 
 import logging
 
-from six import string_types
 from six.moves import http_client
 
 from synapse.api.errors import Codes, SynapseError
@@ -47,7 +46,7 @@ class ReportEventRestServlet(RestServlet):
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("reason", "score"))
 
-        if not isinstance(body["reason"], string_types):
+        if not isinstance(body["reason"], str):
             raise SynapseError(
                 http_client.BAD_REQUEST,
                 "Param 'reason' must be a string",

@@ -19,7 +19,7 @@ import random
 import sys
 from io import BytesIO
 
-from six import raise_from, string_types
+from six import raise_from
 from six.moves import urllib
 
 import attr
@@ -998,7 +998,7 @@ def encode_query_args(args):
 
     encoded_args = {}
     for k, vs in args.items():
-        if isinstance(vs, string_types):
+        if isinstance(vs, str):
             vs = [vs]
         encoded_args[k] = [v.encode("UTF-8") for v in vs]
 

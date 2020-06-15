@@ -25,8 +25,6 @@ import sys
 import traceback
 from typing import Dict, Optional
 
-import six
-from six import string_types
 from six.moves import urllib_parse as urlparse
 
 from canonicaljson import json
@@ -188,7 +186,7 @@ class PreviewUrlResource(DirectServeResource):
             # It may be stored as text in the database, not as bytes (such as
             # PostgreSQL). If so, encode it back before handing it on.
             og = cache_result["og"]
-            if isinstance(og, six.text_type):
+            if isinstance(og, str):
                 og = og.encode("utf8")
             return og
 
@@ -631,7 +629,7 @@ def _iterate_over_text(tree, *tags_to_ignore):
         if el is None:
             return
 
-        if isinstance(el, string_types):
+        if isinstance(el, str):
             yield el
         elif el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately

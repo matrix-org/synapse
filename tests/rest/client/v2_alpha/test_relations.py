@@ -134,7 +134,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Make sure next_batch has something in it that looks like it could be a
         # valid token.
         self.assertIsInstance(
-            channel.json_body.get("next_batch"), six.string_types, channel.json_body
+            channel.json_body.get("next_batch"), str, channel.json_body
         )
 
     def test_repeated_paginate_relations(self):

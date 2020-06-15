@@ -17,7 +17,7 @@
 import logging
 from io import BytesIO
 
-from six import raise_from, text_type
+from six import raise_from
 from six.moves import urllib
 
 import treq
@@ -638,7 +638,7 @@ def encode_urlencode_args(args):
 
 
 def encode_urlencode_arg(arg):
-    if isinstance(arg, text_type):
+    if isinstance(arg, str):
         return arg.encode("utf-8")
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]

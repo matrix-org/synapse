@@ -17,8 +17,6 @@
 import logging
 from typing import Any, Callable, Dict, List, Match, Optional, Tuple, Union
 
-import six
-
 from canonicaljson import json
 from prometheus_client import Counter
 
@@ -751,7 +749,7 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
 
 
 def _acl_entry_matches(server_name: str, acl_entry: str) -> Match:
-    if not isinstance(acl_entry, six.string_types):
+    if not isinstance(acl_entry, str):
         logger.warning(
             "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
         )
