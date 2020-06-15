@@ -147,7 +147,7 @@ class PushRuleEvaluatorForEvent(object):
             return False
 
         body = self._event.content.get("body", None)
-        if not body:
+        if not body or not isinstance(body, str):
             return False
 
         # Similar to _glob_matches, but do not treat display_name as a glob.
