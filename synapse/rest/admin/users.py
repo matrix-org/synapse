@@ -90,7 +90,8 @@ class UsersRestServletV2(RestServlet):
 
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
-        name = parse_string(request, "name", default=None)
+        user_id = parse_string(request, "user_id", default=None)
+        name = parse_string(request, "name", default=user_id)
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
