@@ -1,1 +1,1 @@
-Fix logged error during device resync in opentracing. Broke in #7453.
+Fix logged error during device resync in opentracing. Broke in v1.14.0.
