@@ -15,9 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from collections import defaultdict
-
-from six.moves import urllib
 
 import attr
 from signedjson.key import (

@@ -15,8 +15,7 @@
 
 import itertools
 import json
-
-import six
+import urllib
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
@@ -278,7 +277,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         prev_token = None
         found_event_ids = []
-        encoded_key = six.moves.urllib.parse.quote_plus("👍".encode("utf-8"))
+        encoded_key = urllib.parse.quote_plus("👍".encode("utf-8"))
         for _ in range(20):
             from_token = ""
             if prev_token:
@@ -670,7 +669,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         query = ""
         if key:
-            query = "?key=" + six.moves.urllib.parse.quote_plus(key.encode("utf-8"))
+            query = "?key=" + urllib.parse.quote_plus(key.encode("utf-8"))
 
         original_id = parent_id if parent_id else self.parent_id
 

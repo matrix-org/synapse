@@ -15,9 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from io import BytesIO
-
-from six.moves import urllib
 
 import treq
 from canonicaljson import encode_canonical_json, json

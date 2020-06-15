@@ -14,10 +14,9 @@
 # limitations under the License.
 
 import logging
+import urllib
 import xml.etree.ElementTree as ET
 from typing import Dict, Optional, Tuple
-
-from six.moves import urllib
 
 from twisted.web.client import PartialDownloadError
 

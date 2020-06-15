@@ -14,8 +14,7 @@
 
 import logging
 from typing import Dict
-
-from six.moves.urllib import parse as urlparse
+from urllib import parse as urlparse
 
 import yaml
 from netaddr import IPSet

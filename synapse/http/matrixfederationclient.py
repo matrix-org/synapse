@@ -17,9 +17,8 @@ import cgi
 import logging
 import random
 import sys
+import urllib
 from io import BytesIO
-
-from six.moves import urllib
 
 import attr
 import treq

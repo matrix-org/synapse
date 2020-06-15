@@ -15,9 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from typing import Any, Dict, Optional
-
-from six.moves import urllib
 
 from twisted.internet import defer
 

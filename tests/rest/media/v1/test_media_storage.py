@@ -20,9 +20,9 @@ import tempfile
 from binascii import unhexlify
 from io import BytesIO
 from typing import Optional
+from urllib import parse
 
 from mock import Mock
-from six.moves.urllib import parse
 
 import attr
 import PIL.Image as Image

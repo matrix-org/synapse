@@ -16,10 +16,9 @@
 import abc
 import logging
 import re
+import urllib
 from inspect import signature
 from typing import Dict, List, Tuple
-
-from six.moves import urllib
 
 from twisted.internet import defer
 

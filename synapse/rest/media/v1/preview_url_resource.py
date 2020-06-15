@@ -24,8 +24,7 @@ import shutil
 import sys
 import traceback
 from typing import Dict, Optional
-
-from six.moves import urllib_parse as urlparse
+from urllib import parse as urlparse
 
 from canonicaljson import json
 
