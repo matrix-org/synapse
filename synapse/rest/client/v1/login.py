@@ -61,8 +61,8 @@ def login_id_thirdparty_from_phone(identifier):
     Returns: Login identifier dict of type 'm.id.threepid'
     """
     if "country" not in identifier or (
-        # XXX: We used to require `number` instead of `phone`. The spec
-        # defines `phone`. So accept both
+        # The specification requires a "phone" field, while Synapse used to require a "number"
+        # field. Accept both for backwards compatibility.
         "phone" not in identifier
         and "number" not in identifier
     ):
