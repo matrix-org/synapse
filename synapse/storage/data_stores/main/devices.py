@@ -17,8 +17,6 @@
 import logging
 from typing import List, Optional, Set, Tuple
 
-from six import iteritems
-
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -208,7 +206,7 @@ class DeviceWorkerStore(SQLBaseStore):
         )
 
         # add the updated cross-signing keys to the results list
-        for user_id, result in iteritems(cross_signing_keys_by_user):
+        for user_id, result in cross_signing_keys_by_user.items():
             result["user_id"] = user_id
             # FIXME: switch to m.signing_key_update when MSC1756 is merged into the spec
             results.append(("org.matrix.signing_key_update", result))
@@ -269,7 +267,7 @@ class DeviceWorkerStore(SQLBaseStore):
         )
 
         results = []
-        for user_id, user_devices in iteritems(devices):
+        for user_id, user_devices in devices.items():
             # The prev_id for the first row is always the last row before
             # `from_stream_id`
             prev_id = yield self._get_last_device_update_for_remote_user(
@@ -493,7 +491,7 @@ class DeviceWorkerStore(SQLBaseStore):
         if devices:
             user_devices = devices[user_id]
             results = []
-            for device_id, device in iteritems(user_devices):
+            for device_id, device in user_devices.items():
                 result = {"device_id": device_id}
 
                 key_json = device.get("key_json", None)

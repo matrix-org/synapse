@@ -18,7 +18,6 @@ import logging
 from typing import Any, Callable, Dict, List, Match, Optional, Tuple, Union
 
 import six
-from six import iteritems
 
 from canonicaljson import json
 from prometheus_client import Counter
@@ -534,9 +533,9 @@ class FederationServer(FederationBase):
             ",".join(
                 (
                     "%s for %s:%s" % (key_id, user_id, device_id)
-                    for user_id, user_keys in iteritems(json_result)
-                    for device_id, device_keys in iteritems(user_keys)
-                    for key_id, _ in iteritems(device_keys)
+                    for user_id, user_keys in json_result.items()
+                    for device_id, device_keys in user_keys.items()
+                    for key_id, _ in device_keys.items()
                 )
             ),
         )
