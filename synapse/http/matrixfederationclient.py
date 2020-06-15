@@ -19,7 +19,6 @@ import random
 import sys
 from io import BytesIO
 
-from six import raise_from
 from six.moves import urllib
 
 import attr
@@ -432,10 +431,10 @@ class MatrixFederationHttpClient(object):
                     except TimeoutError as e:
                         raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
-                        raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
+                        raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
                         logger.info("Failed to send request: %s", e)
-                        raise_from(RequestSendFailed(e, can_retry=True), e)
+                        raise RequestSendFailed(e, can_retry=True) from e
 
                     incoming_responses_counter.labels(
                         request.method, response.code
@@ -487,7 +486,7 @@ class MatrixFederationHttpClient(object):
                         # Retry if the error is a 429 (Too Many Requests),
                         # otherwise just raise a standard HttpResponseException
                         if response.code == 429:
-                            raise_from(RequestSendFailed(e, can_retry=True), e)
+                            raise RequestSendFailed(e, can_retry=True) from e
                         else:
                             raise e
 

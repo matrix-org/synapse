@@ -17,7 +17,6 @@
 import logging
 from io import BytesIO
 
-from six import raise_from
 from six.moves import urllib
 
 import treq
@@ -577,7 +576,7 @@ class SimpleHttpClient(object):
             # This can happen e.g. because the body is too large.
             raise
         except Exception as e:
-            raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
+            raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
 
         return (
             length,

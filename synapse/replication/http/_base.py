@@ -19,7 +19,6 @@ import re
 from inspect import signature
 from typing import Dict, List, Tuple
 
-from six import raise_from
 from six.moves import urllib
 
 from twisted.internet import defer
@@ -220,7 +219,7 @@ class ReplicationEndpoint(object):
                 # importantly, not stack traces everywhere)
                 raise e.to_synapse_error()
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to talk to master"), e)
+                raise SynapseError(502, "Failed to talk to master") from e
 
             return result
 
