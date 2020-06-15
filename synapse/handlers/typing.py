@@ -282,7 +282,7 @@ class TypingHandler(object):
                 typing = self._room_typing[room_id]
                 rows.append((serial, (room_id, list(typing))))
         rows.sort()
-        return rows[:limit], current_id, False
+        return rows[:limit], current_id, len(rows) > limit
 
     def get_current_token(self):
         return self._latest_room_serial
