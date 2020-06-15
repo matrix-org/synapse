@@ -1082,6 +1082,21 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> Tuple[List[Tuple[int, list]], int, bool]:
         """Get updates for backfill replication stream, including all new
         backfilled events and events that have gone from being outliers to not.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here sincethere is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, the position of the rows
+            returned up to, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The updates are list of 2-tuples of stream ID and the row.
         """
         if last_id == current_id:
             return [], current_id, False
