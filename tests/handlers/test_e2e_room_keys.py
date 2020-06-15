@@ -96,6 +96,7 @@ class E2eRoomKeysHandlerTestCase(unittest.TestCase):
         # check we can retrieve it as the current version
         res = yield self.handler.get_version_info(self.local_user)
         version_etag = res["etag"]
+        self.assertIsInstance(version_etag, str)
         del res["etag"]
         self.assertDictEqual(
             res,
