@@ -1,24 +1,24 @@
 <!doctype html>
 <html>
 <head>
-<title> Login </title>
-<meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
-<link rel="stylesheet" href="style.css">
-<script src="js/jquery-3.4.1.min.js"></script>
-<script src="js/login.js"></script>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title> Login </title>
+    <meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
+    <link rel="stylesheet" href="style.css">
+    <script src="js/jquery-3.4.1.min.js"></script>
+    <script src="js/login.js"></script>
 </head>
 <body onload="matrixLogin.onLoad()">
-    <center>
-        <br/>
+    <div id="container">
         <h1 id="title"></h1>
 
-        <span id="feedback" style="color: #f00"></span>
+        <span id="feedback"></span>
 
         <div id="loading">
             <img src="spinner.gif" />
         </div>
 
-        <div id="sso_flow" class="login_flow" style="display:none">
+        <div id="sso_flow" class="login_flow" style="display: none;">
             Single-sign on:
             <form id="sso_form" action="/_matrix/client/r0/login/sso/redirect" method="get">
                 <input id="sso_redirect_url" type="hidden" name="redirectUrl" value=""/>
@@ -26,9 +26,9 @@
             </form>
         </div>
 
-        <div id="password_flow" class="login_flow" style="display:none">
+        <div id="password_flow" class="login_flow" style="display: none;">
             Password Authentication:
-            <form onsubmit="matrixLogin.password_login(); return false;">
+            <form onsubmit="matrixLogin.passwordLogin(); return false;">
                 <input id="user_id" size="32" type="text" placeholder="Matrix ID (e.g. bob)" autocapitalize="off" autocorrect="off" />
                 <br/>
                 <input id="password" size="32" type="password" placeholder="Password"/>
@@ -38,9 +38,9 @@
             </form>
         </div>
 
-        <div id="no_login_types" type="button" class="login_flow" style="display:none">
+        <div id="no_login_types" type="button" class="login_flow" style="display: none;">
             Log in currently unavailable.
         </div>
-    </center>
+    </div>
 </body>
 </html>

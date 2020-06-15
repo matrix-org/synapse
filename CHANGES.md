@@ -1,3 +1,9 @@
+Synapse 1.15.0 (2020-06-11)
+===========================
+
+No significant changes.
+
+
 Synapse 1.15.0rc1 (2020-06-09)
 ==============================
 
@@ -8,14 +14,14 @@ Features
 - Add an option to disable autojoining rooms for guest accounts. ([\#6637](https://github.com/matrix-org/synapse/issues/6637))
 - For SAML authentication, add the ability to pass email addresses to be added to new users' accounts via SAML attributes. Contributed by Christopher Cooper. ([\#7385](https://github.com/matrix-org/synapse/issues/7385))
 - Add admin APIs to allow server admins to manage users' devices. Contributed by @dklimpel. ([\#7481](https://github.com/matrix-org/synapse/issues/7481))
-- Add support for generating thumbnails for WebP images. Previously, users would see an empty box instead of preview image. ([\#7586](https://github.com/matrix-org/synapse/issues/7586))
+- Add support for generating thumbnails for WebP images. Previously, users would see an empty box instead of preview image. Contributed by @WGH-. ([\#7586](https://github.com/matrix-org/synapse/issues/7586))
 - Support the standardized `m.login.sso` user-interactive authentication flow. ([\#7630](https://github.com/matrix-org/synapse/issues/7630))
 
 
 Bugfixes
 --------
 
-- Allow new users to be registered via the admin API even if the monthly active user limit has been reached. Contributed by @dkimpel. ([\#7263](https://github.com/matrix-org/synapse/issues/7263))
+- Allow new users to be registered via the admin API even if the monthly active user limit has been reached. Contributed by @dklimpel. ([\#7263](https://github.com/matrix-org/synapse/issues/7263))
 - Fix email notifications not being enabled for new users when created via the Admin API. ([\#7267](https://github.com/matrix-org/synapse/issues/7267))
 - Fix str placeholders in an instance of `PrepareDatabaseException`. Introduced in Synapse v1.8.0. ([\#7575](https://github.com/matrix-org/synapse/issues/7575))
 - Fix a bug in automatic user creation during first time login with `m.login.jwt`. Regression in v1.6.0. Contributed by @olof. ([\#7585](https://github.com/matrix-org/synapse/issues/7585))
@@ -44,7 +50,7 @@ Internal Changes
 ----------------
 
 - Convert the identity handler to async/await. ([\#7561](https://github.com/matrix-org/synapse/issues/7561))
-- Improve query performance for fetching state from a PostgreSQL database. ([\#7567](https://github.com/matrix-org/synapse/issues/7567))
+- Improve query performance for fetching state from a PostgreSQL database. Contributed by @ilmari. ([\#7567](https://github.com/matrix-org/synapse/issues/7567))
 - Speed up processing of federation stream RDATA rows. ([\#7584](https://github.com/matrix-org/synapse/issues/7584))
 - Add comment to systemd example to show postgresql dependency. ([\#7591](https://github.com/matrix-org/synapse/issues/7591))
 - Refactor `Ratelimiter` to limit the amount of expensive config value accesses. ([\#7595](https://github.com/matrix-org/synapse/issues/7595))

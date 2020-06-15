@@ -856,7 +856,7 @@ class ServerConfig(Config):
         # number of monthly active users.
         #
         # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
-        # anabled and a limit is reached the server returns a 'ResourceLimitError'
+        # enabled and a limit is reached the server returns a 'ResourceLimitError'
         # with error type Codes.RESOURCE_LIMIT_EXCEEDED
         #
         # 'max_mau_value' is the hard limit of monthly active users above which
