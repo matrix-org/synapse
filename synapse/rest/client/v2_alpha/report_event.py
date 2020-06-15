@@ -14,8 +14,7 @@
 # limitations under the License.
 
 import logging
-
-from six.moves import http_client
+from http import HTTPStatus
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import (
@@ -48,13 +47,13 @@ class ReportEventRestServlet(RestServlet):
 
         if not isinstance(body["reason"], str):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'reason' must be a string",
                 Codes.BAD_JSON,
             )
         if not isinstance(body["score"], int):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'score' must be an integer",
                 Codes.BAD_JSON,
             )

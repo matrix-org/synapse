@@ -16,9 +16,8 @@
 import hmac
 import logging
 from hashlib import sha256
+from http import HTTPStatus
 from os import path
-
-from six.moves import http_client
 
 import jinja2
 from jinja2 import TemplateNotFound
@@ -223,4 +222,4 @@ class ConsentResource(DirectServeResource):
         )
 
         if not compare_digest(want_mac, userhmac):
-            raise SynapseError(http_client.FORBIDDEN, "HMAC incorrect")
+            raise SynapseError(HTTPStatus.FORBIDDEN, "HMAC incorrect")
