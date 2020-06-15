@@ -16,8 +16,6 @@
 import logging
 import operator
 
-from six.moves import map
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership

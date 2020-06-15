@@ -21,7 +21,7 @@ import itertools
 import logging
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
-from six.moves import http_client, zip
+from six.moves import http_client
 
 import attr
 from signedjson.key import decode_verify_key_bytes

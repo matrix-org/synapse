@@ -29,7 +29,7 @@ from typing import (
     TypeVar,
 )
 
-from six.moves import intern, range
+from six.moves import intern
 
 from prometheus_client import Histogram
 

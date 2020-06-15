@@ -21,8 +21,6 @@ from collections import OrderedDict, namedtuple
 from functools import wraps
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
-from six.moves import range
-
 import attr
 from canonicaljson import json
 from prometheus_client import Counter

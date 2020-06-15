@@ -19,8 +19,6 @@ import logging
 from contextlib import contextmanager
 from typing import Dict, Sequence, Set, Union
 
-from six.moves import range
-
 import attr
 
 from twisted.internet import defer
