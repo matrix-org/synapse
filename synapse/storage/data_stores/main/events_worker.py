@@ -1085,7 +1085,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             instance_name: The writer we want to fetch updates from. Unused
-                here sincethere is only ever one writer.
+                here since there is only ever one writer.
             last_id: The token to fetch updates from. Exclusive.
             current_id: The token to fetch updates up to. Inclusive.
             limit: The requested limit for the number of rows to return. The
@@ -1096,7 +1096,7 @@ class EventsWorkerStore(SQLBaseStore):
             returned up to, and whether we returned fewer rows than exists
             between the requested tokens due to the limit.
 
-            The updates are list of 2-tuples of stream ID and the row.
+            The updates are a list of 2-tuples of stream ID and the row data
         """
         if last_id == current_id:
             return [], current_id, False
