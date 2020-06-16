@@ -400,6 +400,8 @@ The following JSON body parameters are available:
 * `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing future attempts to
   join the room. Defaults to `false`.
 
+## Response
+
 The following fields are returned in the JSON response body:
 
 * `kicked_users` - An array of users (`user_id`) that were kicked.
