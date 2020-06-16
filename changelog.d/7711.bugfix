@@ -1,0 +1,1 @@
+Fixes a bug where the `synapse_port_db` file fails when the `ui_auth_sessions` table is non-empty. This bug has existed since v1.13.0rc1.
