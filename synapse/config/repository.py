@@ -94,6 +94,12 @@ class ContentRepositoryConfig(Config):
         else:
             self.can_load_media_repo = True
 
+        # Whether this instance should be the one to run the background jobs to
+        # e.g clean up old URL previews.
+        self.run_media_background_jobs = config.get(
+            "worker_run_media_background_jobs", True
+        )
+
         self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))

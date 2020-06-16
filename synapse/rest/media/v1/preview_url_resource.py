@@ -85,6 +85,10 @@ class PreviewUrlResource(DirectServeResource):
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage
 
+        self._worker_run_media_background_jobs = (
+            hs.config.media.run_media_background_jobs
+        )
+
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
         self.url_preview_accept_language = hs.config.url_preview_accept_language
 
@@ -97,9 +101,10 @@ class PreviewUrlResource(DirectServeResource):
             expiry_ms=60 * 60 * 1000,
         )
 
-        self._cleaner_loop = self.clock.looping_call(
-            self._start_expire_url_cache_data, 10 * 1000
-        )
+        if self._worker_run_media_background_jobs:
+            self._cleaner_loop = self.clock.looping_call(
+                self._start_expire_url_cache_data, 10 * 1000
+            )
 
     def render_OPTIONS(self, request):
         request.setHeader(b"Allow", b"OPTIONS, GET")
@@ -399,6 +404,8 @@ class PreviewUrlResource(DirectServeResource):
         """Clean up expired url cache content, media and thumbnails.
         """
         # TODO: Delete from backup media store
+
+        assert self._worker_run_media_background_jobs
 
         now = self.clock.time_msec()
 
