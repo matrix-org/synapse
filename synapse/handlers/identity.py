@@ -19,6 +19,7 @@
 
 import logging
 import urllib.parse
+from typing import Dict, Optional, Union
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
@@ -58,6 +59,10 @@ class IdentityHandler(BaseHandler):
         )
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
+
+        self._threepid_behaviour_email_add_threepid = (
+            self.hs.config.threepid_behaviour_email_add_threepid
+        )
 
     async def threepid_from_creds(self, id_server, creds):
         """
@@ -480,17 +485,27 @@ class IdentityHandler(BaseHandler):
         )
         return data
 
-    async def validate_threepid_session(self, client_secret, sid):
+    async def validate_threepid_session(
+        self, client_secret: str, sid: str
+    ) -> Optional[Dict[str, Union[str, int]]]:
         """Validates a threepid session with only the client secret and session ID
         Tries validating against any configured account_threepid_delegates as well as locally.
 
         Args:
-            client_secret (str): A secret provided by the client
+            client_secret: A secret provided by the client
 
-            sid (str): The ID of the session
+            sid: The ID of the session
 
         Returns:
-            Dict[str, str|int] if validation was successful, otherwise None
+            If validation succeeds, a dict containing:
+                * address - address of the 3pid
+                * medium - medium of the 3pid
+                * client_secret - a secret provided by the client for this validation session
+                * session_id - ID of the validation session
+                * send_attempt - a number serving to dedupe send attempts for this session
+                * validated_at - timestamp of when this session was validated if so
+
+                Otherwise None if a validation session is not found
         """
         # XXX: We shouldn't need to keep wrapping and unwrapping this value
         threepid_creds = {"client_secret": client_secret, "sid": sid}
@@ -500,12 +515,17 @@ class IdentityHandler(BaseHandler):
         validation_session = None
 
         # Try to validate as email
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+
+        # Note that this method is only used by /register and /account/3pid* currently,
+        # so there's no need to consult config.threepid_behaviour_email_password_reset
+        threepid_behaviour = self._threepid_behaviour_email_add_threepid
+
+        if threepid_behaviour == ThreepidBehaviour.REMOTE:
             # Ask our delegated email identity server
             validation_session = await self.threepid_from_creds(
                 self.hs.config.account_threepid_delegate_email, threepid_creds
             )
-        elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        elif threepid_behaviour == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
             validation_session = await self.store.get_threepid_validation_session(
                 "email", client_secret, sid=sid, validated=True
