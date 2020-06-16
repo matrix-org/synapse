@@ -1,1 +1,1 @@
-Add support for using `rust-python-jaeger-reporter` library to reduct jaeger tracing overhead.
+Add support for using `rust-python-jaeger-reporter` library to reduce jaeger tracing overhead.
