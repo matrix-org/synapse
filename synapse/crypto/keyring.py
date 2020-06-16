@@ -15,10 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from collections import defaultdict
-
-import six
-from six.moves import urllib
 
 import attr
 from signedjson.key import (
@@ -661,7 +659,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         for response in query_response["server_keys"]:
             # do this first, so that we can give useful errors thereafter
             server_name = response.get("server_name")
-            if not isinstance(server_name, six.string_types):
+            if not isinstance(server_name, str):
                 raise KeyLookupError(
                     "Malformed response from key notary server %s: invalid server_name"
                     % (perspective_name,)

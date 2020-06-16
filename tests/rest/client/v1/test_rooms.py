@@ -19,9 +19,9 @@
 """Tests REST events for /rooms paths."""
 
 import json
+from urllib import parse as urlparse
 
 from mock import Mock
-from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer
 

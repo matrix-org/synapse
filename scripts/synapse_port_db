@@ -23,8 +23,6 @@ import sys
 import time
 import traceback
 
-from six import string_types
-
 import yaml
 
 from twisted.internet import defer, reactor
@@ -635,7 +633,7 @@ class Porter(object):
                 return bool(col)
             if isinstance(col, bytes):
                 return bytearray(col)
-            elif isinstance(col, string_types) and "\0" in col:
+            elif isinstance(col, str) and "\0" in col:
                 logger.warning(
                     "DROPPING ROW: NUL value in table %s col %s: %r",
                     table,

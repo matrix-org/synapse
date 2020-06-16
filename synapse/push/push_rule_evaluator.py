@@ -18,8 +18,6 @@ import logging
 import re
 from typing import Pattern
 
-from six import string_types
-
 from synapse.events import EventBase
 from synapse.types import UserID
 from synapse.util.caches import register_cache
@@ -244,7 +242,7 @@ def _flatten_dict(d, prefix=[], result=None):
     if result is None:
         result = {}
     for key, value in d.items():
-        if isinstance(value, string_types):
+        if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif hasattr(value, "items"):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)

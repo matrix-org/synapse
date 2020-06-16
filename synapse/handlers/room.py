@@ -24,8 +24,6 @@ import string
 from collections import OrderedDict
 from typing import Tuple
 
-from six import string_types
-
 from synapse.api.constants import (
     EventTypes,
     JoinRules,
@@ -595,7 +593,7 @@ class RoomCreationHandler(BaseHandler):
             "room_version", self.config.default_room_version.identifier
         )
 
-        if not isinstance(room_version_id, string_types):
+        if not isinstance(room_version_id, str):
             raise SynapseError(400, "room_version must be a string", Codes.BAD_JSON)
 
         room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)

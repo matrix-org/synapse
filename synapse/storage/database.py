@@ -16,6 +16,7 @@
 # limitations under the License.
 import logging
 import time
+from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
     Any,
@@ -28,8 +29,6 @@ from typing import (
     Tuple,
     TypeVar,
 )
-
-from six.moves import intern, range
 
 from prometheus_client import Histogram
 
