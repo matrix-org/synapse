@@ -150,7 +150,7 @@ class LoginRestServlet(RestServlet):
         )
         if medium and address:
             self._failed_attempts_ratelimiter.ratelimit(
-                (medium.lower(), address.lower()), update=False
+                (medium, address.lower()), update=False
             )
 
         # Extract a localpart or user ID from the values in the identifier
@@ -163,7 +163,7 @@ class LoginRestServlet(RestServlet):
                 # The user attempted to login via threepid and failed
                 # Record this failed attempt
                 self._failed_attempts_ratelimiter.can_do_action(
-                    (medium.lower(), address.lower())
+                    (medium, address.lower())
                 )
 
                 raise LoginError(403, "Unauthorized threepid", errcode=Codes.FORBIDDEN)
