@@ -14,8 +14,6 @@
 # limitations under the License.
 from typing import Optional, Union
 
-from six import iteritems
-
 import attr
 from frozendict import frozendict
 
@@ -341,7 +339,7 @@ def _encode_state_dict(state_dict):
     if state_dict is None:
         return None
 
-    return [(etype, state_key, v) for (etype, state_key), v in iteritems(state_dict)]
+    return [(etype, state_key, v) for (etype, state_key), v in state_dict.items()]
 
 
 def _decode_state_dict(input):

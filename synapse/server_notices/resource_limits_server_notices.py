@@ -14,8 +14,6 @@
 # limitations under the License.
 import logging
 
-from six import iteritems
-
 from synapse.api.constants import (
     EventTypes,
     LimitBlockingTypes,
@@ -214,7 +212,7 @@ class ResourceLimitsServerNotices(object):
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 
         events = await self._store.get_events(referenced_events)
-        for event_id, event in iteritems(events):
+        for event_id, event in events.items():
             if event.type != EventTypes.Message:
                 continue
             if event.content.get("msgtype") == ServerNoticeMsgType:

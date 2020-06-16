@@ -126,7 +126,7 @@ class ModuleApi(object):
                 'errcode' property for more information on the reason for failure
 
         Returns:
-            Deferred[str]: user_id
+            defer.Deferred[str]: user_id
         """
         return defer.ensureDeferred(
             self._hs.get_registration_handler().register_user(
@@ -149,10 +149,12 @@ class ModuleApi(object):
         Returns:
             defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
         """
-        return self._hs.get_registration_handler().register_device(
-            user_id=user_id,
-            device_id=device_id,
-            initial_display_name=initial_display_name,
+        return defer.ensureDeferred(
+            self._hs.get_registration_handler().register_device(
+                user_id=user_id,
+                device_id=device_id,
+                initial_display_name=initial_display_name,
+            )
         )
 
     def record_user_external_id(

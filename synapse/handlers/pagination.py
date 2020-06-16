@@ -15,8 +15,6 @@
 # limitations under the License.
 import logging
 
-from six import iteritems
-
 from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
@@ -143,7 +141,7 @@ class PaginationHandler(object):
 
         logger.debug("[purge] Rooms to purge: %s", rooms)
 
-        for room_id, retention_policy in iteritems(rooms):
+        for room_id, retention_policy in rooms.items():
             logger.info("[purge] Attempting to purge messages in room %s", room_id)
 
             if room_id in self._purges_in_progress_by_room:

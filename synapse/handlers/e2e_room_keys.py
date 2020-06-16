@@ -16,8 +16,6 @@
 
 import logging
 
-from six import iteritems
-
 from twisted.internet import defer
 
 from synapse.api.errors import (
@@ -205,8 +203,8 @@ class E2eRoomKeysHandler(object):
             )
             to_insert = []  # batch the inserts together
             changed = False  # if anything has changed, we need to update the etag
-            for room_id, room in iteritems(room_keys["rooms"]):
-                for session_id, room_key in iteritems(room["sessions"]):
+            for room_id, room in room_keys["rooms"].items():
+                for session_id, room_key in room["sessions"].items():
                     if not isinstance(room_key["is_verified"], bool):
                         msg = (
                             "is_verified must be a boolean in keys for session %s in"
@@ -351,6 +349,7 @@ class E2eRoomKeysHandler(object):
                     raise
 
             res["count"] = yield self.store.count_e2e_room_keys(user_id, res["version"])
+            res["etag"] = str(res["etag"])
             return res
 
     @trace

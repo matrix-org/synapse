@@ -27,8 +27,6 @@ import logging
 from contextlib import contextmanager
 from typing import Dict, Iterable, List, Set
 
-from six import iteritems, itervalues
-
 from prometheus_client import Counter
 from typing_extensions import ContextManager
 
@@ -170,14 +168,14 @@ class BasePresenceHandler(abc.ABC):
             for user_id in user_ids
         }
 
-        missing = [user_id for user_id, state in iteritems(states) if not state]
+        missing = [user_id for user_id, state in states.items() if not state]
         if missing:
             # There are things not in our in memory cache. Lets pull them out of
             # the database.
             res = await self.store.get_presence_for_users(missing)
             states.update(res)
 
-            missing = [user_id for user_id, state in iteritems(states) if not state]
+            missing = [user_id for user_id, state in states.items() if not state]
             if missing:
                 new = {
                     user_id: UserPresenceState.default(user_id) for user_id in missing
@@ -632,7 +630,7 @@ class PresenceHandler(BasePresenceHandler):
             await self._update_states(
                 [
                     prev_state.copy_and_replace(last_user_sync_ts=time_now_ms)
-                    for prev_state in itervalues(prev_states)
+                    for prev_state in prev_states.values()
                 ]
             )
             self.external_process_last_updated_ms.pop(process_id, None)
@@ -1087,7 +1085,7 @@ class PresenceEventSource(object):
             return (list(updates.values()), max_token)
         else:
             return (
-                [s for s in itervalues(updates) if s.state != PresenceState.OFFLINE],
+                [s for s in updates.values() if s.state != PresenceState.OFFLINE],
                 max_token,
             )
 
@@ -1323,11 +1321,11 @@ def get_interested_remotes(store, states, state_handler):
     # hosts in those rooms.
     room_ids_to_states, users_to_states = yield get_interested_parties(store, states)
 
-    for room_id, states in iteritems(room_ids_to_states):
+    for room_id, states in room_ids_to_states.items():
         hosts = yield state_handler.get_current_hosts_in_room(room_id)
         hosts_and_states.append((hosts, states))
 
-    for user_id, states in iteritems(users_to_states):
+    for user_id, states in users_to_states.items():
         host = get_domain_from_id(user_id)
         hosts_and_states.append(([host], states))
 
