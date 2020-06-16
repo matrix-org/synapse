@@ -14,9 +14,8 @@
 # limitations under the License.
 
 import json
+from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
-
-from mock import Mock, patch
 
 import attr
 import pymacaroons

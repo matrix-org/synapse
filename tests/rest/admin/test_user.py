@@ -17,8 +17,7 @@ import hashlib
 import hmac
 import json
 import urllib.parse
-
-from mock import Mock
+from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes

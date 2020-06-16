@@ -20,9 +20,8 @@ import tempfile
 from binascii import unhexlify
 from io import BytesIO
 from typing import Optional
+from unittest.mock import Mock
 from urllib import parse
-
-from mock import Mock
 
 import attr
 import PIL.Image as Image

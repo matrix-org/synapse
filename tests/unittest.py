@@ -22,8 +22,7 @@ import inspect
 import logging
 import time
 from typing import Optional, Tuple, Type, TypeVar, Union
-
-from mock import Mock
+from unittest.mock import Mock
 
 from canonicaljson import json
 

@@ -1,8 +1,7 @@
 import json
 import time
 import urllib.parse
-
-from mock import Mock
+from unittest.mock import Mock
 
 import jwt
 

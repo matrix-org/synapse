@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from mock import Mock
+from unittest.mock import Mock
 
 import treq
 from service_identity import VerificationError

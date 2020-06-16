@@ -15,7 +15,7 @@
 
 # type: ignore
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.replication.tcp.streams._base import ReceiptsStream
 

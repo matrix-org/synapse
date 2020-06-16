@@ -21,9 +21,8 @@ import time
 import uuid
 import warnings
 from inspect import getcallargs
+from unittest.mock import Mock, patch
 from urllib import parse as urlparse
-
-from mock import Mock, patch
 
 from twisted.internet import defer, reactor
 

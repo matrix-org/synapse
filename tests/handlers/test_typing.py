@@ -15,8 +15,7 @@
 
 
 import json
-
-from mock import ANY, Mock, call
+from unittest.mock import ANY, Mock, call
 
 from twisted.internet import defer
 
