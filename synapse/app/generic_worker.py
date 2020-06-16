@@ -518,7 +518,12 @@ class GenericWorkerServer(HomeServer):
     def _listen_http(self, listener_config: ListenerConfig):
         port = listener_config.port
         bind_addresses = listener_config.bind_addresses
-        site_tag = listener_config.http_options.tag or port
+
+        assert listener_config.http_options is not None
+
+        site_tag = listener_config.http_options.tag
+        if site_tag is None:
+            site_tag = port
         resources = {}
         for res in listener_config.http_options.resources:
             for name in res.names:

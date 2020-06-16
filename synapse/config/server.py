@@ -57,14 +57,14 @@ on how to configure the new listener.
 --------------------------------------------------------------------------------"""
 
 
-KNOWN_LISTENER_TYPES = [
+KNOWN_LISTENER_TYPES = {
     "http",
     "metrics",
     "manhole",
     "replication",
-]
+}
 
-KNOWN_RESOURCES = [
+KNOWN_RESOURCES = {
     "client",
     "consent",
     "federation",
@@ -75,7 +75,7 @@ KNOWN_RESOURCES = [
     "replication",
     "static",
     "webclient",
-]
+}
 
 
 @attr.s(frozen=True)

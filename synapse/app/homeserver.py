@@ -95,7 +95,9 @@ class SynapseHomeServer(HomeServer):
         port = listener_config.port
         bind_addresses = listener_config.bind_addresses
         tls = listener_config.tls
-        site_tag = listener_config.http_options.tag or port
+        site_tag = listener_config.http_options.tag
+        if site_tag is None:
+            site_tag = port
 
         resources = {}
         for res in listener_config.http_options.resources:
