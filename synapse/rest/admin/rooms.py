@@ -82,7 +82,7 @@ class DeleteRoomRestServlet(RestServlet):
     It will remove all trace of a room from the database.
     """
 
-    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)$")
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/delete$")
 
     def __init__(self, hs):
         self.hs = hs
@@ -90,7 +90,7 @@ class DeleteRoomRestServlet(RestServlet):
         self.room_shutdown_handler = hs.get_room_shutdown_handler()
         self.pagination_handler = hs.get_pagination_handler()
 
-    async def on_DELETE(self, request, room_id):
+    async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 

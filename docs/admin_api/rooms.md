@@ -344,6 +344,41 @@ several minutes or longer.
 The local server will only have the power to move local user and room aliases to
 the new room. Users on other servers will be unaffected.
 
+The API is:
+
+```json
+POST /_synapse/admin/v1/rooms/<room_id>/delete
+```
+
+with a body of:
+```json
+{
+    "new_room_user_id": "@someuser:example.com",
+    "room_name": "Content Violation Notification",
+    "message": "Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.",
+    "block": true
+}
+```
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see [README.rst](README.rst).
+
+A response body like the following is returned:
+
+```json
+{
+    "kicked_users": [
+        "@foobar:example.com"
+    ],
+    "failed_to_kick_users": [],
+    "local_aliases": [
+        "#badroom:example.com",
+        "#evilsaloon:example.com"
+    ],
+    "new_room_id": "!newroomid:example.com"
+}
+```
+
 ## Parameters
 
 The following parameters should be set in the URL:
@@ -372,35 +407,3 @@ The following fields are returned in the JSON response body:
 * `local_aliases` - An array of strings representing the local aliases that were migrated from
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
-
-The API is:
-
-```json
-DELETE /_synapse/admin/v1/rooms/<room_id>
-
-{
-    "new_room_user_id": "@someuser:example.com",
-    "room_name": "Content Violation Notification",
-    "message": "Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.",
-    "block": true
-}
-```
-
-To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see `README.rst <README.rst>`_.
-
-A response body like the following is returned:
-
-```json
-{
-    "kicked_users": [
-        "@foobar:example.com"
-    ],
-    "failed_to_kick_users": [],
-    "local_aliases": [
-        "#badroom:example.com",
-        "#evilsaloon:example.com"
-    ],
-    "new_room_id": "!newroomid:example.com"
-}
-```

@@ -22,7 +22,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from six import iteritems, string_types
 
@@ -1111,17 +1111,61 @@ class RoomShutdownHandler(object):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
-        self.admin_handler = hs.get_handlers().admin_handler
 
     async def shutdown_room(
         self,
         room_id: str,
-        requester_user_id: UserID,
-        new_room_user_id: Optional[UserID] = None,
+        requester_user_id: str,
+        new_room_user_id: Optional[str] = None,
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
         block: bool = True,
-    ) -> List[str]:
+    ) -> dict:
+        """
+        Shuts down a room. Moves all local users and room aliases automatically
+        to a new room if `new_room_user_id` is set. Otherwise local users only
+        leave the room without any information.
+
+        The new room will be created with the user specified by the
+        `new_room_user_id` parameter as room administrator and will contain a
+        message explaining what happened. Users invited to the new room will
+        have power level `-10` by default, and thus be unable to speak.
+
+        The local server will only have the power to move local user and room
+        aliases to the new room. Users on other servers will be unaffected.
+
+        Args:
+            room_id: The ID of the room to shut down.
+            requester_user_id:
+                User who requested the action and put the room on the
+                blocking list.
+            new_room_user_id:
+                If set, a new room will be created with this user ID
+                as the creator and admin, and all users in the old room will be
+                moved into that room. If not set, no new room will be created
+                and the users will just be removed from the old room.
+            new_room_name:
+                A string representing the name of the room that new users will
+                be invited to. Defaults to `Content Violation Notification`
+            message:
+                A string containing the first message that will be sent as
+                `new_room_user_id` in the new room. Ideally this will clearly
+                convey why the original room was shut down.
+                Defaults to `Sharing illegal content on this server is not
+                permitted and rooms in violation will be blocked.`
+            block:
+                If set to `true`, this room will be added to a blocking list,
+                preventing future attempts to join the room. Defaults to `true`.
+
+        Returns:
+            kicked_users: An array of users (`user_id`) that were kicked.
+            failed_to_kick_users:
+                An array of users (`user_id`) that that were not kicked.
+            local_aliases:
+                An array of strings representing the local aliases that were
+                migrated from the old room to the new.
+            new_room_id: A string representing the room ID of the new room.
+        """
 
         if not new_room_name:
             new_room_name = self.DEFAULT_ROOM_NAME
@@ -1145,9 +1189,7 @@ class RoomShutdownHandler(object):
                     400, "User must be our own: %s" % (new_room_user_id,)
                 )
 
-            if not await self.admin_handler.get_user(
-                UserID.from_string(new_room_user_id)
-            ):
+            if not await self.store.get_user_by_id(new_room_user_id):
                 raise NotFoundError("Unknown user %s" % (new_room_user_id,))
 
             room_creator_requester = create_requester(new_room_user_id)
@@ -1188,8 +1230,8 @@ class RoomShutdownHandler(object):
 
             logger.info("Kicking %r from %r...", user_id, room_id)
 
-            # Kick users from room
             try:
+                # Kick users from room
                 target_requester = create_requester(user_id)
                 _, stream_id = await self.room_member_handler.update_membership(
                     requester=target_requester,
@@ -1208,13 +1250,7 @@ class RoomShutdownHandler(object):
 
                 await self.room_member_handler.forget(target_requester.user, room_id)
 
-                kicked_users.append(user_id)
-            except Exception:
-                logger.exception("Failed to leave old room for %r", user_id)
-                failed_to_kick_users.append(user_id)
-
-            # Join users to new room
-            try:
+                # Join users to new room
                 if new_room_user_id:
                     await self.room_member_handler.update_membership(
                         requester=target_requester,
@@ -1225,8 +1261,13 @@ class RoomShutdownHandler(object):
                         ratelimit=False,
                         require_consent=False,
                     )
+
+                kicked_users.append(user_id)
             except Exception:
-                logger.exception("Failed to join new room for %r", user_id)
+                logger.exception(
+                    "Failed to leave old room and join new room for %r", user_id
+                )
+                failed_to_kick_users.append(user_id)
 
         # Send message in new room and move aliases
         if new_room_user_id:
