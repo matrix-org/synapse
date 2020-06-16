@@ -13,9 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from http import HTTPStatus
 from typing import List, Optional
-
-from six.moves import http_client
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -99,7 +98,7 @@ class DeleteRoomRestServlet(RestServlet):
         block = content.get("block", False)
         if not isinstance(block, bool):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'block' must be a boolean, if given",
                 Codes.BAD_JSON,
             )
