@@ -66,9 +66,9 @@ def client_dict_convert_legacy_fields_to_identifier(
 
     Args:
         submission: The client dict to convert. Passed by reference and modified
+
     Raises:
-        SynapseError: if the dict contains a "medium" parameter that is anything other than
-            "email"
+        SynapseError: If the format of the client dict is invalid
     """
     if "user" in submission:
         submission["identifier"] = {"type": "m.id.user", "user": submission.pop("user")}
