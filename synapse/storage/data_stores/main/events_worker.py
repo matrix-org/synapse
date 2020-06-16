@@ -1092,9 +1092,12 @@ class EventsWorkerStore(SQLBaseStore):
                 function may return more or fewer rows.
 
         Returns:
-            A tuple consisting of: the updates, the position of the rows
-            returned up to, and whether we returned fewer rows than exists
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
             between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
 
             The updates are a list of 2-tuples of stream ID and the row data
         """
