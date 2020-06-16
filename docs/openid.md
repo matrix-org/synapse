@@ -98,7 +98,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 
 1. Click `Clients` in the sidebar and click `Create`
 
-2. Fill Fields
+2. Fill in the fields as below:
 
 | Field | Value |
 |-----------|-----------|
@@ -106,7 +106,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 | Client Protocol | `openid-connect` |
 
 3. Click `Save`
-4. Fill Fields
+4. Fill in the fields as below:
 
 | Field | Value |
 |-----------|-----------|
@@ -117,7 +117,7 @@ Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to 
 | Valid Redirect URIs | `[synapse public baseurl]/_synapse/oidc/callback` |
 
 5. Click `Save`
-6. Credential Tab
+6. On the Credentials tab, update the fields:
 
 | Field | Value |
 |-------|-------|
