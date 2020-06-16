@@ -168,6 +168,7 @@ def default_config(name, parse=False):
         # background, which upsets the test runner.
         "update_user_directory": False,
         "caches": {"global_factor": 1},
+        "listeners": [{"port": 0, "type": "http"}],
     }
 
     if parse:
