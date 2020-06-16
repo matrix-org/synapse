@@ -96,7 +96,7 @@ class DeleteRoomRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request, allow_empty_body=True)
 
-        block = content.get("block", True)
+        block = content.get("block", False)
         if not isinstance(block, bool):
             raise SynapseError(
                 http_client.BAD_REQUEST,

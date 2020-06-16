@@ -1119,7 +1119,7 @@ class RoomShutdownHandler(object):
         new_room_user_id: Optional[str] = None,
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
-        block: bool = True,
+        block: bool = False,
     ) -> dict:
         """
         Shuts down a room. Moves all local users and room aliases automatically
@@ -1155,7 +1155,7 @@ class RoomShutdownHandler(object):
                 permitted and rooms in violation will be blocked.`
             block:
                 If set to `true`, this room will be added to a blocking list,
-                preventing future attempts to join the room. Defaults to `true`.
+                preventing future attempts to join the room. Defaults to `false`.
 
         Returns:
             kicked_users: An array of users (`user_id`) that were kicked.

@@ -398,7 +398,7 @@ The following JSON body parameters are available:
                original room was shut down. Defaults to `Sharing illegal content on this server
                is not permitted and rooms in violation will be blocked.`
 * `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing future attempts to
-  join the room. Defaults to `true`.
+  join the room. Defaults to `false`.
 
 The following fields are returned in the JSON response body:
 
