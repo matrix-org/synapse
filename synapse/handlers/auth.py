@@ -67,17 +67,14 @@ def client_dict_convert_legacy_fields_to_identifier(
             "email"
     """
     if "user" in submission:
-        submission["identifier"] = {"type": "m.id.user", "user": submission["user"]}
-        del submission["user"]
+        submission["identifier"] = {"type": "m.id.user", "user": submission.pop("user")}
 
     if "medium" in submission and "address" in submission:
         submission["identifier"] = {
             "type": "m.id.thirdparty",
-            "medium": submission["medium"],
-            "address": submission["address"],
+            "medium": submission.pop("medium"),
+            "address": submission.pop("address"),
         }
-        del submission["medium"]
-        del submission["address"]
 
     # We've converted valid, legacy login submissions to an identifier. If the
     # dict still doesn't have an identifier, it's invalid
