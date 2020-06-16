@@ -95,11 +95,14 @@ def client_dict_convert_legacy_fields_to_identifier(
         )
 
 
-def login_id_phone_to_thirdparty(identifier: Dict[str, str]):
-    """Convert a phone login identifier type to a generic threepid identifier. Modifies
-    the identifier dict in place
+def login_id_phone_to_thirdparty(identifier: Dict[str, str]) -> Dict[str, str]:
+    """Convert a phone login identifier type to a generic threepid identifier.
+
     Args:
         identifier: Login identifier dict of type 'm.id.phone'
+
+    Returns:
+        An equivalent m.id.thirdparty identifier dict.
     """
     if "type" not in identifier:
         raise SynapseError(
@@ -122,14 +125,12 @@ def login_id_phone_to_thirdparty(identifier: Dict[str, str]):
     # Convert user-provided phone number to a consistent representation
     msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
 
-    # Modify the passed dictionary by reference
-    del identifier["country"]
-    identifier.pop("number", None)
-    identifier.pop("phone", None)
-
-    identifier["type"] = "m.id.thirdparty"
-    identifier["medium"] = "msisdn"
-    identifier["address"] = msisdn
+    # Return the new dictionary
+    return {
+        "type": "m.id.thirdparty",
+        "medium": "msisdn",
+        "address": msisdn,
+    }
 
 
 class AuthHandler(BaseHandler):
@@ -653,7 +654,7 @@ class AuthHandler(BaseHandler):
         # Convert phone type identifiers to generic threepid identifiers, which
         # will be handled in the next step
         if identifier["type"] == "m.id.phone":
-            login_id_phone_to_thirdparty(identifier)
+            identifier = login_id_phone_to_thirdparty(identifier)
 
         # Convert a threepid identifier to an user identifier
         if identifier["type"] == "m.id.thirdparty":
