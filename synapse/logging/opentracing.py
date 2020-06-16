@@ -353,6 +353,7 @@ def init_tracer(hs: "HomeServer"):
 
     # If we have the rust jaeger reporter available let's use that.
     if RustReporter:
+        logger.info("Using rust_python_jaeger_reporter library")
         tracer = config.create_tracer(RustReporter(), config.sampler)
         opentracing.set_global_tracer(tracer)
     else:
