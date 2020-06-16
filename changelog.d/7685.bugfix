@@ -1,1 +1,0 @@
-Fix bug introduced on v1.15.0 which meant that some 3PID management endpoints were not accessible on the correct URL.
