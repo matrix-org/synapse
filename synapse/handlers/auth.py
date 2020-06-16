@@ -56,11 +56,14 @@ logger = logging.getLogger(__name__)
 def client_dict_convert_legacy_fields_to_identifier(
     submission: Dict[str, Union[str, Dict]]
 ):
-    """Take a legacy-formatted login submission or User-Interactive Authentication dict and
-    updates it to feature an identifier dict instead.
-    Providing user-identifying information at the top-level of a login or UIA submission is
-    now deprecated and replaced with identifiers:
+    """
+    Convert a legacy-formatted login submission to an identifier dict.
+
+    Legacy login submissions (used in both login and user-interactive authentication)
+    provide user-identifying information at the top-level instead of in an `indentifier`
+    property. This is now deprecated and replaced with identifiers:
     https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
+
     Args:
         submission: The client dict to convert. Passed by reference and modified
     Raises:
