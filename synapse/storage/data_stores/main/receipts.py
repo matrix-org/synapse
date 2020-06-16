@@ -24,6 +24,7 @@ from twisted.internet import defer
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -300,10 +301,10 @@ class ReceiptsWorkerStore(SQLBaseStore):
             room_id, None, update_metrics=False
         )
 
-        # first handle the Deferred case
-        if isinstance(res, defer.Deferred):
-            if res.called:
-                res = res.result
+        # first handle the ObservableDeferred case
+        if isinstance(res, ObservableDeferred):
+            if res.has_called():
+                res = res.get_result()
             else:
                 res = None
 
