@@ -634,15 +634,19 @@ class AuthHandler(BaseHandler):
         """Given a dictionary containing an identifier from a client, extract the
         possibly unqualified username of the user that it identifies. Does *not*
         guarantee that the user exists.
+
         If this identifier dict contains a threepid, we attempt to ask password
         auth providers about it or, failing that, look up an associated user in
         the database.
+
         Args:
             identifier: The identifier dictionary provided by the client
             password: The user provided password if one exists. Used for asking
                 password auth providers for usernames from 3pid+password combos.
+
         Returns:
             A username if one was found, or None otherwise
+
         Raises:
             SynapseError: If the identifier dict is invalid
         """
