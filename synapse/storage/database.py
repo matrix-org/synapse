@@ -208,7 +208,7 @@ class LoggingTransaction:
         self._do_execute(self.txn.execute, sql, *args)
 
     def executemany(self, sql: str, *args: Any):
-        self._do_execute(self.txn.executemany, sql, *args)
+        return self._do_execute(self.txn.executemany, sql, *args)
 
     def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
