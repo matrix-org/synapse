@@ -127,6 +127,16 @@ APPEND_ONLY_TABLES = [
 ]
 
 
+IGNORED_TABLES = {
+    "user_directory",
+    "user_directory_search",
+    "users_who_share_rooms",
+    "users_in_pubic_room",
+    "ui_auth_sessions",
+    "ui_auth_sessions_credentials",
+}
+
+
 # Error returned by the run function. Used at the top-level part of the script to
 # handle errors and return codes.
 end_error = None
@@ -289,13 +299,8 @@ class Porter(object):
             )
             return
 
-        if table in (
-            "user_directory",
-            "user_directory_search",
-            "users_who_share_rooms",
-            "users_in_pubic_room",
-        ):
-            # We don't port these tables, as they're a faff and we can regenreate
+        if table in IGNORED_TABLES:
+            # We don't port these tables, as they're a faff and we can regenerate
             # them anyway.
             self.progress.update(table, table_size)  # Mark table as done
             return
