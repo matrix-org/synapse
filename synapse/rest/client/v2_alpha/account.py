@@ -119,16 +119,12 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         # Get the email addresses of the user from database
         # The user can own more than one address. Lookup for the right address.
         # The email will be sent to the stored address.
-        # It should prevent potential account hijack via password reset form,
-        # if some compare algorithm are not exactly.
+        # This avoids a potential account hijack by requesting a password reset to
+        # an email address which is controlled by the attacker but which, after
+        # canonicalisation, matches the one in our database.
         addresses = await self.account_validity_handler._get_email_addresses_for_user(
             existing_user_id
         )
-        for address in addresses:
-            if address == email:
-                email_from_database = address
-        if not email_from_database:
-            raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             assert self.hs.config.account_threepid_delegate_email
@@ -136,7 +132,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             # Have the configured identity server handle the request
             ret = await self.identity_handler.requestEmailToken(
                 self.hs.config.account_threepid_delegate_email,
-                email_from_database,
+                email,
                 client_secret,
                 send_attempt,
                 next_link,
@@ -144,7 +140,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         else:
             # Send password reset emails from Synapse
             sid = await self.identity_handler.send_threepid_validation(
-                email_from_database,
+                email,
                 client_secret,
                 send_attempt,
                 self.mailer.send_password_reset_mail,

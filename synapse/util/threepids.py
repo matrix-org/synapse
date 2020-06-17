@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import email.utils
 import logging
 import re
 
@@ -65,13 +64,8 @@ def canonicalise_email(address: str) -> str:
     """
 
     address = address.strip()
-    # Validate address
-    # See https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2019-11340
-    parsedAddress = email.utils.parseaddr(address)[1]
 
-    # parseaddr does not find missing "@"
-    regex = r"^[^@]+@[^@]+\.[^@]+$"
-    if parsedAddress == "" or not bool(re.fullmatch(regex, address)):
+    if len(address.split("@")) != 2:
         logger.debug("Couldn't parse email address %s", address)
         raise ValueError("Unable to parse email address")
 
