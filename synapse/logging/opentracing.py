@@ -241,7 +241,7 @@ try:
         """Wrap the reporter to ensure `report_span` never throws.
         """
 
-        _reporter = attr.ib(type=Reporter, default=lambda: Reporter())
+        _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
 
         def set_process(self, *args, **kwargs):
             return self._reporter.set_process(*args, **kwargs)
