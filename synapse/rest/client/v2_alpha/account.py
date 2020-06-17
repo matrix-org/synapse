@@ -47,7 +47,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.datastore = hs.get_datastore()
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
-        self.account_validity_handler = hs.get_account_validity_handler()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             template_html, template_text = load_jinja2_templates(
@@ -104,6 +103,10 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
+        # The email will be sent to the stored address.
+        # This avoids a potential account hijack by requesting a password reset to
+        # an email address which is controlled by the attacker but which, after
+        # canonicalisation, matches the one in our database.
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
         )
@@ -115,16 +118,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
-
-        # Get the email addresses of the user from database
-        # The user can own more than one address. Lookup for the right address.
-        # The email will be sent to the stored address.
-        # This avoids a potential account hijack by requesting a password reset to
-        # an email address which is controlled by the attacker but which, after
-        # canonicalisation, matches the one in our database.
-        addresses = await self.account_validity_handler._get_email_addresses_for_user(
-            existing_user_id
-        )
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             assert self.hs.config.account_threepid_delegate_email
