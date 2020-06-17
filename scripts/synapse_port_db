@@ -131,6 +131,7 @@ IGNORED_TABLES = {
     # We don't port these tables, as they're a faff and we can regenerate
     # them anyway.
     "user_directory",
+    "user_directory_search",
     "user_directory_search_content",
     "user_directory_search_docsize",
     "user_directory_search_segdir",
