@@ -42,7 +42,7 @@ def get_badge_count(store, user_id):
             # We're populating this badge using the unread_count (instead of the
             # notify_count) as this badge is the number of missed messages, not the
             # number of missed notifications.
-            badge += 1 if notifs["unread_count"] else 0
+            badge += 1 if notifs.get("unread_count") else 0
     return badge
 
 
