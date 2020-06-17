@@ -308,11 +308,10 @@ expose the `media` resource. For example:
 ```
 
 Note that if running multiple media repositories they must be on the same server
-and all but one of the workers must set the following to false to ensure only
-one media repository instance runs the background jobs:
+and you must configure which single instance to run the background tasks, e.g.:
 
 ```yaml
-    worker_run_media_background_jobs: false
+    media_instance_running_background_jobs: "media-repository-1"
 ```
 
 ### `synapse.app.client_reader`

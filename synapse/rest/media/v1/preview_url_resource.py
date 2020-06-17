@@ -85,8 +85,13 @@ class PreviewUrlResource(DirectServeResource):
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage
 
+        # We run the background jobs if we're the instance specified (or no
+        # instance is specified, where we assume there is only one instance
+        # serving media).
+        instance_running_jobs = hs.config.media.media_instance_running_background_jobs
         self._worker_run_media_background_jobs = (
-            hs.config.media.run_media_background_jobs
+            instance_running_jobs is None
+            or instance_running_jobs == hs.get_instance_name()
         )
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
