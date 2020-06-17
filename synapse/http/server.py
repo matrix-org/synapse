@@ -16,10 +16,10 @@
 
 import collections
 import html
-import http.client
 import logging
 import types
 import urllib
+from http import HTTPStatus
 from io import BytesIO
 from typing import Awaitable, Callable, TypeVar, Union
 
@@ -188,7 +188,7 @@ def return_html_error(
                 exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
-        code = http.HTTPStatus.INTERNAL_SERVER_ERROR
+        code = HTTPStatus.INTERNAL_SERVER_ERROR
         msg = "Internal server error"
 
         logger.error(

@@ -15,8 +15,6 @@
 
 import logging
 
-from six import raise_from
-
 from twisted.internet import defer
 
 from synapse.api.errors import (
@@ -84,7 +82,7 @@ class BaseProfileHandler(BaseHandler):
                 )
                 return result
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+                raise SynapseError(502, "Failed to fetch profile") from e
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
@@ -135,7 +133,7 @@ class BaseProfileHandler(BaseHandler):
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+                raise SynapseError(502, "Failed to fetch profile") from e
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
@@ -212,7 +210,7 @@ class BaseProfileHandler(BaseHandler):
                     ignore_backoff=True,
                 )
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to fetch profile"), e)
+                raise SynapseError(502, "Failed to fetch profile") from e
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 

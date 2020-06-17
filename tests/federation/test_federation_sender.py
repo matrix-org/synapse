@@ -21,6 +21,7 @@ from signedjson.types import BaseKey, SigningKey
 
 from twisted.internet import defer
 
+from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.rest import admin
 from synapse.rest.client.v1 import login
 from synapse.types import JsonDict, ReadReceipt
@@ -536,7 +537,10 @@ def build_device_dict(user_id: str, device_id: str, sk: SigningKey):
     return {
         "user_id": user_id,
         "device_id": device_id,
-        "algorithms": ["m.olm.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+        "algorithms": [
+            "m.olm.curve25519-aes-sha2",
+            RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2,
+        ],
         "keys": {
             "curve25519:" + device_id: "curve25519+key",
             key_id(sk): encode_pubkey(sk),

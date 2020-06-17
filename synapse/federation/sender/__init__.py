@@ -16,8 +16,6 @@
 import logging
 from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
-from six import itervalues
-
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -233,7 +231,7 @@ class FederationSender(object):
                     defer.gatherResults(
                         [
                             run_in_background(handle_room_events, evs)
-                            for evs in itervalues(events_by_room)
+                            for evs in events_by_room.values()
                         ],
                         consumeErrors=True,
                     )

@@ -17,8 +17,6 @@ import logging
 from collections import namedtuple
 from typing import Any, Dict, Optional
 
-from six import iteritems
-
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
@@ -272,7 +270,7 @@ class RoomListHandler(BaseHandler):
         event_map = yield self.store.get_events(
             [
                 event_id
-                for key, event_id in iteritems(current_state_ids)
+                for key, event_id in current_state_ids.items()
                 if key[0]
                 in (
                     EventTypes.Create,

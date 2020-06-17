@@ -17,10 +17,8 @@ import cgi
 import logging
 import random
 import sys
+import urllib
 from io import BytesIO
-
-from six import raise_from, string_types
-from six.moves import urllib
 
 import attr
 import treq
@@ -199,7 +197,14 @@ class MatrixFederationHttpClient(object):
 
         self.reactor = Reactor()
 
-        self.agent = MatrixFederationAgent(self.reactor, tls_client_options_factory)
+        user_agent = hs.version_string
+        if hs.config.user_agent_suffix:
+            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+        user_agent = user_agent.encode("ascii")
+
+        self.agent = MatrixFederationAgent(
+            self.reactor, tls_client_options_factory, user_agent
+        )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
@@ -432,10 +437,10 @@ class MatrixFederationHttpClient(object):
                     except TimeoutError as e:
                         raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
-                        raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
+                        raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
                         logger.info("Failed to send request: %s", e)
-                        raise_from(RequestSendFailed(e, can_retry=True), e)
+                        raise RequestSendFailed(e, can_retry=True) from e
 
                     incoming_responses_counter.labels(
                         request.method, response.code
@@ -487,7 +492,7 @@ class MatrixFederationHttpClient(object):
                         # Retry if the error is a 429 (Too Many Requests),
                         # otherwise just raise a standard HttpResponseException
                         if response.code == 429:
-                            raise_from(RequestSendFailed(e, can_retry=True), e)
+                            raise RequestSendFailed(e, can_retry=True) from e
                         else:
                             raise e
 
@@ -998,7 +1003,7 @@ def encode_query_args(args):
 
     encoded_args = {}
     for k, vs in args.items():
-        if isinstance(vs, string_types):
+        if isinstance(vs, str):
             vs = [vs]
         encoded_args[k] = [v.encode("UTF-8") for v in vs]
 

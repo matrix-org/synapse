@@ -30,7 +30,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         room_creator = self.homeserver.get_room_creation_handler()
         room_deferred = ensureDeferred(
             room_creator.create_room(
-                our_user, room_creator.PRESETS_DICT["public_chat"], ratelimit=False
+                our_user, room_creator._presets_dict["public_chat"], ratelimit=False
             )
         )
         self.reactor.advance(0.1)

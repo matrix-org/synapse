@@ -21,8 +21,7 @@ import argparse
 import base64
 import json
 import sys
-
-from six.moves.urllib import parse as urlparse
+from urllib import parse as urlparse
 
 import nacl.signing
 import requests

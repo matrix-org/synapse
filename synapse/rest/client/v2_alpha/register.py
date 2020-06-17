@@ -18,8 +18,6 @@ import hmac
 import logging
 from typing import List, Union
 
-from six import string_types
-
 import synapse
 import synapse.api.auth
 import synapse.types
@@ -413,7 +411,7 @@ class RegisterRestServlet(RestServlet):
         # in sessions. Pull out the username/password provided to us.
         if "password" in body:
             password = body.pop("password")
-            if not isinstance(password, string_types) or len(password) > 512:
+            if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(password)
 
@@ -425,10 +423,7 @@ class RegisterRestServlet(RestServlet):
 
         desired_username = None
         if "username" in body:
-            if (
-                not isinstance(body["username"], string_types)
-                or len(body["username"]) > 512
-            ):
+            if not isinstance(body["username"], str) or len(body["username"]) > 512:
                 raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
 
@@ -453,7 +448,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, string_types):
+            if isinstance(desired_username, str):
                 result = await self._do_appservice_registration(
                     desired_username, access_token, body
                 )

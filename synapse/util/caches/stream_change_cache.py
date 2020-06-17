@@ -17,8 +17,6 @@ import logging
 import math
 from typing import Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
-from six import integer_types
-
 from sortedcontainers import SortedDict
 
 from synapse.types import Collection
@@ -88,7 +86,7 @@ class StreamChangeCache:
     def has_entity_changed(self, entity: EntityType, stream_pos: int) -> bool:
         """Returns True if the entity may have been updated since stream_pos
         """
-        assert type(stream_pos) in integer_types
+        assert isinstance(stream_pos, int)
 
         if stream_pos < self._earliest_known_stream_pos:
             self.metrics.inc_misses()
