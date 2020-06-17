@@ -6,9 +6,10 @@ The API is:
 ```
 GET /_synapse/admin/v1/room/<room_id>/media
 ```
-including an `access_token` of a server admin.
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: see [README.rst](README.rst).
 
-It returns a JSON body like the following:
+The API returns a JSON body like the following:
 ```
 {
     "local": [
@@ -99,4 +100,3 @@ Response:
   "num_quarantined": 10  # The number of media items successfully quarantined
 }
 ```
-

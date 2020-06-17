@@ -17,8 +17,7 @@
 
 import logging
 import re
-
-from six import iterkeys
+from typing import Optional
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
@@ -342,7 +341,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
         return res
 
-    @cachedInlineCallbacks()
+    @cached()
     def is_support_user(self, user_id):
         """Determines if the user is of type UserTypes.SUPPORT
 
@@ -352,10 +351,9 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred[bool]: True if user is of type UserTypes.SUPPORT
         """
-        res = yield self.db.runInteraction(
+        return self.db.runInteraction(
             "is_support_user", self.is_support_user_txn, user_id
         )
-        return res
 
     def is_real_user_txn(self, txn, user_id):
         res = self.db.simple_select_one_onecol_txn(
@@ -516,18 +514,17 @@ class RegistrationWorkerStore(SQLBaseStore):
             )
         )
 
-    @defer.inlineCallbacks
-    def get_user_id_by_threepid(self, medium, address):
+    async def get_user_id_by_threepid(self, medium: str, address: str) -> Optional[str]:
         """Returns user id from threepid
 
         Args:
-            medium (str): threepid medium e.g. email
-            address (str): threepid address e.g. me@example.com
+            medium: threepid medium e.g. email
+            address: threepid address e.g. me@example.com
 
         Returns:
-            Deferred[str|None]: user id or None if no user id/threepid mapping exists
+            The user ID or None if no user id/threepid mapping exists
         """
-        user_id = yield self.db.runInteraction(
+        user_id = await self.db.runInteraction(
             "get_user_id_by_threepid", self.get_user_id_by_threepid_txn, medium, address
         )
         return user_id
@@ -754,7 +751,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 last_send_attempt, validated_at
                 FROM threepid_validation_session WHERE %s
                 """ % (
-                " AND ".join("%s = ?" % k for k in iterkeys(keyvalues)),
+                " AND ".join("%s = ?" % k for k in keyvalues.keys()),
             )
 
             if validated is not None:
@@ -993,7 +990,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         Args:
             user_id (str): The desired user ID to register.
-            password_hash (str): Optional. The password hash for this user.
+            password_hash (str|None): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
             make_guest (boolean): True if the the new user should be guest,
@@ -1007,6 +1004,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         Raises:
             StoreError if the user_id could not be registered.
+
+        Returns:
+            Deferred
         """
         return self.db.runInteraction(
             "register_user",

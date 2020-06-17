@@ -18,9 +18,15 @@ import os
 import shutil
 import tempfile
 from binascii import unhexlify
+from io import BytesIO
+from typing import Optional
+from urllib import parse
 
 from mock import Mock
-from six.moves.urllib import parse
+
+import attr
+import PIL.Image as Image
+from parameterized import parameterized_class
 
 from twisted.internet.defer import Deferred
 
@@ -94,6 +100,68 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.assertEqual(test_body, body)
 
 
+@attr.s
+class _TestImage:
+    """An image for testing thumbnailing with the expected results
+
+    Attributes:
+        data: The raw image to thumbnail
+        content_type: The type of the image as a content type, e.g. "image/png"
+        extension: The extension associated with the format, e.g. ".png"
+        expected_cropped: The expected bytes from cropped thumbnailing, or None if
+            test should just check for success.
+        expected_scaled: The expected bytes from scaled thumbnailing, or None if
+            test should just check for a valid image returned.
+    """
+
+    data = attr.ib(type=bytes)
+    content_type = attr.ib(type=bytes)
+    extension = attr.ib(type=bytes)
+    expected_cropped = attr.ib(type=Optional[bytes])
+    expected_scaled = attr.ib(type=Optional[bytes])
+
+
+@parameterized_class(
+    ("test_image",),
+    [
+        # smol png
+        (
+            _TestImage(
+                unhexlify(
+                    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+                    b"0000001f15c4890000000a49444154789c63000100000500010d"
+                    b"0a2db40000000049454e44ae426082"
+                ),
+                b"image/png",
+                b".png",
+                unhexlify(
+                    b"89504e470d0a1a0a0000000d4948445200000020000000200806"
+                    b"000000737a7af40000001a49444154789cedc101010000008220"
+                    b"ffaf6e484001000000ef0610200001194334ee0000000049454e"
+                    b"44ae426082"
+                ),
+                unhexlify(
+                    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+                    b"0000001f15c4890000000d49444154789c636060606000000005"
+                    b"0001a5f645400000000049454e44ae426082"
+                ),
+            ),
+        ),
+        # small lossless webp
+        (
+            _TestImage(
+                unhexlify(
+                    b"524946461a000000574542505650384c0d0000002f0000001007"
+                    b"1011118888fe0700"
+                ),
+                b"image/webp",
+                b".webp",
+                None,
+                None,
+            ),
+        ),
+    ],
+)
 class MediaRepoTests(unittest.HomeserverTestCase):
 
     hijack_auth = True
@@ -151,13 +219,6 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.download_resource = self.media_repo.children[b"download"]
         self.thumbnail_resource = self.media_repo.children[b"thumbnail"]
 
-        # smol png
-        self.end_content = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
-
         self.media_id = "example.com/12345"
 
     def _req(self, content_disposition):
@@ -171,19 +232,19 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(len(self.fetches), 1)
         self.assertEqual(self.fetches[0][1], "example.com")
         self.assertEqual(
-            self.fetches[0][2], "/_matrix/media/v1/download/" + self.media_id
+            self.fetches[0][2], "/_matrix/media/r0/download/" + self.media_id
         )
         self.assertEqual(self.fetches[0][3], {"allow_remote": "false"})
 
         headers = {
-            b"Content-Length": [b"%d" % (len(self.end_content))],
-            b"Content-Type": [b"image/png"],
+            b"Content-Length": [b"%d" % (len(self.test_image.data))],
+            b"Content-Type": [self.test_image.content_type],
         }
         if content_disposition:
             headers[b"Content-Disposition"] = [content_disposition]
 
         self.fetches[0][0].callback(
-            (self.end_content, (len(self.end_content), headers))
+            (self.test_image.data, (len(self.test_image.data), headers))
         )
 
         self.pump()
@@ -196,12 +257,15 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         If the filename is filename=<ascii> then Synapse will decode it as an
         ASCII string, and use filename= in the response.
         """
-        channel = self._req(b"inline; filename=out.png")
+        channel = self._req(b"inline; filename=out" + self.test_image.extension)
 
         headers = channel.headers
-        self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
         self.assertEqual(
-            headers.getRawHeaders(b"Content-Disposition"), [b"inline; filename=out.png"]
+            headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
+        )
+        self.assertEqual(
+            headers.getRawHeaders(b"Content-Disposition"),
+            [b"inline; filename=out" + self.test_image.extension],
         )
 
     def test_disposition_filenamestar_utf8escaped(self):
@@ -211,13 +275,17 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         response.
         """
         filename = parse.quote("\u2603".encode("utf8")).encode("ascii")
-        channel = self._req(b"inline; filename*=utf-8''" + filename + b".png")
+        channel = self._req(
+            b"inline; filename*=utf-8''" + filename + self.test_image.extension
+        )
 
         headers = channel.headers
-        self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
+        self.assertEqual(
+            headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
+        )
         self.assertEqual(
             headers.getRawHeaders(b"Content-Disposition"),
-            [b"inline; filename*=utf-8''" + filename + b".png"],
+            [b"inline; filename*=utf-8''" + filename + self.test_image.extension],
         )
 
     def test_disposition_none(self):
@@ -228,27 +296,16 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         channel = self._req(None)
 
         headers = channel.headers
-        self.assertEqual(headers.getRawHeaders(b"Content-Type"), [b"image/png"])
+        self.assertEqual(
+            headers.getRawHeaders(b"Content-Type"), [self.test_image.content_type]
+        )
         self.assertEqual(headers.getRawHeaders(b"Content-Disposition"), None)
 
     def test_thumbnail_crop(self):
-        expected_body = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000020000000200806"
-            b"000000737a7af40000001a49444154789cedc101010000008220"
-            b"ffaf6e484001000000ef0610200001194334ee0000000049454e"
-            b"44ae426082"
-        )
-
-        self._test_thumbnail("crop", expected_body)
+        self._test_thumbnail("crop", self.test_image.expected_cropped)
 
     def test_thumbnail_scale(self):
-        expected_body = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000d49444154789c636060606000000005"
-            b"0001a5f645400000000049454e44ae426082"
-        )
-
-        self._test_thumbnail("scale", expected_body)
+        self._test_thumbnail("scale", self.test_image.expected_scaled)
 
     def _test_thumbnail(self, method, expected_body):
         params = "?width=32&height=32&method=" + method
@@ -259,13 +316,19 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.pump()
 
         headers = {
-            b"Content-Length": [b"%d" % (len(self.end_content))],
-            b"Content-Type": [b"image/png"],
+            b"Content-Length": [b"%d" % (len(self.test_image.data))],
+            b"Content-Type": [self.test_image.content_type],
         }
         self.fetches[0][0].callback(
-            (self.end_content, (len(self.end_content), headers))
+            (self.test_image.data, (len(self.test_image.data), headers))
         )
         self.pump()
 
         self.assertEqual(channel.code, 200)
-        self.assertEqual(channel.result["body"], expected_body, channel.result["body"])
+        if expected_body is not None:
+            self.assertEqual(
+                channel.result["body"], expected_body, channel.result["body"]
+            )
+        else:
+            # ensure that the result is at least some valid image
+            Image.open(BytesIO(channel.result["body"]))

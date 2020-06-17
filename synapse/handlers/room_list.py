@@ -17,8 +17,6 @@ import logging
 from collections import namedtuple
 from typing import Any, Dict, Optional
 
-from six import iteritems
-
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
@@ -253,14 +251,25 @@ class RoomListHandler(BaseHandler):
         """
         result = {"room_id": room_id, "num_joined_members": num_joined_users}
 
+        if with_alias:
+            aliases = yield self.store.get_aliases_for_room(
+                room_id, on_invalidate=cache_context.invalidate
+            )
+            if aliases:
+                result["aliases"] = aliases
+
         current_state_ids = yield self.store.get_current_state_ids(
             room_id, on_invalidate=cache_context.invalidate
         )
 
+        if not current_state_ids:
+            # We're not in the room, so may as well bail out here.
+            return result
+
         event_map = yield self.store.get_events(
             [
                 event_id
-                for key, event_id in iteritems(current_state_ids)
+                for key, event_id in current_state_ids.items()
                 if key[0]
                 in (
                     EventTypes.Create,
@@ -289,14 +298,7 @@ class RoomListHandler(BaseHandler):
         create_event = current_state.get((EventTypes.Create, ""))
         result["m.federate"] = create_event.content.get("m.federate", True)
 
-        if with_alias:
-            aliases = yield self.store.get_aliases_for_room(
-                room_id, on_invalidate=cache_context.invalidate
-            )
-            if aliases:
-                result["aliases"] = aliases
-
-        name_event = yield current_state.get((EventTypes.Name, ""))
+        name_event = current_state.get((EventTypes.Name, ""))
         if name_event:
             name = name_event.content.get("name", None)
             if name:

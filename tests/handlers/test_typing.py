@@ -86,7 +86,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         reactor.pump((1000,))
 
         hs = self.setup_test_homeserver(
-            notifier=Mock(), http_client=mock_federation_client, keyring=mock_keyring
+            notifier=Mock(),
+            http_client=mock_federation_client,
+            keyring=mock_keyring,
+            replication_streams={},
         )
 
         hs.datastores = datastores
@@ -126,6 +129,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         def check_user_in_room(room_id, user_id):
             if user_id not in [u.to_string() for u in self.room_members]:
                 raise AuthError(401, "User is not in the room")
+            return defer.succeed(None)
 
         hs.get_auth().check_user_in_room = check_user_in_room
 
@@ -135,7 +139,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_joined_hosts_for_room = get_joined_hosts_for_room
 
         def get_current_users_in_room(room_id):
-            return {str(u) for u in self.room_members}
+            return defer.succeed({str(u) for u in self.room_members})
 
         hs.get_state_handler().get_current_users_in_room = get_current_users_in_room
 
@@ -160,7 +164,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        self.successResultOf(
+        self.get_success(
             self.handler.started_typing(
                 target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=20000
             )
@@ -187,7 +191,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
     def test_started_typing_remote_send(self):
         self.room_members = [U_APPLE, U_ONION]
 
-        self.successResultOf(
+        self.get_success(
             self.handler.started_typing(
                 target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=20000
             )
@@ -262,7 +266,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        self.successResultOf(
+        self.get_success(
             self.handler.stopped_typing(
                 target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID
             )
@@ -302,7 +306,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        self.successResultOf(
+        self.get_success(
             self.handler.started_typing(
                 target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=10000
             )
@@ -341,7 +345,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         # SYN-230 - see if we can still set after timeout
 
-        self.successResultOf(
+        self.get_success(
             self.handler.started_typing(
                 target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=10000
             )

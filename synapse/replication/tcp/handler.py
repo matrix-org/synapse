@@ -38,7 +38,9 @@ from synapse.replication.tcp.commands import (
 from synapse.replication.tcp.protocol import AbstractConnection
 from synapse.replication.tcp.streams import (
     STREAMS_MAP,
+    BackfillStream,
     CachesStream,
+    EventsStream,
     FederationStream,
     Stream,
 )
@@ -87,6 +89,14 @@ class ReplicationCommandHandler:
                 self._streams_to_replicate.append(stream)
                 continue
 
+            if isinstance(stream, (EventsStream, BackfillStream)):
+                # Only add EventStream and BackfillStream as a source on the
+                # instance in charge of event persistence.
+                if hs.config.worker.writers.events == hs.get_instance_name():
+                    self._streams_to_replicate.append(stream)
+
+                continue
+
             # Only add any other streams if we're on master.
             if hs.config.worker_app is not None:
                 continue
@@ -102,8 +112,8 @@ class ReplicationCommandHandler:
             "replication_position", clock=self._clock
         )
 
-        # Map of stream to batched updates. See RdataCommand for info on how
-        # batching works.
+        # Map of stream name to batched updates. See RdataCommand for info on
+        # how batching works.
         self._pending_batches = {}  # type: Dict[str, List[Any]]
 
         # The factory used to create connections.
@@ -113,7 +123,8 @@ class ReplicationCommandHandler:
         # outgoing replication commands to.)
         self._connections = []  # type: List[AbstractConnection]
 
-        # For each connection, the incoming streams that are coming from that connection
+        # For each connection, the incoming stream names that are coming from
+        # that connection.
         self._streams_by_connection = {}  # type: Dict[AbstractConnection, Set[str]]
 
         LaterGauge(
@@ -148,6 +159,9 @@ class ReplicationCommandHandler:
                 hs.config.redis_host,
                 hs.config.redis_port,
             )
+
+            # First let's ensure that we have a ReplicationStreamer started.
+            hs.get_replication_streamer()
 
             # We need two connections to redis, one for the subscription stream and
             # one to send commands to (as you can't send further redis commands to a
@@ -297,7 +311,28 @@ class ReplicationCommandHandler:
                 # Check if this is the last of a batch of updates
                 rows = self._pending_batches.pop(stream_name, [])
                 rows.append(row)
-                await self.on_rdata(stream_name, cmd.instance_name, cmd.token, rows)
+
+                stream = self._streams.get(stream_name)
+                if not stream:
+                    logger.error("Got RDATA for unknown stream: %s", stream_name)
+                    return
+
+                # Find where we previously streamed up to.
+                current_token = stream.current_token(cmd.instance_name)
+
+                # Discard this data if this token is earlier than the current
+                # position. Note that streams can be reset (in which case you
+                # expect an earlier token), but that must be preceded by a
+                # POSITION command.
+                if cmd.token <= current_token:
+                    logger.debug(
+                        "Discarding RDATA from stream %s at position %s before previous position %s",
+                        stream_name,
+                        cmd.token,
+                        current_token,
+                    )
+                else:
+                    await self.on_rdata(stream_name, cmd.instance_name, cmd.token, rows)
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list

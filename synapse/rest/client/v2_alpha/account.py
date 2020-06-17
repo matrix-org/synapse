@@ -15,8 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from six.moves import http_client
+from http import HTTPStatus
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
@@ -232,11 +231,26 @@ class PasswordRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.datastore = self.hs.get_datastore()
+        self.password_policy_handler = hs.get_password_policy_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
     @interactive_auth_handler
     async def on_POST(self, request):
         body = parse_json_object_from_request(request)
+
+        # we do basic sanity checks here because the auth layer will store these
+        # in sessions. Pull out the new password provided to us.
+        if "new_password" in body:
+            new_password = body.pop("new_password")
+            if not isinstance(new_password, str) or len(new_password) > 512:
+                raise SynapseError(400, "Invalid password")
+            self.password_policy_handler.validate_password(new_password)
+
+            # If the password is valid, hash it and store it back on the body.
+            # This ensures that only the hashed password is handled everywhere.
+            if "new_password_hash" in body:
+                raise SynapseError(400, "Unexpected property: new_password_hash")
+            body["new_password_hash"] = await self.auth_handler.hash(new_password)
 
         # there are two possibilities here. Either the user does not have an
         # access token, and needs to do a password reset; or they have one and
@@ -291,12 +305,12 @@ class PasswordRestServlet(RestServlet):
                 logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        assert_params_in_dict(params, ["new_password"])
-        new_password = params["new_password"]
+        assert_params_in_dict(params, ["new_password_hash"])
+        new_password_hash = params["new_password_hash"]
         logout_devices = params.get("logout_devices", True)
 
         await self._set_password_handler.set_password(
-            user_id, new_password, logout_devices, requester
+            user_id, new_password_hash, logout_devices, requester
         )
 
         return 200, {}
@@ -321,7 +335,7 @@ class DeactivateAccountRestServlet(RestServlet):
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'erase' must be a boolean, if given",
                 Codes.BAD_JSON,
             )
@@ -689,7 +703,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidAddRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/add$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/add$")
 
     def __init__(self, hs):
         super(ThreepidAddRestServlet, self).__init__()
@@ -740,7 +754,7 @@ class ThreepidAddRestServlet(RestServlet):
 
 
 class ThreepidBindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/bind$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/bind$")
 
     def __init__(self, hs):
         super(ThreepidBindRestServlet, self).__init__()
@@ -769,7 +783,7 @@ class ThreepidBindRestServlet(RestServlet):
 
 
 class ThreepidUnbindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/unbind$")
 
     def __init__(self, hs):
         super(ThreepidUnbindRestServlet, self).__init__()

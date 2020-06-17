@@ -29,7 +29,6 @@ from synapse.storage.database import Database
 from synapse.storage.state import StateFilter
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import cached, cachedList
-from synapse.util.stringutils import to_ascii
 
 logger = logging.getLogger(__name__)
 
@@ -185,9 +184,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 (room_id,),
             )
 
-            return {
-                (intern_string(r[0]), intern_string(r[1])): to_ascii(r[2]) for r in txn
-            }
+            return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
 
         return self.db.runInteraction(
             "get_current_state_ids", _get_current_state_ids_txn

@@ -19,11 +19,8 @@
 
 import itertools
 import logging
+from http import HTTPStatus
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
-
-import six
-from six import iteritems, itervalues
-from six.moves import http_client, zip
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -33,13 +30,19 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.api.constants import (
+    EventTypes,
+    Membership,
+    RejectedReason,
+    RoomEncryptionAlgorithms,
+)
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
     Codes,
     FederationDeniedError,
     FederationError,
+    HttpResponseException,
     RequestSendFailed,
     SynapseError,
 )
@@ -125,10 +128,10 @@ class FederationHandler(BaseHandler):
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_simple_http_client()
+        self._instance_name = hs.get_instance_name()
+        self._replication = hs.get_replication_data_handler()
 
-        self._send_events_to_master = ReplicationFederationSendEventsRestServlet.make_client(
-            hs
-        )
+        self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
         self._notify_user_membership_change = ReplicationUserJoinedLeftRoomRestServlet.make_client(
             hs
         )
@@ -392,7 +395,7 @@ class FederationHandler(BaseHandler):
                     )
                     event_map.update(evs)
 
-                    state = [event_map[e] for e in six.itervalues(state_map)]
+                    state = [event_map[e] for e in state_map.values()]
                 except Exception:
                     logger.warning(
                         "[%s %s] Error attempting to resolve state at missing "
@@ -500,7 +503,7 @@ class FederationHandler(BaseHandler):
                 min_depth=min_depth,
                 timeout=60000,
             )
-        except RequestSendFailed as e:
+        except (RequestSendFailed, HttpResponseException, NotRetryingDestination) as e:
             # We failed to get the missing events, but since we need to handle
             # the case of `get_missing_events` not returning the necessary
             # events anyway, it is safe to simply log the error and continue.
@@ -741,7 +744,10 @@ class FederationHandler(BaseHandler):
                 if device:
                     keys = device.get("keys", {}).get("keys", {})
 
-                    if event.content.get("algorithm") == "m.megolm.v1.aes-sha2":
+                    if (
+                        event.content.get("algorithm")
+                        == RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2
+                    ):
                         # For this algorithm we expect a curve25519 key.
                         key_name = "curve25519:%s" % (device_id,)
                         current_keys = [keys.get(key_name)]
@@ -1000,7 +1006,7 @@ class FederationHandler(BaseHandler):
             """
             joined_users = [
                 (state_key, int(event.depth))
-                for (e_type, state_key), event in iteritems(state)
+                for (e_type, state_key), event in state.items()
                 if e_type == EventTypes.Member and event.membership == Membership.JOIN
             ]
 
@@ -1036,6 +1042,12 @@ class FederationHandler(BaseHandler):
                     # TODO: We can probably do something more intelligent here.
                     return True
                 except SynapseError as e:
+                    logger.info("Failed to backfill from %s because %s", dom, e)
+                    continue
+                except HttpResponseException as e:
+                    if 400 <= e.code < 500:
+                        raise e.to_synapse_error()
+
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
                 except CodeMessageException as e:
@@ -1084,16 +1096,16 @@ class FederationHandler(BaseHandler):
         states = dict(zip(event_ids, [s.state for s in states]))
 
         state_map = await self.store.get_events(
-            [e_id for ids in itervalues(states) for e_id in itervalues(ids)],
+            [e_id for ids in states.values() for e_id in ids.values()],
             get_prev_content=False,
         )
         states = {
             key: {
                 k: state_map[e_id]
-                for k, e_id in iteritems(state_dict)
+                for k, e_id in state_dict.items()
                 if e_id in state_map
             }
-            for key, state_dict in iteritems(states)
+            for key, state_dict in states.items()
         }
 
         for e_id, _ in sorted_extremeties_tuple:
@@ -1181,7 +1193,7 @@ class FederationHandler(BaseHandler):
                 ev.event_id,
                 len(ev.prev_event_ids()),
             )
-            raise SynapseError(http_client.BAD_REQUEST, "Too many prev_events")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many prev_events")
 
         if len(ev.auth_event_ids()) > 10:
             logger.warning(
@@ -1189,7 +1201,7 @@ class FederationHandler(BaseHandler):
                 ev.event_id,
                 len(ev.auth_event_ids()),
             )
-            raise SynapseError(http_client.BAD_REQUEST, "Too many auth_events")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")
 
     async def send_invite(self, target_host, event):
         """ Sends the invite to the remote server for signing.
@@ -1214,7 +1226,7 @@ class FederationHandler(BaseHandler):
 
     async def do_invite_join(
         self, target_hosts: Iterable[str], room_id: str, joinee: str, content: JsonDict
-    ) -> None:
+    ) -> Tuple[str, int]:
         """ Attempts to join the `joinee` to the room `room_id` via the
         servers contained in `target_hosts`.
 
@@ -1235,6 +1247,10 @@ class FederationHandler(BaseHandler):
 
             content: The event content to use for the join event.
         """
+        # TODO: We should be able to call this on workers, but the upgrading of
+        # room stuff after join currently doesn't work on workers.
+        assert self.config.worker.worker_app is None
+
         logger.debug("Joining %s to %s", joinee, room_id)
 
         origin, event, room_version_obj = await self._make_and_verify_event(
@@ -1297,15 +1313,23 @@ class FederationHandler(BaseHandler):
                 room_id=room_id, room_version=room_version_obj,
             )
 
-            await self._persist_auth_tree(
+            max_stream_id = await self._persist_auth_tree(
                 origin, auth_chain, state, event, room_version_obj
+            )
+
+            # We wait here until this instance has seen the events come down
+            # replication (if we're using replication) as the below uses caches.
+            #
+            # TODO: Currently the events stream is written to from master
+            await self._replication.wait_for_stream_position(
+                self.config.worker.writers.events, "events", max_stream_id
             )
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
             predecessor = await self.store.get_room_predecessor(room_id)
             if not predecessor or not isinstance(predecessor.get("room_id"), str):
-                return
+                return event.event_id, max_stream_id
             old_room_id = predecessor["room_id"]
             logger.debug(
                 "Found predecessor for %s during remote join: %s", room_id, old_room_id
@@ -1318,6 +1342,7 @@ class FederationHandler(BaseHandler):
             )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
+            return event.event_id, max_stream_id
         finally:
             room_queue = self.room_queues[room_id]
             del self.room_queues[room_id]
@@ -1519,7 +1544,7 @@ class FederationHandler(BaseHandler):
 
         # block any attempts to invite the server notices mxid
         if event.state_key == self._server_notices_mxid:
-            raise SynapseError(http_client.FORBIDDEN, "Cannot invite this user")
+            raise SynapseError(HTTPStatus.FORBIDDEN, "Cannot invite this user")
 
         # keep a record of the room version, if we don't yet know it.
         # (this may get overwritten if we later get a different room version in a
@@ -1547,7 +1572,7 @@ class FederationHandler(BaseHandler):
 
     async def do_remotely_reject_invite(
         self, target_hosts: Iterable[str], room_id: str, user_id: str, content: JsonDict
-    ) -> EventBase:
+    ) -> Tuple[EventBase, int]:
         origin, event, room_version = await self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
@@ -1567,9 +1592,9 @@ class FederationHandler(BaseHandler):
         await self.federation_client.send_leave(target_hosts, event)
 
         context = await self.state_handler.compute_event_context(event)
-        await self.persist_events_and_notify([(event, context)])
+        stream_id = await self.persist_events_and_notify([(event, context)])
 
-        return event
+        return event, stream_id
 
     async def _make_and_verify_event(
         self,
@@ -1705,7 +1730,7 @@ class FederationHandler(BaseHandler):
         state_groups = await self.state_store.get_state_groups(room_id, [event_id])
 
         if state_groups:
-            _, state = list(iteritems(state_groups)).pop()
+            _, state = list(state_groups.items()).pop()
             results = {(e.type, e.state_key): e for e in state}
 
             if event.is_state():
@@ -1881,7 +1906,7 @@ class FederationHandler(BaseHandler):
         state: List[EventBase],
         event: EventBase,
         room_version: RoomVersion,
-    ) -> None:
+    ) -> int:
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -1975,7 +2000,7 @@ class FederationHandler(BaseHandler):
             event, old_state=state
         )
 
-        await self.persist_events_and_notify([(event, new_event_context)])
+        return await self.persist_events_and_notify([(event, new_event_context)])
 
     async def _prep_event(
         self,
@@ -2068,7 +2093,7 @@ class FederationHandler(BaseHandler):
                     room_version, state_sets, event
                 )
                 current_state_ids = {
-                    k: e.event_id for k, e in iteritems(current_state_ids)
+                    k: e.event_id for k, e in current_state_ids.items()
                 }
             else:
                 current_state_ids = await self.state_handler.get_current_state_ids(
@@ -2084,7 +2109,7 @@ class FederationHandler(BaseHandler):
             # Now check if event pass auth against said current state
             auth_types = auth_types_for_event(event)
             current_state_ids = [
-                e for k, e in iteritems(current_state_ids) if k in auth_types
+                e for k, e in current_state_ids.items() if k in auth_types
             ]
 
             current_auth_events = await self.store.get_events(current_state_ids)
@@ -2400,7 +2425,7 @@ class FederationHandler(BaseHandler):
         else:
             event_key = None
         state_updates = {
-            k: a.event_id for k, a in iteritems(auth_events) if k != event_key
+            k: a.event_id for k, a in auth_events.items() if k != event_key
         }
 
         current_state_ids = await context.get_current_state_ids()
@@ -2411,7 +2436,7 @@ class FederationHandler(BaseHandler):
         prev_state_ids = await context.get_prev_state_ids()
         prev_state_ids = dict(prev_state_ids)
 
-        prev_state_ids.update({k: a.event_id for k, a in iteritems(auth_events)})
+        prev_state_ids.update({k: a.event_id for k, a in auth_events.items()})
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
@@ -2828,7 +2853,7 @@ class FederationHandler(BaseHandler):
         self,
         event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ) -> None:
+    ) -> int:
         """Persists events and tells the notifier/pushers about them, if
         necessary.
 
@@ -2837,12 +2862,14 @@ class FederationHandler(BaseHandler):
             backfilled: Whether these events are a result of
                 backfilling or not
         """
-        if self.config.worker_app:
-            await self._send_events_to_master(
+        if self.config.worker.writers.events != self._instance_name:
+            result = await self._send_events(
+                instance_name=self.config.worker.writers.events,
                 store=self.store,
                 event_and_contexts=event_and_contexts,
                 backfilled=backfilled,
             )
+            return result["max_stream_id"]
         else:
             max_stream_id = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
@@ -2856,6 +2883,8 @@ class FederationHandler(BaseHandler):
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
                     await self._notify_persisted_event(event, max_stream_id)
+
+            return max_stream_id
 
     async def _notify_persisted_event(
         self, event: EventBase, max_stream_id: int

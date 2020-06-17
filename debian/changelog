@@ -1,16 +1,36 @@
-<<<<<<< HEAD
-matrix-synapse-py3 (1.12.3ubuntu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.15.1) stable; urgency=medium
 
+  * New synapse release 1.15.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Jun 2020 10:27:50 +0100
+
+matrix-synapse-py3 (1.15.0) stable; urgency=medium
+
+  * New synapse release 1.15.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 11 Jun 2020 13:27:06 +0100
+
+matrix-synapse-py3 (1.14.0) stable; urgency=medium
+
+  * New synapse release 1.14.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 28 May 2020 10:37:27 +0000
+
+matrix-synapse-py3 (1.13.0) stable; urgency=medium
+
+  [ Patrick Cloke ]
   * Add information about .well-known files to Debian installation scripts.
 
- -- Patrick Cloke <patrickc@matrix.org>  Mon, 06 Apr 2020 10:10:38 -0400
-=======
+  [ Synapse Packaging team ]
+  * New synapse release 1.13.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 19 May 2020 09:16:56 -0400
+
 matrix-synapse-py3 (1.12.4) stable; urgency=medium
 
   * New synapse release 1.12.4.
 
  -- Synapse Packaging team <packages@matrix.org>  Thu, 23 Apr 2020 10:58:14 -0400
->>>>>>> master
 
 matrix-synapse-py3 (1.12.3) stable; urgency=medium
 

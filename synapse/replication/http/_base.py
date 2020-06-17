@@ -16,11 +16,9 @@
 import abc
 import logging
 import re
+import urllib
 from inspect import signature
 from typing import Dict, List, Tuple
-
-from six import raise_from
-from six.moves import urllib
 
 from twisted.internet import defer
 
@@ -141,17 +139,29 @@ class ReplicationEndpoint(object):
         Returns a callable that accepts the same parameters as `_serialize_payload`.
         """
         clock = hs.get_clock()
-        host = hs.config.worker_replication_host
-        port = hs.config.worker_replication_http_port
-
         client = hs.get_simple_http_client()
+        local_instance_name = hs.get_instance_name()
+
+        master_host = hs.config.worker_replication_host
+        master_port = hs.config.worker_replication_http_port
+
+        instance_map = hs.config.worker.instance_map
 
         @trace(opname="outgoing_replication_request")
         @defer.inlineCallbacks
         def send_request(instance_name="master", **kwargs):
-            # Currently we only support sending requests to master process.
-            if instance_name != "master":
-                raise Exception("Unknown instance")
+            if instance_name == local_instance_name:
+                raise Exception("Trying to send HTTP request to self")
+            if instance_name == "master":
+                host = master_host
+                port = master_port
+            elif instance_name in instance_map:
+                host = instance_map[instance_name].host
+                port = instance_map[instance_name].port
+            else:
+                raise Exception(
+                    "Instance %r not in 'instance_map' config" % (instance_name,)
+                )
 
             data = yield cls._serialize_payload(**kwargs)
 
@@ -208,7 +218,7 @@ class ReplicationEndpoint(object):
                 # importantly, not stack traces everywhere)
                 raise e.to_synapse_error()
             except RequestSendFailed as e:
-                raise_from(SynapseError(502, "Failed to talk to master"), e)
+                raise SynapseError(502, "Failed to talk to master") from e
 
             return result
 

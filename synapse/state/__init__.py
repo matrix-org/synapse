@@ -18,8 +18,6 @@ import logging
 from collections import namedtuple
 from typing import Dict, Iterable, List, Optional, Set
 
-from six import iteritems, itervalues
-
 import attr
 from frozendict import frozendict
 from prometheus_client import Histogram
@@ -144,7 +142,7 @@ class StateHandler(object):
             list(state.values()), get_prev_content=False
         )
         state = {
-            key: state_map[e_id] for key, e_id in iteritems(state) if e_id in state_map
+            key: state_map[e_id] for key, e_id in state.items() if e_id in state_map
         }
 
         return state
@@ -423,7 +421,7 @@ class StateHandler(object):
                 state_res_store=StateResolutionStore(self.store),
             )
 
-        new_state = {key: state_map[ev_id] for key, ev_id in iteritems(new_state)}
+        new_state = {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
         return new_state
 
@@ -505,8 +503,8 @@ class StateResolutionHandler(object):
             # resolve_events_with_store do it?
             new_state = {}
             conflicted_state = False
-            for st in itervalues(state_groups_ids):
-                for key, e_id in iteritems(st):
+            for st in state_groups_ids.values():
+                for key, e_id in st.items():
                     if key in new_state:
                         conflicted_state = True
                         break
@@ -520,7 +518,7 @@ class StateResolutionHandler(object):
                     new_state = yield resolve_events_with_store(
                         room_id,
                         room_version,
-                        list(itervalues(state_groups_ids)),
+                        list(state_groups_ids.values()),
                         event_map=event_map,
                         state_res_store=state_res_store,
                     )
@@ -561,12 +559,12 @@ def _make_state_cache_entry(new_state, state_groups_ids):
     # not get persisted.
 
     # first look for exact matches
-    new_state_event_ids = set(itervalues(new_state))
-    for sg, state in iteritems(state_groups_ids):
+    new_state_event_ids = set(new_state.values())
+    for sg, state in state_groups_ids.items():
         if len(new_state_event_ids) != len(state):
             continue
 
-        old_state_event_ids = set(itervalues(state))
+        old_state_event_ids = set(state.values())
         if new_state_event_ids == old_state_event_ids:
             # got an exact match.
             return _StateCacheEntry(state=new_state, state_group=sg)
@@ -579,8 +577,8 @@ def _make_state_cache_entry(new_state, state_groups_ids):
     prev_group = None
     delta_ids = None
 
-    for old_group, old_state in iteritems(state_groups_ids):
-        n_delta_ids = {k: v for k, v in iteritems(new_state) if old_state.get(k) != v}
+    for old_group, old_state in state_groups_ids.items():
+        n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}
         if not delta_ids or len(n_delta_ids) < len(delta_ids):
             prev_group = old_group
             delta_ids = n_delta_ids

@@ -13,7 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+import attr
+
+from ._base import Config, ConfigError
+from .server import ListenerConfig, parse_listener_def
+
+
+@attr.s
+class InstanceLocationConfig:
+    """The host and port to talk to an instance via HTTP replication.
+    """
+
+    host = attr.ib(type=str)
+    port = attr.ib(type=int)
+
+
+@attr.s
+class WriterLocations:
+    """Specifies the instances that write various streams.
+
+    Attributes:
+        events: The instance that writes to the event and backfill streams.
+    """
+
+    events = attr.ib(default="master", type=str)
 
 
 class WorkerConfig(Config):
@@ -30,7 +53,9 @@ class WorkerConfig(Config):
         if self.worker_app == "synapse.app.homeserver":
             self.worker_app = None
 
-        self.worker_listeners = config.get("worker_listeners", [])
+        self.worker_listeners = [
+            parse_listener_def(x) for x in config.get("worker_listeners", [])
+        ]
         self.worker_daemonize = config.get("worker_daemonize")
         self.worker_pid_file = config.get("worker_pid_file")
         self.worker_log_config = config.get("worker_log_config")
@@ -53,23 +78,31 @@ class WorkerConfig(Config):
         manhole = config.get("worker_manhole")
         if manhole:
             self.worker_listeners.append(
-                {
-                    "port": manhole,
-                    "bind_addresses": ["127.0.0.1"],
-                    "type": "manhole",
-                    "tls": False,
-                }
+                ListenerConfig(
+                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                )
             )
 
-        if self.worker_listeners:
-            for listener in self.worker_listeners:
-                bind_address = listener.pop("bind_address", None)
-                bind_addresses = listener.setdefault("bind_addresses", [])
+        # A map from instance name to host/port of their HTTP replication endpoint.
+        instance_map = config.get("instance_map") or {}
+        self.instance_map = {
+            name: InstanceLocationConfig(**c) for name, c in instance_map.items()
+        }
 
-                if bind_address:
-                    bind_addresses.append(bind_address)
-                elif not bind_addresses:
-                    bind_addresses.append("")
+        # Map from type of streams to source, c.f. WriterLocations.
+        writers = config.get("stream_writers") or {}
+        self.writers = WriterLocations(**writers)
+
+        # Check that the configured writer for events also appears in
+        # `instance_map`.
+        if (
+            self.writers.events != "master"
+            and self.writers.events not in self.instance_map
+        ):
+            raise ConfigError(
+                "Instance %r is configured to write events but does not appear in `instance_map` config."
+                % (self.writers.events,)
+            )
 
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in

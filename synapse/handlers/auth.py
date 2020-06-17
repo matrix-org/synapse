@@ -81,7 +81,9 @@ class AuthHandler(BaseHandler):
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
-        self._sso_enabled = hs.config.saml2_enabled or hs.config.cas_enabled
+        self._sso_enabled = (
+            hs.config.cas_enabled or hs.config.saml2_enabled or hs.config.oidc_enabled
+        )
 
         # we keep this as a list despite the O(N^2) implication so that we can
         # keep PASSWORD first and avoid confusing clients which pick the first
@@ -107,7 +109,11 @@ class AuthHandler(BaseHandler):
 
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
-        self._failed_uia_attempts_ratelimiter = Ratelimiter()
+        self._failed_uia_attempts_ratelimiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+        )
 
         self._clock = self.hs.get_clock()
 
@@ -195,13 +201,7 @@ class AuthHandler(BaseHandler):
         user_id = requester.user.to_string()
 
         # Check if we should be ratelimited due to too many previous failed attempts
-        self._failed_uia_attempts_ratelimiter.ratelimit(
-            user_id,
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-            update=False,
-        )
+        self._failed_uia_attempts_ratelimiter.ratelimit(user_id, update=False)
 
         # build a list of supported flows
         flows = [[login_type] for login_type in self._supported_ui_auth_types]
@@ -211,14 +211,8 @@ class AuthHandler(BaseHandler):
                 flows, request, request_body, clientip, description
             )
         except LoginError:
-            # Update the ratelimite to say we failed (`can_do_action` doesn't raise).
-            self._failed_uia_attempts_ratelimiter.can_do_action(
-                user_id,
-                time_now_s=self._clock.time(),
-                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-                update=True,
-            )
+            # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
+            self._failed_uia_attempts_ratelimiter.can_do_action(user_id)
             raise
 
         # find the completed login type
@@ -253,7 +247,6 @@ class AuthHandler(BaseHandler):
         clientdict: Dict[str, Any],
         clientip: str,
         description: str,
-        validate_clientdict: bool = True,
     ) -> Tuple[dict, dict, str]:
         """
         Takes a dictionary sent by the client in the login / registration
@@ -278,10 +271,6 @@ class AuthHandler(BaseHandler):
 
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
-
-            validate_clientdict: Whether to validate that the operation happening
-                                 on the account has not changed. If this is false,
-                                 the client dict is persisted instead of validated.
 
         Returns:
             A tuple of (creds, params, session_id).
@@ -309,7 +298,7 @@ class AuthHandler(BaseHandler):
 
         # Convert the URI and method to strings.
         uri = request.uri.decode("utf-8")
-        method = request.uri.decode("utf-8")
+        method = request.method.decode("utf-8")
 
         # If there's no session ID, create a new session.
         if not sid:
@@ -347,26 +336,30 @@ class AuthHandler(BaseHandler):
 
             # Ensure that the queried operation does not vary between stages of
             # the UI authentication session. This is done by generating a stable
-            # comparator based on the URI, method, and client dict (minus the
-            # auth dict) and storing it during the initial query. Subsequent
+            # comparator and storing it during the initial query. Subsequent
             # queries ensure that this comparator has not changed.
-            if validate_clientdict:
-                session_comparator = (session.uri, session.method, session.clientdict)
-                comparator = (uri, method, clientdict)
-            else:
-                session_comparator = (session.uri, session.method)  # type: ignore
-                comparator = (uri, method)  # type: ignore
-
-            if session_comparator != comparator:
+            #
+            # The comparator is based on the requested URI and HTTP method. The
+            # client dict (minus the auth dict) should also be checked, but some
+            # clients are not spec compliant, just warn for now if the client
+            # dict changes.
+            if (session.uri, session.method) != (uri, method):
                 raise SynapseError(
                     403,
                     "Requested operation has changed during the UI authentication session.",
                 )
 
-            # For backwards compatibility the registration endpoint persists
-            # changes to the client dict instead of validating them.
-            if not validate_clientdict:
-                await self.store.set_ui_auth_clientdict(sid, clientdict)
+            if session.clientdict != clientdict:
+                logger.warning(
+                    "Requested operation has changed during the UI "
+                    "authentication session. A future version of Synapse "
+                    "will remove this capability."
+                )
+
+            # For backwards compatibility, changes to the client dict are
+            # persisted as clients modify them throughout their user interactive
+            # authentication flow.
+            await self.store.set_ui_auth_clientdict(sid, clientdict)
 
         if not authdict:
             raise InteractiveAuthIncompleteError(

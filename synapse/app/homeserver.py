@@ -23,15 +23,14 @@ import math
 import os
 import resource
 import sys
-
-from six import iteritems
+from typing import Iterable
 
 from prometheus_client import Gauge
 
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
-from twisted.web.resource import EncodingResourceWrapper, IResource, NoResource
+from twisted.web.resource import EncodingResourceWrapper, IResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 
@@ -50,9 +49,14 @@ from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import ListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
-from synapse.http.server import RootRedirect
+from synapse.http.server import (
+    OptionsResource,
+    RootOptionsRedirectResource,
+    RootRedirect,
+)
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
@@ -85,24 +89,24 @@ def gz_wrap(r):
 class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
 
-    def _listener_http(self, config, listener_config):
-        port = listener_config["port"]
-        bind_addresses = listener_config["bind_addresses"]
-        tls = listener_config.get("tls", False)
-        site_tag = listener_config.get("tag", port)
+    def _listener_http(self, config: HomeServerConfig, listener_config: ListenerConfig):
+        port = listener_config.port
+        bind_addresses = listener_config.bind_addresses
+        tls = listener_config.tls
+        site_tag = listener_config.http_options.tag
+        if site_tag is None:
+            site_tag = port
 
         resources = {}
-        for res in listener_config["resources"]:
-            for name in res["names"]:
-                if name == "openid" and "federation" in res["names"]:
+        for res in listener_config.http_options.resources:
+            for name in res.names:
+                if name == "openid" and "federation" in res.names:
                     # Skip loading openid resource if federation is defined
                     # since federation resource will include openid
                     continue
-                resources.update(
-                    self._configure_named_resource(name, res.get("compress", False))
-                )
+                resources.update(self._configure_named_resource(name, res.compress))
 
-        additional_resources = listener_config.get("additional_resources", {})
+        additional_resources = listener_config.http_options.additional_resources
         logger.debug("Configuring additional resources: %r", additional_resources)
         module_api = ModuleApi(self, self.get_auth_handler())
         for path, resmodule in additional_resources.items():
@@ -121,11 +125,11 @@ class SynapseHomeServer(HomeServer):
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
-            root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
-            root_resource = RootRedirect(STATIC_PREFIX)
+            root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
-            root_resource = NoResource()
+            root_resource = OptionsResource()
 
         root_resource = create_resource_tree(resources, root_resource)
 
@@ -274,7 +278,7 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self, listeners):
+    def start_listening(self, listeners: Iterable[ListenerConfig]):
         config = self.get_config()
 
         if config.redis_enabled:
@@ -284,25 +288,25 @@ class SynapseHomeServer(HomeServer):
             self.get_tcp_replication().start_replication(self)
 
         for listener in listeners:
-            if listener["type"] == "http":
+            if listener.type == "http":
                 self._listening_services.extend(self._listener_http(config, listener))
-            elif listener["type"] == "manhole":
+            elif listener.type == "manhole":
                 listen_tcp(
-                    listener["bind_addresses"],
-                    listener["port"],
+                    listener.bind_addresses,
+                    listener.port,
                     manhole(
                         username="matrix", password="rabbithole", globals={"hs": self}
                     ),
                 )
-            elif listener["type"] == "replication":
+            elif listener.type == "replication":
                 services = listen_tcp(
-                    listener["bind_addresses"],
-                    listener["port"],
+                    listener.bind_addresses,
+                    listener.port,
                     ReplicationStreamProtocolFactory(self),
                 )
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
-            elif listener["type"] == "metrics":
+            elif listener.type == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warning(
                         (
@@ -311,9 +315,11 @@ class SynapseHomeServer(HomeServer):
                         )
                     )
                 else:
-                    _base.listen_metrics(listener["bind_addresses"], listener["port"])
+                    _base.listen_metrics(listener.bind_addresses, listener.port)
             else:
-                logger.warning("Unrecognized listener type: %s", listener["type"])
+                # this shouldn't happen, as the listener type should have been checked
+                # during parsing
+                logger.warning("Unrecognized listener type: %s", listener.type)
 
 
 # Gauges to expose monthly active user control metrics
@@ -484,42 +490,8 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     if uptime < 0:
         uptime = 0
 
-    stats["homeserver"] = hs.config.server_name
-    stats["server_context"] = hs.config.server_context
-    stats["timestamp"] = now
-    stats["uptime_seconds"] = uptime
-    version = sys.version_info
-    stats["python_version"] = "{}.{}.{}".format(
-        version.major, version.minor, version.micro
-    )
-    stats["total_users"] = yield hs.get_datastore().count_all_users()
-
-    total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
-    stats["total_nonbridged_users"] = total_nonbridged_users
-
-    daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
-    for name, count in iteritems(daily_user_type_results):
-        stats["daily_user_type_" + name] = count
-
-    room_count = yield hs.get_datastore().get_room_count()
-    stats["total_room_count"] = room_count
-
-    stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
-    stats["monthly_active_users"] = yield hs.get_datastore().count_monthly_users()
-    stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
-    stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
-
-    r30_results = yield hs.get_datastore().count_r30_users()
-    for name, count in iteritems(r30_results):
-        stats["r30_users_" + name] = count
-
-    daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
-    stats["daily_sent_messages"] = daily_sent_messages
-    stats["cache_factor"] = hs.config.caches.global_factor
-    stats["event_cache_size"] = hs.config.caches.event_cache_size
-
     #
-    # Performance statistics
+    # Performance statistics. Keep this early in the function to maintain reliability of `test_performance_100` test.
     #
     old = stats_process[0]
     new = (now, resource.getrusage(resource.RUSAGE_SELF))
@@ -536,6 +508,44 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
         stats["cpu_average"] = 0
     else:
         stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
+
+    #
+    # General statistics
+    #
+
+    stats["homeserver"] = hs.config.server_name
+    stats["server_context"] = hs.config.server_context
+    stats["timestamp"] = now
+    stats["uptime_seconds"] = uptime
+    version = sys.version_info
+    stats["python_version"] = "{}.{}.{}".format(
+        version.major, version.minor, version.micro
+    )
+    stats["total_users"] = yield hs.get_datastore().count_all_users()
+
+    total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
+    stats["total_nonbridged_users"] = total_nonbridged_users
+
+    daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
+    for name, count in daily_user_type_results.items():
+        stats["daily_user_type_" + name] = count
+
+    room_count = yield hs.get_datastore().get_room_count()
+    stats["total_room_count"] = room_count
+
+    stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
+    stats["monthly_active_users"] = yield hs.get_datastore().count_monthly_users()
+    stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
+    stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
+
+    r30_results = yield hs.get_datastore().count_r30_users()
+    for name, count in r30_results.items():
+        stats["r30_users_" + name] = count
+
+    daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
+    stats["daily_sent_messages"] = daily_sent_messages
+    stats["cache_factor"] = hs.config.caches.global_factor
+    stats["event_cache_size"] = hs.config.caches.event_cache_size
 
     #
     # Database version
@@ -613,18 +623,17 @@ def run(hs):
     clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
     reap_monthly_active_users()
 
-    @defer.inlineCallbacks
-    def generate_monthly_active_users():
+    async def generate_monthly_active_users():
         current_mau_count = 0
         current_mau_count_by_service = {}
         reserved_users = ()
         store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
-            current_mau_count = yield store.get_monthly_active_count()
+            current_mau_count = await store.get_monthly_active_count()
             current_mau_count_by_service = (
-                yield store.get_monthly_active_count_by_service()
+                await store.get_monthly_active_count_by_service()
             )
-            reserved_users = yield store.get_registered_reserved_users()
+            reserved_users = await store.get_registered_reserved_users()
         current_mau_gauge.set(float(current_mau_count))
 
         for app_service, count in current_mau_count_by_service.items():

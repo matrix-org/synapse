@@ -16,6 +16,7 @@
 # limitations under the License.
 import logging
 import time
+from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
     Any,
@@ -28,9 +29,6 @@ from typing import (
     Tuple,
     TypeVar,
 )
-
-from six import iteritems, iterkeys, itervalues
-from six.moves import intern, range
 
 from prometheus_client import Histogram
 
@@ -50,7 +48,6 @@ from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
 from synapse.types import Collection
-from synapse.util.stringutils import exception_to_unicode
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +76,6 @@ UNIQUE_INDEX_BACKGROUND_UPDATES = {
     "device_lists_remote_extremeties": "device_lists_remote_extremeties_unique_idx",
     "device_lists_remote_cache": "device_lists_remote_cache_unique_idx",
     "event_search": "event_search_event_id_idx",
-    "device_lists_outbound_last_success": "device_lists_outbound_last_success_unique_idx",
 }
 
 
@@ -261,7 +257,7 @@ class PerformanceCounters(object):
 
     def interval(self, interval_duration_secs, limit=3):
         counters = []
-        for name, (count, cum_time) in iteritems(self.current_counters):
+        for name, (count, cum_time) in self.current_counters.items():
             prev_count, prev_time = self.previous_counters.get(name, (0, 0))
             counters.append(
                 (
@@ -424,20 +420,14 @@ class Database(object):
                     # This can happen if the database disappears mid
                     # transaction.
                     logger.warning(
-                        "[TXN OPERROR] {%s} %s %d/%d",
-                        name,
-                        exception_to_unicode(e),
-                        i,
-                        N,
+                        "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
                     )
                     if i < N:
                         i += 1
                         try:
                             conn.rollback()
                         except self.engine.module.Error as e1:
-                            logger.warning(
-                                "[TXN EROLL] {%s} %s", name, exception_to_unicode(e1)
-                            )
+                            logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
                     raise
                 except self.engine.module.DatabaseError as e:
@@ -449,9 +439,7 @@ class Database(object):
                                 conn.rollback()
                             except self.engine.module.Error as e1:
                                 logger.warning(
-                                    "[TXN EROLL] {%s} %s",
-                                    name,
-                                    exception_to_unicode(e1),
+                                    "[TXN EROLL] {%s} %s", name, e1,
                                 )
                             continue
                     raise
@@ -1063,7 +1051,7 @@ class Database(object):
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
         if keyvalues:
-            sql += " WHERE %s" % " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
+            sql += " WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
             txn.execute(sql, list(keyvalues.values()))
         else:
             txn.execute(sql)
@@ -1201,7 +1189,7 @@ class Database(object):
         clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
         clauses = [clause]
 
-        for key, value in iteritems(keyvalues):
+        for key, value in keyvalues.items():
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
@@ -1222,7 +1210,7 @@ class Database(object):
     @staticmethod
     def simple_update_txn(txn, table, keyvalues, updatevalues):
         if keyvalues:
-            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
+            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
         else:
             where = ""
 
@@ -1361,7 +1349,7 @@ class Database(object):
         clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
         clauses = [clause]
 
-        for key, value in iteritems(keyvalues):
+        for key, value in keyvalues.items():
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
@@ -1398,7 +1386,7 @@ class Database(object):
         txn.close()
 
         if cache:
-            min_val = min(itervalues(cache))
+            min_val = min(cache.values())
         else:
             min_val = max_value
 

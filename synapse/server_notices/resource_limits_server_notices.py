@@ -14,8 +14,6 @@
 # limitations under the License.
 import logging
 
-from six import iteritems
-
 from synapse.api.constants import (
     EventTypes,
     LimitBlockingTypes,
@@ -48,6 +46,12 @@ class ResourceLimitsServerNotices(object):
 
         self._notifier = hs.get_notifier()
 
+        self._enabled = (
+            hs.config.limit_usage_by_mau
+            and self._server_notices_manager.is_enabled()
+            and not hs.config.hs_disabled
+        )
+
     async def maybe_send_server_notice_to_user(self, user_id):
         """Check if we need to send a notice to this user, this will be true in
         two cases.
@@ -61,14 +65,7 @@ class ResourceLimitsServerNotices(object):
         Returns:
             Deferred
         """
-        if self._config.hs_disabled is True:
-            return
-
-        if self._config.limit_usage_by_mau is False:
-            return
-
-        if not self._server_notices_manager.is_enabled():
-            # Don't try and send server notices unless they've been enabled
+        if not self._enabled:
             return
 
         timestamp = await self._store.user_last_seen_monthly_active(user_id)
@@ -215,7 +212,7 @@ class ResourceLimitsServerNotices(object):
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 
         events = await self._store.get_events(referenced_events)
-        for event_id, event in iteritems(events):
+        for event_id, event in events.items():
             if event.type != EventTypes.Message:
                 continue
             if event.content.get("msgtype") == ServerNoticeMsgType:

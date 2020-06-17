@@ -15,8 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from six import iteritems, itervalues
+from typing import Any, Dict, Optional
 
 from twisted.internet import defer
 
@@ -29,7 +28,12 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
-from synapse.types import RoomStreamToken, get_domain_from_id
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import (
+    RoomStreamToken,
+    get_domain_from_id,
+    get_verify_key_from_cross_signing_key,
+)
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -153,7 +157,7 @@ class DeviceWorkerHandler(BaseHandler):
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
             if room_id not in room_ids:
-                for key, event_id in iteritems(current_state_ids):
+                for key, event_id in current_state_ids.items():
                     etype, state_key = key
                     if etype != EventTypes.Member:
                         continue
@@ -176,7 +180,7 @@ class DeviceWorkerHandler(BaseHandler):
                 log_kv(
                     {"event": "encountered empty previous state", "room_id": room_id}
                 )
-                for key, event_id in iteritems(current_state_ids):
+                for key, event_id in current_state_ids.items():
                     etype, state_key = key
                     if etype != EventTypes.Member:
                         continue
@@ -192,10 +196,10 @@ class DeviceWorkerHandler(BaseHandler):
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.
-            for state_dict in itervalues(prev_state_ids):
+            for state_dict in prev_state_ids.values():
                 member_event = state_dict.get((EventTypes.Member, user_id), None)
                 if not member_event or member_event != current_member_id:
-                    for key, event_id in iteritems(current_state_ids):
+                    for key, event_id in current_state_ids.items():
                         etype, state_key = key
                         if etype != EventTypes.Member:
                             continue
@@ -205,14 +209,14 @@ class DeviceWorkerHandler(BaseHandler):
             # If there has been any change in membership, include them in the
             # possibly changed list. We'll check if they are joined below,
             # and we're not toooo worried about spuriously adding users.
-            for key, event_id in iteritems(current_state_ids):
+            for key, event_id in current_state_ids.items():
                 etype, state_key = key
                 if etype != EventTypes.Member:
                     continue
 
                 # check if this member has changed since any of the extremities
                 # at the stream_ordering, and add them to the list if so.
-                for state_dict in itervalues(prev_state_ids):
+                for state_dict in prev_state_ids.values():
                     prev_event_id = state_dict.get(key, None)
                     if not prev_event_id or prev_event_id != event_id:
                         if state_key != user_id:
@@ -535,6 +539,15 @@ class DeviceListUpdater(object):
             iterable=True,
         )
 
+        # Attempt to resync out of sync device lists every 30s.
+        self._resync_retry_in_progress = False
+        self.clock.looping_call(
+            run_as_background_process,
+            30 * 1000,
+            func=self._maybe_retry_device_resync,
+            desc="_maybe_retry_device_resync",
+        )
+
     @trace
     @defer.inlineCallbacks
     def incoming_device_list_update(self, origin, edu_content):
@@ -678,26 +691,85 @@ class DeviceListUpdater(object):
 
         return False
 
+    @trace
     @defer.inlineCallbacks
-    def user_device_resync(self, user_id):
+    def _maybe_retry_device_resync(self):
+        """Retry to resync device lists that are out of sync, except if another retry is
+        in progress.
+        """
+        if self._resync_retry_in_progress:
+            return
+
+        try:
+            # Prevent another call of this function to retry resyncing device lists so
+            # we don't send too many requests.
+            self._resync_retry_in_progress = True
+            # Get all of the users that need resyncing.
+            need_resync = yield self.store.get_user_ids_requiring_device_list_resync()
+            # Iterate over the set of user IDs.
+            for user_id in need_resync:
+                try:
+                    # Try to resync the current user's devices list.
+                    result = yield self.user_device_resync(
+                        user_id=user_id, mark_failed_as_stale=False,
+                    )
+
+                    # user_device_resync only returns a result if it managed to
+                    # successfully resync and update the database. Updating the table
+                    # of users requiring resync isn't necessary here as
+                    # user_device_resync already does it (through
+                    # self.store.update_remote_device_list_cache).
+                    if result:
+                        logger.debug(
+                            "Successfully resynced the device list for %s", user_id,
+                        )
+                except Exception as e:
+                    # If there was an issue resyncing this user, e.g. if the remote
+                    # server sent a malformed result, just log the error instead of
+                    # aborting all the subsequent resyncs.
+                    logger.debug(
+                        "Could not resync the device list for %s: %s", user_id, e,
+                    )
+        finally:
+            # Allow future calls to retry resyncinc out of sync device lists.
+            self._resync_retry_in_progress = False
+
+    @defer.inlineCallbacks
+    def user_device_resync(self, user_id, mark_failed_as_stale=True):
         """Fetches all devices for a user and updates the device cache with them.
 
         Args:
             user_id (str): The user's id whose device_list will be updated.
+            mark_failed_as_stale (bool): Whether to mark the user's device list as stale
+                if the attempt to resync failed.
         Returns:
             Deferred[dict]: a dict with device info as under the "devices" in the result of this
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
         """
+        logger.debug("Attempting to resync the device list for %s", user_id)
         log_kv({"message": "Doing resync to update device list."})
         # Fetch all devices for the user.
         origin = get_domain_from_id(user_id)
         try:
             result = yield self.federation.query_user_devices(origin, user_id)
-        except (NotRetryingDestination, RequestSendFailed, HttpResponseException):
-            # TODO: Remember that we are now out of sync and try again
-            # later
-            logger.warning("Failed to handle device list update for %s", user_id)
+        except NotRetryingDestination:
+            if mark_failed_as_stale:
+                # Mark the remote user's device list as stale so we know we need to retry
+                # it later.
+                yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
+            return
+        except (RequestSendFailed, HttpResponseException) as e:
+            logger.warning(
+                "Failed to handle device list update for %s: %s", user_id, e,
+            )
+
+            if mark_failed_as_stale:
+                # Mark the remote user's device list as stale so we know we need to retry
+                # it later.
+                yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
             # We abort on exceptions rather than accepting the update
             # as otherwise synapse will 'forget' that its device list
             # is out of date. If we bail then we will retry the resync
@@ -711,17 +783,28 @@ class DeviceListUpdater(object):
             logger.info(e)
             return
         except Exception as e:
-            # TODO: Remember that we are now out of sync and try again
-            # later
             set_tag("error", True)
             log_kv(
                 {"message": "Exception raised by federation request", "exception": e}
             )
             logger.exception("Failed to handle device list update for %s", user_id)
+
+            if mark_failed_as_stale:
+                # Mark the remote user's device list as stale so we know we need to retry
+                # it later.
+                yield self.store.mark_remote_user_device_cache_as_stale(user_id)
+
             return
         log_kv({"result": result})
         stream_id = result["stream_id"]
         devices = result["devices"]
+
+        # Get the master key and the self-signing key for this user if provided in the
+        # response (None if not in the response).
+        # The response will not contain the user signing key, as this key is only used by
+        # its owner, thus it doesn't make sense to send it over federation.
+        master_key = result.get("master_key")
+        self_signing_key = result.get("self_signing_key")
 
         # If the remote server has more than ~1000 devices for this user
         # we assume that something is going horribly wrong (e.g. a bot
@@ -752,6 +835,13 @@ class DeviceListUpdater(object):
 
         yield self.store.update_remote_device_list_cache(user_id, devices, stream_id)
         device_ids = [device["device_id"] for device in devices]
+
+        # Handle cross-signing keys.
+        cross_signing_device_ids = yield self.process_cross_signing_key_update(
+            user_id, master_key, self_signing_key,
+        )
+        device_ids = device_ids + cross_signing_device_ids
+
         yield self.device_handler.notify_device_update(user_id, device_ids)
 
         # We clobber the seen updates since we've re-synced from a given
@@ -759,3 +849,40 @@ class DeviceListUpdater(object):
         self._seen_updates[user_id] = {stream_id}
 
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def process_cross_signing_key_update(
+        self,
+        user_id: str,
+        master_key: Optional[Dict[str, Any]],
+        self_signing_key: Optional[Dict[str, Any]],
+    ) -> list:
+        """Process the given new master and self-signing key for the given remote user.
+
+        Args:
+            user_id: The ID of the user these keys are for.
+            master_key: The dict of the cross-signing master key as returned by the
+                remote server.
+            self_signing_key: The dict of the cross-signing self-signing key as returned
+                by the remote server.
+
+        Return:
+            The device IDs for the given keys.
+        """
+        device_ids = []
+
+        if master_key:
+            yield self.store.set_e2e_cross_signing_key(user_id, "master", master_key)
+            _, verify_key = get_verify_key_from_cross_signing_key(master_key)
+            # verify_key is a VerifyKey from signedjson, which uses
+            # .version to denote the portion of the key ID after the
+            # algorithm and colon, which is the device ID
+            device_ids.append(verify_key.version)
+        if self_signing_key:
+            yield self.store.set_e2e_cross_signing_key(
+                user_id, "self_signing", self_signing_key
+            )
+            _, verify_key = get_verify_key_from_cross_signing_key(self_signing_key)
+            device_ids.append(verify_key.version)
+
+        return device_ids

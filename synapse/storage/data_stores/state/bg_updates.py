@@ -15,8 +15,6 @@
 
 import logging
 
-from six import iteritems
-
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
@@ -109,20 +107,20 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     SELECT prev_state_group FROM state_group_edges e, state s
                     WHERE s.state_group = e.state_group
                 )
-                SELECT DISTINCT type, state_key, last_value(event_id) OVER (
-                    PARTITION BY type, state_key ORDER BY state_group ASC
-                    ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
-                ) AS event_id FROM state_groups_state
+                SELECT DISTINCT ON (type, state_key)
+                    type, state_key, event_id
+                FROM state_groups_state
                 WHERE state_group IN (
                     SELECT state_group FROM state
-                )
+                ) %s
+                ORDER BY type, state_key, state_group DESC
             """
 
             for group in groups:
                 args = [group]
                 args.extend(where_args)
 
-                txn.execute(sql + where_clause, args)
+                txn.execute(sql % (where_clause,), args)
                 for row in txn:
                     typ, state_key, event_id = row
                     key = (typ, state_key)
@@ -280,7 +278,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
 
                         delta_state = {
                             key: value
-                            for key, value in iteritems(curr_state)
+                            for key, value in curr_state.items()
                             if prev_state.get(key, None) != value
                         }
 
@@ -316,7 +314,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                                     "state_key": key[1],
                                     "event_id": state_id,
                                 }
-                                for key, state_id in iteritems(delta_state)
+                                for key, state_id in delta_state.items()
                             ],
                         )
 

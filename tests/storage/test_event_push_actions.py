@@ -22,6 +22,10 @@ import tests.utils
 
 USER_ID = "@user:example.com"
 
+MARK_UNREAD = [
+    "org.matrix.msc2625.mark_unread",
+    {"set_tweak": "highlight", "value": False},
+]
 PlAIN_NOTIF = ["notify", {"set_tweak": "highlight", "value": False}]
 HIGHLIGHT = [
     "notify",
@@ -55,13 +59,17 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         user_id = "@user1235:example.com"
 
         @defer.inlineCallbacks
-        def _assert_counts(noitf_count, highlight_count):
+        def _assert_counts(unread_count, notif_count, highlight_count):
             counts = yield self.store.db.runInteraction(
                 "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
             )
             self.assertEquals(
                 counts,
-                {"notify_count": noitf_count, "highlight_count": highlight_count},
+                {
+                    "unread_count": unread_count,
+                    "notify_count": notif_count,
+                    "highlight_count": highlight_count,
+                },
             )
 
         @defer.inlineCallbacks
@@ -96,23 +104,23 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
                 stream,
             )
 
-        yield _assert_counts(0, 0)
+        yield _assert_counts(0, 0, 0)
         yield _inject_actions(1, PlAIN_NOTIF)
-        yield _assert_counts(1, 0)
+        yield _assert_counts(1, 1, 0)
         yield _rotate(2)
-        yield _assert_counts(1, 0)
+        yield _assert_counts(1, 1, 0)
 
         yield _inject_actions(3, PlAIN_NOTIF)
-        yield _assert_counts(2, 0)
+        yield _assert_counts(2, 2, 0)
         yield _rotate(4)
-        yield _assert_counts(2, 0)
+        yield _assert_counts(2, 2, 0)
 
         yield _inject_actions(5, PlAIN_NOTIF)
         yield _mark_read(3, 3)
-        yield _assert_counts(1, 0)
+        yield _assert_counts(1, 1, 0)
 
         yield _mark_read(5, 5)
-        yield _assert_counts(0, 0)
+        yield _assert_counts(0, 0, 0)
 
         yield _inject_actions(6, PlAIN_NOTIF)
         yield _rotate(7)
@@ -121,17 +129,22 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             table="event_push_actions", keyvalues={"1": 1}, desc=""
         )
 
-        yield _assert_counts(1, 0)
+        yield _assert_counts(1, 1, 0)
 
         yield _mark_read(7, 7)
-        yield _assert_counts(0, 0)
+        yield _assert_counts(0, 0, 0)
 
-        yield _inject_actions(8, HIGHLIGHT)
-        yield _assert_counts(1, 1)
+        yield _inject_actions(8, MARK_UNREAD)
+        yield _assert_counts(1, 0, 0)
         yield _rotate(9)
-        yield _assert_counts(1, 1)
-        yield _rotate(10)
-        yield _assert_counts(1, 1)
+        yield _assert_counts(1, 0, 0)
+
+        yield _inject_actions(10, HIGHLIGHT)
+        yield _assert_counts(2, 1, 1)
+        yield _rotate(11)
+        yield _assert_counts(2, 1, 1)
+        yield _rotate(12)
+        yield _assert_counts(2, 1, 1)
 
     @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):

@@ -4,38 +4,52 @@ window.matrixLogin = {
     serverAcceptsSso: false,
 };
 
-var title_pre_auth = "Log in with one of the following methods";
-var title_post_auth = "Logging in...";
+// Titles get updated through the process to give users feedback.
+const TITLE_PRE_AUTH = "Log in with one of the following methods";
+const TITLE_POST_AUTH = "Logging in...";
 
-var submitPassword = function(user, pwd) {
-    console.log("Logging in with password...");
-    set_title(title_post_auth);
-    var data = {
-        type: "m.login.password",
-        user: user,
-        password: pwd,
-    };
+// The cookie used to store the original query parameters when using SSO.
+const COOKIE_KEY = "synapse_login_fallback_qs";
+
+/*
+ * Submit a login request.
+ *
+ * type: The login type as a string (e.g. "m.login.foo").
+ * data: An object of data specific to the login type.
+ * extra: (Optional) An object to search for extra information to send with the
+ *     login request, e.g. device_id.
+ * callback: (Optional) Function to call on successful login.
+ */
+function submitLogin(type, data, extra, callback) {
+    console.log("Logging in with " + type);
+    setTitle(TITLE_POST_AUTH);
+
+    // Add the login type.
+    data.type = type;
+
+    // Add the device information, if it was provided.
+    if (extra.device_id) {
+        data.device_id = extra.device_id;
+    }
+    if (extra.initial_device_display_name) {
+        data.initial_device_display_name = extra.initial_device_display_name;
+    }
+
     $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
+        if (callback) {
+            callback();
+        }
         matrixLogin.onLogin(response);
     }).fail(errorFunc);
-};
+}
 
-var submitToken = function(loginToken) {
-    console.log("Logging in with login token...");
-    set_title(title_post_auth);
-    var data = {
-        type: "m.login.token",
-        token: loginToken
-    };
-    $.post(matrixLogin.endpoint, JSON.stringify(data), function(response) {
-        matrixLogin.onLogin(response);
-    }).fail(errorFunc);
-};
-
-var errorFunc = function(err) {
+/*
+ * Display an error to the user and show the login form again.
+ */
+function errorFunc(err) {
     // We want to show the error to the user rather than redirecting immediately to the
     // SSO portal (if SSO is the only login option), so we inhibit the redirect.
-    show_login(true);
+    showLogin(true);
 
     if (err.responseJSON && err.responseJSON.error) {
         setFeedbackString(err.responseJSON.error + " (" + err.responseJSON.errcode + ")");
@@ -43,20 +57,42 @@ var errorFunc = function(err) {
     else {
         setFeedbackString("Request failed: " + err.status);
     }
-};
+}
 
-var setFeedbackString = function(text) {
+/*
+ * Display an error to the user.
+ */
+function setFeedbackString(text) {
     $("#feedback").text(text);
-};
+}
 
-var show_login = function(inhibit_redirect) {
-    var this_page = window.location.origin + window.location.pathname;
-    $("#sso_redirect_url").val(this_page);
+/*
+ * (Maybe) Show the login forms.
+ *
+ * This actually does a few unrelated functions:
+ *
+ * * Configures the SSO redirect URL to come back to this page.
+ * * Configures and shows the SSO form, if the server supports SSO.
+ * * Otherwise, shows the password form.
+ */
+function showLogin(inhibitRedirect) {
+    setTitle(TITLE_PRE_AUTH);
 
-    // If inhibit_redirect is false, and SSO is the only supported login method, we can
-    // redirect straight to the SSO page
+    // If inhibitRedirect is false, and SSO is the only supported login method,
+    // we can redirect straight to the SSO page.
     if (matrixLogin.serverAcceptsSso) {
-        if (!inhibit_redirect && !matrixLogin.serverAcceptsPassword) {
+        // Set the redirect to come back to this page, a login token will get
+        // added as a query parameter and handled after the redirect.
+        $("#sso_redirect_url").val(window.location.origin + window.location.pathname);
+
+        // Before submitting SSO, set the current query parameters into a cookie
+        // for retrieval later.
+        var qs = parseQsFromUrl();
+        setCookie(COOKIE_KEY, JSON.stringify(qs));
+
+        // If password is not supported and redirects are allowed, then submit
+        // the form (redirecting to the SSO provider).
+        if (!inhibitRedirect && !matrixLogin.serverAcceptsPassword) {
             $("#sso_form").submit();
             return;
         }
@@ -69,30 +105,39 @@ var show_login = function(inhibit_redirect) {
         $("#password_flow").show();
     }
 
+    // If neither password or SSO are supported, show an error to the user.
     if (!matrixLogin.serverAcceptsPassword && !matrixLogin.serverAcceptsSso) {
         $("#no_login_types").show();
     }
 
-    set_title(title_pre_auth);
-
     $("#loading").hide();
-};
+}
 
-var show_spinner = function() {
+/*
+ * Hides the forms and shows a loading throbber.
+ */
+function showSpinner() {
     $("#password_flow").hide();
     $("#sso_flow").hide();
     $("#no_login_types").hide();
     $("#loading").show();
-};
+}
 
-var set_title = function(title) {
+/*
+ * Helper to show the page's main title.
+ */
+function setTitle(title) {
     $("#title").text(title);
-};
+}
 
-var fetch_info = function(cb) {
+/*
+ * Query the login endpoint for the homeserver's supported flows.
+ *
+ * This populates matrixLogin.serverAccepts* variables.
+ */
+function fetchLoginFlows(cb) {
     $.get(matrixLogin.endpoint, function(response) {
-        var serverAcceptsPassword = false;
-        for (var i=0; i<response.flows.length; i++) {
+        for (var i = 0; i < response.flows.length; i++) {
             var flow = response.flows[i];
             if ("m.login.sso" === flow.type) {
                 matrixLogin.serverAcceptsSso = true;
@@ -108,30 +153,56 @@ var fetch_info = function(cb) {
     }).fail(errorFunc);
 }
 
+/*
+ * Called on load to fetch login flows and attempt SSO login (if a token is available).
+ */
 matrixLogin.onLoad = function() {
-    fetch_info(function() {
-        if (!try_token()) {
-            show_login(false);
+    fetchLoginFlows(function() {
+        // (Maybe) attempt logging in via SSO if a token is available.
+        if (!tryTokenLogin()) {
+            showLogin(false);
         }
     });
 };
 
-matrixLogin.password_login = function() {
+/*
+ * Submit simple user & password login.
+ */
+matrixLogin.passwordLogin = function() {
     var user = $("#user_id").val();
     var pwd = $("#password").val();
 
     setFeedbackString("");
 
-    show_spinner();
-    submitPassword(user, pwd);
+    showSpinner();
+    submitLogin(
+        "m.login.password",
+        {user: user, password: pwd},
+        parseQsFromUrl());
 };
 
+/*
+ * The onLogin function gets called after a succesful login.
+ *
+ * It is expected that implementations override this to be notified when the
+ * login is complete. The response to the login call is provided as the single
+ * parameter.
+ */
 matrixLogin.onLogin = function(response) {
     // clobber this function
     console.warn("onLogin - This function should be replaced to proceed.");
 };
 
-var parseQsFromUrl = function(query) {
+/*
+ * Process the query parameters from the current URL into an object.
+ */
+function parseQsFromUrl() {
+    var pos = window.location.href.indexOf("?");
+    if (pos == -1) {
+        return {};
+    }
+    var query = window.location.href.substr(pos + 1);
+
     var result = {};
     query.split("&").forEach(function(part) {
         var item = part.split("=");
@@ -141,25 +212,80 @@ var parseQsFromUrl = function(query) {
         if (val) {
             val = decodeURIComponent(val);
         }
-        result[key] = val
+        result[key] = val;
     });
     return result;
-};
+}
 
-var try_token = function() {
-    var pos = window.location.href.indexOf("?");
-    if (pos == -1) {
-        return false;
-    }
-    var qs = parseQsFromUrl(window.location.href.substr(pos+1));
+/*
+ * Process the cookies and return an object.
+ */
+function parseCookies() {
+    var allCookies = document.cookie;
+    var result = {};
+    allCookies.split(";").forEach(function(part) {
+        var item = part.split("=");
+        // Cookies might have arbitrary whitespace between them.
+        var key = item[0].trim();
+        // You can end up with a broken cookie that doesn't have an equals sign
+        // in it. Set to an empty value.
+        var val = (item[1] || "").trim();
+        // Values might be URI encoded.
+        if (val) {
+            val = decodeURIComponent(val);
+        }
+        result[key] = val;
+    });
+    return result;
+}
+
+/*
+ * Set a cookie that is valid for 1 hour.
+ */
+function setCookie(key, value) {
+    // The maximum age is set in seconds.
+    var maxAge = 60 * 60;
+    // Set the cookie, this defaults to the current domain and path.
+    document.cookie = key + "=" + encodeURIComponent(value) + ";max-age=" + maxAge + ";sameSite=lax";
+}
+
+/*
+ * Removes a cookie by key.
+ */
+function deleteCookie(key) {
+    // Delete a cookie by setting the expiration to 0. (Note that the value
+    // doesn't matter.)
+    document.cookie = key + "=deleted;expires=0";
+}
+
+/*
+ * Submits the login token if one is found in the query parameters. Returns a
+ * boolean of whether the login token was found or not.
+ */
+function tryTokenLogin() {
+    // Check if the login token is in the query parameters.
+    var qs = parseQsFromUrl();
 
     var loginToken = qs.loginToken;
-
     if (!loginToken) {
         return false;
     }
 
-    submitToken(loginToken);
+    // Retrieve the original query parameters (from before the SSO redirect).
+    // They are stored as JSON in a cookie.
+    var cookies = parseCookies();
+    var originalQueryParams = JSON.parse(cookies[COOKIE_KEY] || "{}")
+
+    // If the login is successful, delete the cookie.
+    function callback() {
+        deleteCookie(COOKIE_KEY);
+    }
+
+    submitLogin(
+        "m.login.token",
+        {token: loginToken},
+        originalQueryParams,
+        callback);
 
     return true;
-};
+}

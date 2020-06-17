@@ -90,6 +90,7 @@ from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
+from synapse.replication.tcp.streams import STREAMS_MAP
 from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
@@ -210,6 +211,7 @@ class HomeServer(object):
         "storage",
         "replication_streamer",
         "replication_data_handler",
+        "replication_streams",
     ]
 
     REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
@@ -240,9 +242,12 @@ class HomeServer(object):
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
-        self.ratelimiter = Ratelimiter()
-        self.admin_redaction_ratelimiter = Ratelimiter()
-        self.registration_ratelimiter = Ratelimiter()
+
+        self.registration_ratelimiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=config.rc_registration.per_second,
+            burst_count=config.rc_registration.burst_count,
+        )
 
         self.datastores = None
 
@@ -312,14 +317,8 @@ class HomeServer(object):
     def get_distributor(self):
         return self.distributor
 
-    def get_ratelimiter(self):
-        return self.ratelimiter
-
-    def get_registration_ratelimiter(self):
+    def get_registration_ratelimiter(self) -> Ratelimiter:
         return self.registration_ratelimiter
-
-    def get_admin_redaction_ratelimiter(self):
-        return self.admin_redaction_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)
@@ -581,7 +580,10 @@ class HomeServer(object):
         return ReplicationStreamer(self)
 
     def build_replication_data_handler(self):
-        return ReplicationDataHandler(self.get_datastore())
+        return ReplicationDataHandler(self)
+
+    def build_replication_streams(self):
+        return {stream.NAME: stream(self) for stream in STREAMS_MAP.values()}
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

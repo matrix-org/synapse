@@ -46,7 +46,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Email config.
         self.email_attempts = []
 
-        def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
+        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
             self.email_attempts.append(msg)
             return
 
@@ -398,7 +398,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         # Email config.
         self.email_attempts = []
 
-        def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
+        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
             self.email_attempts.append(msg)
 
         config["email"] = {

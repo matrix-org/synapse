@@ -16,9 +16,7 @@
 
 import logging
 import os
-
-from six import PY3
-from six.moves import urllib
+import urllib
 
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
@@ -324,23 +322,15 @@ def get_filename_from_headers(headers):
             upload_name_utf8 = upload_name_utf8[7:]
             # We have a filename*= section. This MUST be ASCII, and any UTF-8
             # bytes are %-quoted.
-            if PY3:
-                try:
-                    # Once it is decoded, we can then unquote the %-encoded
-                    # parts strictly into a unicode string.
-                    upload_name = urllib.parse.unquote(
-                        upload_name_utf8.decode("ascii"), errors="strict"
-                    )
-                except UnicodeDecodeError:
-                    # Incorrect UTF-8.
-                    pass
-            else:
-                # On Python 2, we first unquote the %-encoded parts and then
-                # decode it strictly using UTF-8.
-                try:
-                    upload_name = urllib.parse.unquote(upload_name_utf8).decode("utf8")
-                except UnicodeDecodeError:
-                    pass
+            try:
+                # Once it is decoded, we can then unquote the %-encoded
+                # parts strictly into a unicode string.
+                upload_name = urllib.parse.unquote(
+                    upload_name_utf8.decode("ascii"), errors="strict"
+                )
+            except UnicodeDecodeError:
+                # Incorrect UTF-8.
+                pass
 
     # If there isn't check for an ascii name.
     if not upload_name:

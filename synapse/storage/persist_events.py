@@ -20,9 +20,6 @@ import logging
 from collections import deque, namedtuple
 from typing import Iterable, List, Optional, Set, Tuple
 
-from six import iteritems
-from six.moves import range
-
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -218,7 +215,7 @@ class EventsPersistenceStorage(object):
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
         deferreds = []
-        for room_id, evs_ctxs in iteritems(partitioned):
+        for room_id, evs_ctxs in partitioned.items():
             d = self._event_persist_queue.add_to_queue(
                 room_id, evs_ctxs, backfilled=backfilled
             )
@@ -319,7 +316,7 @@ class EventsPersistenceStorage(object):
                             (event, context)
                         )
 
-                    for room_id, ev_ctx_rm in iteritems(events_by_room):
+                    for room_id, ev_ctx_rm in events_by_room.items():
                         latest_event_ids = await self.main_store.get_latest_event_ids_in_room(
                             room_id
                         )
@@ -674,7 +671,7 @@ class EventsPersistenceStorage(object):
 
         to_insert = {
             key: ev_id
-            for key, ev_id in iteritems(current_state)
+            for key, ev_id in current_state.items()
             if ev_id != existing_state.get(key)
         }
 
@@ -740,8 +737,8 @@ class EventsPersistenceStorage(object):
         # whose state has changed as we've already their new state above.
         users_to_ignore = [
             state_key
-            for _, state_key in itertools.chain(delta.to_insert, delta.to_delete)
-            if self.is_mine_id(state_key)
+            for typ, state_key in itertools.chain(delta.to_insert, delta.to_delete)
+            if typ == EventTypes.Member and self.is_mine_id(state_key)
         ]
 
         if await self.main_store.is_local_host_in_room_ignoring_users(
@@ -786,3 +783,9 @@ class EventsPersistenceStorage(object):
 
         for user_id in left_users:
             await self.main_store.mark_remote_user_device_list_as_unsubscribed(user_id)
+
+    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
+        """Mark the invite has having been rejected even though we failed to
+        create a leave event for it.
+        """
+        return await self.persist_events_store.locally_reject_invite(user_id, room_id)

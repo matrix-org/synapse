@@ -15,9 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional
-
-from six import iteritems, itervalues, string_types
+from typing import Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
@@ -42,6 +40,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
+from synapse.events import EventBase
 from synapse.events.validator import EventValidator
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -245,7 +244,7 @@ class MessageHandler(object):
                 "avatar_url": profile.avatar_url,
                 "display_name": profile.display_name,
             }
-            for user_id, profile in iteritems(users_with_profile)
+            for user_id, profile in users_with_profile.items()
         }
 
     def maybe_schedule_expiry(self, event):
@@ -361,14 +360,16 @@ class EventCreationHandler(object):
         self.profile_handler = hs.get_profile_handler()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.server_name = hs.hostname
-        self.ratelimiter = hs.get_ratelimiter()
         self.notifier = hs.get_notifier()
         self.config = hs.config
         self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+        self._is_event_writer = (
+            self.config.worker.writers.events == hs.get_instance_name()
+        )
 
         self.room_invite_state_types = self.hs.config.room_invite_state_types
 
-        self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
+        self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
         # This is only used to get at ratelimit function, and maybe_kick_guest_users
         self.base_handler = BaseHandler(hs)
@@ -484,9 +485,13 @@ class EventCreationHandler(object):
 
                 try:
                     if "displayname" not in content:
-                        content["displayname"] = yield profile.get_displayname(target)
+                        displayname = yield profile.get_displayname(target)
+                        if displayname is not None:
+                            content["displayname"] = displayname
                     if "avatar_url" not in content:
-                        content["avatar_url"] = yield profile.get_avatar_url(target)
+                        avatar_url = yield profile.get_avatar_url(target)
+                        if avatar_url is not None:
+                            content["avatar_url"] = avatar_url
                 except Exception as e:
                     logger.info(
                         "Failed to get profile information for %r: %s", target, e
@@ -626,7 +631,9 @@ class EventCreationHandler(object):
         msg = self._block_events_without_consent_error % {"consent_uri": consent_uri}
         raise ConsentNotGivenError(msg=msg, consent_uri=consent_uri)
 
-    async def send_nonmember_event(self, requester, event, context, ratelimit=True):
+    async def send_nonmember_event(
+        self, requester, event, context, ratelimit=True
+    ) -> int:
         """
         Persists and notifies local clients and federation of an event.
 
@@ -635,6 +642,9 @@ class EventCreationHandler(object):
             context (Context) the context of the event.
             ratelimit (bool): Whether to rate limit this send.
             is_guest (bool): Whether the sender is a guest.
+
+        Return:
+            The stream_id of the persisted event.
         """
         if event.type == EventTypes.Member:
             raise SynapseError(
@@ -655,7 +665,7 @@ class EventCreationHandler(object):
                 )
                 return prev_state
 
-        await self.handle_new_client_event(
+        return await self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
         )
 
@@ -684,7 +694,7 @@ class EventCreationHandler(object):
 
     async def create_and_send_nonmember_event(
         self, requester, event_dict, ratelimit=True, txn_id=None
-    ):
+    ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
 
@@ -703,14 +713,14 @@ class EventCreationHandler(object):
 
             spam_error = self.spam_checker.check_event_for_spam(event)
             if spam_error:
-                if not isinstance(spam_error, string_types):
+                if not isinstance(spam_error, str):
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
-            await self.send_nonmember_event(
+            stream_id = await self.send_nonmember_event(
                 requester, event, context, ratelimit=ratelimit
             )
-        return event
+        return event, stream_id
 
     @measure_func("create_new_client_event")
     @defer.inlineCallbacks
@@ -770,7 +780,7 @@ class EventCreationHandler(object):
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
         self, requester, event, context, ratelimit=True, extra_users=[]
-    ):
+    ) -> int:
         """Processes a new event. This includes checking auth, persisting it,
         notifying users, sending to remote servers, etc.
 
@@ -783,6 +793,9 @@ class EventCreationHandler(object):
             context (EventContext)
             ratelimit (bool)
             extra_users (list(UserID)): Any extra users to notify about event
+
+        Return:
+            The stream_id of the persisted event.
         """
 
         if event.is_state() and (event.type, event.state_key) == (
@@ -822,8 +835,9 @@ class EventCreationHandler(object):
         success = False
         try:
             # If we're a worker we need to hit out to the master.
-            if self.config.worker_app:
-                await self.send_event_to_master(
+            if not self._is_event_writer:
+                result = await self.send_event(
+                    instance_name=self.config.worker.writers.events,
                     event_id=event.event_id,
                     store=self.store,
                     requester=requester,
@@ -832,14 +846,17 @@ class EventCreationHandler(object):
                     ratelimit=ratelimit,
                     extra_users=extra_users,
                 )
+                stream_id = result["stream_id"]
+                event.internal_metadata.stream_ordering = stream_id
                 success = True
-                return
+                return stream_id
 
-            await self.persist_and_notify_client_event(
+            stream_id = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
             )
 
             success = True
+            return stream_id
         finally:
             if not success:
                 # Ensure that we actually remove the entries in the push actions
@@ -882,13 +899,13 @@ class EventCreationHandler(object):
 
     async def persist_and_notify_client_event(
         self, requester, event, context, ratelimit=True, extra_users=[]
-    ):
+    ) -> int:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
 
-        This should only be run on master.
+        This should only be run on the instance in charge of persisting events.
         """
-        assert not self.config.worker_app
+        assert self._is_event_writer
 
         if ratelimit:
             # We check if this is a room admin redacting an event so that we
@@ -969,7 +986,7 @@ class EventCreationHandler(object):
 
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in iteritems(current_state_ids)
+                    for k, e_id in current_state_ids.items()
                     if k[0] in self.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
@@ -983,7 +1000,7 @@ class EventCreationHandler(object):
                         "content": e.content,
                         "sender": e.sender,
                     }
-                    for e in itervalues(state_to_include)
+                    for e in state_to_include.values()
                 ]
 
                 invitee = UserID.from_string(event.state_key)
@@ -1071,6 +1088,8 @@ class EventCreationHandler(object):
             # We don't want to block sending messages on any presence code. This
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
+
+        return event_stream_id
 
     async def _bump_active_time(self, user):
         try:

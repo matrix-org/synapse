@@ -16,10 +16,6 @@
 
 import logging
 
-from six import iteritems
-
-from twisted.internet import defer
-
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.types import get_domain_from_id
 
@@ -92,19 +88,18 @@ class GroupsLocalWorkerHandler(object):
     get_group_role = _create_rerouter("get_group_role")
     get_group_roles = _create_rerouter("get_group_roles")
 
-    @defer.inlineCallbacks
-    def get_group_summary(self, group_id, requester_user_id):
+    async def get_group_summary(self, group_id, requester_user_id):
         """Get the group summary for a group.
 
         If the group is remote we check that the users have valid attestations.
         """
         if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.get_group_summary(
+            res = await self.groups_server_handler.get_group_summary(
                 group_id, requester_user_id
             )
         else:
             try:
-                res = yield self.transport_client.get_group_summary(
+                res = await self.transport_client.get_group_summary(
                     get_domain_from_id(group_id), group_id, requester_user_id
                 )
             except HttpResponseException as e:
@@ -122,7 +117,7 @@ class GroupsLocalWorkerHandler(object):
                 attestation = entry.pop("attestation", {})
                 try:
                     if get_domain_from_id(g_user_id) != group_server_name:
-                        yield self.attestations.verify_attestation(
+                        await self.attestations.verify_attestation(
                             attestation,
                             group_id=group_id,
                             user_id=g_user_id,
@@ -139,19 +134,18 @@ class GroupsLocalWorkerHandler(object):
 
         # Add `is_publicised` flag to indicate whether the user has publicised their
         # membership of the group on their profile
-        result = yield self.store.get_publicised_groups_for_user(requester_user_id)
+        result = await self.store.get_publicised_groups_for_user(requester_user_id)
         is_publicised = group_id in result
 
         res.setdefault("user", {})["is_publicised"] = is_publicised
 
         return res
 
-    @defer.inlineCallbacks
-    def get_users_in_group(self, group_id, requester_user_id):
+    async def get_users_in_group(self, group_id, requester_user_id):
         """Get users in a group
         """
         if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.get_users_in_group(
+            res = await self.groups_server_handler.get_users_in_group(
                 group_id, requester_user_id
             )
             return res
@@ -159,7 +153,7 @@ class GroupsLocalWorkerHandler(object):
         group_server_name = get_domain_from_id(group_id)
 
         try:
-            res = yield self.transport_client.get_users_in_group(
+            res = await self.transport_client.get_users_in_group(
                 get_domain_from_id(group_id), group_id, requester_user_id
             )
         except HttpResponseException as e:
@@ -174,7 +168,7 @@ class GroupsLocalWorkerHandler(object):
             attestation = entry.pop("attestation", {})
             try:
                 if get_domain_from_id(g_user_id) != group_server_name:
-                    yield self.attestations.verify_attestation(
+                    await self.attestations.verify_attestation(
                         attestation,
                         group_id=group_id,
                         user_id=g_user_id,
@@ -188,15 +182,13 @@ class GroupsLocalWorkerHandler(object):
 
         return res
 
-    @defer.inlineCallbacks
-    def get_joined_groups(self, user_id):
-        group_ids = yield self.store.get_joined_groups(user_id)
+    async def get_joined_groups(self, user_id):
+        group_ids = await self.store.get_joined_groups(user_id)
         return {"groups": group_ids}
 
-    @defer.inlineCallbacks
-    def get_publicised_groups_for_user(self, user_id):
+    async def get_publicised_groups_for_user(self, user_id):
         if self.hs.is_mine_id(user_id):
-            result = yield self.store.get_publicised_groups_for_user(user_id)
+            result = await self.store.get_publicised_groups_for_user(user_id)
 
             # Check AS associated groups for this user - this depends on the
             # RegExps in the AS registration file (under `users`)
@@ -206,7 +198,7 @@ class GroupsLocalWorkerHandler(object):
             return {"groups": result}
         else:
             try:
-                bulk_result = yield self.transport_client.bulk_get_publicised_groups(
+                bulk_result = await self.transport_client.bulk_get_publicised_groups(
                     get_domain_from_id(user_id), [user_id]
                 )
             except HttpResponseException as e:
@@ -218,8 +210,7 @@ class GroupsLocalWorkerHandler(object):
             # TODO: Verify attestations
             return {"groups": result}
 
-    @defer.inlineCallbacks
-    def bulk_get_publicised_groups(self, user_ids, proxy=True):
+    async def bulk_get_publicised_groups(self, user_ids, proxy=True):
         destinations = {}
         local_users = set()
 
@@ -234,9 +225,9 @@ class GroupsLocalWorkerHandler(object):
 
         results = {}
         failed_results = []
-        for destination, dest_user_ids in iteritems(destinations):
+        for destination, dest_user_ids in destinations.items():
             try:
-                r = yield self.transport_client.bulk_get_publicised_groups(
+                r = await self.transport_client.bulk_get_publicised_groups(
                     destination, list(dest_user_ids)
                 )
                 results.update(r["users"])
@@ -244,7 +235,7 @@ class GroupsLocalWorkerHandler(object):
                 failed_results.extend(dest_user_ids)
 
         for uid in local_users:
-            results[uid] = yield self.store.get_publicised_groups_for_user(uid)
+            results[uid] = await self.store.get_publicised_groups_for_user(uid)
 
             # Check AS associated groups for this user - this depends on the
             # RegExps in the AS registration file (under `users`)
@@ -333,12 +324,11 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return res
 
-    @defer.inlineCallbacks
-    def join_group(self, group_id, user_id, content):
+    async def join_group(self, group_id, user_id, content):
         """Request to join a group
         """
         if self.is_mine_id(group_id):
-            yield self.groups_server_handler.join_group(group_id, user_id, content)
+            await self.groups_server_handler.join_group(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
         else:
@@ -346,7 +336,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             content["attestation"] = local_attestation
 
             try:
-                res = yield self.transport_client.join_group(
+                res = await self.transport_client.join_group(
                     get_domain_from_id(group_id), group_id, user_id, content
                 )
             except HttpResponseException as e:
@@ -356,7 +346,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
             remote_attestation = res["attestation"]
 
-            yield self.attestations.verify_attestation(
+            await self.attestations.verify_attestation(
                 remote_attestation,
                 group_id=group_id,
                 user_id=user_id,
@@ -366,7 +356,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
         # TODO: Check that the group is public and we're being added publically
         is_publicised = content.get("publicise", False)
 
-        token = yield self.store.register_user_group_membership(
+        token = await self.store.register_user_group_membership(
             group_id,
             user_id,
             membership="join",
@@ -379,12 +369,11 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return {}
 
-    @defer.inlineCallbacks
-    def accept_invite(self, group_id, user_id, content):
+    async def accept_invite(self, group_id, user_id, content):
         """Accept an invite to a group
         """
         if self.is_mine_id(group_id):
-            yield self.groups_server_handler.accept_invite(group_id, user_id, content)
+            await self.groups_server_handler.accept_invite(group_id, user_id, content)
             local_attestation = None
             remote_attestation = None
         else:
@@ -392,7 +381,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             content["attestation"] = local_attestation
 
             try:
-                res = yield self.transport_client.accept_group_invite(
+                res = await self.transport_client.accept_group_invite(
                     get_domain_from_id(group_id), group_id, user_id, content
                 )
             except HttpResponseException as e:
@@ -402,7 +391,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
             remote_attestation = res["attestation"]
 
-            yield self.attestations.verify_attestation(
+            await self.attestations.verify_attestation(
                 remote_attestation,
                 group_id=group_id,
                 user_id=user_id,
@@ -412,7 +401,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
         # TODO: Check that the group is public and we're being added publically
         is_publicised = content.get("publicise", False)
 
-        token = yield self.store.register_user_group_membership(
+        token = await self.store.register_user_group_membership(
             group_id,
             user_id,
             membership="join",
@@ -425,18 +414,17 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return {}
 
-    @defer.inlineCallbacks
-    def invite(self, group_id, user_id, requester_user_id, config):
+    async def invite(self, group_id, user_id, requester_user_id, config):
         """Invite a user to a group
         """
         content = {"requester_user_id": requester_user_id, "config": config}
         if self.is_mine_id(group_id):
-            res = yield self.groups_server_handler.invite_to_group(
+            res = await self.groups_server_handler.invite_to_group(
                 group_id, user_id, requester_user_id, content
             )
         else:
             try:
-                res = yield self.transport_client.invite_to_group(
+                res = await self.transport_client.invite_to_group(
                     get_domain_from_id(group_id),
                     group_id,
                     user_id,
@@ -450,8 +438,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return res
 
-    @defer.inlineCallbacks
-    def on_invite(self, group_id, user_id, content):
+    async def on_invite(self, group_id, user_id, content):
         """One of our users were invited to a group
         """
         # TODO: Support auto join and rejection
@@ -466,7 +453,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
             if "avatar_url" in content["profile"]:
                 local_profile["avatar_url"] = content["profile"]["avatar_url"]
 
-        token = yield self.store.register_user_group_membership(
+        token = await self.store.register_user_group_membership(
             group_id,
             user_id,
             membership="invite",
@@ -474,7 +461,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
         )
         self.notifier.on_new_event("groups_key", token, users=[user_id])
         try:
-            user_profile = yield self.profile_handler.get_profile(user_id)
+            user_profile = await self.profile_handler.get_profile(user_id)
         except Exception as e:
             logger.warning("No profile for user %s: %s", user_id, e)
             user_profile = {}
@@ -516,12 +503,11 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return res
 
-    @defer.inlineCallbacks
-    def user_removed_from_group(self, group_id, user_id, content):
+    async def user_removed_from_group(self, group_id, user_id, content):
         """One of our users was removed/kicked from a group
         """
         # TODO: Check if user in group
-        token = yield self.store.register_user_group_membership(
+        token = await self.store.register_user_group_membership(
             group_id, user_id, membership="leave"
         )
         self.notifier.on_new_event("groups_key", token, users=[user_id])

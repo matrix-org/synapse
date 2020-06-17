@@ -17,8 +17,6 @@
 
 import logging
 
-from six import iteritems
-
 import attr
 from canonicaljson import encode_canonical_json, json
 from signedjson.key import decode_verify_key_bytes
@@ -135,7 +133,7 @@ class E2eKeysHandler(object):
         remote_queries_not_in_cache = {}
         if remote_queries:
             query_list = []
-            for user_id, device_ids in iteritems(remote_queries):
+            for user_id, device_ids in remote_queries.items():
                 if device_ids:
                     query_list.extend((user_id, device_id) for device_id in device_ids)
                 else:
@@ -145,9 +143,9 @@ class E2eKeysHandler(object):
                 user_ids_not_in_cache,
                 remote_results,
             ) = yield self.store.get_user_devices_from_cache(query_list)
-            for user_id, devices in iteritems(remote_results):
+            for user_id, devices in remote_results.items():
                 user_devices = results.setdefault(user_id, {})
-                for device_id, device in iteritems(devices):
+                for device_id, device in devices.items():
                     keys = device.get("keys", None)
                     device_display_name = device.get("device_display_name", None)
                     if keys:
@@ -446,9 +444,9 @@ class E2eKeysHandler(object):
             ",".join(
                 (
                     "%s for %s:%s" % (key_id, user_id, device_id)
-                    for user_id, user_keys in iteritems(json_result)
-                    for device_id, device_keys in iteritems(user_keys)
-                    for key_id, _ in iteritems(device_keys)
+                    for user_id, user_keys in json_result.items()
+                    for device_id, device_keys in user_keys.items()
+                    for key_id, _ in device_keys.items()
                 )
             ),
         )
@@ -1291,6 +1289,7 @@ class SigningKeyEduUpdater(object):
         """
 
         device_handler = self.e2e_keys_handler.device_handler
+        device_list_updater = device_handler.device_list_updater
 
         with (yield self._remote_edu_linearizer.queue(user_id)):
             pending_updates = self._pending_updates.pop(user_id, [])
@@ -1303,22 +1302,9 @@ class SigningKeyEduUpdater(object):
             logger.info("pending updates: %r", pending_updates)
 
             for master_key, self_signing_key in pending_updates:
-                if master_key:
-                    yield self.store.set_e2e_cross_signing_key(
-                        user_id, "master", master_key
-                    )
-                    _, verify_key = get_verify_key_from_cross_signing_key(master_key)
-                    # verify_key is a VerifyKey from signedjson, which uses
-                    # .version to denote the portion of the key ID after the
-                    # algorithm and colon, which is the device ID
-                    device_ids.append(verify_key.version)
-                if self_signing_key:
-                    yield self.store.set_e2e_cross_signing_key(
-                        user_id, "self_signing", self_signing_key
-                    )
-                    _, verify_key = get_verify_key_from_cross_signing_key(
-                        self_signing_key
-                    )
-                    device_ids.append(verify_key.version)
+                new_device_ids = yield device_list_updater.process_cross_signing_key_update(
+                    user_id, master_key, self_signing_key,
+                )
+                device_ids = device_ids + new_device_ids
 
             yield device_handler.notify_device_update(user_id, device_ids)
