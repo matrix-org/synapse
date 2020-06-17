@@ -308,7 +308,7 @@ expose the `media` resource. For example:
 ```
 
 Note that if running multiple media repositories they must be on the same server
-and you must configure which single instance to run the background tasks, e.g.:
+and you must configure a single instance to run the background tasks, e.g.:
 
 ```yaml
     media_instance_running_background_jobs: "media-repository-1"
