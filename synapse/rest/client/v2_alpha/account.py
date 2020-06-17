@@ -47,6 +47,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.datastore = hs.get_datastore()
         self.config = hs.config
         self.identity_handler = hs.get_handlers().identity_handler
+        self.account_validity_handler = hs.get_account_validity_handler()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             template_html, template_text = load_jinja2_templates(
@@ -84,6 +85,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
+        # Canonicalise the email address. The addresses are all stored canonicalised
+        # in the database. This allows the user to reset his password without having to
+        # know the exact spelling (eg. upper and lower case) of address in the database.
+        # Stored in the database "foo@bar.com"
+        # User requests with "FOO@bar.com" would raise a Not Found error
         try:
             email = canonicalise_email(body["email"])
         except ValueError as e:
@@ -110,13 +116,27 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
+        # Get the email addresses of the user from database
+        # The user can own more than one address. Lookup for the right address.
+        # The email will be sent to the stored address.
+        # It should prevent potential account hijack via password reset form,
+        # if some compare algorithm are not exactly.
+        addresses = await self.account_validity_handler._get_email_addresses_for_user(
+            existing_user_id
+        )
+        for address in addresses:
+            if address == email:
+                email_from_database = address
+        if not email_from_database:
+            raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
+
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             assert self.hs.config.account_threepid_delegate_email
 
             # Have the configured identity server handle the request
             ret = await self.identity_handler.requestEmailToken(
                 self.hs.config.account_threepid_delegate_email,
-                email,
+                email_from_database,
                 client_secret,
                 send_attempt,
                 next_link,
@@ -124,7 +144,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         else:
             # Send password reset emails from Synapse
             sid = await self.identity_handler.send_threepid_validation(
-                email,
+                email_from_database,
                 client_secret,
                 send_attempt,
                 self.mailer.send_password_reset_mail,
@@ -385,6 +405,12 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
+        # Canonicalise the email address. The addresses are all stored canonicalised
+        # in the database.
+        # This ensures that the validation email is sent to the canonicalised address
+        # as it will later be entered into the database.
+        # Otherwise the email will be sent to "FOO@bar.com" and stored as
+        # "foo@bar.com" in database.
         try:
             email = canonicalise_email(body["email"])
         except ValueError as e:
