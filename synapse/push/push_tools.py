@@ -39,7 +39,10 @@ def get_badge_count(store, user_id):
             )
             # return one badge count per conversation, as count per
             # message is so noisy as to be almost useless
-            badge += 1 if notifs["notify_count"] else 0
+            # We're populating this badge using the unread_count (instead of the
+            # notify_count) as this badge is the number of missed messages, not the
+            # number of missed notifications.
+            badge += 1 if notifs["unread_count"] else 0
     return badge
 
 
