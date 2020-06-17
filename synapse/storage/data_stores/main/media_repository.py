@@ -81,6 +81,15 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_local_media",
         )
 
+    def mark_local_media_as_safe(self, media_id: str):
+        """Mark a local media as safe from quarantining."""
+        return self.db.simple_update_one(
+            "local_media_repository",
+            {"media_id": media_id},
+            {"safe_from_quarantine": True},
+            desc="mark_local_media_as_safe",
+        )
+
     def get_url_cache(self, url, ts):
         """Get the media_id and ts for a cached URL as of the given timestamp
         Returns:

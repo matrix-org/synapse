@@ -417,3 +417,66 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access each piece of media
         self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
         self._ensure_quarantined(admin_user_tok, server_and_media_id_2)
+
+    def test_cannot_quarantine_safe_media(self):
+        self.register_user("user_admin", "pass", admin=True)
+        admin_user_tok = self.login("user_admin", "pass")
+
+        non_admin_user = self.register_user("user_nonadmin", "pass", admin=False)
+        non_admin_user_tok = self.login("user_nonadmin", "pass")
+
+        # Upload some media
+        response_1 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+        response_2 = self.helper.upload_media(
+            self.upload_resource, self.image_data, tok=non_admin_user_tok
+        )
+
+        # Extract media IDs
+        server_and_media_id_1 = response_1["content_uri"][6:]
+        server_and_media_id_2 = response_2["content_uri"][6:]
+
+        # Mark the second item as safe from quarantine.
+        _, media_id_2 = server_and_media_id_2.split("/")
+        self.get_success(self.store.mark_local_media_as_safe(media_id_2))
+
+        # Quarantine all media by this user
+        url = "/_synapse/admin/v1/user/%s/media/quarantine" % urllib.parse.quote(
+            non_admin_user
+        )
+        request, channel = self.make_request(
+            "POST", url.encode("ascii"), access_token=admin_user_tok,
+        )
+        self.render(request)
+        self.pump(1.0)
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(
+            json.loads(channel.result["body"].decode("utf-8")),
+            {"num_quarantined": 1},
+            "Expected 1 quarantined item",
+        )
+
+        # Attempt to access each piece of media, the first should fail, the
+        # second should succeed.
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
+
+        # Attempt to access each piece of media
+        request, channel = self.make_request(
+            "GET",
+            server_and_media_id_2,
+            shorthand=False,
+            access_token=non_admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            200,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 200 on accessing quarantined media: %s"
+                % server_and_media_id_2
+            ),
+        )
