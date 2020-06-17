@@ -220,6 +220,24 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         return hs
 
+    def _ensure_quarantined(self, admin_user_tok, server_and_media_id):
+        """Ensure a piece of media is quarantined when trying to access it."""
+        request, channel = self.make_request(
+            "GET", server_and_media_id, shorthand=False, access_token=admin_user_tok,
+        )
+        request.render(self.download_resource)
+        self.pump(1.0)
+
+        # Should be quarantined
+        self.assertEqual(
+            404,
+            int(channel.code),
+            msg=(
+                "Expected to receive a 404 on accessing quarantined media: %s"
+                % server_and_media_id
+            ),
+        )
+
     def test_quarantine_media_requires_admin(self):
         self.register_user("nonadmin", "pass", admin=False)
         non_admin_user_tok = self.login("nonadmin", "pass")
@@ -292,24 +310,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.code), msg=channel.result["body"])
 
         # Attempt to access the media
-        request, channel = self.make_request(
-            "GET",
-            server_name_and_media_id,
-            shorthand=False,
-            access_token=admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
-
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_name_and_media_id
-            ),
-        )
+        self._ensure_quarantined(admin_user_tok, server_name_and_media_id)
 
     def test_quarantine_all_media_in_room(self, override_url_template=None):
         self.register_user("room_admin", "pass", admin=True)
@@ -371,45 +372,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         server_and_media_id_2 = mxc_2[6:]
 
         # Test that we cannot download any of the media anymore
-        request, channel = self.make_request(
-            "GET",
-            server_and_media_id_1,
-            shorthand=False,
-            access_token=non_admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_2)
 
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_and_media_id_1
-            ),
-        )
-
-        request, channel = self.make_request(
-            "GET",
-            server_and_media_id_2,
-            shorthand=False,
-            access_token=non_admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
-
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_and_media_id_2
-            ),
-        )
-
-    def test_quaraantine_all_media_in_room_deprecated_api_path(self):
+    def test_quarantine_all_media_in_room_deprecated_api_path(self):
         # Perform the above test with the deprecated API path
         self.test_quarantine_all_media_in_room("/_synapse/admin/v1/quarantine_media/%s")
 
@@ -449,41 +415,5 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         )
 
         # Attempt to access each piece of media
-        request, channel = self.make_request(
-            "GET",
-            server_and_media_id_1,
-            shorthand=False,
-            access_token=non_admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
-
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_and_media_id_1,
-            ),
-        )
-
-        # Attempt to access each piece of media
-        request, channel = self.make_request(
-            "GET",
-            server_and_media_id_2,
-            shorthand=False,
-            access_token=non_admin_user_tok,
-        )
-        request.render(self.download_resource)
-        self.pump(1.0)
-
-        # Should be quarantined
-        self.assertEqual(
-            404,
-            int(channel.code),
-            msg=(
-                "Expected to receive a 404 on accessing quarantined media: %s"
-                % server_and_media_id_2
-            ),
-        )
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_1)
+        self._ensure_quarantined(admin_user_tok, server_and_media_id_2)
