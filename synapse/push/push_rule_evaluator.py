@@ -18,8 +18,6 @@ import logging
 import re
 from typing import Pattern
 
-from six import string_types
-
 from synapse.events import EventBase
 from synapse.types import UserID
 from synapse.util.caches import register_cache
@@ -131,7 +129,7 @@ class PushRuleEvaluatorForEvent(object):
         # XXX: optimisation: cache our pattern regexps
         if condition["key"] == "content.body":
             body = self._event.content.get("body", None)
-            if not body:
+            if not body or not isinstance(body, str):
                 return False
 
             return _glob_matches(pattern, body, word_boundary=True)
@@ -147,7 +145,7 @@ class PushRuleEvaluatorForEvent(object):
             return False
 
         body = self._event.content.get("body", None)
-        if not body:
+        if not body or not isinstance(body, str):
             return False
 
         # Similar to _glob_matches, but do not treat display_name as a glob.
@@ -244,7 +242,7 @@ def _flatten_dict(d, prefix=[], result=None):
     if result is None:
         result = {}
     for key, value in d.items():
-        if isinstance(value, string_types):
+        if isinstance(value, str):
             result[".".join(prefix + [key])] = value.lower()
         elif hasattr(value, "items"):
             _flatten_dict(value, prefix=(prefix + [key]), result=result)

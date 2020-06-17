@@ -24,8 +24,6 @@ import string
 from collections import OrderedDict
 from typing import Optional, Tuple
 
-from six import iteritems, string_types
-
 from synapse.api.constants import (
     EventTypes,
     JoinRules,
@@ -379,7 +377,7 @@ class RoomCreationHandler(BaseHandler):
         # map from event_id to BaseEvent
         old_room_state_events = await self.store.get_events(old_room_state_ids.values())
 
-        for k, old_event_id in iteritems(old_room_state_ids):
+        for k, old_event_id in old_room_state_ids.items():
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
                 initial_state[k] = old_event.content
@@ -432,7 +430,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_member_state_events = await self.store.get_events(
             old_room_member_state_ids.values()
         )
-        for k, old_event in iteritems(old_room_member_state_events):
+        for k, old_event in old_room_member_state_events.items():
             # Only transfer ban events
             if (
                 "membership" in old_event.content
@@ -597,7 +595,7 @@ class RoomCreationHandler(BaseHandler):
             "room_version", self.config.default_room_version.identifier
         )
 
-        if not isinstance(room_version_id, string_types):
+        if not isinstance(room_version_id, str):
             raise SynapseError(400, "room_version must be a string", Codes.BAD_JSON)
 
         room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)

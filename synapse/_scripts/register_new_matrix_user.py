@@ -23,8 +23,6 @@ import hmac
 import logging
 import sys
 
-from six.moves import input
-
 import requests as _requests
 import yaml
 

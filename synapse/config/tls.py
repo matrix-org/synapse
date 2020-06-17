@@ -20,8 +20,6 @@ from datetime import datetime
 from hashlib import sha256
 from typing import List
 
-import six
-
 from unpaddedbase64 import encode_base64
 
 from OpenSSL import SSL, crypto
@@ -59,7 +57,7 @@ class TlsConfig(Config):
             logger.warning(ACME_SUPPORT_ENABLED_WARN)
 
         # hyperlink complains on py2 if this is not a Unicode
-        self.acme_url = six.text_type(
+        self.acme_url = str(
             acme_config.get("url", "https://acme-v01.api.letsencrypt.org/directory")
         )
         self.acme_port = acme_config.get("port", 80)

@@ -21,9 +21,6 @@ from collections import OrderedDict, namedtuple
 from functools import wraps
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
-from six import integer_types, iteritems, text_type
-from six.moves import range
-
 import attr
 from canonicaljson import json
 from prometheus_client import Counter
@@ -232,10 +229,10 @@ class PersistEventsStore:
 
                 event_counter.labels(event.type, origin_type, origin_entity).inc()
 
-            for room_id, new_state in iteritems(current_state_for_room):
+            for room_id, new_state in current_state_for_room.items():
                 self.store.get_current_state_ids.prefill((room_id,), new_state)
 
-            for room_id, latest_event_ids in iteritems(new_forward_extremeties):
+            for room_id, latest_event_ids in new_forward_extremeties.items():
                 self.store.get_latest_event_ids_in_room.prefill(
                     (room_id,), list(latest_event_ids)
                 )
@@ -461,7 +458,7 @@ class PersistEventsStore:
         state_delta_by_room: Dict[str, DeltaState],
         stream_id: int,
     ):
-        for room_id, delta_state in iteritems(state_delta_by_room):
+        for room_id, delta_state in state_delta_by_room.items():
             to_delete = delta_state.to_delete
             to_insert = delta_state.to_insert
 
@@ -545,7 +542,7 @@ class PersistEventsStore:
                     """,
                     [
                         (room_id, key[0], key[1], ev_id, ev_id)
-                        for key, ev_id in iteritems(to_insert)
+                        for key, ev_id in to_insert.items()
                     ],
                 )
 
@@ -642,7 +639,7 @@ class PersistEventsStore:
     def _update_forward_extremities_txn(
         self, txn, new_forward_extremities, max_stream_order
     ):
-        for room_id, new_extrem in iteritems(new_forward_extremities):
+        for room_id, new_extrem in new_forward_extremities.items():
             self.db.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
@@ -655,7 +652,7 @@ class PersistEventsStore:
             table="event_forward_extremities",
             values=[
                 {"event_id": ev_id, "room_id": room_id}
-                for room_id, new_extrem in iteritems(new_forward_extremities)
+                for room_id, new_extrem in new_forward_extremities.items()
                 for ev_id in new_extrem
             ],
         )
@@ -672,7 +669,7 @@ class PersistEventsStore:
                     "event_id": event_id,
                     "stream_ordering": max_stream_order,
                 }
-                for room_id, new_extrem in iteritems(new_forward_extremities)
+                for room_id, new_extrem in new_forward_extremities.items()
                 for event_id in new_extrem
             ],
         )
@@ -727,7 +724,7 @@ class PersistEventsStore:
                     event.depth, depth_updates.get(event.room_id, event.depth)
                 )
 
-        for room_id, depth in iteritems(depth_updates):
+        for room_id, depth in depth_updates.items():
             self._update_min_depth_for_room_txn(txn, room_id, depth)
 
     def _update_outliers_txn(self, txn, events_and_contexts):
@@ -893,8 +890,7 @@ class PersistEventsStore:
                     "received_ts": self._clock.time_msec(),
                     "sender": event.sender,
                     "contains_url": (
-                        "url" in event.content
-                        and isinstance(event.content["url"], text_type)
+                        "url" in event.content and isinstance(event.content["url"], str)
                     ),
                 }
                 for event, _ in events_and_contexts
@@ -1345,10 +1341,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), integer_types)
+                and not isinstance(event.content.get("min_lifetime"), int)
             ) or (
                 "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), integer_types)
+                and not isinstance(event.content.get("max_lifetime"), int)
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return
@@ -1497,11 +1493,11 @@ class PersistEventsStore:
             table="event_to_state_groups",
             values=[
                 {"state_group": state_group_id, "event_id": event_id}
-                for event_id, state_group_id in iteritems(state_groups)
+                for event_id, state_group_id in state_groups.items()
             ],
         )
 
-        for event_id, state_group_id in iteritems(state_groups):
+        for event_id, state_group_id in state_groups.items():
             txn.call_after(
                 self.store._get_state_group_for_event.prefill,
                 (event_id,),

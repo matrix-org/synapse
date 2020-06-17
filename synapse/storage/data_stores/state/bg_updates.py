@@ -15,8 +15,6 @@
 
 import logging
 
-from six import iteritems
-
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
@@ -280,7 +278,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
 
                         delta_state = {
                             key: value
-                            for key, value in iteritems(curr_state)
+                            for key, value in curr_state.items()
                             if prev_state.get(key, None) != value
                         }
 
@@ -316,7 +314,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                                     "state_key": key[1],
                                     "event_id": state_id,
                                 }
-                                for key, state_id in iteritems(delta_state)
+                                for key, state_id in delta_state.items()
                             ],
                         )
 

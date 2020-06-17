@@ -20,9 +20,6 @@ import logging
 from collections import deque, namedtuple
 from typing import Iterable, List, Optional, Set, Tuple
 
-from six import iteritems
-from six.moves import range
-
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -218,7 +215,7 @@ class EventsPersistenceStorage(object):
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
         deferreds = []
-        for room_id, evs_ctxs in iteritems(partitioned):
+        for room_id, evs_ctxs in partitioned.items():
             d = self._event_persist_queue.add_to_queue(
                 room_id, evs_ctxs, backfilled=backfilled
             )
@@ -319,7 +316,7 @@ class EventsPersistenceStorage(object):
                             (event, context)
                         )
 
-                    for room_id, ev_ctx_rm in iteritems(events_by_room):
+                    for room_id, ev_ctx_rm in events_by_room.items():
                         latest_event_ids = await self.main_store.get_latest_event_ids_in_room(
                             room_id
                         )
@@ -674,7 +671,7 @@ class EventsPersistenceStorage(object):
 
         to_insert = {
             key: ev_id
-            for key, ev_id in iteritems(current_state)
+            for key, ev_id in current_state.items()
             if ev_id != existing_state.get(key)
         }
 

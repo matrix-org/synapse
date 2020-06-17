@@ -15,8 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from six.moves import http_client
+from http import HTTPStatus
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
@@ -321,7 +320,7 @@ class DeactivateAccountRestServlet(RestServlet):
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'erase' must be a boolean, if given",
                 Codes.BAD_JSON,
             )
@@ -682,7 +681,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidAddRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/add$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/add$")
 
     def __init__(self, hs):
         super(ThreepidAddRestServlet, self).__init__()
@@ -733,7 +732,7 @@ class ThreepidAddRestServlet(RestServlet):
 
 
 class ThreepidBindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/bind$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/bind$")
 
     def __init__(self, hs):
         super(ThreepidBindRestServlet, self).__init__()
@@ -762,7 +761,7 @@ class ThreepidBindRestServlet(RestServlet):
 
 
 class ThreepidUnbindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/unbind$")
 
     def __init__(self, hs):
         super(ThreepidUnbindRestServlet, self).__init__()

@@ -19,8 +19,6 @@ import logging
 import re
 from typing import Optional
 
-from six import iterkeys
-
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
@@ -753,7 +751,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 last_send_attempt, validated_at
                 FROM threepid_validation_session WHERE %s
                 """ % (
-                " AND ".join("%s = ?" % k for k in iterkeys(keyvalues)),
+                " AND ".join("%s = ?" % k for k in keyvalues.keys()),
             )
 
             if validated is not None:

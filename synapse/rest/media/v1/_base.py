@@ -16,8 +16,7 @@
 
 import logging
 import os
-
-from six.moves import urllib
+import urllib
 
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender

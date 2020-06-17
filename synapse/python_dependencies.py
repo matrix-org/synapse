@@ -66,11 +66,9 @@ REQUIREMENTS = [
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
-    "six>=1.10",
     "prometheus_client>=0.0.18,<0.8.0",
-    # we use attr.s(slots), which arrived in 16.0.0
-    # Twisted 18.7.0 requires attrs>=17.4.0
-    "attrs>=17.4.0",
+    # we use attr.validators.deep_iterable, which arrived in 19.1.0
+    "attrs>=19.1.0",
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.3",
