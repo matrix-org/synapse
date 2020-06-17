@@ -89,6 +89,7 @@ BOOLEAN_COLUMNS = {
     "account_validity": ["email_sent"],
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
+    "local_media_repository": ["safe_from_quarantine"],
 }
 
 
