@@ -4,7 +4,7 @@ import urllib.parse
 from mock import Mock
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import devices
 from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
 
@@ -20,6 +20,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
+        logout.register_servlets,
         devices.register_servlets,
         lambda hs, http_server: WhoamiRestServlet(hs).register(http_server),
     ]
@@ -256,8 +257,74 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
 
+    @override_config({"session_lifetime": "24h"})
+    def test_session_can_hard_logout_after_being_soft_logged_out(self):
+        self.register_user("kermit", "monkey")
 
-class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
+        # log in as normal
+        access_token = self.login("kermit", "monkey")
+
+        # we should now be able to make requests with the access token
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.result)
+
+        # time passes
+        self.reactor.advance(24 * 3600)
+
+        # ... and we should be soft-logouted
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 401, channel.result)
+        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEquals(channel.json_body["soft_logout"], True)
+
+        # Now try to hard logout this session
+        request, channel = self.make_request(
+            b"POST", "/logout", access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    @override_config({"session_lifetime": "24h"})
+    def test_session_can_hard_logout_all_sessions_after_being_soft_logged_out(self):
+        self.register_user("kermit", "monkey")
+
+        # log in as normal
+        access_token = self.login("kermit", "monkey")
+
+        # we should now be able to make requests with the access token
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.result)
+
+        # time passes
+        self.reactor.advance(24 * 3600)
+
+        # ... and we should be soft-logouted
+        request, channel = self.make_request(
+            b"GET", TEST_URL, access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 401, channel.result)
+        self.assertEquals(channel.json_body["errcode"], "M_UNKNOWN_TOKEN")
+        self.assertEquals(channel.json_body["soft_logout"], True)
+
+        # Now try to hard log out all of the user's sessions
+        request, channel = self.make_request(
+            b"POST", "/logout/all", access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+
+class CASTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
@@ -274,6 +341,9 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
             "service_url": "https://matrix.goodserver.com:8448",
         }
 
+        cas_user_id = "username"
+        self.user_id = "@%s:test" % cas_user_id
+
         async def get_raw(uri, args):
             """Return an example response payload from a call to the `/proxyValidate`
             endpoint of a CAS server, copied from
@@ -282,10 +352,11 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
             This needs to be returned by an async function (as opposed to set as the
             mock's return value) because the corresponding Synapse code awaits on it.
             """
-            return """
+            return (
+                """
                 <cas:serviceResponse xmlns:cas='http://www.yale.edu/tp/cas'>
                   <cas:authenticationSuccess>
-                      <cas:user>username</cas:user>
+                      <cas:user>%s</cas:user>
                       <cas:proxyGrantingTicket>PGTIOU-84678-8a9d...</cas:proxyGrantingTicket>
                       <cas:proxies>
                           <cas:proxy>https://proxy2/pgtUrl</cas:proxy>
@@ -294,6 +365,8 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
                   </cas:authenticationSuccess>
                 </cas:serviceResponse>
             """
+                % cas_user_id
+            )
 
         mocked_http_client = Mock(spec=["get_raw"])
         mocked_http_client.get_raw.side_effect = get_raw
@@ -303,6 +376,9 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
         )
 
         return self.hs
+
+    def prepare(self, reactor, clock, hs):
+        self.deactivate_account_handler = hs.get_deactivate_account_handler()
 
     def test_cas_redirect_confirm(self):
         """Tests that the SSO login flow serves a confirmation page before redirecting a
@@ -350,7 +426,14 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
     def test_cas_redirect_whitelisted(self):
         """Tests that the SSO login flow serves a redirect to a whitelisted url
         """
-        redirect_url = "https://legit-site.com/"
+        self._test_redirect("https://legit-site.com/")
+
+    @override_config({"public_baseurl": "https://example.com"})
+    def test_cas_redirect_login_fallback(self):
+        self._test_redirect("https://example.com/_matrix/static/client/login")
+
+    def _test_redirect(self, redirect_url):
+        """Tests that the SSO login flow serves a redirect for the given redirect URL."""
         cas_ticket_url = (
             "/_matrix/client/r0/login/cas/ticket?redirectUrl=%s&ticket=ticket"
             % (urllib.parse.quote(redirect_url))
@@ -363,3 +446,30 @@ class CASRedirectConfirmTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 302)
         location_headers = channel.headers.getRawHeaders("Location")
         self.assertEqual(location_headers[0][: len(redirect_url)], redirect_url)
+
+    @override_config({"sso": {"client_whitelist": ["https://legit-site.com/"]}})
+    def test_deactivated_user(self):
+        """Logging in as a deactivated account should error."""
+        redirect_url = "https://legit-site.com/"
+
+        # First login (to create the user).
+        self._test_redirect(redirect_url)
+
+        # Deactivate the account.
+        self.get_success(
+            self.deactivate_account_handler.deactivate_account(self.user_id, False)
+        )
+
+        # Request the CAS ticket.
+        cas_ticket_url = (
+            "/_matrix/client/r0/login/cas/ticket?redirectUrl=%s&ticket=ticket"
+            % (urllib.parse.quote(redirect_url))
+        )
+
+        # Get Synapse to call the fake CAS and serve the template.
+        request, channel = self.make_request("GET", cas_ticket_url)
+        self.render(request)
+
+        # Because the user is deactivated they are served an error template.
+        self.assertEqual(channel.code, 403)
+        self.assertIn(b"SSO account deactivated", channel.result["body"])

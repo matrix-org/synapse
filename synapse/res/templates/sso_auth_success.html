@@ -1,0 +1,18 @@
+<html>
+<head>
+    <title>Authentication Successful</title>
+    <script>
+    if (window.onAuthDone) {
+        window.onAuthDone();
+    } else if (window.opener && window.opener.postMessage) {
+        window.opener.postMessage("authDone", "*");
+    }
+    </script>
+</head>
+    <body>
+        <div>
+            <p>Thank you</p>
+            <p>You may now close this window and return to the application</p>
+        </div>
+    </body>
+</html>

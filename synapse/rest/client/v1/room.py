@@ -27,6 +27,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
+    HttpResponseException,
     InvalidClientCredentialsError,
     SynapseError,
 )
@@ -92,7 +93,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request)
 
-        info = await self._room_creation_handler.create_room(
+        info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
@@ -201,7 +202,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         if event_type == EventTypes.Member:
             membership = content.get("membership", None)
-            event = await self.room_member_handler.update_membership(
+            event_id, _ = await self.room_member_handler.update_membership(
                 requester,
                 target=UserID.from_string(state_key),
                 room_id=room_id,
@@ -209,14 +210,18 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 content=content,
             )
         else:
-            event = await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict, txn_id=txn_id
             )
+            event_id = event.event_id
 
         ret = {}  # type: dict
-        if event:
-            set_tag("event_id", event.event_id)
-            ret = {"event_id": event.event_id}
+        if event_id:
+            set_tag("event_id", event_id)
+            ret = {"event_id": event_id}
         return 200, ret
 
 
@@ -246,7 +251,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
-        event = await self.event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
             requester, event_dict, txn_id=txn_id
         )
 
@@ -364,10 +369,13 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server:
-            data = await handler.get_remote_public_room_list(
-                server, limit=limit, since_token=since_token
-            )
+        if server and server != self.hs.config.server_name:
+            try:
+                data = await handler.get_remote_public_room_list(
+                    server, limit=limit, since_token=since_token
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit, since_token=since_token
@@ -404,15 +412,18 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server:
-            data = await handler.get_remote_public_room_list(
-                server,
-                limit=limit,
-                since_token=since_token,
-                search_filter=search_filter,
-                include_all_networks=include_all_networks,
-                third_party_instance_id=third_party_instance_id,
-            )
+        if server and server != self.hs.config.server_name:
+            try:
+                data = await handler.get_remote_public_room_list(
+                    server,
+                    limit=limit,
+                    since_token=since_token,
+                    search_filter=search_filter,
+                    include_all_networks=include_all_networks,
+                    third_party_instance_id=third_party_instance_id,
+                )
+            except HttpResponseException as e:
+                raise e.to_synapse_error()
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit,
@@ -775,7 +786,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        event = await self.event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.Redaction,

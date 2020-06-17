@@ -173,19 +173,28 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             for event_id in initial_events
         }
 
+        # The sorted list of events whose auth chains we should walk.
+        search = []  # type: List[Tuple[int, str]]
+
         # We need to get the depth of the initial events for sorting purposes.
         sql = """
             SELECT depth, event_id FROM events
             WHERE %s
-            ORDER BY depth ASC
         """
-        clause, args = make_in_list_sql_clause(
-            txn.database_engine, "event_id", initial_events
-        )
-        txn.execute(sql % (clause,), args)
+        # the list can be huge, so let's avoid looking them all up in one massive
+        # query.
+        for batch in batch_iter(initial_events, 1000):
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "event_id", batch
+            )
+            txn.execute(sql % (clause,), args)
 
-        # The sorted list of events whose auth chains we should walk.
-        search = txn.fetchall()  # type: List[Tuple[int, str]]
+            # I think building a temporary list with fetchall is more efficient than
+            # just `search.extend(txn)`, but this is unconfirmed
+            search.extend(txn.fetchall())
+
+        # sort by depth
+        search.sort()
 
         # Map from event to its auth events
         event_to_auth_events = {}  # type: Dict[str, Set[str]]
@@ -629,89 +638,6 @@ class EventFederationStore(EventFederationWorkerStore):
 
         hs.get_clock().looping_call(
             self._delete_old_forward_extrem_cache, 60 * 60 * 1000
-        )
-
-    def _update_min_depth_for_room_txn(self, txn, room_id, depth):
-        min_depth = self._get_min_depth_interaction(txn, room_id)
-
-        if min_depth is not None and depth >= min_depth:
-            return
-
-        self.db.simple_upsert_txn(
-            txn,
-            table="room_depth",
-            keyvalues={"room_id": room_id},
-            values={"min_depth": depth},
-        )
-
-    def _handle_mult_prev_events(self, txn, events):
-        """
-        For the given event, update the event edges table and forward and
-        backward extremities tables.
-        """
-        self.db.simple_insert_many_txn(
-            txn,
-            table="event_edges",
-            values=[
-                {
-                    "event_id": ev.event_id,
-                    "prev_event_id": e_id,
-                    "room_id": ev.room_id,
-                    "is_state": False,
-                }
-                for ev in events
-                for e_id in ev.prev_event_ids()
-            ],
-        )
-
-        self._update_backward_extremeties(txn, events)
-
-    def _update_backward_extremeties(self, txn, events):
-        """Updates the event_backward_extremities tables based on the new/updated
-        events being persisted.
-
-        This is called for new events *and* for events that were outliers, but
-        are now being persisted as non-outliers.
-
-        Forward extremities are handled when we first start persisting the events.
-        """
-        events_by_room = {}
-        for ev in events:
-            events_by_room.setdefault(ev.room_id, []).append(ev)
-
-        query = (
-            "INSERT INTO event_backward_extremities (event_id, room_id)"
-            " SELECT ?, ? WHERE NOT EXISTS ("
-            " SELECT 1 FROM event_backward_extremities"
-            " WHERE event_id = ? AND room_id = ?"
-            " )"
-            " AND NOT EXISTS ("
-            " SELECT 1 FROM events WHERE event_id = ? AND room_id = ? "
-            " AND outlier = ?"
-            " )"
-        )
-
-        txn.executemany(
-            query,
-            [
-                (e_id, ev.room_id, e_id, ev.room_id, e_id, ev.room_id, False)
-                for ev in events
-                for e_id in ev.prev_event_ids()
-                if not ev.internal_metadata.is_outlier()
-            ],
-        )
-
-        query = (
-            "DELETE FROM event_backward_extremities"
-            " WHERE event_id = ? AND room_id = ?"
-        )
-        txn.executemany(
-            query,
-            [
-                (ev.event_id, ev.room_id)
-                for ev in events
-                if not ev.internal_metadata.is_outlier()
-            ],
         )
 
     def _delete_old_forward_extrem_cache(self):

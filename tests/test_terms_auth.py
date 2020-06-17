@@ -28,8 +28,8 @@ from tests import unittest
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
-    def default_config(self, name="test"):
-        config = super().default_config(name)
+    def default_config(self):
+        config = super().default_config()
         config.update(
             {
                 "public_baseurl": "https://example.org/",
@@ -53,7 +53,8 @@ class TermsTestCase(unittest.HomeserverTestCase):
 
     def test_ui_auth(self):
         # Do a UI auth request
-        request, channel = self.make_request(b"POST", self.url, b"{}")
+        request_data = json.dumps({"username": "kermit", "password": "monkey"})
+        request, channel = self.make_request(b"POST", self.url, request_data)
         self.render(request)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)

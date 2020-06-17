@@ -14,16 +14,18 @@ example flow would be (where '>' indicates master to worker and
 '<' worker to master flows):
 
     > SERVER example.com
-    < REPLICATE events 53
-    > RDATA events 54 ["$foo1:bar.com", ...]
-    > RDATA events 55 ["$foo4:bar.com", ...]
+    < REPLICATE
+    > POSITION events master 53
+    > RDATA events master 54 ["$foo1:bar.com", ...]
+    > RDATA events master 55 ["$foo4:bar.com", ...]
 
-The example shows the server accepting a new connection and sending its
-identity with the `SERVER` command, followed by the client asking to
-subscribe to the `events` stream from the token `53`. The server then
-periodically sends `RDATA` commands which have the format
-`RDATA <stream_name> <token> <row>`, where the format of `<row>` is
-defined by the individual streams.
+The example shows the server accepting a new connection and sending its identity
+with the `SERVER` command, followed by the client server to respond with the
+position of all streams. The server then periodically sends `RDATA` commands
+which have the format `RDATA <stream_name> <instance_name> <token> <row>`, where
+the format of `<row>` is defined by the individual streams. The
+`<instance_name>` is the name of the Synapse process that generated the data
+(usually "master").
 
 Error reporting happens by either the client or server sending an ERROR
 command, and usually the connection will be closed.
@@ -32,9 +34,6 @@ Since the protocol is a simple line based, its possible to manually
 connect to the server using a tool like netcat. A few things should be
 noted when manually using the protocol:
 
--   When subscribing to a stream using `REPLICATE`, the special token
-    `NOW` can be used to get all future updates. The special stream name
-    `ALL` can be used with `NOW` to subscribe to all available streams.
 -   The federation stream is only available if federation sending has
     been disabled on the main process.
 -   The server will only time connections out that have sent a `PING`
@@ -55,7 +54,7 @@ The basic structure of the protocol is line based, where the initial
 word of each line specifies the command. The rest of the line is parsed
 based on the command. For example, the RDATA command is defined as:
 
-    RDATA <stream_name> <token> <row_json>
+    RDATA <stream_name> <instance_name> <token> <row_json>
 
 (Note that <row_json> may contains spaces, but cannot contain
 newlines.)
@@ -91,9 +90,7 @@ The client:
 -   Sends a `NAME` command, allowing the server to associate a human
     friendly name with the connection. This is optional.
 -   Sends a `PING` as above
--   For each stream the client wishes to subscribe to it sends a
-    `REPLICATE` with the `stream_name` and token it wants to subscribe
-    from.
+-   Sends a `REPLICATE` to get the current position of all streams.
 -   On receipt of a `SERVER` command, checks that the server name
     matches the expected server name.
 
@@ -140,14 +137,12 @@ the wire:
     > PING 1490197665618
     < NAME synapse.app.appservice
     < PING 1490197665618
-    < REPLICATE events 1
-    < REPLICATE backfill 1
-    < REPLICATE caches 1
-    > POSITION events 1
-    > POSITION backfill 1
-    > POSITION caches 1
-    > RDATA caches 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
-    > RDATA events 14 ["$149019767112vOHxz:localhost:8823",
+    < REPLICATE
+    > POSITION events master 1
+    > POSITION backfill master 1
+    > POSITION caches master 1
+    > RDATA caches master 2 ["get_user_by_id",["@01register-user:localhost:8823"],1490197670513]
+    > RDATA events master 14 ["$149019767112vOHxz:localhost:8823",
         "!AFDCvgApUmpdfVjIXm:localhost:8823","m.room.guest_access","",null]
     < PING 1490197675618
     > ERROR server stopping
@@ -158,10 +153,10 @@ position without needing to send data with the `RDATA` command.
 
 An example of a batched set of `RDATA` is:
 
-    > RDATA caches batch ["get_user_by_id",["@test:localhost:8823"],1490197670513]
-    > RDATA caches batch ["get_user_by_id",["@test2:localhost:8823"],1490197670513]
-    > RDATA caches batch ["get_user_by_id",["@test3:localhost:8823"],1490197670513]
-    > RDATA caches 54 ["get_user_by_id",["@test4:localhost:8823"],1490197670513]
+    > RDATA caches master batch ["get_user_by_id",["@test:localhost:8823"],1490197670513]
+    > RDATA caches master batch ["get_user_by_id",["@test2:localhost:8823"],1490197670513]
+    > RDATA caches master batch ["get_user_by_id",["@test3:localhost:8823"],1490197670513]
+    > RDATA caches master 54 ["get_user_by_id",["@test4:localhost:8823"],1490197670513]
 
 In this case the client shouldn't advance their caches token until it
 sees the the last `RDATA`.
@@ -181,9 +176,14 @@ client (C):
 
 #### POSITION (S)
 
-   The position of the stream has been updated. Sent to the client
-    after all missing updates for a stream have been sent to the client
-    and they're now up to date.
+   On receipt of a POSITION command clients should check if they have missed any
+   updates, and if so then fetch them out of band. Sent in response to a
+   REPLICATE command (but can happen at any time).
+
+   The POSITION command includes the source of the stream. Currently all streams
+   are written by a single process (usually "master"). If fetching missing
+   updates via HTTP API, rather than via the DB, then processes should make the
+   request to the appropriate process.
 
 #### ERROR (S, C)
 
@@ -199,24 +199,17 @@ client (C):
 
 #### REPLICATE (C)
 
-Asks the server to replicate a given stream. The syntax is:
-
-```
-    REPLICATE <stream_name> <token>
-```
-
-Where `<token>` may be either:
- * a numeric stream_id to stream updates since (exclusive)
- * `NOW` to stream all subsequent updates.
-
-The `<stream_name>` is the name of a replication stream to subscribe
-to (see [here](../synapse/replication/tcp/streams/_base.py) for a list
-of streams). It can also be `ALL` to subscribe to all known streams,
-in which case the `<token>` must be set to `NOW`.
+Asks the server for the current position of all streams.
 
 #### USER_SYNC (C)
 
-   A user has started or stopped syncing
+   A user has started or stopped syncing on this process.
+
+#### CLEAR_USER_SYNC (C)
+
+   The server should clear all associated user sync data from the worker.
+
+   This is used when a worker is shutting down.
 
 #### FEDERATION_ACK (C)
 
@@ -225,14 +218,6 @@ in which case the `<token>` must be set to `NOW`.
 #### REMOVE_PUSHER (C)
 
    Inform the server a pusher should be removed
-
-#### INVALIDATE_CACHE (C)
-
-   Inform the server a cache should be invalidated
-
-#### SYNC (S, C)
-
-   Used exclusively in tests
 
 ### REMOTE_SERVER_UP (S, C)
 
@@ -252,12 +237,12 @@ Each individual cache invalidation results in a row being sent down
 replication, which includes the cache name (the name of the function)
 and they key to invalidate. For example:
 
-    > RDATA caches 550953771 ["get_user_by_id", ["@bob:example.com"], 1550574873251]
+    > RDATA caches master 550953771 ["get_user_by_id", ["@bob:example.com"], 1550574873251]
 
 Alternatively, an entire cache can be invalidated by sending down a `null`
 instead of the key. For example:
 
-    > RDATA caches 550953772 ["get_user_by_id", null, 1550574873252]
+    > RDATA caches master 550953772 ["get_user_by_id", null, 1550574873252]
 
 However, there are times when a number of caches need to be invalidated
 at the same time with the same key. To reduce traffic we batch those

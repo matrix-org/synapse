@@ -11,7 +11,9 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         self.updates = self.hs.get_datastore().db.updates  # type: BackgroundUpdater
         # the base test class should have run the real bg updates for us
-        self.assertTrue(self.updates.has_completed_background_updates())
+        self.assertTrue(
+            self.get_success(self.updates.has_completed_background_updates())
+        )
 
         self.update_handler = Mock()
         self.updates.register_background_update_handler(
@@ -25,12 +27,20 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         # the target runtime for each bg update
         target_background_update_duration_ms = 50000
 
+        store = self.hs.get_datastore()
+        self.get_success(
+            store.db.simple_insert(
+                "background_updates",
+                values={"update_name": "test_update", "progress_json": '{"my_key": 1}'},
+            )
+        )
+
         # first step: make a bit of progress
         @defer.inlineCallbacks
         def update(progress, count):
             yield self.clock.sleep((count * duration_ms) / 1000)
             progress = {"my_key": progress["my_key"] + 1}
-            yield self.hs.get_datastore().db.runInteraction(
+            yield store.db.runInteraction(
                 "update_progress",
                 self.updates._background_update_progress_txn,
                 "test_update",
@@ -39,10 +49,6 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
             return count
 
         self.update_handler.side_effect = update
-
-        self.get_success(
-            self.updates.start_background_update("test_update", {"my_key": 1})
-        )
         self.update_handler.reset_mock()
         res = self.get_success(
             self.updates.do_next_background_update(
@@ -50,7 +56,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
             ),
             by=0.1,
         )
-        self.assertIsNotNone(res)
+        self.assertFalse(res)
 
         # on the first call, we should get run with the default background update size
         self.update_handler.assert_called_once_with(
@@ -73,7 +79,7 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.updates.do_next_background_update(target_background_update_duration_ms)
         )
-        self.assertIsNotNone(result)
+        self.assertFalse(result)
         self.update_handler.assert_called_once()
 
         # third step: we don't expect to be called any more
@@ -81,5 +87,5 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.updates.do_next_background_update(target_background_update_duration_ms)
         )
-        self.assertIsNone(result)
+        self.assertTrue(result)
         self.assertFalse(self.update_handler.called)

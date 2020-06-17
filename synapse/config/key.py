@@ -175,8 +175,8 @@ class KeyConfig(Config):
             )
             form_secret = 'form_secret: "%s"' % random_string_with_symbols(50)
         else:
-            macaroon_secret_key = "# macaroon_secret_key: <PRIVATE STRING>"
-            form_secret = "# form_secret: <PRIVATE STRING>"
+            macaroon_secret_key = "#macaroon_secret_key: <PRIVATE STRING>"
+            form_secret = "#form_secret: <PRIVATE STRING>"
 
         return (
             """\

@@ -40,6 +40,7 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     FederationError,
+    HttpResponseException,
     RequestSendFailed,
     SynapseError,
 )
@@ -49,6 +50,7 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
+from synapse.handlers._base import BaseHandler
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -69,9 +71,8 @@ from synapse.types import JsonDict, StateMap, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.distributor import user_joined_room
 from synapse.util.retryutils import NotRetryingDestination
+from synapse.util.stringutils import shortstr
 from synapse.visibility import filter_events_for_server
-
-from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
 
@@ -91,27 +92,6 @@ class _NewEventInfo:
     event = attr.ib(type=EventBase)
     state = attr.ib(type=Optional[Sequence[EventBase]], default=None)
     auth_events = attr.ib(type=Optional[StateMap[EventBase]], default=None)
-
-
-def shortstr(iterable, maxitems=5):
-    """If iterable has maxitems or fewer, return the stringification of a list
-    containing those items.
-
-    Otherwise, return the stringification of a a list with the first maxitems items,
-    followed by "...".
-
-    Args:
-        iterable (Iterable): iterable to truncate
-        maxitems (int): number of items to return before truncating
-
-    Returns:
-        unicode
-    """
-
-    items = list(itertools.islice(iterable, maxitems + 1))
-    if len(items) <= maxitems:
-        return str(items)
-    return "[" + ", ".join(repr(r) for r in items[:maxitems]) + ", ...]"
 
 
 class FederationHandler(BaseHandler):
@@ -146,10 +126,10 @@ class FederationHandler(BaseHandler):
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_simple_http_client()
+        self._instance_name = hs.get_instance_name()
+        self._replication = hs.get_replication_data_handler()
 
-        self._send_events_to_master = ReplicationFederationSendEventsRestServlet.make_client(
-            hs
-        )
+        self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
         self._notify_user_membership_change = ReplicationUserJoinedLeftRoomRestServlet.make_client(
             hs
         )
@@ -366,7 +346,7 @@ class FederationHandler(BaseHandler):
                     ours = await self.state_store.get_state_groups_ids(room_id, seen)
 
                     # state_maps is a list of mappings from (type, state_key) to event_id
-                    state_maps = list(ours.values())  # type: list[StateMap[str]]
+                    state_maps = list(ours.values())  # type: List[StateMap[str]]
 
                     # we don't need this any more, let's delete it.
                     del ours
@@ -1062,6 +1042,12 @@ class FederationHandler(BaseHandler):
                 except SynapseError as e:
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
+                except HttpResponseException as e:
+                    if 400 <= e.code < 500:
+                        raise e.to_synapse_error()
+
+                    logger.info("Failed to backfill from %s because %s", dom, e)
+                    continue
                 except CodeMessageException as e:
                     if 400 <= e.code < 500:
                         raise
@@ -1238,7 +1224,7 @@ class FederationHandler(BaseHandler):
 
     async def do_invite_join(
         self, target_hosts: Iterable[str], room_id: str, joinee: str, content: JsonDict
-    ) -> None:
+    ) -> Tuple[str, int]:
         """ Attempts to join the `joinee` to the room `room_id` via the
         servers contained in `target_hosts`.
 
@@ -1259,6 +1245,10 @@ class FederationHandler(BaseHandler):
 
             content: The event content to use for the join event.
         """
+        # TODO: We should be able to call this on workers, but the upgrading of
+        # room stuff after join currently doesn't work on workers.
+        assert self.config.worker.worker_app is None
+
         logger.debug("Joining %s to %s", joinee, room_id)
 
         origin, event, room_version_obj = await self._make_and_verify_event(
@@ -1321,15 +1311,23 @@ class FederationHandler(BaseHandler):
                 room_id=room_id, room_version=room_version_obj,
             )
 
-            await self._persist_auth_tree(
+            max_stream_id = await self._persist_auth_tree(
                 origin, auth_chain, state, event, room_version_obj
+            )
+
+            # We wait here until this instance has seen the events come down
+            # replication (if we're using replication) as the below uses caches.
+            #
+            # TODO: Currently the events stream is written to from master
+            await self._replication.wait_for_stream_position(
+                self.config.worker.writers.events, "events", max_stream_id
             )
 
             # Check whether this room is the result of an upgrade of a room we already know
             # about. If so, migrate over user information
             predecessor = await self.store.get_room_predecessor(room_id)
             if not predecessor or not isinstance(predecessor.get("room_id"), str):
-                return
+                return event.event_id, max_stream_id
             old_room_id = predecessor["room_id"]
             logger.debug(
                 "Found predecessor for %s during remote join: %s", room_id, old_room_id
@@ -1342,6 +1340,7 @@ class FederationHandler(BaseHandler):
             )
 
             logger.debug("Finished joining %s to %s", joinee, room_id)
+            return event.event_id, max_stream_id
         finally:
             room_queue = self.room_queues[room_id]
             del self.room_queues[room_id]
@@ -1578,7 +1577,7 @@ class FederationHandler(BaseHandler):
 
     async def do_remotely_reject_invite(
         self, target_hosts: Iterable[str], room_id: str, user_id: str, content: JsonDict
-    ) -> EventBase:
+    ) -> Tuple[EventBase, int]:
         origin, event, room_version = await self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
@@ -1598,9 +1597,9 @@ class FederationHandler(BaseHandler):
         await self.federation_client.send_leave(target_hosts, event)
 
         context = await self.state_handler.compute_event_context(event)
-        await self.persist_events_and_notify([(event, context)])
+        stream_id = await self.persist_events_and_notify([(event, context)])
 
-        return event
+        return event, stream_id
 
     async def _make_and_verify_event(
         self,
@@ -1725,16 +1724,15 @@ class FederationHandler(BaseHandler):
 
         return None
 
-    @defer.inlineCallbacks
-    def get_state_for_pdu(self, room_id, event_id):
+    async def get_state_for_pdu(self, room_id: str, event_id: str) -> List[EventBase]:
         """Returns the state at the event. i.e. not including said event.
         """
 
-        event = yield self.store.get_event(
+        event = await self.store.get_event(
             event_id, allow_none=False, check_room_id=room_id
         )
 
-        state_groups = yield self.state_store.get_state_groups(room_id, [event_id])
+        state_groups = await self.state_store.get_state_groups(room_id, [event_id])
 
         if state_groups:
             _, state = list(iteritems(state_groups)).pop()
@@ -1745,7 +1743,7 @@ class FederationHandler(BaseHandler):
                 if "replaces_state" in event.unsigned:
                     prev_id = event.unsigned["replaces_state"]
                     if prev_id != event.event_id:
-                        prev_event = yield self.store.get_event(prev_id)
+                        prev_event = await self.store.get_event(prev_id)
                         results[(event.type, event.state_key)] = prev_event
                 else:
                     del results[(event.type, event.state_key)]
@@ -1755,15 +1753,14 @@ class FederationHandler(BaseHandler):
         else:
             return []
 
-    @defer.inlineCallbacks
-    def get_state_ids_for_pdu(self, room_id, event_id):
+    async def get_state_ids_for_pdu(self, room_id: str, event_id: str) -> List[str]:
         """Returns the state at the event. i.e. not including said event.
         """
-        event = yield self.store.get_event(
+        event = await self.store.get_event(
             event_id, allow_none=False, check_room_id=room_id
         )
 
-        state_groups = yield self.state_store.get_state_groups_ids(room_id, [event_id])
+        state_groups = await self.state_store.get_state_groups_ids(room_id, [event_id])
 
         if state_groups:
             _, state = list(state_groups.items()).pop()
@@ -1782,49 +1779,50 @@ class FederationHandler(BaseHandler):
         else:
             return []
 
-    @defer.inlineCallbacks
     @log_function
-    def on_backfill_request(self, origin, room_id, pdu_list, limit):
-        in_room = yield self.auth.check_host_in_room(room_id, origin)
+    async def on_backfill_request(
+        self, origin: str, room_id: str, pdu_list: List[str], limit: int
+    ) -> List[EventBase]:
+        in_room = await self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
         # Synapse asks for 100 events per backfill request. Do not allow more.
         limit = min(limit, 100)
 
-        events = yield self.store.get_backfill_events(room_id, pdu_list, limit)
+        events = await self.store.get_backfill_events(room_id, pdu_list, limit)
 
-        events = yield filter_events_for_server(self.storage, origin, events)
+        events = await filter_events_for_server(self.storage, origin, events)
 
         return events
 
-    @defer.inlineCallbacks
     @log_function
-    def get_persisted_pdu(self, origin, event_id):
+    async def get_persisted_pdu(
+        self, origin: str, event_id: str
+    ) -> Optional[EventBase]:
         """Get an event from the database for the given server.
 
         Args:
-            origin [str]: hostname of server which is requesting the event; we
+            origin: hostname of server which is requesting the event; we
                will check that the server is allowed to see it.
-            event_id [str]: id of the event being requested
+            event_id: id of the event being requested
 
         Returns:
-            Deferred[EventBase|None]: None if we know nothing about the event;
-                otherwise the (possibly-redacted) event.
+            None if we know nothing about the event; otherwise the (possibly-redacted) event.
 
         Raises:
             AuthError if the server is not currently in the room
         """
-        event = yield self.store.get_event(
+        event = await self.store.get_event(
             event_id, allow_none=True, allow_rejected=True
         )
 
         if event:
-            in_room = yield self.auth.check_host_in_room(event.room_id, origin)
+            in_room = await self.auth.check_host_in_room(event.room_id, origin)
             if not in_room:
                 raise AuthError(403, "Host not in room.")
 
-            events = yield filter_events_for_server(self.storage, origin, [event])
+            events = await filter_events_for_server(self.storage, origin, [event])
             event = events[0]
             return event
         else:
@@ -1913,7 +1911,7 @@ class FederationHandler(BaseHandler):
         state: List[EventBase],
         event: EventBase,
         room_version: RoomVersion,
-    ) -> None:
+    ) -> int:
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -2007,7 +2005,7 @@ class FederationHandler(BaseHandler):
             event, old_state=state
         )
 
-        await self.persist_events_and_notify([(event, new_event_context)])
+        return await self.persist_events_and_notify([(event, new_event_context)])
 
     async def _prep_event(
         self,
@@ -2428,7 +2426,7 @@ class FederationHandler(BaseHandler):
         """
         # exclude the state key of the new event from the current_state in the context.
         if event.is_state():
-            event_key = (event.type, event.state_key)
+            event_key = (event.type, event.state_key)  # type: Optional[Tuple[str, str]]
         else:
             event_key = None
         state_updates = {
@@ -2594,9 +2592,8 @@ class FederationHandler(BaseHandler):
             "missing": [e.event_id for e in missing_locals],
         }
 
-    @defer.inlineCallbacks
     @log_function
-    def exchange_third_party_invite(
+    async def exchange_third_party_invite(
         self, sender_user_id, target_user_id, room_id, signed
     ):
         third_party_invite = {"signed": signed}
@@ -2612,16 +2609,16 @@ class FederationHandler(BaseHandler):
             "state_key": target_user_id,
         }
 
-        if (yield self.auth.check_host_in_room(room_id, self.hs.hostname)):
-            room_version = yield self.store.get_room_version_id(room_id)
+        if await self.auth.check_host_in_room(room_id, self.hs.hostname):
+            room_version = await self.store.get_room_version_id(room_id)
             builder = self.event_builder_factory.new(room_version, event_dict)
 
             EventValidator().validate_builder(builder)
-            event, context = yield self.event_creation_handler.create_new_client_event(
+            event, context = await self.event_creation_handler.create_new_client_event(
                 builder=builder
             )
 
-            event_allowed = yield self.third_party_event_rules.check_event_allowed(
+            event_allowed = await self.third_party_event_rules.check_event_allowed(
                 event, context
             )
             if not event_allowed:
@@ -2633,7 +2630,7 @@ class FederationHandler(BaseHandler):
                     403, "This event is not allowed in this context", Codes.FORBIDDEN
                 )
 
-            event, context = yield self.add_display_name_to_third_party_invite(
+            event, context = await self.add_display_name_to_third_party_invite(
                 room_version, event_dict, event, context
             )
 
@@ -2644,19 +2641,19 @@ class FederationHandler(BaseHandler):
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                yield self.auth.check_from_context(room_version, event, context)
+                await self.auth.check_from_context(room_version, event, context)
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
                 raise e
 
-            yield self._check_signature(event, context)
+            await self._check_signature(event, context)
 
             # We retrieve the room member handler here as to not cause a cyclic dependency
             member_handler = self.hs.get_room_member_handler()
-            yield member_handler.send_membership_event(None, event, context)
+            await member_handler.send_membership_event(None, event, context)
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
-            yield self.federation_client.forward_third_party_invite(
+            await self.federation_client.forward_third_party_invite(
                 destinations, room_id, event_dict
             )
 
@@ -2714,8 +2711,7 @@ class FederationHandler(BaseHandler):
         member_handler = self.hs.get_room_member_handler()
         await member_handler.send_membership_event(None, event, context)
 
-    @defer.inlineCallbacks
-    def add_display_name_to_third_party_invite(
+    async def add_display_name_to_third_party_invite(
         self, room_version, event_dict, event, context
     ):
         key = (
@@ -2723,10 +2719,10 @@ class FederationHandler(BaseHandler):
             event.content["third_party_invite"]["signed"]["token"],
         )
         original_invite = None
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
         original_invite_id = prev_state_ids.get(key)
         if original_invite_id:
-            original_invite = yield self.store.get_event(
+            original_invite = await self.store.get_event(
                 original_invite_id, allow_none=True
             )
         if original_invite:
@@ -2747,14 +2743,13 @@ class FederationHandler(BaseHandler):
 
         builder = self.event_builder_factory.new(room_version, event_dict)
         EventValidator().validate_builder(builder)
-        event, context = yield self.event_creation_handler.create_new_client_event(
+        event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
         EventValidator().validate_new(event, self.config)
         return (event, context)
 
-    @defer.inlineCallbacks
-    def _check_signature(self, event, context):
+    async def _check_signature(self, event, context):
         """
         Checks that the signature in the event is consistent with its invite.
 
@@ -2771,12 +2766,12 @@ class FederationHandler(BaseHandler):
         signed = event.content["third_party_invite"]["signed"]
         token = signed["token"]
 
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
         invite_event_id = prev_state_ids.get((EventTypes.ThirdPartyInvite, token))
 
         invite_event = None
         if invite_event_id:
-            invite_event = yield self.store.get_event(invite_event_id, allow_none=True)
+            invite_event = await self.store.get_event(invite_event_id, allow_none=True)
 
         if not invite_event:
             raise AuthError(403, "Could not find invite")
@@ -2825,7 +2820,7 @@ class FederationHandler(BaseHandler):
                             raise
                         try:
                             if "key_validity_url" in public_key_object:
-                                yield self._check_key_revocation(
+                                await self._check_key_revocation(
                                     public_key, public_key_object["key_validity_url"]
                                 )
                         except Exception:
@@ -2839,8 +2834,7 @@ class FederationHandler(BaseHandler):
                 last_exception = e
         raise last_exception
 
-    @defer.inlineCallbacks
-    def _check_key_revocation(self, public_key, url):
+    async def _check_key_revocation(self, public_key, url):
         """
         Checks whether public_key has been revoked.
 
@@ -2854,7 +2848,7 @@ class FederationHandler(BaseHandler):
                 for revocation.
         """
         try:
-            response = yield self.http_client.get_json(url, {"public_key": public_key})
+            response = await self.http_client.get_json(url, {"public_key": public_key})
         except Exception:
             raise SynapseError(502, "Third party certificate could not be checked")
         if "valid" not in response or not response["valid"]:
@@ -2864,7 +2858,7 @@ class FederationHandler(BaseHandler):
         self,
         event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ) -> None:
+    ) -> int:
         """Persists events and tells the notifier/pushers about them, if
         necessary.
 
@@ -2873,12 +2867,14 @@ class FederationHandler(BaseHandler):
             backfilled: Whether these events are a result of
                 backfilling or not
         """
-        if self.config.worker_app:
-            await self._send_events_to_master(
+        if self.config.worker.writers.events != self._instance_name:
+            result = await self._send_events(
+                instance_name=self.config.worker.writers.events,
                 store=self.store,
                 event_and_contexts=event_and_contexts,
                 backfilled=backfilled,
             )
+            return result["max_stream_id"]
         else:
             max_stream_id = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
@@ -2892,6 +2888,8 @@ class FederationHandler(BaseHandler):
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
                     await self._notify_persisted_event(event, max_stream_id)
+
+            return max_stream_id
 
     async def _notify_persisted_event(
         self, event: EventBase, max_stream_id: int
@@ -2949,8 +2947,7 @@ class FederationHandler(BaseHandler):
         else:
             user_joined_room(self.distributor, user, room_id)
 
-    @defer.inlineCallbacks
-    def get_room_complexity(self, remote_room_hosts, room_id):
+    async def get_room_complexity(self, remote_room_hosts, room_id):
         """
         Fetch the complexity of a remote room over federation.
 
@@ -2964,12 +2961,12 @@ class FederationHandler(BaseHandler):
         """
 
         for host in remote_room_hosts:
-            res = yield self.federation_client.get_room_complexity(host, room_id)
+            res = await self.federation_client.get_room_complexity(host, room_id)
 
             # We got a result, return it.
             if res:
-                defer.returnValue(res)
+                return res
 
         # We fell off the bottom, couldn't get the complexity from anyone. Oh
         # well.
-        defer.returnValue(None)
+        return None

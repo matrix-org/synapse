@@ -65,6 +65,13 @@ class Codes(object):
     INCOMPATIBLE_ROOM_VERSION = "M_INCOMPATIBLE_ROOM_VERSION"
     WRONG_ROOM_KEYS_VERSION = "M_WRONG_ROOM_KEYS_VERSION"
     EXPIRED_ACCOUNT = "ORG_MATRIX_EXPIRED_ACCOUNT"
+    PASSWORD_TOO_SHORT = "M_PASSWORD_TOO_SHORT"
+    PASSWORD_NO_DIGIT = "M_PASSWORD_NO_DIGIT"
+    PASSWORD_NO_UPPERCASE = "M_PASSWORD_NO_UPPERCASE"
+    PASSWORD_NO_LOWERCASE = "M_PASSWORD_NO_LOWERCASE"
+    PASSWORD_NO_SYMBOL = "M_PASSWORD_NO_SYMBOL"
+    PASSWORD_IN_DICTIONARY = "M_PASSWORD_IN_DICTIONARY"
+    WEAK_PASSWORD = "M_WEAK_PASSWORD"
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
     BAD_ALIAS = "M_BAD_ALIAS"
@@ -87,7 +94,14 @@ class CodeMessageException(RuntimeError):
 
     def __init__(self, code, msg):
         super(CodeMessageException, self).__init__("%d: %s" % (code, msg))
-        self.code = code
+
+        # Some calls to this method pass instances of http.HTTPStatus for `code`.
+        # While HTTPStatus is a subclass of int, it has magic __str__ methods
+        # which emit `HTTPStatus.FORBIDDEN` when converted to a str, instead of `403`.
+        # This causes inconsistency in our log lines.
+        #
+        # To eliminate this behaviour, we convert them to their integer equivalents here.
+        self.code = int(code)
         self.msg = msg
 
 
@@ -456,7 +470,9 @@ class PasswordRefusedError(SynapseError):
         msg="This password doesn't comply with the server's policy",
         errcode=Codes.WEAK_PASSWORD,
     ):
-        super(PasswordRefusedError, self).__init__(code=400, msg=msg, errcode=errcode)
+        super(PasswordRefusedError, self).__init__(
+            code=400, msg=msg, errcode=errcode,
+        )
 
 
 class RequestSendFailed(RuntimeError):

@@ -29,8 +29,8 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         )
         return hs
 
-    def default_config(self, name="test"):
-        conf = super().default_config(name)
+    def default_config(self):
+        conf = super().default_config()
         # we're using FederationReaderServer, which uses a SlavedStore, so we
         # have to tell the FederationHandler not to try to access stuff that is only
         # in the primary store.

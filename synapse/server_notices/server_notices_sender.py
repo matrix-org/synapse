@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
-
 from synapse.server_notices.consent_server_notices import ConsentServerNotices
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
@@ -36,18 +34,16 @@ class ServerNoticesSender(object):
             ResourceLimitsServerNotices(hs),
         )
 
-    @defer.inlineCallbacks
-    def on_user_syncing(self, user_id):
+    async def on_user_syncing(self, user_id):
         """Called when the user performs a sync operation.
 
         Args:
             user_id (str): mxid of user who synced
         """
         for sn in self._server_notices:
-            yield sn.maybe_send_server_notice_to_user(user_id)
+            await sn.maybe_send_server_notice_to_user(user_id)
 
-    @defer.inlineCallbacks
-    def on_user_ip(self, user_id):
+    async def on_user_ip(self, user_id):
         """Called on the master when a worker process saw a client request.
 
         Args:
@@ -57,4 +53,4 @@ class ServerNoticesSender(object):
         # we check for notices to send to the user in on_user_ip as well as
         # in on_user_syncing
         for sn in self._server_notices:
-            yield sn.maybe_send_server_notice_to_user(user_id)
+            await sn.maybe_send_server_notice_to_user(user_id)

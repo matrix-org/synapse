@@ -51,7 +51,7 @@ from synapse.http.servlet import (
 from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
-from synapse.util.stringutils import assert_valid_client_secret
+from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
@@ -137,6 +137,11 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -206,6 +211,11 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
@@ -419,15 +429,19 @@ class RegisterRestServlet(RestServlet):
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
-        desired_password = None
+        desired_password_hash = None
         if "password" in body:
-            if (
-                not isinstance(body["password"], string_types)
-                or len(body["password"]) > 512
-            ):
+            password = body.pop("password")
+            if not isinstance(password, string_types) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
-            self.password_policy_handler.validate_password(body["password"])
-            desired_password = body["password"]
+            self.password_policy_handler.validate_password(password)
+
+            # If the password is valid, hash it and store it back on the body.
+            # This ensures that only the hashed password is handled everywhere.
+            if "password_hash" in body:
+                raise SynapseError(400, "Unexpected property: password_hash")
+            body["password_hash"] = await self.auth_handler.hash(password)
+            desired_password_hash = body["password_hash"]
 
         desired_username = None
         if "username" in body:
@@ -464,7 +478,7 @@ class RegisterRestServlet(RestServlet):
             if isinstance(desired_username, string_types):
                 result = await self._do_appservice_registration(
                     desired_username,
-                    desired_password,
+                    desired_password_hash,
                     desired_display_name,
                     access_token,
                     body,
@@ -486,7 +500,7 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
-        if "initial_device_display_name" in body and "password" not in body:
+        if "initial_device_display_name" in body and "password_hash" not in body:
             # ignore 'initial_device_display_name' if sent without
             # a password to work around a client bug where it sent
             # the 'initial_device_display_name' param alone, wiping out
@@ -501,7 +515,7 @@ class RegisterRestServlet(RestServlet):
             # registered a user for this session, so we could just return the
             # user here. We carry on and go through the auth checks though,
             # for paranoia.
-            registered_user_id = self.auth_handler.get_session_data(
+            registered_user_id = await self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
             )
 
@@ -513,7 +527,11 @@ class RegisterRestServlet(RestServlet):
             )
 
         auth_result, params, session_id = await self.auth_handler.check_auth(
-            self._registration_flows, body, self.hs.get_ip_from_request(request)
+            self._registration_flows,
+            request,
+            body,
+            self.hs.get_ip_from_request(request),
+            "register a new account",
         )
 
         # Check that we're not trying to register a denied 3pid.
@@ -618,7 +636,7 @@ class RegisterRestServlet(RestServlet):
             registered = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
-            assert_params_in_dict(params, ["password"])
+            assert_params_in_dict(params, ["password_hash"])
 
             if not self.hs.config.register_mxid_from_3pid:
                 desired_username = params.get("username", None)
@@ -627,9 +645,7 @@ class RegisterRestServlet(RestServlet):
                 pass
 
             guest_access_token = params.get("guest_access_token", None)
-
-            # XXX: don't we need to validate these for length etc like we did on
-            # the ones from the JSON body earlier on in the method?
+            new_password_hash = params.get("password_hash", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
@@ -662,7 +678,7 @@ class RegisterRestServlet(RestServlet):
 
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
-                password=params.get("password", None),
+                password_hash=new_password_hash,
                 guest_access_token=guest_access_token,
                 default_display_name=desired_display_name,
                 threepid=threepid,
@@ -686,7 +702,7 @@ class RegisterRestServlet(RestServlet):
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
-            self.auth_handler.set_session_data(
+            await self.auth_handler.set_session_data(
                 session_id, "registered_user_id", registered_user_id
             )
 
@@ -709,12 +725,12 @@ class RegisterRestServlet(RestServlet):
         return 200, {}
 
     async def _do_appservice_registration(
-        self, username, password, display_name, as_token, body
+        self, username, password_hash, display_name, as_token, body
     ):
         # FIXME: appservice_register() is horribly duplicated with register()
         # and they should probably just be combined together with a config flag.
         user_id = await self.registration_handler.appservice_register(
-            username, as_token, password, display_name
+            username, as_token, password_hash, display_name
         )
         result = await self._create_registration_details(user_id, body)
 

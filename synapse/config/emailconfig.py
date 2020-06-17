@@ -108,9 +108,14 @@ class EmailConfig(Config):
             if self.trusted_third_party_id_servers:
                 # XXX: It's a little confusing that account_threepid_delegate_email is modified
                 # both in RegistrationConfig and here. We should factor this bit out
-                self.account_threepid_delegate_email = self.trusted_third_party_id_servers[
-                    0
-                ]  # type: Optional[str]
+
+                first_trusted_identity_server = self.trusted_third_party_id_servers[0]
+
+                # trusted_third_party_id_servers does not contain a scheme whereas
+                # account_threepid_delegate_email is expected to. Presume https
+                self.account_threepid_delegate_email = (
+                    "https://" + first_trusted_identity_server
+                )  # type: Optional[str]
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(
@@ -306,8 +311,8 @@ class EmailConfig(Config):
           # Username/password for authentication to the SMTP server. By default, no
           # authentication is attempted.
           #
-          # smtp_user: "exampleusername"
-          # smtp_pass: "examplepassword"
+          #smtp_user: "exampleusername"
+          #smtp_pass: "examplepassword"
 
           # Uncomment the following to require TLS transport security for SMTP.
           # By default, Synapse will connect over plain text, and will then switch to

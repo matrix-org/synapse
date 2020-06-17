@@ -31,7 +31,7 @@ from prometheus_client import Gauge
 from twisted.application import service
 from twisted.internet import defer, reactor
 from twisted.python.failure import Failure
-from twisted.web.resource import EncodingResourceWrapper, IResource, NoResource
+from twisted.web.resource import EncodingResourceWrapper, IResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
 
@@ -52,7 +52,11 @@ from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
-from synapse.http.server import RootRedirect
+from synapse.http.server import (
+    OptionsResource,
+    RootOptionsRedirectResource,
+    RootRedirect,
+)
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
 from synapse.metrics import METRICS_PREFIX, MetricsResource, RegistryProxy
@@ -69,7 +73,6 @@ from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.prepare_database import UpgradeDatabaseException
-from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
@@ -122,11 +125,11 @@ class SynapseHomeServer(HomeServer):
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
-            root_resource = RootRedirect(WEB_CLIENT_PREFIX)
+            root_resource = RootOptionsRedirectResource(WEB_CLIENT_PREFIX)
         elif STATIC_PREFIX in resources:
-            root_resource = RootRedirect(STATIC_PREFIX)
+            root_resource = RootOptionsRedirectResource(STATIC_PREFIX)
         else:
-            root_resource = NoResource()
+            root_resource = OptionsResource()
 
         root_resource = create_resource_tree(resources, root_resource)
 
@@ -192,6 +195,11 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
+            if self.get_config().oidc_enabled:
+                from synapse.rest.oidc import OIDCResource
+
+                resources["/_synapse/oidc"] = OIDCResource(self)
+
             if self.get_config().saml2_enabled:
                 from synapse.rest.saml2 import SAML2Resource
 
@@ -241,16 +249,26 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_path = self.get_config().web_client_location
+            webclient_loc = self.get_config().web_client_location
 
-            if webclient_path is None:
+            if webclient_loc is None:
                 logger.warning(
                     "Not enabling webclient resource, as web_client_location is unset."
                 )
+            elif webclient_loc.startswith("http://") or webclient_loc.startswith(
+                "https://"
+            ):
+                resources[WEB_CLIENT_PREFIX] = RootRedirect(webclient_loc)
             else:
+                logger.warning(
+                    "Running webclient on the same domain is not recommended: "
+                    "https://github.com/matrix-org/synapse#security-note - "
+                    "after you move webclient to different host you can set "
+                    "web_client_location to its full URL to enable redirection."
+                )
                 # GZip is disabled here due to
                 # https://twistedmatrix.com/trac/ticket/7678
-                resources[WEB_CLIENT_PREFIX] = File(webclient_path)
+                resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
         if name == "metrics" and self.get_config().enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
@@ -262,6 +280,12 @@ class SynapseHomeServer(HomeServer):
 
     def start_listening(self, listeners):
         config = self.get_config()
+
+        if config.redis_enabled:
+            # If redis is enabled we connect via the replication command handler
+            # in the same way as the workers (since we're effectively a client
+            # rather than a server).
+            self.get_tcp_replication().start_replication(self)
 
         for listener in listeners:
             if listener["type"] == "http":
@@ -406,6 +430,13 @@ def setup(config_options):
                 # Check if it needs to be reprovisioned every day.
                 hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
 
+            # Load the OIDC provider metadatas, if OIDC is enabled.
+            if hs.config.oidc_enabled:
+                oidc = hs.get_oidc_handler()
+                # Loading the provider metadata also ensures the provider config is valid.
+                yield defer.ensureDeferred(oidc.load_metadata())
+                yield defer.ensureDeferred(oidc.load_jwks())
+
             _base.start(hs, config.listeners)
 
             hs.get_datastore().db.updates.start_doing_background_updates()
@@ -488,8 +519,8 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
-    stats["cache_factor"] = CACHE_SIZE_FACTOR
-    stats["event_cache_size"] = hs.config.event_cache_size
+    stats["cache_factor"] = hs.config.caches.global_factor
+    stats["event_cache_size"] = hs.config.caches.event_cache_size
 
     #
     # Performance statistics
