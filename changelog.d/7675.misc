@@ -1,1 +1,1 @@
-Rename m.login.jwt to org.matrix.login.jwt as that is not in the spec.
+Deprecate m.login.jwt in favour of org.matrix.login.jwt as m.login.jwt is not in the spec.
