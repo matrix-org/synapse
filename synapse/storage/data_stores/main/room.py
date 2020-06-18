@@ -786,7 +786,7 @@ class RoomWorkerStore(SQLBaseStore):
             """
             UPDATE local_media_repository
             SET quarantined_by = ?
-            WHERE media_id = ? AND safe_from_quarantine IS ?
+            WHERE media_id = ? AND safe_from_quarantine = ?
         """,
             ((quarantined_by, media_id, False) for media_id in local_mxcs),
         )
