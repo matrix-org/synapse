@@ -526,6 +526,19 @@ def start_active_span_from_edu(
     return scope
 
 
+def get_active_span_context():
+    """Gets the active span's context, if any.
+    """
+    if not opentracing:
+        return None
+
+    active_span = opentracing.tracer.active_span
+    if not active_span:
+        return None
+
+    return active_span.context
+
+
 # Opentracing setters for tags, logs, etc
 
 
