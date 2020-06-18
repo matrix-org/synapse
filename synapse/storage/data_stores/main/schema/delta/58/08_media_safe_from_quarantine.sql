@@ -15,4 +15,4 @@
 
 -- The local_media_repository should have files which do not get quarantined,
 -- e.g. files from sticker packs.
-ALTER TABLE local_media_repository ADD COLUMN safe_from_quarantine BOOLEAN DEFAULT FALSE;
+ALTER TABLE local_media_repository ADD COLUMN safe_from_quarantine BOOLEAN DEFAULT (1 = 0);
