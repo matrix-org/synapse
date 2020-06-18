@@ -782,7 +782,7 @@ class RoomWorkerStore(SQLBaseStore):
         total_media_quarantined = 0
 
         # Update all the tables to set the quarantined_by flag
-        cursor = txn.executemany(
+        txn.executemany(
             """
             UPDATE local_media_repository
             SET quarantined_by = ?
@@ -790,9 +790,9 @@ class RoomWorkerStore(SQLBaseStore):
         """,
             ((quarantined_by, media_id, False) for media_id in local_mxcs),
         )
-        total_media_quarantined += cursor.rowcount
+        total_media_quarantined += txn.rowcount
 
-        cursor = txn.executemany(
+        txn.executemany(
             """
                 UPDATE remote_media_cache
                 SET quarantined_by = ?
@@ -800,7 +800,7 @@ class RoomWorkerStore(SQLBaseStore):
             """,
             ((quarantined_by, origin, media_id) for origin, media_id in remote_mxcs),
         )
-        total_media_quarantined += cursor.rowcount
+        total_media_quarantined += txn.rowcount
 
         return total_media_quarantined
 
