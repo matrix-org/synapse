@@ -22,6 +22,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 from synapse.logging.context import LoggingContext, current_context
+from synapse.logging.opentracing import start_active_span
 from synapse.metrics import InFlightGauge
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ class Measure(object):
         "name",
         "_logging_context",
         "start",
+        "_span",
     ]
 
     def __init__(self, clock, name):
@@ -100,6 +102,7 @@ class Measure(object):
         self.name = name
         self._logging_context = None
         self.start = None
+        self._span = None
 
     def __enter__(self):
         if self._logging_context:
@@ -111,11 +114,18 @@ class Measure(object):
             "Measure[%s]" % (self.name,), parent_context
         )
         self._logging_context.__enter__()
+
+        self._span = start_active_span(self.name)
+        self._span.__enter__()
+
         in_flight.register((self.name,), self._update_in_flight)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self._logging_context:
             raise RuntimeError("Measure() block exited without being entered")
+
+        if self._span:
+            self._span.__exit__(exc_type, exc_val, exc_tb)
 
         duration = self.clock.time() - self.start
         usage = self._logging_context.get_resource_usage()
