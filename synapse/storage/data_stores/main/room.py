@@ -779,18 +779,17 @@ class RoomWorkerStore(SQLBaseStore):
         Returns:
             The total number of media items quarantined
         """
-        total_media_quarantined = 0
-
         # Update all the tables to set the quarantined_by flag
         txn.executemany(
             """
             UPDATE local_media_repository
             SET quarantined_by = ?
-            WHERE media_id = ? AND safe_from_quarantine = ?
+            WHERE media_id = ? AND safe_from_quarantine = FALSE
         """,
-            ((quarantined_by, media_id, False) for media_id in local_mxcs),
+            ((quarantined_by, media_id) for media_id in local_mxcs),
         )
-        total_media_quarantined += txn.rowcount
+        # Note that a rowcount of -1 can be used to indicate no rows were affected.
+        total_media_quarantined = txn.rowcount if txn.rowcount > 0 else 0
 
         txn.executemany(
             """
@@ -800,7 +799,7 @@ class RoomWorkerStore(SQLBaseStore):
             """,
             ((quarantined_by, origin, media_id) for origin, media_id in remote_mxcs),
         )
-        total_media_quarantined += txn.rowcount
+        total_media_quarantined += txn.rowcount if txn.rowcount > 0 else 0
 
         return total_media_quarantined
 
