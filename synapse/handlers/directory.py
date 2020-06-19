@@ -144,7 +144,7 @@ class DirectoryHandler(BaseHandler):
                 # per alias creation rule?
                 raise SynapseError(403, "Not allowed to create alias")
 
-            can_create = await self.can_modify_alias(room_alias, user_id=user_id)
+            can_create = self.can_modify_alias(room_alias, user_id=user_id)
             if not can_create:
                 raise AuthError(
                     400,
@@ -189,7 +189,7 @@ class DirectoryHandler(BaseHandler):
         if not can_delete:
             raise AuthError(403, "You don't have permission to delete the alias.")
 
-        can_delete = await self.can_modify_alias(room_alias, user_id=user_id)
+        can_delete = self.can_modify_alias(room_alias, user_id=user_id)
         if not can_delete:
             raise SynapseError(
                 400,
@@ -348,7 +348,7 @@ class DirectoryHandler(BaseHandler):
             result = yield as_handler.query_room_alias_exists(room_alias)
         return result
 
-    def can_modify_alias(self, alias: RoomAlias, user_id: Optional[str] = None):
+    def can_modify_alias(self, alias: RoomAlias, user_id: Optional[str] = None) -> bool:
         # Any application service "interested" in an alias they are regexing on
         # can modify the alias.
         # Users can only modify the alias if ALL the interested services have
@@ -361,12 +361,12 @@ class DirectoryHandler(BaseHandler):
         for service in interested_services:
             if user_id == service.sender:
                 # this user IS the app service so they can do whatever they like
-                return defer.succeed(True)
+                return True
             elif service.is_exclusive_alias(alias.to_string()):
                 # another service has an exclusive lock on this alias.
-                return defer.succeed(False)
+                return False
         # either no interested services, or no service with an exclusive lock
-        return defer.succeed(True)
+        return True
 
     async def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
         """Determine whether a user can delete an alias.
