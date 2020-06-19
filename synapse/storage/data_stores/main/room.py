@@ -784,9 +784,9 @@ class RoomWorkerStore(SQLBaseStore):
             """
             UPDATE local_media_repository
             SET quarantined_by = ?
-            WHERE media_id = ? AND safe_from_quarantine = FALSE
+            WHERE media_id = ? AND safe_from_quarantine = ?
         """,
-            ((quarantined_by, media_id) for media_id in local_mxcs),
+            ((quarantined_by, media_id, False) for media_id in local_mxcs),
         )
         # Note that a rowcount of -1 can be used to indicate no rows were affected.
         total_media_quarantined = txn.rowcount if txn.rowcount > 0 else 0
