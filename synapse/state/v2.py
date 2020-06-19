@@ -133,8 +133,9 @@ def resolve_events_with_store(
     # OK, so we've now resolved the power events. Now sort the remaining
     # events using the mainline of the resolved power level.
 
+    set_power_events = set(sorted_power_events)
     leftover_events = [
-        ev_id for ev_id in full_conflicted_set if ev_id not in sorted_power_events
+        ev_id for ev_id in full_conflicted_set if ev_id not in set_power_events
     ]
 
     logger.debug("sorting %d remaining events", len(leftover_events))
