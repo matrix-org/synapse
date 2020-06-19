@@ -17,8 +17,6 @@ import logging
 import string
 from typing import Iterable, List, Optional
 
-from twisted.internet import defer
-
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
     AuthError,
@@ -225,18 +223,17 @@ class DirectoryHandler(BaseHandler):
 
         return room_id
 
-    @defer.inlineCallbacks
-    def get_association(self, room_alias: RoomAlias):
+    async def get_association(self, room_alias: RoomAlias):
         room_id = None
         if self.hs.is_mine(room_alias):
-            result = yield self.get_association_from_room_alias(room_alias)
+            result = await self.get_association_from_room_alias(room_alias)
 
             if result:
                 room_id = result.room_id
                 servers = result.servers
         else:
             try:
-                result = yield self.federation.make_query(
+                result = await self.federation.make_query(
                     destination=room_alias.domain,
                     query_type="directory",
                     args={"room_alias": room_alias.to_string()},
@@ -261,7 +258,7 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND,
             )
 
-        users = yield self.state.get_current_users_in_room(room_id)
+        users = await self.state.get_current_users_in_room(room_id)
         extra_servers = {get_domain_from_id(u) for u in users}
         servers = set(extra_servers) | set(servers)
 
@@ -339,13 +336,12 @@ class DirectoryHandler(BaseHandler):
                 ratelimit=False,
             )
 
-    @defer.inlineCallbacks
-    def get_association_from_room_alias(self, room_alias: RoomAlias):
-        result = yield self.store.get_association_from_room_alias(room_alias)
+    async def get_association_from_room_alias(self, room_alias: RoomAlias):
+        result = await self.store.get_association_from_room_alias(room_alias)
         if not result:
             # Query AS to see if it exists
             as_handler = self.appservice_handler
-            result = yield as_handler.query_room_alias_exists(room_alias)
+            result = await as_handler.query_room_alias_exists(room_alias)
         return result
 
     def can_modify_alias(self, alias: RoomAlias, user_id: Optional[str] = None) -> bool:
