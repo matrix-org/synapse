@@ -195,7 +195,7 @@ By default Synapse uses SQLite in and doing so trades performance for convenienc
 SQLite is only recommended in Synapse for testing purposes or for servers with
 light workloads.
 
-Almost all installations should opt to use PostreSQL. Advantages include:
+Almost all installations should opt to use PostgreSQL. Advantages include:
 
 * significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
