@@ -1,0 +1,1 @@
+Improve performance of `mark_expired_users_as_inactive` background job.

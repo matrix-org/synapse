@@ -281,7 +281,7 @@ class RegistrationHandler(BaseHandler):
             yield self.store.add_account_data_for_user(
                 user_id, "im.vector.hide_profile", {"hide_profile": True}
             )
-            yield self.profile_handler.set_active(user, False, True)
+            yield self.profile_handler.set_active([user], False, True)
 
         return user_id
 

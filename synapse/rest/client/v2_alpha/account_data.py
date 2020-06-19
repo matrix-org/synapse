@@ -55,7 +55,7 @@ class AccountDataServlet(RestServlet):
         if account_data_type == "im.vector.hide_profile":
             user = UserID.from_string(user_id)
             hide_profile = body.get("hide_profile")
-            await self._profile_handler.set_active(user, not hide_profile, True)
+            await self._profile_handler.set_active([user], not hide_profile, True)
 
         max_id = await self.store.add_account_data_for_user(
             user_id, account_data_type, body

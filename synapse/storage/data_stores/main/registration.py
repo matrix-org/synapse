@@ -159,25 +159,34 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_expired_users(self):
-        """Get IDs of all expired users
+        """Get UserIDs of all expired users.
+
+        Users who are not active, or do not have profile information, are
+        excluded from the results.
 
         Returns:
-            Deferred[list[str]]: List of expired user IDs
+            Deferred[List[UserID]]: List of expired user IDs
         """
 
         def get_expired_users_txn(txn, now_ms):
+            # We need to use pattern matching as profiles.user_id is confusingly just the
+            # user's localpart, whereas account_validity.user_id is a full user ID
             sql = """
-                SELECT user_id from account_validity
-                WHERE expiration_ts_ms <= ?
+            SELECT av.user_id from account_validity AS av
+                LEFT JOIN profiles as p
+                ON av.user_id LIKE '%%' || p.user_id || ':%%'
+            WHERE expiration_ts_ms <= ?
+                AND p.active = 1
             """
             txn.execute(sql, (now_ms,))
             rows = txn.fetchall()
-            return [row[0] for row in rows]
+
+            return [UserID.from_string(row[0]) for row in rows]
 
         res = yield self.db.runInteraction(
             "get_expired_users", get_expired_users_txn, self.clock.time_msec()
         )
-        defer.returnValue(res)
+        return res
 
     @defer.inlineCallbacks
     def set_renewal_token_for_user(self, user_id, renewal_token):

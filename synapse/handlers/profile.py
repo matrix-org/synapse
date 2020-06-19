@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from typing import List
 
 from six import raise_from
 from six.moves import range
@@ -67,6 +68,7 @@ class BaseProfileHandler(BaseHandler):
 
         self.max_avatar_size = hs.config.max_avatar_size
         self.allowed_avatar_mimetypes = hs.config.allowed_avatar_mimetypes
+        self.replicate_user_profiles_to = hs.config.replicate_user_profiles_to
 
         if hs.config.worker_app is None:
             self.clock.looping_call(
@@ -293,29 +295,42 @@ class BaseProfileHandler(BaseHandler):
         run_in_background(self._replicate_profiles)
 
     @defer.inlineCallbacks
-    def set_active(self, target_user, active, hide):
+    def set_active(
+        self, users: List[UserID], active: bool, hide: bool,
+    ):
         """
-        Sets the 'active' flag on a user profile. If set to false, the user
-        account is considered deactivated or hidden.
+        Sets the 'active' flag on a set of user profiles. If set to false, the
+        accounts are considered deactivated or hidden.
 
         If 'hide' is true, then we interpret active=False as a request to try to
-        hide the user rather than deactivating it.  This means withholding the
-        profile from replication (and mark it as inactive) rather than clearing
-        the profile from the HS DB. Note that unlike set_displayname and
-        set_avatar_url, this does *not* perform authorization checks! This is
-        because the only place it's used currently is in account deactivation
-        where we've already done these checks anyway.
+        hide the users rather than deactivating them. This means withholding the
+        profiles from replication (and mark it as inactive) rather than clearing
+        the profile from the HS DB.
+
+        Note that unlike set_displayname and set_avatar_url, this does *not*
+        perform authorization checks! This is because the only place it's used
+        currently is in account deactivation where we've already done these
+        checks anyway.
+
+        Args:
+            users: The users to modify
+            active: Whether to set the user to active or inactive
+            hide: Whether to hide the user (withold from replication). If
+                False and active is False, user will have their profile
+                erased
+
+        Returns:
+            Deferred
         """
-        if len(self.hs.config.replicate_user_profiles_to) > 0:
+        if len(self.replicate_user_profiles_to) > 0:
             cur_batchnum = (
                 yield self.store.get_latest_profile_replication_batch_number()
             )
             new_batchnum = 0 if cur_batchnum is None else cur_batchnum + 1
         else:
             new_batchnum = None
-        yield self.store.set_profile_active(
-            target_user.localpart, active, hide, new_batchnum
-        )
+
+        yield self.store.set_profiles_active(users, active, hide, new_batchnum)
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)

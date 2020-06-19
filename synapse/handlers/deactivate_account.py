@@ -106,7 +106,7 @@ class DeactivateAccountHandler(BaseHandler):
         await self.store.user_set_password_hash(user_id, None)
 
         user = UserID.from_string(user_id)
-        await self._profile_handler.set_active(user, False, False)
+        await self._profile_handler.set_active([user], False, False)
 
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)

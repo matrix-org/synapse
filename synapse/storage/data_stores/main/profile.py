@@ -14,11 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List, Tuple
+
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.roommember import ProfileInfo
+from synapse.types import UserID
 from synapse.util.caches.descriptors import cached
 
 BATCH_SIZE = 100
@@ -149,19 +152,43 @@ class ProfileWorkerStore(SQLBaseStore):
             lock=False,  # we can do this because user_id has a unique index
         )
 
-    def set_profile_active(self, user_localpart, active, hide, batchnum):
-        values = {"active": int(active), "batch": batchnum}
+    def set_profiles_active(
+        self, users: List[UserID], active: bool, hide: bool, batchnum: int,
+    ):
+        """Given a set of users, set active and hidden flags on them.
+
+        Args:
+            users: A list of UserIDs
+            active: Whether to set the users to active or inactive
+            hide: Whether to hide the users (withold from replication). If
+                False and active is False, users will have their profiles
+                erased
+            batchnum: The batch number, used for profile replication
+
+        Returns:
+            Deferred
+        """
+        # Convert list of localparts to list of tuples containing localparts
+        user_localparts = [(user.localpart,) for user in users]
+
+        # Generate list of value tuples for each user
+        value_names = ("active", "batch")
+        values = [(int(active), batchnum) for _ in user_localparts]  # type: List[Tuple]
+
         if not active and not hide:
             # we are deactivating for real (not in hide mode)
-            # so clear the profile.
-            values["avatar_url"] = None
-            values["displayname"] = None
-        return self.db.simple_upsert(
+            # so clear the profile information
+            value_names += ("avatar_url", "displayname")
+            values = [v + (None, None) for v in values]
+
+        return self.db.runInteraction(
+            "set_profiles_active",
+            self.db.simple_upsert_many_txn,
             table="profiles",
-            keyvalues={"user_id": user_localpart},
-            values=values,
-            desc="set_profile_active",
-            lock=False,  # we can do this because user_id has a unique index
+            key_names=("user_id",),
+            key_values=user_localparts,
+            value_names=value_names,
+            value_values=values,
         )
 
 
