@@ -17,14 +17,11 @@ import logging
 
 from six import iteritems, iterkeys
 
-from twisted.internet import defer
-
 import synapse.metrics
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import get_localpart_from_id
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -103,43 +100,39 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self._is_processing:
             return
 
-        @defer.inlineCallbacks
-        def process():
+        async def process():
             try:
-                yield self._unsafe_process()
+                await self._unsafe_process()
             finally:
                 self._is_processing = False
 
         self._is_processing = True
         run_as_background_process("user_directory.notify_new_event", process)
 
-    @defer.inlineCallbacks
-    def handle_local_profile_change(self, user_id, profile):
+    async def handle_local_profile_change(self, user_id, profile):
         """Called to update index of our local user profiles when they change
         irrespective of any rooms the user may be in.
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        is_support = yield self.store.is_support_user(user_id)
+        is_support = await self.store.is_support_user(user_id)
         # Support users are for diagnostics and should not appear in the user directory.
         if not is_support:
-            yield self.store.update_profile_in_user_dir(
+            await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
 
-    @defer.inlineCallbacks
-    def handle_user_deactivated(self, user_id):
+    async def handle_user_deactivated(self, user_id):
         """Called when a user ID is deactivated
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        yield self.store.remove_from_user_dir(user_id)
+        await self.store.remove_from_user_dir(user_id)
 
-    @defer.inlineCallbacks
-    def _unsafe_process(self):
+    async def _unsafe_process(self):
         # If self.pos is None then means we haven't fetched it from DB
         if self.pos is None:
-            self.pos = yield self.store.get_user_directory_stream_pos()
+            self.pos = await self.store.get_user_directory_stream_pos()
 
         # If still None then the initial background update hasn't happened yet
         if self.pos is None:
@@ -155,12 +148,12 @@ class UserDirectoryHandler(StateDeltasHandler):
                 logger.debug(
                     "Processing user stats %s->%s", self.pos, room_max_stream_ordering
                 )
-                max_pos, deltas = yield self.store.get_current_state_deltas(
+                max_pos, deltas = await self.store.get_current_state_deltas(
                     self.pos, room_max_stream_ordering
                 )
 
                 logger.debug("Handling %d state deltas", len(deltas))
-                yield self._handle_deltas(deltas)
+                await self._handle_deltas(deltas)
 
                 self.pos = max_pos
 
@@ -169,10 +162,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                     max_pos
                 )
 
-                yield self.store.update_user_directory_stream_pos(max_pos)
+                await self.store.update_user_directory_stream_pos(max_pos)
 
-    @defer.inlineCallbacks
-    def _handle_deltas(self, deltas):
+    async def _handle_deltas(self, deltas):
         """Called with the state deltas to process
         """
         for delta in deltas:
@@ -187,11 +179,11 @@ class UserDirectoryHandler(StateDeltasHandler):
             # For join rule and visibility changes we need to check if the room
             # may have become public or not and add/remove the users in said room
             if typ in (EventTypes.RoomHistoryVisibility, EventTypes.JoinRules):
-                yield self._handle_room_publicity_change(
+                await self._handle_room_publicity_change(
                     room_id, prev_event_id, event_id, typ
                 )
             elif typ == EventTypes.Member:
-                change = yield self._get_key_change(
+                change = await self._get_key_change(
                     prev_event_id,
                     event_id,
                     key_name="membership",
@@ -201,7 +193,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 if change is False:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
-                    is_in_room = yield self.store.is_host_joined(
+                    is_in_room = await self.store.is_host_joined(
                         room_id, self.server_name
                     )
                     if not is_in_room:
@@ -209,40 +201,41 @@ class UserDirectoryHandler(StateDeltasHandler):
                         # Fetch all the users that we marked as being in user
                         # directory due to being in the room and then check if
                         # need to remove those users or not
-                        user_ids = yield self.store.get_users_in_dir_due_to_room(
+                        user_ids = await self.store.get_users_in_dir_due_to_room(
                             room_id
                         )
 
                         for user_id in user_ids:
-                            yield self._handle_remove_user(room_id, user_id)
+                            await self._handle_remove_user(room_id, user_id)
                         return
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                is_support = yield self.store.is_support_user(state_key)
+                is_support = await self.store.is_support_user(state_key)
                 if not is_support:
                     if change is None:
                         # Handle any profile changes
-                        yield self._handle_profile_change(
+                        await self._handle_profile_change(
                             state_key, room_id, prev_event_id, event_id
                         )
                         continue
 
                     if change:  # The user joined
-                        event = yield self.store.get_event(event_id, allow_none=True)
+                        event = await self.store.get_event(event_id, allow_none=True)
                         profile = ProfileInfo(
                             avatar_url=event.content.get("avatar_url"),
                             display_name=event.content.get("displayname"),
                         )
 
-                        yield self._handle_new_user(room_id, state_key, profile)
+                        await self._handle_new_user(room_id, state_key, profile)
                     else:  # The user left
-                        yield self._handle_remove_user(room_id, state_key)
+                        await self._handle_remove_user(room_id, state_key)
             else:
                 logger.debug("Ignoring irrelevant type: %r", typ)
 
-    @defer.inlineCallbacks
-    def _handle_room_publicity_change(self, room_id, prev_event_id, event_id, typ):
+    async def _handle_room_publicity_change(
+        self, room_id, prev_event_id, event_id, typ
+    ):
         """Handle a room having potentially changed from/to world_readable/publically
         joinable.
 
@@ -255,14 +248,14 @@ class UserDirectoryHandler(StateDeltasHandler):
         logger.debug("Handling change for %s: %s", typ, room_id)
 
         if typ == EventTypes.RoomHistoryVisibility:
-            change = yield self._get_key_change(
+            change = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="history_visibility",
                 public_value="world_readable",
             )
         elif typ == EventTypes.JoinRules:
-            change = yield self._get_key_change(
+            change = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="join_rule",
@@ -278,7 +271,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         # There's been a change to or from being world readable.
 
-        is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+        is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
 
@@ -293,11 +286,11 @@ class UserDirectoryHandler(StateDeltasHandler):
             # ignore the change
             return
 
-        users_with_profile = yield self.state.get_current_users_in_room(room_id)
+        users_with_profile = await self.state.get_current_users_in_room(room_id)
 
         # Remove every user from the sharing tables for that room.
         for user_id in iterkeys(users_with_profile):
-            yield self.store.remove_user_who_share_room(user_id, room_id)
+            await self.store.remove_user_who_share_room(user_id, room_id)
 
         # Then, re-add them to the tables.
         # NOTE: this is not the most efficient method, as handle_new_user sets
@@ -306,26 +299,9 @@ class UserDirectoryHandler(StateDeltasHandler):
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
         for user_id, profile in iteritems(users_with_profile):
-            yield self._handle_new_user(room_id, user_id, profile)
+            await self._handle_new_user(room_id, user_id, profile)
 
-    @defer.inlineCallbacks
-    def _handle_local_user(self, user_id):
-        """Adds a new local roomless user into the user_directory_search table.
-        Used to populate up the user index when we have an
-        user_directory_search_all_users specified.
-        """
-        logger.debug("Adding new local user to dir, %r", user_id)
-
-        profile = yield self.store.get_profileinfo(get_localpart_from_id(user_id))
-
-        row = yield self.store.get_user_in_directory(user_id)
-        if not row:
-            yield self.store.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
-            )
-
-    @defer.inlineCallbacks
-    def _handle_new_user(self, room_id, user_id, profile):
+    async def _handle_new_user(self, room_id, user_id, profile):
         """Called when we might need to add user to directory
 
         Args:
@@ -334,18 +310,18 @@ class UserDirectoryHandler(StateDeltasHandler):
         """
         logger.debug("Adding new user to dir, %r", user_id)
 
-        yield self.store.update_profile_in_user_dir(
+        await self.store.update_profile_in_user_dir(
             user_id, profile.display_name, profile.avatar_url
         )
 
-        is_public = yield self.store.is_room_world_readable_or_publicly_joinable(
+        is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
         # Now we update users who share rooms with users.
-        users_with_profile = yield self.state.get_current_users_in_room(room_id)
+        users_with_profile = await self.state.get_current_users_in_room(room_id)
 
         if is_public:
-            yield self.store.add_users_in_public_rooms(room_id, (user_id,))
+            await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
             to_insert = set()
 
@@ -376,10 +352,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                     to_insert.add((other_user_id, user_id))
 
             if to_insert:
-                yield self.store.add_users_who_share_private_room(room_id, to_insert)
+                await self.store.add_users_who_share_private_room(room_id, to_insert)
 
-    @defer.inlineCallbacks
-    def _handle_remove_user(self, room_id, user_id):
+    async def _handle_remove_user(self, room_id, user_id):
         """Called when we might need to remove user from directory
 
         Args:
@@ -389,24 +364,23 @@ class UserDirectoryHandler(StateDeltasHandler):
         logger.debug("Removing user %r", user_id)
 
         # Remove user from sharing tables
-        yield self.store.remove_user_who_share_room(user_id, room_id)
+        await self.store.remove_user_who_share_room(user_id, room_id)
 
         # Are they still in any rooms? If not, remove them entirely.
-        rooms_user_is_in = yield self.store.get_user_dir_rooms_user_is_in(user_id)
+        rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
 
         if len(rooms_user_is_in) == 0:
-            yield self.store.remove_from_user_dir(user_id)
+            await self.store.remove_from_user_dir(user_id)
 
-    @defer.inlineCallbacks
-    def _handle_profile_change(self, user_id, room_id, prev_event_id, event_id):
+    async def _handle_profile_change(self, user_id, room_id, prev_event_id, event_id):
         """Check member event changes for any profile changes and update the
         database if there are.
         """
         if not prev_event_id or not event_id:
             return
 
-        prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
-        event = yield self.store.get_event(event_id, allow_none=True)
+        prev_event = await self.store.get_event(prev_event_id, allow_none=True)
+        event = await self.store.get_event(event_id, allow_none=True)
 
         if not prev_event or not event:
             return
@@ -421,4 +395,4 @@ class UserDirectoryHandler(StateDeltasHandler):
         new_avatar = event.content.get("avatar_url")
 
         if prev_name != new_name or prev_avatar != new_avatar:
-            yield self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)
+            await self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)

@@ -61,12 +61,8 @@ class LoginType(object):
     MSISDN = "m.login.msisdn"
     RECAPTCHA = "m.login.recaptcha"
     TERMS = "m.login.terms"
-    SSO = "org.matrix.login.sso"
+    SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
-
-    # Only for C/S API v1
-    APPLICATION_SERVICE = "m.login.application_service"
-    SHARED_SECRET = "org.matrix.login.shared_secret"
 
 
 class EventTypes(object):

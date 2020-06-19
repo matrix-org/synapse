@@ -14,6 +14,8 @@
 # limitations under the License.
 from mock import Mock
 
+from twisted.internet import defer
+
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.rest.client.v1 import login, room
@@ -75,18 +77,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self.store.remove_from_user_dir = Mock()
-        self.store.remove_from_user_in_public_room = Mock()
+        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_user_deactivated(s_user_id))
         self.store.remove_from_user_dir.not_called()
-        self.store.remove_from_user_in_public_room.not_called()
 
     def test_handle_user_deactivated_regular_user(self):
         r_user_id = "@regular:test"
         self.get_success(
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
-        self.store.remove_from_user_dir = Mock()
+        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
 
@@ -185,7 +185,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 # Allow all users.
                 return False
 
-        spam_checker.spam_checker = AllowAll()
+        spam_checker.spam_checkers = [AllowAll()]
 
         # The results do not change:
         # We get one search result when searching for user2 by user1.
@@ -198,7 +198,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 # All users are spammy.
                 return True
 
-        spam_checker.spam_checker = BlockAll()
+        spam_checker.spam_checkers = [BlockAll()]
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))

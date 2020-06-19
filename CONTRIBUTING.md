@@ -1,62 +1,48 @@
-# Contributing code to Matrix
+# Contributing code to Synapse
 
-Everyone is welcome to contribute code to Matrix
-(https://github.com/matrix-org), provided that they are willing to license
-their contributions under the same license as the project itself. We follow a
-simple 'inbound=outbound' model for contributions: the act of submitting an
-'inbound' contribution means that the contributor agrees to license the code
-under the same terms as the project's overall 'outbound' license - in our
-case, this is almost always Apache Software License v2 (see [LICENSE](LICENSE)).
+Everyone is welcome to contribute code to [matrix.org
+projects](https://github.com/matrix-org), provided that they are willing to
+license their contributions under the same license as the project itself. We
+follow a simple 'inbound=outbound' model for contributions: the act of
+submitting an 'inbound' contribution means that the contributor agrees to
+license the code under the same terms as the project's overall 'outbound'
+license - in our case, this is almost always Apache Software License v2 (see
+[LICENSE](LICENSE)).
 
 ## How to contribute
 
-The preferred and easiest way to contribute changes to Matrix is to fork the
-relevant project on github, and then [create a pull request](
-https://help.github.com/articles/using-pull-requests/) to ask us to pull
-your changes into our repo.
+The preferred and easiest way to contribute changes is to fork the relevant
+project on github, and then [create a pull request](
+https://help.github.com/articles/using-pull-requests/) to ask us to pull your
+changes into our repo.
 
-**The single biggest thing you need to know is: please base your changes on
-the develop branch - *not* master.**
+Some other points to follow:
+ 
+ * Please base your changes on the `develop` branch.
+  
+ * Please follow the [code style requirements](#code-style).
 
-We use the master branch to track the most recent release, so that folks who
-blindly clone the repo and automatically check out master get something that
-works. Develop is the unstable branch where all the development actually
-happens: the workflow is that contributors should fork the develop branch to
-make a 'feature' branch for a particular contribution, and then make a pull
-request to merge this back into the matrix.org 'official' develop branch. We
-use github's pull request workflow to review the contribution, and either ask
-you to make any refinements needed or merge it and make them ourselves. The
-changes will then land on master when we next do a release.
+ * Please include a [changelog entry](#changelog) with each PR.
 
-We use [Buildkite](https://buildkite.com/matrix-dot-org/synapse) for continuous
-integration. If your change breaks the build, this will be shown in GitHub, so
-please keep an eye on the pull request for feedback.
+ * Please [sign off](#sign-off) your contribution.
 
-To run unit tests in a local development environment, you can use:
+ * Please keep an eye on the pull request for feedback from the [continuous
+   integration system](#continuous-integration-and-testing) and try to fix any
+   errors that come up.
 
-- ``tox -e py35`` (requires tox to be installed by ``pip install tox``)
-  for SQLite-backed Synapse on Python 3.5.
-- ``tox -e py36`` for SQLite-backed Synapse on Python 3.6.
-- ``tox -e py36-postgres`` for PostgreSQL-backed Synapse on Python 3.6
-  (requires a running local PostgreSQL with access to create databases).
-- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 3.5
-  (requires Docker). Entirely self-contained, recommended if you don't want to
-  set up PostgreSQL yourself.
-
-Docker images are available for running the integration tests (SyTest) locally,
-see the [documentation in the SyTest repo](
-https://github.com/matrix-org/sytest/blob/develop/docker/README.md) for more
-information.
+ * If you need to [update your PR](#updating-your-pull-request), just add new
+   commits to your branch rather than rebasing.
 
 ## Code style
 
-All Matrix projects have a well-defined code-style - and sometimes we've even
-got as far as documenting it... For instance, synapse's code style doc lives
-[here](docs/code_style.md).
+Synapse's code style is documented [here](docs/code_style.md). Please follow
+it, including the conventions for the [sample configuration
+file](docs/code_style.md#configuration-file-format).
 
-To facilitate meeting these criteria you can run `scripts-dev/lint.sh`
-locally. Since this runs the tools listed in the above document, you'll need
-python 3.6 and to install each tool:
+Many of the conventions are enforced by scripts which are run as part of the
+[continuous integration system](#continuous-integration-and-testing). To help
+check if you have followed the code style, you can run `scripts-dev/lint.sh`
+locally. You'll need python 3.6 or later, and to install a number of tools:
 
 ```
 # Install the dependencies
@@ -67,9 +53,11 @@ pip install -U black flake8 flake8-comprehensions isort
 ```
 
 **Note that the script does not just test/check, but also reformats code, so you
-may wish to ensure any new code is committed first**. By default this script
-checks all files and can take some time; if you alter only certain files, you
-might wish to specify paths as arguments to reduce the run-time:
+may wish to ensure any new code is committed first**.
+
+By default, this script checks all files and can take some time; if you alter
+only certain files, you might wish to specify paths as arguments to reduce the
+run-time:
 
 ```
 ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
@@ -81,7 +69,6 @@ files that were corrected.
 Please ensure your changes match the cosmetic style of the existing project,
 and **never** mix cosmetic and functional changes in the same commit, as it
 makes it horribly hard to review otherwise.
-
 
 ## Changelog
 
@@ -98,24 +85,55 @@ in the format of `PRnumber.type`. The type can be one of the following:
 * `removal` (also used for deprecations)
 * `misc` (for internal-only changes)
 
-The content of the file is your changelog entry, which should be a short
-description of your change in the same style as the rest of our [changelog](
-https://github.com/matrix-org/synapse/blob/master/CHANGES.md). The file can
-contain Markdown formatting, and should end with a full stop (.) or an
-exclamation mark (!) for consistency.
+This file will become part of our [changelog](
+https://github.com/matrix-org/synapse/blob/master/CHANGES.md) at the next
+release, so the content of the file should be a short description of your
+change in the same style as the rest of the changelog. The file can contain Markdown
+formatting, and should end with a full stop (.) or an exclamation mark (!) for
+consistency.
 
 Adding credits to the changelog is encouraged, we value your
 contributions and would like to have you shouted out in the release notes!
 
 For example, a fix in PR #1234 would have its changelog entry in
-`changelog.d/1234.bugfix`, and contain content like "The security levels of
-Florbs are now validated when received over federation. Contributed by Jane
-Matrix.".
+`changelog.d/1234.bugfix`, and contain content like:
 
-## Debian changelog
+> The security levels of Florbs are now validated when received
+> via the `/federation/florb` endpoint. Contributed by Jane Matrix.
+
+If there are multiple pull requests involved in a single bugfix/feature/etc,
+then the content for each `changelog.d` file should be the same. Towncrier will
+merge the matching files together into a single changelog entry when we come to
+release.
+
+### How do I know what to call the changelog file before I create the PR?
+
+Obviously, you don't know if you should call your newsfile
+`1234.bugfix` or `5678.bugfix` until you create the PR, which leads to a
+chicken-and-egg problem.
+
+There are two options for solving this:
+
+ 1. Open the PR without a changelog file, see what number you got, and *then*
+    add the changelog file to your branch (see [Updating your pull
+    request](#updating-your-pull-request)), or:
+
+ 1. Look at the [list of all
+    issues/PRs](https://github.com/matrix-org/synapse/issues?q=), add one to the
+    highest number you see, and quickly open the PR before somebody else claims
+    your number.
+
+    [This
+    script](https://github.com/richvdh/scripts/blob/master/next_github_number.sh)
+    might be helpful if you find yourself doing this a lot.
+
+Sorry, we know it's a bit fiddly, but it's *really* helpful for us when we come
+to put together a release!
+
+### Debian changelog
 
 Changes which affect the debian packaging files (in `debian`) are an
-exception.
+exception to the rule that all changes require a `changelog.d` file.
 
 In this case, you will need to add an entry to the debian changelog for the
 next release. For this, run the following command:
@@ -200,19 +218,45 @@ Git allows you to add this signoff automatically when using the `-s`
 flag to `git commit`, which uses the name and email set in your
 `user.name` and `user.email` git configs.
 
-## Merge Strategy
+## Continuous integration and testing
 
-We use the commit history of develop/master extensively to identify
-when regressions were introduced and what changes have been made.
+[Buildkite](https://buildkite.com/matrix-dot-org/synapse) will automatically
+run a series of checks and tests against any PR which is opened against the
+project; if your change breaks the build, this will be shown in GitHub, with
+links to the build results. If your build fails, please try to fix the errors
+and update your branch.
 
-We aim to have a clean merge history, which means we normally squash-merge
-changes into develop. For small changes this means there is no need to rebase
-to clean up your PR before merging. Larger changes with an organised set of
-commits may be merged as-is, if the history is judged to be useful.
+To run unit tests in a local development environment, you can use:
 
-This use of squash-merging will mean PRs built on each other will be hard to 
-merge. We suggest avoiding these where possible, and if required, ensuring
-each PR has a tidy set of commits to ease merging.
+- ``tox -e py35`` (requires tox to be installed by ``pip install tox``)
+  for SQLite-backed Synapse on Python 3.5.
+- ``tox -e py36`` for SQLite-backed Synapse on Python 3.6.
+- ``tox -e py36-postgres`` for PostgreSQL-backed Synapse on Python 3.6
+  (requires a running local PostgreSQL with access to create databases).
+- ``./test_postgresql.sh`` for PostgreSQL-backed Synapse on Python 3.5
+  (requires Docker). Entirely self-contained, recommended if you don't want to
+  set up PostgreSQL yourself.
+
+Docker images are available for running the integration tests (SyTest) locally,
+see the [documentation in the SyTest repo](
+https://github.com/matrix-org/sytest/blob/develop/docker/README.md) for more
+information.
+
+## Updating your pull request
+
+If you decide to make changes to your pull request - perhaps to address issues
+raised in a review, or to fix problems highlighted by [continuous
+integration](#continuous-integration-and-testing) - just add new commits to your
+branch, and push to GitHub. The pull request will automatically be updated.
+
+Please **avoid** rebasing your branch, especially once the PR has been
+reviewed: doing so makes it very difficult for a reviewer to see what has
+changed since a previous review.
+
+## Notes for maintainers on merging PRs etc
+
+There are some notes for those with commit access to the project on how we
+manage git [here](docs/dev/git.md).
 
 ## Conclusion
 

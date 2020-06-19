@@ -1,3 +1,5 @@
+from typing import Dict
+
 import twisted.internet
 
 import synapse.api.auth
@@ -13,11 +15,13 @@ import synapse.handlers.device
 import synapse.handlers.e2e_keys
 import synapse.handlers.message
 import synapse.handlers.presence
+import synapse.handlers.register
 import synapse.handlers.room
 import synapse.handlers.room_member
 import synapse.handlers.set_password
 import synapse.http.client
 import synapse.notifier
+import synapse.push.pusherpool
 import synapse.replication.tcp.client
 import synapse.replication.tcp.handler
 import synapse.rest.media.v1.media_repository
@@ -26,6 +30,7 @@ import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
 from synapse.events.builder import EventBuilderFactory
+from synapse.replication.tcp.streams import Stream
 
 class HomeServer(object):
     @property
@@ -127,4 +132,12 @@ class HomeServer(object):
     def get_event_builder_factory(self) -> EventBuilderFactory:
         pass
     def get_storage(self) -> synapse.storage.Storage:
+        pass
+    def get_registration_handler(self) -> synapse.handlers.register.RegistrationHandler:
+        pass
+    def get_macaroon_generator(self) -> synapse.handlers.auth.MacaroonGenerator:
+        pass
+    def get_pusherpool(self) -> synapse.push.pusherpool.PusherPool:
+        pass
+    def get_replication_streams(self) -> Dict[str, Stream]:
         pass

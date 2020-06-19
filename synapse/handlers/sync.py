@@ -1143,10 +1143,14 @@ class SyncHandler(object):
                 user_id
             )
 
-            tracked_users = set(users_who_share_room)
+            # Always tell the user about their own devices. We check as the user
+            # ID is almost certainly already included (unless they're not in any
+            # rooms) and taking a copy of the set is relatively expensive.
+            if user_id not in users_who_share_room:
+                users_who_share_room = set(users_who_share_room)
+                users_who_share_room.add(user_id)
 
-            # Always tell the user about their own devices
-            tracked_users.add(user_id)
+            tracked_users = users_who_share_room
 
             # Step 1a, check for changes in devices of users we share a room with
             users_that_have_changed = await self.store.get_users_whose_devices_changed(
@@ -1366,7 +1370,7 @@ class SyncHandler(object):
             sync_result_builder.now_token = now_token
 
         # We check up front if anything has changed, if it hasn't then there is
-        # no point in going futher.
+        # no point in going further.
         since_token = sync_result_builder.since_token
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:

@@ -122,7 +122,7 @@ APPEND_ONLY_TABLES = [
     "presence_stream",
     "push_rules_stream",
     "ex_outlier_stream",
-    "cache_invalidation_stream",
+    "cache_invalidation_stream_by_instance",
     "public_room_list_stream",
     "state_group_edges",
     "stream_ordering_to_exterm",
@@ -188,13 +188,16 @@ class MockHomeserver:
         self.clock = Clock(reactor)
         self.config = config
         self.hostname = config.server_name
-        self.version_string = "Synapse/"+get_version_string(synapse)
+        self.version_string = "Synapse/" + get_version_string(synapse)
 
     def get_clock(self):
         return self.clock
 
     def get_reactor(self):
         return reactor
+
+    def get_instance_name(self):
+        return "master"
 
 
 class Porter(object):

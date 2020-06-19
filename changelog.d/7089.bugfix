@@ -1,1 +1,0 @@
-Fix a bug in the federation API which could cause occasional "Failed to get PDU" errors.

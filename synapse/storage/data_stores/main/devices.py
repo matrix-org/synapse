@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Set, Tuple
 
 from six import iteritems
 
@@ -342,32 +342,23 @@ class DeviceWorkerStore(SQLBaseStore):
 
     def _mark_as_sent_devices_by_remote_txn(self, txn, destination, stream_id):
         # We update the device_lists_outbound_last_success with the successfully
-        # poked users. We do the join to see which users need to be inserted and
-        # which updated.
+        # poked users.
         sql = """
-            SELECT user_id, coalesce(max(o.stream_id), 0), (max(s.stream_id) IS NOT NULL)
+            SELECT user_id, coalesce(max(o.stream_id), 0)
             FROM device_lists_outbound_pokes as o
-            LEFT JOIN device_lists_outbound_last_success as s
-                USING (destination, user_id)
             WHERE destination = ? AND o.stream_id <= ?
             GROUP BY user_id
         """
         txn.execute(sql, (destination, stream_id))
         rows = txn.fetchall()
 
-        sql = """
-            UPDATE device_lists_outbound_last_success
-            SET stream_id = ?
-            WHERE destination = ? AND user_id = ?
-        """
-        txn.executemany(sql, ((row[1], destination, row[0]) for row in rows if row[2]))
-
-        sql = """
-            INSERT INTO device_lists_outbound_last_success
-            (destination, user_id, stream_id) VALUES (?, ?, ?)
-        """
-        txn.executemany(
-            sql, ((destination, row[0], row[1]) for row in rows if not row[2])
+        self.db.simple_upsert_many_txn(
+            txn=txn,
+            table="device_lists_outbound_last_success",
+            key_names=("destination", "user_id"),
+            key_values=((destination, user_id) for user_id, _ in rows),
+            value_names=("stream_id",),
+            value_values=((stream_id,) for _, stream_id in rows),
         )
 
         # Delete all sent outbound pokes
@@ -541,8 +532,8 @@ class DeviceWorkerStore(SQLBaseStore):
 
         # Get set of users who *may* have changed. Users not in the returned
         # list have definitely not changed.
-        to_check = list(
-            self._device_list_stream_cache.get_entities_changed(user_ids, from_key)
+        to_check = self._device_list_stream_cache.get_entities_changed(
+            user_ids, from_key
         )
 
         if not to_check:
@@ -654,21 +645,31 @@ class DeviceWorkerStore(SQLBaseStore):
         return results
 
     @defer.inlineCallbacks
-    def get_user_ids_requiring_device_list_resync(self, user_ids: Collection[str]):
+    def get_user_ids_requiring_device_list_resync(
+        self, user_ids: Optional[Collection[str]] = None,
+    ) -> Set[str]:
         """Given a list of remote users return the list of users that we
-        should resync the device lists for.
+        should resync the device lists for. If None is given instead of a list,
+        return every user that we should resync the device lists for.
 
         Returns:
-            Deferred[Set[str]]
+            The IDs of users whose device lists need resync.
         """
-
-        rows = yield self.db.simple_select_many_batch(
-            table="device_lists_remote_resync",
-            column="user_id",
-            iterable=user_ids,
-            retcols=("user_id",),
-            desc="get_user_ids_requiring_device_list_resync",
-        )
+        if user_ids:
+            rows = yield self.db.simple_select_many_batch(
+                table="device_lists_remote_resync",
+                column="user_id",
+                iterable=user_ids,
+                retcols=("user_id",),
+                desc="get_user_ids_requiring_device_list_resync_with_iterable",
+            )
+        else:
+            rows = yield self.db.simple_select_list(
+                table="device_lists_remote_resync",
+                keyvalues=None,
+                retcols=("user_id",),
+                desc="get_user_ids_requiring_device_list_resync",
+            )
 
         return {row["user_id"] for row in rows}
 
@@ -682,6 +683,25 @@ class DeviceWorkerStore(SQLBaseStore):
             values={},
             insertion_values={"added_ts": self._clock.time_msec()},
             desc="make_remote_user_device_cache_as_stale",
+        )
+
+    def mark_remote_user_device_list_as_unsubscribed(self, user_id):
+        """Mark that we no longer track device lists for remote user.
+        """
+
+        def _mark_remote_user_device_list_as_unsubscribed_txn(txn):
+            self.db.simple_delete_txn(
+                txn,
+                table="device_lists_remote_extremeties",
+                keyvalues={"user_id": user_id},
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_device_list_last_stream_id_for_remote, (user_id,)
+            )
+
+        return self.db.runInteraction(
+            "mark_remote_user_device_list_as_unsubscribed",
+            _mark_remote_user_device_list_as_unsubscribed_txn,
         )
 
 
@@ -723,6 +743,15 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         # clear out duplicate device list outbound pokes
         self.db.updates.register_background_update_handler(
             BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, self._remove_duplicate_outbound_pokes,
+        )
+
+        # a pair of background updates that were added during the 1.14 release cycle,
+        # but replaced with 58/06dlols_unique_idx.py
+        self.db.updates.register_noop_background_update(
+            "device_lists_outbound_last_success_unique_idx",
+        )
+        self.db.updates.register_noop_background_update(
+            "drop_device_lists_outbound_last_success_non_unique_idx",
         )
 
     @defer.inlineCallbacks
@@ -934,17 +963,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             updatevalues=updates,
             desc="update_device",
         )
-
-    @defer.inlineCallbacks
-    def mark_remote_user_device_list_as_unsubscribed(self, user_id):
-        """Mark that we no longer track device lists for remote user.
-        """
-        yield self.db.simple_delete(
-            table="device_lists_remote_extremeties",
-            keyvalues={"user_id": user_id},
-            desc="mark_remote_user_device_list_as_unsubscribed",
-        )
-        self.get_device_list_last_stream_id_for_remote.invalidate((user_id,))
 
     def update_remote_device_list_cache_entry(
         self, user_id, device_id, content, stream_id

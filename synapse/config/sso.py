@@ -36,17 +36,13 @@ class SSOConfig(Config):
         if not template_dir:
             template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
 
-        self.sso_redirect_confirm_template_dir = template_dir
+        self.sso_template_dir = template_dir
         self.sso_account_deactivated_template = self.read_file(
-            os.path.join(
-                self.sso_redirect_confirm_template_dir, "sso_account_deactivated.html"
-            ),
+            os.path.join(self.sso_template_dir, "sso_account_deactivated.html"),
             "sso_account_deactivated_template",
         )
         self.sso_auth_success_template = self.read_file(
-            os.path.join(
-                self.sso_redirect_confirm_template_dir, "sso_auth_success.html"
-            ),
+            os.path.join(self.sso_template_dir, "sso_auth_success.html"),
             "sso_auth_success_template",
         )
 
@@ -65,7 +61,8 @@ class SSOConfig(Config):
 
     def generate_config_section(self, **kwargs):
         return """\
-        # Additional settings to use with single-sign on systems such as SAML2 and CAS.
+        # Additional settings to use with single-sign on systems such as OpenID Connect,
+        # SAML2 and CAS.
         #
         sso:
             # A list of client URLs which are whitelisted so that the user does not
@@ -136,6 +133,13 @@ class SSOConfig(Config):
             #   attempts to login: 'sso_account_deactivated.html'.
             #
             #   This template has no additional variables.
+            #
+            # * HTML page to display to users if something goes wrong during the
+            #   OpenID Connect authentication process: 'sso_error.html'.
+            #
+            #   When rendering, this template is given two variables:
+            #     * error: the technical name of the error
+            #     * error_description: a human-readable message for the error
             #
             # You can see the default templates at:
             # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates

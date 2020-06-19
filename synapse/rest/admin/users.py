@@ -143,6 +143,7 @@ class UserRestServletV2(RestServlet):
         self.set_password_handler = hs.get_set_password_handler()
         self.deactivate_account_handler = hs.get_deactivate_account_handler()
         self.registration_handler = hs.get_registration_handler()
+        self.pusher_pool = hs.get_pusherpool()
 
     async def on_GET(self, request, user_id):
         await assert_requester_is_admin(self.auth, request)
@@ -223,8 +224,14 @@ class UserRestServletV2(RestServlet):
                 else:
                     new_password = body["password"]
                     logout_devices = True
+
+                    new_password_hash = await self.auth_handler.hash(new_password)
+
                     await self.set_password_handler.set_password(
-                        target_user.to_string(), new_password, logout_devices, requester
+                        target_user.to_string(),
+                        new_password_hash,
+                        logout_devices,
+                        requester,
                     )
 
             if "deactivated" in body:
@@ -244,11 +251,11 @@ class UserRestServletV2(RestServlet):
 
         else:  # create user
             password = body.get("password")
-            if password is not None and (
-                not isinstance(body["password"], text_type)
-                or len(body["password"]) > 512
-            ):
-                raise SynapseError(400, "Invalid password")
+            password_hash = None
+            if password is not None:
+                if not isinstance(password, text_type) or len(password) > 512:
+                    raise SynapseError(400, "Invalid password")
+                password_hash = await self.auth_handler.hash(password)
 
             admin = body.get("admin", None)
             user_type = body.get("user_type", None)
@@ -260,10 +267,11 @@ class UserRestServletV2(RestServlet):
 
             user_id = await self.registration_handler.register_user(
                 localpart=target_user.localpart,
-                password=password,
+                password_hash=password_hash,
                 admin=bool(admin),
                 default_display_name=displayname,
                 user_type=user_type,
+                by_admin=True,
             )
 
             if "threepids" in body:
@@ -276,6 +284,21 @@ class UserRestServletV2(RestServlet):
                     await self.auth_handler.add_threepid(
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
+                    if (
+                        self.hs.config.email_enable_notifs
+                        and self.hs.config.email_notif_for_new_users
+                    ):
+                        await self.pusher_pool.add_pusher(
+                            user_id=user_id,
+                            access_token=None,
+                            kind="email",
+                            app_id="m.email",
+                            app_display_name="Email Notifications",
+                            device_display_name=threepid["address"],
+                            pushkey=threepid["address"],
+                            lang=None,  # We don't know a user's language here
+                            data={},
+                        )
 
             if "avatar_url" in body and type(body["avatar_url"]) == str:
                 await self.profile_handler.set_avatar_url(
@@ -299,7 +322,7 @@ class UserRegisterServlet(RestServlet):
     NONCE_TIMEOUT = 60
 
     def __init__(self, hs):
-        self.handlers = hs.get_handlers()
+        self.auth_handler = hs.get_auth_handler()
         self.reactor = hs.get_reactor()
         self.nonces = {}
         self.hs = hs
@@ -363,15 +386,15 @@ class UserRegisterServlet(RestServlet):
                 400, "password must be specified", errcode=Codes.BAD_JSON
             )
         else:
-            if (
-                not isinstance(body["password"], text_type)
-                or len(body["password"]) > 512
-            ):
+            password = body["password"]
+            if not isinstance(password, text_type) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
 
-            password = body["password"].encode("utf-8")
-            if b"\x00" in password:
+            password_bytes = password.encode("utf-8")
+            if b"\x00" in password_bytes:
                 raise SynapseError(400, "Invalid password")
+
+            password_hash = await self.auth_handler.hash(password)
 
         admin = body.get("admin", None)
         user_type = body.get("user_type", None)
@@ -389,7 +412,7 @@ class UserRegisterServlet(RestServlet):
         want_mac_builder.update(b"\x00")
         want_mac_builder.update(username)
         want_mac_builder.update(b"\x00")
-        want_mac_builder.update(password)
+        want_mac_builder.update(password_bytes)
         want_mac_builder.update(b"\x00")
         want_mac_builder.update(b"admin" if admin else b"notadmin")
         if user_type:
@@ -408,9 +431,10 @@ class UserRegisterServlet(RestServlet):
 
         user_id = await register.registration_handler.register_user(
             localpart=body["username"].lower(),
-            password=body["password"],
+            password_hash=password_hash,
             admin=bool(admin),
             user_type=user_type,
+            by_admin=True,
         )
 
         result = await register._create_registration_details(user_id, body)
@@ -524,6 +548,7 @@ class ResetPasswordRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.hs = hs
         self.auth = hs.get_auth()
+        self.auth_handler = hs.get_auth_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
     async def on_POST(self, request, target_user_id):
@@ -540,8 +565,10 @@ class ResetPasswordRestServlet(RestServlet):
         new_password = params["new_password"]
         logout_devices = params.get("logout_devices", True)
 
+        new_password_hash = await self.auth_handler.hash(new_password)
+
         await self._set_password_handler.set_password(
-            target_user_id, new_password, logout_devices, requester
+            target_user_id, new_password_hash, logout_devices, requester
         )
         return 200, {}
 

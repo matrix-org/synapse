@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import re
-from typing import Optional, Tuple
+from typing import Callable, Dict, Optional, Set, Tuple
 
 import attr
 import saml2
@@ -23,10 +23,9 @@ from saml2.client import Saml2Client
 
 from synapse.api.errors import SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import finish_request
 from synapse.http.servlet import parse_string
+from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
-from synapse.module_api.errors import RedirectException
 from synapse.types import (
     UserID,
     map_username_to_mxid_localpart,
@@ -79,19 +78,19 @@ class SamlHandler:
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="saml_mapping", clock=self._clock)
 
-        self._error_html_content = hs.config.saml2_error_html_content
-
-    def handle_redirect_request(self, client_redirect_url, ui_auth_session_id=None):
+    def handle_redirect_request(
+        self, client_redirect_url: bytes, ui_auth_session_id: Optional[str] = None
+    ) -> bytes:
         """Handle an incoming request to /login/sso/redirect
 
         Args:
-            client_redirect_url (bytes): the URL that we should redirect the
+            client_redirect_url: the URL that we should redirect the
                 client to when everything is done
-            ui_auth_session_id (Optional[str]): The session ID of the ongoing UI Auth (or
+            ui_auth_session_id: The session ID of the ongoing UI Auth (or
                 None if this is a login).
 
         Returns:
-            bytes: URL to redirect to
+            URL to redirect to
         """
         reqid, info = self._saml_client.prepare_for_authenticate(
             relay_state=client_redirect_url
@@ -109,15 +108,15 @@ class SamlHandler:
         # this shouldn't happen!
         raise Exception("prepare_for_authenticate didn't return a Location header")
 
-    async def handle_saml_response(self, request):
+    async def handle_saml_response(self, request: SynapseRequest) -> None:
         """Handle an incoming request to /_matrix/saml2/authn_response
 
         Args:
-            request (SynapseRequest): the incoming request from the browser. We'll
+            request: the incoming request from the browser. We'll
                 respond to it with a redirect.
 
         Returns:
-            Deferred[none]: Completes once we have handled the request.
+            Completes once we have handled the request.
         """
         resp_bytes = parse_string(request, "SAMLResponse", required=True)
         relay_state = parse_string(request, "RelayState", required=True)
@@ -126,26 +125,9 @@ class SamlHandler:
         # the dict.
         self.expire_sessions()
 
-        try:
-            user_id, current_session = await self._map_saml_response_to_user(
-                resp_bytes, relay_state
-            )
-        except RedirectException:
-            # Raise the exception as per the wishes of the SAML module response
-            raise
-        except Exception as e:
-            # If decoding the response or mapping it to a user failed, then log the
-            # error and tell the user that something went wrong.
-            logger.error(e)
-
-            request.setResponseCode(400)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(
-                b"Content-Length", b"%d" % (len(self._error_html_content),)
-            )
-            request.write(self._error_html_content.encode("utf8"))
-            finish_request(request)
-            return
+        user_id, current_session = await self._map_saml_response_to_user(
+            resp_bytes, relay_state
+        )
 
         # Complete the interactive auth session or the login.
         if current_session and current_session.ui_auth_session_id:
@@ -168,6 +150,11 @@ class SamlHandler:
 
         Returns:
              Tuple of the user ID and SAML session associated with this response.
+
+        Raises:
+            SynapseError if there was a problem with the response.
+            RedirectException: some mapping providers may raise this if they need
+                to redirect to an interstitial page.
         """
         try:
             saml2_auth = self._saml_client.parse_authn_request_response(
@@ -176,11 +163,9 @@ class SamlHandler:
                 outstanding=self._outstanding_requests_dict,
             )
         except Exception as e:
-            logger.warning("Exception parsing SAML2 response: %s", e)
             raise SynapseError(400, "Unable to parse SAML2 response: %s" % (e,))
 
         if saml2_auth.not_signed:
-            logger.warning("SAML2 response was not signed")
             raise SynapseError(400, "SAML2 response was not signed")
 
         logger.debug("SAML2 response: %s", saml2_auth.origxml)
@@ -261,13 +246,13 @@ class SamlHandler:
 
                 localpart = attribute_dict.get("mxid_localpart")
                 if not localpart:
-                    logger.error(
-                        "SAML mapping provider plugin did not return a "
-                        "mxid_localpart object"
+                    raise Exception(
+                        "Error parsing SAML2 response: SAML mapping provider plugin "
+                        "did not return a mxid_localpart value"
                     )
-                    raise SynapseError(500, "Error parsing SAML2 response")
 
                 displayname = attribute_dict.get("displayname")
+                emails = attribute_dict.get("emails", [])
 
                 # Check if this mxid already exists
                 if not await self._datastore.get_users_by_id_case_insensitive(
@@ -285,7 +270,9 @@ class SamlHandler:
             logger.info("Mapped SAML user to local part %s", localpart)
 
             registered_user_id = await self._registration_handler.register_user(
-                localpart=localpart, default_display_name=displayname
+                localpart=localpart,
+                default_display_name=displayname,
+                bind_emails=emails,
             )
 
             await self._datastore.record_user_external_id(
@@ -310,6 +297,7 @@ DOT_REPLACE_PATTERN = re.compile(
 
 
 def dot_replace_for_mxid(username: str) -> str:
+    """Replace any characters which are not allowed in Matrix IDs with a dot."""
     username = username.lower()
     username = DOT_REPLACE_PATTERN.sub(".", username)
 
@@ -321,7 +309,7 @@ def dot_replace_for_mxid(username: str) -> str:
 MXID_MAPPER_MAP = {
     "hexencode": map_username_to_mxid_localpart,
     "dotreplace": dot_replace_for_mxid,
-}
+}  # type: Dict[str, Callable[[str], str]]
 
 
 @attr.s
@@ -349,7 +337,7 @@ class DefaultSamlMappingProvider(object):
 
     def get_remote_user_id(
         self, saml_response: saml2.response.AuthnResponse, client_redirect_url: str
-    ):
+    ) -> str:
         """Extracts the remote user id from the SAML response"""
         try:
             return saml_response.ava["uid"][0]
@@ -377,6 +365,7 @@ class DefaultSamlMappingProvider(object):
             dict: A dict containing new user attributes. Possible keys:
                 * mxid_localpart (str): Required. The localpart of the user's mxid
                 * displayname (str): The displayname of the user
+                * emails (list[str]): Any emails for the user
         """
         try:
             mxid_source = saml_response.ava[self._mxid_source_attribute][0]
@@ -399,9 +388,13 @@ class DefaultSamlMappingProvider(object):
         # If displayname is None, the mxid_localpart will be used instead
         displayname = saml_response.ava.get("displayName", [None])[0]
 
+        # Retrieve any emails present in the saml response
+        emails = saml_response.ava.get("email", [])
+
         return {
             "mxid_localpart": localpart,
             "displayname": displayname,
+            "emails": emails,
         }
 
     @staticmethod
@@ -428,16 +421,16 @@ class DefaultSamlMappingProvider(object):
         return SamlConfig(mxid_source_attribute, mxid_mapper)
 
     @staticmethod
-    def get_saml_attributes(config: SamlConfig) -> Tuple[set, set]:
+    def get_saml_attributes(config: SamlConfig) -> Tuple[Set[str], Set[str]]:
         """Returns the required attributes of a SAML
 
         Args:
             config: A SamlConfig object containing configuration params for this provider
 
         Returns:
-            tuple[set,set]: The first set equates to the saml auth response
+            The first set equates to the saml auth response
                 attributes that are required for the module to function, whereas the
                 second set consists of those attributes which can be used if
                 available, but are not necessary
         """
-        return {"uid", config.mxid_source_attribute}, {"displayName"}
+        return {"uid", config.mxid_source_attribute}, {"displayName", "email"}
