@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from six.moves import urllib
 
@@ -1020,6 +1020,20 @@ class TransportLayerClient(object):
         path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id)
 
         return self.client.get_json(destination=destination, path=path)
+
+    def get_info_of_users(self, destination: str, user_ids: List[str]):
+        """
+        Args:
+            destination: The remote server
+            user_ids: A list of user IDs to query info about
+
+        Returns:
+            Deferred[List]: A dictionary of User ID to information about that user.
+        """
+        path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/users/info")
+        data = {"user_ids": user_ids}
+
+        return self.client.post_json(destination=destination, path=path, data=data)
 
 
 def _create_path(federation_prefix, path, *args):

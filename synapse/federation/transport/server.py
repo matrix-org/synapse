@@ -33,6 +33,7 @@ from synapse.api.urls import (
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.http.server import JsonResource
 from synapse.http.servlet import (
+    assert_params_in_dict,
     parse_boolean_from_args,
     parse_integer_from_args,
     parse_json_object_from_request,
@@ -849,6 +850,57 @@ class PublicRoomList(BaseFederationServlet):
         return 200, data
 
 
+class FederationUserInfoServlet(BaseFederationServlet):
+    """
+    Return information about a set of users.
+
+    This API returns expiration and deactivation information about a set of
+    users. Requested users not local to this homeserver will be ignored.
+
+    Example request:
+        POST /users/info
+
+        {
+            "user_ids": [
+                "@alice:example.com",
+                "@bob:example.com"
+            ]
+        }
+
+    Example response
+        {
+            "@alice:example.com": {
+                "expired": false,
+                "deactivated": true
+            }
+        }
+    """
+
+    PATH = "/users/info"
+    PREFIX = FEDERATION_UNSTABLE_PREFIX
+
+    def __init__(self, handler, authenticator, ratelimiter, server_name):
+        super(FederationUserInfoServlet, self).__init__(
+            handler, authenticator, ratelimiter, server_name
+        )
+        self.handler = handler
+
+    async def on_POST(self, origin, content, query):
+        assert_params_in_dict(content, required=["user_ids"])
+
+        user_ids = content.get("user_ids", [])
+
+        if not isinstance(user_ids, list):
+            raise SynapseError(
+                400,
+                "'user_ids' must be a list of user ID strings",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        data = await self.handler.store.get_info_for_users(user_ids)
+        return 200, data
+
+
 class FederationVersionServlet(BaseFederationServlet):
     PATH = "/version"
 
@@ -1410,6 +1462,7 @@ FEDERATION_SERVLET_CLASSES = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
+    FederationUserInfoServlet,
 )  # type: Tuple[Type[BaseFederationServlet], ...]
 
 OPENID_SERVLET_CLASSES = (

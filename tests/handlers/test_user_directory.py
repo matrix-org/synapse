@@ -17,7 +17,7 @@ from mock import Mock
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import user_directory
+from synapse.rest.client.v2_alpha import account, account_validity, user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
@@ -460,3 +460,136 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
+
+
+class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        account_validity.register_servlets,
+        synapse.rest.client.v2_alpha.user_directory.register_servlets,
+        account.register_servlets,
+    ]
+
+    def default_config(self):
+        config = super().default_config()
+
+        # Set accounts to expire after a week
+        config["account_validity"] = {
+            "enabled": True,
+            "period": 604800000,  # Time in ms for 1 week
+        }
+        return config
+
+    def prepare(self, reactor, clock, hs):
+        super(UserInfoTestCase, self).prepare(reactor, clock, hs)
+        self.store = hs.get_datastore()
+        self.handler = hs.get_user_directory_handler()
+
+    def test_user_info(self):
+        """Test /users/info for local users from the Client-Server API"""
+        user_one, user_two, user_three, user_three_token = self.setup_test_users()
+
+        # Request info about each user from user_three
+        request, channel = self.make_request(
+            "POST",
+            path="/_matrix/client/unstable/users/info",
+            content={"user_ids": [user_one, user_two, user_three]},
+            access_token=user_three_token,
+            shorthand=False,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Check the state of user_one matches
+        user_one_info = channel.json_body[user_one]
+        self.assertTrue(user_one_info["deactivated"])
+        self.assertFalse(user_one_info["expired"])
+
+        # Check the state of user_two matches
+        user_two_info = channel.json_body[user_two]
+        self.assertFalse(user_two_info["deactivated"])
+        self.assertTrue(user_two_info["expired"])
+
+        # Check the state of user_three matches
+        user_three_info = channel.json_body[user_three]
+        self.assertFalse(user_three_info["deactivated"])
+        self.assertFalse(user_three_info["expired"])
+
+    def test_user_info_federation(self):
+        """Test that /users/info can be called from the Federation API, and
+        and that we can query remote users from the Client-Server API
+        """
+        user_one, user_two, user_three, user_three_token = self.setup_test_users()
+
+        # Request information about our local users from the perspective of a remote server
+        request, channel = self.make_request(
+            "POST",
+            path="/_matrix/federation/unstable/users/info",
+            content={"user_ids": [user_one, user_two, user_three]},
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code)
+
+        # Check the state of user_one matches
+        user_one_info = channel.json_body[user_one]
+        self.assertTrue(user_one_info["deactivated"])
+        self.assertFalse(user_one_info["expired"])
+
+        # Check the state of user_two matches
+        user_two_info = channel.json_body[user_two]
+        self.assertFalse(user_two_info["deactivated"])
+        self.assertTrue(user_two_info["expired"])
+
+        # Check the state of user_three matches
+        user_three_info = channel.json_body[user_three]
+        self.assertFalse(user_three_info["deactivated"])
+        self.assertFalse(user_three_info["expired"])
+
+    def setup_test_users(self):
+        """Create an admin user and three test users, each with a different state"""
+
+        # Create an admin user to expire other users with
+        self.register_user("admin", "adminpassword", admin=True)
+        admin_token = self.login("admin", "adminpassword")
+
+        # Create three users
+        user_one = self.register_user("alice", "pass")
+        user_one_token = self.login("alice", "pass")
+        user_two = self.register_user("bob", "pass")
+        user_three = self.register_user("carl", "pass")
+        user_three_token = self.login("carl", "pass")
+
+        # Deactivate user_one
+        self.deactivate(user_one, user_one_token)
+
+        # Expire user_two
+        self.expire(user_two, admin_token)
+
+        # Do nothing to user_three
+
+        return user_one, user_two, user_three, user_three_token
+
+    def expire(self, user_id_to_expire, admin_tok):
+        url = "/_matrix/client/unstable/admin/account_validity/validity"
+        request_data = {
+            "user_id": user_id_to_expire,
+            "expiration_ts": 0,
+            "enable_renewal_emails": False,
+        }
+        request, channel = self.make_request(
+            "POST", url, request_data, access_token=admin_tok
+        )
+        self.render(request)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+    def deactivate(self, user_id, tok):
+        request_data = {
+            "auth": {"type": "m.login.password", "user": user_id, "password": "pass"},
+            "erase": False,
+        }
+        request, channel = self.make_request(
+            "POST", "account/deactivate", request_data, access_token=tok
+        )
+        self.render(request)
+        self.assertEqual(request.code, 200)
