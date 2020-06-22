@@ -130,27 +130,6 @@ def return_json_error(f: failure.Failure, request: Request) -> None:
 TV = TypeVar("TV")
 
 
-def wrap_html_request_handler(
-    h: Callable[[TV, SynapseRequest], Awaitable]
-) -> Callable[[TV, SynapseRequest], Awaitable[None]]:
-    """Wraps a request handler method with exception handling.
-
-    Also does the wrapping with request.processing as per wrap_async_request_handler.
-
-    The handler method must have a signature of "handle_foo(self, request)",
-    where "request" must be a SynapseRequest.
-    """
-
-    async def wrapped_request_handler(self, request):
-        try:
-            await h(self, request)
-        except Exception:
-            f = failure.Failure()
-            return_html_error(f, request, HTML_ERROR_TEMPLATE)
-
-    return wrap_async_request_handler(wrapped_request_handler)
-
-
 def return_html_error(
     f: failure.Failure, request: Request, error_template: Union[str, jinja2.Template],
 ) -> None:
@@ -429,27 +408,91 @@ class JsonResource(HttpServer, _AsyncResource):
         return_json_error(f, request)
 
 
-class DirectServeResource(resource.Resource):
-    def render(self, request):
-        """
-        Render the request, using an asynchronous render handler if it exists.
-        """
-        async_render_callback_name = "_async_render_" + request.method.decode("ascii")
+class _DirectServeResource(_AsyncResource):
+    """Base class for resources that will just call `self._async_on_<METHOD>`
+    on new requests, formatting responses and errors as JSON.
+    """
 
-        # Try and get the async renderer
-        callback = getattr(self, async_render_callback_name, None)
+    def __init__(self):
+        super().__init__()
 
-        # No async renderer for this request method.
+        self._callbacks = {}
+        self._name = self.__class__.__name__
+
+        for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
+            method_handler = getattr(self, "_async_render_%s" % (method,), None)
+            if method_handler:
+                self._callbacks[method.encode("ascii")] = trace_servlet(self._name)(
+                    method_handler
+                )
+
+    def _get_handler_for_request(self, request: SynapseRequest):
+        """Implements _AsyncResource._get_handler_for_request
+        """
+        callback = self._callbacks.get(request.method)
         if not callback:
-            return super().render(request)
+            return _unrecognised_request_handler, "unrecognised_request_handler", {}
 
-        resp = trace_servlet(self.__class__.__name__)(callback)(request)
+        return callback, self._name, {}
 
-        # If it's a coroutine, turn it into a Deferred
-        if isinstance(resp, types.CoroutineType):
-            defer.ensureDeferred(resp)
 
-        return NOT_DONE_YET
+class DirectServeJsonResource(_DirectServeResource):
+    """A resource that will call `self._async_on_<METHOD>` on new requests,
+    formatting responses and errors as JSON.
+    """
+
+    def _send_response(
+        self, request, code, response_object,
+    ):
+        """Implements _AsyncResource._send_response
+        """
+        # TODO: Only enable CORS for the requests that need it.
+        respond_with_json(
+            request,
+            code,
+            response_object,
+            send_cors=True,
+            pretty_print=_request_user_agent_is_curl(request),
+            canonical_json=self.canonical_json,
+        )
+
+    def _send_error_response(
+        self, f: failure.Failure, request: SynapseRequest,
+    ) -> None:
+        """Implements _AsyncResource._send_error_response
+        """
+        return_json_error(f, request)
+
+
+class DirectServeHtmlResource(_DirectServeResource):
+    """A resource that will call `self._async_on_<METHOD>` on new requests,
+    formatting responses and errors as HTML.
+    """
+
+    # The error template to use for this resource
+    ERROR_TEMPLATE = HTML_ERROR_TEMPLATE
+
+    def _send_response(
+        self, request: SynapseRequest, code: int, response_object: Any,
+    ):
+        """Implements _AsyncResource._send_response
+        """
+        # We expect to get bytes for us to write
+        assert isinstance(response_object, bytes)
+        html_bytes = response_object
+
+        request.setResponseCode(200)
+        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+        request.write(html_bytes)
+        finish_request(request)
+
+    def _send_error_response(
+        self, f: failure.Failure, request: SynapseRequest,
+    ) -> None:
+        """Implements _AsyncResource._send_error_response
+        """
+        return_html_error(f, request, self.ERROR_TEMPLATE)
 
 
 def _options_handler(request):

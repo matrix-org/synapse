@@ -14,16 +14,10 @@
 # limitations under the License.
 #
 
-from twisted.web.server import NOT_DONE_YET
-
-from synapse.http.server import (
-    DirectServeResource,
-    respond_with_json,
-    wrap_json_request_handler,
-)
+from synapse.http.server import DirectServeJsonResource, respond_with_json
 
 
-class MediaConfigResource(DirectServeResource):
+class MediaConfigResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs):
@@ -33,11 +27,9 @@ class MediaConfigResource(DirectServeResource):
         self.auth = hs.get_auth()
         self.limits_dict = {"m.upload.size": config.max_upload_size}
 
-    @wrap_json_request_handler
     async def _async_render_GET(self, request):
         await self.auth.get_user_by_req(request)
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
 
-    def render_OPTIONS(self, request):
+    async def _async_render_OPTIONS(self, request):
         respond_with_json(request, 200, {}, send_cors=True)
-        return NOT_DONE_YET
