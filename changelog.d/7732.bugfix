@@ -1,0 +1,1 @@
+Fix "Tried to close a non-active scope!" error messages when opentracing is enabled.
