@@ -21,7 +21,7 @@ from __future__ import print_function
 import email.utils
 import os
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 import pkg_resources
 
@@ -86,15 +86,6 @@ class EmailConfig(Config):
         account_validity_config = config.get("account_validity") or {}
         account_validity_renewal_enabled = account_validity_config.get("renew_at")
 
-        self.threepid_behaviour_email = (
-            # Have Synapse handle the email sending if account_threepid_delegates.email
-            # is not defined
-            # msisdn is currently always remote while Synapse does not support any method of
-            # sending SMS messages
-            ThreepidBehaviour.REMOTE
-            if self.account_threepid_delegate_email
-            else ThreepidBehaviour.LOCAL
-        )
         # Prior to Synapse v1.4.0, there was another option that defined whether Synapse would
         # use an identity server to password reset tokens on its behalf. We now warn the user
         # if they have this set and tell them to use the updated option, while using a default
@@ -123,16 +114,43 @@ class EmailConfig(Config):
                     '"trusted_third_party_id_servers" but it is empty.'
                 )
 
+        self.threepid_behaviour_email_add_threepid = (
+            # Only delegate email sending if a delegate is set and a corresponding ThreepidService
+            # type appears in delegate_for
+            #
+            # msisdn is currently always remote as Synapse does not currently support any
+            # method of sending SMS messages
+            ThreepidBehaviour.REMOTE
+            if self.account_threepid_delegate_email
+            and ThreepidService.ADDING_THREEPID
+            in self.account_threepid_delegate_delegate_for
+            else ThreepidBehaviour.LOCAL
+        )
+        self.threepid_behaviour_email_password_reset = (
+            # Same as above
+            ThreepidBehaviour.REMOTE
+            if self.account_threepid_delegate_email
+            and ThreepidService.PASSWORD_RESET
+            in self.account_threepid_delegate_delegate_for
+            else ThreepidBehaviour.LOCAL
+        )
+
+        # If a service is intended to be provided by the local Synapse instance, check that
+        # the config exists for us to do so.
+        # If not, disable the service and warn the user why it has happened
         self.local_threepid_handling_disabled_due_to_email_config = False
         if (
-            self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-            and email_config == {}
-        ):
+            self.threepid_behaviour_email_add_threepid == ThreepidBehaviour.LOCAL
+            or self.threepid_behaviour_email_password_reset == ThreepidBehaviour.LOCAL
+        ) and email_config == {}:
             # We cannot warn the user this has happened here
             # Instead do so when a user attempts to reset their password
             self.local_threepid_handling_disabled_due_to_email_config = True
 
-            self.threepid_behaviour_email = ThreepidBehaviour.OFF
+            if self.threepid_behaviour_email_add_threepid == ThreepidBehaviour.LOCAL:
+                self.threepid_behaviour_email_add_threepid = ThreepidBehaviour.OFF
+            if self.threepid_behaviour_email_password_reset == ThreepidBehaviour.LOCAL:
+                self.threepid_behaviour_email_password_reset = ThreepidBehaviour.OFF
 
         # Get lifetime of a validation token in milliseconds
         self.email_validation_token_lifetime = self.parse_duration(
@@ -142,7 +160,8 @@ class EmailConfig(Config):
         if (
             self.email_enable_notifs
             or account_validity_renewal_enabled
-            or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
+            or self.threepid_behaviour_email_add_threepid == ThreepidBehaviour.LOCAL
+            or self.threepid_behaviour_email_password_reset == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
             import jinja2
@@ -152,7 +171,73 @@ class EmailConfig(Config):
             jinja2
             bleach
 
-        if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        if self.threepid_behaviour_email_add_threepid == ThreepidBehaviour.LOCAL:
+            self.email_add_threepid_template_html = email_config.get(
+                "add_threepid_template_html", "add_threepid.html"
+            )
+            self.email_add_threepid_template_text = email_config.get(
+                "add_threepid_template_text", "add_threepid.txt"
+            )
+            self.email_add_threepid_template_failure_html = email_config.get(
+                "add_threepid_template_failure_html", "add_threepid_failure.html"
+            )
+            email_add_threepid_template_success_html = email_config.get(
+                "add_threepid_template_success_html", "add_threepid_success.html"
+            )
+
+            self._check_templates_exist(
+                [
+                    self.email_add_threepid_template_html,
+                    self.email_add_threepid_template_text,
+                    self.email_add_threepid_template_failure_html,
+                    email_add_threepid_template_success_html,
+                ]
+            )
+
+            self.email_add_threepid_template_success_html_content = self._read_template_with_name(
+                email_add_threepid_template_success_html,
+                "email.add_threepid_template_success_html",
+            )
+
+        if self.threepid_behaviour_email_password_reset == ThreepidBehaviour.LOCAL:
+            # These templates have placeholders in them, and thus must be
+            # parsed using a templating engine during a request
+            self.email_password_reset_template_html = email_config.get(
+                "password_reset_template_html", "password_reset.html"
+            )
+            self.email_password_reset_template_text = email_config.get(
+                "password_reset_template_text", "password_reset.txt"
+            )
+            self.email_password_reset_template_failure_html = email_config.get(
+                "password_reset_template_failure_html", "password_reset_failure.html"
+            )
+
+            # These templates do not support any placeholder variables, so we
+            # will read them from disk once during setup
+            email_password_reset_template_success_html = email_config.get(
+                "password_reset_template_success_html", "password_reset_success.html"
+            )
+
+            self._check_templates_exist(
+                [
+                    self.email_password_reset_template_html,
+                    self.email_password_reset_template_text,
+                    self.email_password_reset_template_failure_html,
+                    email_password_reset_template_success_html,
+                ]
+            )
+
+            # This is a static template. Load its contents here instead of at runtime
+            self.email_password_reset_template_success_html = self._read_template_with_name(
+                email_password_reset_template_success_html,
+                "email.password_reset_template_success_html",
+            )
+
+        # Required config for threepid
+        if (
+            self.threepid_behaviour_email_add_threepid == ThreepidBehaviour.LOCAL
+            or self.threepid_behaviour_email_password_reset == ThreepidBehaviour.LOCAL
+        ):
             missing = []
             if not self.email_notif_from:
                 missing.append("email.notif_from")
@@ -169,84 +254,32 @@ class EmailConfig(Config):
 
             # These email templates have placeholders in them, and thus must be
             # parsed using a templating engine during a request
-            self.email_password_reset_template_html = email_config.get(
-                "password_reset_template_html", "password_reset.html"
-            )
-            self.email_password_reset_template_text = email_config.get(
-                "password_reset_template_text", "password_reset.txt"
-            )
             self.email_registration_template_html = email_config.get(
                 "registration_template_html", "registration.html"
             )
             self.email_registration_template_text = email_config.get(
                 "registration_template_text", "registration.txt"
             )
-            self.email_add_threepid_template_html = email_config.get(
-                "add_threepid_template_html", "add_threepid.html"
-            )
-            self.email_add_threepid_template_text = email_config.get(
-                "add_threepid_template_text", "add_threepid.txt"
-            )
-
-            self.email_password_reset_template_failure_html = email_config.get(
-                "password_reset_template_failure_html", "password_reset_failure.html"
-            )
             self.email_registration_template_failure_html = email_config.get(
                 "registration_template_failure_html", "registration_failure.html"
-            )
-            self.email_add_threepid_template_failure_html = email_config.get(
-                "add_threepid_template_failure_html", "add_threepid_failure.html"
-            )
-
-            # These templates do not support any placeholder variables, so we
-            # will read them from disk once during setup
-            email_password_reset_template_success_html = email_config.get(
-                "password_reset_template_success_html", "password_reset_success.html"
             )
             email_registration_template_success_html = email_config.get(
                 "registration_template_success_html", "registration_success.html"
             )
-            email_add_threepid_template_success_html = email_config.get(
-                "add_threepid_template_success_html", "add_threepid_success.html"
+
+            self._check_templates_exist(
+                [
+                    self.email_registration_template_html,
+                    self.email_registration_template_text,
+                    self.email_registration_template_failure_html,
+                    email_registration_template_success_html,
+                ]
             )
 
-            # Check templates exist
-            for f in [
-                self.email_password_reset_template_html,
-                self.email_password_reset_template_text,
-                self.email_registration_template_html,
-                self.email_registration_template_text,
-                self.email_add_threepid_template_html,
-                self.email_add_threepid_template_text,
-                self.email_password_reset_template_failure_html,
-                self.email_registration_template_failure_html,
-                self.email_add_threepid_template_failure_html,
-                email_password_reset_template_success_html,
+            # This is a static template. Load its contents here instead of at runtime
+            self.email_registration_template_success_html_content = self._read_template_with_name(
                 email_registration_template_success_html,
-                email_add_threepid_template_success_html,
-            ]:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find template file %s" % (p,))
-
-            # Retrieve content of web templates
-            filepath = os.path.join(
-                self.email_template_dir, email_password_reset_template_success_html
-            )
-            self.email_password_reset_template_success_html = self.read_file(
-                filepath, "email.password_reset_template_success_html"
-            )
-            filepath = os.path.join(
-                self.email_template_dir, email_registration_template_success_html
-            )
-            self.email_registration_template_success_html_content = self.read_file(
-                filepath, "email.registration_template_success_html"
-            )
-            filepath = os.path.join(
-                self.email_template_dir, email_add_threepid_template_success_html
-            )
-            self.email_add_threepid_template_success_html_content = self.read_file(
-                filepath, "email.add_threepid_template_success_html"
+                "email.registration_template_success_html",
             )
 
         if self.email_enable_notifs:
@@ -263,18 +296,6 @@ class EmailConfig(Config):
                     % (", ".join(missing),)
                 )
 
-            self.email_notif_template_html = email_config.get(
-                "notif_template_html", "notif_mail.html"
-            )
-            self.email_notif_template_text = email_config.get(
-                "notif_template_text", "notif_mail.txt"
-            )
-
-            for f in self.email_notif_template_text, self.email_notif_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
-
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
@@ -282,7 +303,22 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
+            # These email templates have placeholders in them, and thus must be
+            # parsed using a templating engine during a request
+            self.email_notif_template_html = email_config.get(
+                "notif_template_html", "notif_mail.html"
+            )
+            self.email_notif_template_text = email_config.get(
+                "notif_template_text", "notif_mail.txt"
+            )
+
+            self._check_templates_exist(
+                [self.email_notif_template_text, self.email_notif_template_html]
+            )
+
         if account_validity_renewal_enabled:
+            # These email templates have placeholders in them, and thus must be
+            # parsed using a templating engine during a request
             self.email_expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
@@ -290,10 +326,9 @@ class EmailConfig(Config):
                 "expiry_template_text", "notice_expiry.txt"
             )
 
-            for f in self.email_expiry_template_text, self.email_expiry_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
+            self._check_templates_exist(
+                [self.email_expiry_template_text, self.email_expiry_template_html]
+            )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -404,6 +439,38 @@ class EmailConfig(Config):
           #template_dir: "res/templates"
         """
 
+    def _check_templates_exist(self, template_filepaths: List[str]):
+        """Checks that the given filepaths exist
+
+        Raises:
+            ConfigError: if at least one filepath does not exist or can't otherwise be read
+        """
+        for filepath in template_filepaths:
+            absolute_path = os.path.join(self.email_template_dir, filepath)
+            if not os.path.isfile(absolute_path):
+                raise ConfigError("Unable to find template file %s" % (absolute_path,))
+
+    def _read_template_with_name(
+        self, template_filename: str, config_option: str
+    ) -> str:
+        """Returns the contents of a template given the filename
+
+        Args:
+            template_filename: The name of the template file. The contents of
+                self.email_template_dir will be prepended to create the final filepath
+
+            config_option: The config option name that defined the template name. Used for
+                warning the sysadmin when a template file cannot be found
+
+        Raises:
+            ConfigError: if the file's path is incorrect or otherwise cannot be read
+
+        Returns:
+            The contents of the template
+        """
+        filepath = os.path.join(self.email_template_dir, template_filename)
+        return self.read_file(filepath, config_option)
+
 
 class ThreepidBehaviour(Enum):
     """
@@ -418,3 +485,19 @@ class ThreepidBehaviour(Enum):
     REMOTE = "remote"
     LOCAL = "local"
     OFF = "off"
+
+
+class ThreepidService(Enum):
+    """
+    Services regarding threepids that the homeserver can either provide locally or by proxying
+    to an external server. The server may choose to do this if they cannot access an SMTP
+    server from the Synapse box for some reason. Or if they are accepting phone numbers,
+    which Synapse cannot verify itself yet
+
+    ADDING_THREEPID = the user is adding a threepid to their account information. This is
+        also used when threepids are added during registration
+    PASSWORD_RESET = the user is validating a threepid in order to reset their password
+    """
+
+    ADDING_THREEPID = "adding_threepid"
+    PASSWORD_RESET = "password_reset"
