@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Any, Dict, Optional
 
 from canonicaljson import json
 
@@ -21,7 +22,7 @@ from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, LoginError, SynapseError
-from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.config.emailconfig import ThreepidBehaviour, ThreepidService
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,21 @@ class _BaseThreepidAuthChecker:
         self.hs = hs
         self.store = hs.get_datastore()
 
-    async def _check_threepid(self, medium, authdict):
+        self._account_threepid_delegate_email = (
+            self.hs.config.account_threepid_delegate_email
+        )
+        self._account_threepid_delegate_msisdn = (
+            self.hs.config.account_threepid_delegate_msisdn
+        )
+
+        self._threepid_behaviour_email_add_threepid = (
+            self.hs.config.threepid_behaviour_email_add_threepid
+        )
+        self._threepid_behaviour_email_password_reset = (
+            self.hs.config.threepid_behaviour_email_password_reset
+        )
+
+    async def _check_threepid(self, medium: str, authdict: Dict[str, Any]):
         if "threepid_creds" not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
@@ -150,20 +165,54 @@ class _BaseThreepidAuthChecker:
 
         # msisdns are currently always ThreepidBehaviour.REMOTE
         if medium == "msisdn":
-            if not self.hs.config.account_threepid_delegate_msisdn:
+            if not self._account_threepid_delegate_msisdn:
                 raise SynapseError(
                     400, "Phone number verification is not enabled on this homeserver"
                 )
             threepid = await identity_handler.threepid_from_creds(
-                self.hs.config.account_threepid_delegate_msisdn, threepid_creds
+                self._account_threepid_delegate_msisdn, threepid_creds
             )
         elif medium == "email":
-            if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            # Determine why this check is happening. This will help us decide whether
+            # Synapse or an account threepid delegate should complete the validation
+            service = None  # type: Optional[ThreepidService]
+
+            session = await self.store.get_threepid_validation_session(
+                medium,
+                threepid_creds["client_secret"],
+                sid=threepid_creds["sid"],
+                validated=True,
+            )
+
+            if session:
+                # We found a local session.
+                # Determine which service this was intended to authorise
+                service = ThreepidService(session["service"])
+
+                if service == ThreepidService.ADDING_THREEPID:
+                    threepid_behaviour = self._threepid_behaviour_email_add_threepid
+                elif service == ThreepidService.PASSWORD_RESET:
+                    threepid_behaviour = self._threepid_behaviour_email_password_reset
+                else:
+                    raise SynapseError(500, "Unknown threepid service")
+            else:
+                # We can't find a local, matching session.
+                # Do we have a threepid delegate configured?
+                if not self.hs.config.account_threepid_delegate_email:
+                    raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
+
+                # We do. Presume that this is a remote session
+                threepid_behaviour = ThreepidBehaviour.REMOTE
+
+            if threepid_behaviour == ThreepidBehaviour.REMOTE:
                 assert self.hs.config.account_threepid_delegate_email
+
+                # Ask our threepid delegate about this validation attempt
                 threepid = await identity_handler.threepid_from_creds(
                     self.hs.config.account_threepid_delegate_email, threepid_creds
                 )
-            elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            elif threepid_behaviour == ThreepidBehaviour.LOCAL:
+                # Attempt to validate locally
                 threepid = None
                 row = await self.store.get_threepid_validation_session(
                     medium,
@@ -213,10 +262,15 @@ class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChec
         _BaseThreepidAuthChecker.__init__(self, hs)
 
     def is_enabled(self):
-        return self.hs.config.threepid_behaviour_email in (
-            ThreepidBehaviour.REMOTE,
-            ThreepidBehaviour.LOCAL,
+        add_threepid_enabled = (
+            self.hs.config.threepid_behaviour_email_add_threepid
+            != ThreepidBehaviour.OFF
         )
+        password_reset_enabled = (
+            self.hs.config.threepid_behaviour_email_password_reset
+            != ThreepidBehaviour.OFF
+        )
+        return add_threepid_enabled or password_reset_enabled
 
     def check_auth(self, authdict, clientip):
         return defer.ensureDeferred(self._check_threepid("email", authdict))
