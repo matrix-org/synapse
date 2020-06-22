@@ -471,12 +471,12 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         request.render(self.download_resource)
         self.pump(1.0)
 
-        # Should be quarantined
+        # Shouldn't be quarantined
         self.assertEqual(
             200,
             int(channel.code),
             msg=(
-                "Expected to receive a 200 on accessing quarantined media: %s"
+                "Expected to receive a 200 on accessing not-quarantined media: %s"
                 % server_and_media_id_2
             ),
         )
