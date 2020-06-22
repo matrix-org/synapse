@@ -357,15 +357,9 @@ class UsernameAvailabilityRestServlet(RestServlet):
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
             )
 
-        ip = self.hs.get_ip_from_request(request)
-        with self.ratelimiter.ratelimit(ip) as wait_deferred:
-            await wait_deferred
-
-            username = parse_string(request, "username", required=True)
-
-            await self.registration_handler.check_username(username)
-
-            return 200, {"available": True}
+        # We are not interested in logging in via a username in this deployment.
+        # Simply allow anything here as it won't be used later.
+        return 200, {"available": True}
 
 
 class RegisterRestServlet(RestServlet):
@@ -443,14 +437,15 @@ class RegisterRestServlet(RestServlet):
             body["password_hash"] = await self.auth_handler.hash(password)
             desired_password_hash = body["password_hash"]
 
+        # We don't care about usernames for this deployment. In fact, the act
+        # of checking whether they exist already can leak metadata about
+        # which users are already registered.
+        #
+        # Usernames are already derived via the provided email.
+        # So, if they're not necessary, just ignore them.
+        #
+        # (we do still allow appservices to set them below)
         desired_username = None
-        if "username" in body:
-            if (
-                not isinstance(body["username"], string_types)
-                or len(body["username"]) > 512
-            ):
-                raise SynapseError(400, "Invalid username")
-            desired_username = body["username"]
 
         desired_display_name = body.get("display_name")
 
@@ -466,7 +461,7 @@ class RegisterRestServlet(RestServlet):
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
-            desired_username = body.get("user", desired_username)
+            desired_username = body.get("user", body.get("username"))
 
             # XXX we should check that desired_username is valid. Currently
             # we give appservices carte blanche for any insanity in mxids,
@@ -484,15 +479,6 @@ class RegisterRestServlet(RestServlet):
                     body,
                 )
             return 200, result  # we throw for non 200 responses
-
-        # for regular registration, downcase the provided username before
-        # attempting to register it. This should mean
-        # that people who try to register with upper-case in their usernames
-        # don't get a nasty surprise. (Note that we treat username
-        # case-insenstively in login, so they are free to carry on imagining
-        # that their username is CrAzYh4cKeR if that keeps them happy)
-        if desired_username is not None:
-            desired_username = desired_username.lower()
 
         # == Normal User Registration == (everyone else)
         if not self.hs.config.enable_registration:
@@ -517,13 +503,6 @@ class RegisterRestServlet(RestServlet):
             # for paranoia.
             registered_user_id = await self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
-            )
-
-        if desired_username is not None:
-            await self.registration_handler.check_username(
-                desired_username,
-                guest_access_token=guest_access_token,
-                assigned_user_id=registered_user_id,
             )
 
         auth_result, params, session_id = await self.auth_handler.check_auth(

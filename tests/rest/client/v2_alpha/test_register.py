@@ -90,14 +90,6 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"400", channel.result)
         self.assertEquals(channel.json_body["error"], "Invalid password")
 
-    def test_POST_bad_username(self):
-        request_data = json.dumps({"username": 777, "password": "monkey"})
-        request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
-
-        self.assertEquals(channel.result["code"], b"400", channel.result)
-        self.assertEquals(channel.json_body["error"], "Invalid username")
-
     def test_POST_user_valid(self):
         user_id = "@kermit:test"
         device_id = "frogfone"

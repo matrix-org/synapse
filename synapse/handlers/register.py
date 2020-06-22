@@ -79,7 +79,19 @@ class RegistrationHandler(BaseHandler):
         self.session_lifetime = hs.config.session_lifetime
 
     @defer.inlineCallbacks
-    def check_username(self, localpart, guest_access_token=None, assigned_user_id=None):
+    def check_username(
+        self, localpart, guest_access_token=None, assigned_user_id=None,
+    ):
+        """
+
+        Args:
+            localpart (str|None): The user's localpart
+            guest_access_token (str|None): A guest's access token
+            assigned_user_id (str|None): An existing User ID for this user if pre-calculated
+
+        Returns:
+            Deferred
+        """
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
@@ -122,6 +134,8 @@ class RegistrationHandler(BaseHandler):
                 raise SynapseError(
                     400, "User ID already taken.", errcode=Codes.USER_IN_USE
                 )
+
+            # Retrieve guest user information from provided access token
             user_data = yield self.auth.get_user_by_access_token(guest_access_token)
             if not user_data["is_guest"] or user_data["user"].localpart != localpart:
                 raise AuthError(
