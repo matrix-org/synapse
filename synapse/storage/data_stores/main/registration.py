@@ -24,6 +24,7 @@ from twisted.internet.defer import Deferred
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
+from synapse.config.emailconfig import ThreepidService  # noqa: F401
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import Database
@@ -727,6 +728,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 * session_id - ID of the validation session
                 * send_attempt - a number serving to dedupe send attempts for this session
                 * validated_at - timestamp of when this session was validated if so
+                * service - the ThreepidService type that this session is authorising
 
                 Otherwise None if a validation session is not found
         """
@@ -748,7 +750,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         def get_threepid_validation_session_txn(txn):
             sql = """
                 SELECT address, session_id, medium, client_secret,
-                last_send_attempt, validated_at
+                last_send_attempt, validated_at, service
                 FROM threepid_validation_session WHERE %s
                 """ % (
                 " AND ".join("%s = ?" % k for k in keyvalues.keys()),
@@ -1426,6 +1428,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         next_link,
         token,
         token_expires,
+        service,
     ):
         """Creates a new threepid validation session if it does not already
         exist and associates a new validation token with it
@@ -1442,6 +1445,8 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             token (str): The validation token
             token_expires (int): The timestamp for which after the token
                 will no longer be valid
+            service (ThreepidService): The type of threepid service that
+                this validation session will authorise
         """
 
         def start_or_continue_validation_session_txn(txn):
@@ -1455,6 +1460,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                     "medium": medium,
                     "address": address,
                     "client_secret": client_secret,
+                    "service": service.value,
                 },
             )
 
