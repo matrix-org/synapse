@@ -19,6 +19,7 @@ from distutils.util import strtobool
 import pkg_resources
 
 from synapse.config._base import Config, ConfigError
+from synapse.config.emailconfig import ThreepidService
 from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string_with_symbols
 
@@ -115,6 +116,20 @@ class RegistrationConfig(Config):
                 "`account_threepid_delegate.msisdn` is set, such that "
                 "clients know where to submit validation tokens to. Please "
                 "configure `public_baseurl`."
+            )
+
+        delegate_for = account_threepid_delegates.get(
+            "delegate_for",
+            [ThreepidService.ADDING_THREEPID, ThreepidService.PASSWORD_RESET],
+        )
+        try:
+            self.account_threepid_delegate_delegate_for = [
+                ThreepidService(service_type) for service_type in delegate_for
+            ]
+        except ValueError as e:
+            # This will be raised if a provided service_type does not exist
+            raise ConfigError(
+                "Option account_threepid_delegates.delegate_for: %s" % (e,)
             )
 
         self.default_identity_server = config.get("default_identity_server")
@@ -307,9 +322,9 @@ class RegistrationConfig(Config):
         #  - matrix.org
         #  - vector.im
 
-        # Handle threepid (email/phone etc) registration and password resets through a set of
-        # *trusted* identity servers. Note that this allows the configured identity server to
-        # reset passwords for accounts!
+        # Handle threepid (email/phone etc) registration and/or password resets through a set of
+        # *trusted* identity servers. Note that this potentially allows the configured external
+        # service to reset passwords for accounts!
         #
         # Be aware that if `email` is not set, and SMTP options have not been
         # configured in the email config block, registration and user password resets via
@@ -332,6 +347,16 @@ class RegistrationConfig(Config):
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
+
+            # Choose which services are delegated. These apply to both email and msisdn
+            # identities.
+            #
+            # * adding_threepid: when adding an email or phone number to your homeserver
+            # * password_resets: when verifying your email or phone number during password reset
+            #
+            # Default is delegating for all services, or [adding_threepid, password_resets].
+            #
+            #delegate_for: [adding_threepid]
 
         # Whether users are allowed to change their displayname after it has
         # been initially set. Useful when provisioning users based on the

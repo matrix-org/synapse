@@ -1160,9 +1160,9 @@ account_validity:
 #  - matrix.org
 #  - vector.im
 
-# Handle threepid (email/phone etc) registration and password resets through a set of
-# *trusted* identity servers. Note that this allows the configured identity server to
-# reset passwords for accounts!
+# Handle threepid (email/phone etc) registration and/or password resets through a set of
+# *trusted* identity servers. Note that this potentially allows the configured external
+# service to reset passwords for accounts!
 #
 # Be aware that if `email` is not set, and SMTP options have not been
 # configured in the email config block, registration and user password resets via
@@ -1185,6 +1185,16 @@ account_validity:
 account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
     #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
+
+    # Choose which services are delegated. These apply to both email and msisdn
+    # identities.
+    #
+    # * adding_threepid: when adding an email or phone number to your homeserver
+    # * password_resets: when verifying your email or phone number during password reset
+    #
+    # Default is delegating for all services, or [adding_threepid, password_resets].
+    #
+    #delegate_for: [adding_threepid]
 
 # Whether users are allowed to change their displayname after it has
 # been initially set. Useful when provisioning users based on the
