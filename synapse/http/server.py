@@ -261,11 +261,13 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
                 }
             )
 
-            callback_return = callback(request, **kwargs)
+            raw_callback_return = callback(request, **kwargs)
 
             # Is it synchronous? We'll allow this for now.
-            if isinstance(callback_return, (defer.Deferred, types.CoroutineType)):
-                callback_return = await callback_return
+            if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
+                callback_return = await raw_callback_return
+            else:
+                callback_return = raw_callback_return
 
             if callback_return is not None:
                 code, response = callback_return
@@ -416,7 +418,9 @@ class _DirectServeResource(_AsyncResource):
     def __init__(self):
         super().__init__()
 
-        self._callbacks = {}
+        self._callbacks = (
+            {}
+        )  # type: Dict[bytes, Callable[..., Awaitable[Optional[Tuple[int, Any]]]]]
         self._name = self.__class__.__name__
 
         for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
