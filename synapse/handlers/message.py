@@ -879,7 +879,9 @@ class EventCreationHandler(object):
         """
         room_alias = RoomAlias.from_string(room_alias_str)
         try:
-            mapping = yield directory_handler.get_association(room_alias)
+            mapping = yield defer.ensureDeferred(
+                directory_handler.get_association(room_alias)
+            )
         except SynapseError as e:
             # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
             if e.errcode == Codes.NOT_FOUND:
