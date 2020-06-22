@@ -31,7 +31,7 @@ from synapse.api.errors import (
 from synapse.config import ConfigError
 from synapse.config.captcha import CaptchaConfig
 from synapse.config.consent_config import ConsentConfig
-from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.config.emailconfig import ThreepidBehaviour, ThreepidService
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
@@ -168,7 +168,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 client_secret,
                 send_attempt,
                 self.mailer.send_registration_mail,
-                next_link,
+                service=ThreepidService.ADDING_THREEPID,
+                next_link=next_link,
             )
 
             # Wrap the session id in a JSON object

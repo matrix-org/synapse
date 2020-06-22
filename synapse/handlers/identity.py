@@ -35,7 +35,7 @@ from synapse.api.errors import (
     HttpResponseException,
     SynapseError,
 )
-from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.config.emailconfig import ThreepidBehaviour, ThreepidService  # noqa: F401
 from synapse.http.client import SimpleHttpClient
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -296,6 +296,7 @@ class IdentityHandler(BaseHandler):
         client_secret,
         send_attempt,
         send_email_func,
+        service,
         next_link=None,
     ):
         """Send a threepid validation email for password reset or
@@ -308,6 +309,8 @@ class IdentityHandler(BaseHandler):
             send_email_func (func): A function that takes an email address, token,
                                     client_secret and session_id, sends an email
                                     and returns a Deferred.
+            service (ThreepidService): The type of threepid service that
+                this validation session will authorise
             next_link (str|None): The URL to redirect the user to after validation
 
         Returns:
@@ -372,6 +375,7 @@ class IdentityHandler(BaseHandler):
             next_link,
             token,
             token_expires,
+            service,
         )
 
         return session_id

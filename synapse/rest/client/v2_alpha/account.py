@@ -19,7 +19,7 @@ from http import HTTPStatus
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
-from synapse.config.emailconfig import ThreepidBehaviour
+from synapse.config.emailconfig import ThreepidBehaviour, ThreepidService
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
@@ -130,7 +130,8 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 client_secret,
                 send_attempt,
                 self.mailer.send_password_reset_mail,
-                next_link,
+                service=ThreepidService.PASSWORD_RESET,
+                next_link=next_link,
             )
 
             # Wrap the session id in a JSON object
@@ -446,7 +447,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 client_secret,
                 send_attempt,
                 self.mailer.send_add_threepid_mail,
-                next_link,
+                service=ThreepidService.ADDING_THREEPID,
+                next_link=next_link,
             )
 
             # Wrap the session id in a JSON object
