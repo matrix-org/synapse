@@ -1,0 +1,1 @@
+Fix missing `Content-Length` on HTTP responses from the metrics handler.
