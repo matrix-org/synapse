@@ -62,6 +62,15 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
+T = TypeVar("T")
+
+# A tuple of HTTP response code and response body. For JSON requests the body is
+# anything JSON serializable, while for HTML requests they are bytes.
+ResponseTuple = Tuple[int, Any]
+
+# Used for functions that may or may not return an awaitable object.
+MaybeAwaitable = Union[Awaitable[T], T]
+
 
 def wrap_json_request_handler(h):
     """Wraps a request handler method with exception handling.
@@ -280,7 +289,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
     def _get_handler_for_request(
         self, request: SynapseRequest
     ) -> Tuple[
-        Callable[..., Awaitable[Optional[Tuple[int, Any]]]], str, Dict[str, str],
+        Callable[..., MaybeAwaitable[Optional[ResponseTuple]]], str, Dict[str, str],
     ]:
         """Finds a callback method to handle the given request.
 
