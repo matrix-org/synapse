@@ -25,6 +25,7 @@ import attr
 from canonicaljson import json
 from prometheus_client import Counter
 
+from twisted.enterprise.adbapi import Connection
 from twisted.internet import defer
 
 import synapse.metrics
@@ -60,6 +61,12 @@ event_counter = Counter(
     "",
     ["type", "origin_type", "origin_entity"],
 )
+
+STATE_EVENT_TYPES_TO_MARK_UNREAD = [
+    EventTypes.PowerLevels,
+    EventTypes.Topic,
+    EventTypes.Name,
+]
 
 
 def encode_json(json_object):
@@ -977,7 +984,7 @@ class PersistEventsStore:
             txn, events=[event for event, _ in events_and_contexts]
         )
 
-        for event, _ in events_and_contexts:
+        for event, context in events_and_contexts:
             if event.type == EventTypes.Name:
                 # Insert into the event_search table.
                 self._store_room_name_txn(txn, event)
@@ -1008,6 +1015,8 @@ class PersistEventsStore:
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
                 if isinstance(expiry_ts, int) and not event.is_state():
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
+
+            self._maybe_insert_unread_event_txn(txn, event, context)
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -1614,3 +1623,72 @@ class PersistEventsStore:
             await self.db.runInteraction("locally_reject_invite", f, stream_ordering)
 
         return stream_ordering
+
+    def _maybe_insert_unread_event_txn(
+        self, txn: Connection, event: EventBase, context: EventContext,
+    ):
+        """Mark the event as unread for every current member of the room if it passes the
+        conditions for that.
+
+        These conditions are: the event must either have a body, be an encrypted message,
+        or be either a power levels event, a room name event or a room topic event, and
+        must be neither rejected or soft-failed nor an edit or a notice.
+
+        Args:
+            txn: The transaction to use to retrieve room members and to mark the event
+                as unread.
+            event: The event to evaluate and maybe mark as unread.
+            context: The context in which the event was sent (used to figure out whether
+                the event has been rejected).
+        """
+        content = event.content
+
+        is_edit = (
+            content.get("m.relates_to", {}).get("rel_type") == RelationTypes.REPLACE
+        )
+        is_notice = not event.is_state() and content.get("msgtype") == "m.notice"
+
+        # We don't want rejected or soft-failed events, edits or notices to be marked
+        # unread.
+        if (
+            context.rejected
+            or is_edit
+            or is_notice
+            or event.internal_metadata.is_soft_failed()
+        ):
+            return
+
+        body_exists = content.get("body") is not None
+        is_state_event_to_mark_unread = (
+            event.is_state() and event.type in STATE_EVENT_TYPES_TO_MARK_UNREAD
+        )
+        is_encrypted_message = (
+            not event.is_state() and event.type == EventTypes.Encrypted
+        )
+
+        # We want to mark unread messages with a body, some state events (power levels,
+        # room name, room topic) and encrypted messages.
+        if not (body_exists or is_state_event_to_mark_unread or is_encrypted_message):
+            return
+
+        # Get the list of users that are currently joined to the room.
+        users_in_room = self.db.simple_select_onecol_txn(
+            txn=txn,
+            table="room_memberships",
+            keyvalues={"membership": Membership.JOIN, "room_id": event.room_id},
+            retcol="user_id",
+        )
+
+        # Mark the message as unread for every user currently in the room.
+        self.db.simple_insert_many_txn(
+            txn=txn,
+            table="unread_messages",
+            values=[
+                {
+                    "user_id": user_id,
+                    "stream_ordering": event.internal_metadata.stream_ordering,
+                    "room_id": event.room_id,
+                }
+                for user_id in users_in_room
+            ],
+        )
