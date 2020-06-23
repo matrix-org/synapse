@@ -17,7 +17,7 @@
 import logging
 
 from synapse import types
-from synapse.api.constants import MAX_USERID_LENGTH, LoginType
+from synapse.api.constants import MAX_USERID_LENGTH, LoginType, RoomCreationPreset
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import assert_params_in_dict
@@ -308,7 +308,7 @@ class RegistrationHandler(BaseHandler):
                         await self.hs.get_room_creation_handler().create_room(
                             fake_requester,
                             config={
-                                "preset": "public_chat",
+                                "preset": RoomCreationPreset.PUBLIC_CHAT,
                                 "room_alias_name": room_alias_localpart,
                             },
                             ratelimit=False,
