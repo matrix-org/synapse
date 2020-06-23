@@ -129,10 +129,20 @@ APPEND_ONLY_TABLES = [
 
 
 IGNORED_TABLES = {
+    # We don't port these tables, as they're a faff and we can regenerate
+    # them anyway.
     "user_directory",
     "user_directory_search",
-    "users_who_share_rooms",
-    "users_in_pubic_room",
+    "user_directory_search_content",
+    "user_directory_search_docsize",
+    "user_directory_search_segdir",
+    "user_directory_search_segments",
+    "user_directory_search_stat",
+    "user_directory_search_pos",
+    "users_who_share_private_rooms",
+    "users_in_public_room",
+    # UI auth sessions have foreign keys so additional care needs to be taken,
+    # the sessions are transient anyway, so ignore them.
     "ui_auth_sessions",
     "ui_auth_sessions_credentials",
 }
@@ -301,8 +311,6 @@ class Porter(object):
             return
 
         if table in IGNORED_TABLES:
-            # We don't port these tables, as they're a faff and we can regenerate
-            # them anyway.
             self.progress.update(table, table_size)  # Mark table as done
             return
 
