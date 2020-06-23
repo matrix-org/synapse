@@ -1210,7 +1210,11 @@ account_threepid_delegates:
 #enable_3pid_changes: false
 
 # Users who register on this homeserver will automatically be joined
-# to these rooms
+# to these rooms.
+#
+# By default, any room aliases included in this list will be created
+# as a publicly joinable room when the first user registers for the
+# homeserver. This behaviour can be customised with the settings below.
 #
 #auto_join_rooms:
 #  - "#example:example.com"
@@ -1218,10 +1222,62 @@ account_threepid_delegates:
 # Where auto_join_rooms are specified, setting this flag ensures that the
 # the rooms exist by creating them when the first user on the
 # homeserver registers.
+#
+# By default the auto-created rooms are publicly joinable from any federated
+# server. Use the autocreate_auto_join_rooms_federated and
+# autocreate_auto_join_room_preset settings below to customise this behaviour.
+#
 # Setting to false means that if the rooms are not manually created,
 # users cannot be auto-joined since they do not exist.
 #
-#autocreate_auto_join_rooms: true
+# Defaults to true. Uncomment the following line to disable automatically
+# creating auto-join rooms.
+#
+#autocreate_auto_join_rooms: false
+
+# Whether the auto_join_rooms that are auto-created are available via
+# federation. Only has an effect if autocreate_auto_join_rooms is true.
+#
+# Note that whether a room is federated cannot be modified after
+# creation.
+#
+# Defaults to true: the room will be joinable from other servers.
+# Uncomment the following to prevent users from other homeservers from
+# joining these rooms.
+#
+#autocreate_auto_join_rooms_federated: false
+
+# The room preset to use when auto-creating one of auto_join_rooms. Only has an
+# effect if autocreate_auto_join_rooms is true.
+#
+# This can be one of "public_chat", "private_chat", or "trusted_private_chat".
+# If a value of "private_chat" or "trusted_private_chat" is used then
+# auto_join_mxid_localpart must also be configured.
+#
+# Defaults to "public_chat", meaning that the room is joinable by anyone, including
+# federated servers if autocreate_auto_join_rooms_federated is true (the default).
+# Uncomment the following to require an invitation to join these rooms.
+#
+#autocreate_auto_join_room_preset: private_chat
+
+# The local part of the user id which is used to create auto_join_rooms if
+# autocreate_auto_join_rooms is true. If this is not provided then the
+# initial user account that registers will be used to create the rooms.
+#
+# The user id is also used to invite new users to any auto-join rooms which
+# are set to invite-only.
+#
+# It *must* be configured if autocreate_auto_join_room_preset is set to
+# "private_chat" or "trusted_private_chat".
+#
+# Note that this must be specified in order for new users to be correctly
+# invited to any auto-join rooms which have been set to invite-only (either
+# at the time of creation or subsequently).
+#
+# Note that, if the room already exists, this user must be joined and
+# have the appropriate permissions to invite new members.
+#
+#auto_join_mxid_localpart: system
 
 # When auto_join_rooms is specified, setting this flag to false prevents
 # guest accounts from being automatically joined to the rooms.
