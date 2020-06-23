@@ -1,0 +1,1 @@
+Prevent a failure in a linting tool blocking the others from being run. Move flake8 to the end as it takes the longest.
