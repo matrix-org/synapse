@@ -420,8 +420,11 @@ class JsonResource(HttpServer, _AsyncResource):
 
 
 class _DirectServeResource(_AsyncResource):
-    """Base class for resources that will just call `self._async_on_<METHOD>`
+    """Base class for resources that will just call `self._async_render_<METHOD>`
     on new requests, formatting responses and errors as JSON.
+
+    If an `_async_render` function exists then that will be called if no method
+    specific function exists, otherwise returns a 400.
     """
 
     def __init__(self):
@@ -439,14 +442,24 @@ class _DirectServeResource(_AsyncResource):
                     method_handler
                 )
 
+        fallback_handler = getattr(self, "_async_render", None)
+        if fallback_handler:
+            self._fallback_handler = trace_servlet(self._name)(fallback_handler)
+
+        else:
+            self._fallback_handler = None
+
     def _get_handler_for_request(self, request: SynapseRequest):
         """Implements _AsyncResource._get_handler_for_request
         """
         callback = self._callbacks.get(request.method)
-        if not callback:
-            return _unrecognised_request_handler, "unrecognised_request_handler", {}
+        if callback:
+            return callback, self._name, {}
 
-        return callback, self._name, {}
+        if self._fallback_handler:
+            return self._fallback_handler, self._name, {}
+
+        return _unrecognised_request_handler, "unrecognised_request_handler", {}
 
 
 class DirectServeJsonResource(_DirectServeResource):

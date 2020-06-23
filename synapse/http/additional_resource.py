@@ -13,13 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
-
-from synapse.http.server import wrap_json_request_handler
+from synapse.http.server import DirectServeJsonResource
 
 
-class AdditionalResource(Resource):
+class AdditionalResource(DirectServeJsonResource):
     """Resource wrapper for additional_resources
 
     If the user has configured additional_resources, we need to wrap the
@@ -41,16 +38,10 @@ class AdditionalResource(Resource):
             handler ((twisted.web.server.Request) -> twisted.internet.defer.Deferred):
                 function to be called to handle the request.
         """
-        Resource.__init__(self)
+        super().__init__()
         self._handler = handler
 
-        # required by the request_handler wrapper
-        self.clock = hs.get_clock()
-
-    def render(self, request):
-        self._async_render(request)
-        return NOT_DONE_YET
-
-    @wrap_json_request_handler
     def _async_render(self, request):
+        # Cheekily pass the result straight through, so we don't need to worry
+        # if its an awaitable or not.
         return self._handler(request)
