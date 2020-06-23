@@ -123,7 +123,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         txn.execute(sql, (room_id, last_read_event_id))
         results = txn.fetchall()
         if len(results) == 0:
-            return {"notify_count": 0, "highlight_count": 0, "unread_count": 0}
+            return {"notify_count": 0, "highlight_count": 0}
 
         stream_ordering = results[0][0]
 
