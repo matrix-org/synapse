@@ -348,7 +348,7 @@ def _reverse_topological_power_sort(
 
         # We yield occasionally when we're working with large data sets to
         # ensure that we don't block the reactor loop for too long.
-        if idx != 0 and idx % _YIELD_AFTER_ITERATIONS == 0 == 0:
+        if idx != 0 and idx % _YIELD_AFTER_ITERATIONS == 0:
             yield clock.sleep(0)
 
     event_to_pl = {}
@@ -360,7 +360,7 @@ def _reverse_topological_power_sort(
 
         # We yield occasionally when we're working with large data sets to
         # ensure that we don't block the reactor loop for too long.
-        if idx != 0 and idx % _YIELD_AFTER_ITERATIONS == 0 == 0:
+        if idx != 0 and idx % _YIELD_AFTER_ITERATIONS == 0:
             yield clock.sleep(0)
 
     def _get_power_order(event_id):
