@@ -32,6 +32,7 @@ from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.types import StateMap
+from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure, measure_func
@@ -414,6 +415,7 @@ class StateHandler(object):
 
         with Measure(self.clock, "state._resolve_events"):
             new_state = yield resolve_events_with_store(
+                self.clock,
                 event.room_id,
                 room_version,
                 state_set_ids,
@@ -516,6 +518,7 @@ class StateResolutionHandler(object):
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
                     new_state = yield resolve_events_with_store(
+                        self.clock,
                         room_id,
                         room_version,
                         list(state_groups_ids.values()),
@@ -589,6 +592,7 @@ def _make_state_cache_entry(new_state, state_groups_ids):
 
 
 def resolve_events_with_store(
+    clock: Clock,
     room_id: str,
     room_version: str,
     state_sets: List[StateMap[str]],
@@ -625,7 +629,7 @@ def resolve_events_with_store(
         )
     else:
         return v2.resolve_events_with_store(
-            room_id, room_version, state_sets, event_map, state_res_store
+            clock, room_id, room_version, state_sets, event_map, state_res_store
         )
 
 
