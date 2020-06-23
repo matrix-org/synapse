@@ -72,33 +72,6 @@ ResponseTuple = Tuple[int, Any]
 MaybeAwaitable = Union[Awaitable[T], T]
 
 
-def wrap_json_request_handler(h):
-    """Wraps a request handler method with exception handling.
-
-    Also does the wrapping with request.processing as per wrap_async_request_handler.
-
-    The handler method must have a signature of "handle_foo(self, request)",
-    where "request" must be a SynapseRequest.
-
-    The handler must return a deferred or a coroutine. If the deferred succeeds
-    we assume that a response has been sent. If the deferred fails with a SynapseError we use
-    it to send a JSON response with the appropriate HTTP reponse code. If the
-    deferred fails with any other type of error we send a 500 reponse.
-    """
-
-    async def wrapped_request_handler(self, request):
-        try:
-            await h(self, request)
-        except Exception:
-            # failure.Failure() fishes the original Failure out
-            # of our stack, and thus gives us a sensible stack
-            # trace.
-            f = failure.Failure()
-            return_json_error(f, request)
-
-    return wrap_async_request_handler(wrapped_request_handler)
-
-
 def return_json_error(f: failure.Failure, request: Request) -> None:
     """Sends a JSON error response to clients.
     """

@@ -41,7 +41,6 @@ class ThumbnailResource(DirectServeJsonResource):
         self.media_storage = media_storage
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.server_name = hs.hostname
-        self.clock = hs.get_clock()
 
     async def _async_render_GET(self, request):
         set_cors_headers(request)
