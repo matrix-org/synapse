@@ -103,6 +103,7 @@ class JoinedSyncResult:
     account_data = attr.ib(type=List[JsonDict])
     unread_notifications = attr.ib(type=JsonDict)
     summary = attr.ib(type=Optional[JsonDict])
+    unread_count = attr.ib(type=int)
 
     def __nonzero__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -950,6 +951,27 @@ class SyncHandler(object):
         # There is no new information in this period, so your notification
         # count is whatever it was last time.
         return None
+
+    async def unread_messages_for_room_id(
+        self, room_id: str, sync_config: SyncConfig,
+    ) -> int:
+        """Retrieve the count of unread message for the current user in the given room.
+        """
+        with Measure(self.clock, "unread_messages_for_room_id"):
+            last_unread_event_id = await self.store.get_last_receipt_event_id_for_user(
+                user_id=sync_config.user.to_string(),
+                room_id=room_id,
+                receipt_type="m.read",
+            )
+
+            if last_unread_event_id:
+                count = await self.store.get_unread_message_count_for_user(
+                    sync_config.user.to_string(), room_id, last_unread_event_id
+                )
+                return count
+
+        # There is no unread message for this user in this room.
+        return 0
 
     async def generate_sync_result(
         self,
@@ -1877,6 +1899,8 @@ class SyncHandler(object):
 
         if room_builder.rtype == "joined":
             unread_notifications = {}  # type: Dict[str, str]
+
+            unread_count = await self.unread_messages_for_room_id(room_id, sync_config)
             room_sync = JoinedSyncResult(
                 room_id=room_id,
                 timeline=batch,
@@ -1885,6 +1909,7 @@ class SyncHandler(object):
                 account_data=account_data_events,
                 unread_notifications=unread_notifications,
                 summary=summary,
+                unread_count=unread_count,
             )
 
             if room_sync or always_include:

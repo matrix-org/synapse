@@ -24,6 +24,7 @@ from typing import List, Optional, Tuple
 from canonicaljson import json
 from constantly import NamedConstant, Names
 
+from twisted.enterprise.adbapi import Connection
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
@@ -39,7 +40,7 @@ from synapse.logging.context import PreserveLoggingContext, current_context
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
-from synapse.storage.database import Database
+from synapse.storage.database import Database, LoggingTransaction
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import get_domain_from_id
 from synapse.util.caches.descriptors import Cache, cached, cachedInlineCallbacks
@@ -1359,6 +1360,47 @@ class EventsWorkerStore(SQLBaseStore):
         return self.db.runInteraction(
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
+
+    async def get_unread_message_count_for_user(
+        self,
+        user_id: str,
+        room_id: str,
+        last_read_event_id: str,
+    ):
+        return await self.db.runInteraction(
+            "get_unread_message_count_for_user",
+            self._get_unread_message_count_for_user_txn,
+            user_id,
+            room_id,
+            last_read_event_id,
+        )
+
+    def _get_unread_message_count_for_user_txn(
+        self,
+        txn: LoggingTransaction,
+        user_id: str,
+        room_id: str,
+        last_read_event_id: str,
+    ):
+        # Get the stream ordering for the last read event.
+        stream_ordering = self.db.simple_select_one_onecol_txn(
+            txn=txn,
+            table="events",
+            keyvalues={"room_id": room_id, "event_id": last_read_event_id},
+            retcol="stream_ordering",
+        )
+
+        # Count the messages that qualify as unread after the stream ordering we've just
+        # retrieved.
+        sql = """
+            SELECT COUNT(*) FROM unread_messages
+            WHERE user_id = ? AND room_id = ? AND stream_ordering > ?
+        """
+
+        txn.execute(sql, (user_id, room_id, stream_ordering))
+        row = txn.fetchone()
+
+        return row[0] if row else 0
 
 
 AllNewEventsResult = namedtuple(

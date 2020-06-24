@@ -1688,6 +1688,7 @@ class PersistEventsStore:
                     "user_id": user_id,
                     "stream_ordering": event.internal_metadata.stream_ordering,
                     "room_id": event.room_id,
+                    "event_id": event.event_id,
                 }
                 for user_id in users_in_room
             ],

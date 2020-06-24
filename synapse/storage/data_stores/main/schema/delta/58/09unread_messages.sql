@@ -17,5 +17,6 @@ CREATE TABLE IF NOT EXISTS unread_messages(
     user_id TEXT NOT NULL,  -- The user for which the message is unread.
     stream_ordering BIGINT NOT NULL,  -- The position of the message in the event stream.
     room_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,  -- The ID of the message, we need it to handle redactions.
     UNIQUE (user_id, stream_ordering)
 );
