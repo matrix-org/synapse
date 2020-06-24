@@ -5,6 +5,8 @@
 # black - opinionated code formatter
 # flake8 - lints and finds mistakes
 
+set -e
+
 if [ $# -ge 1 ]
 then
   files=$*
