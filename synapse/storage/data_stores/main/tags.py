@@ -233,6 +233,9 @@ class TagsStore(TagsWorkerStore):
             self._account_data_stream_cache.entity_has_changed, user_id, next_id
         )
 
+        # Note: This is only here for backwards compat to allow admins to
+        # roll back to a previous Synapse version. Next time we update the
+        # database version we can remove this table.
         update_max_id_sql = (
             "UPDATE account_data_max_stream_id"
             " SET stream_id = ?"

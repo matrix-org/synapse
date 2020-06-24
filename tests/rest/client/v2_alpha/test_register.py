@@ -33,6 +33,7 @@ from synapse.rest.client.v1 import login, logout
 from synapse.rest.client.v2_alpha import account, account_validity, register, sync
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class RegisterRestServletTestCase(unittest.HomeserverTestCase):
@@ -142,10 +143,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"403", channel.result)
         self.assertEquals(channel.json_body["error"], "Guest access is disabled")
 
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting_guest(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
-
         for i in range(0, 6):
             url = self.url + b"?kind=guest"
             request, channel = self.make_request(b"POST", url, b"{}")
@@ -164,10 +163,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
+    @override_config({"rc_registration": {"per_second": 0.17, "burst_count": 5}})
     def test_POST_ratelimiting(self):
-        self.hs.config.rc_registration.burst_count = 5
-        self.hs.config.rc_registration.per_second = 0.17
-
         for i in range(0, 6):
             params = {
                 "username": "kermit" + str(i),
