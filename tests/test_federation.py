@@ -206,3 +206,59 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         # list.
         self.reactor.advance(30)
         self.assertEqual(self.resync_attempts, 2)
+
+    def test_cross_signing_keys_retry(self):
+        """Tests that resyncing a device list correctly processes cross-signing keys from
+        the remote server.
+        """
+        remote_user_id = "@john:test_remote"
+        remote_master_key = "85T7JXPFBAySB/jwby4S3lBPTqY3+Zg53nYuGmu1ggY"
+        remote_self_signing_key = "QeIiFEjluPBtI7WQdG365QKZcFs9kqmHir6RBD0//nQ"
+
+        # Register mock device list retrieval on the federation client.
+        federation_client = self.homeserver.get_federation_client()
+        federation_client.query_user_devices = Mock(
+            return_value={
+                "user_id": remote_user_id,
+                "stream_id": 1,
+                "devices": [],
+                "master_key": {
+                    "user_id": remote_user_id,
+                    "usage": ["master"],
+                    "keys": {"ed25519:" + remote_master_key: remote_master_key},
+                },
+                "self_signing_key": {
+                    "user_id": remote_user_id,
+                    "usage": ["self_signing"],
+                    "keys": {
+                        "ed25519:" + remote_self_signing_key: remote_self_signing_key
+                    },
+                },
+            }
+        )
+
+        # Resync the device list.
+        device_handler = self.homeserver.get_device_handler()
+        self.get_success(
+            device_handler.device_list_updater.user_device_resync(remote_user_id),
+        )
+
+        # Retrieve the cross-signing keys for this user.
+        keys = self.get_success(
+            self.store.get_e2e_cross_signing_keys_bulk(user_ids=[remote_user_id]),
+        )
+        self.assertTrue(remote_user_id in keys)
+
+        # Check that the master key is the one returned by the mock.
+        master_key = keys[remote_user_id]["master"]
+        self.assertEqual(len(master_key["keys"]), 1)
+        self.assertTrue("ed25519:" + remote_master_key in master_key["keys"].keys())
+        self.assertTrue(remote_master_key in master_key["keys"].values())
+
+        # Check that the self-signing key is the one returned by the mock.
+        self_signing_key = keys[remote_user_id]["self_signing"]
+        self.assertEqual(len(self_signing_key["keys"]), 1)
+        self.assertTrue(
+            "ed25519:" + remote_self_signing_key in self_signing_key["keys"].keys(),
+        )
+        self.assertTrue(remote_self_signing_key in self_signing_key["keys"].values())

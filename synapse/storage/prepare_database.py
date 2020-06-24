@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 # schema files, so the users will be informed on server restarts.
 # XXX: If you're about to bump this to 59 (or higher) please create an update
 # that drops the unused `cache_invalidation_stream` table, as per #7436!
+# XXX: Also add an update to drop `account_data_max_stream_id` as per #7656!
 SCHEMA_VERSION = 58
 
 dir_path = os.path.abspath(os.path.dirname(__file__))
@@ -366,9 +367,8 @@ def _upgrade_existing_database(
         if duplicates:
             # We don't support using the same file name in the same delta version.
             raise PrepareDatabaseException(
-                "Found multiple delta files with the same name in v%d: %s",
-                v,
-                duplicates,
+                "Found multiple delta files with the same name in v%d: %s"
+                % (v, duplicates,)
             )
 
         # We sort to ensure that we apply the delta files in a consistent

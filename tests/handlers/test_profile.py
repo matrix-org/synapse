@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from twisted.internet import defer
 
@@ -55,11 +55,7 @@ class ProfileTestCase(unittest.TestCase):
             federation_client=self.mock_federation,
             federation_server=Mock(),
             federation_registry=self.mock_registry,
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
-
-        self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         self.store = hs.get_datastore()
 

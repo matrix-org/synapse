@@ -70,6 +70,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {

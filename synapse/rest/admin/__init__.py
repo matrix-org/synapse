@@ -26,6 +26,11 @@ from synapse.rest.admin._base import (
     assert_requester_is_admin,
     historical_admin_path_patterns,
 )
+from synapse.rest.admin.devices import (
+    DeleteDevicesRestServlet,
+    DeviceRestServlet,
+    DevicesRestServlet,
+)
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
@@ -202,6 +207,9 @@ def register_servlets(hs, http_server):
     UserAdminServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
     UsersRestServletV2(hs).register(http_server)
+    DeviceRestServlet(hs).register(http_server)
+    DevicesRestServlet(hs).register(http_server)
+    DeleteDevicesRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):
