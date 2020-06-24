@@ -341,18 +341,18 @@ def _reverse_topological_power_sort(
     """
 
     graph = {}
-    for idx, event_id in enumerate(event_ids):
+    for idx, event_id in enumerate(event_ids, start=1):
         yield _add_event_and_auth_chain_to_graph(
             graph, room_id, event_id, event_map, state_res_store, auth_diff
         )
 
         # We yield occasionally when we're working with large data sets to
         # ensure that we don't block the reactor loop for too long.
-        if idx != 0 and idx % _YIELD_AFTER_ITERATIONS == 0:
+        if idx % _YIELD_AFTER_ITERATIONS == 0:
             yield clock.sleep(0)
 
     event_to_pl = {}
-    for idx, event_id in enumerate(graph):
+    for idx, event_id in enumerate(graph, start=1):
         pl = yield _get_power_level_for_sender(
             room_id, event_id, event_map, state_res_store
         )
@@ -360,7 +360,7 @@ def _reverse_topological_power_sort(
 
         # We yield occasionally when we're working with large data sets to
         # ensure that we don't block the reactor loop for too long.
-        if idx != 0 and idx % _YIELD_AFTER_ITERATIONS == 0:
+        if idx % _YIELD_AFTER_ITERATIONS == 0:
             yield clock.sleep(0)
 
     def _get_power_order(event_id):
@@ -489,7 +489,7 @@ def _mainline_sort(
     event_ids = list(event_ids)
 
     order_map = {}
-    for idx, ev_id in enumerate(event_ids):
+    for idx, ev_id in enumerate(event_ids, start=1):
         depth = yield _get_mainline_depth_for_event(
             event_map[ev_id], mainline_map, event_map, state_res_store
         )
@@ -497,7 +497,7 @@ def _mainline_sort(
 
         # We yield occasionally when we're working with large data sets to
         # ensure that we don't block the reactor loop for too long.
-        if idx != 0 and idx % _YIELD_AFTER_ITERATIONS == 0:
+        if idx % _YIELD_AFTER_ITERATIONS == 0:
             yield clock.sleep(0)
 
     event_ids.sort(key=lambda ev_id: order_map[ev_id])
