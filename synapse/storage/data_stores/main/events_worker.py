@@ -1398,7 +1398,8 @@ class EventsWorkerStore(SQLBaseStore):
                 WHERE membership = 'join'
                     AND user_id = ?
                     AND room_id = ?
-                """, (user_id, room_id)
+                """,
+                (user_id, room_id),
             )
             row = txn.fetchone()
             stream_ordering = row[0]
