@@ -161,7 +161,8 @@ class LoginRestServlet(RestServlet):
         if not username:
             if medium and address:
                 # The user attempted to login via threepid and failed
-                # Record this failed attempt
+                # Record this failed attempt using the threepid as a key, as otherwise
+                # the user could bypass the ratelimiter by not providing a username
                 self._failed_attempts_ratelimiter.can_do_action(
                     (medium, address.lower())
                 )
