@@ -138,6 +138,8 @@ def resolve_events_with_store(
     )
 
     logger.debug("resolved power events")
+    for s in resolved_state.items():
+        logger.debug("resolved power state: %s", s)
 
     # OK, so we've now resolved the power events. Now sort the remaining
     # events using the mainline of the resolved power level.
@@ -442,9 +444,11 @@ def _iterative_auth_checks(
                 do_sig_check=False,
                 do_size_check=False,
             )
+            logger.debug("Authing event: %s success", event_id)
 
             resolved_state[(event.type, event.state_key)] = event_id
-        except AuthError:
+        except AuthError as e:
+            logger.debug("Authing event: %s failed: %s", event_id, e)
             pass
 
     return resolved_state
@@ -518,7 +522,7 @@ def _mainline_sort(
     event_ids.sort(key=lambda ev_id: order_map[ev_id])
 
     for event_id in event_ids:
-        logger.debug("Event %s has mainline %d", event_id, order_map[event_id])
+        logger.debug("Event %s has mainline %d", event_id, order_map[event_id][0])
 
     return event_ids
 
