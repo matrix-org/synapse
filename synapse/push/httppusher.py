@@ -133,6 +133,8 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _update_badge(self):
+        # XXX as per https://github.com/matrix-org/matrix-doc/issues/2627, this seems
+        # to be largely redundant. perhaps we can remove it.
         badge = yield push_tools.get_badge_count(self.hs.get_datastore(), self.user_id)
         yield self._send_badge(badge)
 
