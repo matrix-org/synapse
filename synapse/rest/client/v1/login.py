@@ -144,10 +144,8 @@ class LoginRestServlet(RestServlet):
 
         # Check whether this attempt uses a threepid, if so, check if our failed attempt
         # ratelimiter allows another attempt at this time
-        medium, address = (
-            login_submission.get("medium"),
-            login_submission.get("address"),
-        )
+        medium = login_submission.get("medium")
+        address = login_submission.get("address")
         if medium and address:
             self._failed_attempts_ratelimiter.ratelimit(
                 (medium, address.lower()), update=False
