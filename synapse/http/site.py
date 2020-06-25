@@ -14,7 +14,9 @@
 import contextlib
 import logging
 import time
+from typing import Optional
 
+from twisted.python.failure import Failure
 from twisted.web.server import Request, Site
 
 from synapse.http import redact_uri
@@ -44,7 +46,7 @@ class SynapseRequest(Request):
     request even after the client has disconnected.
 
     Attributes:
-        logcontext(LoggingContext) : the log context for this request
+        logcontext: the log context for this request
     """
 
     def __init__(self, channel, *args, **kw):
@@ -52,10 +54,10 @@ class SynapseRequest(Request):
         self.site = channel.site
         self._channel = channel  # this is used by the tests
         self.authenticated_entity = None
-        self.start_time = 0
+        self.start_time = 0.0
 
         # we can't yet create the logcontext, as we don't know the method.
-        self.logcontext = None
+        self.logcontext = None  # type: Optional[LoggingContext]
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -181,6 +183,7 @@ class SynapseRequest(Request):
         self.finish_time = time.time()
         Request.finish(self)
         if not self._is_processing:
+            assert self.logcontext is not None
             with PreserveLoggingContext(self.logcontext):
                 self._finished_processing()
 
@@ -190,8 +193,20 @@ class SynapseRequest(Request):
         Overrides twisted.web.server.Request.connectionLost to record the finish time and
         do logging.
         """
+        # There is a bug in Twisted where reason is not wrapped in a Failure object
+        # Detect this and wrap it manually as a workaround
+        # More information: https://github.com/matrix-org/synapse/issues/7441
+        if not isinstance(reason, Failure):
+            reason = Failure(reason)
+
         self.finish_time = time.time()
         Request.connectionLost(self, reason)
+
+        if self.logcontext is None:
+            logger.info(
+                "Connection from %s lost before request headers were read", self.client
+            )
+            return
 
         # we only get here if the connection to the client drops before we send
         # the response.
@@ -236,13 +251,7 @@ class SynapseRequest(Request):
     def _finished_processing(self):
         """Log the completion of this request and update the metrics
         """
-
-        if self.logcontext is None:
-            # this can happen if the connection closed before we read the
-            # headers (so render was never called). In that case we'll already
-            # have logged a warning, so just bail out.
-            return
-
+        assert self.logcontext is not None
         usage = self.logcontext.get_resource_usage()
 
         if self._processing_finished_time is None:

@@ -18,14 +18,13 @@
 """Utilities for interacting with Identity Servers"""
 
 import logging
-import urllib
+import urllib.parse
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from twisted.internet import defer
 from twisted.internet.error import TimeoutError
 
 from synapse.api.errors import (
@@ -60,8 +59,7 @@ class IdentityHandler(BaseHandler):
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
 
-    @defer.inlineCallbacks
-    def threepid_from_creds(self, id_server, creds):
+    async def threepid_from_creds(self, id_server, creds):
         """
         Retrieve and validate a threepid identifier from a "credentials" dictionary against a
         given identity server
@@ -97,7 +95,7 @@ class IdentityHandler(BaseHandler):
         url = id_server + "/_matrix/identity/api/v1/3pid/getValidated3pid"
 
         try:
-            data = yield self.http_client.get_json(url, query_params)
+            data = await self.http_client.get_json(url, query_params)
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
         except HttpResponseException as e:
@@ -120,8 +118,7 @@ class IdentityHandler(BaseHandler):
         logger.info("%s reported non-validated threepid: %s", id_server, creds)
         return None
 
-    @defer.inlineCallbacks
-    def bind_threepid(
+    async def bind_threepid(
         self, client_secret, sid, mxid, id_server, id_access_token=None, use_v2=True
     ):
         """Bind a 3PID to an identity server
@@ -161,12 +158,12 @@ class IdentityHandler(BaseHandler):
         try:
             # Use the blacklisting http client as this call is only to identity servers
             # provided by a client
-            data = yield self.blacklisting_http_client.post_json_get_json(
+            data = await self.blacklisting_http_client.post_json_get_json(
                 bind_url, bind_data, headers=headers
             )
 
             # Remember where we bound the threepid
-            yield self.store.add_user_bound_threepid(
+            await self.store.add_user_bound_threepid(
                 user_id=mxid,
                 medium=data["medium"],
                 address=data["address"],
@@ -185,13 +182,12 @@ class IdentityHandler(BaseHandler):
             return data
 
         logger.info("Got 404 when POSTing JSON %s, falling back to v1 URL", bind_url)
-        res = yield self.bind_threepid(
+        res = await self.bind_threepid(
             client_secret, sid, mxid, id_server, id_access_token, use_v2=False
         )
         return res
 
-    @defer.inlineCallbacks
-    def try_unbind_threepid(self, mxid, threepid):
+    async def try_unbind_threepid(self, mxid, threepid):
         """Attempt to remove a 3PID from an identity server, or if one is not provided, all
         identity servers we're aware the binding is present on
 
@@ -211,7 +207,7 @@ class IdentityHandler(BaseHandler):
         if threepid.get("id_server"):
             id_servers = [threepid["id_server"]]
         else:
-            id_servers = yield self.store.get_id_servers_user_bound(
+            id_servers = await self.store.get_id_servers_user_bound(
                 user_id=mxid, medium=threepid["medium"], address=threepid["address"]
             )
 
@@ -221,14 +217,13 @@ class IdentityHandler(BaseHandler):
 
         changed = True
         for id_server in id_servers:
-            changed &= yield self.try_unbind_threepid_with_id_server(
+            changed &= await self.try_unbind_threepid_with_id_server(
                 mxid, threepid, id_server
             )
 
         return changed
 
-    @defer.inlineCallbacks
-    def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
+    async def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
         """Removes a binding from an identity server
 
         Args:
@@ -266,7 +261,7 @@ class IdentityHandler(BaseHandler):
         try:
             # Use the blacklisting http client as this call is only to identity servers
             # provided by a client
-            yield self.blacklisting_http_client.post_json_get_json(
+            await self.blacklisting_http_client.post_json_get_json(
                 url, content, headers
             )
             changed = True
@@ -281,7 +276,7 @@ class IdentityHandler(BaseHandler):
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
-        yield self.store.remove_user_bound_threepid(
+        await self.store.remove_user_bound_threepid(
             user_id=mxid,
             medium=threepid["medium"],
             address=threepid["address"],
@@ -290,8 +285,7 @@ class IdentityHandler(BaseHandler):
 
         return changed
 
-    @defer.inlineCallbacks
-    def send_threepid_validation(
+    async def send_threepid_validation(
         self,
         email_address,
         client_secret,
@@ -319,7 +313,7 @@ class IdentityHandler(BaseHandler):
         """
         # Check that this email/client_secret/send_attempt combo is new or
         # greater than what we've seen previously
-        session = yield self.store.get_threepid_validation_session(
+        session = await self.store.get_threepid_validation_session(
             "email", client_secret, address=email_address, validated=False
         )
 
@@ -353,7 +347,7 @@ class IdentityHandler(BaseHandler):
         # Send the mail with the link containing the token, client_secret
         # and session_id
         try:
-            yield send_email_func(email_address, token, client_secret, session_id)
+            await send_email_func(email_address, token, client_secret, session_id)
         except Exception:
             logger.exception(
                 "Error sending threepid validation email to %s", email_address
@@ -364,7 +358,7 @@ class IdentityHandler(BaseHandler):
             self.hs.clock.time_msec() + self.hs.config.email_validation_token_lifetime
         )
 
-        yield self.store.start_or_continue_validation_session(
+        await self.store.start_or_continue_validation_session(
             "email",
             email_address,
             session_id,
@@ -377,8 +371,7 @@ class IdentityHandler(BaseHandler):
 
         return session_id
 
-    @defer.inlineCallbacks
-    def requestEmailToken(
+    async def requestEmailToken(
         self, id_server, email, client_secret, send_attempt, next_link=None
     ):
         """
@@ -413,7 +406,7 @@ class IdentityHandler(BaseHandler):
             )
 
         try:
-            data = yield self.http_client.post_json_get_json(
+            data = await self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/email/requestToken",
                 params,
             )
@@ -424,8 +417,7 @@ class IdentityHandler(BaseHandler):
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
-    @defer.inlineCallbacks
-    def requestMsisdnToken(
+    async def requestMsisdnToken(
         self,
         id_server,
         country,
@@ -467,7 +459,7 @@ class IdentityHandler(BaseHandler):
             )
 
         try:
-            data = yield self.http_client.post_json_get_json(
+            data = await self.http_client.post_json_get_json(
                 id_server + "/_matrix/identity/api/v1/validate/msisdn/requestToken",
                 params,
             )
@@ -488,8 +480,7 @@ class IdentityHandler(BaseHandler):
         )
         return data
 
-    @defer.inlineCallbacks
-    def validate_threepid_session(self, client_secret, sid):
+    async def validate_threepid_session(self, client_secret, sid):
         """Validates a threepid session with only the client secret and session ID
         Tries validating against any configured account_threepid_delegates as well as locally.
 
@@ -511,12 +502,12 @@ class IdentityHandler(BaseHandler):
         # Try to validate as email
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
             # Ask our delegated email identity server
-            validation_session = yield self.threepid_from_creds(
+            validation_session = await self.threepid_from_creds(
                 self.hs.config.account_threepid_delegate_email, threepid_creds
             )
         elif self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             # Get a validated session matching these details
-            validation_session = yield self.store.get_threepid_validation_session(
+            validation_session = await self.store.get_threepid_validation_session(
                 "email", client_secret, sid=sid, validated=True
             )
 
@@ -526,14 +517,13 @@ class IdentityHandler(BaseHandler):
         # Try to validate as msisdn
         if self.hs.config.account_threepid_delegate_msisdn:
             # Ask our delegated msisdn identity server
-            validation_session = yield self.threepid_from_creds(
+            validation_session = await self.threepid_from_creds(
                 self.hs.config.account_threepid_delegate_msisdn, threepid_creds
             )
 
         return validation_session
 
-    @defer.inlineCallbacks
-    def proxy_msisdn_submit_token(self, id_server, client_secret, sid, token):
+    async def proxy_msisdn_submit_token(self, id_server, client_secret, sid, token):
         """Proxy a POST submitToken request to an identity server for verification purposes
 
         Args:
@@ -554,11 +544,9 @@ class IdentityHandler(BaseHandler):
         body = {"client_secret": client_secret, "sid": sid, "token": token}
 
         try:
-            return (
-                yield self.http_client.post_json_get_json(
-                    id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
-                    body,
-                )
+            return await self.http_client.post_json_get_json(
+                id_server + "/_matrix/identity/api/v1/validate/msisdn/submitToken",
+                body,
             )
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
@@ -566,8 +554,7 @@ class IdentityHandler(BaseHandler):
             logger.warning("Error contacting msisdn account_threepid_delegate: %s", e)
             raise SynapseError(400, "Error contacting the identity server")
 
-    @defer.inlineCallbacks
-    def lookup_3pid(self, id_server, medium, address, id_access_token=None):
+    async def lookup_3pid(self, id_server, medium, address, id_access_token=None):
         """Looks up a 3pid in the passed identity server.
 
         Args:
@@ -583,7 +570,7 @@ class IdentityHandler(BaseHandler):
         """
         if id_access_token is not None:
             try:
-                results = yield self._lookup_3pid_v2(
+                results = await self._lookup_3pid_v2(
                     id_server, id_access_token, medium, address
                 )
                 return results
@@ -602,10 +589,9 @@ class IdentityHandler(BaseHandler):
                     logger.warning("Error when looking up hashing details: %s", e)
                     return None
 
-        return (yield self._lookup_3pid_v1(id_server, medium, address))
+        return await self._lookup_3pid_v1(id_server, medium, address)
 
-    @defer.inlineCallbacks
-    def _lookup_3pid_v1(self, id_server, medium, address):
+    async def _lookup_3pid_v1(self, id_server, medium, address):
         """Looks up a 3pid in the passed identity server using v1 lookup.
 
         Args:
@@ -618,7 +604,7 @@ class IdentityHandler(BaseHandler):
             str: the matrix ID of the 3pid, or None if it is not recognized.
         """
         try:
-            data = yield self.blacklisting_http_client.get_json(
+            data = await self.blacklisting_http_client.get_json(
                 "%s%s/_matrix/identity/api/v1/lookup" % (id_server_scheme, id_server),
                 {"medium": medium, "address": address},
             )
@@ -626,7 +612,7 @@ class IdentityHandler(BaseHandler):
             if "mxid" in data:
                 if "signatures" not in data:
                     raise AuthError(401, "No signatures on 3pid binding")
-                yield self._verify_any_signature(data, id_server)
+                await self._verify_any_signature(data, id_server)
                 return data["mxid"]
         except TimeoutError:
             raise SynapseError(500, "Timed out contacting identity server")
@@ -635,8 +621,7 @@ class IdentityHandler(BaseHandler):
 
         return None
 
-    @defer.inlineCallbacks
-    def _lookup_3pid_v2(self, id_server, id_access_token, medium, address):
+    async def _lookup_3pid_v2(self, id_server, id_access_token, medium, address):
         """Looks up a 3pid in the passed identity server using v2 lookup.
 
         Args:
@@ -651,7 +636,7 @@ class IdentityHandler(BaseHandler):
         """
         # Check what hashing details are supported by this identity server
         try:
-            hash_details = yield self.blacklisting_http_client.get_json(
+            hash_details = await self.blacklisting_http_client.get_json(
                 "%s%s/_matrix/identity/v2/hash_details" % (id_server_scheme, id_server),
                 {"access_token": id_access_token},
             )
@@ -718,7 +703,7 @@ class IdentityHandler(BaseHandler):
         headers = {"Authorization": create_id_access_token_header(id_access_token)}
 
         try:
-            lookup_results = yield self.blacklisting_http_client.post_json_get_json(
+            lookup_results = await self.blacklisting_http_client.post_json_get_json(
                 "%s%s/_matrix/identity/v2/lookup" % (id_server_scheme, id_server),
                 {
                     "addresses": [lookup_value],
@@ -746,13 +731,12 @@ class IdentityHandler(BaseHandler):
         mxid = lookup_results["mappings"].get(lookup_value)
         return mxid
 
-    @defer.inlineCallbacks
-    def _verify_any_signature(self, data, server_hostname):
+    async def _verify_any_signature(self, data, server_hostname):
         if server_hostname not in data["signatures"]:
             raise AuthError(401, "No signature from server %s" % (server_hostname,))
         for key_name, signature in data["signatures"][server_hostname].items():
             try:
-                key_data = yield self.blacklisting_http_client.get_json(
+                key_data = await self.blacklisting_http_client.get_json(
                     "%s%s/_matrix/identity/api/v1/pubkey/%s"
                     % (id_server_scheme, server_hostname, key_name)
                 )
@@ -771,8 +755,7 @@ class IdentityHandler(BaseHandler):
             )
             return
 
-    @defer.inlineCallbacks
-    def ask_id_server_for_third_party_invite(
+    async def ask_id_server_for_third_party_invite(
         self,
         requester,
         id_server,
@@ -845,7 +828,7 @@ class IdentityHandler(BaseHandler):
             # Attempt a v2 lookup
             url = base_url + "/v2/store-invite"
             try:
-                data = yield self.blacklisting_http_client.post_json_get_json(
+                data = await self.blacklisting_http_client.post_json_get_json(
                     url,
                     invite_config,
                     {"Authorization": create_id_access_token_header(id_access_token)},
@@ -865,7 +848,7 @@ class IdentityHandler(BaseHandler):
             url = base_url + "/api/v1/store-invite"
 
             try:
-                data = yield self.blacklisting_http_client.post_json_get_json(
+                data = await self.blacklisting_http_client.post_json_get_json(
                     url, invite_config
                 )
             except TimeoutError:
@@ -883,7 +866,7 @@ class IdentityHandler(BaseHandler):
                 # types. This is especially true with old instances of Sydent, see
                 # https://github.com/matrix-org/sydent/pull/170
                 try:
-                    data = yield self.blacklisting_http_client.post_urlencoded_get_json(
+                    data = await self.blacklisting_http_client.post_urlencoded_get_json(
                         url, invite_config
                     )
                 except HttpResponseException as e:

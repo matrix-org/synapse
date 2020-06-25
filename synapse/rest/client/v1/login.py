@@ -14,11 +14,6 @@
 # limitations under the License.
 
 import logging
-import xml.etree.ElementTree as ET
-
-from six.moves import urllib
-
-from twisted.web.client import PartialDownloadError
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
@@ -28,10 +23,10 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import load_jinja2_templates
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
-from synapse.types import UserID, map_username_to_mxid_localpart
+from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
 
 logger = logging.getLogger(__name__)
@@ -88,32 +83,42 @@ class LoginRestServlet(RestServlet):
         self.jwt_algorithm = hs.config.jwt_algorithm
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
+        self.oidc_enabled = hs.config.oidc_enabled
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
-        self._clock = hs.get_clock()
         self._well_known_builder = WellKnownBuilder(hs)
-        self._address_ratelimiter = Ratelimiter()
-        self._account_ratelimiter = Ratelimiter()
-        self._failed_attempts_ratelimiter = Ratelimiter()
+        self._address_ratelimiter = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=self.hs.config.rc_login_address.per_second,
+            burst_count=self.hs.config.rc_login_address.burst_count,
+        )
+        self._account_ratelimiter = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=self.hs.config.rc_login_account.per_second,
+            burst_count=self.hs.config.rc_login_account.burst_count,
+        )
+        self._failed_attempts_ratelimiter = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+        )
 
     def on_GET(self, request):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
-        if self.saml2_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
-            flows.append({"type": LoginRestServlet.TOKEN_TYPE})
-        if self.cas_enabled:
-            flows.append({"type": LoginRestServlet.SSO_TYPE})
 
+        if self.cas_enabled:
             # we advertise CAS for backwards compat, though MSC1721 renamed it
             # to SSO.
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
+        if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
+            flows.append({"type": LoginRestServlet.SSO_TYPE})
             # While its valid for us to advertise this login type generally,
             # synapse currently only gives out these tokens as part of the
-            # CAS login flow.
+            # SSO login flow.
             # Generally we don't want to advertise login flows that clients
             # don't know how to implement, since they (currently) will always
             # fall back to the fallback API if they don't understand one of the
@@ -130,13 +135,7 @@ class LoginRestServlet(RestServlet):
         return 200, {}
 
     async def on_POST(self, request):
-        self._address_ratelimiter.ratelimit(
-            request.getClientIP(),
-            time_now_s=self.hs.clock.time(),
-            rate_hz=self.hs.config.rc_login_address.per_second,
-            burst_count=self.hs.config.rc_login_address.burst_count,
-            update=True,
-        )
+        self._address_ratelimiter.ratelimit(request.getClientIP())
 
         login_submission = parse_json_object_from_request(request)
         try:
@@ -204,13 +203,7 @@ class LoginRestServlet(RestServlet):
 
             # We also apply account rate limiting using the 3PID as a key, as
             # otherwise using 3PID bypasses the ratelimiting based on user ID.
-            self._failed_attempts_ratelimiter.ratelimit(
-                (medium, address),
-                time_now_s=self._clock.time(),
-                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-                update=False,
-            )
+            self._failed_attempts_ratelimiter.ratelimit((medium, address), update=False)
 
             # Check for login providers that support 3pid login types
             (
@@ -244,13 +237,7 @@ class LoginRestServlet(RestServlet):
                 # If it returned None but the 3PID was bound then we won't hit
                 # this code path, which is fine as then the per-user ratelimit
                 # will kick in below.
-                self._failed_attempts_ratelimiter.can_do_action(
-                    (medium, address),
-                    time_now_s=self._clock.time(),
-                    rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                    burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-                    update=True,
-                )
+                self._failed_attempts_ratelimiter.can_do_action((medium, address))
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
             identifier = {"type": "m.id.user", "user": user_id}
@@ -269,11 +256,7 @@ class LoginRestServlet(RestServlet):
 
         # Check if we've hit the failed ratelimit (but don't update it)
         self._failed_attempts_ratelimiter.ratelimit(
-            qualified_user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-            update=False,
+            qualified_user_id.lower(), update=False
         )
 
         try:
@@ -285,13 +268,7 @@ class LoginRestServlet(RestServlet):
             # limiter. Using `can_do_action` avoids us raising a ratelimit
             # exception and masking the LoginError. The actual ratelimiting
             # should have happened above.
-            self._failed_attempts_ratelimiter.can_do_action(
-                qualified_user_id.lower(),
-                time_now_s=self._clock.time(),
-                rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-                burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-                update=True,
-            )
+            self._failed_attempts_ratelimiter.can_do_action(qualified_user_id.lower())
             raise
 
         result = await self._complete_login(
@@ -300,7 +277,7 @@ class LoginRestServlet(RestServlet):
         return result
 
     async def _complete_login(
-        self, user_id, login_submission, callback=None, create_non_existant_users=False
+        self, user_id, login_submission, callback=None, create_non_existent_users=False
     ):
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
@@ -313,7 +290,7 @@ class LoginRestServlet(RestServlet):
             user_id (str): ID of the user to register.
             login_submission (dict): Dictionary of login information.
             callback (func|None): Callback function to run after registration.
-            create_non_existant_users (bool): Whether to create the user if
+            create_non_existent_users (bool): Whether to create the user if
                 they don't exist. Defaults to False.
 
         Returns:
@@ -324,20 +301,15 @@ class LoginRestServlet(RestServlet):
         # Before we actually log them in we check if they've already logged in
         # too often. This happens here rather than before as we don't
         # necessarily know the user before now.
-        self._account_ratelimiter.ratelimit(
-            user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_account.per_second,
-            burst_count=self.hs.config.rc_login_account.burst_count,
-            update=True,
-        )
+        self._account_ratelimiter.ratelimit(user_id.lower())
 
-        if create_non_existant_users:
-            user_id = await self.auth_handler.check_user_exists(user_id)
-            if not user_id:
-                user_id = await self.registration_handler.register_user(
+        if create_non_existent_users:
+            canonical_uid = await self.auth_handler.check_user_exists(user_id)
+            if not canonical_uid:
+                canonical_uid = await self.registration_handler.register_user(
                     localpart=UserID.from_string(user_id).localpart
                 )
+            user_id = canonical_uid
 
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
@@ -392,7 +364,7 @@ class LoginRestServlet(RestServlet):
 
         user_id = UserID(user, self.hs.hostname).to_string()
         result = await self._complete_login(
-            user_id, login_submission, create_non_existant_users=True
+            user_id, login_submission, create_non_existent_users=True
         )
         return result
 
@@ -402,24 +374,27 @@ class BaseSSORedirectServlet(RestServlet):
 
     PATTERNS = client_patterns("/login/(cas|sso)/redirect", v1=True)
 
-    def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest):
         args = request.args
         if b"redirectUrl" not in args:
             return 400, "Redirect URL not specified for SSO auth"
         client_redirect_url = args[b"redirectUrl"][0]
-        sso_url = self.get_sso_url(client_redirect_url)
+        sso_url = await self.get_sso_url(request, client_redirect_url)
         request.redirect(sso_url)
         finish_request(request)
 
-    def get_sso_url(self, client_redirect_url):
+    async def get_sso_url(
+        self, request: SynapseRequest, client_redirect_url: bytes
+    ) -> bytes:
         """Get the URL to redirect to, to perform SSO auth
 
         Args:
-            client_redirect_url (bytes): the URL that we should redirect the
+            request: The client request to redirect.
+            client_redirect_url: the URL that we should redirect the
                 client to when everything is done
 
         Returns:
-            bytes: URL to redirect to
+            URL to redirect to
         """
         # to be implemented by subclasses
         raise NotImplementedError()
@@ -427,19 +402,14 @@ class BaseSSORedirectServlet(RestServlet):
 
 class CasRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
-        super(CasRedirectServlet, self).__init__()
-        self.cas_server_url = hs.config.cas_server_url.encode("ascii")
-        self.cas_service_url = hs.config.cas_service_url.encode("ascii")
+        self._cas_handler = hs.get_cas_handler()
 
-    def get_sso_url(self, client_redirect_url):
-        client_redirect_url_param = urllib.parse.urlencode(
-            {b"redirectUrl": client_redirect_url}
+    async def get_sso_url(
+        self, request: SynapseRequest, client_redirect_url: bytes
+    ) -> bytes:
+        return self._cas_handler.get_redirect_url(
+            {"redirectUrl": client_redirect_url}
         ).encode("ascii")
-        hs_redirect_url = self.cas_service_url + b"/_matrix/client/r0/login/cas/ticket"
-        service_param = urllib.parse.urlencode(
-            {b"service": b"%s?%s" % (hs_redirect_url, client_redirect_url_param)}
-        ).encode("ascii")
-        return b"%s/login?%s" % (self.cas_server_url, service_param)
 
 
 class CasTicketServlet(RestServlet):
@@ -447,80 +417,24 @@ class CasTicketServlet(RestServlet):
 
     def __init__(self, hs):
         super(CasTicketServlet, self).__init__()
-        self.cas_server_url = hs.config.cas_server_url
-        self.cas_service_url = hs.config.cas_service_url
-        self.cas_displayname_attribute = hs.config.cas_displayname_attribute
-        self.cas_required_attributes = hs.config.cas_required_attributes
-        self._sso_auth_handler = SSOAuthHandler(hs)
-        self._http_client = hs.get_proxied_http_client()
+        self._cas_handler = hs.get_cas_handler()
 
-    async def on_GET(self, request):
-        client_redirect_url = parse_string(request, "redirectUrl", required=True)
-        uri = self.cas_server_url + "/proxyValidate"
-        args = {
-            "ticket": parse_string(request, "ticket", required=True),
-            "service": self.cas_service_url,
-        }
-        try:
-            body = await self._http_client.get_raw(uri, args)
-        except PartialDownloadError as pde:
-            # Twisted raises this error if the connection is closed,
-            # even if that's being used old-http style to signal end-of-data
-            body = pde.response
-        result = await self.handle_cas_response(request, body, client_redirect_url)
-        return result
+    async def on_GET(self, request: SynapseRequest) -> None:
+        client_redirect_url = parse_string(request, "redirectUrl")
+        ticket = parse_string(request, "ticket", required=True)
 
-    def handle_cas_response(self, request, cas_response_body, client_redirect_url):
-        user, attributes = self.parse_cas_response(cas_response_body)
-        displayname = attributes.pop(self.cas_displayname_attribute, None)
+        # Maybe get a session ID (if this ticket is from user interactive
+        # authentication).
+        session = parse_string(request, "session")
 
-        for required_attribute, required_value in self.cas_required_attributes.items():
-            # If required attribute was not in CAS Response - Forbidden
-            if required_attribute not in attributes:
-                raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
+        # Either client_redirect_url or session must be provided.
+        if not client_redirect_url and not session:
+            message = "Missing string query parameter redirectUrl or session"
+            raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
 
-            # Also need to check value
-            if required_value is not None:
-                actual_value = attributes[required_attribute]
-                # If required attribute value does not match expected - Forbidden
-                if required_value != actual_value:
-                    raise LoginError(401, "Unauthorized", errcode=Codes.UNAUTHORIZED)
-
-        return self._sso_auth_handler.on_successful_auth(
-            user, request, client_redirect_url, displayname
+        await self._cas_handler.handle_ticket(
+            request, ticket, client_redirect_url, session
         )
-
-    def parse_cas_response(self, cas_response_body):
-        user = None
-        attributes = {}
-        try:
-            root = ET.fromstring(cas_response_body)
-            if not root.tag.endswith("serviceResponse"):
-                raise Exception("root of CAS response is not serviceResponse")
-            success = root[0].tag.endswith("authenticationSuccess")
-            for child in root[0]:
-                if child.tag.endswith("user"):
-                    user = child.text
-                if child.tag.endswith("attributes"):
-                    for attribute in child:
-                        # ElementTree library expands the namespace in
-                        # attribute tags to the full URL of the namespace.
-                        # We don't care about namespace here and it will always
-                        # be encased in curly braces, so we remove them.
-                        tag = attribute.tag
-                        if "}" in tag:
-                            tag = tag.split("}")[1]
-                        attributes[tag] = attribute.text
-            if user is None:
-                raise Exception("CAS response does not contain user")
-        except Exception:
-            logger.exception("Error parsing CAS response")
-            raise LoginError(401, "Invalid CAS response", errcode=Codes.UNAUTHORIZED)
-        if not success:
-            raise LoginError(
-                401, "Unsuccessful CAS response", errcode=Codes.UNAUTHORIZED
-            )
-        return user, attributes
 
 
 class SAMLRedirectServlet(BaseSSORedirectServlet):
@@ -529,69 +443,25 @@ class SAMLRedirectServlet(BaseSSORedirectServlet):
     def __init__(self, hs):
         self._saml_handler = hs.get_saml_handler()
 
-    def get_sso_url(self, client_redirect_url):
+    async def get_sso_url(
+        self, request: SynapseRequest, client_redirect_url: bytes
+    ) -> bytes:
         return self._saml_handler.handle_redirect_request(client_redirect_url)
 
 
-class SSOAuthHandler(object):
-    """
-    Utility class for Resources and Servlets which handle the response from a SSO
-    service
+class OIDCRedirectServlet(BaseSSORedirectServlet):
+    """Implementation for /login/sso/redirect for the OIDC login flow."""
 
-    Args:
-        hs (synapse.server.HomeServer)
-    """
+    PATTERNS = client_patterns("/login/sso/redirect", v1=True)
 
     def __init__(self, hs):
-        self._hostname = hs.hostname
-        self._auth_handler = hs.get_auth_handler()
-        self._registration_handler = hs.get_registration_handler()
-        self._macaroon_gen = hs.get_macaroon_generator()
+        self._oidc_handler = hs.get_oidc_handler()
 
-        # Load the redirect page HTML template
-        self._template = load_jinja2_templates(
-            hs.config.sso_redirect_confirm_template_dir, ["sso_redirect_confirm.html"],
-        )[0]
-
-        self._server_name = hs.config.server_name
-
-        # cast to tuple for use with str.startswith
-        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
-
-    async def on_successful_auth(
-        self, username, request, client_redirect_url, user_display_name=None
-    ):
-        """Called once the user has successfully authenticated with the SSO.
-
-        Registers the user if necessary, and then returns a redirect (with
-        a login token) to the client.
-
-        Args:
-            username (unicode|bytes): the remote user id. We'll map this onto
-                something sane for a MXID localpath.
-
-            request (SynapseRequest): the incoming request from the browser. We'll
-                respond to it with a redirect.
-
-            client_redirect_url (unicode): the redirect_url the client gave us when
-                it first started the process.
-
-            user_display_name (unicode|None): if set, and we have to register a new user,
-                we will set their displayname to this.
-
-        Returns:
-            Deferred[none]: Completes once we have handled the request.
-        """
-        localpart = map_username_to_mxid_localpart(username)
-        user_id = UserID(localpart, self._hostname).to_string()
-        registered_user_id = await self._auth_handler.check_user_exists(user_id)
-        if not registered_user_id:
-            registered_user_id = await self._registration_handler.register_user(
-                localpart=localpart, default_display_name=user_display_name
-            )
-
-        self._auth_handler.complete_sso_login(
-            registered_user_id, request, client_redirect_url
+    async def get_sso_url(
+        self, request: SynapseRequest, client_redirect_url: bytes
+    ) -> bytes:
+        return await self._oidc_handler.handle_redirect_request(
+            request, client_redirect_url
         )
 
 
@@ -602,3 +472,5 @@ def register_servlets(hs, http_server):
         CasTicketServlet(hs).register(http_server)
     elif hs.config.saml2_enabled:
         SAMLRedirectServlet(hs).register(http_server)
+    elif hs.config.oidc_enabled:
+        OIDCRedirectServlet(hs).register(http_server)

@@ -37,13 +37,13 @@ An attestation is a signed blob of json that looks like:
 
 import logging
 import random
+from typing import Tuple
 
 from signedjson.sign import sign_json
 
 from twisted.internet import defer
 
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
-from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import get_domain_from_id
 
@@ -162,19 +162,19 @@ class GroupAttestionRenewer(object):
     def _start_renew_attestations(self):
         return run_as_background_process("renew_attestations", self._renew_attestations)
 
-    @defer.inlineCallbacks
-    def _renew_attestations(self):
+    async def _renew_attestations(self):
         """Called periodically to check if we need to update any of our attestations
         """
 
         now = self.clock.time_msec()
 
-        rows = yield self.store.get_attestations_need_renewals(
+        rows = await self.store.get_attestations_need_renewals(
             now + UPDATE_ATTESTATION_TIME_MS
         )
 
         @defer.inlineCallbacks
-        def _renew_attestation(group_id, user_id):
+        def _renew_attestation(group_user: Tuple[str, str]):
+            group_id, user_id = group_user
             try:
                 if not self.is_mine_id(group_id):
                     destination = get_domain_from_id(group_id)
@@ -208,7 +208,4 @@ class GroupAttestionRenewer(object):
                 )
 
         for row in rows:
-            group_id = row["group_id"]
-            user_id = row["user_id"]
-
-            run_in_background(_renew_attestation, group_id, user_id)
+            await _renew_attestation((row["group_id"], row["user_id"]))

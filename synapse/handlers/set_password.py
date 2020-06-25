@@ -15,8 +15,6 @@
 import logging
 from typing import Optional
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.types import Requester
 
@@ -32,22 +30,20 @@ class SetPasswordHandler(BaseHandler):
         super(SetPasswordHandler, self).__init__(hs)
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
+        self._password_policy_handler = hs.get_password_policy_handler()
 
-    @defer.inlineCallbacks
-    def set_password(
+    async def set_password(
         self,
         user_id: str,
-        new_password: str,
+        password_hash: str,
         logout_devices: bool,
         requester: Optional[Requester] = None,
     ):
         if not self.hs.config.password_localdb_enabled:
             raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
 
-        password_hash = yield self._auth_handler.hash(new_password)
-
         try:
-            yield self.store.user_set_password_hash(user_id, password_hash)
+            await self.store.user_set_password_hash(user_id, password_hash)
         except StoreError as e:
             if e.code == 404:
                 raise SynapseError(404, "Unknown user", Codes.NOT_FOUND)
@@ -59,12 +55,12 @@ class SetPasswordHandler(BaseHandler):
             except_access_token_id = requester.access_token_id if requester else None
 
             # First delete all of their other devices.
-            yield self._device_handler.delete_all_devices_for_user(
+            await self._device_handler.delete_all_devices_for_user(
                 user_id, except_device_id=except_device_id
             )
 
             # and now delete any access tokens which weren't associated with
             # devices (or were associated with this device).
-            yield self._auth_handler.delete_access_tokens_for_user(
+            await self._auth_handler.delete_access_tokens_for_user(
                 user_id, except_token_id=except_access_token_id
             )

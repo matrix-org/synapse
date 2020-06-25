@@ -52,6 +52,10 @@ class AuthTestCase(unittest.TestCase):
         self.hs.handlers = TestHandlers(self.hs)
         self.auth = Auth(self.hs)
 
+        # AuthBlocking reads from the hs' config on initialization. We need to
+        # modify its config instead of the hs'
+        self.auth_blocking = self.auth._auth_blocking
+
         self.test_user = "@foo:bar"
         self.test_token = b"_test_token_"
 
@@ -68,7 +72,7 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield defer.ensureDeferred(self.auth.get_user_by_req(request))
         self.assertEquals(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_user_bad_token(self):
@@ -105,7 +109,7 @@ class AuthTestCase(unittest.TestCase):
         request.getClientIP.return_value = "127.0.0.1"
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield defer.ensureDeferred(self.auth.get_user_by_req(request))
         self.assertEquals(requester.user.to_string(), self.test_user)
 
     @defer.inlineCallbacks
@@ -125,7 +129,7 @@ class AuthTestCase(unittest.TestCase):
         request.getClientIP.return_value = "192.168.10.10"
         request.args[b"access_token"] = [self.test_token]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield defer.ensureDeferred(self.auth.get_user_by_req(request))
         self.assertEquals(requester.user.to_string(), self.test_user)
 
     def test_get_user_by_req_appservice_valid_token_bad_ip(self):
@@ -188,7 +192,7 @@ class AuthTestCase(unittest.TestCase):
         request.args[b"access_token"] = [self.test_token]
         request.args[b"user_id"] = [masquerading_user_id]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = yield self.auth.get_user_by_req(request)
+        requester = yield defer.ensureDeferred(self.auth.get_user_by_req(request))
         self.assertEquals(
             requester.user.to_string(), masquerading_user_id.decode("utf8")
         )
@@ -225,7 +229,9 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("type = access")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
-        user_info = yield self.auth.get_user_by_access_token(macaroon.serialize())
+        user_info = yield defer.ensureDeferred(
+            self.auth.get_user_by_access_token(macaroon.serialize())
+        )
         user = user_info["user"]
         self.assertEqual(UserID.from_string(user_id), user)
 
@@ -250,7 +256,9 @@ class AuthTestCase(unittest.TestCase):
         macaroon.add_first_party_caveat("guest = true")
         serialized = macaroon.serialize()
 
-        user_info = yield self.auth.get_user_by_access_token(serialized)
+        user_info = yield defer.ensureDeferred(
+            self.auth.get_user_by_access_token(serialized)
+        )
         user = user_info["user"]
         is_guest = user_info["is_guest"]
         self.assertEqual(UserID.from_string(user_id), user)
@@ -260,10 +268,13 @@ class AuthTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_cannot_use_regular_token_as_guest(self):
         USER_ID = "@percy:matrix.org"
-        self.store.add_access_token_to_user = Mock()
+        self.store.add_access_token_to_user = Mock(return_value=defer.succeed(None))
+        self.store.get_device = Mock(return_value=defer.succeed(None))
 
-        token = yield self.hs.handlers.auth_handler.get_access_token_for_user_id(
-            USER_ID, "DEVICE", valid_until_ms=None
+        token = yield defer.ensureDeferred(
+            self.hs.handlers.auth_handler.get_access_token_for_user_id(
+                USER_ID, "DEVICE", valid_until_ms=None
+            )
         )
         self.store.add_access_token_to_user.assert_called_with(
             USER_ID, token, "DEVICE", None
@@ -286,7 +297,9 @@ class AuthTestCase(unittest.TestCase):
         request = Mock(args={})
         request.args[b"access_token"] = [token.encode("ascii")]
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+        requester = yield defer.ensureDeferred(
+            self.auth.get_user_by_req(request, allow_guest=True)
+        )
         self.assertEqual(UserID.from_string(USER_ID), requester.user)
         self.assertFalse(requester.is_guest)
 
@@ -301,7 +314,9 @@ class AuthTestCase(unittest.TestCase):
         request.requestHeaders.getRawHeaders = mock_getRawHeaders()
 
         with self.assertRaises(InvalidClientCredentialsError) as cm:
-            yield self.auth.get_user_by_req(request, allow_guest=True)
+            yield defer.ensureDeferred(
+                self.auth.get_user_by_req(request, allow_guest=True)
+            )
 
         self.assertEqual(401, cm.exception.code)
         self.assertEqual("Guest access token used for regular user", cm.exception.msg)
@@ -310,22 +325,22 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_blocking_mau(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.max_mau_value = 50
+        self.auth_blocking._limit_usage_by_mau = False
+        self.auth_blocking._max_mau_value = 50
         lots_of_users = 100
         small_number_of_users = 1
 
         # Ensure no error thrown
-        yield self.auth.check_auth_blocking()
+        yield defer.ensureDeferred(self.auth.check_auth_blocking())
 
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
 
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(lots_of_users)
         )
 
         with self.assertRaises(ResourceLimitError) as e:
-            yield self.auth.check_auth_blocking()
+            yield defer.ensureDeferred(self.auth.check_auth_blocking())
         self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.exception.code, 403)
@@ -334,49 +349,54 @@ class AuthTestCase(unittest.TestCase):
         self.store.get_monthly_active_count = Mock(
             return_value=defer.succeed(small_number_of_users)
         )
-        yield self.auth.check_auth_blocking()
+        yield defer.ensureDeferred(self.auth.check_auth_blocking())
 
     @defer.inlineCallbacks
     def test_blocking_mau__depending_on_user_type(self):
-        self.hs.config.max_mau_value = 50
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._max_mau_value = 50
+        self.auth_blocking._limit_usage_by_mau = True
 
         self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
         # Support users allowed
-        yield self.auth.check_auth_blocking(user_type=UserTypes.SUPPORT)
+        yield defer.ensureDeferred(
+            self.auth.check_auth_blocking(user_type=UserTypes.SUPPORT)
+        )
         self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
         # Bots not allowed
         with self.assertRaises(ResourceLimitError):
-            yield self.auth.check_auth_blocking(user_type=UserTypes.BOT)
+            yield defer.ensureDeferred(
+                self.auth.check_auth_blocking(user_type=UserTypes.BOT)
+            )
         self.store.get_monthly_active_count = Mock(return_value=defer.succeed(100))
         # Real users not allowed
         with self.assertRaises(ResourceLimitError):
-            yield self.auth.check_auth_blocking()
+            yield defer.ensureDeferred(self.auth.check_auth_blocking())
 
     @defer.inlineCallbacks
     def test_reserved_threepid(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 1
+        self.auth_blocking._limit_usage_by_mau = True
+        self.auth_blocking._max_mau_value = 1
         self.store.get_monthly_active_count = lambda: defer.succeed(2)
         threepid = {"medium": "email", "address": "reserved@server.com"}
         unknown_threepid = {"medium": "email", "address": "unreserved@server.com"}
-        self.hs.config.mau_limits_reserved_threepids = [threepid]
-
-        yield self.store.register_user(user_id="user1", password_hash=None)
-        with self.assertRaises(ResourceLimitError):
-            yield self.auth.check_auth_blocking()
+        self.auth_blocking._mau_limits_reserved_threepids = [threepid]
 
         with self.assertRaises(ResourceLimitError):
-            yield self.auth.check_auth_blocking(threepid=unknown_threepid)
+            yield defer.ensureDeferred(self.auth.check_auth_blocking())
 
-        yield self.auth.check_auth_blocking(threepid=threepid)
+        with self.assertRaises(ResourceLimitError):
+            yield defer.ensureDeferred(
+                self.auth.check_auth_blocking(threepid=unknown_threepid)
+            )
+
+        yield defer.ensureDeferred(self.auth.check_auth_blocking(threepid=threepid))
 
     @defer.inlineCallbacks
     def test_hs_disabled(self):
-        self.hs.config.hs_disabled = True
-        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        self.auth_blocking._hs_disabled = True
+        self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         with self.assertRaises(ResourceLimitError) as e:
-            yield self.auth.check_auth_blocking()
+            yield defer.ensureDeferred(self.auth.check_auth_blocking())
         self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.exception.code, 403)
@@ -388,20 +408,20 @@ class AuthTestCase(unittest.TestCase):
         """
         # this should be the default, but we had a bug where the test was doing the wrong
         # thing, so let's make it explicit
-        self.hs.config.server_notices_mxid = None
+        self.auth_blocking._server_notices_mxid = None
 
-        self.hs.config.hs_disabled = True
-        self.hs.config.hs_disabled_message = "Reason for being disabled"
+        self.auth_blocking._hs_disabled = True
+        self.auth_blocking._hs_disabled_message = "Reason for being disabled"
         with self.assertRaises(ResourceLimitError) as e:
-            yield self.auth.check_auth_blocking()
+            yield defer.ensureDeferred(self.auth.check_auth_blocking())
         self.assertEquals(e.exception.admin_contact, self.hs.config.admin_contact)
         self.assertEquals(e.exception.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
         self.assertEquals(e.exception.code, 403)
 
     @defer.inlineCallbacks
     def test_server_notices_mxid_special_cased(self):
-        self.hs.config.hs_disabled = True
+        self.auth_blocking._hs_disabled = True
         user = "@user:server"
-        self.hs.config.server_notices_mxid = user
-        self.hs.config.hs_disabled_message = "Reason for being disabled"
-        yield self.auth.check_auth_blocking(user)
+        self.auth_blocking._server_notices_mxid = user
+        self.auth_blocking._hs_disabled_message = "Reason for being disabled"
+        yield defer.ensureDeferred(self.auth.check_auth_blocking(user))

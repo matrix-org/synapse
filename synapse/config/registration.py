@@ -131,6 +131,11 @@ class RegistrationConfig(Config):
             if not RoomAlias.is_valid(room_alias):
                 raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
+        self.auto_join_rooms_for_guests = config.get("auto_join_rooms_for_guests", True)
+
+        self.enable_set_displayname = config.get("enable_set_displayname", True)
+        self.enable_set_avatar_url = config.get("enable_set_avatar_url", True)
+        self.enable_3pid_changes = config.get("enable_3pid_changes", True)
 
         self.disable_msisdn_registration = config.get(
             "disable_msisdn_registration", False
@@ -147,9 +152,7 @@ class RegistrationConfig(Config):
                 random_string_with_symbols(50),
             )
         else:
-            registration_shared_secret = (
-                "# registration_shared_secret: <PRIVATE STRING>"
-            )
+            registration_shared_secret = "#registration_shared_secret: <PRIVATE STRING>"
 
         return (
             """\
@@ -338,6 +341,29 @@ class RegistrationConfig(Config):
             #email: https://example.com     # Delegate email sending to example.com
             #msisdn: http://localhost:8090  # Delegate SMS sending to this local process
 
+        # Whether users are allowed to change their displayname after it has
+        # been initially set. Useful when provisioning users based on the
+        # contents of a third-party directory.
+        #
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_displayname: false
+
+        # Whether users are allowed to change their avatar after it has been
+        # initially set. Useful when provisioning users based on the contents
+        # of a third-party directory.
+        #
+        # Does not apply to server administrators. Defaults to 'true'
+        #
+        #enable_set_avatar_url: false
+
+        # Whether users can change the 3PIDs associated with their accounts
+        # (email address and msisdn).
+        #
+        # Defaults to 'true'
+        #
+        #enable_3pid_changes: false
+
         # Users who register on this homeserver will automatically be joined
         # to these rooms
         #
@@ -351,6 +377,13 @@ class RegistrationConfig(Config):
         # users cannot be auto-joined since they do not exist.
         #
         #autocreate_auto_join_rooms: true
+
+        # When auto_join_rooms is specified, setting this flag to false prevents
+        # guest accounts from being automatically joined to the rooms.
+        #
+        # Defaults to true.
+        #
+        #auto_join_rooms_for_guests: false
         """
             % locals()
         )

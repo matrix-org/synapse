@@ -43,7 +43,7 @@ class FederationRateLimiter(object):
         self.ratelimiters = collections.defaultdict(new_limiter)
 
     def ratelimit(self, host):
-        """Used to ratelimit an incoming request from given host
+        """Used to ratelimit an incoming request from a given host
 
         Example usage:
 

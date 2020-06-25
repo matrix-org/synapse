@@ -15,13 +15,14 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from six.moves import urllib
 
 from twisted.internet import defer
 
 from synapse.api.constants import Membership
+from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.api.urls import (
     FEDERATION_UNSTABLE_PREFIX,
     FEDERATION_V1_PREFIX,
@@ -326,18 +327,25 @@ class TransportLayerClient(object):
     @log_function
     def get_public_rooms(
         self,
-        remote_server,
-        limit,
-        since_token,
-        search_filter=None,
-        include_all_networks=False,
-        third_party_instance_id=None,
+        remote_server: str,
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        include_all_networks: bool = False,
+        third_party_instance_id: Optional[str] = None,
     ):
+        """Get the list of public rooms from a remote homeserver
+
+        See synapse.federation.federation_client.FederationClient.get_public_rooms for
+        more information.
+        """
         if search_filter:
             # this uses MSC2197 (Search Filtering over Federation)
             path = _create_v1_path("/publicRooms")
 
-            data = {"include_all_networks": "true" if include_all_networks else "false"}
+            data = {
+                "include_all_networks": "true" if include_all_networks else "false"
+            }  # type: Dict[str, Any]
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
@@ -347,9 +355,19 @@ class TransportLayerClient(object):
 
             data["filter"] = search_filter
 
-            response = yield self.client.post_json(
-                destination=remote_server, path=path, data=data, ignore_backoff=True
-            )
+            try:
+                response = yield self.client.post_json(
+                    destination=remote_server, path=path, data=data, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                    )
+                raise
         else:
             path = _create_v1_path("/publicRooms")
 
@@ -363,9 +381,19 @@ class TransportLayerClient(object):
             if since_token:
                 args["since"] = [since_token]
 
-            response = yield self.client.get_json(
-                destination=remote_server, path=path, args=args, ignore_backoff=True
-            )
+            try:
+                response = yield self.client.get_json(
+                    destination=remote_server, path=path, args=args, ignore_backoff=True
+                )
+            except HttpResponseException as e:
+                if e.code == 403:
+                    raise SynapseError(
+                        403,
+                        "You are not allowed to view the public rooms list of %s"
+                        % (remote_server,),
+                        errcode=Codes.FORBIDDEN,
+                    )
+                raise
 
         return response
 

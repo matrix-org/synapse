@@ -117,7 +117,17 @@ def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
         False if there was an error starting the process
     """
 
-    args = [sys.executable, "-B", "-m", app, "-c", configfile, "-c", worker_configfile]
+    args = [
+        sys.executable,
+        "-B",
+        "-m",
+        app,
+        "-c",
+        configfile,
+        "-c",
+        worker_configfile,
+        "--daemonize",
+    ]
 
     try:
         subprocess.check_call(args)
@@ -132,12 +142,23 @@ def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
         return False
 
 
-def stop(pidfile, app):
+def stop(pidfile: str, app: str) -> bool:
+    """Attempts to kill a synapse worker from the pidfile.
+    Args:
+        pidfile: path to file containing worker's pid
+        app: name of the worker's appservice
+
+    Returns:
+        True if the process stopped successfully
+        False if process was already stopped or an error occured
+    """
+
     if os.path.exists(pidfile):
         pid = int(open(pidfile).read())
         try:
             os.kill(pid, signal.SIGTERM)
             write("stopped %s" % (app,), colour=GREEN)
+            return True
         except OSError as err:
             if err.errno == errno.ESRCH:
                 write("%s not running" % (app,), colour=YELLOW)
@@ -145,6 +166,14 @@ def stop(pidfile, app):
                 abort("Cannot stop %s: Operation not permitted" % (app,))
             else:
                 abort("Cannot stop %s: Unknown error" % (app,))
+            return False
+    else:
+        write(
+            "No running worker of %s found (from %s)\nThe process might be managed by another controller (e.g. systemd)"
+            % (app, pidfile),
+            colour=YELLOW,
+        )
+    return False
 
 
 Worker = collections.namedtuple(
@@ -266,9 +295,6 @@ def main():
             worker_cache_factors = (
                 worker_config.get("synctl_cache_factors") or cache_factors
             )
-            daemonize = worker_config.get("daemonize") or config.get("daemonize")
-            assert daemonize, "Main process must have daemonize set to true"
-
             # The master process doesn't support using worker_* config.
             for key in worker_config:
                 if key == "worker_app":  # But we allow worker_app
@@ -278,11 +304,6 @@ def main():
                 ), "Main process cannot use worker_* config"
         else:
             worker_pidfile = worker_config["worker_pid_file"]
-            worker_daemonize = worker_config["worker_daemonize"]
-            assert worker_daemonize, "In config %r: expected '%s' to be True" % (
-                worker_configfile,
-                "worker_daemonize",
-            )
             worker_cache_factor = worker_config.get("synctl_cache_factor")
             worker_cache_factors = worker_config.get("synctl_cache_factors", {})
         workers.append(
@@ -298,11 +319,17 @@ def main():
     action = options.action
 
     if action == "stop" or action == "restart":
+        has_stopped = True
         for worker in workers:
-            stop(worker.pidfile, worker.app)
+            if not stop(worker.pidfile, worker.app):
+                # A worker could not be stopped.
+                has_stopped = False
 
         if start_stop_synapse:
-            stop(pidfile, "synapse.app.homeserver")
+            if not stop(pidfile, "synapse.app.homeserver"):
+                has_stopped = False
+        if not has_stopped and action == "stop":
+            sys.exit(1)
 
     # Wait for synapse to actually shutdown before starting it again
     if action == "restart":
