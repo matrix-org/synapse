@@ -997,6 +997,8 @@ class PersistEventsStore:
             elif event.type == EventTypes.Redaction and event.redacts is not None:
                 # Insert into the redactions table.
                 self._store_redaction(txn, event)
+                # If the redacted event was unread, revert that.
+                self._handle_redacted_unread_event_txn(txn, event)
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
                 self._store_retention_policy_for_room_txn(txn, event)
@@ -1692,4 +1694,12 @@ class PersistEventsStore:
                 }
                 for user_id in users_in_room
             ],
+        )
+
+    def _handle_redacted_unread_event_txn(self, txn: Connection, event: EventBase):
+        # Redact every row for this event in the unread_messages table.
+        self.db.simple_delete_txn(
+            txn=txn,
+            table="unread_messages",
+            keyvalues={"event_id": event.redacts}
         )
