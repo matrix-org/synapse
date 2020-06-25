@@ -1376,15 +1376,32 @@ class EventsWorkerStore(SQLBaseStore):
         txn: LoggingTransaction,
         user_id: str,
         room_id: str,
-        last_read_event_id: str,
+        last_read_event_id: Optional[str],
     ):
-        # Get the stream ordering for the last read event.
-        stream_ordering = self.db.simple_select_one_onecol_txn(
-            txn=txn,
-            table="events",
-            keyvalues={"room_id": room_id, "event_id": last_read_event_id},
-            retcol="stream_ordering",
-        )
+        if last_read_event_id:
+            # Get the stream ordering for the last read event.
+            stream_ordering = self.db.simple_select_one_onecol_txn(
+                txn=txn,
+                table="events",
+                keyvalues={"room_id": room_id, "event_id": last_read_event_id},
+                retcol="stream_ordering",
+            )
+        else:
+            # If there's no read receipt for that room, it probably means the user hasn't
+            # opened it yet, in which case use the stream ID of their join event.
+            # We can't just set it to 0 otherwise messages from other local users from
+            # before this user joined will be counted as well.
+            txn.execute(
+                """
+                SELECT stream_ordering FROM room_memberships
+                LEFT JOIN events USING (event_id, room_id)
+                WHERE membership = 'join'
+                    AND user_id = ?
+                    AND room_id = ?
+                """, (user_id, room_id)
+            )
+            row = txn.fetchone()
+            stream_ordering = row[0]
 
         # Count the messages that qualify as unread after the stream ordering we've just
         # retrieved.

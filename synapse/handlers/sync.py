@@ -964,14 +964,10 @@ class SyncHandler(object):
                 receipt_type="m.read",
             )
 
-            if last_unread_event_id:
-                count = await self.store.get_unread_message_count_for_user(
-                    sync_config.user.to_string(), room_id, last_unread_event_id
-                )
-                return count
-
-        # There is no unread message for this user in this room.
-        return 0
+            count = await self.store.get_unread_message_count_for_user(
+                sync_config.user.to_string(), room_id, last_unread_event_id
+            )
+            return count
 
     async def generate_sync_result(
         self,
