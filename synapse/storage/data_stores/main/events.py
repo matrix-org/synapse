@@ -1679,6 +1679,11 @@ class PersistEventsStore:
             table="room_memberships",
             keyvalues={"membership": Membership.JOIN, "room_id": event.room_id},
             retcol="user_id",
+        )  # type: list
+
+        # Only insert rows for local users.
+        local_users_in_room = list(
+            filter(lambda user_id: self.hs.is_mine_id(user_id), users_in_room)
         )
 
         # Mark the message as unread for every user currently in the room.
@@ -1692,14 +1697,12 @@ class PersistEventsStore:
                     "room_id": event.room_id,
                     "event_id": event.event_id,
                 }
-                for user_id in users_in_room
+                for user_id in local_users_in_room
             ],
         )
 
     def _handle_redacted_unread_event_txn(self, txn: Connection, event: EventBase):
         # Redact every row for this event in the unread_messages table.
         self.db.simple_delete_txn(
-            txn=txn,
-            table="unread_messages",
-            keyvalues={"event_id": event.redacts}
+            txn=txn, table="unread_messages", keyvalues={"event_id": event.redacts}
         )

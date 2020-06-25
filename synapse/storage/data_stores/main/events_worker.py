@@ -24,7 +24,6 @@ from typing import List, Optional, Tuple
 from canonicaljson import json
 from constantly import NamedConstant, Names
 
-from twisted.enterprise.adbapi import Connection
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
@@ -1362,10 +1361,7 @@ class EventsWorkerStore(SQLBaseStore):
         )
 
     async def get_unread_message_count_for_user(
-        self,
-        user_id: str,
-        room_id: str,
-        last_read_event_id: str,
+        self, user_id: str, room_id: str, last_read_event_id: str,
     ):
         return await self.db.runInteraction(
             "get_unread_message_count_for_user",
