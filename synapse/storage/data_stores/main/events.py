@@ -1686,7 +1686,9 @@ class PersistEventsStore:
             filter(lambda user_id: self.hs.is_mine_id(user_id), users_in_room)
         )
 
-        # Mark the message as unread for every user currently in the room.
+        # Mark the message as unread for every user currently in the room, except the
+        # sender of the event (because even if they haven't sent a read receipt for the
+        # event, it seems dumb to show it as unread to its sender).
         self.db.simple_insert_many_txn(
             txn=txn,
             table="unread_messages",
@@ -1698,6 +1700,7 @@ class PersistEventsStore:
                     "event_id": event.event_id,
                 }
                 for user_id in local_users_in_room
+                if user_id != event.sender
             ],
         )
 
