@@ -124,6 +124,9 @@ def resolve_events_with_store(
 
     logger.debug("sorted %d power events", len(sorted_power_events))
 
+    for e in sorted_power_events:
+        logger.debug("Power event: %s", e)
+
     # Now sequentially auth each one
     resolved_state = yield _iterative_auth_checks(
         room_id,
@@ -421,8 +424,17 @@ def _iterative_auth_checks(
 
                 if ev.rejected_reason is None:
                     auth_events[key] = event_map[ev_id]
+                    logger.debug("No current auth event for %s, using from event", key)
+                else:
+                    logger.debug(
+                        "No current auth event for %s, one from event is rejected", key
+                    )
 
         try:
+            logger.debug(
+                "Authing event: %s with auth_events: %s", event_id, auth_events
+            )
+
             event_auth.check(
                 room_version_obj,
                 event,
@@ -484,6 +496,9 @@ def _mainline_sort(
 
         idx += 1
 
+    for i, ev_id in enumerate(reversed(mainline)):
+        logger.debug("Mainline %d: %s", i, ev_id)
+
     mainline_map = {ev_id: i + 1 for i, ev_id in enumerate(reversed(mainline))}
 
     event_ids = list(event_ids)
@@ -501,6 +516,9 @@ def _mainline_sort(
             yield clock.sleep(0)
 
     event_ids.sort(key=lambda ev_id: order_map[ev_id])
+
+    for event_id in event_ids:
+        logger.debug("Event %s has mainline %d", event_id, order_map[event_id])
 
     return event_ids
 
