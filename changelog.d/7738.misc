@@ -1,0 +1,1 @@
+Move `flake8` to the end of `scripts-dev/lint.sh` as it takes the longest and could cause the script to exit early.
