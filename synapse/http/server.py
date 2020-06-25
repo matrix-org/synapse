@@ -22,7 +22,7 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Awaitable, Callable, Dict, Optional, Tuple, TypeVar, Union
+from typing import Any, Awaitable, Tuple, TypeVar, Union
 
 import jinja2
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
@@ -211,39 +211,46 @@ class HttpServer(object):
 
 class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
     """Base class for resources that have async handlers.
+
+    Args:
+        extract_context: Whether to attempt to extract the opentracing
+            context from the request the servlet is handling.
     """
+
+    def __init__(self, extract_context=False):
+        super().__init__()
+
+        self._extract_context = extract_context
 
     def render(self, request):
         """ This gets called by twisted every time someone sends us a request.
         """
-        defer.ensureDeferred(self._async_render(request))
+        defer.ensureDeferred(self._async_render_wrapper(request))
         return NOT_DONE_YET
 
     @wrap_async_request_handler
-    async def _async_render(self, request):
-        """ This gets called from render() every time someone sends us a request.
-
-        Calls `self._get_handler_for_request` to get the callback to use.
+    async def _async_render_wrapper(self, request):
+        """This is a wrapper that delegates to `_async_render`,
         """
         try:
-            callback, servlet_classname, group_dict = self._get_handler_for_request(
-                request
-            )
+            request.request_metrics.name = self.__class__.__name__
 
-            # Make sure we have a name for this handler in prometheus.
-            request.request_metrics.name = servlet_classname
+            with trace_servlet(request, self._extract_context):
+                callback_return = await self._async_render(request)
 
-            # Now trigger the callback. If it returns a response, we send it
-            # here. If it throws an exception, that is handled by the wrapper
-            # installed by @request_handler.
-            kwargs = intern_dict(
-                {
-                    name: urllib.parse.unquote(value) if value else value
-                    for name, value in group_dict.items()
-                }
-            )
+                if callback_return is not None:
+                    code, response = callback_return
+                    self._send_response(request, code, response)
+        except Exception:
+            f = failure.Failure()
+            self._send_error_response(f, request)
 
-            raw_callback_return = callback(request, **kwargs)
+    async def _async_render(self, request):
+        method_handler = getattr(
+            self, "_async_render_%s" % (request.method.decode("ascii"),), None
+        )
+        if method_handler:
+            raw_callback_return = method_handler(request)
 
             # Is it synchronous? We'll allow this for now.
             if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
@@ -251,32 +258,9 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             else:
                 callback_return = raw_callback_return
 
-            if callback_return is not None:
-                code, response = callback_return
-                self._send_response(request, code, response)
-        except Exception:
-            f = failure.Failure()
-            self._send_error_response(f, request)
+            return callback_return
 
-    @abc.abstractmethod
-    def _get_handler_for_request(
-        self, request: SynapseRequest
-    ) -> Tuple[
-        Callable[..., MaybeAwaitable[Optional[ResponseTuple]]], str, Dict[str, str],
-    ]:
-        """Finds a callback method to handle the given request.
-
-        Returns:
-            A tuple of callback method, the label to use for that method in
-            prometheus metrics, and a dict to pass as kwargs to the callback
-            (typically mapping keys to path components as specified in the
-            handler's path match regexp).
-
-            The returned callback should either return a tuple of response code
-            and response object that will be passed to `self._send_response` or
-            None if the callback writes the response itself.
-        """
-        raise NotImplementedError()
+        _unrecognised_request_handler(request)
 
     @abc.abstractmethod
     def _send_response(
@@ -291,151 +275,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
 
-class JsonResource(HttpServer, _AsyncResource):
-    """ This implements the HttpServer interface and provides JSON support for
-    Resources.
-
-    Register callbacks via register_paths()
-
-    Callbacks can return a tuple of status code and a dict in which case the
-    the dict will automatically be sent to the client as a JSON object.
-
-    The JsonResource is primarily intended for returning JSON, but callbacks
-    may send something other than JSON, they may do so by using the methods
-    on the request object and instead returning None.
-    """
-
-    isLeaf = True
-
-    _PathEntry = collections.namedtuple(
-        "_PathEntry", ["pattern", "callback", "servlet_classname"]
-    )
-
-    def __init__(self, hs, canonical_json=True):
-        resource.Resource.__init__(self)
-
-        self.canonical_json = canonical_json
-        self.clock = hs.get_clock()
-        self.path_regexs = {}
-        self.hs = hs
-
-    def register_paths(
-        self, method, path_patterns, callback, servlet_classname, trace=True
-    ):
-        """
-        Registers a request handler against a regular expression. Later request URLs are
-        checked against these regular expressions in order to identify an appropriate
-        handler for that request.
-
-        Args:
-            method (str): GET, POST etc
-
-            path_patterns (Iterable[str]): A list of regular expressions to which
-                the request URLs are compared.
-
-            callback (function): The handler for the request. Usually a Servlet
-
-            servlet_classname (str): The name of the handler to be used in prometheus
-                and opentracing logs.
-
-            trace (bool): Whether we should start a span to trace the servlet.
-        """
-        method = method.encode("utf-8")  # method is bytes on py3
-
-        if trace:
-            # We don't extract the context from the servlet because we can't
-            # trust the sender
-            callback = trace_servlet(servlet_classname)(callback)
-
-        for path_pattern in path_patterns:
-            logger.debug("Registering for %s %s", method, path_pattern.pattern)
-            self.path_regexs.setdefault(method, []).append(
-                self._PathEntry(path_pattern, callback, servlet_classname)
-            )
-
-    def _get_handler_for_request(self, request: SynapseRequest):
-        """Implements _AsyncResource._get_handler_for_request
-        """
-        request_path = request.path.decode("ascii")
-
-        # Loop through all the registered callbacks to check if the method
-        # and path regex match
-        for path_entry in self.path_regexs.get(request.method, []):
-            m = path_entry.pattern.match(request_path)
-            if m:
-                # We found a match!
-                return path_entry.callback, path_entry.servlet_classname, m.groupdict()
-
-        # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
-        return _unrecognised_request_handler, "unrecognised_request_handler", {}
-
-    def _send_response(
-        self, request, code, response_object,
-    ):
-        """Implements _AsyncResource._send_response
-        """
-        # TODO: Only enable CORS for the requests that need it.
-        respond_with_json(
-            request,
-            code,
-            response_object,
-            send_cors=True,
-            pretty_print=_request_user_agent_is_curl(request),
-            canonical_json=self.canonical_json,
-        )
-
-    def _send_error_response(
-        self, f: failure.Failure, request: SynapseRequest,
-    ) -> None:
-        """Implements _AsyncResource._send_error_response
-        """
-        return_json_error(f, request)
-
-
-class _DirectServeResource(_AsyncResource):
-    """Base class for resources that will just call `self._async_render_<METHOD>`
-    on new requests, formatting responses and errors as JSON.
-
-    If an `_async_render` function exists then that will be called if no method
-    specific function exists, otherwise returns a 400.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-        self._callbacks = (
-            {}
-        )  # type: Dict[bytes, Callable[..., Awaitable[Optional[Tuple[int, Any]]]]]
-        self._name = self.__class__.__name__
-
-        for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
-            method_handler = getattr(self, "_async_render_%s" % (method,), None)
-            if method_handler:
-                self._callbacks[method.encode("ascii")] = trace_servlet(self._name)(
-                    method_handler
-                )
-
-        fallback_handler = getattr(self, "_async_render", None)
-        if fallback_handler:
-            self._fallback_handler = trace_servlet(self._name)(fallback_handler)
-
-        else:
-            self._fallback_handler = None
-
-    def _get_handler_for_request(self, request: SynapseRequest):
-        """Implements _AsyncResource._get_handler_for_request
-        """
-        callback = self._callbacks.get(request.method)
-        if callback:
-            return callback, self._name, {}
-
-        if self._fallback_handler:
-            return self._fallback_handler, self._name, {}
-
-        return _unrecognised_request_handler, "unrecognised_request_handler", {}
-
-
-class DirectServeJsonResource(_DirectServeResource):
+class DirectServeJsonResource(_AsyncResource):
     """A resource that will call `self._async_on_<METHOD>` on new requests,
     formatting responses and errors as JSON.
     """
@@ -463,7 +303,102 @@ class DirectServeJsonResource(_DirectServeResource):
         return_json_error(f, request)
 
 
-class DirectServeHtmlResource(_DirectServeResource):
+class JsonResource(DirectServeJsonResource):
+    """ This implements the HttpServer interface and provides JSON support for
+    Resources.
+
+    Register callbacks via register_paths()
+
+    Callbacks can return a tuple of status code and a dict in which case the
+    the dict will automatically be sent to the client as a JSON object.
+
+    The JsonResource is primarily intended for returning JSON, but callbacks
+    may send something other than JSON, they may do so by using the methods
+    on the request object and instead returning None.
+    """
+
+    isLeaf = True
+
+    _PathEntry = collections.namedtuple(
+        "_PathEntry", ["pattern", "callback", "servlet_classname"]
+    )
+
+    def __init__(self, hs, canonical_json=True, extract_context=False):
+        super().__init__(extract_context)
+
+        self.canonical_json = canonical_json
+        self.clock = hs.get_clock()
+        self.path_regexs = {}
+        self.hs = hs
+
+    def register_paths(self, method, path_patterns, callback, servlet_classname):
+        """
+        Registers a request handler against a regular expression. Later request URLs are
+        checked against these regular expressions in order to identify an appropriate
+        handler for that request.
+
+        Args:
+            method (str): GET, POST etc
+
+            path_patterns (Iterable[str]): A list of regular expressions to which
+                the request URLs are compared.
+
+            callback (function): The handler for the request. Usually a Servlet
+
+            servlet_classname (str): The name of the handler to be used in prometheus
+                and opentracing logs.
+        """
+        method = method.encode("utf-8")  # method is bytes on py3
+
+        for path_pattern in path_patterns:
+            logger.debug("Registering for %s %s", method, path_pattern.pattern)
+            self.path_regexs.setdefault(method, []).append(
+                self._PathEntry(path_pattern, callback, servlet_classname)
+            )
+
+    def _get_handler_for_request(self, request: SynapseRequest):
+        """Implements _AsyncResource._get_handler_for_request
+        """
+        request_path = request.path.decode("ascii")
+
+        # Loop through all the registered callbacks to check if the method
+        # and path regex match
+        for path_entry in self.path_regexs.get(request.method, []):
+            m = path_entry.pattern.match(request_path)
+            if m:
+                # We found a match!
+                return path_entry.callback, path_entry.servlet_classname, m.groupdict()
+
+        # Huh. No one wanted to handle that? Fiiiiiine. Send 400.
+        return _unrecognised_request_handler, "unrecognised_request_handler", {}
+
+    async def _async_render(self, request):
+        callback, servlet_classname, group_dict = self._get_handler_for_request(request)
+
+        request.request_metrics.name = servlet_classname
+
+        # Now trigger the callback. If it returns a response, we send it
+        # here. If it throws an exception, that is handled by the wrapper
+        # installed by @request_handler.
+        kwargs = intern_dict(
+            {
+                name: urllib.parse.unquote(value) if value else value
+                for name, value in group_dict.items()
+            }
+        )
+
+        raw_callback_return = callback(request, **kwargs)
+
+        # Is it synchronous? We'll allow this for now.
+        if isinstance(raw_callback_return, (defer.Deferred, types.CoroutineType)):
+            callback_return = await raw_callback_return
+        else:
+            callback_return = raw_callback_return
+
+        return callback_return
+
+
+class DirectServeHtmlResource(_AsyncResource):
     """A resource that will call `self._async_on_<METHOD>` on new requests,
     formatting responses and errors as HTML.
     """
