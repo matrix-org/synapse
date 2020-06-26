@@ -124,7 +124,7 @@ class LoggingContextTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_make_deferred_yieldable(self):
-        # a function which retuns an incomplete deferred, but doesn't follow
+        # a function which returns an incomplete deferred, but doesn't follow
         # the synapse rules.
         def blocking_function():
             d = defer.Deferred()
@@ -183,7 +183,7 @@ class LoggingContextTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_make_deferred_yieldable_with_await(self):
-        # an async function which retuns an incomplete coroutine, but doesn't
+        # an async function which returns an incomplete coroutine, but doesn't
         # follow the synapse rules.
 
         async def blocking_function():

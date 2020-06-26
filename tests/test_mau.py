@@ -166,7 +166,7 @@ class TestMauLimit(unittest.HomeserverTestCase):
         self.do_sync_for_user(token5)
         self.do_sync_for_user(token6)
 
-        # But old user cant
+        # But old user can't
         with self.assertRaises(SynapseError) as cm:
             self.do_sync_for_user(token1)
 
