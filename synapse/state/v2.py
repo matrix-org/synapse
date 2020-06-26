@@ -126,6 +126,7 @@ def resolve_events_with_store(
 
     # Now sequentially auth each one
     resolved_state = yield _iterative_auth_checks(
+        clock,
         room_id,
         room_version,
         sorted_power_events,
@@ -154,6 +155,7 @@ def resolve_events_with_store(
     logger.debug("resolving remaining events")
 
     resolved_state = yield _iterative_auth_checks(
+        clock,
         room_id,
         room_version,
         leftover_events,
@@ -378,12 +380,13 @@ def _reverse_topological_power_sort(
 
 @defer.inlineCallbacks
 def _iterative_auth_checks(
-    room_id, room_version, event_ids, base_state, event_map, state_res_store
+    clock, room_id, room_version, event_ids, base_state, event_map, state_res_store
 ):
     """Sequentially apply auth checks to each event in given list, updating the
     state as it goes along.
 
     Args:
+        clock (Clock)
         room_id (str)
         room_version (str)
         event_ids (list[str]): Ordered list of events to apply auth checks to
@@ -397,7 +400,7 @@ def _iterative_auth_checks(
     resolved_state = base_state.copy()
     room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
-    for event_id in event_ids:
+    for idx, event_id in enumerate(event_ids, start=1):
         event = event_map[event_id]
 
         auth_events = {}
@@ -434,6 +437,11 @@ def _iterative_auth_checks(
             resolved_state[(event.type, event.state_key)] = event_id
         except AuthError:
             pass
+
+        # We yield occasionally when we're working with large data sets to
+        # ensure that we don't block the reactor loop for too long.
+        if idx % _YIELD_AFTER_ITERATIONS == 0:
+            yield clock.sleep(0)
 
     return resolved_state
 
