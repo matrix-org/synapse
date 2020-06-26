@@ -55,7 +55,7 @@ class Clock(object):
         return self._reactor.seconds()
 
     def time_msec(self):
-        """Returns the current system time in miliseconds since epoch."""
+        """Returns the current system time in milliseconds since epoch."""
         return int(self.time() * 1000)
 
     def looping_call(self, f, msec, *args, **kwargs):

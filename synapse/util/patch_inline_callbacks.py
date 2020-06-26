@@ -192,7 +192,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
                 result = yield d
             except Exception:
                 # this will fish an earlier Failure out of the stack where possible, and
-                # thus is preferable to passing in an exeception to the Failure
+                # thus is preferable to passing in an exception to the Failure
                 # constructor, since it results in less stack-mangling.
                 result = Failure()
 

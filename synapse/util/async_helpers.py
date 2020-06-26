@@ -352,7 +352,7 @@ class ReadWriteLock(object):
     # resolved when they release the lock).
     #
     # Read: We know its safe to acquire a read lock when the latest writer has
-    # been resolved. The new reader is appeneded to the list of latest readers.
+    # been resolved. The new reader is appended to the list of latest readers.
     #
     # Write: We know its safe to acquire the write lock when both the latest
     # writers and readers have been resolved. The new writer replaces the latest

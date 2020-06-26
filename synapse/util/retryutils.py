@@ -22,7 +22,7 @@ from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
 
-# the intial backoff, after the first transaction fails
+# the initial backoff, after the first transaction fails
 MIN_RETRY_INTERVAL = 10 * 60 * 1000
 
 # how much we multiply the backoff by after each subsequent fail
@@ -174,7 +174,7 @@ class RetryDestinationLimiter(object):
             # has been decommissioned.
             # If we get a 401, then we should probably back off since they
             # won't accept our requests for at least a while.
-            # 429 is us being aggresively rate limited, so lets rate limit
+            # 429 is us being aggressively rate limited, so lets rate limit
             # ourselves.
             if exc_val.code == 404 and self.backoff_on_404:
                 valid_err_code = False
