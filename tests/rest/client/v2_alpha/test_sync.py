@@ -353,10 +353,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Change the power levels of the room so that the second user can send state
         # events.
         self.power_levels = {
-            "users": {
-                self.user_id: 100,
-                self.user2: 100,
-            },
+            "users": {self.user_id: 100, self.user2: 100},
             "users_default": 0,
             "events": {
                 "m.room.name": 50,
@@ -366,14 +363,14 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
                 "m.room.avatar": 50,
                 "m.room.tombstone": 100,
                 "m.room.server_acl": 100,
-                "m.room.encryption": 100
+                "m.room.encryption": 100,
             },
             "events_default": 0,
             "state_default": 50,
             "ban": 50,
             "kick": 50,
             "redact": 50,
-            "invite": 0
+            "invite": 0,
         }
         self.helper.send_state(
             self.room_id, EventTypes.PowerLevels, self.power_levels, tok=self.tok,
@@ -405,7 +402,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         # Send a read receipt to tell the server we've read the latest event.
         body = json.dumps({"m.read": res["event_id"]}).encode("utf8")
         request, channel = self.make_request(
-            "POST", "/rooms/%s/read_markers" % self.room_id, body, access_token=self.tok,
+            "POST",
+            "/rooms/%s/read_markers" % self.room_id,
+            body,
+            access_token=self.tok,
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.json_body)
@@ -449,7 +449,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             content={
                 "body": "hello",
                 "msgtype": "m.text",
-                "m.relates_to": {"rel_type": RelationTypes.REPLACE}
+                "m.relates_to": {"rel_type": RelationTypes.REPLACE},
             },
             tok=self.tok2,
         )
@@ -459,10 +459,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
-            content={
-                "body": "hello",
-                "msgtype": "m.notice",
-            },
+            content={"body": "hello", "msgtype": "m.notice"},
             tok=self.tok2,
         )
         self._check_unread_count(5)

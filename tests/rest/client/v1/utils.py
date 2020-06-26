@@ -143,9 +143,7 @@ class RestHelper(object):
 
         return channel.json_body
 
-    def redact(
-        self, room_id, event_id, txn_id=None, tok=None, expect_code=200
-    ):
+    def redact(self, room_id, event_id, txn_id=None, tok=None, expect_code=200):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
 
