@@ -1676,9 +1676,9 @@ class PersistEventsStore:
         # Get the list of users that are currently joined to the room.
         users_in_room = self.db.simple_select_onecol_txn(
             txn=txn,
-            table="room_memberships",
+            table="current_state_events",
             keyvalues={"membership": Membership.JOIN, "room_id": event.room_id},
-            retcol="user_id",
+            retcol="state_key",
         )  # type: list
 
         # Only insert rows for local users.
