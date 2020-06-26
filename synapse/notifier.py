@@ -83,7 +83,7 @@ class _NotifierUserStream(object):
         self.current_token = current_token
 
         # The last token for which we should wake up any streams that have a
-        # token that comes before it. This gets updated everytime we get poked.
+        # token that comes before it. This gets updated every time we get poked.
         # We start it at the current token since if we get any streams
         # that have a token from before we have no idea whether they should be
         # woken up or not, so lets just wake them up.
