@@ -488,6 +488,29 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     if uptime < 0:
         uptime = 0
 
+    #
+    # Performance statistics. Keep this early in the function to maintain reliability of `test_performance_100` test.
+    #
+    old = stats_process[0]
+    new = (now, resource.getrusage(resource.RUSAGE_SELF))
+    stats_process[0] = new
+
+    # Get RSS in bytes
+    stats["memory_rss"] = new[1].ru_maxrss
+
+    # Get CPU time in % of a single core, not % of all cores
+    used_cpu_time = (new[1].ru_utime + new[1].ru_stime) - (
+        old[1].ru_utime + old[1].ru_stime
+    )
+    if used_cpu_time == 0 or new[0] == old[0]:
+        stats["cpu_average"] = 0
+    else:
+        stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
+
+    #
+    # General statistics
+    #
+
     stats["homeserver"] = hs.config.server_name
     stats["server_context"] = hs.config.server_context
     stats["timestamp"] = now
@@ -521,25 +544,6 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     stats["daily_sent_messages"] = daily_sent_messages
     stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.caches.event_cache_size
-
-    #
-    # Performance statistics
-    #
-    old = stats_process[0]
-    new = (now, resource.getrusage(resource.RUSAGE_SELF))
-    stats_process[0] = new
-
-    # Get RSS in bytes
-    stats["memory_rss"] = new[1].ru_maxrss
-
-    # Get CPU time in % of a single core, not % of all cores
-    used_cpu_time = (new[1].ru_utime + new[1].ru_stime) - (
-        old[1].ru_utime + old[1].ru_stime
-    )
-    if used_cpu_time == 0 or new[0] == old[0]:
-        stats["cpu_average"] = 0
-    else:
-        stats["cpu_average"] = math.floor(used_cpu_time / (new[0] - old[0]) * 100)
 
     #
     # Database version
@@ -617,18 +621,17 @@ def run(hs):
     clock.looping_call(reap_monthly_active_users, 1000 * 60 * 60)
     reap_monthly_active_users()
 
-    @defer.inlineCallbacks
-    def generate_monthly_active_users():
+    async def generate_monthly_active_users():
         current_mau_count = 0
         current_mau_count_by_service = {}
         reserved_users = ()
         store = hs.get_datastore()
         if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
-            current_mau_count = yield store.get_monthly_active_count()
+            current_mau_count = await store.get_monthly_active_count()
             current_mau_count_by_service = (
-                yield store.get_monthly_active_count_by_service()
+                await store.get_monthly_active_count_by_service()
             )
-            reserved_users = yield store.get_registered_reserved_users()
+            reserved_users = await store.get_registered_reserved_users()
         current_mau_gauge.set(float(current_mau_count))
 
         for app_service, count in current_mau_count_by_service.items():

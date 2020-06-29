@@ -536,7 +536,7 @@ def build_device_dict(user_id: str, device_id: str, sk: SigningKey):
     return {
         "user_id": user_id,
         "device_id": device_id,
-        "algorithms": ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+        "algorithms": ["m.olm.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
         "keys": {
             "curve25519:" + device_id: "curve25519+key",
             key_id(sk): encode_pubkey(sk),

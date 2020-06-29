@@ -600,8 +600,14 @@ class AccountDataStream(Stream):
             for stream_id, user_id, room_id, account_data_type in room_results
         )
 
-        # we need to return a sorted list, so merge them together.
-        updates = list(heapq.merge(room_rows, global_rows))
+        # We need to return a sorted list, so merge them together.
+        #
+        # Note: We order only by the stream ID to work around a bug where the
+        # same stream ID could appear in both `global_rows` and `room_rows`,
+        # leading to a comparison between the data tuples. The comparison could
+        # fail due to attempting to compare the `room_id` which results in a
+        # `TypeError` from comparing a `str` vs `None`.
+        updates = list(heapq.merge(room_rows, global_rows, key=lambda row: row[0]))
         return updates, to_token, limited
 
 

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock, NonCallableMock
+from mock import Mock
 
 from tests.replication._base import BaseStreamTestCase
 
@@ -21,12 +21,7 @@ from tests.replication._base import BaseStreamTestCase
 class BaseSlavedStoreTestCase(BaseStreamTestCase):
     def make_homeserver(self, reactor, clock):
 
-        hs = self.setup_test_homeserver(
-            federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
-        )
-
-        hs.get_ratelimiter().can_do_action.return_value = (True, 0)
+        hs = self.setup_test_homeserver(federation_client=Mock())
 
         return hs
 

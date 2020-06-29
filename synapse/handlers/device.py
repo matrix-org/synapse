@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Any, Dict, Optional
 
 from six import iteritems, itervalues
 
@@ -30,7 +31,11 @@ from synapse.api.errors import (
 )
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import RoomStreamToken, get_domain_from_id
+from synapse.types import (
+    RoomStreamToken,
+    get_domain_from_id,
+    get_verify_key_from_cross_signing_key,
+)
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -704,22 +709,27 @@ class DeviceListUpdater(object):
             need_resync = yield self.store.get_user_ids_requiring_device_list_resync()
             # Iterate over the set of user IDs.
             for user_id in need_resync:
-                # Try to resync the current user's devices list. Exception handling
-                # isn't necessary here, since user_device_resync catches all instances
-                # of "Exception" that might be raised from the federation request. This
-                # means that if an exception is raised by this function, it must be
-                # because of a database issue, which means _maybe_retry_device_resync
-                # probably won't be able to go much further anyway.
-                result = yield self.user_device_resync(
-                    user_id=user_id, mark_failed_as_stale=False,
-                )
-                # user_device_resync only returns a result if it managed to successfully
-                # resync and update the database. Updating the table of users requiring
-                # resync isn't necessary here as user_device_resync already does it
-                # (through self.store.update_remote_device_list_cache).
-                if result:
+                try:
+                    # Try to resync the current user's devices list.
+                    result = yield self.user_device_resync(
+                        user_id=user_id, mark_failed_as_stale=False,
+                    )
+
+                    # user_device_resync only returns a result if it managed to
+                    # successfully resync and update the database. Updating the table
+                    # of users requiring resync isn't necessary here as
+                    # user_device_resync already does it (through
+                    # self.store.update_remote_device_list_cache).
+                    if result:
+                        logger.debug(
+                            "Successfully resynced the device list for %s", user_id,
+                        )
+                except Exception as e:
+                    # If there was an issue resyncing this user, e.g. if the remote
+                    # server sent a malformed result, just log the error instead of
+                    # aborting all the subsequent resyncs.
                     logger.debug(
-                        "Successfully resynced the device list for %s" % user_id,
+                        "Could not resync the device list for %s: %s", user_id, e,
                     )
         finally:
             # Allow future calls to retry resyncinc out of sync device lists.
@@ -738,6 +748,7 @@ class DeviceListUpdater(object):
             request:
             https://matrix.org/docs/spec/server_server/r0.1.2#get-matrix-federation-v1-user-devices-userid
         """
+        logger.debug("Attempting to resync the device list for %s", user_id)
         log_kv({"message": "Doing resync to update device list."})
         # Fetch all devices for the user.
         origin = get_domain_from_id(user_id)
@@ -789,6 +800,13 @@ class DeviceListUpdater(object):
         stream_id = result["stream_id"]
         devices = result["devices"]
 
+        # Get the master key and the self-signing key for this user if provided in the
+        # response (None if not in the response).
+        # The response will not contain the user signing key, as this key is only used by
+        # its owner, thus it doesn't make sense to send it over federation.
+        master_key = result.get("master_key")
+        self_signing_key = result.get("self_signing_key")
+
         # If the remote server has more than ~1000 devices for this user
         # we assume that something is going horribly wrong (e.g. a bot
         # that logs in and creates a new device every time it tries to
@@ -818,6 +836,13 @@ class DeviceListUpdater(object):
 
         yield self.store.update_remote_device_list_cache(user_id, devices, stream_id)
         device_ids = [device["device_id"] for device in devices]
+
+        # Handle cross-signing keys.
+        cross_signing_device_ids = yield self.process_cross_signing_key_update(
+            user_id, master_key, self_signing_key,
+        )
+        device_ids = device_ids + cross_signing_device_ids
+
         yield self.device_handler.notify_device_update(user_id, device_ids)
 
         # We clobber the seen updates since we've re-synced from a given
@@ -825,3 +850,40 @@ class DeviceListUpdater(object):
         self._seen_updates[user_id] = {stream_id}
 
         defer.returnValue(result)
+
+    @defer.inlineCallbacks
+    def process_cross_signing_key_update(
+        self,
+        user_id: str,
+        master_key: Optional[Dict[str, Any]],
+        self_signing_key: Optional[Dict[str, Any]],
+    ) -> list:
+        """Process the given new master and self-signing key for the given remote user.
+
+        Args:
+            user_id: The ID of the user these keys are for.
+            master_key: The dict of the cross-signing master key as returned by the
+                remote server.
+            self_signing_key: The dict of the cross-signing self-signing key as returned
+                by the remote server.
+
+        Return:
+            The device IDs for the given keys.
+        """
+        device_ids = []
+
+        if master_key:
+            yield self.store.set_e2e_cross_signing_key(user_id, "master", master_key)
+            _, verify_key = get_verify_key_from_cross_signing_key(master_key)
+            # verify_key is a VerifyKey from signedjson, which uses
+            # .version to denote the portion of the key ID after the
+            # algorithm and colon, which is the device ID
+            device_ids.append(verify_key.version)
+        if self_signing_key:
+            yield self.store.set_e2e_cross_signing_key(
+                user_id, "self_signing", self_signing_key
+            )
+            _, verify_key = get_verify_key_from_cross_signing_key(self_signing_key)
+            device_ids.append(verify_key.version)
+
+        return device_ids

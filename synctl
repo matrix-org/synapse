@@ -328,7 +328,7 @@ def main():
         if start_stop_synapse:
             if not stop(pidfile, "synapse.app.homeserver"):
                 has_stopped = False
-        if not has_stopped:
+        if not has_stopped and action == "stop":
             sys.exit(1)
 
     # Wait for synapse to actually shutdown before starting it again
