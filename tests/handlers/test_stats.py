@@ -253,7 +253,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # self.handler.notify_new_event()
 
         # We need to let the delta processor advance…
-        self.pump(10 * 60)
+        self.reactor.advance(10 * 60)
 
         # Get the slices! There should be two -- day 1, and day 2.
         r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))

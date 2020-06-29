@@ -271,7 +271,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
 
         # Pump the reactor repeatedly so that the background updates have a
         # chance to run.
-        self.pump(10 * 60)
+        self.reactor.advance(10 * 60)
 
         latest_event_ids = self.get_success(
             self.store.get_latest_event_ids_in_room(self.room_id)

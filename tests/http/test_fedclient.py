@@ -486,6 +486,6 @@ class FederationClientTests(HomeserverTestCase):
         self.assertFalse(conn.disconnecting)
 
         # wait for a while
-        self.pump(120)
+        self.reactor.advance(120)
 
         self.assertTrue(conn.disconnecting)
