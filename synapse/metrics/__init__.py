@@ -465,7 +465,7 @@ event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
 
 event_processing_lag_by_event = Histogram(
     "synapse_event_processing_lag_by_event",
-    "Time between event is persisted and it being queued up to be sent to the relevant remote servers",
+    "Time between an event being persisted and it being queued up to be sent to the relevant remote servers",
     ["name"],
 )
 
