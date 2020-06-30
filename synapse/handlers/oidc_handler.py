@@ -233,7 +233,6 @@ class OidcHandler:
         elif self._user_profile_method == "auto":
             return "id_token" not in token
         else:
-            #TODO We should probably check this earlier.
             raise ValueError(
                 'user_profile_method must be one of "userinfo_endpoint", "id_token", or "auto"'
             )

@@ -287,10 +287,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         h._validate_metadata()
         h._user_profile_method = "invalid"
         self.assertRaisesRegex(
-            ValueError,
-            "user_profile_method must be one of",
-            h._uses_userinfo,
-            token1
+            ValueError, "user_profile_method must be one of", h._uses_userinfo, token1
         )
 
         h._user_profile_method = "userinfo_endpoint"
