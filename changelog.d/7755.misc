@@ -1,1 +1,1 @@
-Add some metrics for inbound and outbound federation latencies.
+Add some metrics for inbound and outbound federation latencies: `synapse_federation_server_pdu_process_time` and `synapse_event_processing_lag_by_event`.
