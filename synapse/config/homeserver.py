@@ -23,6 +23,7 @@ from .cas import CasConfig
 from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
+from .federation import FederationConfig
 from .groups import GroupsConfig
 from .jwt_config import JWTConfig
 from .key import KeyConfig
@@ -91,4 +92,5 @@ class HomeServerConfig(RootConfig):
         ThirdPartyRulesConfig,
         TracerConfig,
         RedisConfig,
+        FederationConfig,
     ]
