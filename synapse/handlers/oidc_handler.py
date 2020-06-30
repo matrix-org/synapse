@@ -262,7 +262,7 @@ class OidcHandler:
 
         return self._provider_metadata
 
-    async def load_jwks(self, token, force: bool = False) -> JWKS:
+    async def load_jwks(self, token=None, force: bool = False) -> JWKS:
         """Load the JSON Web Key Set used to sign ID tokens.
 
         If we're not using the ``userinfo_endpoint``, user infos are extracted
@@ -290,7 +290,7 @@ class OidcHandler:
                     ]
                 }
         """
-        if self._uses_userinfo(token):
+        if token is not None and self._uses_userinfo(token):
             # We're not using jwt signing, return an empty jwk set
             return {"keys": []}
 
