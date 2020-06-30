@@ -30,8 +30,7 @@ REPLICATION_PREFIX = "/_synapse/replication"
 
 class ReplicationRestResource(JsonResource):
     def __init__(self, hs):
-        # We enabling extracting jaeger contexts here as these are internal
-        # APIs.
+        # We enable extracting jaeger contexts here as these are internal APIs.
         super().__init__(hs, canonical_json=False, extract_context=True)
         self.register_servlets(hs)
 

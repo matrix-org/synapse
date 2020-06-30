@@ -22,7 +22,7 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Awaitable, Tuple, TypeVar, Union
+from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
@@ -62,17 +62,8 @@ HTML_ERROR_TEMPLATE = """<!DOCTYPE html>
 </html>
 """
 
-T = TypeVar("T")
 
-# A tuple of HTTP response code and response body. For JSON requests the body is
-# anything JSON serializable, while for HTML requests they are bytes.
-ResponseTuple = Tuple[int, Any]
-
-# Used for functions that may or may not return an awaitable object.
-MaybeAwaitable = Union[Awaitable[T], T]
-
-
-def return_json_error(f: failure.Failure, request: Request) -> None:
+def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
     """Sends a JSON error response to clients.
     """
 
@@ -107,9 +98,6 @@ def return_json_error(f: failure.Failure, request: Request) -> None:
             send_cors=True,
             pretty_print=_request_user_agent_is_curl(request),
         )
-
-
-TV = TypeVar("TV")
 
 
 def return_html_error(
@@ -212,6 +200,9 @@ class HttpServer(object):
 class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
     """Base class for resources that have async handlers.
 
+    Sub classes can either implement `_async_render_<METHOD>` to handle
+    requests by method, or override `_async_render` to handle all requests.
+
     Args:
         extract_context: Whether to attempt to extract the opentracing
             context from the request the servlet is handling.
@@ -230,7 +221,8 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
     @wrap_async_request_handler
     async def _async_render_wrapper(self, request):
-        """This is a wrapper that delegates to `_async_render`,
+        """This is a wrapper that delegates to `_async_render` and handles
+        exceptions, return values, metrics, etc.
         """
         try:
             request.request_metrics.name = self.__class__.__name__
@@ -246,6 +238,11 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             self._send_error_response(f, request)
 
     async def _async_render(self, request):
+        """Delegates to `_async_render_<METHOD>` methods, or returns a 400 if
+        no appropriate method exists. Can be overriden in sub classes for
+        different routing.
+        """
+
         method_handler = getattr(
             self, "_async_render_%s" % (request.method.decode("ascii"),), None
         )
@@ -356,8 +353,14 @@ class JsonResource(DirectServeJsonResource):
                 self._PathEntry(path_pattern, callback, servlet_classname)
             )
 
-    def _get_handler_for_request(self, request: SynapseRequest):
-        """Implements _AsyncResource._get_handler_for_request
+    def _get_handler_for_request(
+        self, request: SynapseRequest
+    ) -> Tuple[Callable, str, Dict[str, str]]:
+        """Finds a callback method to handle the given request.
+
+        Returns:
+            A tuple of the callback to use, the name of the servlet, and the
+            key word arguments to pass to the callback
         """
         request_path = request.path.decode("ascii")
 
@@ -375,6 +378,8 @@ class JsonResource(DirectServeJsonResource):
     async def _async_render(self, request):
         callback, servlet_classname, group_dict = self._get_handler_for_request(request)
 
+        # Make sure we have an appopriate name for this handler in prometheus
+        # (rather than the default of JsonResource).
         request.request_metrics.name = servlet_classname
 
         # Now trigger the callback. If it returns a response, we send it

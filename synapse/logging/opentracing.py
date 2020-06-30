@@ -795,8 +795,9 @@ def tag_args(func):
 
 @contextlib.contextmanager
 def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
-    """Context manager which traces a servlet. It starts a span with some
-    servlet specific tags such as the servlet_name and request information.
+    """Returns a context manager which traces a request. It starts a span
+    with some servlet specific tags such as the request metrics name and
+    request information.
 
     Args:
         request
