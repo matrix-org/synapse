@@ -57,6 +57,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ServerConfig,
         TlsConfig,
+        FederationConfig,
         CacheConfig,
         DatabaseConfig,
         LoggingConfig,
