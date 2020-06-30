@@ -56,6 +56,7 @@ class OIDCConfig(Config):
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
+        self.oidc_user_profile_method = oidc_config.get("user_profile_method", "auto")
 
         ump_config = oidc_config.get("user_mapping_provider", {})
         ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
