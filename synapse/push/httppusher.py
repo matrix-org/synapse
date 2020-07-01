@@ -20,11 +20,11 @@ from prometheus_client import Counter
 from twisted.internet import defer
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 
+from synapse.api.constants import EventTypes
 from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
 
-from synapse.api.constants import EventTypes
 from . import push_rule_evaluator, push_tools
 
 logger = logging.getLogger(__name__)
