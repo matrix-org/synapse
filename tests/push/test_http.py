@@ -88,9 +88,6 @@ class HTTPPusherTests(HomeserverTestCase):
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
 
-        # Invite the other person
-        self.helper.invite(room=room, src=user_id, tok=access_token, targ=other_user_id)
-
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
@@ -177,9 +174,6 @@ class HTTPPusherTests(HomeserverTestCase):
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
 
-        # Invite the other person
-        self.helper.invite(room=room, src=user_id, tok=access_token, targ=other_user_id)
-
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
@@ -238,15 +232,10 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(self.push_attempts[0][1], "example.com")
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
 
-        # Invite yet another person — we want to make this room not a 1:1
+        # Add yet another person — we want to make this room not a 1:1
         # (as encrypted messages in a 1:1 currently have tweaks applied
         #  so it doesn't properly exercise the condition of all encrypted
         #  messages need to be high).
-        self.helper.invite(
-            room=room, src=user_id, tok=access_token, targ=yet_another_user_id
-        )
-
-        # Yet another user joins
         self.helper.join(
             room=room, user=yet_another_user_id, tok=yet_another_access_token
         )
@@ -301,9 +290,6 @@ class HTTPPusherTests(HomeserverTestCase):
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
 
-        # Invite the other person
-        self.helper.invite(room=room, src=user_id, tok=access_token, targ=other_user_id)
-
         # The other user joins
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
 
@@ -341,11 +327,6 @@ class HTTPPusherTests(HomeserverTestCase):
         self.assertEqual(len(self.push_attempts), 1)
         self.assertEqual(self.push_attempts[0][1], "example.com")
         self.assertEqual(self.push_attempts[0][2]["notification"]["prio"], "high")
-
-        # Invite yet another person — we want to make this room not a 1:1.
-        self.helper.invite(
-            room=room, src=user_id, tok=access_token, targ=yet_another_user_id
-        )
 
         # Yet another user joins
         self.helper.join(
@@ -387,12 +368,6 @@ class HTTPPusherTests(HomeserverTestCase):
 
         # Create a room
         room = self.helper.create_room_as(user_id, tok=access_token)
-
-        # Invite the other people
-        self.helper.invite(room=room, src=user_id, tok=access_token, targ=other_user_id)
-        self.helper.invite(
-            room=room, src=user_id, tok=access_token, targ=yet_another_user_id
-        )
 
         # The other users join
         self.helper.join(room=room, user=other_user_id, tok=other_access_token)
@@ -466,17 +441,6 @@ class HTTPPusherTests(HomeserverTestCase):
         # Create a room (as other_user so the power levels are compatible with
         # other_user sending @room).
         room = self.helper.create_room_as(other_user_id, tok=other_access_token)
-
-        # Invite the other people
-        self.helper.invite(
-            room=room, src=other_user_id, tok=other_access_token, targ=user_id
-        )
-        self.helper.invite(
-            room=room,
-            src=other_user_id,
-            tok=other_access_token,
-            targ=yet_another_user_id,
-        )
 
         # The other users join
         self.helper.join(room=room, user=user_id, tok=access_token)
