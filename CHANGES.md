@@ -1,13 +1,17 @@
 Synapse 1.16.0rc1 (2020-07-01)
 ==============================
 
+Note that this release deprecates the `m.login.jwt` login method, renaming it
+to `org.matrix.login.jwt`, as `m.login.jwt` is not part of the Matrix spec.
+Otherwise the behaviour is identical. Synapse will accept both names for now,
+but this may change in a future release.
+
 Features
 --------
 
 - Add an option to enable encryption by default for new rooms. ([\#7639](https://github.com/matrix-org/synapse/issues/7639))
-- Add support for running multiple media repository workers. See [docs/workers.md](docs/workers.md) for instructions. ([\#7706](https://github.com/matrix-org/synapse/issues/7706))
+- Add support for running multiple media repository workers. See [docs/workers.md](https://github.com/matrix-org/synapse/blob/develop/docs/workers.md) for instructions. ([\#7706](https://github.com/matrix-org/synapse/issues/7706))
 - Media can now be marked as safe from quarantined. ([\#7718](https://github.com/matrix-org/synapse/issues/7718))
-- Add unread messages count to sync responses. ([\#7761](https://github.com/matrix-org/synapse/issues/7761))
 - Expand the configuration options for auto-join rooms. ([\#7763](https://github.com/matrix-org/synapse/issues/7763))
 
 
@@ -15,17 +19,17 @@ Bugfixes
 --------
 
 - Remove `user_id` from the response to `GET /_matrix/client/r0/presence/{userId}/status` to match the specification. ([\#7606](https://github.com/matrix-org/synapse/issues/7606))
-- In working mode, ensure that replicated data has not already been received. ([\#7648](https://github.com/matrix-org/synapse/issues/7648))
+- In worker mode, ensure that replicated data has not already been received. ([\#7648](https://github.com/matrix-org/synapse/issues/7648))
 - Fix intermittent exception during startup, introduced in Synapse 1.14.0. ([\#7663](https://github.com/matrix-org/synapse/issues/7663))
 - Include a user-agent for federation and well-known requests. ([\#7677](https://github.com/matrix-org/synapse/issues/7677))
-- Accept the proper field (`phone`) for the `m.id.phone` identifier type. The legacy field of `number` is still accepted as a fallback. Bug introduced in v0.20.0-rc1. ([\#7687](https://github.com/matrix-org/synapse/issues/7687))
-- Fix "Starting db txn 'get_completed_ui_auth_stages' from sentinel context" warning. The bug was introduced in 1.13.0rc1. ([\#7688](https://github.com/matrix-org/synapse/issues/7688))
-- Compare the URI and method during user interactive authentication (instead of the URI twice). Bug introduced in 1.13.0rc1. ([\#7689](https://github.com/matrix-org/synapse/issues/7689))
+- Accept the proper field (`phone`) for the `m.id.phone` identifier type. The legacy field of `number` is still accepted as a fallback. Bug introduced in v0.20.0. ([\#7687](https://github.com/matrix-org/synapse/issues/7687))
+- Fix "Starting db txn 'get_completed_ui_auth_stages' from sentinel context" warning. The bug was introduced in 1.13.0. ([\#7688](https://github.com/matrix-org/synapse/issues/7688))
+- Compare the URI and method during user interactive authentication (instead of the URI twice). Bug introduced in 1.13.0. ([\#7689](https://github.com/matrix-org/synapse/issues/7689))
 - Fix a long standing bug where the response to the `GET room_keys/version` endpoint had the incorrect type for the `etag` field. ([\#7691](https://github.com/matrix-org/synapse/issues/7691))
 - Fix logged error during device resync in opentracing. Broke in v1.14.0. ([\#7698](https://github.com/matrix-org/synapse/issues/7698))
 - Do not break push rule evaluation when receiving an event with a non-string body. This is a long-standing bug. ([\#7701](https://github.com/matrix-org/synapse/issues/7701))
 - Fixs a long standing bug which resulted in an exception: "TypeError: argument of type 'ObservableDeferred' is not iterable". ([\#7708](https://github.com/matrix-org/synapse/issues/7708))
-- The `synapse_port_db` script no longer fails when the `ui_auth_sessions` table is non-empty. This bug has existed since v1.13.0rc1. ([\#7711](https://github.com/matrix-org/synapse/issues/7711))
+- The `synapse_port_db` script no longer fails when the `ui_auth_sessions` table is non-empty. This bug has existed since v1.13.0. ([\#7711](https://github.com/matrix-org/synapse/issues/7711))
 - Synapse will now fetch media from the proper specified URL (using the r0 prefix instead of the unspecified v1). ([\#7714](https://github.com/matrix-org/synapse/issues/7714))
 - Fix the tables ignored by `synapse_port_db` to be in sync the current database schema. ([\#7717](https://github.com/matrix-org/synapse/issues/7717))
 - Fix missing `Content-Length` on HTTP responses from the metrics handler. ([\#7730](https://github.com/matrix-org/synapse/issues/7730))
@@ -51,7 +55,7 @@ Internal Changes
 
 - Refactor getting replication updates from database. ([\#7636](https://github.com/matrix-org/synapse/issues/7636))
 - Clean-up the login fallback code. ([\#7657](https://github.com/matrix-org/synapse/issues/7657))
-- Increase the default SAML session expirary time to 15 minutes. ([\#7664](https://github.com/matrix-org/synapse/issues/7664))
+- Increase the default SAML session expiry time to 15 minutes. ([\#7664](https://github.com/matrix-org/synapse/issues/7664))
 - Convert the device message and pagination handlers to async/await. ([\#7678](https://github.com/matrix-org/synapse/issues/7678))
 - Convert typing handler to async/await. ([\#7679](https://github.com/matrix-org/synapse/issues/7679))
 - Require `parameterized` package version to be at least 0.7.0. ([\#7680](https://github.com/matrix-org/synapse/issues/7680))
