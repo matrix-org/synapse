@@ -1,0 +1,1 @@
+Fix to not ignore `set_tweak` actions in Push Rules that have no `value`, as permitted by the specification.
