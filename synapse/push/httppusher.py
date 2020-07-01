@@ -24,8 +24,8 @@ from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
 
-from . import push_rule_evaluator, push_tools
 from ..api.constants import EventTypes
+from . import push_rule_evaluator, push_tools
 
 logger = logging.getLogger(__name__)
 
