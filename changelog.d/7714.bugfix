@@ -1,1 +1,0 @@
-Synapse will now fetch media from the proper specified URL (using the r0 prefix instead of the unspecified v1).
