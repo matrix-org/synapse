@@ -77,8 +77,10 @@ def tweaks_for_actions(actions):
     for a in actions:
         if not isinstance(a, dict):
             continue
-        if "set_tweak" in a and "value" in a:
-            tweaks[a["set_tweak"]] = a["value"]
+        if "set_tweak" in a:
+            # value is allowed to be absent in which case the value assumed
+            # should be True.
+            tweaks[a["set_tweak"]] = a.get("value", True)
     return tweaks
 
 
