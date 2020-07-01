@@ -25,6 +25,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import PusherConfigException
 
 from . import push_rule_evaluator, push_tools
+from ..api.constants import EventTypes
 
 logger = logging.getLogger(__name__)
 
@@ -305,12 +306,23 @@ class HttpPusher(object):
 
     @defer.inlineCallbacks
     def _build_notification_dict(self, event, tweaks, badge):
+        priority = "low"
+        if (
+            event.type == EventTypes.Encrypted
+            or tweaks.get("highlight")
+            or tweaks.get("sound")
+        ):
+            # HACK send our push as high priority only if it generates a sound, highlight
+            #  or may do so (i.e. is encrypted so has unknown effects).
+            priority = "high"
+
         if self.data.get("format") == "event_id_only":
             d = {
                 "notification": {
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "counts": {"unread": badge},
+                    "prio": priority,
                     "devices": [
                         {
                             "app_id": self.app_id,
@@ -334,6 +346,7 @@ class HttpPusher(object):
                 "room_id": event.room_id,
                 "type": event.type,
                 "sender": event.user_id,
+                "prio": priority,
                 "counts": {
                     "unread": badge,
                     # 'missed_calls': 2
