@@ -16,7 +16,7 @@
 
 import logging
 import re
-from typing import Pattern
+from typing import Any, Dict, List, Pattern, Union
 
 from synapse.events import EventBase
 from synapse.types import UserID
@@ -72,7 +72,28 @@ def _test_ineq_condition(condition, number):
         return False
 
 
-def tweaks_for_actions(actions):
+def tweaks_for_actions(actions: List[Union[str, Dict]]) -> Dict[str, Any]:
+    """
+    Converts a list of actions into a `tweaks` dict (which can then be passed to
+        the push gateway).
+
+    This function ignores all actions other than `set_tweak` actions, and treats
+    absent `value`s as `True`, which agrees with the only spec-defined treatment
+    of absent `value`s (namely, for `highlight` tweaks).
+
+    Args:
+        actions: list of actions
+            e.g. [
+                {"set_tweak": "a", "value": "AAA"},
+                {"set_tweak": "b", "value": "BBB"},
+                {"set_tweak": "highlight"},
+                "notify"
+            ]
+
+    Returns:
+        dictionary of tweaks for those actions
+            e.g. {"a": "AAA", "b": "BBB", "highlight": True}
+    """
     tweaks = {}
     for a in actions:
         if not isinstance(a, dict):
