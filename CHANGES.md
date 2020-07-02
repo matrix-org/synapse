@@ -1,7 +1,7 @@
 Synapse 1.15.2 (2020-07-02)
 ===========================
 
-Due to the two security issues highlight below, server administrators are
+Due to the two security issues highlighted below, server administrators are
 encouraged to update Synapse. We are not aware of these vulnerabilities being
 exploited in the wild.
 
