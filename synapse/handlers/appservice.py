@@ -118,7 +118,7 @@ class ApplicationServicesHandler(object):
                         ts = yield self.store.get_received_ts(event.event_id)
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "appservice_sender"
-                        ).observe(now - ts)
+                        ).observe((now - ts) / 1000)
 
                     @defer.inlineCallbacks
                     def handle_room_events(events):
