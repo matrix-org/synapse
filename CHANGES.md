@@ -1,3 +1,21 @@
+Synapse 1.16.0rc2 (2020-07-02)
+==============================
+
+Synapse 1.16.0rc2 includes the security fixes releases with Synapse 1.15.2.
+Please see [below](#synapse-1152-2020-07-02) for more details.
+
+Improved Documentation
+----------------------
+
+- Update postgres image in example `docker-compose.yaml` to tag `12-alpine`. ([\#7696](https://github.com/matrix-org/synapse/issues/7696))
+
+
+Internal Changes
+----------------
+
+- Add some metrics for inbound and outbound federation latencies: `synapse_federation_server_pdu_process_time` and `synapse_event_processing_lag_by_event`. ([\#7771](https://github.com/matrix-org/synapse/issues/7771))
+
+
 Synapse 1.16.0rc1 (2020-07-01)
 ==============================
 
