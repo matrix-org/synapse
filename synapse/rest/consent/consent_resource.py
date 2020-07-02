@@ -29,7 +29,7 @@ from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
 from synapse.http.server import (
     DirectServeResource,
-    finish_request,
+    respond_with_html,
     wrap_html_request_handler,
 )
 from synapse.http.servlet import parse_string
@@ -197,12 +197,8 @@ class ConsentResource(DirectServeResource):
         template_html = self._jinja_env.get_template(
             path.join(TEMPLATE_LANGUAGE, template_name)
         )
-        html_bytes = template_html.render(**template_args).encode("utf8")
-
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%i" % len(html_bytes))
-        request.write(html_bytes)
-        finish_request(request)
+        html = template_html.render(**template_args)
+        respond_with_html(request, 200, html)
 
     def _check_hash(self, userid, userhmac):
         """
