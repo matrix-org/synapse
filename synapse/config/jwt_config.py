@@ -63,8 +63,8 @@ class JWTConfig(Config):
             #
             #enabled: true
 
-            # This is either the private secret or the public key used to decode
-            # the contents of the JWT.
+            # This is either the private shared secret or the public key used to
+            # decode the contents of the JSON web token.
             #
             # Required if 'enabled' is true.
             #
