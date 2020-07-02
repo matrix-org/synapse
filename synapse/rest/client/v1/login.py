@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import Awaitable, Callable, Dict, Optional
 
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
@@ -26,7 +27,7 @@ from synapse.http.servlet import (
 from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
 from synapse.util.msisdn import phone_number_to_msisdn
 
 logger = logging.getLogger(__name__)
@@ -113,7 +114,7 @@ class LoginRestServlet(RestServlet):
             burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
         )
 
-    def on_GET(self, request):
+    def on_GET(self, request: SynapseRequest):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
@@ -141,10 +142,10 @@ class LoginRestServlet(RestServlet):
 
         return 200, {"flows": flows}
 
-    def on_OPTIONS(self, request):
+    def on_OPTIONS(self, request: SynapseRequest):
         return 200, {}
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest):
         self._address_ratelimiter.ratelimit(request.getClientIP())
 
         login_submission = parse_json_object_from_request(request)
@@ -153,9 +154,9 @@ class LoginRestServlet(RestServlet):
                 login_submission["type"] == LoginRestServlet.JWT_TYPE
                 or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
             ):
-                result = await self.do_jwt_login(login_submission)
+                result = await self._do_jwt_login(login_submission)
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
-                result = await self.do_token_login(login_submission)
+                result = await self._do_token_login(login_submission)
             else:
                 result = await self._do_other_login(login_submission)
         except KeyError:
@@ -166,7 +167,7 @@ class LoginRestServlet(RestServlet):
             result["well_known"] = well_known_data
         return 200, result
 
-    async def _do_other_login(self, login_submission):
+    async def _do_other_login(self, login_submission: JsonDict):
         """Handle non-token/saml/jwt logins
 
         Args:
@@ -288,25 +289,30 @@ class LoginRestServlet(RestServlet):
         return result
 
     async def _complete_login(
-        self, user_id, login_submission, callback=None, create_non_existent_users=False
+        self,
+        user_id: str,
+        login_submission: JsonDict,
+        callback: Optional[
+            Callable[[Dict[str, str]], Awaitable[Dict[str, str]]]
+        ] = None,
+        create_non_existent_users: bool = False,
     ):
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
-        all succesful logins.
+        all successful logins.
 
-        Applies the ratelimiting for succesful login attempts against an
+        Applies the ratelimiting for successful login attempts against an
         account.
 
         Args:
-            user_id (str): ID of the user to register.
-            login_submission (dict): Dictionary of login information.
-            callback (func|None): Callback function to run after registration.
-            create_non_existent_users (bool): Whether to create the user if
-                they don't exist. Defaults to False.
+            user_id: ID of the user to register.
+            login_submission: Dictionary of login information.
+            callback: Callback function to run after registration.
+            create_non_existent_users: Whether to create the user if they don't
+                exist. Defaults to False.
 
         Returns:
-            result (Dict[str,str]): Dictionary of account information after
-                successful registration.
+            result: Dictionary of account information after successful registration.
         """
 
         # Before we actually log them in we check if they've already logged in
@@ -340,7 +346,7 @@ class LoginRestServlet(RestServlet):
 
         return result
 
-    async def do_token_login(self, login_submission):
+    async def _do_token_login(self, login_submission: JsonDict):
         token = login_submission["token"]
         auth_handler = self.auth_handler
         user_id = await auth_handler.validate_short_term_login_token_and_get_user_id(
@@ -350,7 +356,7 @@ class LoginRestServlet(RestServlet):
         result = await self._complete_login(user_id, login_submission)
         return result
 
-    async def do_jwt_login(self, login_submission):
+    async def _do_jwt_login(self, login_submission: JsonDict):
         token = login_submission.get("token", None)
         if token is None:
             raise LoginError(
