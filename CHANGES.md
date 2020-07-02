@@ -72,6 +72,26 @@ Internal Changes
 - Add some metrics for inbound and outbound federation latencies: `synapse_federation_server_pdu_process_time` and `synapse_event_processing_lag_by_event`. ([\#7755](https://github.com/matrix-org/synapse/issues/7755))
 
 
+Synapse 1.15.2 (2020-07-02)
+===========================
+
+Due to the two security issues highlighted below, server administrators are
+encouraged to update Synapse. We are not aware of these vulnerabilities being
+exploited in the wild.
+
+Security advisory
+-----------------
+
+* A malicious homeserver could force Synapse to reset the state in a room to a
+  small subset of the correct state. This affects all Synapse deployments which
+  federate with untrusted servers. ([96e9afe6](https://github.com/matrix-org/synapse/commit/96e9afe62500310977dc3cbc99a8d16d3d2fa15c))
+* HTML pages served via Synapse were vulnerable to clickjacking attacks. This
+  predominantly affects homeservers with single-sign-on enabled, but all server
+  administrators are encouraged to upgrade. ([ea26e9a9](https://github.com/matrix-org/synapse/commit/ea26e9a98b0541fc886a1cb826a38352b7599dbe))
+
+  This was reported by [Quentin Gliech](https://sandhose.fr/).
+
+
 Synapse 1.15.1 (2020-06-16)
 ===========================
 
