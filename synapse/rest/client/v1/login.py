@@ -167,14 +167,14 @@ class LoginRestServlet(RestServlet):
             result["well_known"] = well_known_data
         return 200, result
 
-    async def _do_other_login(self, login_submission: JsonDict):
+    async def _do_other_login(self, login_submission: JsonDict) -> Dict[str, str]:
         """Handle non-token/saml/jwt logins
 
         Args:
             login_submission:
 
         Returns:
-            dict: HTTP response
+            HTTP response
         """
         # Log the request we got, but only certain fields to minimise the chance of
         # logging someone's password (even if they accidentally put it in the wrong
@@ -296,7 +296,7 @@ class LoginRestServlet(RestServlet):
             Callable[[Dict[str, str]], Awaitable[Dict[str, str]]]
         ] = None,
         create_non_existent_users: bool = False,
-    ):
+    ) -> Dict[str, str]:
         """Called when we've successfully authed the user and now need to
         actually login them in (e.g. create devices). This gets called on
         all successful logins.
@@ -346,7 +346,7 @@ class LoginRestServlet(RestServlet):
 
         return result
 
-    async def _do_token_login(self, login_submission: JsonDict):
+    async def _do_token_login(self, login_submission: JsonDict) -> Dict[str, str]:
         token = login_submission["token"]
         auth_handler = self.auth_handler
         user_id = await auth_handler.validate_short_term_login_token_and_get_user_id(
@@ -356,7 +356,7 @@ class LoginRestServlet(RestServlet):
         result = await self._complete_login(user_id, login_submission)
         return result
 
-    async def _do_jwt_login(self, login_submission: JsonDict):
+    async def _do_jwt_login(self, login_submission: JsonDict) -> Dict[str, str]:
         token = login_submission.get("token", None)
         if token is None:
             raise LoginError(
