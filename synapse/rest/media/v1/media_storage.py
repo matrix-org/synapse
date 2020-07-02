@@ -46,8 +46,7 @@ class MediaStorage(object):
         self.filepaths = filepaths
         self.storage_providers = storage_providers
 
-    @defer.inlineCallbacks
-    def store_file(self, source, file_info):
+    async def store_file(self, source, file_info):
         """Write `source` to the on disk media store, and also any other
         configured storage providers
 
@@ -61,10 +60,10 @@ class MediaStorage(object):
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
             # Write to the main repository
-            yield defer_to_thread(
+            await defer_to_thread(
                 self.hs.get_reactor(), _write_file_synchronously, source, f
             )
-            yield finish_cb()
+            await finish_cb()
 
         return fname
 
@@ -75,7 +74,7 @@ class MediaStorage(object):
 
         Actually yields a 3-tuple (file, fname, finish_cb), where file is a file
         like object that can be written to, fname is the absolute path of file
-        on disk, and finish_cb is a function that returns a Deferred.
+        on disk, and finish_cb is a function that returns an awaitable.
 
         fname can be used to read the contents from after upload, e.g. to
         generate thumbnails.
@@ -91,7 +90,7 @@ class MediaStorage(object):
 
             with media_storage.store_into_file(info) as (f, fname, finish_cb):
                 # .. write into f ...
-                yield finish_cb()
+                await finish_cb()
         """
 
         path = self._file_info_to_path(file_info)
@@ -103,10 +102,9 @@ class MediaStorage(object):
 
         finished_called = [False]
 
-        @defer.inlineCallbacks
-        def finish():
+        async def finish():
             for provider in self.storage_providers:
-                yield provider.store_file(path, file_info)
+                await provider.store_file(path, file_info)
 
             finished_called[0] = True
 
