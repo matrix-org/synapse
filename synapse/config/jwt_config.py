@@ -72,6 +72,9 @@ class JWTConfig(Config):
 
             # The algorithm used to sign the JSON web token.
             #
+            # Supported algorithms are listed at
+            # https://pyjwt.readthedocs.io/en/latest/algorithms.html
+            #
             # Required if 'enabled' is true.
             #
             #algorithm: "provided-by-your-issuer"
