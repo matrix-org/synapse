@@ -240,7 +240,7 @@ class FederationHandler(BaseHandler):
             logger.debug("[%s %s] min_depth: %d", room_id, event_id, min_depth)
 
             prevs = set(pdu.prev_event_ids())
-            seen = await self.store.have_seen_events(prevs)
+            seen = await self.store.have_events_in_timeline(prevs)
 
             if min_depth is not None and pdu.depth < min_depth:
                 # This is so that we don't notify the user about this
@@ -280,7 +280,7 @@ class FederationHandler(BaseHandler):
 
                         # Update the set of things we've seen after trying to
                         # fetch the missing stuff
-                        seen = await self.store.have_seen_events(prevs)
+                        seen = await self.store.have_events_in_timeline(prevs)
 
                         if not prevs - seen:
                             logger.info(
@@ -426,7 +426,7 @@ class FederationHandler(BaseHandler):
         room_id = pdu.room_id
         event_id = pdu.event_id
 
-        seen = await self.store.have_seen_events(prevs)
+        seen = await self.store.have_events_in_timeline(prevs)
 
         if not prevs - seen:
             return

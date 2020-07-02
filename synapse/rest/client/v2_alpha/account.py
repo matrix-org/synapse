@@ -20,7 +20,7 @@ from http import HTTPStatus
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour
-from synapse.http.server import finish_request
+from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -198,16 +198,15 @@ class PasswordResetSubmitTokenServlet(RestServlet):
 
             # Otherwise show the success template
             html = self.config.email_password_reset_template_success_html
-            request.setResponseCode(200)
+            status_code = 200
         except ThreepidValidationError as e:
-            request.setResponseCode(e.code)
+            status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
             html = self.failure_email_template.render(**template_vars)
 
-        request.write(html.encode("utf-8"))
-        finish_request(request)
+        respond_with_html(request, status_code, html)
 
 
 class PasswordRestServlet(RestServlet):
@@ -570,16 +569,15 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
 
             # Otherwise show the success template
             html = self.config.email_add_threepid_template_success_html_content
-            request.setResponseCode(200)
+            status_code = 200
         except ThreepidValidationError as e:
-            request.setResponseCode(e.code)
+            status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
             html = self.failure_email_template.render(**template_vars)
 
-        request.write(html.encode("utf-8"))
-        finish_request(request)
+        respond_with_html(request, status_code, html)
 
 
 class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
