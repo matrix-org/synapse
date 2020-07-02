@@ -1804,12 +1804,19 @@ sso:
     #template_dir: "res/templates"
 
 
-# The JWT needs to contain a globally unique "sub" (subject) claim.
+# Configure the non-standard JSON Web Token login type.
+#
+# Each JSON Web Token needs to contain a "sub" (subject) claim, which is
+# used as the localpart of the mxid.
 #
 #jwt_config:
-#   enabled: true
-#   secret: "a secret"
-#   algorithm: "HS256"
+    # Uncomment the following to enable JWT logins.
+    #enabled: true
+    # This is either the private secret or the public key used to decode
+    # the contents of the JWT.
+    #secret: "a secret"
+    # The algorithm used to sign the JWT.
+    #algorithm: "HS256"
 
 
 password_config:
