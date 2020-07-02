@@ -66,6 +66,7 @@ STATE_EVENT_TYPES_TO_MARK_UNREAD = [
     EventTypes.PowerLevels,
     EventTypes.Topic,
     EventTypes.Name,
+    EventTypes.RoomAvatar,
 ]
 
 
@@ -1632,9 +1633,9 @@ class PersistEventsStore:
         """Mark the event as unread for every current member of the room if it passes the
         conditions for that.
 
-        These conditions are: the event must either have a body, be an encrypted message,
-        or be either a power levels event, a room name event or a room topic event, and
-        must be neither rejected or soft-failed nor an edit or a notice.
+        These conditions are: the event must either have a non-empty string body, be an
+        encrypted message, or be either a power levels event, a room name event or a room
+        topic event, and must be neither rejected or soft-failed nor an edit or a notice.
 
         Args:
             txn: The transaction to use to retrieve room members and to mark the event
@@ -1660,7 +1661,7 @@ class PersistEventsStore:
         ):
             return
 
-        body_exists = content.get("body") is not None
+        body_exists = isinstance(content.get("body"), str)
         is_state_event_to_mark_unread = (
             event.is_state() and event.type in STATE_EVENT_TYPES_TO_MARK_UNREAD
         )
@@ -1668,8 +1669,8 @@ class PersistEventsStore:
             not event.is_state() and event.type == EventTypes.Encrypted
         )
 
-        # We want to mark unread messages with a body, some state events (power levels,
-        # room name, room topic) and encrypted messages.
+        # We want to mark unread messages with a non-empty string body, some state events
+        # (power levels, room name, room topic, room avatar) and encrypted messages.
         if not (body_exists or is_state_event_to_mark_unread or is_encrypted_message):
             return
 
