@@ -1,3 +1,23 @@
+Synapse 1.15.2 (2020-07-02)
+===========================
+
+Due to the two security issues highlight below, server administrators are
+encouraged to update Synapse. We are not aware of these vulnerabilities being
+exploited in the wild.
+
+Security advisory
+-----------------
+
+* A malicious homeserver could force Synapse to reset the state in a room to a
+  small subset of the correct state. This affects all Synapse deployments which
+  federate with untrusted servers.
+* HTML pages served via Synapse were vulnerable to clickjacking attacks. This
+  predominantly affects homeservers with single-sign-on enabled, but all server
+  administrators are encouraged to upgrade.
+
+  This was reported by [Quentin Gliech](https://sandhose.fr/).
+
+
 Synapse 1.15.1 (2020-06-16)
 ===========================
 
