@@ -10,10 +10,10 @@ Security advisory
 
 * A malicious homeserver could force Synapse to reset the state in a room to a
   small subset of the correct state. This affects all Synapse deployments which
-  federate with untrusted servers.
+  federate with untrusted servers. ([96e9afe6](https://github.com/matrix-org/synapse/commit/96e9afe62500310977dc3cbc99a8d16d3d2fa15c))
 * HTML pages served via Synapse were vulnerable to clickjacking attacks. This
   predominantly affects homeservers with single-sign-on enabled, but all server
-  administrators are encouraged to upgrade.
+  administrators are encouraged to upgrade.  ([ea26e9a9](https://github.com/matrix-org/synapse/commit/ea26e9a98b0541fc886a1cb826a38352b7599dbe))
 
   This was reported by [Quentin Gliech](https://sandhose.fr/).
 
