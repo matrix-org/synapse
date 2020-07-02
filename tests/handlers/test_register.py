@@ -20,8 +20,15 @@ from twisted.internet import defer
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
-from synapse.rest.client.v2_alpha.register import _map_email_to_displayname
+from synapse.http.site import SynapseRequest
+from synapse.rest.client.v2_alpha.register import (
+    _map_email_to_displayname,
+    register_servlets,
+)
 from synapse.types import RoomAlias, UserID, create_requester
+
+from tests.server import FakeChannel
+from tests.unittest import override_config
 
 from .. import unittest
 
@@ -33,6 +40,10 @@ class RegistrationHandlers(object):
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """ Tests the RegistrationHandler. """
+
+    servlets = [
+        register_servlets,
+    ]
 
     def make_homeserver(self, reactor, clock):
         hs_config = self.default_config()
@@ -286,6 +297,78 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     def _check_mapping(self, i, expected):
         result = _map_email_to_displayname(i)
         self.assertEqual(result, expected)
+
+    @override_config(
+        {
+            "bind_new_user_emails_to_sydent": "https://is.example.com",
+            "registrations_require_3pid": ["email"],
+            "account_threepid_delegates": {},
+            "email": {
+                "smtp_host": "127.0.0.1",
+                "smtp_port": 20,
+                "require_transport_security": False,
+                "smtp_user": None,
+                "smtp_pass": None,
+                "notif_from": "test@example.com",
+            },
+            "public_baseurl": "http://localhost",
+        }
+    )
+    def test_user_email_bound_via_sydent_internal_api(self):
+        """Tests that emails are bound after registration if this option is set"""
+        # Register user with an email address
+        email = "alice@example.com"
+
+        # Mock Synapse's threepid validator
+        get_threepid_validation_session = Mock(
+            return_value=defer.succeed(
+                {"medium": "email", "address": email, "validated_at": 0}
+            )
+        )
+        self.store.get_threepid_validation_session = get_threepid_validation_session
+        delete_threepid_session = Mock(return_value=defer.succeed(None))
+        self.store.delete_threepid_session = delete_threepid_session
+
+        # Mock Synapse's http json post method to check for the internal bind call
+        post_json_get_json = Mock(return_value=defer.succeed(None))
+        self.hs.get_simple_http_client().post_json_get_json = post_json_get_json
+
+        # Retrieve a UIA session ID
+        channel = self.uia_register(
+            401, {"username": "alice", "password": "nobodywillguessthis"}
+        )
+        session_id = channel.json_body["session"]
+
+        # Register our email address using the fake validation session above
+        channel = self.uia_register(
+            200,
+            {
+                "username": "alice",
+                "password": "nobodywillguessthis",
+                "auth": {
+                    "session": session_id,
+                    "type": "m.login.email.identity",
+                    "threepid_creds": {"sid": "blabla", "client_secret": "blablabla"},
+                },
+            },
+        )
+        self.assertEqual(channel.json_body["user_id"], "@alice:test")
+
+        # Check that a bind attempt was made to our fake identity server
+        post_json_get_json.assert_called_with(
+            "https://is.example.com/_matrix/identity/internal/bind",
+            {"address": "alice@example.com", "medium": "email", "mxid": "@alice:test"},
+        )
+
+    def uia_register(self, expected_response: int, body: dict) -> FakeChannel:
+        """Make a register request."""
+        request, channel = self.make_request(
+            "POST", "register", body
+        )  # type: SynapseRequest, FakeChannel
+        self.render(request)
+
+        self.assertEqual(request.code, expected_response)
+        return channel
 
     async def get_or_create_user(
         self, requester, localpart, displayname, password_hash=None

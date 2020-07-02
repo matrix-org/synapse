@@ -177,6 +177,23 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
+        self.bind_new_user_emails_to_sydent = config.get(
+            "bind_new_user_emails_to_sydent"
+        )
+
+        if self.bind_new_user_emails_to_sydent:
+            if not isinstance(
+                self.bind_new_user_emails_to_sydent, str
+            ) or not self.bind_new_user_emails_to_sydent.startswith("http"):
+                raise ConfigError(
+                    "Option bind_new_user_emails_to_sydent has invalid value"
+                )
+
+            # Remove trailing slashes
+            self.bind_new_user_emails_to_sydent = self.bind_new_user_emails_to_sydent.strip(
+                "/"
+            )
+
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
             registration_shared_secret = 'registration_shared_secret: "%s"' % (
@@ -469,6 +486,24 @@ class RegistrationConfig(Config):
         #
         #rewrite_identity_server_urls:
         #   "https://somewhere.example.com": "https://somewhereelse.example.com"
+
+        # When a user registers an account with an email address, it can be useful to
+        # bind that email address to their mxid on an identity server. Typically, this
+        # requires the user to validate their email address with the identity server.
+        # However if Synapse itself is handling email validation on registration, the
+        # user ends up needing to validate their email twice, which leads to poor UX.
+        #
+        # It is possible to force Sydent, one identity server implementation, to bind
+        # threepids using its internal, unauthenticated bind API:
+        # https://github.com/matrix-org/sydent/#internal-bind-and-unbind-api
+        #
+        # Configure the address of a Sydent server here to have Synapse attempt
+        # to automatically bind users' emails following registration. The
+        # internal bind API must be reachable from Synapse, but should NOT be
+        # exposed to any third party, as it allows the creation of bindings
+        # without validation.
+        #
+        #bind_new_user_emails_to_sydent: https://example.com:8091
         """
             % locals()
         )

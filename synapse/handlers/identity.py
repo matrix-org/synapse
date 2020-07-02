@@ -1033,6 +1033,30 @@ class IdentityHandler(BaseHandler):
         display_name = data["display_name"]
         return token, public_keys, fallback_public_key, display_name
 
+    async def bind_email_using_internal_sydent_api(
+        self, id_server_url: str, email: str, user_id: str,
+    ):
+        """Bind an email to a fully qualified user ID using the internal API of an
+        instance of Sydent.
+
+        Args:
+            id_server_url: The URL of the Sydent instance
+            email: The email address to bind
+            user_id: The user ID to bind the email to
+
+        Raises:
+            HTTPResponseException: On a non-2xx HTTP response.
+        """
+        # id_server_url is assumed to have no trailing slashes
+        url = id_server_url + "/_matrix/identity/internal/bind"
+        body = {
+            "address": email,
+            "medium": "email",
+            "mxid": user_id,
+        }
+
+        await self.http_client.post_json_get_json(url, body)
+
 
 def create_id_access_token_header(id_access_token):
     """Create an Authorization header for passing to SimpleHttpClient as the header value

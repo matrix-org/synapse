@@ -636,6 +636,7 @@ class RegistrationHandler(BaseHandler):
 
         if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
             threepid = auth_result[LoginType.EMAIL_IDENTITY]
+
             # Necessary due to auth checks prior to the threepid being
             # written to the db
             if is_threepid_reserved(
@@ -645,34 +646,30 @@ class RegistrationHandler(BaseHandler):
 
             await self.register_email_threepid(user_id, threepid, access_token)
 
-            if self.hs.config.account_threepid_delegate_email:
-                # Bind the 3PID to the identity server
+            if self.hs.config.bind_new_user_emails_to_sydent:
+                # Attempt to call Sydent's internal bind API on the given identity server
+                # to bind this threepid
+                id_server_url = self.hs.config.bind_new_user_emails_to_sydent
+
                 logger.debug(
-                    "Binding email to %s on id_server %s",
+                    "Attempting the bind email of %s to identity server: %s using "
+                    "internal Sydent bind API.",
                     user_id,
-                    self.hs.config.account_threepid_delegate_email,
+                    self.hs.config.bind_new_user_emails_to_sydent,
                 )
-                threepid_creds = threepid["threepid_creds"]
 
-                # Remove the protocol scheme before handling to `bind_threepid`
-                # `bind_threepid` will add https:// to it, so this restricts
-                # account_threepid_delegate.email to https:// addresses only
-                # We assume this is always the case for dinsic however.
-                if self.hs.config.account_threepid_delegate_email.startswith(
-                    "https://"
-                ):
-                    id_server = self.hs.config.account_threepid_delegate_email[8:]
-                else:
-                    # Must start with http:// instead
-                    id_server = self.hs.config.account_threepid_delegate_email[7:]
-
-                await self.identity_handler.bind_threepid(
-                    threepid_creds["client_secret"],
-                    threepid_creds["sid"],
-                    user_id,
-                    id_server,
-                    threepid_creds.get("id_access_token"),
-                )
+                try:
+                    await self.identity_handler.bind_email_using_internal_sydent_api(
+                        id_server_url, threepid["address"], user_id
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to bind email of '%s' to Sydent instance '%s' ",
+                        "using Sydent internal bind API: %s",
+                        user_id,
+                        id_server_url,
+                        e,
+                    )
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]
