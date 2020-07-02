@@ -30,6 +30,26 @@ claim. In the case that the token is not valid, the homeserver must respond with
 As with other login types, there are additional fields (e.g. `device_id` and
 `initial_device_display_name`) which can be included in the above request.
 
+## Preparing Synapse
+
+The JSON Web Token integration in Synapse uses the
+[`PyJWT`](https://pypi.org/project/pyjwt/) library, which must be installed
+as follows:
+
+ * The relevant libraries are included in the Docker images and Debian packages
+   provided by `matrix.org` so no further action is needed.
+
+ * If you installed Synapse into a virtualenv, run `/path/to/env/bin/pip
+   install synapse[pyjwt]` to install the necessary dependencies.
+
+ * For other installation mechanisms, see the documentation provided by the
+   maintainer.
+
+To enable the JSON web token integration, you should then add an `jwt_config` section
+to your configuration file (or uncomment the `enabled: true` line in the
+existing section). See [sample_config.yaml](./sample_config.yaml) for some
+sample settings.
+
 ## How to test JWT as a developer
 
 Although JSON Web Tokens are typically generated from an external server, the
