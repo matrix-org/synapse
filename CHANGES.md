@@ -1,7 +1,7 @@
 Synapse 1.16.0rc2 (2020-07-02)
 ==============================
 
-Synapse 1.16.0rc2 includes the security fixes releases with Synapse 1.15.2.
+Synapse 1.16.0rc2 includes the security fixes released with Synapse 1.15.2.
 Please see [below](#synapse-1152-2020-07-02) for more details.
 
 Improved Documentation
