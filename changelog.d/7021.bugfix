@@ -1,0 +1,1 @@
+Fix inconsistent handling of upper and lower case in email addresses when used as identifiers for login, etc. Contributed by @dklimpel.
