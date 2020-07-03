@@ -14,9 +14,7 @@
 
 import logging
 from typing import Dict
-
-from six import string_types
-from six.moves.urllib import parse as urlparse
+from urllib import parse as urlparse
 
 import yaml
 from netaddr import IPSet
@@ -98,17 +96,14 @@ def load_appservices(hostname, config_files):
 def _load_appservice(hostname, as_info, config_filename):
     required_string_fields = ["id", "as_token", "hs_token", "sender_localpart"]
     for field in required_string_fields:
-        if not isinstance(as_info.get(field), string_types):
+        if not isinstance(as_info.get(field), str):
             raise KeyError(
                 "Required string field: '%s' (%s)" % (field, config_filename)
             )
 
     # 'url' must either be a string or explicitly null, not missing
     # to avoid accidentally turning off push for ASes.
-    if (
-        not isinstance(as_info.get("url"), string_types)
-        and as_info.get("url", "") is not None
-    ):
+    if not isinstance(as_info.get("url"), str) and as_info.get("url", "") is not None:
         raise KeyError(
             "Required string field or explicit null: 'url' (%s)" % (config_filename,)
         )
@@ -138,7 +133,7 @@ def _load_appservice(hostname, as_info, config_filename):
                         ns,
                         regex_obj,
                     )
-                if not isinstance(regex_obj.get("regex"), string_types):
+                if not isinstance(regex_obj.get("regex"), str):
                     raise ValueError("Missing/bad type 'regex' key in %s", regex_obj)
                 if not isinstance(regex_obj.get("exclusive"), bool):
                     raise ValueError(

@@ -15,8 +15,6 @@
 
 import logging
 
-from six import iteritems, iterkeys
-
 import synapse.metrics
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
@@ -289,7 +287,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         users_with_profile = await self.state.get_current_users_in_room(room_id)
 
         # Remove every user from the sharing tables for that room.
-        for user_id in iterkeys(users_with_profile):
+        for user_id in users_with_profile.keys():
             await self.store.remove_user_who_share_room(user_id, room_id)
 
         # Then, re-add them to the tables.
@@ -298,7 +296,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
-        for user_id, profile in iteritems(users_with_profile):
+        for user_id, profile in users_with_profile.items():
             await self._handle_new_user(room_id, user_id, profile)
 
     async def _handle_new_user(self, room_id, user_id, profile):

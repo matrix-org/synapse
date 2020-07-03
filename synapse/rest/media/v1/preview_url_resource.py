@@ -24,10 +24,7 @@ import shutil
 import sys
 import traceback
 from typing import Dict, Optional
-
-import six
-from six import string_types
-from six.moves import urllib_parse as urlparse
+from urllib import parse as urlparse
 
 from canonicaljson import json
 
@@ -37,10 +34,9 @@ from twisted.internet.error import DNSLookupError
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
-    DirectServeResource,
+    DirectServeJsonResource,
     respond_with_json,
     respond_with_json_bytes,
-    wrap_json_request_handler,
 )
 from synapse.http.servlet import parse_integer, parse_string
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -61,7 +57,7 @@ OG_TAG_NAME_MAXLEN = 50
 OG_TAG_VALUE_MAXLEN = 1000
 
 
-class PreviewUrlResource(DirectServeResource):
+class PreviewUrlResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
@@ -85,6 +81,15 @@ class PreviewUrlResource(DirectServeResource):
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage
 
+        # We run the background jobs if we're the instance specified (or no
+        # instance is specified, where we assume there is only one instance
+        # serving media).
+        instance_running_jobs = hs.config.media.media_instance_running_background_jobs
+        self._worker_run_media_background_jobs = (
+            instance_running_jobs is None
+            or instance_running_jobs == hs.get_instance_name()
+        )
+
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
         self.url_preview_accept_language = hs.config.url_preview_accept_language
 
@@ -97,15 +102,15 @@ class PreviewUrlResource(DirectServeResource):
             expiry_ms=60 * 60 * 1000,
         )
 
-        self._cleaner_loop = self.clock.looping_call(
-            self._start_expire_url_cache_data, 10 * 1000
-        )
+        if self._worker_run_media_background_jobs:
+            self._cleaner_loop = self.clock.looping_call(
+                self._start_expire_url_cache_data, 10 * 1000
+            )
 
-    def render_OPTIONS(self, request):
+    async def _async_render_OPTIONS(self, request):
         request.setHeader(b"Allow", b"OPTIONS, GET")
-        return respond_with_json(request, 200, {}, send_cors=True)
+        respond_with_json(request, 200, {}, send_cors=True)
 
-    @wrap_json_request_handler
     async def _async_render_GET(self, request):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
@@ -188,7 +193,7 @@ class PreviewUrlResource(DirectServeResource):
             # It may be stored as text in the database, not as bytes (such as
             # PostgreSQL). If so, encode it back before handing it on.
             og = cache_result["og"]
-            if isinstance(og, six.text_type):
+            if isinstance(og, str):
                 og = og.encode("utf8")
             return og
 
@@ -399,6 +404,8 @@ class PreviewUrlResource(DirectServeResource):
         """Clean up expired url cache content, media and thumbnails.
         """
         # TODO: Delete from backup media store
+
+        assert self._worker_run_media_background_jobs
 
         now = self.clock.time_msec()
 
@@ -631,7 +638,7 @@ def _iterate_over_text(tree, *tags_to_ignore):
         if el is None:
             return
 
-        if isinstance(el, string_types):
+        if isinstance(el, str):
             yield el
         elif el.tag not in tags_to_ignore:
             # el.text is the text before the first child, so we can immediately

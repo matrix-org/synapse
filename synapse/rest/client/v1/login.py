@@ -28,6 +28,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.well_known import WellKnownBuilder
 from synapse.types import UserID
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.threepids import canonicalise_email
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +61,18 @@ def login_id_thirdparty_from_phone(identifier):
 
     Returns: Login identifier dict of type 'm.id.threepid'
     """
-    if "country" not in identifier or "number" not in identifier:
+    if "country" not in identifier or (
+        # The specification requires a "phone" field, while Synapse used to require a "number"
+        # field. Accept both for backwards compatibility.
+        "phone" not in identifier
+        and "number" not in identifier
+    ):
         raise SynapseError(400, "Invalid phone-type identifier")
 
-    msisdn = phone_number_to_msisdn(identifier["country"], identifier["number"])
+    # Accept both "phone" and "number" as valid keys in m.id.phone
+    phone_number = identifier.get("phone", identifier["number"])
+
+    msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
 
     return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
 
@@ -73,7 +82,8 @@ class LoginRestServlet(RestServlet):
     CAS_TYPE = "m.login.cas"
     SSO_TYPE = "m.login.sso"
     TOKEN_TYPE = "m.login.token"
-    JWT_TYPE = "m.login.jwt"
+    JWT_TYPE = "org.matrix.login.jwt"
+    JWT_TYPE_DEPRECATED = "m.login.jwt"
 
     def __init__(self, hs):
         super(LoginRestServlet, self).__init__()
@@ -108,6 +118,7 @@ class LoginRestServlet(RestServlet):
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
+            flows.append({"type": LoginRestServlet.JWT_TYPE_DEPRECATED})
 
         if self.cas_enabled:
             # we advertise CAS for backwards compat, though MSC1721 renamed it
@@ -141,6 +152,7 @@ class LoginRestServlet(RestServlet):
         try:
             if self.jwt_enabled and (
                 login_submission["type"] == LoginRestServlet.JWT_TYPE
+                or login_submission["type"] == LoginRestServlet.JWT_TYPE_DEPRECATED
             ):
                 result = await self.do_jwt_login(login_submission)
             elif login_submission["type"] == LoginRestServlet.TOKEN_TYPE:
@@ -195,11 +207,14 @@ class LoginRestServlet(RestServlet):
             if medium is None or address is None:
                 raise SynapseError(400, "Invalid thirdparty identifier")
 
+            # For emails, canonicalise the address.
+            # We store all email addresses canonicalised in the DB.
+            # (See add_threepid in synapse/handlers/auth.py)
             if medium == "email":
-                # For emails, transform the address to lowercase.
-                # We store all email addreses as lowercase in the DB.
-                # (See add_threepid in synapse/handlers/auth.py)
-                address = address.lower()
+                try:
+                    address = canonicalise_email(address)
+                except ValueError as e:
+                    raise SynapseError(400, str(e))
 
             # We also apply account rate limiting using the 3PID as a key, as
             # otherwise using 3PID bypasses the ratelimiting based on user ID.

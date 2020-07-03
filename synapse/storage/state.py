@@ -16,8 +16,6 @@
 import logging
 from typing import Iterable, List, TypeVar
 
-from six import iteritems, itervalues
-
 import attr
 
 from twisted.internet import defer
@@ -51,7 +49,7 @@ class StateFilter(object):
         # If `include_others` is set we canonicalise the filter by removing
         # wildcards from the types dictionary
         if self.include_others:
-            self.types = {k: v for k, v in iteritems(self.types) if v is not None}
+            self.types = {k: v for k, v in self.types.items() if v is not None}
 
     @staticmethod
     def all():
@@ -150,7 +148,7 @@ class StateFilter(object):
 
         has_non_member_wildcard = self.include_others or any(
             state_keys is None
-            for t, state_keys in iteritems(self.types)
+            for t, state_keys in self.types.items()
             if t != EventTypes.Member
         )
 
@@ -199,7 +197,7 @@ class StateFilter(object):
 
         # First we build up a lost of clauses for each type/state_key combo
         clauses = []
-        for etype, state_keys in iteritems(self.types):
+        for etype, state_keys in self.types.items():
             if state_keys is None:
                 clauses.append("(type = ?)")
                 where_args.append(etype)
@@ -251,7 +249,7 @@ class StateFilter(object):
             return dict(state_dict)
 
         filtered_state = {}
-        for k, v in iteritems(state_dict):
+        for k, v in state_dict.items():
             typ, state_key = k
             if typ in self.types:
                 state_keys = self.types[typ]
@@ -279,7 +277,7 @@ class StateFilter(object):
         """
 
         return self.include_others or any(
-            state_keys is None for state_keys in itervalues(self.types)
+            state_keys is None for state_keys in self.types.values()
         )
 
     def concrete_types(self):
@@ -292,7 +290,7 @@ class StateFilter(object):
         """
         return [
             (t, s)
-            for t, state_keys in iteritems(self.types)
+            for t, state_keys in self.types.items()
             if state_keys is not None
             for s in state_keys
         ]
@@ -324,7 +322,7 @@ class StateFilter(object):
             member_filter = StateFilter.none()
 
         non_member_filter = StateFilter(
-            types={k: v for k, v in iteritems(self.types) if k != EventTypes.Member},
+            types={k: v for k, v in self.types.items() if k != EventTypes.Member},
             include_others=self.include_others,
         )
 
@@ -366,7 +364,7 @@ class StateGroupStorage(object):
 
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
-        groups = set(itervalues(event_to_groups))
+        groups = set(event_to_groups.values())
         group_to_state = yield self.stores.state._get_state_for_groups(groups)
 
         return group_to_state
@@ -400,8 +398,8 @@ class StateGroupStorage(object):
         state_event_map = yield self.stores.main.get_events(
             [
                 ev_id
-                for group_ids in itervalues(group_to_ids)
-                for ev_id in itervalues(group_ids)
+                for group_ids in group_to_ids.values()
+                for ev_id in group_ids.values()
             ],
             get_prev_content=False,
         )
@@ -409,10 +407,10 @@ class StateGroupStorage(object):
         return {
             group: [
                 state_event_map[v]
-                for v in itervalues(event_id_map)
+                for v in event_id_map.values()
                 if v in state_event_map
             ]
-            for group, event_id_map in iteritems(group_to_ids)
+            for group, event_id_map in group_to_ids.items()
         }
 
     def _get_state_groups_from_groups(
@@ -444,23 +442,23 @@ class StateGroupStorage(object):
         """
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
-        groups = set(itervalues(event_to_groups))
+        groups = set(event_to_groups.values())
         group_to_state = yield self.stores.state._get_state_for_groups(
             groups, state_filter
         )
 
         state_event_map = yield self.stores.main.get_events(
-            [ev_id for sd in itervalues(group_to_state) for ev_id in itervalues(sd)],
+            [ev_id for sd in group_to_state.values() for ev_id in sd.values()],
             get_prev_content=False,
         )
 
         event_to_state = {
             event_id: {
                 k: state_event_map[v]
-                for k, v in iteritems(group_to_state[group])
+                for k, v in group_to_state[group].items()
                 if v in state_event_map
             }
-            for event_id, group in iteritems(event_to_groups)
+            for event_id, group in event_to_groups.items()
         }
 
         return {event: event_to_state[event] for event in event_ids}
@@ -481,14 +479,14 @@ class StateGroupStorage(object):
         """
         event_to_groups = yield self.stores.main._get_state_group_for_events(event_ids)
 
-        groups = set(itervalues(event_to_groups))
+        groups = set(event_to_groups.values())
         group_to_state = yield self.stores.state._get_state_for_groups(
             groups, state_filter
         )
 
         event_to_state = {
             event_id: group_to_state[group]
-            for event_id, group in iteritems(event_to_groups)
+            for event_id, group in event_to_groups.items()
         }
 
         return {event: event_to_state[event] for event in event_ids}

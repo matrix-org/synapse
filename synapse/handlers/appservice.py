@@ -15,8 +15,6 @@
 
 import logging
 
-from six import itervalues
-
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -116,6 +114,12 @@ class ApplicationServicesHandler(object):
                         for service in services:
                             self.scheduler.submit_event_for_as(service, event)
 
+                        now = self.clock.time_msec()
+                        ts = yield self.store.get_received_ts(event.event_id)
+                        synapse.metrics.event_processing_lag_by_event.labels(
+                            "appservice_sender"
+                        ).observe((now - ts) / 1000)
+
                     @defer.inlineCallbacks
                     def handle_room_events(events):
                         for event in events:
@@ -125,7 +129,7 @@ class ApplicationServicesHandler(object):
                         defer.gatherResults(
                             [
                                 run_in_background(handle_room_events, evs)
-                                for evs in itervalues(events_by_room)
+                                for evs in events_by_room.values()
                             ],
                             consumeErrors=True,
                         )

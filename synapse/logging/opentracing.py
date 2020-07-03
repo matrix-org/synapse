@@ -169,10 +169,10 @@ import contextlib
 import inspect
 import logging
 import re
-import types
 from functools import wraps
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, Optional, Type
 
+import attr
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -181,6 +181,7 @@ from synapse.config import ConfigError
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+    from synapse.http.site import SynapseRequest
 
 # Helper class
 
@@ -230,6 +231,30 @@ try:
 except ImportError:
     JaegerConfig = None  # type: ignore
     LogContextScopeManager = None  # type: ignore
+
+
+try:
+    from rust_python_jaeger_reporter import Reporter
+
+    @attr.s(slots=True, frozen=True)
+    class _WrappedRustReporter:
+        """Wrap the reporter to ensure `report_span` never throws.
+        """
+
+        _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
+
+        def set_process(self, *args, **kwargs):
+            return self._reporter.set_process(*args, **kwargs)
+
+        def report_span(self, span):
+            try:
+                return self._reporter.report_span(span)
+            except Exception:
+                logger.exception("Failed to report span")
+
+    RustReporter = _WrappedRustReporter  # type: Optional[Type[_WrappedRustReporter]]
+except ImportError:
+    RustReporter = None
 
 
 logger = logging.getLogger(__name__)
@@ -320,11 +345,19 @@ def init_tracer(hs: "HomeServer"):
 
     set_homeserver_whitelist(hs.config.opentracer_whitelist)
 
-    JaegerConfig(
+    config = JaegerConfig(
         config=hs.config.jaeger_config,
         service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
         scope_manager=LogContextScopeManager(hs.config),
-    ).initialize_tracer()
+    )
+
+    # If we have the rust jaeger reporter available let's use that.
+    if RustReporter:
+        logger.info("Using rust_python_jaeger_reporter library")
+        tracer = config.create_tracer(RustReporter(), config.sampler)
+        opentracing.set_global_tracer(tracer)
+    else:
+        config.initialize_tracer()
 
 
 # Whitelisting
@@ -760,48 +793,42 @@ def tag_args(func):
     return _tag_args_inner
 
 
-def trace_servlet(servlet_name, extract_context=False):
-    """Decorator which traces a serlet. It starts a span with some servlet specific
-    tags such as the servlet_name and request information
+@contextlib.contextmanager
+def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
+    """Returns a context manager which traces a request. It starts a span
+    with some servlet specific tags such as the request metrics name and
+    request information.
 
     Args:
-        servlet_name (str): The name to be used for the span's operation_name
-        extract_context (bool): Whether to attempt to extract the opentracing
+        request
+        extract_context: Whether to attempt to extract the opentracing
             context from the request the servlet is handling.
-
     """
 
-    def _trace_servlet_inner_1(func):
-        if not opentracing:
-            return func
+    if opentracing is None:
+        yield
+        return
 
-        @wraps(func)
-        async def _trace_servlet_inner(request, *args, **kwargs):
-            request_tags = {
-                "request_id": request.get_request_id(),
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
-                tags.HTTP_METHOD: request.get_method(),
-                tags.HTTP_URL: request.get_redacted_uri(),
-                tags.PEER_HOST_IPV6: request.getClientIP(),
-            }
+    request_tags = {
+        "request_id": request.get_request_id(),
+        tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+        tags.HTTP_METHOD: request.get_method(),
+        tags.HTTP_URL: request.get_redacted_uri(),
+        tags.PEER_HOST_IPV6: request.getClientIP(),
+    }
 
-            if extract_context:
-                scope = start_active_span_from_request(
-                    request, servlet_name, tags=request_tags
-                )
-            else:
-                scope = start_active_span(servlet_name, tags=request_tags)
+    request_name = request.request_metrics.name
+    if extract_context:
+        scope = start_active_span_from_request(request, request_name, tags=request_tags)
+    else:
+        scope = start_active_span(request_name, tags=request_tags)
 
-            with scope:
-                result = func(request, *args, **kwargs)
+    with scope:
+        try:
+            yield
+        finally:
+            # We set the operation name again in case its changed (which happens
+            # with JsonResource).
+            scope.span.set_operation_name(request.request_metrics.name)
 
-                if not isinstance(result, (types.CoroutineType, defer.Deferred)):
-                    # Some servlets aren't async and just return results
-                    # directly, so we handle that here.
-                    return result
-
-                return await result
-
-        return _trace_servlet_inner
-
-    return _trace_servlet_inner_1
+            scope.span.set_tag("request_tag", request.request_metrics.start_context.tag)

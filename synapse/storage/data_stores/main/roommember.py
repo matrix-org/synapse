@@ -17,8 +17,6 @@
 import logging
 from typing import Iterable, List, Set
 
-from six import iteritems, itervalues
-
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -544,7 +542,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         users_in_room = {}
         member_event_ids = [
             e_id
-            for key, e_id in iteritems(current_state_ids)
+            for key, e_id in current_state_ids.items()
             if key[0] == EventTypes.Member
         ]
 
@@ -561,7 +559,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     users_in_room = dict(prev_res)
                     member_event_ids = [
                         e_id
-                        for key, e_id in iteritems(context.delta_ids)
+                        for key, e_id in context.delta_ids.items()
                         if key[0] == EventTypes.Member
                     ]
                     for etype, state_key in context.delta_ids:
@@ -1101,7 +1099,7 @@ class _JoinedHostsCache(object):
             if state_entry.state_group == self.state_group:
                 pass
             elif state_entry.prev_group == self.state_group:
-                for (typ, state_key), event_id in iteritems(state_entry.delta_ids):
+                for (typ, state_key), event_id in state_entry.delta_ids.items():
                     if typ != EventTypes.Member:
                         continue
 
@@ -1131,7 +1129,7 @@ class _JoinedHostsCache(object):
                 self.state_group = state_entry.state_group
             else:
                 self.state_group = object()
-            self._len = sum(len(v) for v in itervalues(self.hosts_to_joined_users))
+            self._len = sum(len(v) for v in self.hosts_to_joined_users.values())
         return frozenset(self.hosts_to_joined_users)
 
     def __len__(self):
