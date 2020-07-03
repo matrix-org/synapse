@@ -484,6 +484,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
     ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
         """Get updates for groups replication stream.
 
+        Note that the user signature stream represents when a user signs their
+        device with their user-signing key, which is not published to other
+        users or servers, so no `destination` is needed in the returned
+        list. However, this is needed to poke workers.
+
         Args:
             instance_name: The writer we want to fetch updates from. Unused
                 here since there is only ever one writer.
