@@ -38,7 +38,7 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
-from synapse.http.server import finish_request
+from synapse.http.server import finish_request, respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -1055,13 +1055,8 @@ class AuthHandler(BaseHandler):
         )
 
         # Render the HTML and return.
-        html_bytes = self._sso_auth_success_template.encode("utf-8")
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-        request.write(html_bytes)
-        finish_request(request)
+        html = self._sso_auth_success_template
+        respond_with_html(request, 200, html)
 
     async def complete_sso_login(
         self,
@@ -1081,13 +1076,7 @@ class AuthHandler(BaseHandler):
         # flow.
         deactivated = await self.store.get_user_deactivated_status(registered_user_id)
         if deactivated:
-            html_bytes = self._sso_account_deactivated_template.encode("utf-8")
-
-            request.setResponseCode(403)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-            request.write(html_bytes)
-            finish_request(request)
+            respond_with_html(request, 403, self._sso_account_deactivated_template)
             return
 
         self._complete_sso_login(registered_user_id, request, client_redirect_url)
@@ -1128,17 +1117,12 @@ class AuthHandler(BaseHandler):
         # URL we redirect users to.
         redirect_url_no_params = client_redirect_url.split("?")[0]
 
-        html_bytes = self._sso_redirect_confirm_template.render(
+        html = self._sso_redirect_confirm_template.render(
             display_url=redirect_url_no_params,
             redirect_url=redirect_url,
             server_name=self._server_name,
-        ).encode("utf-8")
-
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-        request.write(html_bytes)
-        finish_request(request)
+        )
+        respond_with_html(request, 200, html)
 
     @staticmethod
     def add_query_param_to_url(url: str, param_name: str, param: Any):

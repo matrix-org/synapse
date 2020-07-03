@@ -26,7 +26,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import DirectServeHtmlResource, finish_request
+from synapse.http.server import DirectServeHtmlResource, respond_with_html
 from synapse.http.servlet import parse_string
 from synapse.types import UserID
 
@@ -190,12 +190,8 @@ class ConsentResource(DirectServeHtmlResource):
         template_html = self._jinja_env.get_template(
             path.join(TEMPLATE_LANGUAGE, template_name)
         )
-        html_bytes = template_html.render(**template_args).encode("utf8")
-
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%i" % len(html_bytes))
-        request.write(html_bytes)
-        finish_request(request)
+        html = template_html.render(**template_args)
+        respond_with_html(request, 200, html)
 
     def _check_hash(self, userid, userhmac):
         """
