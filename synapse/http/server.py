@@ -83,6 +83,8 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
             exc_info=(f.type, f.value, f.getTracebackObject()),
         )
 
+    # Only respond with an error response if we haven't already started writing,
+    # otherwise lets just kill the connection
     if request.startedWriting:
         if request.transport:
             try:
@@ -229,6 +231,9 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
                     code, response = callback_return
                     self._send_response(request, code, response)
         except Exception:
+            # failure.Failure() fishes the original Failure out
+            # of our stack, and thus gives us a sensible stack
+            # trace.
             f = failure.Failure()
             self._send_error_response(f, request)
 
@@ -415,11 +420,7 @@ class DirectServeHtmlResource(_AsyncResource):
         assert isinstance(response_object, bytes)
         html_bytes = response_object
 
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-        request.write(html_bytes)
-        finish_request(request)
+        respond_with_html_bytes(request, 200, html_bytes)
 
     def _send_error_response(
         self, f: failure.Failure, request: SynapseRequest,

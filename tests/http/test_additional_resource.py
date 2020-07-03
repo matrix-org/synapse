@@ -38,7 +38,7 @@ class _SyncTestCustomEndpoint:
 
 class AdditionalResourceTests(HomeserverTestCase):
     """Very basic tests that `AdditionalResource` works correctly with sync
-    and async handler.s
+    and async handlers.
     """
 
     def test_async(self):
