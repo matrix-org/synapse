@@ -239,7 +239,8 @@ def main():
     for config_file in config_files:
         with open(config_file) as file_stream:
             yaml_config = yaml.safe_load(file_stream)
-        config.update(yaml_config)
+        if yaml_config is not None:
+            config.update(yaml_config)
 
     pidfile = config["pid_file"]
     cache_factor = config.get("synctl_cache_factor")
