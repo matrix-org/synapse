@@ -1,0 +1,1 @@
+Allow YAML config file to contain None. Useful when config file is fully commented.
