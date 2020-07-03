@@ -65,10 +65,9 @@ def canonicalise_email(address: str) -> str:
 
     address = address.strip()
 
-    if len(address.split("@")) != 2:
+    parts = address.split("@")
+    if len(parts) != 2:
         logger.debug("Couldn't parse email address %s", address)
         raise ValueError("Unable to parse email address")
 
-    # double check, split starting from the right and only at first `@`
-    address = address.rsplit("@", 1)
-    return address[0].casefold() + "@" + address[1].lower()
+    return parts[0].casefold() + "@" + parts[1].lower()
