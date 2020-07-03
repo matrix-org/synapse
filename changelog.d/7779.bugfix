@@ -1,1 +1,1 @@
-Allow **synctl** config files to contain `None`. Useful when some config files are fully commented.
+Fix synctl to handle empty config files correctly.
