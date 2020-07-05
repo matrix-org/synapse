@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class UserSharedRoomsServlet(RestServlet):
     """
-    GET /user/{user_id}/shared_rooms/(?P<other_user_id>[^/]*) HTTP/1.1
+    GET /user/{user_id}/shared_rooms/{other_user_id} HTTP/1.1
     """
 
     PATTERNS = client_patterns(

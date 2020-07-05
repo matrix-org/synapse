@@ -1,0 +1,1 @@
+Add `/user/{user_id}/shared_rooms/{other_user_id}` endpoint
