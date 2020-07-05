@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Optional, Tuple
 
 import synapse.server
@@ -24,7 +23,6 @@ from synapse.events.snapshot import EventContext
 from synapse.types import Collection
 
 from tests.test_utils import get_awaitable_result
-
 
 """
 Utility functions for poking events into the storage of the server under test.
