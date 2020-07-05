@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import heapq
 from collections import Iterable
 from typing import List, Tuple, Type
@@ -21,7 +20,6 @@ from typing import List, Tuple, Type
 import attr
 
 from ._base import Stream, StreamUpdateResult, Token, current_token_without_instance
-
 
 """Handling of the 'events' replication stream
 
