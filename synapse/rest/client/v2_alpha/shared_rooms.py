@@ -15,6 +15,7 @@
 
 import logging
 
+from synapse.api.errors import AuthError
 from synapse.http.servlet import RestServlet
 from ._base import client_patterns
 
@@ -28,7 +29,7 @@ class UserSharedRoomsServlet(RestServlet):
 
     PATTERNS = client_patterns(
         "/user/(?P<user_id>[^/]*)/shared_rooms/(?P<other_user_id>[^/]*)",
-        releases=(),  #  This is an unstable feature
+        releases=(),  # This is an unstable feature
     )
 
     def __init__(self, hs):
@@ -43,9 +44,7 @@ class UserSharedRoomsServlet(RestServlet):
 
         rooms = await self.store.get_rooms_in_common_for_users(user_id, other_user_id)
 
-        return 200, {
-            "rooms": rooms,
-        }
+        return 200, {"rooms": rooms,}
 
 
 def register_servlets(hs, http_server):
