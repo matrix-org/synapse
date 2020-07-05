@@ -1,1 +1,1 @@
-Update linting scripts and codebase to be isort5 compatible.
+Update linting scripts and codebase to be compatible with `isort` v5.
