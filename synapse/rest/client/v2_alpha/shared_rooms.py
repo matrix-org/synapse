@@ -43,7 +43,9 @@ class UserSharedRoomsServlet(RestServlet):
 
         rooms = await self.store.get_rooms_in_common_for_users(user_id, other_user_id)
 
-        return 200, rooms
+        return 200, {
+            "rooms": rooms,
+        }
 
 
 def register_servlets(hs, http_server):
