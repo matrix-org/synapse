@@ -250,6 +250,11 @@ class PersistEventsStore:
             )
             persist_event_counter.inc(len(events_and_contexts))
 
+            for event, _ in events_and_contexts:
+                self.store.get_unread_message_count_for_user.invalidate_many(
+                    (event.room_id,),
+                )
+
             if not backfilled:
                 # backfilled events have negative stream orderings, so we don't
                 # want to set the event_persisted_position to that.
@@ -488,11 +493,6 @@ class PersistEventsStore:
             all_events_and_contexts=all_events_and_contexts,
             backfilled=backfilled,
         )
-
-        for event, _ in events_and_contexts:
-            self.store.get_unread_message_count_for_user.invalidate_many(
-                (event.room_id,),
-            )
 
         # We call this last as it assumes we've inserted the events into
         # room_memberships, where applicable.
