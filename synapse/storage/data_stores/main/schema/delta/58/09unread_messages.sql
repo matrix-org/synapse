@@ -15,4 +15,4 @@
 
 -- Store a boolean value in the events table for whether the event should be counted in
 -- the unread_count property of sync responses.
-ALTER TABLE events ADD COLUMN count_as_unread SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE events ADD COLUMN count_as_unread BOOLEAN NOT NULL DEFAULT 0;
