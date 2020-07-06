@@ -68,7 +68,7 @@ logger = logging.getLogger("synapse_port_db")
 
 
 BOOLEAN_COLUMNS = {
-    "events": ["processed", "outlier", "contains_url"],
+    "events": ["processed", "outlier", "contains_url", "count_as_unread"],
     "rooms": ["is_public"],
     "event_edges": ["is_state"],
     "presence_list": ["accepted"],
