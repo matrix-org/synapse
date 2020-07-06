@@ -114,6 +114,12 @@ class ApplicationServicesHandler(object):
                         for service in services:
                             self.scheduler.submit_event_for_as(service, event)
 
+                        now = self.clock.time_msec()
+                        ts = yield self.store.get_received_ts(event.event_id)
+                        synapse.metrics.event_processing_lag_by_event.labels(
+                            "appservice_sender"
+                        ).observe(now - ts)
+
                     @defer.inlineCallbacks
                     def handle_room_events(events):
                         for event in events:
