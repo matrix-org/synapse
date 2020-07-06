@@ -1402,10 +1402,10 @@ class EventsWorkerStore(SQLBaseStore):
             # before this user joined will be counted as well.
             txn.execute(
                 """
-                SELECT stream_ordering FROM current_state_events
+                SELECT stream_ordering FROM local_current_membership
                 LEFT JOIN events USING (event_id, room_id)
                 WHERE membership = 'join'
-                    AND state_key = ?
+                    AND user_id = ?
                     AND room_id = ?
                 """,
                 (user_id, room_id),

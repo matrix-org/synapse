@@ -490,7 +490,7 @@ class PersistEventsStore:
         )
 
         for event, _ in events_and_contexts:
-            self.get_unread_message_count_for_user.invalidate((event.room_id,))
+            self.store.get_unread_message_count_for_user.invalidate_many((event.room_id,))
 
         # We call this last as it assumes we've inserted the events into
         # room_memberships, where applicable.

@@ -959,7 +959,7 @@ class SyncHandler(object):
         """
         with Measure(self.clock, "unread_messages_for_room_id"):
             count = await self.store.get_unread_message_count_for_user(
-                sync_config.user.to_string(), room_id,
+                room_id, sync_config.user.to_string(),
             )
             return count
 
