@@ -1393,10 +1393,10 @@ class EventsWorkerStore(SQLBaseStore):
             # before this user joined will be counted as well.
             txn.execute(
                 """
-                SELECT stream_ordering FROM room_memberships
+                SELECT stream_ordering FROM current_state_events
                 LEFT JOIN events USING (event_id, room_id)
                 WHERE membership = 'join'
-                    AND user_id = ?
+                    AND state_key = ?
                     AND room_id = ?
                 """,
                 (user_id, room_id),
@@ -1407,8 +1407,8 @@ class EventsWorkerStore(SQLBaseStore):
         # Count the messages that qualify as unread after the stream ordering we've just
         # retrieved.
         sql = """
-            SELECT COUNT(*) FROM unread_messages
-            WHERE user_id = ? AND room_id = ? AND stream_ordering > ?
+            SELECT COUNT(*) FROM events
+            WHERE sender != ? AND room_id = ? AND stream_ordering > ? AND count_as_unread
         """
 
         txn.execute(sql, (user_id, room_id, stream_ordering))

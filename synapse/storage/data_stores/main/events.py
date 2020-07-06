@@ -62,12 +62,48 @@ event_counter = Counter(
     ["type", "origin_type", "origin_entity"],
 )
 
-STATE_EVENT_TYPES_TO_MARK_UNREAD = [
+STATE_EVENT_TYPES_TO_MARK_UNREAD = {
     EventTypes.PowerLevels,
     EventTypes.Topic,
     EventTypes.Name,
     EventTypes.RoomAvatar,
-]
+}
+
+
+def count_as_unread(event: EventBase, context: EventContext) -> bool:
+    # Exclude rejected and soft-failed events.
+    if context.rejected or event.internal_metadata.is_soft_failed():
+        return False
+
+    # Exclude notices.
+    if (
+        not event.is_state()
+        and event.type == EventTypes.Message
+        and event.content.get("msgtype") == "m.notice"
+    ):
+        return False
+
+    # Exclude edits.
+    relates_to = event.content.get("m.relates_to", {})
+    if (
+        relates_to.get("rel_type") == RelationTypes.REPLACE
+    ):
+        return False
+
+    # Mark events that have a non-empty string body as unread.
+    body = event.content.get("body")
+    if isinstance(body, str) and body:
+        return True
+
+    # Mark some state events as unread.
+    if event.is_state() and event.type in STATE_EVENT_TYPES_TO_MARK_UNREAD:
+        return True
+
+    # Mark encrypted events as unread.
+    if not event.is_state() and event.type == EventTypes.Encrypted:
+        return True
+
+    return False
 
 
 def encode_json(json_object):
@@ -900,8 +936,9 @@ class PersistEventsStore:
                     "contains_url": (
                         "url" in event.content and isinstance(event.content["url"], str)
                     ),
+                    "count_as_unread": count_as_unread(event, context),
                 }
-                for event, _ in events_and_contexts
+                for event, context in events_and_contexts
             ],
         )
 
@@ -985,7 +1022,7 @@ class PersistEventsStore:
             txn, events=[event for event, _ in events_and_contexts]
         )
 
-        for event, context in events_and_contexts:
+        for event, _ in events_and_contexts:
             if event.type == EventTypes.Name:
                 # Insert into the event_search table.
                 self._store_room_name_txn(txn, event)
@@ -998,7 +1035,7 @@ class PersistEventsStore:
             elif event.type == EventTypes.Redaction and event.redacts is not None:
                 # Insert into the redactions table.
                 self._store_redaction(txn, event)
-                # If the redacted event was unread, revert that.
+                # Prevent the redacted event from counting towards the unread count.
                 self._handle_redacted_unread_event_txn(txn, event)
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
@@ -1018,8 +1055,6 @@ class PersistEventsStore:
                 expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
                 if isinstance(expiry_ts, int) and not event.is_state():
                     self._insert_event_expiry_txn(txn, event.event_id, expiry_ts)
-
-            self._maybe_insert_unread_event_txn(txn, event, context)
 
         # Insert into the room_memberships table.
         self._store_room_members_txn(
@@ -1627,86 +1662,10 @@ class PersistEventsStore:
 
         return stream_ordering
 
-    def _maybe_insert_unread_event_txn(
-        self, txn: Connection, event: EventBase, context: EventContext,
-    ):
-        """Mark the event as unread for every current member of the room if it passes the
-        conditions for that.
-
-        These conditions are: the event must either have a non-empty string body, be an
-        encrypted message, or be either a power levels event, a room name event or a room
-        topic event, and must be neither rejected or soft-failed nor an edit or a notice.
-
-        Args:
-            txn: The transaction to use to retrieve room members and to mark the event
-                as unread.
-            event: The event to evaluate and maybe mark as unread.
-            context: The context in which the event was sent (used to figure out whether
-                the event has been rejected).
-        """
-        content = event.content
-
-        is_edit = (
-            content.get("m.relates_to", {}).get("rel_type") == RelationTypes.REPLACE
-        )
-        is_notice = not event.is_state() and content.get("msgtype") == "m.notice"
-
-        # We don't want rejected or soft-failed events, edits or notices to be marked
-        # unread.
-        if (
-            context.rejected
-            or is_edit
-            or is_notice
-            or event.internal_metadata.is_soft_failed()
-        ):
-            return
-
-        body_exists = isinstance(content.get("body"), str)
-        is_state_event_to_mark_unread = (
-            event.is_state() and event.type in STATE_EVENT_TYPES_TO_MARK_UNREAD
-        )
-        is_encrypted_message = (
-            not event.is_state() and event.type == EventTypes.Encrypted
-        )
-
-        # We want to mark unread messages with a non-empty string body, some state events
-        # (power levels, room name, room topic, room avatar) and encrypted messages.
-        if not (body_exists or is_state_event_to_mark_unread or is_encrypted_message):
-            return
-
-        # Get the list of users that are currently joined to the room.
-        users_in_room = self.db.simple_select_onecol_txn(
-            txn=txn,
-            table="current_state_events",
-            keyvalues={"membership": Membership.JOIN, "room_id": event.room_id},
-            retcol="state_key",
-        )  # type: list
-
-        # Only insert rows for local users.
-        local_users_in_room = list(
-            filter(lambda user_id: self.hs.is_mine_id(user_id), users_in_room)
-        )
-
-        # Mark the message as unread for every user currently in the room, except the
-        # sender of the event (because even if they haven't sent a read receipt for the
-        # event, it seems dumb to show it as unread to its sender).
-        self.db.simple_insert_many_txn(
-            txn=txn,
-            table="unread_messages",
-            values=[
-                {
-                    "user_id": user_id,
-                    "stream_ordering": event.internal_metadata.stream_ordering,
-                    "room_id": event.room_id,
-                    "event_id": event.event_id,
-                }
-                for user_id in local_users_in_room
-                if user_id != event.sender
-            ],
-        )
-
     def _handle_redacted_unread_event_txn(self, txn: Connection, event: EventBase):
-        # Redact every row for this event in the unread_messages table.
-        self.db.simple_delete_txn(
-            txn=txn, table="unread_messages", keyvalues={"event_id": event.redacts}
+        self.db.simple_update_txn(
+            txn=txn,
+            table="events",
+            keyvalues={"event_id": event.redacts},
+            updatevalues={"count_as_unread": False},
         )
