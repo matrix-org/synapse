@@ -84,7 +84,7 @@ def count_as_unread(event: EventBase, context: EventContext) -> bool:
 
     # Exclude edits.
     relates_to = event.content.get("m.relates_to", {})
-    if (relates_to.get("rel_type") == RelationTypes.REPLACE):
+    if relates_to.get("rel_type") == RelationTypes.REPLACE:
         return False
 
     # Mark events that have a non-empty string body as unread.
