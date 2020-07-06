@@ -209,7 +209,7 @@ class FederationSender(object):
 
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "federation_sender"
-                        ).observe(now - ts)
+                        ).observe((now - ts) / 1000)
 
                 async def handle_room_events(events: Iterable[EventBase]) -> None:
                     with Measure(self.clock, "handle_room_events"):

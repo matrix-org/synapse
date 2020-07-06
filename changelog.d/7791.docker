@@ -1,0 +1,1 @@
+Include libwebp in the Docker file to properly handle webp image uploads.

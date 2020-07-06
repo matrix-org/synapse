@@ -15,6 +15,7 @@
 
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
+from synapse.push import push_rule_evaluator
 from synapse.push.push_rule_evaluator import PushRuleEvaluatorForEvent
 
 from tests import unittest
@@ -84,3 +85,19 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
         for body in (1, True, {"foo": "bar"}):
             evaluator = self._get_evaluator({"body": body})
             self.assertFalse(evaluator.matches(condition, "@user:test", "foo"))
+
+    def test_tweaks_for_actions(self):
+        """
+        This tests the behaviour of tweaks_for_actions.
+        """
+
+        actions = [
+            {"set_tweak": "sound", "value": "default"},
+            {"set_tweak": "highlight"},
+            "notify",
+        ]
+
+        self.assertEqual(
+            push_rule_evaluator.tweaks_for_actions(actions),
+            {"sound": "default", "highlight": True},
+        )
