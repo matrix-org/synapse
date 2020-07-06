@@ -1367,9 +1367,7 @@ class EventsWorkerStore(SQLBaseStore):
         self, room_id: str, user_id: str,
     ):
         last_read_event_id = await self.get_last_receipt_event_id_for_user(
-            user_id=user_id,
-            room_id=room_id,
-            receipt_type="m.read",
+            user_id=user_id, room_id=room_id, receipt_type="m.read",
         )
 
         return await self.db.runInteraction(

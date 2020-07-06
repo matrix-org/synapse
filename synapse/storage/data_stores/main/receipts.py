@@ -447,8 +447,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
         )
 
         txn.call_after(
-            self.get_unread_message_count_for_user.invalidate,
-            (room_id, user_id),
+            self.get_unread_message_count_for_user.invalidate, (room_id, user_id),
         )
 
         self.db.simple_upsert_txn(
