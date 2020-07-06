@@ -43,6 +43,7 @@ class SlavedReceiptsStore(ReceiptsWorkerStore, BaseSlavedStore):
         )
         self._invalidate_get_users_with_receipts_in_room(room_id, receipt_type, user_id)
         self.get_receipts_for_room.invalidate((room_id, receipt_type))
+        self.get_unread_message_count_for_user.invalidate((user_id, room_id))
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == ReceiptsStream.NAME:

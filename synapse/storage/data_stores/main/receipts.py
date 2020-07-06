@@ -446,6 +446,11 @@ class ReceiptsStore(ReceiptsWorkerStore):
             (user_id, room_id, receipt_type),
         )
 
+        txn.call_after(
+            self.get_unread_message_count_for_user.invalidate,
+            (room_id, user_id),
+        )
+
         self.db.simple_upsert_txn(
             txn,
             table="receipts_linearized",

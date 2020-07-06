@@ -1362,9 +1362,16 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
+    @cached(tree=True)
     async def get_unread_message_count_for_user(
-        self, user_id: str, room_id: str, last_read_event_id: str,
+        self, room_id: str, user_id: str,
     ):
+        last_read_event_id = await self.get_last_receipt_event_id_for_user(
+            user_id=user_id,
+            room_id=room_id,
+            receipt_type="m.read",
+        )
+
         return await self.db.runInteraction(
             "get_unread_message_count_for_user",
             self._get_unread_message_count_for_user_txn,

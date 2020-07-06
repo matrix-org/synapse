@@ -489,6 +489,9 @@ class PersistEventsStore:
             backfilled=backfilled,
         )
 
+        for event, _ in events_and_contexts:
+            self.get_unread_message_count_for_user.invalidate((event.room_id,))
+
         # We call this last as it assumes we've inserted the events into
         # room_memberships, where applicable.
         self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)

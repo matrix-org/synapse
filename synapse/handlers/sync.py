@@ -958,14 +958,8 @@ class SyncHandler(object):
         """Retrieve the count of unread message for the current user in the given room.
         """
         with Measure(self.clock, "unread_messages_for_room_id"):
-            last_unread_event_id = await self.store.get_last_receipt_event_id_for_user(
-                user_id=sync_config.user.to_string(),
-                room_id=room_id,
-                receipt_type="m.read",
-            )
-
             count = await self.store.get_unread_message_count_for_user(
-                sync_config.user.to_string(), room_id, last_unread_event_id
+                sync_config.user.to_string(), room_id,
             )
             return count
 
