@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import abc
 import logging
 from typing import List, Tuple, Union
@@ -22,7 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes, StoreError
+from synapse.api.errors import Codes, StoreError, SynapseError
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore

@@ -14,7 +14,8 @@
 # limitations under the License.
 import synapse
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import room, login, push_rule
+from synapse.rest.client.v1 import login, push_rule, room
+
 from tests.unittest import HomeserverTestCase
 
 
