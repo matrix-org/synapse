@@ -210,11 +210,10 @@ class KeyUploadServlet(RestServlet):
             # Proxy headers from the original request, such as the auth headers
             # (in case the access token is there) and the original IP /
             # User-Agent of the request.
-            headers = {}
-            for header in (b"Authorization", b"X-Forwarded-For", b"User-Agent"):
-                header_value = request.requestHeaders.getRawHeaders(header)
-                if header_value:
-                    headers[header] = header_value
+            headers = {
+                header: request.requestHeaders.getRawHeaders(header, [])
+                for header in (b"Authorization", b"X-Forwarded-For", b"User-Agent")
+            }
 
             try:
                 result = await self.http_client.post_json_get_json(
