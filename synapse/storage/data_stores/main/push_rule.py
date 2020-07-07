@@ -22,6 +22,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
+from synapse.api.errors import SynapseError, Codes
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore
@@ -708,12 +709,18 @@ class PushRuleStore(PushRulesWorkerStore):
                     update_stream=False,
                 )
             else:
-                self.db.simple_update_one_txn(
-                    txn,
-                    "push_rules",
-                    {"user_name": user_id, "rule_id": rule_id},
-                    {"actions": actions_json},
-                )
+                try:
+                    self.db.simple_update_one_txn(
+                        txn,
+                        "push_rules",
+                        {"user_name": user_id, "rule_id": rule_id},
+                        {"actions": actions_json},
+                    )
+                except SynapseError as serr:
+                    if serr.code == 404:
+                        raise SynapseError(404, "Push rule does not exist", Codes.NOT_FOUND)
+                    else:
+                        raise serr
 
             self._insert_push_rules_update_txn(
                 txn,
