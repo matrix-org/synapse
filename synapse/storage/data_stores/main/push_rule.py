@@ -22,7 +22,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import SynapseError, Codes
+from synapse.api.errors import SynapseError, Codes, StoreError
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore
@@ -652,7 +652,7 @@ class PushRuleStore(PushRulesWorkerStore):
             )
 
     @defer.inlineCallbacks
-    def set_push_rule_enabled(self, user_id, rule_id, enabled):
+    def set_push_rule_enabled(self, user_id, rule_id, enabled, is_default_rule):
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
             yield self.db.runInteraction(
@@ -663,12 +663,27 @@ class PushRuleStore(PushRulesWorkerStore):
                 user_id,
                 rule_id,
                 enabled,
+                is_default_rule,
             )
 
     def _set_push_rule_enabled_txn(
-        self, txn, stream_id, event_stream_ordering, user_id, rule_id, enabled
+        self, txn, stream_id, event_stream_ordering, user_id, rule_id, enabled, is_default_rule
     ):
         new_id = self._push_rules_enable_id_gen.get_next()
+
+        if not is_default_rule:
+            try:
+                # first check it exists
+                self.db.simple_select_one_onecol_txn(
+                    txn,
+                    "push_rules",
+                    {"user_name": user_id, "rule_id": rule_id},
+                    "id"
+                )
+            except StoreError as serr:
+                if serr.code == 404:
+                    raise StoreError(404, "Push rule does not exist.", Codes.NOT_FOUND)
+
         self.db.simple_upsert_txn(
             txn,
             "push_rules_enable",
