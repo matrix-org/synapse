@@ -294,6 +294,9 @@ class TypingHandler(object):
         rows.sort()
 
         limited = False
+        # We, unusually, use a strict limit here as we have all the rows in
+        # memory rather than pulling them out of the database with a `LIMIT ?`
+        # clause.
         if len(rows) > limit:
             rows = rows[:limit]
             current_id = rows[-1][0]
