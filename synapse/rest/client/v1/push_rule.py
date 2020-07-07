@@ -18,7 +18,7 @@ from synapse.api.errors import (
     NotFoundError,
     StoreError,
     SynapseError,
-    UnrecognizedRequestError,
+    UnrecognizedRequestError, Codes,
 )
 from synapse.http.servlet import (
     RestServlet,
@@ -180,7 +180,7 @@ class PushRuleRestServlet(RestServlet):
             is_default_rule = rule_id.startswith(".")
             if is_default_rule:
                 if namespaced_rule_id not in BASE_RULE_IDS:
-                    raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
+                    raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,), Codes.NOT_FOUND)
             return self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
