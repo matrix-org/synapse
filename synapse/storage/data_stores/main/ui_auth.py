@@ -17,10 +17,10 @@ from typing import Any, Dict, Optional, Union
 
 import attr
 
-import synapse.util.stringutils as stringutils
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore
 from synapse.types import JsonDict
+from synapse.util import stringutils as stringutils
 
 
 @attr.s

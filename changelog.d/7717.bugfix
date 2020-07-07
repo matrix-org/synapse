@@ -1,1 +1,0 @@
-Fix the tables ignored by `synapse_port_db` to be in sync the current database schema.

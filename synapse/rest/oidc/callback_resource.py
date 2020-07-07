@@ -14,18 +14,17 @@
 # limitations under the License.
 import logging
 
-from synapse.http.server import DirectServeResource, wrap_html_request_handler
+from synapse.http.server import DirectServeHtmlResource
 
 logger = logging.getLogger(__name__)
 
 
-class OIDCCallbackResource(DirectServeResource):
+class OIDCCallbackResource(DirectServeHtmlResource):
     isLeaf = 1
 
     def __init__(self, hs):
         super().__init__()
         self._oidc_handler = hs.get_oidc_handler()
 
-    @wrap_html_request_handler
     async def _async_render_GET(self, request):
-        return await self._oidc_handler.handle_oidc_callback(request)
+        await self._oidc_handler.handle_oidc_callback(request)

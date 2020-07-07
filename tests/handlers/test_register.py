@@ -22,6 +22,8 @@ from synapse.api.errors import Codes, ResourceLimitError, SynapseError
 from synapse.handlers.register import RegistrationHandler
 from synapse.types import RoomAlias, UserID, create_requester
 
+from tests.unittest import override_config
+
 from .. import unittest
 
 
@@ -145,9 +147,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
 
+    @override_config({"auto_join_rooms": ["#room:test"]})
     def test_auto_create_auto_join_rooms(self):
         room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
         user_id = self.get_success(self.handler.register_user(localpart="jeff"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         directory_handler = self.hs.get_handlers().directory_handler
@@ -193,9 +195,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         room_alias = RoomAlias.from_string(room_alias_str)
         self.get_failure(directory_handler.get_association(room_alias), SynapseError)
 
+    @override_config({"auto_join_rooms": ["#room:test"]})
     def test_auto_create_auto_join_rooms_when_user_is_the_first_real_user(self):
         room_alias_str = "#room:test"
-        self.hs.config.auto_join_rooms = [room_alias_str]
 
         self.store.count_real_users = Mock(return_value=defer.succeed(1))
         self.store.is_real_user = Mock(return_value=defer.succeed(True))
@@ -217,6 +219,212 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="real"))
         rooms = self.get_success(self.store.get_rooms_for_user(user_id))
         self.assertEqual(len(rooms), 0)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_rooms_federated": False,
+        }
+    )
+    def test_auto_create_auto_join_rooms_federated(self):
+        """
+        Auto-created rooms that are private require an invite to go to the user
+        (instead of directly joining it).
+        """
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly not federated.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertFalse(room["federatable"])
+        self.assertFalse(room["public"])
+        self.assertEqual(room["join_rules"], "public")
+        self.assertIsNone(room["guest_access"])
+
+        # The user should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {"auto_join_rooms": ["#room:test"], "auto_join_mxid_localpart": "support"}
+    )
+    def test_auto_join_mxid_localpart(self):
+        """
+        Ensure the user still needs up in the room created by a different user.
+        """
+        # Ensure the support user exists.
+        inviter = "@support:test"
+
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly a public room.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertEqual(room["join_rules"], "public")
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+        # Register a second user, which should also end up in the room.
+        user_id = self.get_success(self.handler.register_user(localpart="bob"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_room_preset": "private_chat",
+            "auto_join_mxid_localpart": "support",
+        }
+    )
+    def test_auto_create_auto_join_room_preset(self):
+        """
+        Auto-created rooms that are private require an invite to go to the user
+        (instead of directly joining it).
+        """
+        # Ensure the support user exists.
+        inviter = "@support:test"
+
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly a private room.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertFalse(room["public"])
+        self.assertEqual(room["join_rules"], "invite")
+        self.assertEqual(room["guest_access"], "can_join")
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+        # Register a second user, which should also end up in the room.
+        user_id = self.get_success(self.handler.register_user(localpart="bob"))
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_room_preset": "private_chat",
+            "auto_join_mxid_localpart": "support",
+        }
+    )
+    def test_auto_create_auto_join_room_preset_guest(self):
+        """
+        Auto-created rooms that are private require an invite to go to the user
+        (instead of directly joining it).
+
+        This should also work for guests.
+        """
+        inviter = "@support:test"
+
+        room_alias_str = "#room:test"
+        user_id = self.get_success(
+            self.handler.register_user(localpart="jeff", make_guest=True)
+        )
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room is properly a private room.
+        room = self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+        self.assertFalse(room["public"])
+        self.assertEqual(room["join_rules"], "invite")
+        self.assertEqual(room["guest_access"], "can_join")
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+    @override_config(
+        {
+            "auto_join_rooms": ["#room:test"],
+            "autocreate_auto_join_room_preset": "private_chat",
+            "auto_join_mxid_localpart": "support",
+        }
+    )
+    def test_auto_create_auto_join_room_preset_invalid_permissions(self):
+        """
+        Auto-created rooms that are private require an invite, check that
+        registration doesn't completely break if the inviter doesn't have proper
+        permissions.
+        """
+        inviter = "@support:test"
+
+        # Register an initial user to create the room and such (essentially this
+        # is a subset of test_auto_create_auto_join_room_preset).
+        room_alias_str = "#room:test"
+        user_id = self.get_success(self.handler.register_user(localpart="jeff"))
+
+        # Ensure the room was created.
+        directory_handler = self.hs.get_handlers().directory_handler
+        room_alias = RoomAlias.from_string(room_alias_str)
+        room_id = self.get_success(directory_handler.get_association(room_alias))
+
+        # Ensure the room exists.
+        self.get_success(self.store.get_room_with_stats(room_id["room_id"]))
+
+        # Both users should be in the room.
+        rooms = self.get_success(self.store.get_rooms_for_user(inviter))
+        self.assertIn(room_id["room_id"], rooms)
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        self.assertIn(room_id["room_id"], rooms)
+
+        # Lower the permissions of the inviter.
+        event_creation_handler = self.hs.get_event_creation_handler()
+        requester = create_requester(inviter)
+        event, context = self.get_success(
+            event_creation_handler.create_event(
+                requester,
+                {
+                    "type": "m.room.power_levels",
+                    "state_key": "",
+                    "room_id": room_id["room_id"],
+                    "content": {"invite": 100, "users": {inviter: 0}},
+                    "sender": inviter,
+                },
+            )
+        )
+        self.get_success(
+            event_creation_handler.send_nonmember_event(requester, event, context)
+        )
+
+        # Register a second user, which won't be be in the room (or even have an invite)
+        # since the inviter no longer has the proper permissions.
+        user_id = self.get_success(self.handler.register_user(localpart="bob"))
+
+        # This user should not be in any rooms.
+        rooms = self.get_success(self.store.get_rooms_for_user(user_id))
+        invited_rooms = self.get_success(
+            self.store.get_invited_rooms_for_local_user(user_id)
+        )
+        self.assertEqual(rooms, set())
+        self.assertEqual(invited_rooms, [])
 
     def test_auto_create_auto_join_where_no_consent(self):
         """Test to ensure that the first user is not auto-joined to a room if
