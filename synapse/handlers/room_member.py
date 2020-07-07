@@ -105,7 +105,7 @@ class RoomMemberHandler(object):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def _remote_reject_invite(
+    async def remote_reject_invite(
         self,
         requester: Requester,
         remote_room_hosts: List[str],
@@ -499,7 +499,7 @@ class RoomMemberHandler(object):
                 else:
                     # send the rejection to the inviter's HS.
                     remote_room_hosts = remote_room_hosts + [inviter.domain]
-                    return await self._remote_reject_invite(
+                    return await self.remote_reject_invite(
                         requester, remote_room_hosts, room_id, target, content,
                     )
 
@@ -1014,7 +1014,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         return event_id, stream_id
 
-    async def _remote_reject_invite(
+    async def remote_reject_invite(
         self,
         requester: Requester,
         remote_room_hosts: List[str],
@@ -1022,8 +1022,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         target: UserID,
         content: dict,
     ) -> Tuple[Optional[str], int]:
-        """Implements RoomMemberHandler._remote_reject_invite
+        """Implements RoomMemberHandler.remote_reject_invite
         """
+        logger.info("remote_reject_invite: %s out of room: %s", target, room_id)
+
         fed_handler = self.federation_handler
         try:
             event, stream_id = await fed_handler.do_remotely_reject_invite(

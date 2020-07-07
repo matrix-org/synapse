@@ -61,7 +61,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         return ret["event_id"], ret["stream_id"]
 
-    async def _remote_reject_invite(
+    async def remote_reject_invite(
         self,
         requester: Requester,
         remote_room_hosts: List[str],
@@ -69,7 +69,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         target: UserID,
         content: dict,
     ) -> Tuple[Optional[str], int]:
-        """Implements RoomMemberHandler._remote_reject_invite
+        """Implements RoomMemberHandler.remote_reject_invite
         """
         ret = await self._remote_reject_client(
             requester=requester,

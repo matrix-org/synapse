@@ -104,10 +104,9 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
     NAME = "remote_reject_invite"
     PATH_ARGS = ("room_id", "user_id")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super(ReplicationRemoteRejectInviteRestServlet, self).__init__(hs)
 
-        self.federation_handler = hs.get_handlers().federation_handler
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.member_handler = hs.get_room_member_handler()
@@ -138,26 +137,10 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         if requester.user:
             request.authenticated_entity = requester.user.to_string()
 
-        logger.info("remote_reject_invite: %s out of room: %s", user_id, room_id)
-
-        try:
-            event, stream_id = await self.federation_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, user_id, event_content,
-            )
-            event_id = event.event_id
-        except Exception as e:
-            # if we were unable to reject the exception, just mark
-            # it as rejected on our end and plough ahead.
-            #
-            # The 'except' clause is very broad, but we need to
-            # capture everything from DNS failures upwards
-            #
-            logger.warning("Failed to reject invite: %s", e)
-
-            stream_id = await self.member_handler.locally_reject_invite(
-                user_id, room_id
-            )
-            event_id = None
+        # hopefully we're now on the master, so this won't recurse!
+        event_id, stream_id = await self.member_handler.remote_reject_invite(
+            requester, remote_room_hosts, room_id, user_id, event_content,
+        )
 
         return 200, {"event_id": event_id, "stream_id": stream_id}
 
