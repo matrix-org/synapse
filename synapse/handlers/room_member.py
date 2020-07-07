@@ -28,7 +28,8 @@ from synapse.events.snapshot import EventContext
 from synapse.replication.http.membership import (
     ReplicationLocallyRejectInviteRestServlet,
 )
-from synapse.types import Collection, Requester, RoomAlias, RoomID, UserID
+from synapse.storage.roommember import RoomsForUser
+from synapse.types import Collection, JsonDict, Requester, RoomAlias, RoomID, UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_joined_room, user_left_room
 
@@ -107,25 +108,23 @@ class RoomMemberHandler(object):
     @abc.abstractmethod
     async def remote_reject_invite(
         self,
+        invite_event_id: str,
+        txn_id: Optional[str],
         requester: Requester,
-        remote_room_hosts: List[str],
-        room_id: str,
-        target: UserID,
-        content: dict,
+        content: JsonDict,
     ) -> Tuple[Optional[str], int]:
-        """Attempt to reject an invite for a room this server is not in. If we
-        fail to do so we locally mark the invite as rejected.
+        """
+        Rejects an out-of-band invite we have received from a remote server
 
         Args:
-            requester
-            remote_room_hosts: List of servers to use to try and reject invite
-            room_id
-            target: The user rejecting the invite
-            content: The content for the rejection event
+            invite_event_id: ID of the invite to be rejected
+            txn_id: optional transaction ID supplied by the client
+            requester: user making the rejection request, according to the access token
+            content: additional content to include in the rejection event.
+               Normally an empty dict.
 
         Returns:
-            A dictionary to be returned to the client, may
-            include event_id etc, or nothing if we locally rejected
+            event id, stream_id of the leave event
         """
         raise NotImplementedError()
 
@@ -485,11 +484,17 @@ class RoomMemberHandler(object):
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
                 # perhaps we've been invited
-                inviter = await self._get_inviter(target.to_string(), room_id)
-                if not inviter:
+                invite = await self.store.get_invite_for_local_user_in_room(
+                    user_id=target.to_string(), room_id=room_id
+                )  # type: Optional[RoomsForUser]
+                if not invite:
                     raise SynapseError(404, "Not a known room")
 
-                if self.hs.is_mine(inviter):
+                logger.info(
+                    "%s rejects invite to %s from %s", target, room_id, invite.sender
+                )
+
+                if self.hs.is_mine_id(invite.sender):
                     # the inviter was on our server, but has now left. Carry on
                     # with the normal rejection codepath.
                     #
@@ -497,10 +502,9 @@ class RoomMemberHandler(object):
                     # active on other servers.
                     pass
                 else:
-                    # send the rejection to the inviter's HS.
-                    remote_room_hosts = remote_room_hosts + [inviter.domain]
+                    # send the rejection to the inviter's HS (with fallback)
                     return await self.remote_reject_invite(
-                        requester, remote_room_hosts, room_id, target, content,
+                        invite.event_id, txn_id, requester, content,
                     )
 
         return await self._local_membership_update(
@@ -1016,20 +1020,26 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
     async def remote_reject_invite(
         self,
+        invite_event_id: str,
+        txn_id: Optional[str],
         requester: Requester,
-        remote_room_hosts: List[str],
-        room_id: str,
-        target: UserID,
-        content: dict,
+        content: JsonDict,
     ) -> Tuple[Optional[str], int]:
-        """Implements RoomMemberHandler.remote_reject_invite
         """
-        logger.info("remote_reject_invite: %s out of room: %s", target, room_id)
+        Rejects an out-of-band invite received from a remote user
 
+        Implements RoomMemberHandler.remote_reject_invite
+        """
+        invite_event = await self.store.get_event(invite_event_id)
+        room_id = invite_event.room_id
+        target_user = invite_event.state_key
+
+        # first of all, try doing a rejection via the inviting server
         fed_handler = self.federation_handler
         try:
+            inviter_id = UserID.from_string(invite_event.sender)
             event, stream_id = await fed_handler.do_remotely_reject_invite(
-                remote_room_hosts, room_id, target.to_string(), content=content,
+                [inviter_id.domain], room_id, target_user, content=content
             )
             return event.event_id, stream_id
         except Exception as e:
@@ -1041,7 +1051,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            stream_id = await self.locally_reject_invite(target.to_string(), room_id)
+            stream_id = await self.locally_reject_invite(target_user, room_id)
             return None, stream_id
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:

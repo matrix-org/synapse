@@ -14,11 +14,11 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
-from synapse.types import Requester, UserID
+from synapse.types import JsonDict, Requester, UserID
 from synapse.util.distributor import user_joined_room, user_left_room
 
 if TYPE_CHECKING:
@@ -88,21 +88,21 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
 
 
 class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
-    """Rejects the invite for the user and room.
+    """Rejects an out-of-band invite we have received from a remote server
 
     Request format:
 
-        POST /_synapse/replication/remote_reject_invite/:room_id/:user_id
+        POST /_synapse/replication/remote_reject_invite/:event_id
 
         {
+            "txn_id": ...,
             "requester": ...,
-            "remote_room_hosts": [...],
             "content": { ... }
         }
     """
 
     NAME = "remote_reject_invite"
-    PATH_ARGS = ("room_id", "user_id")
+    PATH_ARGS = ("invite_event_id",)
 
     def __init__(self, hs: "HomeServer"):
         super(ReplicationRemoteRejectInviteRestServlet, self).__init__(hs)
@@ -112,24 +112,30 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         self.member_handler = hs.get_room_member_handler()
 
     @staticmethod
-    def _serialize_payload(requester, room_id, user_id, remote_room_hosts, content):
+    def _serialize_payload(  # type: ignore
+        invite_event_id: str,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ):
         """
         Args:
-            requester(Requester)
-            room_id (str)
-            user_id (str)
-            remote_room_hosts (list[str]): Servers to try and reject via
+            invite_event_id: ID of the invite to be rejected
+            txn_id: optional transaction ID supplied by the client
+            requester: user making the rejection request, according to the access token
+            content: additional content to include in the rejection event.
+               Normally an empty dict.
         """
         return {
+            "txn_id": txn_id,
             "requester": requester.serialize(),
-            "remote_room_hosts": remote_room_hosts,
             "content": content,
         }
 
-    async def _handle_request(self, request, room_id, user_id):
+    async def _handle_request(self, request, invite_event_id):
         content = parse_json_object_from_request(request)
 
-        remote_room_hosts = content["remote_room_hosts"]
+        txn_id = content["txn_id"]
         event_content = content["content"]
 
         requester = Requester.deserialize(self.store, content["requester"])
@@ -139,7 +145,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
 
         # hopefully we're now on the master, so this won't recurse!
         event_id, stream_id = await self.member_handler.remote_reject_invite(
-            requester, remote_room_hosts, room_id, user_id, event_content,
+            invite_event_id, txn_id, requester, event_content,
         )
 
         return 200, {"event_id": event_id, "stream_id": stream_id}
