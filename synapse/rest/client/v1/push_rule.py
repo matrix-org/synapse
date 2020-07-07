@@ -18,7 +18,8 @@ from synapse.api.errors import (
     NotFoundError,
     StoreError,
     SynapseError,
-    UnrecognizedRequestError, Codes,
+    UnrecognizedRequestError,
+    Codes,
 )
 from synapse.http.servlet import (
     RestServlet,
@@ -173,7 +174,9 @@ class PushRuleRestServlet(RestServlet):
         is_default_rule = rule_id.startswith(".")
         if is_default_rule:
             if namespaced_rule_id not in BASE_RULE_IDS:
-                raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,), Codes.NOT_FOUND)
+                raise SynapseError(
+                    404, "Unknown rule %r" % (namespaced_rule_id,), Codes.NOT_FOUND
+                )
 
         if spec["attr"] == "enabled":
             if isinstance(val, dict) and "enabled" in val:
@@ -183,7 +186,9 @@ class PushRuleRestServlet(RestServlet):
                 # This should *actually* take a dict, but many clients pass
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
-            return self.store.set_push_rule_enabled(user_id, namespaced_rule_id, val, is_default_rule)
+            return self.store.set_push_rule_enabled(
+                user_id, namespaced_rule_id, val, is_default_rule
+            )
         elif spec["attr"] == "actions":
             actions = val.get("actions")
             _check_actions(actions)

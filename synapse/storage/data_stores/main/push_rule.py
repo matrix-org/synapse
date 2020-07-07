@@ -667,7 +667,14 @@ class PushRuleStore(PushRulesWorkerStore):
             )
 
     def _set_push_rule_enabled_txn(
-        self, txn, stream_id, event_stream_ordering, user_id, rule_id, enabled, is_default_rule
+        self,
+        txn,
+        stream_id,
+        event_stream_ordering,
+        user_id,
+        rule_id,
+        enabled,
+        is_default_rule,
     ):
         new_id = self._push_rules_enable_id_gen.get_next()
 
@@ -675,10 +682,7 @@ class PushRuleStore(PushRulesWorkerStore):
             try:
                 # first check it exists
                 self.db.simple_select_one_onecol_txn(
-                    txn,
-                    "push_rules",
-                    {"user_name": user_id, "rule_id": rule_id},
-                    "id"
+                    txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}, "id"
                 )
             except StoreError as serr:
                 if serr.code == 404:
@@ -733,7 +737,9 @@ class PushRuleStore(PushRulesWorkerStore):
                     )
                 except SynapseError as serr:
                     if serr.code == 404:
-                        raise SynapseError(404, "Push rule does not exist", Codes.NOT_FOUND)
+                        raise SynapseError(
+                            404, "Push rule does not exist", Codes.NOT_FOUND
+                        )
                     else:
                         raise serr
 
