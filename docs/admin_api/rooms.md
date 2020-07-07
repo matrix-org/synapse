@@ -318,3 +318,30 @@ Response:
   "state_events": 93534
 }
 ```
+
+# Room Members API
+
+The Room Members admin API allows server admins to get a list of all members of a room.
+
+## Usage
+
+A standard request:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/members
+
+{}
+```
+
+Response:
+
+```
+{
+  "members": [
+    "@foo:matrix.org",
+    "@bar:matrix.org",
+    "@foobar:matrix.org
+    ],
+  "total": 3
+}
+```
