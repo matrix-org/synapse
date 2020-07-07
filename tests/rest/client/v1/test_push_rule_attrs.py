@@ -438,7 +438,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
         # enable & check 404 for never-heard-of rule
         request, channel = self.make_request(
             "PUT",
-            "/pushrules/global/override/.m.muahahah/enabled",
+            "/pushrules/global/override/.m.muahahah/actions",
             {"actions": ["dont_notify"]},
             access_token=token,
         )
