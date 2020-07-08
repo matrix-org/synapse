@@ -87,7 +87,7 @@ class FederationClient(FederationBase):
         self.transport_layer = hs.get_federation_transport_client()
 
         self.hostname = hs.hostname
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
 
         self._get_pdu_cache = ExpiringCache(
             cache_name="get_pdu_cache",
