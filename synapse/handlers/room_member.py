@@ -29,9 +29,6 @@ from synapse.events import EventBase
 from synapse.events.builder import create_local_event_from_event_dict
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
-from synapse.replication.http.membership import (
-    ReplicationLocallyRejectInviteRestServlet,
-)
 from synapse.storage.roommember import RoomsForUser
 from synapse.types import Collection, JsonDict, Requester, RoomAlias, RoomID, UserID
 from synapse.util.async_helpers import Linearizer
@@ -79,10 +76,6 @@ class RoomMemberHandler(object):
         )
         if self._is_on_event_persistence_instance:
             self.persist_event_storage = hs.get_storage().persistence
-        else:
-            self._locally_reject_client = ReplicationLocallyRejectInviteRestServlet.make_client(
-                hs
-            )
 
         # This is only used to get at ratelimit function, and
         # maybe_kick_guest_users. It's fine there are multiple of these as
@@ -131,22 +124,6 @@ class RoomMemberHandler(object):
             event id, stream_id of the leave event
         """
         raise NotImplementedError()
-
-    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
-        """Mark the invite has having been rejected even though we failed to
-        create a leave event for it.
-        """
-        if self._is_on_event_persistence_instance:
-            return await self.persist_event_storage.locally_reject_invite(
-                user_id, room_id
-            )
-        else:
-            result = await self._locally_reject_client(
-                instance_name=self._event_stream_writer_instance,
-                user_id=user_id,
-                room_id=room_id,
-            )
-            return result["stream_id"]
 
     @abc.abstractmethod
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:

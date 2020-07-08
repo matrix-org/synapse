@@ -151,36 +151,6 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         return 200, {"event_id": event_id, "stream_id": stream_id}
 
 
-class ReplicationLocallyRejectInviteRestServlet(ReplicationEndpoint):
-    """Rejects the invite for the user and room locally.
-
-    Request format:
-
-        POST /_synapse/replication/locally_reject_invite/:room_id/:user_id
-
-        {}
-    """
-
-    NAME = "locally_reject_invite"
-    PATH_ARGS = ("room_id", "user_id")
-
-    def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
-        self.member_handler = hs.get_room_member_handler()
-
-    @staticmethod
-    def _serialize_payload(room_id, user_id):
-        return {}
-
-    async def _handle_request(self, request, room_id, user_id):
-        logger.info("locally_reject_invite: %s out of room: %s", user_id, room_id)
-
-        stream_id = await self.member_handler.locally_reject_invite(user_id, room_id)
-
-        return 200, {"stream_id": stream_id}
-
-
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
     """Notifies that a user has joined or left the room
 
@@ -234,4 +204,3 @@ def register_servlets(hs, http_server):
     ReplicationRemoteJoinRestServlet(hs).register(http_server)
     ReplicationRemoteRejectInviteRestServlet(hs).register(http_server)
     ReplicationUserJoinedLeftRoomRestServlet(hs).register(http_server)
-    ReplicationLocallyRejectInviteRestServlet(hs).register(http_server)
