@@ -446,10 +446,6 @@ class ReceiptsStore(ReceiptsWorkerStore):
             (user_id, room_id, receipt_type),
         )
 
-        txn.call_after(
-            self.get_unread_message_count_for_user.invalidate, (room_id, user_id),
-        )
-
         self.db.simple_upsert_txn(
             txn,
             table="receipts_linearized",
@@ -526,6 +522,12 @@ class ReceiptsStore(ReceiptsWorkerStore):
                 data,
                 stream_id=stream_id,
             )
+
+        yield defer.ensureDeferred(
+            self.invalidate_cache_and_stream(
+                "get_unread_message_count_for_user", (room_id, user_id),
+            )
+        )
 
         if event_ts is None:
             return None
