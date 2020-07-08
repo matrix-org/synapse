@@ -214,8 +214,7 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     if not content_bytes and allow_empty_body:
         return None
 
-    # Decode to Unicode so that simplejson will return Unicode strings on
-    # Python 2
+    # Decode to Unicode since json on Python 3.5 requires str, not bytes.
     try:
         content_unicode = content_bytes.decode("utf8")
     except UnicodeDecodeError:
