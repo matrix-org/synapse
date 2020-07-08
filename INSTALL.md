@@ -259,17 +259,6 @@ Synapse via https://packages.matrix.org/debian/. They are available for Debian
 
 ```
 sudo apt install -y lsb-release wget apt-transport-https
-```
-
-for Debian/Ubuntu versions shipping `apt` < 1.6 (Debian < 10 / Ubuntu < 18.04), or
-
-```
-sudo apt install -y lsb-release wget
-```
-
-for Debian 10 / Ubuntu 18.04 and newer, followed by
-
-```
 sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main" |
     sudo tee /etc/apt/sources.list.d/matrix-org.list
