@@ -251,10 +251,10 @@ class IdentityHandler(BaseHandler):
         # 'browser-like' HTTPS.
         auth_headers = self.federation_http_client.build_auth_headers(
             destination=None,
-            method="POST",
+            method=b"POST",
             url_bytes=url_bytes,
             content=content,
-            destination_is=id_server,
+            destination_is=id_server.encode("ascii"),
         )
         headers = {b"Authorization": auth_headers}
 
