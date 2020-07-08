@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2016-2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,13 +16,19 @@
 import abc
 import logging
 from http import HTTPStatus
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple, Union
+
+from unpaddedbase64 import encode_base64
 
 from synapse import types
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
 from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.room_versions import EventFormatVersions
+from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase
+from synapse.events.builder import create_local_event_from_event_dict
 from synapse.events.snapshot import EventContext
+from synapse.events.validator import EventValidator
 from synapse.replication.http.membership import (
     ReplicationLocallyRejectInviteRestServlet,
 )
@@ -502,7 +506,8 @@ class RoomMemberHandler(object):
                     # active on other servers.
                     pass
                 else:
-                    # send the rejection to the inviter's HS (with fallback)
+                    # send the rejection to the inviter's HS (with fallback to
+                    # local event)
                     return await self.remote_reject_invite(
                         invite.event_id, txn_id, requester, content,
                     )
@@ -1043,16 +1048,94 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
             return event.event_id, stream_id
         except Exception as e:
-            # if we were unable to reject the exception, just mark
-            # it as rejected on our end and plough ahead.
+            # if we were unable to reject the invite, we will generate our own
+            # leave event.
             #
             # The 'except' clause is very broad, but we need to
             # capture everything from DNS failures upwards
             #
             logger.warning("Failed to reject invite: %s", e)
 
-            stream_id = await self.locally_reject_invite(target_user, room_id)
-            return None, stream_id
+            return await self._locally_reject_invite(
+                invite_event, txn_id, requester, content
+            )
+
+    async def _locally_reject_invite(
+        self,
+        invite_event: EventBase,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ) -> Tuple[str, int]:
+        """Generate a local invite rejection
+
+        This is called after  we fail to reject an invite via a remote server. It
+        generates an out-of-band membership event locally.
+
+        Args:
+            invite_event: the invite to be rejected
+            txn_id: optional transaction ID supplied by the client
+            requester:  user making the rejection request, according to the access token
+            content: additional content to include in the rejection event.
+               Normally an empty dict.
+        """
+
+        room_id = invite_event.room_id
+        target_user = invite_event.state_key
+        room_version = await self.store.get_room_version(room_id)
+
+        content["membership"] = Membership.LEAVE
+
+        # the auth events for the new event are the same as that of the invite, plus
+        # the invite itself.
+        #
+        # the prev_events are just the invite.
+        invite_hash = invite_event.event_id  # type: Union[str, Tuple]
+        if room_version.event_format == EventFormatVersions.V1:
+            alg, h = compute_event_reference_hash(invite_event)
+            invite_hash = (invite_event.event_id, {alg: encode_base64(h)})
+
+        auth_events = invite_event.auth_events + (invite_hash,)
+        prev_events = (invite_hash,)
+
+        # we cap depth of generated events, to ensure that they are not
+        # rejected by other servers (and so that they can be persisted in
+        # the db)
+        depth = min(invite_event.depth + 1, MAX_DEPTH)
+
+        event_dict = {
+            "depth": depth,
+            "auth_events": auth_events,
+            "prev_events": prev_events,
+            "type": EventTypes.Member,
+            "room_id": room_id,
+            "sender": target_user,
+            "content": content,
+            "state_key": target_user,
+        }
+
+        event = create_local_event_from_event_dict(
+            clock=self.clock,
+            hostname=self.hs.hostname,
+            signing_key=self.hs.signing_key,
+            room_version=room_version,
+            event_dict=event_dict,
+        )
+        event.internal_metadata.outlier = True
+        event.internal_metadata.out_of_band_membership = True
+        if txn_id is not None:
+            event.internal_metadata.txn_id = txn_id
+        if requester.access_token_id is not None:
+            event.internal_metadata.token_id = requester.access_token_id
+
+        EventValidator().validate_new(event, self.config)
+
+        context = await self.state_handler.compute_event_context(event)
+        context.app_service = requester.app_service
+        stream_id = await self.event_creation_handler.handle_new_client_event(
+            requester, event, context, extra_users=[UserID.from_string(target_user)],
+        )
+        return event.event_id, stream_id
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_joined_room
