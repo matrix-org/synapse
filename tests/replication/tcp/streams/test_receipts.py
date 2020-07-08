@@ -39,9 +39,13 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         )
         self.replicate()
 
-        # there should be one RDATA command
-        self.test_handler.on_rdata.assert_called_once()
-        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
+        # there should be two RDATA commands, one for invalidating the unread counts
+        # cache in sync responses and pushes, and one for the actual read receipt.
+        self.assertEqual(self.test_handler.on_rdata.call_count, 2)
+
+        # The first call will be the cache invalidation, so we ignore it.
+        stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[1]
+
         self.assertEqual(stream_name, "receipts")
         self.assertEqual(1, len(rdata_rows))
         row = rdata_rows[0]  # type: ReceiptsStream.ReceiptsStreamRow
