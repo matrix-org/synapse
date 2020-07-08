@@ -1,0 +1,1 @@
+Change the installation documentation regarding the `apt-transport-https` package, which is no longer needed on Debian 10/Ubuntu 18.04 and newer.
