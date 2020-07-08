@@ -1046,7 +1046,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
     ) -> Tuple[str, int]:
         """Generate a local invite rejection
 
-        This is called after  we fail to reject an invite via a remote server. It
+        This is called after we fail to reject an invite via a remote server. It
         generates an out-of-band membership event locally.
 
         Args:
