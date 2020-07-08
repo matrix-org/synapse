@@ -1,3 +1,13 @@
+Synapse 1.16.0 (2020-07-08)
+===========================
+
+No significant changes since 1.16.0rc2.
+
+Note that this release deprecates the `m.login.jwt` login method, renaming it
+to `org.matrix.login.jwt`, as `m.login.jwt` is not part of the Matrix spec.
+Otherwise the behaviour is identical. Synapse will accept both names for now,
+but this may change in a future release.
+
 Synapse 1.16.0rc2 (2020-07-02)
 ==============================
 
@@ -38,11 +48,6 @@ Security advisory
 
 Synapse 1.16.0rc1 (2020-07-01)
 ==============================
-
-Note that this release deprecates the `m.login.jwt` login method, renaming it
-to `org.matrix.login.jwt`, as `m.login.jwt` is not part of the Matrix spec.
-Otherwise the behaviour is identical. Synapse will accept both names for now,
-but this may change in a future release.
 
 Features
 --------
