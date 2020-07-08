@@ -14,8 +14,6 @@
 # limitations under the License.
 import logging
 
-from six import iteritems, string_types
-
 from synapse.api.errors import SynapseError
 from synapse.api.urls import ConsentURIBuilder
 from synapse.config import ConfigError
@@ -118,10 +116,10 @@ def copy_with_str_subst(x, substitutions):
     Returns:
         copy of x
     """
-    if isinstance(x, string_types):
+    if isinstance(x, str):
         return x % substitutions
     if isinstance(x, dict):
-        return {k: copy_with_str_subst(v, substitutions) for (k, v) in iteritems(x)}
+        return {k: copy_with_str_subst(v, substitutions) for (k, v) in x.items()}
     if isinstance(x, (list, tuple)):
         return [copy_with_str_subst(y) for y in x]
 

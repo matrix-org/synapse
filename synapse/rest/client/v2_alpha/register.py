@@ -18,8 +18,6 @@ import hmac
 import logging
 from typing import List, Union
 
-from six import string_types
-
 import synapse
 import synapse.api.auth
 import synapse.types
@@ -38,7 +36,7 @@ from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.handlers.auth import AuthHandler
-from synapse.http.server import finish_request
+from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -306,17 +304,15 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
             # Otherwise show the success template
             html = self.config.email_registration_template_success_html_content
-
-            request.setResponseCode(200)
+            status_code = 200
         except ThreepidValidationError as e:
-            request.setResponseCode(e.code)
+            status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
             html = self.failure_email_template.render(**template_vars)
 
-        request.write(html.encode("utf-8"))
-        finish_request(request)
+        respond_with_html(request, status_code, html)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -413,7 +409,7 @@ class RegisterRestServlet(RestServlet):
         # in sessions. Pull out the username/password provided to us.
         if "password" in body:
             password = body.pop("password")
-            if not isinstance(password, string_types) or len(password) > 512:
+            if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(password)
 
@@ -425,10 +421,7 @@ class RegisterRestServlet(RestServlet):
 
         desired_username = None
         if "username" in body:
-            if (
-                not isinstance(body["username"], string_types)
-                or len(body["username"]) > 512
-            ):
+            if not isinstance(body["username"], str) or len(body["username"]) > 512:
                 raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
 
@@ -453,7 +446,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, string_types):
+            if isinstance(desired_username, str):
                 result = await self._do_appservice_registration(
                     desired_username, access_token, body
                 )

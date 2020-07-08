@@ -19,11 +19,8 @@
 
 import itertools
 import logging
+from http import HTTPStatus
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
-
-import six
-from six import iteritems, itervalues
-from six.moves import http_client, zip
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -33,7 +30,12 @@ from unpaddedbase64 import decode_base64
 from twisted.internet import defer
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, Membership, RejectedReason
+from synapse.api.constants import (
+    EventTypes,
+    Membership,
+    RejectedReason,
+    RoomEncryptionAlgorithms,
+)
 from synapse.api.errors import (
     AuthError,
     CodeMessageException,
@@ -238,7 +240,7 @@ class FederationHandler(BaseHandler):
             logger.debug("[%s %s] min_depth: %d", room_id, event_id, min_depth)
 
             prevs = set(pdu.prev_event_ids())
-            seen = await self.store.have_seen_events(prevs)
+            seen = await self.store.have_events_in_timeline(prevs)
 
             if min_depth is not None and pdu.depth < min_depth:
                 # This is so that we don't notify the user about this
@@ -278,7 +280,7 @@ class FederationHandler(BaseHandler):
 
                         # Update the set of things we've seen after trying to
                         # fetch the missing stuff
-                        seen = await self.store.have_seen_events(prevs)
+                        seen = await self.store.have_events_in_timeline(prevs)
 
                         if not prevs - seen:
                             logger.info(
@@ -374,6 +376,7 @@ class FederationHandler(BaseHandler):
 
                     room_version = await self.store.get_room_version_id(room_id)
                     state_map = await resolve_events_with_store(
+                        self.clock,
                         room_id,
                         room_version,
                         state_maps,
@@ -393,7 +396,7 @@ class FederationHandler(BaseHandler):
                     )
                     event_map.update(evs)
 
-                    state = [event_map[e] for e in six.itervalues(state_map)]
+                    state = [event_map[e] for e in state_map.values()]
                 except Exception:
                     logger.warning(
                         "[%s %s] Error attempting to resolve state at missing "
@@ -423,7 +426,7 @@ class FederationHandler(BaseHandler):
         room_id = pdu.room_id
         event_id = pdu.event_id
 
-        seen = await self.store.have_seen_events(prevs)
+        seen = await self.store.have_events_in_timeline(prevs)
 
         if not prevs - seen:
             return
@@ -742,7 +745,10 @@ class FederationHandler(BaseHandler):
                 if device:
                     keys = device.get("keys", {}).get("keys", {})
 
-                    if event.content.get("algorithm") == "m.megolm.v1.aes-sha2":
+                    if (
+                        event.content.get("algorithm")
+                        == RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2
+                    ):
                         # For this algorithm we expect a curve25519 key.
                         key_name = "curve25519:%s" % (device_id,)
                         current_keys = [keys.get(key_name)]
@@ -1001,7 +1007,7 @@ class FederationHandler(BaseHandler):
             """
             joined_users = [
                 (state_key, int(event.depth))
-                for (e_type, state_key), event in iteritems(state)
+                for (e_type, state_key), event in state.items()
                 if e_type == EventTypes.Member and event.membership == Membership.JOIN
             ]
 
@@ -1091,16 +1097,16 @@ class FederationHandler(BaseHandler):
         states = dict(zip(event_ids, [s.state for s in states]))
 
         state_map = await self.store.get_events(
-            [e_id for ids in itervalues(states) for e_id in itervalues(ids)],
+            [e_id for ids in states.values() for e_id in ids.values()],
             get_prev_content=False,
         )
         states = {
             key: {
                 k: state_map[e_id]
-                for k, e_id in iteritems(state_dict)
+                for k, e_id in state_dict.items()
                 if e_id in state_map
             }
-            for key, state_dict in iteritems(states)
+            for key, state_dict in states.items()
         }
 
         for e_id, _ in sorted_extremeties_tuple:
@@ -1188,7 +1194,7 @@ class FederationHandler(BaseHandler):
                 ev.event_id,
                 len(ev.prev_event_ids()),
             )
-            raise SynapseError(http_client.BAD_REQUEST, "Too many prev_events")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many prev_events")
 
         if len(ev.auth_event_ids()) > 10:
             logger.warning(
@@ -1196,7 +1202,7 @@ class FederationHandler(BaseHandler):
                 ev.event_id,
                 len(ev.auth_event_ids()),
             )
-            raise SynapseError(http_client.BAD_REQUEST, "Too many auth_events")
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")
 
     async def send_invite(self, target_host, event):
         """ Sends the invite to the remote server for signing.
@@ -1539,7 +1545,7 @@ class FederationHandler(BaseHandler):
 
         # block any attempts to invite the server notices mxid
         if event.state_key == self._server_notices_mxid:
-            raise SynapseError(http_client.FORBIDDEN, "Cannot invite this user")
+            raise SynapseError(HTTPStatus.FORBIDDEN, "Cannot invite this user")
 
         # keep a record of the room version, if we don't yet know it.
         # (this may get overwritten if we later get a different room version in a
@@ -1725,7 +1731,7 @@ class FederationHandler(BaseHandler):
         state_groups = await self.state_store.get_state_groups(room_id, [event_id])
 
         if state_groups:
-            _, state = list(iteritems(state_groups)).pop()
+            _, state = list(state_groups.items()).pop()
             results = {(e.type, e.state_key): e for e in state}
 
             if event.is_state():
@@ -2088,7 +2094,7 @@ class FederationHandler(BaseHandler):
                     room_version, state_sets, event
                 )
                 current_state_ids = {
-                    k: e.event_id for k, e in iteritems(current_state_ids)
+                    k: e.event_id for k, e in current_state_ids.items()
                 }
             else:
                 current_state_ids = await self.state_handler.get_current_state_ids(
@@ -2104,7 +2110,7 @@ class FederationHandler(BaseHandler):
             # Now check if event pass auth against said current state
             auth_types = auth_types_for_event(event)
             current_state_ids = [
-                e for k, e in iteritems(current_state_ids) if k in auth_types
+                e for k, e in current_state_ids.items() if k in auth_types
             ]
 
             current_auth_events = await self.store.get_events(current_state_ids)
@@ -2420,7 +2426,7 @@ class FederationHandler(BaseHandler):
         else:
             event_key = None
         state_updates = {
-            k: a.event_id for k, a in iteritems(auth_events) if k != event_key
+            k: a.event_id for k, a in auth_events.items() if k != event_key
         }
 
         current_state_ids = await context.get_current_state_ids()
@@ -2431,7 +2437,7 @@ class FederationHandler(BaseHandler):
         prev_state_ids = await context.get_prev_state_ids()
         prev_state_ids = dict(prev_state_ids)
 
-        prev_state_ids.update({k: a.event_id for k, a in iteritems(auth_events)})
+        prev_state_ids.update({k: a.event_id for k, a in auth_events.items()})
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group

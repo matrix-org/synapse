@@ -16,8 +16,6 @@ import collections
 import re
 from typing import Any, Mapping, Union
 
-from six import string_types
-
 from frozendict import frozendict
 
 from twisted.internet import defer
@@ -318,7 +316,7 @@ def serialize_event(
 
     if only_event_fields:
         if not isinstance(only_event_fields, list) or not all(
-            isinstance(f, string_types) for f in only_event_fields
+            isinstance(f, str) for f in only_event_fields
         ):
             raise TypeError("only_event_fields must be a list of strings")
         d = only_fields(d, only_event_fields)

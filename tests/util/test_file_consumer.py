@@ -15,9 +15,9 @@
 
 
 import threading
+from io import StringIO
 
 from mock import NonCallableMock
-from six import StringIO
 
 from twisted.internet import defer, reactor
 

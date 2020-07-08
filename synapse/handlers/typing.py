@@ -15,9 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import List
-
-from twisted.internet import defer
+from typing import List, Tuple
 
 from synapse.api.errors import AuthError, SynapseError
 from synapse.logging.context import run_in_background
@@ -115,8 +113,7 @@ class TypingHandler(object):
     def is_typing(self, member):
         return member.user_id in self._room_typing.get(member.room_id, [])
 
-    @defer.inlineCallbacks
-    def started_typing(self, target_user, auth_user, room_id, timeout):
+    async def started_typing(self, target_user, auth_user, room_id, timeout):
         target_user_id = target_user.to_string()
         auth_user_id = auth_user.to_string()
 
@@ -126,7 +123,7 @@ class TypingHandler(object):
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
 
-        yield self.auth.check_user_in_room(room_id, target_user_id)
+        await self.auth.check_user_in_room(room_id, target_user_id)
 
         logger.debug("%s has started typing in %s", target_user_id, room_id)
 
@@ -145,8 +142,7 @@ class TypingHandler(object):
 
         self._push_update(member=member, typing=True)
 
-    @defer.inlineCallbacks
-    def stopped_typing(self, target_user, auth_user, room_id):
+    async def stopped_typing(self, target_user, auth_user, room_id):
         target_user_id = target_user.to_string()
         auth_user_id = auth_user.to_string()
 
@@ -156,7 +152,7 @@ class TypingHandler(object):
         if target_user_id != auth_user_id:
             raise AuthError(400, "Cannot set another user's typing state")
 
-        yield self.auth.check_user_in_room(room_id, target_user_id)
+        await self.auth.check_user_in_room(room_id, target_user_id)
 
         logger.debug("%s has stopped typing in %s", target_user_id, room_id)
 
@@ -164,12 +160,11 @@ class TypingHandler(object):
 
         self._stopped_typing(member)
 
-    @defer.inlineCallbacks
     def user_left_room(self, user, room_id):
         user_id = user.to_string()
         if self.is_mine_id(user_id):
             member = RoomMember(room_id=room_id, user_id=user_id)
-            yield self._stopped_typing(member)
+            self._stopped_typing(member)
 
     def _stopped_typing(self, member):
         if member.user_id not in self._room_typing.get(member.room_id, set()):
@@ -188,10 +183,9 @@ class TypingHandler(object):
 
         self._push_update_local(member=member, typing=typing)
 
-    @defer.inlineCallbacks
-    def _push_remote(self, member, typing):
+    async def _push_remote(self, member, typing):
         try:
-            users = yield self.state.get_current_users_in_room(member.room_id)
+            users = await self.state.get_current_users_in_room(member.room_id)
             self._member_last_federation_poke[member] = self.clock.time_msec()
 
             now = self.clock.time_msec()
@@ -215,8 +209,7 @@ class TypingHandler(object):
         except Exception:
             logger.exception("Error pushing typing notif to remotes")
 
-    @defer.inlineCallbacks
-    def _recv_edu(self, origin, content):
+    async def _recv_edu(self, origin, content):
         room_id = content["room_id"]
         user_id = content["user_id"]
 
@@ -231,7 +224,7 @@ class TypingHandler(object):
             )
             return
 
-        users = yield self.state.get_current_users_in_room(room_id)
+        users = await self.state.get_current_users_in_room(room_id)
         domains = {get_domain_from_id(u) for u in users}
 
         if self.server_name in domains:
@@ -259,14 +252,31 @@ class TypingHandler(object):
         )
 
     async def get_all_typing_updates(
-        self, last_id: int, current_id: int, limit: int
-    ) -> List[dict]:
-        """Get up to `limit` typing updates between the given tokens, earliest
-        updates first.
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, list]], int, bool]:
+        """Get updates for typing replication stream.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here since there is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
+
+            The updates are a list of 2-tuples of stream ID and the row data
         """
 
         if last_id == current_id:
-            return []
+            return [], current_id, False
 
         changed_rooms = self._typing_stream_change_cache.get_all_entities_changed(
             last_id
@@ -280,9 +290,16 @@ class TypingHandler(object):
             serial = self._room_serials[room_id]
             if last_id < serial <= current_id:
                 typing = self._room_typing[room_id]
-                rows.append((serial, room_id, list(typing)))
+                rows.append((serial, [room_id, list(typing)]))
         rows.sort()
-        return rows[:limit]
+
+        limited = False
+        if len(rows) > limit:
+            rows = rows[:limit]
+            current_id = rows[-1][0]
+            limited = True
+
+        return rows, current_id, limited
 
     def get_current_token(self):
         return self._latest_room_serial
@@ -306,7 +323,7 @@ class TypingNotificationEventSource(object):
             "content": {"user_ids": list(typing)},
         }
 
-    def get_new_events(self, from_key, room_ids, **kwargs):
+    async def get_new_events(self, from_key, room_ids, **kwargs):
         with Measure(self.clock, "typing.get_new_events"):
             from_key = int(from_key)
             handler = self.get_typing_handler()
@@ -320,7 +337,7 @@ class TypingNotificationEventSource(object):
 
                 events.append(self._make_event_for(room_id))
 
-            return defer.succeed((events, handler._latest_room_serial))
+            return (events, handler._latest_room_serial)
 
     def get_current_key(self):
         return self.get_typing_handler()._latest_room_serial

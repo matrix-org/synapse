@@ -229,7 +229,7 @@ class HomeserverTestCase(TestCase):
         self.site = SynapseSite(
             logger_name="synapse.access.http.fake",
             site_tag="test",
-            config={},
+            config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
         )

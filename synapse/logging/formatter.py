@@ -16,8 +16,7 @@
 
 import logging
 import traceback
-
-from six import StringIO
+from io import StringIO
 
 
 class LogFormatter(logging.Formatter):

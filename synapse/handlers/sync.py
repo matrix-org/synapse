@@ -18,8 +18,6 @@ import itertools
 import logging
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
-from six import iteritems, itervalues
-
 import attr
 from prometheus_client import Counter
 
@@ -390,7 +388,7 @@ class SyncHandler(object):
                 # result returned by the event source is poor form (it might cache
                 # the object)
                 room_id = event["room_id"]
-                event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
+                event_copy = {k: v for (k, v) in event.items() if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
             receipt_key = since_token.receipt_key if since_token else "0"
@@ -408,7 +406,7 @@ class SyncHandler(object):
             for event in receipts:
                 room_id = event["room_id"]
                 # exclude room id, as above
-                event_copy = {k: v for (k, v) in iteritems(event) if k != "room_id"}
+                event_copy = {k: v for (k, v) in event.items() if k != "room_id"}
                 ephemeral_by_room.setdefault(room_id, []).append(event_copy)
 
         return now_token, ephemeral_by_room
@@ -454,7 +452,7 @@ class SyncHandler(object):
                     current_state_ids_map = await self.state.get_current_state_ids(
                         room_id
                     )
-                    current_state_ids = frozenset(itervalues(current_state_ids_map))
+                    current_state_ids = frozenset(current_state_ids_map.values())
 
                 recents = await filter_events_for_client(
                     self.storage,
@@ -509,7 +507,7 @@ class SyncHandler(object):
                     current_state_ids_map = await self.state.get_current_state_ids(
                         room_id
                     )
-                    current_state_ids = frozenset(itervalues(current_state_ids_map))
+                    current_state_ids = frozenset(current_state_ids_map.values())
 
                 loaded_recents = await filter_events_for_client(
                     self.storage,
@@ -909,7 +907,7 @@ class SyncHandler(object):
                     logger.debug("filtering state from %r...", state_ids)
                     state_ids = {
                         t: event_id
-                        for t, event_id in iteritems(state_ids)
+                        for t, event_id in state_ids.items()
                         if cache.get(t[1]) != event_id
                     }
                     logger.debug("...to %r", state_ids)
@@ -1430,7 +1428,7 @@ class SyncHandler(object):
         if since_token:
             for joined_sync in sync_result_builder.joined:
                 it = itertools.chain(
-                    joined_sync.timeline.events, itervalues(joined_sync.state)
+                    joined_sync.timeline.events, joined_sync.state.values()
                 )
                 for event in it:
                     if event.type == EventTypes.Member:
@@ -1505,7 +1503,7 @@ class SyncHandler(object):
         newly_left_rooms = []
         room_entries = []
         invited = []
-        for room_id, events in iteritems(mem_change_events_by_room_id):
+        for room_id, events in mem_change_events_by_room_id.items():
             logger.debug(
                 "Membership changes in %s: [%s]",
                 room_id,
@@ -1993,17 +1991,17 @@ def _calculate_state(
     event_id_to_key = {
         e: key
         for key, e in itertools.chain(
-            iteritems(timeline_contains),
-            iteritems(previous),
-            iteritems(timeline_start),
-            iteritems(current),
+            timeline_contains.items(),
+            previous.items(),
+            timeline_start.items(),
+            current.items(),
         )
     }
 
-    c_ids = set(itervalues(current))
-    ts_ids = set(itervalues(timeline_start))
-    p_ids = set(itervalues(previous))
-    tc_ids = set(itervalues(timeline_contains))
+    c_ids = set(current.values())
+    ts_ids = set(timeline_start.values())
+    p_ids = set(previous.values())
+    tc_ids = set(timeline_contains.values())
 
     # If we are lazyloading room members, we explicitly add the membership events
     # for the senders in the timeline into the state block returned by /sync,
@@ -2017,7 +2015,7 @@ def _calculate_state(
 
     if lazy_load_members:
         p_ids.difference_update(
-            e for t, e in iteritems(timeline_start) if t[0] == EventTypes.Member
+            e for t, e in timeline_start.items() if t[0] == EventTypes.Member
         )
 
     state_ids = ((c_ids | ts_ids) - p_ids) - tc_ids

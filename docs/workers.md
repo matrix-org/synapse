@@ -307,7 +307,12 @@ expose the `media` resource. For example:
            - media
 ```
 
-Note this worker cannot be load-balanced: only one instance should be active.
+Note that if running multiple media repositories they must be on the same server
+and you must configure a single instance to run the background tasks, e.g.:
+
+```yaml
+    media_instance_running_background_jobs: "media-repository-1"
+```
 
 ### `synapse.app.client_reader`
 

@@ -17,8 +17,6 @@
 import logging
 from typing import Any, Dict, Optional
 
-from six import iteritems, itervalues
-
 from twisted.internet import defer
 
 from synapse.api import errors
@@ -159,7 +157,7 @@ class DeviceWorkerHandler(BaseHandler):
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
             if room_id not in room_ids:
-                for key, event_id in iteritems(current_state_ids):
+                for key, event_id in current_state_ids.items():
                     etype, state_key = key
                     if etype != EventTypes.Member:
                         continue
@@ -182,7 +180,7 @@ class DeviceWorkerHandler(BaseHandler):
                 log_kv(
                     {"event": "encountered empty previous state", "room_id": room_id}
                 )
-                for key, event_id in iteritems(current_state_ids):
+                for key, event_id in current_state_ids.items():
                     etype, state_key = key
                     if etype != EventTypes.Member:
                         continue
@@ -198,10 +196,10 @@ class DeviceWorkerHandler(BaseHandler):
 
             # Check if we've joined the room? If so we just blindly add all the users to
             # the "possibly changed" users.
-            for state_dict in itervalues(prev_state_ids):
+            for state_dict in prev_state_ids.values():
                 member_event = state_dict.get((EventTypes.Member, user_id), None)
                 if not member_event or member_event != current_member_id:
-                    for key, event_id in iteritems(current_state_ids):
+                    for key, event_id in current_state_ids.items():
                         etype, state_key = key
                         if etype != EventTypes.Member:
                             continue
@@ -211,14 +209,14 @@ class DeviceWorkerHandler(BaseHandler):
             # If there has been any change in membership, include them in the
             # possibly changed list. We'll check if they are joined below,
             # and we're not toooo worried about spuriously adding users.
-            for key, event_id in iteritems(current_state_ids):
+            for key, event_id in current_state_ids.items():
                 etype, state_key = key
                 if etype != EventTypes.Member:
                     continue
 
                 # check if this member has changed since any of the extremities
                 # at the stream_ordering, and add them to the list if so.
-                for state_dict in itervalues(prev_state_ids):
+                for state_dict in prev_state_ids.values():
                     prev_event_id = state_dict.get(key, None)
                     if not prev_event_id or prev_event_id != event_id:
                         if state_key != user_id:
@@ -693,6 +691,7 @@ class DeviceListUpdater(object):
 
         return False
 
+    @trace
     @defer.inlineCallbacks
     def _maybe_retry_device_resync(self):
         """Retry to resync device lists that are out of sync, except if another retry is

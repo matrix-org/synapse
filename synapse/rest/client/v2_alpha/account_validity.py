@@ -16,7 +16,7 @@
 import logging
 
 from synapse.api.errors import AuthError, SynapseError
-from synapse.http.server import finish_request
+from synapse.http.server import respond_with_html
 from synapse.http.servlet import RestServlet
 
 from ._base import client_patterns
@@ -26,9 +26,6 @@ logger = logging.getLogger(__name__)
 
 class AccountValidityRenewServlet(RestServlet):
     PATTERNS = client_patterns("/account_validity/renew$")
-    SUCCESS_HTML = (
-        b"<html><body>Your account has been successfully renewed.</body><html>"
-    )
 
     def __init__(self, hs):
         """
@@ -59,11 +56,7 @@ class AccountValidityRenewServlet(RestServlet):
             status_code = 404
             response = self.failure_html
 
-        request.setResponseCode(status_code)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(response),))
-        request.write(response.encode("utf8"))
-        finish_request(request)
+        respond_with_html(request, status_code, response)
 
 
 class AccountValiditySendMailServlet(RestServlet):

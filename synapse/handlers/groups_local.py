@@ -16,8 +16,6 @@
 
 import logging
 
-from six import iteritems
-
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.types import get_domain_from_id
 
@@ -227,7 +225,7 @@ class GroupsLocalWorkerHandler(object):
 
         results = {}
         failed_results = []
-        for destination, dest_user_ids in iteritems(destinations):
+        for destination, dest_user_ids in destinations.items():
             try:
                 r = await self.transport_client.bulk_get_publicised_groups(
                     destination, list(dest_user_ids)

@@ -16,10 +16,10 @@
 
 import collections
 import html
-import http.client
 import logging
 import types
 import urllib
+from http import HTTPStatus
 from io import BytesIO
 from typing import Awaitable, Callable, TypeVar, Union
 
@@ -30,7 +30,7 @@ from twisted.internet import defer
 from twisted.python import failure
 from twisted.web import resource
 from twisted.web.server import NOT_DONE_YET, Request
-from twisted.web.static import NoRangeStaticProducer
+from twisted.web.static import File, NoRangeStaticProducer
 from twisted.web.util import redirectTo
 
 import synapse.events
@@ -188,7 +188,7 @@ def return_html_error(
                 exc_info=(f.type, f.value, f.getTracebackObject()),
             )
     else:
-        code = http.HTTPStatus.INTERNAL_SERVER_ERROR
+        code = HTTPStatus.INTERNAL_SERVER_ERROR
         msg = "Internal server error"
 
         logger.error(
@@ -202,12 +202,7 @@ def return_html_error(
     else:
         body = error_template.render(code=code, msg=msg)
 
-    body_bytes = body.encode("utf-8")
-    request.setResponseCode(code)
-    request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-    request.setHeader(b"Content-Length", b"%i" % (len(body_bytes),))
-    request.write(body_bytes)
-    finish_request(request)
+    respond_with_html(request, code, body)
 
 
 def wrap_async_request_handler(h):
@@ -420,6 +415,18 @@ class DirectServeResource(resource.Resource):
         return NOT_DONE_YET
 
 
+class StaticResource(File):
+    """
+    A resource that represents a plain non-interpreted file or directory.
+
+    Differs from the File resource by adding clickjacking protection.
+    """
+
+    def render_GET(self, request: Request):
+        set_clickjacking_protection_headers(request)
+        return super().render_GET(request)
+
+
 def _options_handler(request):
     """Request handler for OPTIONS requests
 
@@ -530,7 +537,7 @@ def respond_with_json_bytes(
         code (int): The HTTP response code.
         json_bytes (bytes): The json bytes to use as the response body.
         send_cors (bool): Whether to send Cross-Origin Resource Sharing headers
-            http://www.w3.org/TR/cors/
+            https://fetch.spec.whatwg.org/#http-cors-protocol
     Returns:
         twisted.web.server.NOT_DONE_YET"""
 
@@ -566,6 +573,59 @@ def set_cors_headers(request):
         b"Access-Control-Allow-Headers",
         b"Origin, X-Requested-With, Content-Type, Accept, Authorization",
     )
+
+
+def respond_with_html(request: Request, code: int, html: str):
+    """
+    Wraps `respond_with_html_bytes` by first encoding HTML from a str to UTF-8 bytes.
+    """
+    respond_with_html_bytes(request, code, html.encode("utf-8"))
+
+
+def respond_with_html_bytes(request: Request, code: int, html_bytes: bytes):
+    """
+    Sends HTML (encoded as UTF-8 bytes) as the response to the given request.
+
+    Note that this adds clickjacking protection headers and finishes the request.
+
+    Args:
+        request: The http request to respond to.
+        code: The HTTP response code.
+        html_bytes: The HTML bytes to use as the response body.
+    """
+    # could alternatively use request.notifyFinish() and flip a flag when
+    # the Deferred fires, but since the flag is RIGHT THERE it seems like
+    # a waste.
+    if request._disconnected:
+        logger.warning(
+            "Not sending response to request %s, already disconnected.", request
+        )
+        return
+
+    request.setResponseCode(code)
+    request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
+    request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
+
+    # Ensure this content cannot be embedded.
+    set_clickjacking_protection_headers(request)
+
+    request.write(html_bytes)
+    finish_request(request)
+
+
+def set_clickjacking_protection_headers(request: Request):
+    """
+    Set headers to guard against clickjacking of embedded content.
+
+    This sets the X-Frame-Options and Content-Security-Policy headers which instructs
+    browsers to not allow the HTML of the response to be embedded onto another
+    page.
+
+    Args:
+        request: The http request to add the headers to.
+    """
+    request.setHeader(b"X-Frame-Options", b"DENY")
+    request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
 def finish_request(request):

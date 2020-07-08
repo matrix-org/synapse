@@ -17,8 +17,7 @@
 """Contains the URL paths to prefix various aspects of the server with. """
 import hmac
 from hashlib import sha256
-
-from six.moves.urllib.parse import urlencode
+from urllib.parse import urlencode
 
 from synapse.config import ConfigError
 
