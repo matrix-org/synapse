@@ -21,7 +21,7 @@ from typing import Dict, Iterable, Optional, Set
 
 from typing_extensions import ContextManager
 
-from twisted.internet import defer, reactor
+from twisted.internet import address, defer, reactor
 
 import synapse
 import synapse.events
@@ -215,14 +215,15 @@ class KeyUploadServlet(RestServlet):
                 for header in (b"Authorization", b"User-Agent")
             }
             # Add the previous hop the the X-Forwarded-For header.
-            x_forwarded_for = request.requestHeaders.getRawHeaders(b"X-Forwarded-For")
-            previous_host = request.client.host.encode("ascii")
-            # If the header exists, add to the comma-separated list of the first
-            # instance of the header. Otherwise, generate a new header.
-            if x_forwarded_for:
-                x_forwarded_for[0] += b", " + previous_host
-            else:
-                x_forwarded_for = [previous_host]
+            x_forwarded_for = request.requestHeaders.getRawHeaders(b"X-Forwarded-For", [])
+            if isinstance(request.client, (address.IPv4Address, address.IPv6Address)):
+                previous_host = request.client.host.encode("ascii")
+                # If the header exists, add to the comma-separated list of the first
+                # instance of the header. Otherwise, generate a new header.
+                if x_forwarded_for:
+                    x_forwarded_for[0] += b", " + previous_host
+                else:
+                    x_forwarded_for = [previous_host]
             headers[b"X-Forwarded-For"] = x_forwarded_for
 
             try:
