@@ -223,7 +223,9 @@ class KeyUploadServlet(RestServlet):
                 # If the header exists, add to the comma-separated list of the first
                 # instance of the header. Otherwise, generate a new header.
                 if x_forwarded_for:
-                    x_forwarded_for[0] += b", " + previous_host
+                    x_forwarded_for = [
+                        x_forwarded_for[0] + b", " + previous_host
+                    ] + x_forwarded_for[1:]
                 else:
                     x_forwarded_for = [previous_host]
             headers[b"X-Forwarded-For"] = x_forwarded_for
