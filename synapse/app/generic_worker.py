@@ -212,8 +212,18 @@ class KeyUploadServlet(RestServlet):
             # User-Agent of the request.
             headers = {
                 header: request.requestHeaders.getRawHeaders(header, [])
-                for header in (b"Authorization", b"X-Forwarded-For", b"User-Agent")
+                for header in (b"Authorization", b"User-Agent")
             }
+            # Add the previous hop the the X-Forwarded-For header.
+            x_forwarded_for = request.requestHeaders.getRawHeaders(b"X-Forwarded-For")
+            previous_host = request.client.host.encode("ascii")
+            # If the header exists, add to the comma-separated list of the first
+            # instance of the header. Otherwise, generate a new header.
+            if x_forwarded_for:
+                x_forwarded_for[0] += b", " + previous_host
+            else:
+                x_forwarded_for = [previous_host]
+            headers[b"X-Forwarded-For"] = x_forwarded_for
 
             try:
                 result = await self.http_client.post_json_get_json(
