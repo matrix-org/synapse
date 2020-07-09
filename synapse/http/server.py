@@ -22,7 +22,7 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
@@ -511,7 +511,6 @@ def respond_with_json(
     code: int,
     json_object: Any,
     send_cors: bool = False,
-    response_code_message: Optional[str] = None,
     pretty_print: bool = False,
     canonical_json: bool = True,
 ) -> NOT_DONE_YET:
@@ -533,21 +532,11 @@ def respond_with_json(
         else:
             json_bytes = json.dumps(json_object).encode("utf-8")
 
-    return respond_with_json_bytes(
-        request,
-        code,
-        json_bytes,
-        send_cors=send_cors,
-        response_code_message=response_code_message,
-    )
+    return respond_with_json_bytes(request, code, json_bytes, send_cors=send_cors)
 
 
 def respond_with_json_bytes(
-    request: Request,
-    code: int,
-    json_bytes: bytes,
-    send_cors: bool = False,
-    response_code_message: Optional[str] = None,
+    request: Request, code: int, json_bytes: bytes, send_cors: bool = False,
 ) -> NOT_DONE_YET:
     """Sends encoded JSON in response to the given request.
 
@@ -560,7 +549,7 @@ def respond_with_json_bytes(
     Returns:
         twisted.web.server.NOT_DONE_YET"""
 
-    request.setResponseCode(code, message=response_code_message)
+    request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
     request.setHeader(b"Content-Length", b"%d" % (len(json_bytes),))
     request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
