@@ -22,7 +22,7 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Callable, Dict, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import jinja2
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
@@ -217,7 +217,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         return NOT_DONE_YET
 
     @wrap_async_request_handler
-    async def _async_render_wrapper(self, request):
+    async def _async_render_wrapper(self, request: Request):
         """This is a wrapper that delegates to `_async_render` and handles
         exceptions, return values, metrics, etc.
         """
@@ -237,7 +237,7 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
             f = failure.Failure()
             self._send_error_response(f, request)
 
-    async def _async_render(self, request):
+    async def _async_render(self, request: Request):
         """Delegates to `_async_render_<METHOD>` methods, or returns a 400 if
         no appropriate method exists. Can be overriden in sub classes for
         different routing.
@@ -278,7 +278,7 @@ class DirectServeJsonResource(_AsyncResource):
     """
 
     def _send_response(
-        self, request, code, response_object,
+        self, request: Request, code: int, response_object: Any,
     ):
         """Implements _AsyncResource._send_response
         """
@@ -507,14 +507,14 @@ class RootOptionsRedirectResource(OptionsResource, RootRedirect):
 
 
 def respond_with_json(
-    request,
-    code,
-    json_object,
-    send_cors=False,
-    response_code_message=None,
-    pretty_print=False,
-    canonical_json=True,
-):
+    request: Request,
+    code: int,
+    json_object: Any,
+    send_cors: bool = False,
+    response_code_message: Optional[str] = None,
+    pretty_print: bool = False,
+    canonical_json: bool = True,
+) -> NOT_DONE_YET:
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -543,15 +543,19 @@ def respond_with_json(
 
 
 def respond_with_json_bytes(
-    request, code, json_bytes, send_cors=False, response_code_message=None
-):
+    request: Request,
+    code: int,
+    json_bytes: bytes,
+    send_cors: bool = False,
+    response_code_message: Optional[str] = None,
+) -> NOT_DONE_YET:
     """Sends encoded JSON in response to the given request.
 
     Args:
-        request (twisted.web.http.Request): The http request to respond to.
-        code (int): The HTTP response code.
-        json_bytes (bytes): The json bytes to use as the response body.
-        send_cors (bool): Whether to send Cross-Origin Resource Sharing headers
+        request: The http request to respond to.
+        code: The HTTP response code.
+        json_bytes: The json bytes to use as the response body.
+        send_cors: Whether to send Cross-Origin Resource Sharing headers
             https://fetch.spec.whatwg.org/#http-cors-protocol
     Returns:
         twisted.web.server.NOT_DONE_YET"""
@@ -573,12 +577,12 @@ def respond_with_json_bytes(
     return NOT_DONE_YET
 
 
-def set_cors_headers(request):
+def set_cors_headers(request: Request):
     """Set the CORs headers so that javascript running in a web browsers can
     use this API
 
     Args:
-        request (twisted.web.http.Request): The http request to add CORs to.
+        request: The http request to add CORs to.
     """
     request.setHeader(b"Access-Control-Allow-Origin", b"*")
     request.setHeader(
@@ -643,7 +647,7 @@ def set_clickjacking_protection_headers(request: Request):
     request.setHeader(b"Content-Security-Policy", b"frame-ancestors 'none';")
 
 
-def finish_request(request):
+def finish_request(request: Request):
     """ Finish writing the response to the request.
 
     Twisted throws a RuntimeException if the connection closed before the
@@ -662,7 +666,7 @@ def finish_request(request):
         logger.info("Connection disconnected before response was written: %r", e)
 
 
-def _request_user_agent_is_curl(request):
+def _request_user_agent_is_curl(request: Request) -> bool:
     user_agents = request.requestHeaders.getRawHeaders(b"User-Agent", default=[])
     for user_agent in user_agents:
         if b"curl" in user_agent:
