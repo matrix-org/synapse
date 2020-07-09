@@ -1,0 +1,1 @@
+Fix 'stuck invites' which happen when we are unable to reject a room invite received over federation.
