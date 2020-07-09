@@ -572,8 +572,15 @@ class HttpResponseException(CodeMessageException):
         """
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
+
+        # Decode to Unicode since json on Python 3.5 requires str, not bytes.
         try:
-            j = json.loads(self.response)
+            response_unicode = self.response.decode("utf8")
+        except UnicodeDecodeError:
+            response_unicode = "{}"
+
+        try:
+            j = json.loads(response_unicode)
         except ValueError:
             j = {}
 
