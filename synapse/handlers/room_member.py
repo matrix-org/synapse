@@ -1072,7 +1072,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             alg, h = compute_event_reference_hash(invite_event)
             invite_hash = (invite_event.event_id, {alg: encode_base64(h)})
 
-        auth_events = invite_event.auth_events + (invite_hash,)
+        auth_events = tuple(invite_event.auth_events) + (invite_hash,)
         prev_events = (invite_hash,)
 
         # we cap depth of generated events, to ensure that they are not
