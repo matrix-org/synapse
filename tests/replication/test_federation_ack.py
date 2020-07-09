@@ -32,6 +32,13 @@ class FederationAckTestCase(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(homeserverToUse=GenericWorkerServer)
+
+        # Hack for SQLite in memory databases to ensure this gets run on them.
+        store = hs.get_datastore()
+        self.get_success(
+            store.db.runInteraction("reset", store._reset_federation_positions_txn)
+        )
+
         return hs
 
     def test_federation_ack_sent(self):
