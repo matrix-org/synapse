@@ -68,7 +68,7 @@ class EventSources(object):
         The returned token does not have the current values for fields other
         than `room`, since they are not used during pagination.
 
-        Retuns:
+        Returns:
             Deferred[StreamToken]
         """
         token = StreamToken(

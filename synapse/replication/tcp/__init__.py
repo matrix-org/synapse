@@ -25,7 +25,7 @@ Structure of the module:
  * command.py  - the definitions of all the valid commands
  * protocol.py - the TCP protocol classes
  * resource.py - handles streaming stream updates to replications
- * streams/    - the definitons of all the valid streams
+ * streams/    - the definitions of all the valid streams
 
 
 The general interaction of the classes are:

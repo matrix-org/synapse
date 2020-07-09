@@ -317,7 +317,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def _queue_command(self, cmd):
         """Queue the command until the connection is ready to write to again.
         """
-        logger.debug("[%s] Queing as conn %r, cmd: %r", self.id(), self.state, cmd)
+        logger.debug("[%s] Queueing as conn %r, cmd: %r", self.id(), self.state, cmd)
         self.pending_commands.append(cmd)
 
         if len(self.pending_commands) > self.max_line_buffer:

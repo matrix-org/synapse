@@ -39,7 +39,7 @@ class Distributor(object):
     Signals are named simply by strings.
 
     TODO(paul): It would be nice to give signals stronger object identities,
-      so we can attach metadata, docstrings, detect typoes, etc... But this
+      so we can attach metadata, docstrings, detect typos, etc... But this
       model will do for today.
     """
 

@@ -92,11 +92,11 @@ class ReplicationEndpoint(object):
         # assert here that sub classes don't try and use the name.
         assert (
             "instance_name" not in self.PATH_ARGS
-        ), "`instance_name` is a reserved paramater name"
+        ), "`instance_name` is a reserved parameter name"
         assert (
             "instance_name"
             not in signature(self.__class__._serialize_payload).parameters
-        ), "`instance_name` is a reserved paramater name"
+        ), "`instance_name` is a reserved parameter name"
 
         assert self.METHOD in ("PUT", "POST", "GET")
 

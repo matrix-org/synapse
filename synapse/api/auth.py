@@ -537,7 +537,7 @@ class Auth(object):
         # Currently we ignore the `for_verification` flag even though there are
         # some situations where we can drop particular auth events when adding
         # to the event's `auth_events` (e.g. joins pointing to previous joins
-        # when room is publically joinable). Dropping event IDs has the
+        # when room is publicly joinable). Dropping event IDs has the
         # advantage that the auth chain for the room grows slower, but we use
         # the auth chain in state resolution v2 to order events, which means
         # care must be taken if dropping events to ensure that it doesn't
