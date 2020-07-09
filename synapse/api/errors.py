@@ -20,9 +20,9 @@ import logging
 from http import HTTPStatus
 from typing import Dict, List
 
-from canonicaljson import json
-
 from twisted.web import http
+
+from synapse.util.json import load_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -572,15 +572,8 @@ class HttpResponseException(CodeMessageException):
         """
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
-
-        # Decode to Unicode since json on Python 3.5 requires str, not bytes.
         try:
-            response_unicode = self.response.decode("utf8")
-        except UnicodeDecodeError:
-            response_unicode = "{}"
-
-        try:
-            j = json.loads(response_unicode)
+            j = load_bytes(self.response)
         except ValueError:
             j = {}
 
