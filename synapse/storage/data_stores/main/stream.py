@@ -258,7 +258,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         super(StreamWorkerStore, self).__init__(database, db_conn, hs)
 
         self._instance_name = hs.get_instance_name()
-        self._send_federation = hs.config.federation.send_federation
+        self._send_federation = hs.should_send_federation()
         self._federation_shard_config = hs.config.federation.federation_shard_config
 
         cur = LoggingTransaction(
