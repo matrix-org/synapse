@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import Optional
 
@@ -22,7 +21,6 @@ from netaddr import IPAddress
 from twisted.internet import defer
 from twisted.web.server import Request
 
-import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
@@ -35,6 +33,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
+from synapse.logging import opentracing as opentracing
 from synapse.types import StateMap, UserID
 from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache

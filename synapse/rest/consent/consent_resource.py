@@ -26,11 +26,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import (
-    DirectServeResource,
-    respond_with_html,
-    wrap_html_request_handler,
-)
+from synapse.http.server import DirectServeHtmlResource, respond_with_html
 from synapse.http.servlet import parse_string
 from synapse.types import UserID
 
@@ -48,7 +44,7 @@ else:
         return a == b
 
 
-class ConsentResource(DirectServeResource):
+class ConsentResource(DirectServeHtmlResource):
     """A twisted Resource to display a privacy policy and gather consent to it
 
     When accessed via GET, returns the privacy policy via a template.
@@ -119,7 +115,6 @@ class ConsentResource(DirectServeResource):
 
         self._hmac_secret = hs.config.form_secret.encode("utf-8")
 
-    @wrap_html_request_handler
     async def _async_render_GET(self, request):
         """
         Args:
@@ -160,7 +155,6 @@ class ConsentResource(DirectServeResource):
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")
 
-    @wrap_html_request_handler
     async def _async_render_POST(self, request):
         """
         Args:

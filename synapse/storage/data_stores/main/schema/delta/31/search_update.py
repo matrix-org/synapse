@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
-
-import simplejson
 
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.prepare_database import get_statements
@@ -50,7 +48,7 @@ def run_create(cur, database_engine, *args, **kwargs):
             "rows_inserted": 0,
             "have_added_indexes": False,
         }
-        progress_json = simplejson.dumps(progress)
+        progress_json = json.dumps(progress)
 
         sql = (
             "INSERT into background_updates (update_name, progress_json)"

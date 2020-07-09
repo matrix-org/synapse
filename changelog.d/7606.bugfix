@@ -1,1 +1,0 @@
-Remove `user_id` from the response to `GET /_matrix/client/r0/presence/{userId}/status` to match the specification.

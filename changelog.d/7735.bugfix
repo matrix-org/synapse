@@ -1,1 +1,0 @@
-Fix large state resolutions from stalling Synapse for seconds at a time.
