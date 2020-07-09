@@ -21,7 +21,7 @@ from typing import Dict, Iterable, Optional, Set
 
 from typing_extensions import ContextManager
 
-from twisted.internet import defer, reactor
+from twisted.internet import address, defer, reactor
 
 import synapse
 import synapse.events
@@ -206,10 +206,30 @@ class KeyUploadServlet(RestServlet):
 
         if body:
             # They're actually trying to upload something, proxy to main synapse.
-            # Pass through the auth headers, if any, in case the access token
-            # is there.
-            auth_headers = request.requestHeaders.getRawHeaders(b"Authorization", [])
-            headers = {"Authorization": auth_headers}
+
+            # Proxy headers from the original request, such as the auth headers
+            # (in case the access token is there) and the original IP /
+            # User-Agent of the request.
+            headers = {
+                header: request.requestHeaders.getRawHeaders(header, [])
+                for header in (b"Authorization", b"User-Agent")
+            }
+            # Add the previous hop the the X-Forwarded-For header.
+            x_forwarded_for = request.requestHeaders.getRawHeaders(
+                b"X-Forwarded-For", []
+            )
+            if isinstance(request.client, (address.IPv4Address, address.IPv6Address)):
+                previous_host = request.client.host.encode("ascii")
+                # If the header exists, add to the comma-separated list of the first
+                # instance of the header. Otherwise, generate a new header.
+                if x_forwarded_for:
+                    x_forwarded_for = [
+                        x_forwarded_for[0] + b", " + previous_host
+                    ] + x_forwarded_for[1:]
+                else:
+                    x_forwarded_for = [previous_host]
+            headers[b"X-Forwarded-For"] = x_forwarded_for
+
             try:
                 result = await self.http_client.post_json_get_json(
                     self.main_uri + request.uri.decode("ascii"), body, headers=headers
