@@ -45,10 +45,7 @@ from twisted.internet import defer
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
-from synapse.storage.database import (
-    Database,
-    make_in_list_sql_clause,
-)
+from synapse.storage.database import Database, make_in_list_sql_clause
 from synapse.storage.engines import PostgresEngine
 from synapse.types import RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
