@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 class UserSharedRoomsServlet(RestServlet):
     """
-    GET /user/{user_id}/shared_rooms/{other_user_id} HTTP/1.1
+    GET /uk.half-shot.msc2666/user/{user_id}/shared_rooms/{other_user_id} HTTP/1.1
     """
 
     PATTERNS = client_patterns(
-        "/user/(?P<user_id>[^/]*)/shared_rooms/(?P<other_user_id>[^/]*)",
+        "/uk.half-shot.msc2666/user/(?P<user_id>[^/]*)/shared_rooms/(?P<other_user_id>[^/]*)",
         releases=(),  # This is an unstable feature
     )
 
