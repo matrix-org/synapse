@@ -567,11 +567,11 @@ def respond_with_json_bytes(
 
 
 def set_cors_headers(request: Request):
-    """Set the CORs headers so that javascript running in a web browsers can
+    """Set the CORS headers so that javascript running in a web browsers can
     use this API
 
     Args:
-        request: The http request to add CORs to.
+        request: The http request to add CORS to.
     """
     request.setHeader(b"Access-Control-Allow-Origin", b"*")
     request.setHeader(
