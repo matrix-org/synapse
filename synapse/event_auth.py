@@ -69,10 +69,11 @@ def check(
     # sanity-check it
     for auth_event in auth_events.values():
         if auth_event.room_id != room_id:
-            raise Exception(
+            raise AuthError(
+                500,
                 "During auth for event %s in room %s, found event %s in the state "
                 "which is in room %s"
-                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id)
+                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id),
             )
 
     if do_sig_check:
