@@ -398,7 +398,7 @@ class CASTestCase(unittest.HomeserverTestCase):
                 </cas:serviceResponse>
             """
                 % cas_user_id
-            )
+            ).encode("utf-8")
 
         mocked_http_client = Mock(spec=["get_raw"])
         mocked_http_client.get_raw.side_effect = get_raw
