@@ -514,6 +514,19 @@ def respond_with_json(
     pretty_print: bool = False,
     canonical_json: bool = True,
 ) -> Optional[NOT_DONE_YET]:
+    """Sends encoded JSON in response to the given request.
+
+    Args:
+        request: The http request to respond to.
+        code: The HTTP response code.
+        json_object: The object to serialize to JSON.
+        send_cors: Whether to send Cross-Origin Resource Sharing headers
+            https://fetch.spec.whatwg.org/#http-cors-protocol
+        pretty_print: Whether to include indentation and line-breaks in the
+            resulting JSON bytes.
+        canonical_json: Whether to use the canonicaljson algorithm when encoding
+            the JSON bytes.
+    """
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
@@ -546,8 +559,7 @@ def respond_with_json_bytes(
         json_bytes: The json bytes to use as the response body.
         send_cors: Whether to send Cross-Origin Resource Sharing headers
             https://fetch.spec.whatwg.org/#http-cors-protocol
-    Returns:
-        twisted.web.server.NOT_DONE_YET"""
+    """
 
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
