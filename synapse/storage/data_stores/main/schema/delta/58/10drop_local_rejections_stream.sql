@@ -19,4 +19,4 @@ added a table called 'local_rejections_stream'. This table is not used, and
 we drop it here for anyone who was affected.
 */
 
-DROP TABLE IF NOT EXISTS local_rejections_stream;
+DROP TABLE IF EXISTS local_rejections_stream;
