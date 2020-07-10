@@ -60,7 +60,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
     def test_put_presence_disabled(self):
         """
-        PUT to the status endpoint with use_presence disbled will NOT call
+        PUT to the status endpoint with use_presence disabled will NOT call
         set_state on the presence handler.
         """
         self.hs.config.use_presence = False

@@ -245,7 +245,7 @@ class FederationClient(FederationBase):
             event_id: event to fetch
             room_version: version of the room
             outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitary point in the context as opposed to part
+                it's from an arbitrary point in the context as opposed to part
                 of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
@@ -351,7 +351,7 @@ class FederationClient(FederationBase):
         outlier: bool = False,
         include_none: bool = False,
     ) -> List[EventBase]:
-        """Takes a list of PDUs and checks the signatures and hashs of each
+        """Takes a list of PDUs and checks the signatures and hashes of each
         one. If a PDU fails its signature check then we check if we have it in
         the database and if not then request if from the originating server of
         that PDU.
