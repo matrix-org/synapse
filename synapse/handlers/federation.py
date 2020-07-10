@@ -618,6 +618,10 @@ class FederationHandler(BaseHandler):
         will be omitted from the result. Likewise, any events which turn out not to
         be in the given room.
 
+        This function *does not* recursively get missing auth events of the
+        newly fetched events. Callers must include any missing events from the
+        auth chain.
+
         Returns:
             map from event_id to event
         """
@@ -1131,12 +1135,16 @@ class FederationHandler(BaseHandler):
     ):
         """Fetch the given events from a server, and persist them as outliers.
 
+        This function *does not* recursively get missing auth events of the
+        newly fetched events. Callers must include any missing events from the
+        auth chain.
+
         Logs a warning if we can't find the given event.
         """
 
         room_version = await self.store.get_room_version(room_id)
 
-        event_infos = []
+        event_map = {}  # type: Dict[str, EventBase]
 
         async def get_event(event_id: str):
             with nested_logging_context(event_id):
@@ -1150,17 +1158,7 @@ class FederationHandler(BaseHandler):
                         )
                         return
 
-                    # recursively fetch the auth events for this event
-                    auth_events = await self._get_events_from_store_or_dest(
-                        destination, room_id, event.auth_event_ids()
-                    )
-                    auth = {}
-                    for auth_event_id in event.auth_event_ids():
-                        ae = auth_events.get(auth_event_id)
-                        if ae:
-                            auth[(ae.type, ae.state_key)] = ae
-
-                    event_infos.append(_NewEventInfo(event, None, auth))
+                    event_map[event.event_id]
 
                 except Exception as e:
                     logger.warning(
@@ -1171,6 +1169,25 @@ class FederationHandler(BaseHandler):
                     )
 
         await concurrently_execute(get_event, events, 5)
+
+        # Make a map of auth events for each event. We do this after fetching
+        # all the events as some of the events auth events will be in the list
+        # of requested events.
+
+        persisted_events = await self.store.get_events(
+            (event.auth_event_ids() for event in event_map.values()),
+            allow_rejected=True,
+        )
+
+        event_infos = []
+        for event in event_map.values():
+            auth = {}
+            for auth_event_id in event.auth_event_ids():
+                ae = persisted_events.get(auth_event_id) or event_map.get(auth_event_id)
+                if ae:
+                    auth[(ae.type, ae.state_key)] = ae
+
+            event_infos.append(_NewEventInfo(event, None, auth))
 
         await self._handle_new_events(
             destination, event_infos,
