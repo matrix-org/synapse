@@ -13,13 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
 import urllib
 from io import BytesIO
 
 import treq
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 from netaddr import IPAddress
 from prometheus_client import Counter
 from zope.interface import implementer, provider
@@ -371,7 +371,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -412,7 +412,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -441,7 +441,7 @@ class SimpleHttpClient(object):
             actual_headers.update(headers)
 
         body = yield self.get_raw(uri, args, headers=headers)
-        return json.loads(body)
+        return json.loads(body.decode("utf-8"))
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}, headers=None):
@@ -485,7 +485,7 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
             raise HttpResponseException(response.code, response.phrase, body)
 
@@ -503,7 +503,7 @@ class SimpleHttpClient(object):
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
-            HTTP body at text.
+            HTTP body as bytes.
         Raises:
             HttpResponseException on a non-2xx HTTP response.
         """
