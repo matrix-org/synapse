@@ -14,11 +14,10 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
-
+import json
 import logging
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.util.json import load_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +213,7 @@ def parse_json_value_from_request(request, allow_empty_body=False):
         return None
 
     try:
-        content = load_bytes(content_bytes)
+        content = json.loads(content_bytes.decode("utf-8"))
     except Exception as e:
         logger.warning("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
