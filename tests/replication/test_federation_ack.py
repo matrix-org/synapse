@@ -32,6 +32,7 @@ class FederationAckTestCase(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(homeserverToUse=GenericWorkerServer)
+
         return hs
 
     def test_federation_ack_sent(self):
