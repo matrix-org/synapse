@@ -47,7 +47,6 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.database import (
     Database,
-    LoggingTransaction,
     make_in_list_sql_clause,
 )
 from synapse.storage.engines import PostgresEngine
@@ -261,13 +260,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self._send_federation = hs.should_send_federation()
         self._federation_shard_config = hs.config.federation.federation_shard_config
 
-        cur = LoggingTransaction(
-            db_conn.cursor(),
-            name="_reset_federation_positions_txn",
-            database_engine=self.database_engine,
-        )
-        self._reset_federation_positions_txn(cur)
-        cur.close()
+        # If we're a process that sends federation we may need to reset the
+        # `federation_stream_position` table to match the current sharding
+        # config. We don't do this now as otherwise two processes could conflict
+        # during startup which would cause one to die.
+        self._need_to_reset_federation_stream_positions = self._send_federation
 
         events_max = self.get_room_max_stream_ordering()
         event_cache_prefill, min_event_val = self.db.get_cache_dict(
@@ -809,16 +806,28 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return upper_bound, events
 
-    def get_federation_out_pos(self, typ):
-        return self.db.simple_select_one_onecol(
+    async def get_federation_out_pos(self, typ: str) -> int:
+        if self._need_to_reset_federation_stream_positions:
+            await self.db.runInteraction(
+                "_reset_federation_positions_txn", self._reset_federation_positions_txn
+            )
+            self._need_to_reset_federation_stream_positions = False
+
+        return await self.db.simple_select_one_onecol(
             table="federation_stream_position",
             retcol="stream_id",
             keyvalues={"type": typ, "instance_name": self._instance_name},
             desc="get_federation_out_pos",
         )
 
-    def update_federation_out_pos(self, typ, stream_id):
-        return self.db.simple_update_one(
+    async def update_federation_out_pos(self, typ, stream_id):
+        if self._need_to_reset_federation_stream_positions:
+            await self.db.runInteraction(
+                "_reset_federation_positions_txn", self._reset_federation_positions_txn
+            )
+            self._need_to_reset_federation_stream_positions = False
+
+        return await self.db.simple_update_one(
             table="federation_stream_position",
             keyvalues={"type": typ, "instance_name": self._instance_name},
             updatevalues={"stream_id": stream_id},

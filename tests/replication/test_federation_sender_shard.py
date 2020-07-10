@@ -74,12 +74,6 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         store = worker_hs.get_datastore()
         store.db._db_pool = self.database._db_pool
 
-        # We run this manaully to work around the fact that this doesn't get
-        # correctly applied when using sqlite :memory: databases.
-        self.get_success(
-            store.db.runInteraction("reset", store._reset_federation_positions_txn)
-        )
-
         repl_handler = ReplicationCommandHandler(worker_hs)
         client = ClientReplicationStreamProtocol(
             worker_hs, "client", "test", self.clock, repl_handler,
