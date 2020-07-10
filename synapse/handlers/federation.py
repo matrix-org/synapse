@@ -1174,9 +1174,14 @@ class FederationHandler(BaseHandler):
         # all the events as some of the events' auth events will be in the list
         # of requested events.
 
+        auth_events = [
+            aid
+            for event in event_map.values()
+            for aid in event.auth_event_ids()
+            if aid not in event_map
+        ]
         persisted_events = await self.store.get_events(
-            (aid for event in event_map.values() for aid in event.auth_event_ids()),
-            allow_rejected=True,
+            auth_events, allow_rejected=True,
         )
 
         event_infos = []
@@ -1186,6 +1191,8 @@ class FederationHandler(BaseHandler):
                 ae = persisted_events.get(auth_event_id) or event_map.get(auth_event_id)
                 if ae:
                     auth[(ae.type, ae.state_key)] = ae
+                else:
+                    logger.info("Missing auth event %s", auth_event_id)
 
             event_infos.append(_NewEventInfo(event, None, auth))
 
