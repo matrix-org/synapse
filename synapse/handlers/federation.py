@@ -1175,7 +1175,7 @@ class FederationHandler(BaseHandler):
         # of requested events.
 
         persisted_events = await self.store.get_events(
-            (event.auth_event_ids() for event in event_map.values()),
+            (aid for event in event_map.values() for aid in event.auth_event_ids()),
             allow_rejected=True,
         )
 
