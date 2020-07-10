@@ -60,8 +60,8 @@ from synapse.logging.context import (
     preserve_fn,
     run_in_background,
 )
-from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.logging.utils import log_function
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
