@@ -194,7 +194,7 @@ class PerDestinationQueue(object):
             logger.debug("TX [%s] Transaction already in progress", self._destination)
             return
 
-        if self._should_send_on_this_instance:
+        if not self._should_send_on_this_instance:
             # We don't raise an exception here to avoid taking out any other
             # processing.
             logger.error(
