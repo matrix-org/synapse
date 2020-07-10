@@ -22,7 +22,7 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Callable, Dict, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import jinja2
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
@@ -513,7 +513,7 @@ def respond_with_json(
     send_cors: bool = False,
     pretty_print: bool = False,
     canonical_json: bool = True,
-) -> NOT_DONE_YET:
+) -> Optional[NOT_DONE_YET]:
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
     # a waste.
