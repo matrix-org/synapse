@@ -60,6 +60,7 @@ from synapse.logging.context import (
     preserve_fn,
     run_in_background,
 )
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.logging.utils import log_function
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
@@ -784,9 +785,11 @@ class FederationHandler(BaseHandler):
                     resync = True
 
             if resync:
-                run_in_background(self._resync_device, event.sender)
+                run_as_background_process(
+                    "resync_device_due_to_pdu", self._resync_device, event.sender
+                )
 
-    async def _resync_device(self, sender: str):
+    async def _resync_device(self, sender: str) -> None:
         """We have detected that the device list for the given user may be out
         of sync, so we try and resync them.
         """
