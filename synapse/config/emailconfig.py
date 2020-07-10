@@ -72,7 +72,7 @@ class EmailConfig(Config):
 
         template_dir = email_config.get("template_dir")
         # we need an absolute path, because we change directory after starting (and
-        # we don't yet know what auxilliary templates like mail.css we will need).
+        # we don't yet know what auxiliary templates like mail.css we will need).
         # (Note that loading as package_resources with jinja.PackageLoader doesn't
         # work for the same reason.)
         if not template_dir:

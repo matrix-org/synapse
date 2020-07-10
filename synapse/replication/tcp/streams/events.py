@@ -62,7 +62,7 @@ class BaseEventsStreamRow(object):
     Specifies how to identify, serialize and deserialize the different types.
     """
 
-    # Unique string that ids the type. Must be overriden in sub classes.
+    # Unique string that ids the type. Must be overridden in sub classes.
     TypeId = None  # type: str
 
     @classmethod
