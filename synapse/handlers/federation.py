@@ -618,9 +618,10 @@ class FederationHandler(BaseHandler):
         will be omitted from the result. Likewise, any events which turn out not to
         be in the given room.
 
-        This function *does not* recursively get missing auth events of the
-        newly fetched events. Callers must include in the `event_ids` argument
-        any missing events from the auth chain.
+        This function *does not* automatically get missing auth events of the
+        newly fetched events. Callers must include the full auth chain of
+        of the missing events in the `event_ids` argument, to ensure that any
+        missing auth events are correctly fetched.
 
         Returns:
             map from event_id to event
@@ -1136,7 +1137,7 @@ class FederationHandler(BaseHandler):
         """Fetch the given events from a server, and persist them as outliers.
 
         This function *does not* recursively get missing auth events of the
-        newly fetched events. Callers must include in the `event_ids` argument
+        newly fetched events. Callers must include in the `events` argument
         any missing events from the auth chain.
 
         Logs a warning if we can't find the given event.
