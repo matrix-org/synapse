@@ -619,8 +619,8 @@ class FederationHandler(BaseHandler):
         be in the given room.
 
         This function *does not* recursively get missing auth events of the
-        newly fetched events. Callers must include any missing events from the
-        auth chain.
+        newly fetched events. Callers must include in the `event_ids` argument
+        any missing events from the auth chain.
 
         Returns:
             map from event_id to event
@@ -1136,8 +1136,8 @@ class FederationHandler(BaseHandler):
         """Fetch the given events from a server, and persist them as outliers.
 
         This function *does not* recursively get missing auth events of the
-        newly fetched events. Callers must include any missing events from the
-        auth chain.
+        newly fetched events. Callers must include in the `event_ids` argument
+        any missing events from the auth chain.
 
         Logs a warning if we can't find the given event.
         """
@@ -1158,7 +1158,7 @@ class FederationHandler(BaseHandler):
                         )
                         return
 
-                    event_map[event.event_id]
+                    event_map[event.event_id] = event
 
                 except Exception as e:
                     logger.warning(
@@ -1171,7 +1171,7 @@ class FederationHandler(BaseHandler):
         await concurrently_execute(get_event, events, 5)
 
         # Make a map of auth events for each event. We do this after fetching
-        # all the events as some of the events auth events will be in the list
+        # all the events as some of the events' auth events will be in the list
         # of requested events.
 
         persisted_events = await self.store.get_events(
