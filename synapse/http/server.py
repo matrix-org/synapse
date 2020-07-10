@@ -534,7 +534,7 @@ def respond_with_json(
         logger.warning(
             "Not sending response to request %s, already disconnected.", request
         )
-        return
+        return None
 
     if pretty_print:
         json_bytes = encode_pretty_printed_json(json_object) + b"\n"
