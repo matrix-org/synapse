@@ -840,7 +840,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if not self._send_federation:
             return
 
-        # Pull out the configured instancs. If we don't have a shard config then
+        # Pull out the configured instances. If we don't have a shard config then
         # we assume that we're the only instance sending.
         configured_instances = self._federation_shard_config.instances
         if not configured_instances:

@@ -331,7 +331,12 @@ class FederationSender(object):
 
         # Work out which remote servers should be poked and poke them.
         domains = yield self.state.get_current_hosts_in_room(room_id)
-        domains = [d for d in domains if d != self.server_name]
+        domains = [
+            d
+            for d in domains
+            if d != self.server_name
+            and self._federation_shard_config.should_send_to(self._instance_name, d)
+        ]
         if not domains:
             return
 
@@ -346,11 +351,6 @@ class FederationSender(object):
             self._schedule_rr_flush_for_room(room_id, len(domains))
 
         for domain in domains:
-            if not self._federation_shard_config.should_send_to(
-                self._instance_name, domain
-            ):
-                continue
-
             queue = self._get_per_destination_queue(domain)
             queue.queue_read_receipt(receipt)
 
@@ -459,6 +459,7 @@ class FederationSender(object):
             for destination in destinations:
                 if destination == self.server_name:
                     continue
+
                 if not self._federation_shard_config.should_send_to(
                     self._instance_name, destination
                 ):

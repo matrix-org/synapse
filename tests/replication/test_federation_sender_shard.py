@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2019 New Vector Ltd
+# Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,7 +50,6 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         store = hs.get_datastore()
         self.database = store.db
 
-        # Make a new HomeServer object for the worker
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
     def default_config(self):
@@ -75,6 +74,8 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         store = worker_hs.get_datastore()
         store.db._db_pool = self.database._db_pool
 
+        # We run this manaully to work around the fact that this doesn't get
+        # correctly applied when using sqlite :memory: databases.
         self.get_success(
             store.db.runInteraction("reset", store._reset_federation_positions_txn)
         )
@@ -145,6 +146,9 @@ class FederationSenderTestCase(BaseStreamTestCase):
     ]
 
     def test_send_event_single_sender(self):
+        """Test that using a single federation sender worker correctly sends a
+        new event.
+        """
         worker_hs = self.make_worker_hs({"send_federation": True})
         mock_client = worker_hs.get_http_client()
 
@@ -164,6 +168,9 @@ class FederationSenderTestCase(BaseStreamTestCase):
         self.assertTrue(mock_client.put_json.call_args[1]["data"].get("pdus"))
 
     def test_send_event_sharded(self):
+        """Test that using two federation sender workers correctly sends
+        new events.
+        """
         worker1 = self.make_worker_hs(
             {
                 "send_federation": True,
@@ -218,6 +225,9 @@ class FederationSenderTestCase(BaseStreamTestCase):
         self.assertTrue(sent_on_2)
 
     def test_send_typing_sharded(self):
+        """Test that using two federation sender workers correctly sends
+        new typing EDUs.
+        """
         worker1 = self.make_worker_hs(
             {
                 "send_federation": True,
