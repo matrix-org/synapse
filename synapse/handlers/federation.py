@@ -784,15 +784,23 @@ class FederationHandler(BaseHandler):
                     resync = True
 
             if resync:
-                await self.store.mark_remote_user_device_cache_as_stale(event.sender)
+                run_in_background(self._resync_device, event.sender)
 
-                # Immediately attempt a resync in the background
-                if self.config.worker_app:
-                    return run_in_background(self._user_device_resync, event.sender)
-                else:
-                    return run_in_background(
-                        self._device_list_updater.user_device_resync, event.sender
-                    )
+    async def _resync_device(self, sender: str):
+        """We have detected that the device list for the given user may be out
+        of sync, so we try and resync them.
+        """
+
+        try:
+            await self.store.mark_remote_user_device_cache_as_stale(sender)
+
+            # Immediately attempt a resync in the background
+            if self.config.worker_app:
+                await self._user_device_resync(user_id=sender)
+            else:
+                await self._device_list_updater.user_device_resync(sender)
+        except Exception:
+            logger.exception("Failed to resync device for %s", sender)
 
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
