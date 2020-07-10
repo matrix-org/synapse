@@ -1,1 +1,0 @@
-Drop table `local_rejections_stream` which was incorrectly added in Synapse 1.16.0.

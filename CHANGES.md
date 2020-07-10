@@ -1,3 +1,22 @@
+Synapse 1.16.1 (2020-07-10)
+===========================
+
+In some distributions of Synapse 1.16.0, we incorrectly included a database
+migration which added a new, unused table. This release removes the redundant
+table.
+
+Bugfixes
+--------
+
+- Drop table `local_rejections_stream` which was incorrectly added in Synapse 1.16.0. ([\#7816](https://github.com/matrix-org/synapse/issues/7816))
+
+
+Synapse 1.16.1 (2020-07-10)
+===========================
+
+No significant changes.
+
+
 Synapse 1.16.0 (2020-07-08)
 ===========================
 
