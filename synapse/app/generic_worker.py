@@ -491,25 +491,7 @@ class GenericWorkerSlavedStore(
     SearchWorkerStore,
     BaseSlavedStore,
 ):
-    def __init__(self, database, db_conn, hs):
-        super(GenericWorkerSlavedStore, self).__init__(database, db_conn, hs)
-
-        # We pull out the current federation stream position now so that we
-        # always have a known value for the federation position in memory so
-        # that we don't have to bounce via a deferred once when we start the
-        # replication streams.
-        self.federation_out_pos_startup = self._get_federation_out_pos(db_conn)
-
-    def _get_federation_out_pos(self, db_conn):
-        sql = "SELECT stream_id FROM federation_stream_position WHERE type = ?"
-        sql = self.database_engine.convert_param_style(sql)
-
-        txn = db_conn.cursor()
-        txn.execute(sql, ("federation",))
-        rows = txn.fetchall()
-        txn.close()
-
-        return rows[0][0] if rows else -1
+    pass
 
 
 class GenericWorkerServer(HomeServer):
@@ -792,19 +774,11 @@ class FederationSenderHandler(object):
         self.federation_sender = hs.get_federation_sender()
         self._hs = hs
 
-        # if the worker is restarted, we want to pick up where we left off in
-        # the replication stream, so load the position from the database.
-        #
-        # XXX is this actually worthwhile? Whenever the master is restarted, we'll
-        # drop some rows anyway (which is mostly fine because we're only dropping
-        # typing and presence notifications). If the replication stream is
-        # unreliable, why do we do all this hoop-jumping to store the position in the
-        # database? See also https://github.com/matrix-org/synapse/issues/7535.
-        #
-        self.federation_position = self.store.federation_out_pos_startup
+        # Stores the latest position in the federation stream we've gotten up
+        # to. This is always set before we use it.
+        self.federation_position = None
 
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
-        self._last_ack = self.federation_position
 
     def on_start(self):
         # There may be some events that are persisted but haven't been sent,
@@ -912,7 +886,6 @@ class FederationSenderHandler(object):
                 # We ACK this token over replication so that the master can drop
                 # its in memory queues
                 self._hs.get_tcp_replication().send_federation_ack(current_position)
-                self._last_ack = current_position
         except Exception:
             logger.exception("Error updating federation stream position")
 
