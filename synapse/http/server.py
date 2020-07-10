@@ -22,7 +22,7 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
 from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
@@ -513,7 +513,7 @@ def respond_with_json(
     send_cors: bool = False,
     pretty_print: bool = False,
     canonical_json: bool = True,
-) -> Optional[NOT_DONE_YET]:
+):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -526,6 +526,9 @@ def respond_with_json(
             resulting JSON bytes.
         canonical_json: Whether to use the canonicaljson algorithm when encoding
             the JSON bytes.
+
+    Returns:
+        twisted.web.server.NOT_DONE_YET if the request is still active.
     """
     # could alternatively use request.notifyFinish() and flip a flag when
     # the Deferred fires, but since the flag is RIGHT THERE it seems like
@@ -550,7 +553,7 @@ def respond_with_json(
 
 def respond_with_json_bytes(
     request: Request, code: int, json_bytes: bytes, send_cors: bool = False,
-) -> NOT_DONE_YET:
+):
     """Sends encoded JSON in response to the given request.
 
     Args:
@@ -559,6 +562,9 @@ def respond_with_json_bytes(
         json_bytes: The json bytes to use as the response body.
         send_cors: Whether to send Cross-Origin Resource Sharing headers
             https://fetch.spec.whatwg.org/#http-cors-protocol
+
+    Returns:
+        twisted.web.server.NOT_DONE_YET if the request is still active.
     """
 
     request.setResponseCode(code)
