@@ -52,7 +52,7 @@ class RoomConfig(Config):
             ]
         elif (
             encryption_for_room_type == RoomDefaultEncryptionTypes.OFF
-            or not encryption_for_room_type
+            or encryption_for_room_type is False
         ):
             # PyYAML translates "off" into False if it's unquoted, so we also need to
             # check for encryption_for_room_type being False.
