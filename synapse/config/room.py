@@ -50,7 +50,12 @@ class RoomConfig(Config):
                 RoomCreationPreset.PRIVATE_CHAT,
                 RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
             ]
-        elif encryption_for_room_type == RoomDefaultEncryptionTypes.OFF:
+        elif (
+            encryption_for_room_type == RoomDefaultEncryptionTypes.OFF
+            or not encryption_for_room_type
+        ):
+            # PyYAML translates "off" into False if it's unquoted, so we also need to
+            # check for encryption_for_room_type being False.
             self.encryption_enabled_by_default_for_room_presets = []
         else:
             raise ConfigError(
