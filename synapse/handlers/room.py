@@ -1155,7 +1155,7 @@ class RoomShutdownHandler(object):
                 If set to `true`, this room will be added to a blocking list,
                 preventing future attempts to join the room. Defaults to `false`.
 
-        Returns:
+        Returns: a dict containing the following keys:
             kicked_users: An array of users (`user_id`) that were kicked.
             failed_to_kick_users:
                 An array of users (`user_id`) that that were not kicked.
@@ -1173,7 +1173,7 @@ class RoomShutdownHandler(object):
         if not RoomID.is_valid(room_id):
             raise SynapseError(400, "%s is not a legal room ID" % (room_id,))
 
-        if not await self.store.get_room_with_stats(room_id):
+        if not await self.store.get_room(room_id):
             raise NotFoundError("Unknown room id %s" % (room_id,))
 
         # This will work even if the room is already blocked, but that is
@@ -1181,21 +1181,18 @@ class RoomShutdownHandler(object):
         if block:
             await self.store.block_room(room_id, requester_user_id)
 
-        if new_room_user_id:
+        if new_room_user_id is not None:
             if not self.hs.is_mine_id(new_room_user_id):
                 raise SynapseError(
                     400, "User must be our own: %s" % (new_room_user_id,)
                 )
-
-            if not await self.store.get_user_by_id(new_room_user_id):
-                raise NotFoundError("Unknown user %s" % (new_room_user_id,))
 
             room_creator_requester = create_requester(new_room_user_id)
 
             info, stream_id = await self._room_creation_handler.create_room(
                 room_creator_requester,
                 config={
-                    "preset": "public_chat",
+                    "preset": RoomCreationPreset.PUBLIC_CHAT,
                     "name": new_room_name,
                     "power_level_content_override": {"users_default": -10},
                 },

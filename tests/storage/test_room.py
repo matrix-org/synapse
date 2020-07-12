@@ -56,6 +56,10 @@ class RoomStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_get_room_unknown_room(self):
+        self.assertIsNone((yield self.store.get_room("!uknown:test")),)
+
+    @defer.inlineCallbacks
     def test_get_room_with_stats(self):
         self.assertDictContainsSubset(
             {

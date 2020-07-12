@@ -190,7 +190,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
 
         request, channel = self.make_request(
-            "POST", self.url, access_token=self.other_user_tok,
+            "POST", self.url, json.dumps({}), access_token=self.other_user_tok,
         )
         self.render(request)
 
@@ -204,7 +204,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/rooms/!unknown:test/delete"
 
         request, channel = self.make_request(
-            "POST", url, access_token=self.admin_user_tok,
+            "POST", url, json.dumps({}), access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -218,7 +218,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v1/rooms/invalidroom/delete"
 
         request, channel = self.make_request(
-            "POST", url, access_token=self.admin_user_tok,
+            "POST", url, json.dumps({}), access_token=self.admin_user_tok,
         )
         self.render(request)
 
@@ -229,7 +229,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
 
     def test_new_room_user_does_not_exist(self):
         """
-        Tests that a lookup for a user that does not exist returns a 404
+        Tests that the user ID must be from local server but it does not have to exist.
         """
         body = json.dumps({"new_room_user_id": "@unknown:test"})
 
@@ -241,8 +241,11 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         )
         self.render(request)
 
-        self.assertEqual(404, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertIn("new_room_id", channel.json_body)
+        self.assertIn("kicked_users", channel.json_body)
+        self.assertIn("failed_to_kick_users", channel.json_body)
+        self.assertIn("local_aliases", channel.json_body)
 
     def test_new_room_user_is_not_local(self):
         """

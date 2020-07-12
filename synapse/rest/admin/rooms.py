@@ -60,7 +60,7 @@ class ShutdownRoomRestServlet(RestServlet):
 
         ret = await self.room_shutdown_handler.shutdown_room(
             room_id=room_id,
-            new_room_user_id=content.get("new_room_user_id"),
+            new_room_user_id=content["new_room_user_id"],
             new_room_name=content.get("room_name"),
             message=content.get("message"),
             requester_user_id=requester.user.to_string(),
@@ -93,7 +93,7 @@ class DeleteRoomRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 
-        content = parse_json_object_from_request(request, allow_empty_body=True)
+        content = parse_json_object_from_request(request)
 
         block = content.get("block", False)
         if not isinstance(block, bool):
