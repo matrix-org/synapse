@@ -405,13 +405,11 @@ so, you will need to edit `homeserver.yaml`, as follows:
   ```
 
 * You will also need to uncomment the `tls_certificate_path` and
-  `tls_private_key_path` lines under the `TLS` section. You can either
-  point these settings at an existing certificate and key, or you can
-  enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
-  for having Synapse automatically provision and renew federation
-  certificates through ACME can be found at [ACME.md](docs/ACME.md).
-  Note that, as pointed out in that document, this feature will not
-  work with installs set up after November 2019.
+  `tls_private_key_path` lines under the `TLS` section. You will need to manage
+  provisioning of these certificates yourself — Synapse had built-in ACME
+  support, but the ACMEv1 protocol Synapse implements is deprecated, not
+  allowed by LetsEncrypt for new sites, and will break for existing sites in
+  late 2020. See [ACME.md](docs/ACME.md).
 
   If you are using your own certificate, be sure to use a `.pem` file that
   includes the full certificate chain including any intermediate certificates
