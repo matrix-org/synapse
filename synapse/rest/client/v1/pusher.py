@@ -16,7 +16,7 @@
 import logging
 
 from synapse.api.errors import Codes, StoreError, SynapseError
-from synapse.http.server import finish_request
+from synapse.http.server import respond_with_html_bytes
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -177,13 +177,9 @@ class PushersRemoveRestServlet(RestServlet):
 
         self.notifier.on_new_replication_data()
 
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(
-            b"Content-Length", b"%d" % (len(PushersRemoveRestServlet.SUCCESS_HTML),)
+        respond_with_html_bytes(
+            request, 200, PushersRemoveRestServlet.SUCCESS_HTML,
         )
-        request.write(PushersRemoveRestServlet.SUCCESS_HTML)
-        finish_request(request)
         return None
 
     def on_OPTIONS(self, _):

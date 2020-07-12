@@ -398,7 +398,7 @@ class CASTestCase(unittest.HomeserverTestCase):
                 </cas:serviceResponse>
             """
                 % cas_user_id
-            )
+            ).encode("utf-8")
 
         mocked_http_client = Mock(spec=["get_raw"])
         mocked_http_client.get_raw.side_effect = get_raw
@@ -526,7 +526,9 @@ class JWTTestCase(unittest.HomeserverTestCase):
         return jwt.encode(token, secret, "HS256").decode("ascii")
 
     def jwt_login(self, *args):
-        params = json.dumps({"type": "m.login.jwt", "token": self.jwt_encode(*args)})
+        params = json.dumps(
+            {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
+        )
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
         return channel
@@ -568,7 +570,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["error"], "Invalid JWT")
 
     def test_login_no_token(self):
-        params = json.dumps({"type": "m.login.jwt"})
+        params = json.dumps({"type": "org.matrix.login.jwt"})
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
         self.assertEqual(channel.result["code"], b"401", channel.result)
@@ -640,7 +642,9 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
         return jwt.encode(token, secret, "RS256").decode("ascii")
 
     def jwt_login(self, *args):
-        params = json.dumps({"type": "m.login.jwt", "token": self.jwt_encode(*args)})
+        params = json.dumps(
+            {"type": "org.matrix.login.jwt", "token": self.jwt_encode(*args)}
+        )
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
         return channel

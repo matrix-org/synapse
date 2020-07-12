@@ -14,11 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 from typing import Any, Callable, Dict, List, Match, Optional, Tuple, Union
 
-from canonicaljson import json
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
@@ -68,6 +68,10 @@ received_edus_counter = Counter("synapse_federation_server_received_edus", "")
 
 received_queries_counter = Counter(
     "synapse_federation_server_received_queries", "", ["type"]
+)
+
+pdu_process_time = Histogram(
+    "synapse_federation_server_pdu_process_time", "Time taken to process an event",
 )
 
 
@@ -271,21 +275,22 @@ class FederationServer(FederationBase):
 
             for pdu in pdus_by_room[room_id]:
                 event_id = pdu.event_id
-                with nested_logging_context(event_id):
-                    try:
-                        await self._handle_received_pdu(origin, pdu)
-                        pdu_results[event_id] = {}
-                    except FederationError as e:
-                        logger.warning("Error handling PDU %s: %s", event_id, e)
-                        pdu_results[event_id] = {"error": str(e)}
-                    except Exception as e:
-                        f = failure.Failure()
-                        pdu_results[event_id] = {"error": str(e)}
-                        logger.error(
-                            "Failed to handle PDU %s",
-                            event_id,
-                            exc_info=(f.type, f.value, f.getTracebackObject()),
-                        )
+                with pdu_process_time.time():
+                    with nested_logging_context(event_id):
+                        try:
+                            await self._handle_received_pdu(origin, pdu)
+                            pdu_results[event_id] = {}
+                        except FederationError as e:
+                            logger.warning("Error handling PDU %s: %s", event_id, e)
+                            pdu_results[event_id] = {"error": str(e)}
+                        except Exception as e:
+                            f = failure.Failure()
+                            pdu_results[event_id] = {"error": str(e)}
+                            logger.error(
+                                "Failed to handle PDU %s",
+                                event_id,
+                                exc_info=(f.type, f.value, f.getTracebackObject()),
+                            )
 
         await concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(), TRANSACTION_CONCURRENCY_LIMIT
@@ -521,9 +526,9 @@ class FederationServer(FederationBase):
         json_result = {}  # type: Dict[str, Dict[str, dict]]
         for user_id, device_keys in results.items():
             for device_id, keys in device_keys.items():
-                for key_id, json_bytes in keys.items():
+                for key_id, json_str in keys.items():
                     json_result.setdefault(user_id, {})[device_id] = {
-                        key_id: json.loads(json_bytes)
+                        key_id: json.loads(json_str)
                     }
 
         logger.info(
@@ -712,7 +717,7 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     # server name is a literal IP
     allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
     if not isinstance(allow_ip_literals, bool):
-        logger.warning("Ignorning non-bool allow_ip_literals flag")
+        logger.warning("Ignoring non-bool allow_ip_literals flag")
         allow_ip_literals = True
     if not allow_ip_literals:
         # check for ipv6 literals. These start with '['.
@@ -726,7 +731,7 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     # next,  check the deny list
     deny = acl_event.content.get("deny", [])
     if not isinstance(deny, (list, tuple)):
-        logger.warning("Ignorning non-list deny ACL %s", deny)
+        logger.warning("Ignoring non-list deny ACL %s", deny)
         deny = []
     for e in deny:
         if _acl_entry_matches(server_name, e):
@@ -736,7 +741,7 @@ def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     # then the allow list.
     allow = acl_event.content.get("allow", [])
     if not isinstance(allow, (list, tuple)):
-        logger.warning("Ignorning non-list allow ACL %s", allow)
+        logger.warning("Ignoring non-list allow ACL %s", allow)
         allow = []
     for e in allow:
         if _acl_entry_matches(server_name, e):

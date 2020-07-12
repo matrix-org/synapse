@@ -746,7 +746,7 @@ class TransportLayerClient(object):
     def remove_user_from_group(
         self, destination, group_id, requester_user_id, user_id, content
     ):
-        """Remove a user fron a group
+        """Remove a user from a group
         """
         path = _create_v1_path("/groups/%s/users/%s/remove", group_id, user_id)
 

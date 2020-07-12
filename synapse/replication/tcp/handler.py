@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple, TypeVar
 
@@ -149,10 +148,11 @@ class ReplicationCommandHandler:
         using TCP.
         """
         if hs.config.redis.redis_enabled:
+            import txredisapi
+
             from synapse.replication.tcp.redis import (
                 RedisDirectTcpReplicationClientFactory,
             )
-            import txredisapi
 
             logger.info(
                 "Connecting to redis (host=%r port=%r)",
@@ -238,7 +238,7 @@ class ReplicationCommandHandler:
         federation_ack_counter.inc()
 
         if self._federation_sender:
-            self._federation_sender.federation_ack(cmd.token)
+            self._federation_sender.federation_ack(cmd.instance_name, cmd.token)
 
     async def on_REMOVE_PUSHER(
         self, conn: AbstractConnection, cmd: RemovePusherCommand
@@ -527,7 +527,7 @@ class ReplicationCommandHandler:
         """Ack data for the federation stream. This allows the master to drop
         data stored purely in memory.
         """
-        self.send_command(FederationAckCommand(token))
+        self.send_command(FederationAckCommand(self._instance_name, token))
 
     def send_user_sync(
         self, instance_id: str, user_id: str, is_syncing: bool, last_sync_ms: int

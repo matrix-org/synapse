@@ -192,7 +192,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         d = _verify_json_for_server(kr, "server9", {}, 0, "test unsigned")
         self.failureResultOf(d, SynapseError)
 
-        # should suceed on a signed object
+        # should succeed on a signed object
         d = _verify_json_for_server(kr, "server9", json1, 500, "test signed")
         # self.assertFalse(d.called)
         self.get_success(d)

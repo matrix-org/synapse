@@ -1,1 +1,0 @@
-Do not break push rule evaluation when receiving an event with a non-string body. This is a long-standing bug.

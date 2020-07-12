@@ -45,10 +45,37 @@ class JWTConfig(Config):
 
     def generate_config_section(self, **kwargs):
         return """\
-        # The JWT needs to contain a globally unique "sub" (subject) claim.
+        # JSON web token integration. The following settings can be used to make
+        # Synapse JSON web tokens for authentication, instead of its internal
+        # password database.
+        #
+        # Each JSON Web Token needs to contain a "sub" (subject) claim, which is
+        # used as the localpart of the mxid.
+        #
+        # Note that this is a non-standard login type and client support is
+        # expected to be non-existant.
+        #
+        # See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
         #
         #jwt_config:
-        #   enabled: true
-        #   secret: "a secret"
-        #   algorithm: "HS256"
+            # Uncomment the following to enable authorization using JSON web
+            # tokens. Defaults to false.
+            #
+            #enabled: true
+
+            # This is either the private shared secret or the public key used to
+            # decode the contents of the JSON web token.
+            #
+            # Required if 'enabled' is true.
+            #
+            #secret: "provided-by-your-issuer"
+
+            # The algorithm used to sign the JSON web token.
+            #
+            # Supported algorithms are listed at
+            # https://pyjwt.readthedocs.io/en/latest/algorithms.html
+            #
+            # Required if 'enabled' is true.
+            #
+            #algorithm: "provided-by-your-issuer"
         """

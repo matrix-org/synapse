@@ -12,11 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import urllib
-import xml.etree.ElementTree as ET
 from typing import Dict, Optional, Tuple
+from xml.etree import ElementTree as ET
 
 from twisted.web.client import PartialDownloadError
 
@@ -105,7 +104,7 @@ class CasHandler:
         return user, displayname
 
     def _parse_cas_response(
-        self, cas_response_body: str
+        self, cas_response_body: bytes
     ) -> Tuple[str, Dict[str, Optional[str]]]:
         """
         Retrieve the user and other parameters from the CAS response.

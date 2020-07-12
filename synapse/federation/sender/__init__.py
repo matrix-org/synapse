@@ -69,6 +69,9 @@ class FederationSender(object):
 
         self._transaction_manager = TransactionManager(hs)
 
+        self._instance_name = hs.get_instance_name()
+        self._federation_shard_config = hs.config.federation.federation_shard_config
+
         # map from destination to PerDestinationQueue
         self._per_destination_queues = {}  # type: Dict[str, PerDestinationQueue]
 
@@ -191,7 +194,13 @@ class FederationSender(object):
                         )
                         return
 
-                    destinations = set(destinations)
+                    destinations = {
+                        d
+                        for d in destinations
+                        if self._federation_shard_config.should_send_to(
+                            self._instance_name, d
+                        )
+                    }
 
                     if send_on_behalf_of is not None:
                         # If we are sending the event on behalf of another server
@@ -201,7 +210,15 @@ class FederationSender(object):
 
                     logger.debug("Sending %s to %r", event, destinations)
 
-                    self._send_pdu(event, destinations)
+                    if destinations:
+                        self._send_pdu(event, destinations)
+
+                        now = self.clock.time_msec()
+                        ts = await self.store.get_received_ts(event.event_id)
+
+                        synapse.metrics.event_processing_lag_by_event.labels(
+                            "federation_sender"
+                        ).observe((now - ts) / 1000)
 
                 async def handle_room_events(events: Iterable[EventBase]) -> None:
                     with Measure(self.clock, "handle_room_events"):
@@ -314,7 +331,12 @@ class FederationSender(object):
 
         # Work out which remote servers should be poked and poke them.
         domains = yield self.state.get_current_hosts_in_room(room_id)
-        domains = [d for d in domains if d != self.server_name]
+        domains = [
+            d
+            for d in domains
+            if d != self.server_name
+            and self._federation_shard_config.should_send_to(self._instance_name, d)
+        ]
         if not domains:
             return
 
@@ -419,6 +441,10 @@ class FederationSender(object):
         for destination in destinations:
             if destination == self.server_name:
                 continue
+            if not self._federation_shard_config.should_send_to(
+                self._instance_name, destination
+            ):
+                continue
             self._get_per_destination_queue(destination).send_presence(states)
 
     @measure_func("txnqueue._process_presence")
@@ -433,6 +459,12 @@ class FederationSender(object):
             for destination in destinations:
                 if destination == self.server_name:
                     continue
+
+                if not self._federation_shard_config.should_send_to(
+                    self._instance_name, destination
+                ):
+                    continue
+
                 self._get_per_destination_queue(destination).send_presence(states)
 
     def build_and_send_edu(
@@ -454,6 +486,11 @@ class FederationSender(object):
             logger.info("Not sending EDU to ourselves")
             return
 
+        if not self._federation_shard_config.should_send_to(
+            self._instance_name, destination
+        ):
+            return
+
         edu = Edu(
             origin=self.server_name,
             destination=destination,
@@ -470,6 +507,11 @@ class FederationSender(object):
             edu: edu to send
             key: clobbering key for this edu
         """
+        if not self._federation_shard_config.should_send_to(
+            self._instance_name, edu.destination
+        ):
+            return
+
         queue = self._get_per_destination_queue(edu.destination)
         if key:
             queue.send_keyed_edu(edu, key)
@@ -479,6 +521,11 @@ class FederationSender(object):
     def send_device_messages(self, destination: str):
         if destination == self.server_name:
             logger.warning("Not sending device update to ourselves")
+            return
+
+        if not self._federation_shard_config.should_send_to(
+            self._instance_name, destination
+        ):
             return
 
         self._get_per_destination_queue(destination).attempt_new_transaction()
@@ -492,6 +539,11 @@ class FederationSender(object):
 
         if destination == self.server_name:
             logger.warning("Not waking up ourselves")
+            return
+
+        if not self._federation_shard_config.should_send_to(
+            self._instance_name, destination
+        ):
             return
 
         self._get_per_destination_queue(destination).attempt_new_transaction()

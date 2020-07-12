@@ -14,7 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import print_function
 
 # This file can't be called email.py because if it is, we cannot:
@@ -73,7 +72,7 @@ class EmailConfig(Config):
 
         template_dir = email_config.get("template_dir")
         # we need an absolute path, because we change directory after starting (and
-        # we don't yet know what auxilliary templates like mail.css we will need).
+        # we don't yet know what auxiliary templates like mail.css we will need).
         # (Note that loading as package_resources with jinja.PackageLoader doesn't
         # work for the same reason.)
         if not template_dir:
@@ -145,8 +144,8 @@ class EmailConfig(Config):
             or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
         ):
             # make sure we can import the required deps
-            import jinja2
             import bleach
+            import jinja2
 
             # prevent unused warnings
             jinja2

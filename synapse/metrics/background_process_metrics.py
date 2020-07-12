@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Dict, Optional, Set
 from prometheus_client.core import REGISTRY, Counter, Gauge
 
 from twisted.internet import defer
+from twisted.python.failure import Failure
 
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
 
@@ -212,7 +213,14 @@ def run_as_background_process(desc, func, *args, **kwargs):
 
                 return (yield result)
             except Exception:
-                logger.exception("Background process '%s' threw an exception", desc)
+                # failure.Failure() fishes the original Failure out of our stack, and
+                # thus gives us a sensible stack trace.
+                f = Failure()
+                logger.error(
+                    "Background process '%s' threw an exception",
+                    desc,
+                    exc_info=(f.type, f.value, f.getTracebackObject()),
+                )
             finally:
                 _background_process_in_flight_count.labels(desc).dec()
 

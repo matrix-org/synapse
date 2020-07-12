@@ -70,7 +70,7 @@ class GroupAttestationSigning(object):
         self.keyring = hs.get_keyring()
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
 
     @defer.inlineCallbacks
     def verify_attestation(self, attestation, group_id, user_id, server_name=None):

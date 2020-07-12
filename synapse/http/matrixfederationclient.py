@@ -176,7 +176,7 @@ class MatrixFederationHttpClient(object):
 
     def __init__(self, hs, tls_client_options_factory):
         self.hs = hs
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
         real_reactor = hs.get_reactor()
@@ -562,13 +562,17 @@ class MatrixFederationHttpClient(object):
         Returns:
             list[bytes]: a list of headers to be added as "Authorization:" headers
         """
-        request = {"method": method, "uri": url_bytes, "origin": self.server_name}
+        request = {
+            "method": method.decode("ascii"),
+            "uri": url_bytes.decode("ascii"),
+            "origin": self.server_name,
+        }
 
         if destination is not None:
-            request["destination"] = destination
+            request["destination"] = destination.decode("ascii")
 
         if destination_is is not None:
-            request["destination_is"] = destination_is
+            request["destination_is"] = destination_is.decode("ascii")
 
         if content is not None:
             request["content"] = content
