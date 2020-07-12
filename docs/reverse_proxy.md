@@ -38,9 +38,14 @@ the reverse proxy and the homeserver.
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+
+    # For the federation port
+    listen 8448 ssl default_server;
+    listen [::]:8448 ssl default_server;
+
     server_name matrix.example.com;
 
-    location /_matrix {
+    location / {
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         # Nginx by default only allows file uploads up to 1M in size
@@ -49,16 +54,6 @@ server {
     }
 }
 
-server {
-    listen 8448 ssl default_server;
-    listen [::]:8448 ssl default_server;
-    server_name example.com;
-
-    location / {
-        proxy_pass http://localhost:8008;
-        proxy_set_header X-Forwarded-For $remote_addr;
-    }
-}
 ```
 
 **NOTE**: Do not add a path after the port in `proxy_pass`, otherwise nginx will
