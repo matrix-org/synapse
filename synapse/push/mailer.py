@@ -278,7 +278,7 @@ class Mailer(object):
             email_address, "[%s] %s" % (self.app_name, summary_text), template_vars
         )
 
-    async def send_email(self, email_address, subject, template_vars):
+    async def send_email(self, email_address, subject, extra_template_vars):
         """Send an email with the given information and template text"""
         try:
             from_string = self.hs.config.email_notif_from % {"app": self.app_name}
@@ -290,6 +290,13 @@ class Mailer(object):
 
         if raw_to == "":
             raise RuntimeError("Invalid 'to' address")
+
+        template_vars = {
+            "app_name": self.app_name,
+            "server_name": self.hs.config.server.server_name,
+        }
+
+        template_vars.update(extra_template_vars)
 
         html_text = self.template_html.render(**template_vars)
         html_part = MIMEText(html_text, "html", "utf8")
