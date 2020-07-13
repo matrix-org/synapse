@@ -269,7 +269,6 @@ class Mailer(object):
                 user_id, app_id, email_address
             ),
             "summary_text": summary_text,
-            "app_name": self.app_name,
             "rooms": rooms,
             "reason": reason,
         }
