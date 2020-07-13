@@ -17,6 +17,7 @@
 import abc
 import collections
 import html
+import json
 import logging
 import types
 import urllib
@@ -25,7 +26,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
-from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+from canonicaljson import encode_canonical_json, encode_pretty_printed_json
 
 from twisted.internet import defer
 from twisted.python import failure

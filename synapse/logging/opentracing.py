@@ -166,13 +166,13 @@ Gotchas
 """
 import contextlib
 import inspect
+import json
 import logging
 import re
 from functools import wraps
 from typing import TYPE_CHECKING, Dict, Optional, Type
 
 import attr
-from canonicaljson import json
 
 from twisted.internet import defer
 

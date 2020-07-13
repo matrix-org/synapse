@@ -16,11 +16,10 @@
 # limitations under the License.
 
 """Utilities for interacting with Identity Servers"""
-
+import json
 import logging
 import urllib.parse
 
-from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
