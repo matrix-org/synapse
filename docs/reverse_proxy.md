@@ -3,7 +3,7 @@
 It is recommended to put a reverse proxy such as
 [nginx](https://nginx.org/en/docs/http/ngx_http_proxy_module.html),
 [Apache](https://httpd.apache.org/docs/current/mod/mod_proxy_http.html),
-[Caddy](https://caddyserver.com/docs/proxy) or
+[Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy) or
 [HAProxy](https://www.haproxy.org/) in front of Synapse. One advantage
 of doing so is that it means that you can expose the default https port
 (443) to Matrix clients without needing to run Synapse with root

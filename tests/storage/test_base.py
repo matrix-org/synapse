@@ -25,7 +25,7 @@ from synapse.storage.database import Database
 from synapse.storage.engines import create_engine
 
 from tests import unittest
-from tests.utils import TestHomeServer
+from tests.utils import TestHomeServer, default_config
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
@@ -49,10 +49,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
 
         self.db_pool.runWithConnection = runWithConnection
 
-        config = Mock()
-        config._disable_native_upserts = True
-        config.caches = Mock()
-        config.caches.event_cache_size = 1
+        config = default_config(name="test", parse=True)
         hs = TestHomeServer("test", config=config)
 
         sqlite_config = {"name": "sqlite3"}

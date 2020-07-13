@@ -24,6 +24,7 @@ RUN apk add \
         build-base \
         libffi-dev \
         libjpeg-turbo-dev \
+        libwebp-dev \
         libressl-dev \
         libxslt-dev \
         linux-headers \
@@ -61,6 +62,7 @@ FROM docker.io/python:${PYTHON_VERSION}-alpine3.11
 RUN apk add --no-cache --virtual .runtime_deps \
         libffi \
         libjpeg-turbo \
+        libwebp \
         libressl \
         libxslt \
         libpq \

@@ -20,17 +20,13 @@ from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
-from synapse.http.server import (
-    DirectServeResource,
-    respond_with_json_bytes,
-    wrap_json_request_handler,
-)
+from synapse.http.server import DirectServeJsonResource, respond_with_json_bytes
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
 logger = logging.getLogger(__name__)
 
 
-class RemoteKey(DirectServeResource):
+class RemoteKey(DirectServeJsonResource):
     """HTTP resource for retreiving the TLS certificate and NACL signature
     verification keys for a collection of servers. Checks that the reported
     X.509 TLS certificate matches the one used in the HTTPS connection. Checks
@@ -92,13 +88,14 @@ class RemoteKey(DirectServeResource):
     isLeaf = True
 
     def __init__(self, hs):
+        super().__init__()
+
         self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
         self.config = hs.config
 
-    @wrap_json_request_handler
     async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
             (server,) = request.postpath
@@ -115,7 +112,6 @@ class RemoteKey(DirectServeResource):
 
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    @wrap_json_request_handler
     async def _async_render_POST(self, request):
         content = parse_json_object_from_request(request)
 

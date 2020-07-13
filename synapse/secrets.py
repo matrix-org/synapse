@@ -19,7 +19,6 @@ Injectable secrets module for Synapse.
 See https://docs.python.org/3/library/secrets.html#module-secrets for the API
 used in Python 3.6, and the API emulated in Python 2.7.
 """
-
 import sys
 
 # secrets is available since python 3.6
@@ -31,8 +30,8 @@ if sys.version_info[0:2] >= (3, 6):
 
 
 else:
-    import os
     import binascii
+    import os
 
     class Secrets(object):
         def token_bytes(self, nbytes=32):
