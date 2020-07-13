@@ -1,9 +1,13 @@
+Synapse 1.17.0 (2020-07-13)
+===========================
+
+Synapse 1.17.0 is identical to 1.17.0rc1, with the addition of the fix that was included in 1.16.1.
+
+
 Synapse 1.16.1 (2020-07-10)
 ===========================
 
-In some distributions of Synapse 1.16.0, we incorrectly included a database
-migration which added a new, unused table. This release removes the redundant
-table.
+In some distributions of Synapse 1.16.0, we incorrectly included a database migration which added a new, unused table. This release removes the redundant table.
 
 Bugfixes
 --------
