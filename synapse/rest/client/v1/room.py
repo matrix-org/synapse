@@ -15,12 +15,11 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
+import json
 import logging
 import re
 from typing import List, Optional
 from urllib import parse as urlparse
-
-from canonicaljson import json
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
@@ -515,9 +514,9 @@ class RoomMessageListRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(request, default_limit=10)
         as_client_event = b"raw" not in request.args
-        filter_bytes = parse_string(request, b"filter", encoding=None)
-        if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes.decode("UTF-8"))
+        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
             if (
                 event_filter
@@ -627,9 +626,9 @@ class RoomEventContextServlet(RestServlet):
         limit = parse_integer(request, "limit", default=10)
 
         # picking the API shape for symmetry with /messages
-        filter_bytes = parse_string(request, "filter")
-        if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes)
+        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
         else:
             event_filter = None

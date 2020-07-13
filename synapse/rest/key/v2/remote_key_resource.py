@@ -11,11 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
 from typing import Dict, Set
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes, SynapseError
@@ -202,10 +202,10 @@ class RemoteKey(DirectServeJsonResource):
 
                 if miss:
                     cache_misses.setdefault(server_name, set()).add(key_id)
-                json_results.add(bytes(most_recent_result["key_json"]))
+                json_results.add(most_recent_result["key_json"])
             else:
                 for ts_added, result in results:
-                    json_results.add(bytes(result["key_json"]))
+                    json_results.add(result["key_json"])
 
         if cache_misses and query_remote_on_cache_miss:
             await self.fetcher.get_keys(cache_misses)
@@ -213,7 +213,7 @@ class RemoteKey(DirectServeJsonResource):
         else:
             signed_keys = []
             for key_json in json_results:
-                key_json = json.loads(key_json)
+                key_json = json.loads(key_json.decode("utf-8"))
                 for signing_key in self.config.key_server_signing_keys:
                     key_json = sign_json(key_json, self.config.server_name, signing_key)
 
