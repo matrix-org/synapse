@@ -17,10 +17,14 @@
 """Contains exceptions and error codes."""
 import json
 import logging
+import typing
 from http import HTTPStatus
 from typing import Dict, List, Optional, Union
 
 from twisted.web import http
+
+if typing.TYPE_CHECKING:
+    from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +240,7 @@ class InteractiveAuthIncompleteError(Exception):
             passed back to the client
     """
 
-    def __init__(self, result: Dict):
+    def __init__(self, result: "JsonDict"):
         super(InteractiveAuthIncompleteError, self).__init__(
             "Interactive auth not yet complete"
         )
@@ -391,7 +395,7 @@ class LimitExceededError(SynapseError):
         self,
         code: int = 429,
         msg: str = "Too Many Requests",
-        retry_after_ms: int = None,
+        retry_after_ms: Optional[int] = None,
         errcode: str = Codes.LIMIT_EXCEEDED,
     ):
         super(LimitExceededError, self).__init__(code, msg, errcode)
