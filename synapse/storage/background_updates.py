@@ -12,11 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
 from typing import Optional
-
-from canonicaljson import json
 
 from twisted.internet import defer
 
@@ -249,7 +247,10 @@ class BackgroundUpdater(object):
             retcol="progress_json",
         )
 
-        progress = json.loads(progress_json)
+        # Avoid a circular import.
+        from synapse.storage._base import db_to_json
+
+        progress = db_to_json(progress_json)
 
         time_start = self._clock.time_msec()
         items_updated = await update_handler(progress, batch_size)

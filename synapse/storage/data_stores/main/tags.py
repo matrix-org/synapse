@@ -13,14 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
 from typing import List, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
+from synapse.storage._base import db_to_json
 from synapse.storage.data_stores.main.account_data import AccountDataWorkerStore
 from synapse.util.caches.descriptors import cached
 
@@ -49,7 +48,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             tags_by_room = {}
             for row in rows:
                 room_tags = tags_by_room.setdefault(row["room_id"], {})
-                room_tags[row["tag"]] = json.loads(row["content"])
+                room_tags[row["tag"]] = db_to_json(row["content"])
             return tags_by_room
 
         return deferred
@@ -180,7 +179,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
             retcols=("tag", "content"),
             desc="get_tags_for_room",
         ).addCallback(
-            lambda rows: {row["tag"]: json.loads(row["content"]) for row in rows}
+            lambda rows: {row["tag"]: db_to_json(row["content"]) for row in rows}
         )
 
 

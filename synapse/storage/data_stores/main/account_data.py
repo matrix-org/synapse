@@ -15,14 +15,13 @@
 # limitations under the License.
 
 import abc
+import json
 import logging
 from typing import List, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import Database
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -77,7 +76,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             )
 
             global_account_data = {
-                row["account_data_type"]: json.loads(row["content"]) for row in rows
+                row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
             rows = self.db.simple_select_list_txn(
@@ -90,7 +89,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             by_room = {}
             for row in rows:
                 room_data = by_room.setdefault(row["room_id"], {})
-                room_data[row["account_data_type"]] = json.loads(row["content"])
+                room_data[row["account_data_type"]] = db_to_json(row["content"])
 
             return global_account_data, by_room
 
@@ -113,7 +112,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         )
 
         if result:
-            return json.loads(result)
+            return db_to_json(result)
         else:
             return None
 
@@ -137,7 +136,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             )
 
             return {
-                row["account_data_type"]: json.loads(row["content"]) for row in rows
+                row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
         return self.db.runInteraction(
@@ -170,7 +169,7 @@ class AccountDataWorkerStore(SQLBaseStore):
                 allow_none=True,
             )
 
-            return json.loads(content_json) if content_json else None
+            return db_to_json(content_json) if content_json else None
 
         return self.db.runInteraction(
             "get_account_data_for_room_and_type", get_account_data_for_room_and_type_txn
@@ -255,7 +254,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
             txn.execute(sql, (user_id, stream_id))
 
-            global_account_data = {row[0]: json.loads(row[1]) for row in txn}
+            global_account_data = {row[0]: db_to_json(row[1]) for row in txn}
 
             sql = (
                 "SELECT room_id, account_data_type, content FROM room_account_data"
@@ -267,7 +266,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             account_data_by_room = {}
             for row in txn:
                 room_account_data = account_data_by_room.setdefault(row[0], {})
-                room_account_data[row[1]] = json.loads(row[2])
+                room_account_data[row[1]] = db_to_json(row[2])
 
             return global_account_data, account_data_by_room
 

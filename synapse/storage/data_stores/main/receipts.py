@@ -15,14 +15,13 @@
 # limitations under the License.
 
 import abc
+import json
 import logging
 from typing import List, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.async_helpers import ObservableDeferred
@@ -203,7 +202,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         for row in rows:
             content.setdefault(row["event_id"], {}).setdefault(row["receipt_type"], {})[
                 row["user_id"]
-            ] = json.loads(row["data"])
+            ] = db_to_json(row["data"])
 
         return [{"type": "m.receipt", "room_id": room_id, "content": content}]
 
@@ -260,7 +259,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             event_entry = room_event["content"].setdefault(row["event_id"], {})
             receipt_type = event_entry.setdefault(row["receipt_type"], {})
 
-            receipt_type[row["user_id"]] = json.loads(row["data"])
+            receipt_type[row["user_id"]] = db_to_json(row["data"])
 
         results = {
             room_id: [results[room_id]] if room_id in results else []
@@ -329,7 +328,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
             """
             txn.execute(sql, (last_id, current_id, limit))
 
-            updates = [(r[0], r[1:5] + (json.loads(r[5]),)) for r in txn]
+            updates = [(r[0], r[1:5] + (db_to_json(r[5]),)) for r in txn]
 
             limited = False
             upper_bound = current_id

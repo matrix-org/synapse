@@ -15,16 +15,15 @@
 # limitations under the License.
 
 import abc
+import json
 import logging
 from typing import List, Tuple, Union
-
-from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.data_stores.main.appservice import ApplicationServiceWorkerStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.data_stores.main.pusher import PusherWorkerStore
@@ -43,8 +42,8 @@ def _load_rules(rawrules, enabled_map):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
-        rule["conditions"] = json.loads(rawrule["conditions"])
-        rule["actions"] = json.loads(rawrule["actions"])
+        rule["conditions"] = db_to_json(rawrule["conditions"])
+        rule["actions"] = db_to_json(rawrule["actions"])
         rule["default"] = False
         ruleslist.append(rule)
 

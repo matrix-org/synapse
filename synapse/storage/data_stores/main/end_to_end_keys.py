@@ -14,9 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 from typing import Dict, List, Tuple
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.enterprise.adbapi import Connection
 from twisted.internet import defer
@@ -366,7 +367,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             for row in rows:
                 user_id = row["user_id"]
                 key_type = row["keytype"]
-                key = json.loads(row["keydata"])
+                key = db_to_json(row["keydata"])
                 user_info = result.setdefault(user_id, {})
                 user_info[key_type] = key
 

@@ -14,10 +14,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 from typing import List, Optional, Set, Tuple
-
-from canonicaljson import json
 
 from twisted.internet import defer
 
@@ -577,7 +576,7 @@ class DeviceWorkerStore(SQLBaseStore):
             rows = yield self.db.execute(
                 "get_users_whose_signatures_changed", None, sql, user_id, from_key
             )
-            return {user for row in rows for user in json.loads(row[0])}
+            return {user for row in rows for user in db_to_json(row[0])}
         else:
             return set()
 

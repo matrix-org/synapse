@@ -13,16 +13,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 import re
-
-from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.database import Database
 
@@ -303,7 +302,7 @@ class ApplicationServiceTransactionWorkerStore(
         if not entry:
             return None
 
-        event_ids = json.loads(entry["event_ids"])
+        event_ids = db_to_json(entry["event_ids"])
 
         events = yield self.get_events_as_list(event_ids)
 

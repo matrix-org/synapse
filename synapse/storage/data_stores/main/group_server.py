@@ -13,15 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 from typing import List, Tuple
-
-from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 
 # The category ID for the "default" category. We don't store as null in the
 # database to avoid the fun of null != null
@@ -197,7 +195,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             categories = {
                 row[0]: {
                     "is_public": row[1],
-                    "profile": json.loads(row[2]),
+                    "profile": db_to_json(row[2]),
                     "order": row[3],
                 }
                 for row in txn
@@ -221,7 +219,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return {
             row["category_id"]: {
                 "is_public": row["is_public"],
-                "profile": json.loads(row["profile"]),
+                "profile": db_to_json(row["profile"]),
             }
             for row in rows
         }
@@ -235,7 +233,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group_category",
         )
 
-        category["profile"] = json.loads(category["profile"])
+        category["profile"] = db_to_json(category["profile"])
 
         return category
 
@@ -251,7 +249,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return {
             row["role_id"]: {
                 "is_public": row["is_public"],
-                "profile": json.loads(row["profile"]),
+                "profile": db_to_json(row["profile"]),
             }
             for row in rows
         }
@@ -265,7 +263,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group_role",
         )
 
-        role["profile"] = json.loads(role["profile"])
+        role["profile"] = db_to_json(role["profile"])
 
         return role
 
@@ -333,7 +331,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             roles = {
                 row[0]: {
                     "is_public": row[1],
-                    "profile": json.loads(row[2]),
+                    "profile": db_to_json(row[2]),
                     "order": row[3],
                 }
                 for row in txn
@@ -462,7 +460,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         now = int(self._clock.time_msec())
         if row and now < row["valid_until_ms"]:
-            return json.loads(row["attestation_json"])
+            return db_to_json(row["attestation_json"])
 
         return None
 
@@ -489,7 +487,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     "group_id": row[0],
                     "type": row[1],
                     "membership": row[2],
-                    "content": json.loads(row[3]),
+                    "content": db_to_json(row[3]),
                 }
                 for row in txn
             ]
@@ -519,7 +517,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     "group_id": group_id,
                     "membership": membership,
                     "type": gtype,
-                    "content": json.loads(content_json),
+                    "content": db_to_json(content_json),
                 }
                 for group_id, membership, gtype, content_json in txn
             ]
@@ -567,7 +565,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             """
             txn.execute(sql, (last_id, current_id, limit))
             updates = [
-                (stream_id, (group_id, user_id, gtype, json.loads(content_json)))
+                (stream_id, (group_id, user_id, gtype, db_to_json(content_json)))
                 for stream_id, group_id, user_id, gtype, content_json in txn
             ]
 

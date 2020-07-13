@@ -17,11 +17,11 @@
 import logging
 from typing import Iterable, Iterator, List, Tuple
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ class PusherWorkerStore(SQLBaseStore):
         for r in rows:
             dataJson = r["data"]
             try:
-                r["data"] = json.loads(dataJson)
+                r["data"] = db_to_json(dataJson)
             except Exception as e:
                 logger.warning(
                     "Invalid JSON in data for pusher %d: %s, %s",
