@@ -20,7 +20,7 @@ from __future__ import print_function
 import email.utils
 import os
 from enum import Enum
-from typing import Optional
+from typing import Dict, Optional
 
 import pkg_resources
 
@@ -307,7 +307,7 @@ class EmailConfig(Config):
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find email template file %s" % (p,))
 
-        self.email_subjects = {}
+        self.email_subjects = {}  # type: Dict[str, str]
         subjects_config = email_config.get("subjects", {})
         for subject_id, default_subject in DEFAULT_SUBJECTS.items():
             self.email_subjects[subject_id] = subjects_config.get(
