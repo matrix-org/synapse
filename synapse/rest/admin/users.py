@@ -240,6 +240,11 @@ class UserRestServletV2(RestServlet):
                         target_user.to_string(), False
                     )
                 elif not deactivate and user["deactivated"]:
+                    if "password" not in body:
+                        raise SynapseError(
+                            400, "Must provide a password to re-activate an account."
+                        )
+
                     await self.deactivate_account_handler.activate_account(
                         target_user.to_string()
                     )
