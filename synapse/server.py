@@ -232,6 +232,8 @@ class HomeServer(object):
 
         self._reactor = reactor
         self.hostname = hostname
+        # the key we use to sign events and requests
+        self.signing_key = config.key.signing_key[0]
         self.config = config
         self._building = {}
         self._listening_services = []

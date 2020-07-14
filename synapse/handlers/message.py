@@ -15,9 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional, Tuple
-
-from six import iteritems, itervalues, string_types
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
@@ -56,6 +54,9 @@ from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +247,7 @@ class MessageHandler(object):
                 "avatar_url": profile.avatar_url,
                 "display_name": profile.display_name,
             }
-            for user_id, profile in iteritems(users_with_profile)
+            for user_id, profile in users_with_profile.items()
         }
 
     def maybe_schedule_expiry(self, event):
@@ -351,7 +352,7 @@ _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
 
 
 class EventCreationHandler(object):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
@@ -715,7 +716,7 @@ class EventCreationHandler(object):
 
             spam_error = self.spam_checker.check_event_for_spam(event)
             if spam_error:
-                if not isinstance(spam_error, string_types):
+                if not isinstance(spam_error, str):
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
@@ -816,11 +817,17 @@ class EventCreationHandler(object):
                 403, "This event is not allowed in this context", Codes.FORBIDDEN
             )
 
-        try:
-            await self.auth.check_from_context(room_version, event, context)
-        except AuthError as err:
-            logger.warning("Denying new event %r because %s", event, err)
-            raise err
+        if event.internal_metadata.is_out_of_band_membership():
+            # the only sort of out-of-band-membership events we expect to see here
+            # are invite rejections we have generated ourselves.
+            assert event.type == EventTypes.Member
+            assert event.content["membership"] == Membership.LEAVE
+        else:
+            try:
+                await self.auth.check_from_context(room_version, event, context)
+            except AuthError as err:
+                logger.warning("Denying new event %r because %s", event, err)
+                raise err
 
         # Ensure that we can round trip before trying to persist in db
         try:
@@ -881,7 +888,9 @@ class EventCreationHandler(object):
         """
         room_alias = RoomAlias.from_string(room_alias_str)
         try:
-            mapping = yield directory_handler.get_association(room_alias)
+            mapping = yield defer.ensureDeferred(
+                directory_handler.get_association(room_alias)
+            )
         except SynapseError as e:
             # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
             if e.errcode == Codes.NOT_FOUND:
@@ -988,7 +997,7 @@ class EventCreationHandler(object):
 
                 state_to_include_ids = [
                     e_id
-                    for k, e_id in iteritems(current_state_ids)
+                    for k, e_id in current_state_ids.items()
                     if k[0] in self.room_invite_state_types
                     or k == (EventTypes.Member, event.sender)
                 ]
@@ -1002,7 +1011,7 @@ class EventCreationHandler(object):
                         "content": e.content,
                         "sender": e.sender,
                     }
-                    for e in itervalues(state_to_include)
+                    for e in state_to_include.values()
                 ]
 
                 invitee = UserID.from_string(event.state_key)

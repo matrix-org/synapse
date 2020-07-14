@@ -14,15 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import itertools
 import logging
 from collections import OrderedDict, namedtuple
 from functools import wraps
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
-
-from six import integer_types, iteritems, text_type
-from six.moves import range
 
 import attr
 from canonicaljson import json
@@ -31,12 +27,7 @@ from prometheus_client import Counter
 from twisted.internet import defer
 
 import synapse.metrics
-from synapse.api.constants import (
-    EventContentFields,
-    EventTypes,
-    Membership,
-    RelationTypes,
-)
+from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
@@ -51,8 +42,8 @@ from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
-    from synapse.storage.data_stores.main import DataStore
     from synapse.server import HomeServer
+    from synapse.storage.data_stores.main import DataStore
 
 
 logger = logging.getLogger(__name__)
@@ -232,10 +223,10 @@ class PersistEventsStore:
 
                 event_counter.labels(event.type, origin_type, origin_entity).inc()
 
-            for room_id, new_state in iteritems(current_state_for_room):
+            for room_id, new_state in current_state_for_room.items():
                 self.store.get_current_state_ids.prefill((room_id,), new_state)
 
-            for room_id, latest_event_ids in iteritems(new_forward_extremeties):
+            for room_id, latest_event_ids in new_forward_extremeties.items():
                 self.store.get_latest_event_ids_in_room.prefill(
                     (room_id,), list(latest_event_ids)
                 )
@@ -461,7 +452,7 @@ class PersistEventsStore:
         state_delta_by_room: Dict[str, DeltaState],
         stream_id: int,
     ):
-        for room_id, delta_state in iteritems(state_delta_by_room):
+        for room_id, delta_state in state_delta_by_room.items():
             to_delete = delta_state.to_delete
             to_insert = delta_state.to_insert
 
@@ -545,7 +536,7 @@ class PersistEventsStore:
                     """,
                     [
                         (room_id, key[0], key[1], ev_id, ev_id)
-                        for key, ev_id in iteritems(to_insert)
+                        for key, ev_id in to_insert.items()
                     ],
                 )
 
@@ -642,7 +633,7 @@ class PersistEventsStore:
     def _update_forward_extremities_txn(
         self, txn, new_forward_extremities, max_stream_order
     ):
-        for room_id, new_extrem in iteritems(new_forward_extremities):
+        for room_id, new_extrem in new_forward_extremities.items():
             self.db.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
@@ -655,7 +646,7 @@ class PersistEventsStore:
             table="event_forward_extremities",
             values=[
                 {"event_id": ev_id, "room_id": room_id}
-                for room_id, new_extrem in iteritems(new_forward_extremities)
+                for room_id, new_extrem in new_forward_extremities.items()
                 for ev_id in new_extrem
             ],
         )
@@ -672,7 +663,7 @@ class PersistEventsStore:
                     "event_id": event_id,
                     "stream_ordering": max_stream_order,
                 }
-                for room_id, new_extrem in iteritems(new_forward_extremities)
+                for room_id, new_extrem in new_forward_extremities.items()
                 for event_id in new_extrem
             ],
         )
@@ -727,7 +718,7 @@ class PersistEventsStore:
                     event.depth, depth_updates.get(event.room_id, event.depth)
                 )
 
-        for room_id, depth in iteritems(depth_updates):
+        for room_id, depth in depth_updates.items():
             self._update_min_depth_for_room_txn(txn, room_id, depth)
 
     def _update_outliers_txn(self, txn, events_and_contexts):
@@ -823,7 +814,6 @@ class PersistEventsStore:
             "event_reference_hashes",
             "event_search",
             "event_to_state_groups",
-            "local_invites",
             "state_events",
             "rejections",
             "redactions",
@@ -893,8 +883,7 @@ class PersistEventsStore:
                     "received_ts": self._clock.time_msec(),
                     "sender": event.sender,
                     "contains_url": (
-                        "url" in event.content
-                        and isinstance(event.content["url"], text_type)
+                        "url" in event.content and isinstance(event.content["url"], str)
                     ),
                 }
                 for event, _ in events_and_contexts
@@ -1201,65 +1190,27 @@ class PersistEventsStore:
                 (event.state_key,),
             )
 
-            # We update the local_invites table only if the event is "current",
-            # i.e., its something that has just happened. If the event is an
-            # outlier it is only current if its an "out of band membership",
-            # like a remote invite or a rejection of a remote invite.
-            is_new_state = not backfilled and (
-                not event.internal_metadata.is_outlier()
-                or event.internal_metadata.is_out_of_band_membership()
-            )
-            is_mine = self.is_mine_id(event.state_key)
-            if is_new_state and is_mine:
-                if event.membership == Membership.INVITE:
-                    self.db.simple_insert_txn(
-                        txn,
-                        table="local_invites",
-                        values={
-                            "event_id": event.event_id,
-                            "invitee": event.state_key,
-                            "inviter": event.sender,
-                            "room_id": event.room_id,
-                            "stream_id": event.internal_metadata.stream_ordering,
-                        },
-                    )
-                else:
-                    sql = (
-                        "UPDATE local_invites SET stream_id = ?, replaced_by = ? WHERE"
-                        " room_id = ? AND invitee = ? AND locally_rejected is NULL"
-                        " AND replaced_by is NULL"
-                    )
-
-                    txn.execute(
-                        sql,
-                        (
-                            event.internal_metadata.stream_ordering,
-                            event.event_id,
-                            event.room_id,
-                            event.state_key,
-                        ),
-                    )
-
-                # We also update the `local_current_membership` table with
-                # latest invite info. This will usually get updated by the
-                # `current_state_events` handling, unless its an outlier.
-                if event.internal_metadata.is_outlier():
-                    # This should only happen for out of band memberships, so
-                    # we add a paranoia check.
-                    assert event.internal_metadata.is_out_of_band_membership()
-
-                    self.db.simple_upsert_txn(
-                        txn,
-                        table="local_current_membership",
-                        keyvalues={
-                            "room_id": event.room_id,
-                            "user_id": event.state_key,
-                        },
-                        values={
-                            "event_id": event.event_id,
-                            "membership": event.membership,
-                        },
-                    )
+            # We update the local_current_membership table only if the event is
+            # "current", i.e., its something that has just happened.
+            #
+            # This will usually get updated by the `current_state_events` handling,
+            # unless its an outlier, and an outlier is only "current" if it's an "out of
+            # band membership", like a remote invite or a rejection of a remote invite.
+            if (
+                self.is_mine_id(event.state_key)
+                and not backfilled
+                and event.internal_metadata.is_outlier()
+                and event.internal_metadata.is_out_of_band_membership()
+            ):
+                self.db.simple_upsert_txn(
+                    txn,
+                    table="local_current_membership",
+                    keyvalues={"room_id": event.room_id, "user_id": event.state_key},
+                    values={
+                        "event_id": event.event_id,
+                        "membership": event.membership,
+                    },
+                )
 
     def _handle_event_relations(self, txn, event):
         """Handles inserting relation data during peristence of events
@@ -1345,10 +1296,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), integer_types)
+                and not isinstance(event.content.get("min_lifetime"), int)
             ) or (
                 "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), integer_types)
+                and not isinstance(event.content.get("max_lifetime"), int)
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return
@@ -1497,11 +1448,11 @@ class PersistEventsStore:
             table="event_to_state_groups",
             values=[
                 {"state_group": state_group_id, "event_id": event_id}
-                for event_id, state_group_id in iteritems(state_groups)
+                for event_id, state_group_id in state_groups.items()
             ],
         )
 
-        for event_id, state_group_id in iteritems(state_groups):
+        for event_id, state_group_id in state_groups.items():
             txn.call_after(
                 self.store._get_state_group_for_event.prefill,
                 (event_id,),
@@ -1590,31 +1541,3 @@ class PersistEventsStore:
                 if not ev.internal_metadata.is_outlier()
             ],
         )
-
-    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
-        """Mark the invite has having been rejected even though we failed to
-        create a leave event for it.
-        """
-
-        sql = (
-            "UPDATE local_invites SET stream_id = ?, locally_rejected = ? WHERE"
-            " room_id = ? AND invitee = ? AND locally_rejected is NULL"
-            " AND replaced_by is NULL"
-        )
-
-        def f(txn, stream_ordering):
-            txn.execute(sql, (stream_ordering, True, room_id, user_id))
-
-            # We also clear this entry from `local_current_membership`.
-            # Ideally we'd point to a leave event, but we don't have one, so
-            # nevermind.
-            self.db.simple_delete_txn(
-                txn,
-                table="local_current_membership",
-                keyvalues={"room_id": room_id, "user_id": user_id},
-            )
-
-        with self._stream_id_gen.get_next() as stream_ordering:
-            await self.db.runInteraction("locally_reject_invite", f, stream_ordering)
-
-        return stream_ordering

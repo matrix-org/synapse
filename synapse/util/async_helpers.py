@@ -19,8 +19,6 @@ import logging
 from contextlib import contextmanager
 from typing import Dict, Sequence, Set, Union
 
-from six.moves import range
-
 import attr
 
 from twisted.internet import defer
@@ -95,7 +93,7 @@ class ObservableDeferred(object):
 
         This returns a brand new deferred that is resolved when the underlying
         deferred is resolved. Interacting with the returned deferred does not
-        effect the underdlying deferred.
+        effect the underlying deferred.
         """
         if not self._result:
             d = defer.Deferred()

@@ -15,10 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from io import BytesIO
-
-from six import raise_from, text_type
-from six.moves import urllib
 
 import treq
 from canonicaljson import encode_canonical_json, json
@@ -577,7 +575,7 @@ class SimpleHttpClient(object):
             # This can happen e.g. because the body is too large.
             raise
         except Exception as e:
-            raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
+            raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
 
         return (
             length,
@@ -638,7 +636,7 @@ def encode_urlencode_args(args):
 
 
 def encode_urlencode_arg(arg):
-    if isinstance(arg, text_type):
+    if isinstance(arg, str):
         return arg.encode("utf-8")
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]

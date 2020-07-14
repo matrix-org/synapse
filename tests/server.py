@@ -2,8 +2,6 @@ import json
 import logging
 from io import BytesIO
 
-from six import text_type
-
 import attr
 from zope.interface import implementer
 
@@ -174,7 +172,7 @@ def make_request(
     if not path.startswith(b"/"):
         path = b"/" + path
 
-    if isinstance(content, text_type):
+    if isinstance(content, str):
         content = content.encode("utf8")
 
     site = FakeSite()

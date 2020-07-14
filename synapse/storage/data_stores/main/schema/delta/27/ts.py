@@ -11,10 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import logging
-
-import simplejson
 
 from synapse.storage.prepare_database import get_statements
 
@@ -45,7 +43,7 @@ def run_create(cur, database_engine, *args, **kwargs):
             "max_stream_id_exclusive": max_stream_id + 1,
             "rows_inserted": 0,
         }
-        progress_json = simplejson.dumps(progress)
+        progress_json = json.dumps(progress)
 
         sql = (
             "INSERT into background_updates (update_name, progress_json)"

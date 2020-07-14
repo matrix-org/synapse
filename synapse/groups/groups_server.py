@@ -17,8 +17,6 @@
 
 import logging
 
-from six import string_types
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
@@ -43,7 +41,7 @@ class GroupsServerWorkerHandler(object):
         self.clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
         self.server_name = hs.hostname
         self.attestations = hs.get_groups_attestation_signing()
         self.transport_client = hs.get_federation_transport_client()
@@ -513,7 +511,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         for keyname in ("name", "avatar_url", "short_description", "long_description"):
             if keyname in content:
                 value = content[keyname]
-                if not isinstance(value, string_types):
+                if not isinstance(value, str):
                     raise SynapseError(400, "%r value is not a string" % (keyname,))
                 profile[keyname] = value
 

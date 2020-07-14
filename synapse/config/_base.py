@@ -22,8 +22,6 @@ from collections import OrderedDict
 from textwrap import dedent
 from typing import Any, MutableMapping, Optional
 
-from six import integer_types
-
 import yaml
 
 
@@ -117,7 +115,7 @@ class Config(object):
 
     @staticmethod
     def parse_size(value):
-        if isinstance(value, integer_types):
+        if isinstance(value, int):
             return value
         sizes = {"K": 1024, "M": 1024 * 1024}
         size = 1
@@ -129,7 +127,7 @@ class Config(object):
 
     @staticmethod
     def parse_duration(value):
-        if isinstance(value, integer_types):
+        if isinstance(value, int):
             return value
         second = 1000
         minute = 60 * second

@@ -86,6 +86,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.well_known_resolver = WellKnownResolver(
             self.reactor,
             Agent(self.reactor, contextFactory=self.tls_factory),
+            b"test-agent",
             well_known_cache=self.well_known_cache,
             had_well_known_cache=self.had_well_known_cache,
         )
@@ -93,6 +94,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=self.tls_factory,
+            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=self.well_known_resolver,
         )
@@ -186,6 +188,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # check the .well-known request and send a response
         self.assertEqual(len(well_known_server.requests), 1)
         request = well_known_server.requests[0]
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
+        )
         self._send_well_known_response(request, content, headers=response_headers)
         return well_known_server
 
@@ -230,6 +235,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(request.path, b"/foo/bar")
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"host"), [b"testserv:8448"]
+        )
+        self.assertEqual(
+            request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
         )
         content = request.content.read()
         self.assertEqual(content, b"")
@@ -719,10 +727,12 @@ class MatrixFederationAgentTests(unittest.TestCase):
         agent = MatrixFederationAgent(
             reactor=self.reactor,
             tls_client_options_factory=tls_factory,
+            user_agent=b"test-agent",  # This is unused since _well_known_resolver is passed below.
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=WellKnownResolver(
                 self.reactor,
                 Agent(self.reactor, contextFactory=tls_factory),
+                b"test-agent",
                 well_known_cache=self.well_known_cache,
                 had_well_known_cache=self.had_well_known_cache,
             ),

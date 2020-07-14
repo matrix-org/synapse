@@ -13,8 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from six.moves import urllib
+import urllib
 
 from prometheus_client import Counter
 
@@ -99,7 +98,6 @@ class ApplicationServiceApi(SimpleHttpClient):
         if service.url is None:
             return False
         uri = service.url + ("/users/%s" % urllib.parse.quote(user_id))
-        response = None
         try:
             response = yield self.get_json(uri, {"access_token": service.hs_token})
             if response is not None:  # just an empty json object

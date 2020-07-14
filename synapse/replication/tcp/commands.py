@@ -18,18 +18,11 @@ The VALID_SERVER_COMMANDS and VALID_CLIENT_COMMANDS define which commands are
 allowed to be sent by which side.
 """
 import abc
+import json
 import logging
-import platform
 from typing import Tuple, Type
 
-if platform.python_implementation() == "PyPy":
-    import json
-
-    _json_encoder = json.JSONEncoder()
-else:
-    import simplejson as json  # type: ignore[no-redef]  # noqa: F821
-
-    _json_encoder = json.JSONEncoder(namedtuple_as_object=False)  # type: ignore[call-arg]  # noqa: F821
+_json_encoder = json.JSONEncoder()
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +142,7 @@ class RdataCommand(Command):
 
 
 class PositionCommand(Command):
-    """Sent by the server to tell the client the stream postition without
+    """Sent by the server to tell the client the stream position without
     needing to send an RDATA.
 
     Format::
@@ -188,7 +181,7 @@ class ErrorCommand(_SimpleCommand):
 
 
 class PingCommand(_SimpleCommand):
-    """Sent by either side as a keep alive. The data is arbitary (often timestamp)
+    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)
     """
 
     NAME = "PING"

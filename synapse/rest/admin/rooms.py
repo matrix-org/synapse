@@ -15,7 +15,7 @@
 import logging
 from typing import List, Optional
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
@@ -77,7 +77,7 @@ class ShutdownRoomRestServlet(RestServlet):
         info, stream_id = await self._room_creation_handler.create_room(
             room_creator_requester,
             config={
-                "preset": "public_chat",
+                "preset": RoomCreationPreset.PUBLIC_CHAT,
                 "name": room_name,
                 "power_level_content_override": {"users_default": -10},
             },

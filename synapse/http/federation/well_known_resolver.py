@@ -23,6 +23,7 @@ import attr
 from twisted.internet import defer
 from twisted.web.client import RedirectAgent, readBody
 from twisted.web.http import stringToDatetime
+from twisted.web.http_headers import Headers
 
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
@@ -78,7 +79,12 @@ class WellKnownResolver(object):
     """
 
     def __init__(
-        self, reactor, agent, well_known_cache=None, had_well_known_cache=None
+        self,
+        reactor,
+        agent,
+        user_agent,
+        well_known_cache=None,
+        had_well_known_cache=None,
     ):
         self._reactor = reactor
         self._clock = Clock(reactor)
@@ -92,6 +98,7 @@ class WellKnownResolver(object):
         self._well_known_cache = well_known_cache
         self._had_valid_well_known_cache = had_well_known_cache
         self._well_known_agent = RedirectAgent(agent)
+        self.user_agent = user_agent
 
     @defer.inlineCallbacks
     def get_well_known(self, server_name):
@@ -227,6 +234,10 @@ class WellKnownResolver(object):
         uri = b"https://%s/.well-known/matrix/server" % (server_name,)
         uri_str = uri.decode("ascii")
 
+        headers = {
+            b"User-Agent": [self.user_agent],
+        }
+
         i = 0
         while True:
             i += 1
@@ -234,7 +245,9 @@ class WellKnownResolver(object):
             logger.info("Fetching %s", uri_str)
             try:
                 response = yield make_deferred_yieldable(
-                    self._well_known_agent.request(b"GET", uri)
+                    self._well_known_agent.request(
+                        b"GET", uri, headers=Headers(headers)
+                    )
                 )
                 body = yield make_deferred_yieldable(readBody(response))
 

@@ -1,0 +1,1 @@
+Ensure that strings (not bytes) are passed into JSON serialization.

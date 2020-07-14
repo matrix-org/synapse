@@ -14,9 +14,8 @@
 # limitations under the License.
 import itertools
 import logging
+from queue import Empty, PriorityQueue
 from typing import Dict, List, Optional, Set, Tuple
-
-from six.moves.queue import Empty, PriorityQueue
 
 from twisted.internet import defer
 

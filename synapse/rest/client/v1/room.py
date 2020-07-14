@@ -18,8 +18,7 @@
 import logging
 import re
 from typing import List, Optional
-
-from six.moves.urllib import parse as urlparse
+from urllib import parse as urlparse
 
 from canonicaljson import json
 
@@ -218,10 +217,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             )
             event_id = event.event_id
 
-        ret = {}  # type: dict
-        if event_id:
-            set_tag("event_id", event_id)
-            ret = {"event_id": event_id}
+        set_tag("event_id", event_id)
+        ret = {"event_id": event_id}
         return 200, ret
 
 

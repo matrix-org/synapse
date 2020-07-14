@@ -16,8 +16,6 @@
 
 import logging
 
-from six import iteritems
-
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -455,7 +453,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 sql,
                 (
                     _gen_entry(user_id, actions)
-                    for user_id, actions in iteritems(user_id_actions)
+                    for user_id, actions in user_id_actions.items()
                 ),
             )
 

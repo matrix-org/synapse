@@ -15,9 +15,9 @@
 
 import itertools
 
-from six.moves import zip
-
 import attr
+
+from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
@@ -41,6 +41,11 @@ MEMBERSHIP_CONTENT_BAN = {"membership": Membership.BAN}
 
 
 ORIGIN_SERVER_TS = 0
+
+
+class FakeClock:
+    def sleep(self, msec):
+        return defer.succeed(None)
 
 
 class FakeEvent(object):
@@ -419,6 +424,7 @@ class StateTestCase(unittest.TestCase):
                 state_before = dict(state_at_event[prev_events[0]])
             else:
                 state_d = resolve_events_with_store(
+                    FakeClock(),
                     ROOM_ID,
                     RoomVersions.V2.identifier,
                     [state_at_event[n] for n in prev_events],
@@ -567,6 +573,7 @@ class SimpleParamStateTestCase(unittest.TestCase):
         # Test that we correctly handle passing `None` as the event_map
 
         state_d = resolve_events_with_store(
+            FakeClock(),
             ROOM_ID,
             RoomVersions.V2.identifier,
             [self.state_at_bob, self.state_at_charlie],

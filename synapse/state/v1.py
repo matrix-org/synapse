@@ -17,8 +17,6 @@ import hashlib
 import logging
 from typing import Callable, Dict, List, Optional
 
-from six import iteritems, iterkeys, itervalues
-
 from twisted.internet import defer
 
 from synapse import event_auth
@@ -70,11 +68,11 @@ def resolve_events_with_store(
     unconflicted_state, conflicted_state = _seperate(state_sets)
 
     needed_events = {
-        event_id for event_ids in itervalues(conflicted_state) for event_id in event_ids
+        event_id for event_ids in conflicted_state.values() for event_id in event_ids
     }
     needed_event_count = len(needed_events)
     if event_map is not None:
-        needed_events -= set(iterkeys(event_map))
+        needed_events -= set(event_map.keys())
 
     logger.info(
         "Asking for %d/%d conflicted events", len(needed_events), needed_event_count
@@ -102,11 +100,11 @@ def resolve_events_with_store(
         unconflicted_state, conflicted_state, state_map
     )
 
-    new_needed_events = set(itervalues(auth_events))
+    new_needed_events = set(auth_events.values())
     new_needed_event_count = len(new_needed_events)
     new_needed_events -= needed_events
     if event_map is not None:
-        new_needed_events -= set(iterkeys(event_map))
+        new_needed_events -= set(event_map.keys())
 
     logger.info(
         "Asking for %d/%d auth events", len(new_needed_events), new_needed_event_count
@@ -152,7 +150,7 @@ def _seperate(state_sets):
     conflicted_state = {}
 
     for state_set in state_set_iterator:
-        for key, value in iteritems(state_set):
+        for key, value in state_set.items():
             # Check if there is an unconflicted entry for the state key.
             unconflicted_value = unconflicted_state.get(key)
             if unconflicted_value is None:
@@ -178,7 +176,7 @@ def _seperate(state_sets):
 
 def _create_auth_events_from_maps(unconflicted_state, conflicted_state, state_map):
     auth_events = {}
-    for event_ids in itervalues(conflicted_state):
+    for event_ids in conflicted_state.values():
         for event_id in event_ids:
             if event_id in state_map:
                 keys = event_auth.auth_types_for_event(state_map[event_id])
@@ -194,7 +192,7 @@ def _resolve_with_state(
     unconflicted_state_ids, conflicted_state_ids, auth_event_ids, state_map
 ):
     conflicted_state = {}
-    for key, event_ids in iteritems(conflicted_state_ids):
+    for key, event_ids in conflicted_state_ids.items():
         events = [state_map[ev_id] for ev_id in event_ids if ev_id in state_map]
         if len(events) > 1:
             conflicted_state[key] = events
@@ -203,7 +201,7 @@ def _resolve_with_state(
 
     auth_events = {
         key: state_map[ev_id]
-        for key, ev_id in iteritems(auth_event_ids)
+        for key, ev_id in auth_event_ids.items()
         if ev_id in state_map
     }
 
@@ -214,7 +212,7 @@ def _resolve_with_state(
         raise
 
     new_state = unconflicted_state_ids
-    for key, event in iteritems(resolved_state):
+    for key, event in resolved_state.items():
         new_state[key] = event.event_id
 
     return new_state
@@ -238,21 +236,21 @@ def _resolve_state_events(conflicted_state, auth_events):
 
     auth_events.update(resolved_state)
 
-    for key, events in iteritems(conflicted_state):
+    for key, events in conflicted_state.items():
         if key[0] == EventTypes.JoinRules:
             logger.debug("Resolving conflicted join rules %r", events)
             resolved_state[key] = _resolve_auth_events(events, auth_events)
 
     auth_events.update(resolved_state)
 
-    for key, events in iteritems(conflicted_state):
+    for key, events in conflicted_state.items():
         if key[0] == EventTypes.Member:
             logger.debug("Resolving conflicted member lists %r", events)
             resolved_state[key] = _resolve_auth_events(events, auth_events)
 
     auth_events.update(resolved_state)
 
-    for key, events in iteritems(conflicted_state):
+    for key, events in conflicted_state.items():
         if key not in resolved_state:
             logger.debug("Resolving conflicted state %r:%r", key, events)
             resolved_state[key] = _resolve_normal_events(events, auth_events)

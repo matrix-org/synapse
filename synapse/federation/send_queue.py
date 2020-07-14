@@ -33,8 +33,6 @@ import logging
 from collections import namedtuple
 from typing import Dict, List, Tuple, Type
 
-from six import iteritems
-
 from sortedcontainers import SortedDict
 
 from twisted.internet import defer
@@ -327,7 +325,7 @@ class FederationRemoteSendQueue(object):
         # stream position.
         keyed_edus = {v: k for k, v in self.keyed_edu_changed.items()[i:j]}
 
-        for ((destination, edu_key), pos) in iteritems(keyed_edus):
+        for ((destination, edu_key), pos) in keyed_edus.items():
             rows.append(
                 (
                     pos,
@@ -530,10 +528,10 @@ def process_rows_for_federation(transaction_queue, rows):
             states=[state], destinations=destinations
         )
 
-    for destination, edu_map in iteritems(buff.keyed_edus):
+    for destination, edu_map in buff.keyed_edus.items():
         for key, edu in edu_map.items():
             transaction_queue.send_edu(edu, key)
 
-    for destination, edu_list in iteritems(buff.edus):
+    for destination, edu_list in buff.edus.items():
         for edu in edu_list:
             transaction_queue.send_edu(edu, None)

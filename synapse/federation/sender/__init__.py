@@ -16,8 +16,6 @@
 import logging
 from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
-from six import itervalues
-
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -203,7 +201,15 @@ class FederationSender(object):
 
                     logger.debug("Sending %s to %r", event, destinations)
 
-                    self._send_pdu(event, destinations)
+                    if destinations:
+                        self._send_pdu(event, destinations)
+
+                        now = self.clock.time_msec()
+                        ts = await self.store.get_received_ts(event.event_id)
+
+                        synapse.metrics.event_processing_lag_by_event.labels(
+                            "federation_sender"
+                        ).observe((now - ts) / 1000)
 
                 async def handle_room_events(events: Iterable[EventBase]) -> None:
                     with Measure(self.clock, "handle_room_events"):
@@ -218,7 +224,7 @@ class FederationSender(object):
                     defer.gatherResults(
                         [
                             run_in_background(handle_room_events, evs)
-                            for evs in itervalues(events_by_room)
+                            for evs in events_by_room.values()
                         ],
                         consumeErrors=True,
                     )

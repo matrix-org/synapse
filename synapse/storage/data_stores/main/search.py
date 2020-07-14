@@ -17,8 +17,6 @@ import logging
 import re
 from collections import namedtuple
 
-from six import string_types
-
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -180,7 +178,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                     # skip over it.
                     continue
 
-                if not isinstance(value, string_types):
+                if not isinstance(value, str):
                     # If the event body, name or topic isn't a string
                     # then skip over it
                     continue

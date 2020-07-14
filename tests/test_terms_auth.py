@@ -14,7 +14,6 @@
 
 import json
 
-import six
 from mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
@@ -60,7 +59,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
         self.assertTrue(channel.json_body is not None)
-        self.assertIsInstance(channel.json_body["session"], six.text_type)
+        self.assertIsInstance(channel.json_body["session"], str)
 
         self.assertIsInstance(channel.json_body["flows"], list)
         for flow in channel.json_body["flows"]:
@@ -125,6 +124,6 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.assertTrue(channel.json_body is not None)
-        self.assertIsInstance(channel.json_body["user_id"], six.text_type)
-        self.assertIsInstance(channel.json_body["access_token"], six.text_type)
-        self.assertIsInstance(channel.json_body["device_id"], six.text_type)
+        self.assertIsInstance(channel.json_body["user_id"], str)
+        self.assertIsInstance(channel.json_body["access_token"], str)
+        self.assertIsInstance(channel.json_body["device_id"], str)

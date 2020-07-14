@@ -18,8 +18,6 @@ import logging
 from collections import namedtuple
 from typing import Dict, Iterable, List, Optional, Set
 
-from six import iteritems, itervalues
-
 import attr
 from frozendict import frozendict
 from prometheus_client import Histogram
@@ -34,6 +32,7 @@ from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.types import StateMap
+from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure, measure_func
@@ -144,7 +143,7 @@ class StateHandler(object):
             list(state.values()), get_prev_content=False
         )
         state = {
-            key: state_map[e_id] for key, e_id in iteritems(state) if e_id in state_map
+            key: state_map[e_id] for key, e_id in state.items() if e_id in state_map
         }
 
         return state
@@ -416,6 +415,7 @@ class StateHandler(object):
 
         with Measure(self.clock, "state._resolve_events"):
             new_state = yield resolve_events_with_store(
+                self.clock,
                 event.room_id,
                 room_version,
                 state_set_ids,
@@ -423,7 +423,7 @@ class StateHandler(object):
                 state_res_store=StateResolutionStore(self.store),
             )
 
-        new_state = {key: state_map[ev_id] for key, ev_id in iteritems(new_state)}
+        new_state = {key: state_map[ev_id] for key, ev_id in new_state.items()}
 
         return new_state
 
@@ -505,8 +505,8 @@ class StateResolutionHandler(object):
             # resolve_events_with_store do it?
             new_state = {}
             conflicted_state = False
-            for st in itervalues(state_groups_ids):
-                for key, e_id in iteritems(st):
+            for st in state_groups_ids.values():
+                for key, e_id in st.items():
                     if key in new_state:
                         conflicted_state = True
                         break
@@ -518,9 +518,10 @@ class StateResolutionHandler(object):
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
                     new_state = yield resolve_events_with_store(
+                        self.clock,
                         room_id,
                         room_version,
-                        list(itervalues(state_groups_ids)),
+                        list(state_groups_ids.values()),
                         event_map=event_map,
                         state_res_store=state_res_store,
                     )
@@ -561,12 +562,12 @@ def _make_state_cache_entry(new_state, state_groups_ids):
     # not get persisted.
 
     # first look for exact matches
-    new_state_event_ids = set(itervalues(new_state))
-    for sg, state in iteritems(state_groups_ids):
+    new_state_event_ids = set(new_state.values())
+    for sg, state in state_groups_ids.items():
         if len(new_state_event_ids) != len(state):
             continue
 
-        old_state_event_ids = set(itervalues(state))
+        old_state_event_ids = set(state.values())
         if new_state_event_ids == old_state_event_ids:
             # got an exact match.
             return _StateCacheEntry(state=new_state, state_group=sg)
@@ -579,8 +580,8 @@ def _make_state_cache_entry(new_state, state_groups_ids):
     prev_group = None
     delta_ids = None
 
-    for old_group, old_state in iteritems(state_groups_ids):
-        n_delta_ids = {k: v for k, v in iteritems(new_state) if old_state.get(k) != v}
+    for old_group, old_state in state_groups_ids.items():
+        n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}
         if not delta_ids or len(n_delta_ids) < len(delta_ids):
             prev_group = old_group
             delta_ids = n_delta_ids
@@ -591,6 +592,7 @@ def _make_state_cache_entry(new_state, state_groups_ids):
 
 
 def resolve_events_with_store(
+    clock: Clock,
     room_id: str,
     room_version: str,
     state_sets: List[StateMap[str]],
@@ -627,7 +629,7 @@ def resolve_events_with_store(
         )
     else:
         return v2.resolve_events_with_store(
-            room_id, room_version, state_sets, event_map, state_res_store
+            clock, room_id, room_version, state_sets, event_map, state_res_store
         )
 
 

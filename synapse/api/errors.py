@@ -17,10 +17,8 @@
 """Contains exceptions and error codes."""
 
 import logging
+from http import HTTPStatus
 from typing import Dict, List
-
-from six import iteritems
-from six.moves import http_client
 
 from canonicaljson import json
 
@@ -174,7 +172,7 @@ class ConsentNotGivenError(SynapseError):
             consent_url (str): The URL where the user can give their consent
         """
         super(ConsentNotGivenError, self).__init__(
-            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.CONSENT_NOT_GIVEN
+            code=HTTPStatus.FORBIDDEN, msg=msg, errcode=Codes.CONSENT_NOT_GIVEN
         )
         self._consent_uri = consent_uri
 
@@ -194,7 +192,7 @@ class UserDeactivatedError(SynapseError):
             msg (str): The human-readable error message
         """
         super(UserDeactivatedError, self).__init__(
-            code=http_client.FORBIDDEN, msg=msg, errcode=Codes.USER_DEACTIVATED
+            code=HTTPStatus.FORBIDDEN, msg=msg, errcode=Codes.USER_DEACTIVATED
         )
 
 
@@ -497,7 +495,7 @@ def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
         A dict representing the error response JSON.
     """
     err = {"error": msg, "errcode": code}
-    for key, value in iteritems(kwargs):
+    for key, value in kwargs.items():
         err[key] = value
     return err
 

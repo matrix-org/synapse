@@ -15,8 +15,6 @@
 
 import logging
 
-from six import text_type
-
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -133,7 +131,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
                     contains_url = "url" in content
                     if contains_url:
-                        contains_url &= isinstance(content["url"], text_type)
+                        contains_url &= isinstance(content["url"], str)
                 except (KeyError, AttributeError):
                     # If the event is missing a necessary field then
                     # skip over it.

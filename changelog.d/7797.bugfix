@@ -1,0 +1,1 @@
+Fixes a long standing bug in worker mode where worker information was saved in the devices table instead of the original IP address and user agent.

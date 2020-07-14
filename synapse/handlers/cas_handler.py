@@ -12,12 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
-import xml.etree.ElementTree as ET
+import urllib
 from typing import Dict, Optional, Tuple
-
-from six.moves import urllib
+from xml.etree import ElementTree as ET
 
 from twisted.web.client import PartialDownloadError
 

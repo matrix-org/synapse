@@ -1,7 +1,5 @@
 from typing import Dict
 
-from six import itervalues
-
 SENTINEL = object()
 
 
@@ -81,7 +79,7 @@ def iterate_tree_cache_entry(d):
     can contain dicts.
     """
     if isinstance(d, dict):
-        for value_d in itervalues(d):
+        for value_d in d.values():
             for value in iterate_tree_cache_entry(value_d):
                 yield value
     else:
