@@ -1165,7 +1165,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
-        self.assertCountEqual(["@admin:test", "@foo:test", "@bar:test"], channel.json_body["members"])
+        self.assertCountEqual(
+            ["@admin:test", "@foo:test", "@bar:test"], channel.json_body["members"]
+        )
         self.assertEqual(channel.json_body["total"], 3)
 
         url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_2,)
@@ -1175,7 +1177,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
-        self.assertCountEqual(["@admin:test", "@bar:test", "@foobar:test"], channel.json_body["members"])
+        self.assertCountEqual(
+            ["@admin:test", "@bar:test", "@foobar:test"], channel.json_body["members"]
+        )
         self.assertEqual(channel.json_body["total"], 3)
 
 
