@@ -323,42 +323,12 @@ class EmailConfig(Config):
                     raise ConfigError("Unable to find email template file %s" % (p,))
 
         subjects_config = email_config.get("subjects", {})
-        self.email_subjects = EmailSubjectConfig(
-            message_from_person_in_room=subjects_config.get(
-                "message_from_person_in_room",
-                DEFAULT_SUBJECTS["message_from_person_in_room"],
-            ),
-            message_from_person=subjects_config.get(
-                "message_from_person", DEFAULT_SUBJECTS["message_from_person"],
-            ),
-            messages_from_person=subjects_config.get(
-                "messages_from_person", DEFAULT_SUBJECTS["messages_from_person"],
-            ),
-            messages_in_room=subjects_config.get(
-                "messages_in_room", DEFAULT_SUBJECTS["messages_in_room"],
-            ),
-            messages_in_room_and_others=subjects_config.get(
-                "messages_in_room_and_others",
-                DEFAULT_SUBJECTS["messages_in_room_and_others"],
-            ),
-            messages_from_person_and_others=subjects_config.get(
-                "messages_from_person_and_others",
-                DEFAULT_SUBJECTS["messages_from_person_and_others"],
-            ),
-            invite_from_person=subjects_config.get(
-                "invite_from_person", DEFAULT_SUBJECTS["invite_from_person"],
-            ),
-            invite_from_person_to_room=subjects_config.get(
-                "invite_from_person_to_room",
-                DEFAULT_SUBJECTS["invite_from_person_to_room"],
-            ),
-            password_reset=subjects_config.get(
-                "password_reset", DEFAULT_SUBJECTS["password_reset"],
-            ),
-            email_validation=subjects_config.get(
-                "email_validation", DEFAULT_SUBJECTS["email_validation"],
-            ),
-        )
+        subjects = {}
+
+        for key, default in DEFAULT_SUBJECTS.items():
+            subjects[key] = subjects_config.get(key, default)
+
+        self.email_subjects = EmailSubjectConfig(**subjects)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return (
