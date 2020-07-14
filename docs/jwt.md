@@ -31,10 +31,7 @@ The `token` field should include the JSON web token with the following claims:
   Providing the audience claim when not configured will cause validation to fail.
 
 In the case that the token is not valid, the homeserver must respond with
-`401 Unauthorized` and an error code of `M_UNAUTHORIZED`.
-
-(Note that this differs from the token based logins which return a
-`403 Forbidden` and an error code of `M_FORBIDDEN` if an error occurs.)
+`403 Forbidden` and an error code of `M_FORBIDDEN`.
 
 As with other login types, there are additional fields (e.g. `device_id` and
 `initial_device_display_name`) which can be included in the above request.
