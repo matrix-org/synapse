@@ -118,38 +118,6 @@ pid_file: DATADIR/homeserver.pid
 #
 #enable_search: false
 
-# Restrict federation to the following whitelist of domains.
-# N.B. we recommend also firewalling your federation listener to limit
-# inbound federation traffic as early as possible, rather than relying
-# purely on this application-layer restriction.  If not specified, the
-# default is to whitelist everything.
-#
-#federation_domain_whitelist:
-#  - lon.example.com
-#  - nyc.example.com
-#  - syd.example.com
-
-# Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges. If this option is not specified, or
-# specified with an empty list, no ip range blacklist will be enforced.
-#
-# As of Synapse v1.4.0 this option also affects any outbound requests to identity
-# servers provided by user input.
-#
-# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-# listed here, since they correspond to unroutable addresses.)
-#
-federation_ip_range_blacklist:
-  - '127.0.0.0/8'
-  - '10.0.0.0/8'
-  - '172.16.0.0/12'
-  - '192.168.0.0/16'
-  - '100.64.0.0/10'
-  - '169.254.0.0/16'
-  - '::1/128'
-  - 'fe80::/64'
-  - 'fc00::/7'
-
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
 #
@@ -606,6 +574,39 @@ acme:
 #
 #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
 
+
+
+# Restrict federation to the following whitelist of domains.
+# N.B. we recommend also firewalling your federation listener to limit
+# inbound federation traffic as early as possible, rather than relying
+# purely on this application-layer restriction.  If not specified, the
+# default is to whitelist everything.
+#
+#federation_domain_whitelist:
+#  - lon.example.com
+#  - nyc.example.com
+#  - syd.example.com
+
+# Prevent federation requests from being sent to the following
+# blacklist IP address CIDR ranges. If this option is not specified, or
+# specified with an empty list, no ip range blacklist will be enforced.
+#
+# As of Synapse v1.4.0 this option also affects any outbound requests to identity
+# servers provided by user input.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+federation_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/64'
+  - 'fc00::/7'
 
 
 ## Caching ##
@@ -1804,12 +1805,60 @@ sso:
     #template_dir: "res/templates"
 
 
-# The JWT needs to contain a globally unique "sub" (subject) claim.
+# JSON web token integration. The following settings can be used to make
+# Synapse JSON web tokens for authentication, instead of its internal
+# password database.
+#
+# Each JSON Web Token needs to contain a "sub" (subject) claim, which is
+# used as the localpart of the mxid.
+#
+# Additionally, the expiration time ("exp"), not before time ("nbf"),
+# and issued at ("iat") claims are validated if present.
+#
+# Note that this is a non-standard login type and client support is
+# expected to be non-existant.
+#
+# See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
 #
 #jwt_config:
-#   enabled: true
-#   secret: "a secret"
-#   algorithm: "HS256"
+    # Uncomment the following to enable authorization using JSON web
+    # tokens. Defaults to false.
+    #
+    #enabled: true
+
+    # This is either the private shared secret or the public key used to
+    # decode the contents of the JSON web token.
+    #
+    # Required if 'enabled' is true.
+    #
+    #secret: "provided-by-your-issuer"
+
+    # The algorithm used to sign the JSON web token.
+    #
+    # Supported algorithms are listed at
+    # https://pyjwt.readthedocs.io/en/latest/algorithms.html
+    #
+    # Required if 'enabled' is true.
+    #
+    #algorithm: "provided-by-your-issuer"
+
+    # The issuer to validate the "iss" claim against.
+    #
+    # Optional, if provided the "iss" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    #issuer: "provided-by-your-issuer"
+
+    # A list of audiences to validate the "aud" claim against.
+    #
+    # Optional, if provided the "aud" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    # Note that if the "aud" claim is included in a JSON web token then
+    # validation will fail without configuring audiences.
+    #
+    #audiences:
+    #    - "provided-by-your-issuer"
 
 
 password_config:

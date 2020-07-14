@@ -1,0 +1,1 @@
+Fix bug where we did not always pass in `app_name` or `server_name` to email templates, including e.g. for registration emails.

@@ -177,7 +177,7 @@ class RedisDirectTcpReplicationClientFactory(txredisapi.SubscriberFactory):
     Args:
         hs
         outbound_redis_connection: A connection to redis that will be used to
-            send outbound commands (this is seperate to the redis connection
+            send outbound commands (this is separate to the redis connection
             used to subscribe).
     """
 

@@ -71,6 +71,8 @@ class HomeServer(object):
         pass
     def get_room_member_handler(self) -> synapse.handlers.room_member.RoomMemberHandler:
         pass
+    def get_room_shutdown_handler(self) -> synapse.handlers.room.RoomShutdownHandler:
+        pass
     def get_event_creation_handler(
         self,
     ) -> synapse.handlers.message.EventCreationHandler:
