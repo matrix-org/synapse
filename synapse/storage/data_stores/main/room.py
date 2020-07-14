@@ -118,7 +118,12 @@ class RoomWorkerStore(SQLBaseStore):
                 WHERE room_id = ?
                 """
             txn.execute(sql, [room_id])
-            res = self.db.cursor_to_dict(txn)[0]
+            # Catch error if sql returns empty result to return "None" instead of an error
+            try:
+                res = self.db.cursor_to_dict(txn)[0]
+            except IndexError:
+                return None
+
             res["federatable"] = bool(res["federatable"])
             res["public"] = bool(res["public"])
             return res
