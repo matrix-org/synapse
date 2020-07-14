@@ -916,7 +916,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                     retention_policy = {}
                 else:
                     ev = json.loads(row["json"])
-                    retention_policy = json.dumps(ev["content"])
+                    retention_policy = ev["content"]
 
                 self.db.simple_insert_txn(
                     txn=txn,
