@@ -390,7 +390,8 @@ The following JSON body parameters are available:
 * `new_room_user_id` - Optional. If set, a new room will be created with this user ID
       as the creator and admin, and all users in the old room will be moved into that
       room. If not set, no new room will be created and the users will just be removed
-      from the old room. The user ID must be from local server but it does not have to exist.
+      from the old room. The user ID must be on the local server, but does not necessarily
+      have to belong to a registered user.
 * `room_name` - Optional. A string representing the name of the room that new users will be
                 invited to. Defaults to `Content Violation Notification`
 * `message` - Optional. A string containing the first message that will be sent as
