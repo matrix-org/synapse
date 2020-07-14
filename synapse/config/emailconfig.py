@@ -22,8 +22,8 @@ import os
 from enum import Enum
 from typing import Optional
 
-import pkg_resources
 import attr
+import pkg_resources
 
 from ._base import Config, ConfigError
 
