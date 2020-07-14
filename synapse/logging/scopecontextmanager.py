@@ -50,7 +50,12 @@ class LogContextScopeManager(ScopeManager):
             available.
         """
         ctx = current_context()
-        return ctx.scope
+        while ctx:
+            if ctx.scope:
+                return ctx.scope
+            ctx = ctx.parent_context
+
+        return None
 
     def activate(self, span, finish_on_close):
         """

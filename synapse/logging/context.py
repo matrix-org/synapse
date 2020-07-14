@@ -367,15 +367,11 @@ class LoggingContext(object):
         # we track the current request
         record.request = self.request
 
-        # we also track the current scope:
-        record.scope = self.scope
-
     def copy_to_twisted_log_entry(self, record) -> None:
         """
         Copy logging fields from this context to a Twisted log record.
         """
         record["request"] = self.request
-        record["scope"] = self.scope
 
     def start(self, rusage: "Optional[resource._RUsage]") -> None:
         """
