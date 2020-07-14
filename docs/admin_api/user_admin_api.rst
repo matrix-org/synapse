@@ -95,6 +95,9 @@ Body parameters:
 
 If the user already exists then optional parameters default to the current value.
 
+In order to re-activate an account ``deactivated`` must be set to ``true`` and a new
+``password`` must be provided.
+
 List Accounts
 =============
 
