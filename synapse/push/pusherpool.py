@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Union
+from typing import TYPE_CHECKING, Dict, Union
 
 from prometheus_client import Gauge
 
@@ -27,6 +27,10 @@ from synapse.push.emailpusher import EmailPusher
 from synapse.push.httppusher import HttpPusher
 from synapse.push.pusher import PusherFactory
 from synapse.util.async_helpers import concurrently_execute
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +55,16 @@ class PusherPool:
     Pusher.on_new_receipts are not expected to return deferreds.
     """
 
-    def __init__(self, _hs):
-        self.hs = _hs
-        self.pusher_factory = PusherFactory(_hs)
-        self._should_start_pushers = _hs.config.start_pushers
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.pusher_factory = PusherFactory(hs)
+        self._should_start_pushers = hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
+
+        # We shard the handling of push notifications by user ID.
+        self._pusher_shard_config = hs.config.push.pusher_shard_config
+        self._instance_name = hs.get_instance_name()
 
         # map from user id to app_id:pushkey to pusher
         self.pushers = {}  # type: Dict[str, Dict[str, Union[HttpPusher, EmailPusher]]]
@@ -88,6 +96,7 @@ class PusherPool:
         Returns:
             Deferred[EmailPusher|HttpPusher]
         """
+
         time_now_msec = self.clock.time_msec()
 
         # we try to create the pusher just to validate the config: it
@@ -160,6 +169,9 @@ class PusherPool:
             access_tokens (Iterable[int]): access token *ids* to remove pushers
                 for
         """
+        if not self._pusher_shard_config.should_handle(self._instance_name, user_id):
+            return
+
         tokens = set(access_tokens)
         for p in (yield self.store.get_pushers_by_user_id(user_id)):
             if p["access_token"] in tokens:
@@ -221,6 +233,9 @@ class PusherPool:
         if not self._should_start_pushers:
             return
 
+        if not self._pusher_shard_config.should_handle(self._instance_name, user_id):
+            return
+
         resultlist = yield self.store.get_pushers_by_app_id_and_pushkey(app_id, pushkey)
 
         pusher_dict = None
@@ -243,6 +258,14 @@ class PusherPool:
         """
         pushers = yield self.store.get_all_pushers()
 
+        pushers = [
+            pusherdict
+            for pusherdict in pushers
+            if self._pusher_shard_config.should_handle(
+                self._instance_name, pusherdict["user_name"]
+            )
+        ]
+
         # Stagger starting up the pushers so we don't completely drown the
         # process on start up.
         yield concurrently_execute(self._start_pusher, pushers, 10)
@@ -259,6 +282,11 @@ class PusherPool:
         Returns:
             Deferred[EmailPusher|HttpPusher]
         """
+        if not self._pusher_shard_config.should_handle(
+            self._instance_name, pusherdict["user_name"]
+        ):
+            return
+
         try:
             p = self.pusher_factory.create_pusher(pusherdict)
         except PusherConfigException as e:
