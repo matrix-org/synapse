@@ -20,9 +20,10 @@ from __future__ import print_function
 import email.utils
 import os
 from enum import Enum
-from typing import Dict, Optional
+from typing import Optional
 
 import pkg_resources
+import attr
 
 from ._base import Config, ConfigError
 
@@ -44,6 +45,20 @@ DEFAULT_SUBJECTS = {
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
 }
+
+
+@attr.s
+class EmailSubjectConfig:
+    message_from_person_in_room = attr.ib(type=str)
+    message_from_person = attr.ib(type=str)
+    messages_from_person = attr.ib(type=str)
+    messages_in_room = attr.ib(type=str)
+    messages_in_room_and_others = attr.ib(type=str)
+    messages_from_person_and_others = attr.ib(type=str)
+    invite_from_person = attr.ib(type=str)
+    invite_from_person_to_room = attr.ib(type=str)
+    password_reset = attr.ib(type=str)
+    email_validation = attr.ib(type=str)
 
 
 class EmailConfig(Config):
@@ -307,12 +322,43 @@ class EmailConfig(Config):
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find email template file %s" % (p,))
 
-        self.email_subjects = {}  # type: Dict[str, str]
         subjects_config = email_config.get("subjects", {})
-        for subject_id, default_subject in DEFAULT_SUBJECTS.items():
-            self.email_subjects[subject_id] = subjects_config.get(
-                subject_id, default_subject,
-            )
+        self.email_subjects = EmailSubjectConfig(
+            message_from_person_in_room=subjects_config.get(
+                "message_from_person_in_room",
+                DEFAULT_SUBJECTS["message_from_person_in_room"],
+            ),
+            message_from_person=subjects_config.get(
+                "message_from_person", DEFAULT_SUBJECTS["message_from_person"],
+            ),
+            messages_from_person=subjects_config.get(
+                "messages_from_person", DEFAULT_SUBJECTS["messages_from_person"],
+            ),
+            messages_in_room=subjects_config.get(
+                "messages_in_room", DEFAULT_SUBJECTS["messages_in_room"],
+            ),
+            messages_in_room_and_others=subjects_config.get(
+                "messages_in_room_and_others",
+                DEFAULT_SUBJECTS["messages_in_room_and_others"],
+            ),
+            messages_from_person_and_others=subjects_config.get(
+                "messages_from_person_and_others",
+                DEFAULT_SUBJECTS["messages_from_person_and_others"],
+            ),
+            invite_from_person=subjects_config.get(
+                "invite_from_person", DEFAULT_SUBJECTS["invite_from_person"],
+            ),
+            invite_from_person_to_room=subjects_config.get(
+                "invite_from_person_to_room",
+                DEFAULT_SUBJECTS["invite_from_person_to_room"],
+            ),
+            password_reset=subjects_config.get(
+                "password_reset", DEFAULT_SUBJECTS["password_reset"],
+            ),
+            email_validation=subjects_config.get(
+                "email_validation", DEFAULT_SUBJECTS["email_validation"],
+            ),
+        )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return (
