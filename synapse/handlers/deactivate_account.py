@@ -217,3 +217,18 @@ class DeactivateAccountHandler(BaseHandler):
                     user_id,
                     room_id,
                 )
+
+    async def activate_account(self, user_id: str) -> None:
+        """
+        Activate an account that was previously deactivated.
+
+        This simply marks the user as activate in the database and does not
+        attempt to rejoin rooms, re-add threepids, etc.
+
+        The user will also need a password hash set to actually login.
+
+        Args:
+            user_id: ID of user to be deactivated
+        """
+        # Mark the user as activate.
+        await self.store.set_user_deactivated_status(user_id, False)
