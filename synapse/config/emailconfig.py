@@ -33,6 +33,19 @@ Password reset emails are enabled on this homeserver due to a partial
     %s
 """
 
+DEFAULT_SUBJECTS = {
+    "message_from_person_in_room": "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room...",
+    "message_from_person": "[%(app)s] You have a message on %(app)s from %(person)s...",
+    "messages_from_person": "[%(app)s] You have messages on %(app)s from %(person)s...",
+    "messages_in_room": "[%(app)s] You have messages on %(app)s in the %(room)s room...",
+    "messages_in_room_and_others": "[%(app)s] You have messages on %(app)s in the %(room)s room and others...",
+    "messages_from_person_and_others": "[%(app)s] You have messages on %(app)s from %(person)s and others...",
+    "invite_from_person": "[%(app)s] %(person)s has invited you to chat on %(app)s...",
+    "invite_from_person_to_room": "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...",
+    "password_reset": "[%(server_name)s] Password reset",
+    "email_validation": "[%(server_name)s] Validate your email",
+}
+
 
 class EmailConfig(Config):
     section = "email"
@@ -295,6 +308,13 @@ class EmailConfig(Config):
                 if not os.path.isfile(p):
                     raise ConfigError("Unable to find email template file %s" % (p,))
 
+        self.email_subjects = {}
+        subjects_config = email_config.get("subjects", {})
+        for subject_id, default_subject in DEFAULT_SUBJECTS.items():
+            self.email_subjects[subject_id] = subjects_config.get(
+                subject_id, default_subject,
+            )
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         # Configuration for sending emails from Synapse.
@@ -324,17 +344,17 @@ class EmailConfig(Config):
           # notif_from defines the "From" address to use when sending emails.
           # It must be set if email sending is enabled.
           #
-          # The placeholder '%(app)s' will be replaced by the application name,
+          # The placeholder '%%(app)s' will be replaced by the application name,
           # which is normally 'app_name' (below), but may be overridden by the
           # Matrix client application.
           #
-          # Note that the placeholder must be written '%(app)s', including the
+          # Note that the placeholder must be written '%%(app)s', including the
           # trailing 's'.
           #
-          #notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
+          #notif_from: "Your Friendly %%(app)s homeserver <noreply@example.com>"
 
-          # app_name defines the default value for '%(app)s' in notif_from. It
-          # defaults to 'Matrix'.
+          # app_name defines the default value for '%%(app)s' in notif_from and email
+          # subjects. It defaults to 'Matrix'.
           #
           #app_name: my_branded_matrix_server
 
@@ -402,7 +422,74 @@ class EmailConfig(Config):
           # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
           #
           #template_dir: "res/templates"
-        """
+
+          # Subjects to use when sending emails from Synapse.
+          #
+          # The placeholder '%%(app)s' will be replaced with the value of the 'app_name'
+          # setting above, or by a value dictated by the Matrix client application.
+          #
+          # If a subject isn't overridden in this configuration file, the value used as
+          # its example will be used.
+          #
+          subjects:
+
+            # Subjects for notification emails.
+            #
+            # On top of the '%%(app)s' placeholder, these can use the following
+            # placeholders:
+            #
+            #   * '%%(person)s', which will be replaced by the display name of the user(s)
+            #      that sent the message(s), e.g. "Alice and Bob".
+            #   * '%%(room)s', which will be replaced by the name of the room the
+            #      message(s) have been sent to, e.g. "My super room".
+            #
+            # See the example provided for each setting to see which placeholder can be
+            # used and how to use them.
+            #
+            # Subject to use to notify about one message from one or more user(s) in a
+            # room which has a name.
+            #message_from_person_in_room: "%(message_from_person_in_room)s"
+            #
+            # Subject to use to notify about one message from one or more user(s) in a
+            # room which doesn't have a name.
+            #message_from_person: "%(message_from_person)s"
+            #
+            # Subject to use to notify about multiple messages from one or more users in
+            # a room which doesn't have a name.
+            #messages_from_person: "%(messages_from_person)s"
+            #
+            # Subject to use to notify about multiple messages in a room which has a
+            # name.
+            #messages_in_room: "%(messages_in_room)s"
+            #
+            # Subject to use to notify about multiple messages in multiple rooms.
+            #messages_in_room_and_others: "%(messages_in_room_and_others)s"
+            #
+            # Subject to use to notify about multiple messages from multiple persons in
+            # multiple rooms. This is similar to the setting above except it's used when
+            # the room in which the notification was triggered has no name.
+            #messages_from_person_and_others: "%(messages_from_person_and_others)s"
+            #
+            # Subject to use to notify about an invite to a room which has a name.
+            #invite_from_person_to_room: "%(invite_from_person_to_room)s"
+            #
+            # Subject to use to notify about an invite to a room which doesn't have a
+            # name.
+            #invite_from_person: "%(invite_from_person)s"
+
+            # Subject for emails related to account administration.
+            #
+            # On top of the '%%(app)s' placeholder, these one can use the
+            # '%%(server_name)s' placeholder, which will be replaced by the value of the
+            # 'server_name' setting in your Synapse configuration.
+            #
+            # Subject to use when sending a password reset email.
+            #password_reset: "%(password_reset)s"
+            #
+            # Subject to use when sending a verification email to assert an address's
+            # ownership.
+            #email_validation: "%(email_validation)s"
+        """ % DEFAULT_SUBJECTS
 
 
 class ThreepidBehaviour(Enum):
