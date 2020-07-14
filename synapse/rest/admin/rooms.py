@@ -248,7 +248,6 @@ class RoomMembersRestServlet(RestServlet):
 
         members = await self.store.get_users_in_room(room_id)
         if not members:
-            print(members)
             raise NotFoundError("Room not found or empty")
 
         ret = {"members": members, "total": len(members)}
