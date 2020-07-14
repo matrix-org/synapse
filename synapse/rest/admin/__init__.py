@@ -37,8 +37,8 @@ from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
 from synapse.rest.admin.rooms import (
     JoinRoomAliasServlet,
     ListRoomRestServlet,
-    RoomRestServlet,
     RoomMembersRestServlet,
+    RoomRestServlet,
     ShutdownRoomRestServlet,
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet

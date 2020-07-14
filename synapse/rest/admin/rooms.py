@@ -291,6 +291,7 @@ class RoomRestServlet(RestServlet):
 
         return 200, ret
 
+
 class RoomMembersRestServlet(RestServlet):
     """
     Get members list of a room.
@@ -310,9 +311,10 @@ class RoomMembersRestServlet(RestServlet):
         if not members:
             raise NotFoundError("Room not found")
 
-        ret = {'members': members, 'total': len(members)}
+        ret = {"members": members, "total": len(members)}
 
         return 200, ret
+
 
 class JoinRoomAliasServlet(RestServlet):
 

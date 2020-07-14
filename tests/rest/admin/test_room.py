@@ -786,6 +786,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("@foobar:test", channel.json_body["members"])
         self.assertEqual(channel.json_body["total"], 3)
 
+
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
     servlets = [
