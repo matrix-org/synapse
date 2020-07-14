@@ -659,9 +659,10 @@ def nested_logging_context(
         context = parent_context  # type: LoggingContextOrSentinel
     else:
         context = current_context()
-    return LoggingContext(
-        parent_context=context, request=str(context.request) + "-" + suffix
-    )
+    name = str(context.request)
+    if suffix:
+        name = name + "-" + suffix
+    return LoggingContext(parent_context=context, request=name)
 
 
 def preserve_fn(f):
