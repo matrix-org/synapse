@@ -132,9 +132,8 @@ class Mailer(object):
 
         await self.send_email(
             email_address,
-            self.email_subjects["password_reset"] % {
-                "server_name": self.hs.config.server_name,
-            },
+            self.email_subjects["password_reset"]
+            % {"server_name": self.hs.config.server_name},
             template_vars,
         )
 
@@ -161,9 +160,8 @@ class Mailer(object):
 
         await self.send_email(
             email_address,
-            self.email_subjects["email_validation"] % {
-                "server_name": self.hs.config.server_name,
-            },
+            self.email_subjects["email_validation"]
+            % {"server_name": self.hs.config.server_name},
             template_vars,
         )
 
@@ -191,9 +189,8 @@ class Mailer(object):
 
         await self.send_email(
             email_address,
-            self.email_subjects["email_validation"] % {
-                "server_name": self.hs.config.server_name,
-            },
+            self.email_subjects["email_validation"]
+            % {"server_name": self.hs.config.server_name},
             template_vars,
         )
 
@@ -265,9 +262,7 @@ class Mailer(object):
             "reason": reason,
         }
 
-        await self.send_email(
-            email_address, summary_text, template_vars
-        )
+        await self.send_email(email_address, summary_text, template_vars)
 
     async def send_email(self, email_address, subject, template_vars):
         """Send an email with the given information and template text"""

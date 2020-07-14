@@ -316,7 +316,8 @@ class EmailConfig(Config):
             )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """\
+        return (
+            """\
         # Configuration for sending emails from Synapse.
         #
         email:
@@ -489,7 +490,9 @@ class EmailConfig(Config):
             # Subject to use when sending a verification email to assert an address's
             # ownership.
             #email_validation: "%(email_validation)s"
-        """ % DEFAULT_SUBJECTS
+        """
+            % DEFAULT_SUBJECTS
+        )
 
 
 class ThreepidBehaviour(Enum):
