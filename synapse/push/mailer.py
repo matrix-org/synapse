@@ -43,23 +43,6 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-MESSAGE_FROM_PERSON_IN_ROOM = (
-    "You have a message on %(app)s from %(person)s in the %(room)s room..."
-)
-MESSAGE_FROM_PERSON = "You have a message on %(app)s from %(person)s..."
-MESSAGES_FROM_PERSON = "You have messages on %(app)s from %(person)s..."
-MESSAGES_IN_ROOM = "You have messages on %(app)s in the %(room)s room..."
-MESSAGES_IN_ROOM_AND_OTHERS = (
-    "You have messages on %(app)s in the %(room)s room and others..."
-)
-MESSAGES_FROM_PERSON_AND_OTHERS = (
-    "You have messages on %(app)s from %(person)s and others..."
-)
-INVITE_FROM_PERSON_TO_ROOM = (
-    "%(person)s has invited you to join the %(room)s room on %(app)s..."
-)
-INVITE_FROM_PERSON = "%(person)s has invited you to chat on %(app)s..."
-
 CONTEXT_BEFORE = 1
 CONTEXT_AFTER = 1
 
@@ -122,6 +105,7 @@ class Mailer(object):
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
         self.app_name = app_name
+        self.email_subjects = hs.config.email_subjects
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -148,7 +132,9 @@ class Mailer(object):
 
         await self.send_email(
             email_address,
-            "[%s] Password Reset" % self.hs.config.server_name,
+            self.email_subjects["password_reset"] % {
+                "server_name": self.hs.config.server_name,
+            },
             template_vars,
         )
 
@@ -175,7 +161,9 @@ class Mailer(object):
 
         await self.send_email(
             email_address,
-            "[%s] Register your Email Address" % self.hs.config.server_name,
+            self.email_subjects["email_validation"] % {
+                "server_name": self.hs.config.server_name,
+            },
             template_vars,
         )
 
@@ -203,7 +191,9 @@ class Mailer(object):
 
         await self.send_email(
             email_address,
-            "[%s] Validate Your Email" % self.hs.config.server_name,
+            self.email_subjects["email_validation"] % {
+                "server_name": self.hs.config.server_name,
+            },
             template_vars,
         )
 
@@ -276,7 +266,7 @@ class Mailer(object):
         }
 
         await self.send_email(
-            email_address, "[%s] %s" % (self.app_name, summary_text), template_vars
+            email_address, summary_text, template_vars
         )
 
     async def send_email(self, email_address, subject, template_vars):
@@ -477,12 +467,12 @@ class Mailer(object):
                 inviter_name = name_from_member_event(inviter_member_event)
 
                 if room_name is None:
-                    return INVITE_FROM_PERSON % {
+                    return self.email_subjects["invite_from_person"] % {
                         "person": inviter_name,
                         "app": self.app_name,
                     }
                 else:
-                    return INVITE_FROM_PERSON_TO_ROOM % {
+                    return self.email_subjects["invite_from_person_to_room"] % {
                         "person": inviter_name,
                         "room": room_name,
                         "app": self.app_name,
@@ -500,13 +490,13 @@ class Mailer(object):
                     sender_name = name_from_member_event(state_event)
 
                 if sender_name is not None and room_name is not None:
-                    return MESSAGE_FROM_PERSON_IN_ROOM % {
+                    return self.email_subjects["message_from_person_in_room"] % {
                         "person": sender_name,
                         "room": room_name,
                         "app": self.app_name,
                     }
                 elif sender_name is not None:
-                    return MESSAGE_FROM_PERSON % {
+                    return self.email_subjects["message_from_person"] % {
                         "person": sender_name,
                         "app": self.app_name,
                     }
@@ -514,7 +504,10 @@ class Mailer(object):
                 # There's more than one notification for this room, so just
                 # say there are several
                 if room_name is not None:
-                    return MESSAGES_IN_ROOM % {"room": room_name, "app": self.app_name}
+                    return self.email_subjects["messages_in_room"] % {
+                        "room": room_name,
+                        "app": self.app_name,
+                    }
                 else:
                     # If the room doesn't have a name, say who the messages
                     # are from explicitly to avoid, "messages in the Bob room"
@@ -532,7 +525,7 @@ class Mailer(object):
                         ]
                     )
 
-                    return MESSAGES_FROM_PERSON % {
+                    return self.email_subjects["messages_from_person"] % {
                         "person": descriptor_from_member_events(member_events.values()),
                         "app": self.app_name,
                     }
@@ -541,7 +534,7 @@ class Mailer(object):
 
             # ...but we still refer to the 'reason' room which triggered the mail
             if reason["room_name"] is not None:
-                return MESSAGES_IN_ROOM_AND_OTHERS % {
+                return self.email_subjects["messages_in_room_and_others"] % {
                     "room": reason["room_name"],
                     "app": self.app_name,
                 }
@@ -561,7 +554,7 @@ class Mailer(object):
                     [room_state_ids[room_id][("m.room.member", s)] for s in sender_ids]
                 )
 
-                return MESSAGES_FROM_PERSON_AND_OTHERS % {
+                return self.email_subjects["messages_from_person_and_others"] % {
                     "person": descriptor_from_member_events(member_events.values()),
                     "app": self.app_name,
                 }
