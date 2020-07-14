@@ -202,10 +202,12 @@ class RemoteKey(DirectServeJsonResource):
 
                 if miss:
                     cache_misses.setdefault(server_name, set()).add(key_id)
-                json_results.add(most_recent_result["key_json"])
+                # Cast to bytes since postgresql returns a memoryview.
+                json_results.add(bytes(most_recent_result["key_json"]))
             else:
                 for ts_added, result in results:
-                    json_results.add(result["key_json"])
+                    # Cast to bytes since postgresql returns a memoryview.
+                    json_results.add(bytes(result["key_json"]))
 
         if cache_misses and query_remote_on_cache_miss:
             await self.fetcher.get_keys(cache_misses)
