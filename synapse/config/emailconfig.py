@@ -431,7 +431,7 @@ class EmailConfig(Config):
           # If a subject isn't overridden in this configuration file, the value used as
           # its example will be used.
           #
-          subjects:
+          #subjects:
 
             # Subjects for notification emails.
             #
