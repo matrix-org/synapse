@@ -18,7 +18,7 @@ from typing import Any, Dict, Optional, Union
 import attr
 
 from synapse.api.errors import StoreError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.types import JsonDict
 from synapse.util import stringutils as stringutils
 
@@ -118,7 +118,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             desc="get_ui_auth_session",
         )
 
-        result["clientdict"] = json.loads(result["clientdict"])
+        result["clientdict"] = db_to_json(result["clientdict"])
 
         return UIAuthSessionData(session_id, **result)
 
@@ -168,7 +168,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             retcols=("stage_type", "result"),
             desc="get_completed_ui_auth_stages",
         ):
-            results[row["stage_type"]] = json.loads(row["result"])
+            results[row["stage_type"]] = db_to_json(row["result"])
 
         return results
 
@@ -224,7 +224,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         )
 
         # Update it and add it back to the database.
-        serverdict = json.loads(result["serverdict"])
+        serverdict = db_to_json(result["serverdict"])
         serverdict[key] = value
 
         self.db.simple_update_one_txn(
@@ -254,7 +254,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             desc="get_ui_auth_session_data",
         )
 
-        serverdict = json.loads(result["serverdict"])
+        serverdict = db_to_json(result["serverdict"])
 
         return serverdict.get(key, default)
 
