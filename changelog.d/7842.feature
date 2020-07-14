@@ -1,1 +1,1 @@
-Add room members admin endpoint. Contributed by Awesome Technologies Innovationslabor GmbH.
+Add an admin API to list the users in a room. Contributed by Awesome Technologies Innovationslabor GmbH.

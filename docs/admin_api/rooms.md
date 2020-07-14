@@ -323,6 +323,11 @@ Response:
 
 The Room Members admin API allows server admins to get a list of all members of a room.
 
+The response includes the following fields:
+
+* `members` - A list of all the members that are present in the room, represented by their ids.
+* `total` - Total number of members in the room.
+
 ## Usage
 
 A standard request:
@@ -350,7 +355,7 @@ Response:
 
 The Delete Room admin API allows server admins to remove rooms from server
 and block these rooms.
-It is a combination and improvement of "[Shutdown room](shutdown_room.md)" 
+It is a combination and improvement of "[Shutdown room](shutdown_room.md)"
 and "[Purge room](purge_room.md)" API.
 
 Shuts down a room. Moves all local users and room aliases automatically to a
