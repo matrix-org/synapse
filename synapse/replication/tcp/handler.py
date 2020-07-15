@@ -156,7 +156,7 @@ class ReplicationCommandHandler:
         self._streams_by_connection = {}  # type: Dict[AbstractConnection, Set[str]]
 
         LaterGauge(
-            "synapse_replication_tcp_commmand_queue",
+            "synapse_replication_tcp_command_queue",
             "Number of inbound RDATA/POSITION commands queued for processing",
             ["stream_name"],
             lambda: {
