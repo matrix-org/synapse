@@ -185,7 +185,7 @@ class TypingHandler(object):
 
     async def _push_remote(self, member, typing):
         try:
-            users = await self.state.get_users_in_room(member.room_id)
+            users = await self.store.get_users_in_room(member.room_id)
             self._member_last_federation_poke[member] = self.clock.time_msec()
 
             now = self.clock.time_msec()
