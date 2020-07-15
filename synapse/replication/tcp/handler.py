@@ -160,7 +160,7 @@ class ReplicationCommandHandler:
             "Number of inbound RDATA/POSITION commands queued for processing",
             ["stream_name"],
             lambda: {
-                stream_name: (len(queue),)
+                (stream_name,): len(queue)
                 for stream_name, queue in self._command_queues_by_stream.items()
             },
         )
@@ -192,7 +192,7 @@ class ReplicationCommandHandler:
         # if we're already processing this stream, stick the new command in the
         # queue, and we're done.
         if stream_name in self._processing_streams:
-            queue.append(cmd, conn)
+            queue.append((cmd, conn))
             return
 
         # otherwise, process the new command.
