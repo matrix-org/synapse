@@ -364,7 +364,10 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             if not room_ids:
                 return True, set()
 
+            ###########################################################################
+            #
             # exclude rooms where we have active members
+
             sql = """
                 SELECT room_id
                 FROM local_current_membership
@@ -378,12 +381,15 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             joined_room_ids = {row[0] for row in txn}
             to_delete = set(room_ids) - joined_room_ids
 
+            ###########################################################################
+            #
             # exclude rooms which we are in the process of constructing; these otherwise
             # qualify as "rooms with no local users", and would have their
             # forward extremities cleaned up.
 
             # the following query will return a list of rooms which have forward
-            # extremities that are *not* also the create event in the room.
+            # extremities that are *not* also the create event in the room - ie
+            # those that are not being created currently.
 
             sql = """
                 SELECT DISTINCT efe.room_id
@@ -398,10 +404,26 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             """
 
             txn.execute(sql, (last_room_id, room_ids[-1]))
+
+            # build a set of those rooms within `to_delete` that do not appear in
+            # the above, leaving us with the rooms in `to_delete` that *are* being
+            # created.
             creating_rooms = to_delete.difference(row[0] for row in txn)
             logger.info("skipping rooms which are being created: %s", creating_rooms)
 
-            to_delete.difference_update(creating_rooms)
+            # now remove the rooms being created from the list of those to delete.
+            #
+            # (we could have just taken the intersection of `to_delete` with the result
+            # of the sql query, but it's useful to be able to log `creating_rooms`; and
+            # having done so, it's quicker to remove the (few) creating rooms from
+            # `to_delete` than it is to form the intersection with the (larger) list of
+            # not-creating-rooms)
+
+            to_delete -= creating_rooms
+
+            ###########################################################################
+            #
+            # now clear the state for the rooms
 
             logger.info("Deleting current state left rooms: %r", to_delete)
 
