@@ -15,9 +15,10 @@
 # limitations under the License.
 
 import abc
-import json
 import logging
 from typing import List, Tuple
+
+from canonicaljson import json
 
 from twisted.internet import defer
 

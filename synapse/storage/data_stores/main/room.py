@@ -15,12 +15,13 @@
 # limitations under the License.
 
 import collections
-import json
 import logging
 import re
 from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
+
+from canonicaljson import json
 
 from twisted.internet import defer
 
