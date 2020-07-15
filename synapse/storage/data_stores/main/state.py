@@ -399,7 +399,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
             txn.execute(sql, (last_room_id, room_ids[-1]))
             creating_rooms = to_delete.difference(row[0] for row in txn)
-            logger.info("skipping rooms which are being deleted: %s", creating_rooms)
+            logger.info("skipping rooms which are being created: %s", creating_rooms)
 
             to_delete.difference_update(creating_rooms)
 
