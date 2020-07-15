@@ -13,13 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
+
 import logging
 import urllib
 from io import BytesIO
 
 import treq
-from canonicaljson import encode_canonical_json
+from canonicaljson import encode_canonical_json, json
 from netaddr import IPAddress
 from prometheus_client import Counter
 from zope.interface import implementer, provider

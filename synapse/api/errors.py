@@ -15,10 +15,12 @@
 # limitations under the License.
 
 """Contains exceptions and error codes."""
-import json
+
 import logging
 from http import HTTPStatus
 from typing import Dict, List
+
+from canonicaljson import json
 
 from twisted.web import http
 
