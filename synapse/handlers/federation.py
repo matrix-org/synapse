@@ -44,6 +44,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     FederationError,
     HttpResponseException,
+    NotFoundError,
     RequestSendFailed,
     SynapseError,
 )
@@ -1439,9 +1440,19 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        event_content = {"membership": Membership.JOIN}
-
+        # checking the room version will check that we've actually heard of the room
+        # (and return a 404 otherwise)
         room_version = await self.store.get_room_version_id(room_id)
+
+        # now check that we are *still* in the room
+        is_in_room = await self.auth.check_host_in_room(room_id, self.server_name)
+        if not is_in_room:
+            logger.info(
+                "Got /make_join request for room %s we are no longer in", room_id,
+            )
+            raise NotFoundError("Not an active room on this server")
+
+        event_content = {"membership": Membership.JOIN}
 
         builder = self.event_builder_factory.new(
             room_version,
