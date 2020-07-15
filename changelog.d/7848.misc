@@ -1,0 +1,1 @@
+Remove redundant `retry_on_integrity_error` wrapper for event persistence code.
