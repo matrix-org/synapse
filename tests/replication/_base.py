@@ -16,11 +16,8 @@
 import logging
 from typing import Any, Callable, List, Optional, Tuple
 
-from mock import Mock
-
 import attr
 
-from twisted.internet import defer
 from twisted.internet.interfaces import IConsumer, IPullProducer, IReactorTime
 from twisted.internet.task import LoopingCall
 from twisted.web.http import HTTPChannel
@@ -229,19 +226,31 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
 
         return resource
 
-    def make_worker_hs(self, worker_app: str, extra_config={}) -> HomeServer:
+    def make_worker_hs(
+        self, worker_app: str, extra_config: dict = {}, **kwargs
+    ) -> HomeServer:
+        """Make a new worker HS instance, correctly connecting replcation
+        stream to the master HS.
+
+        Args:
+            worker_app: Type of worker, e.g. `synapse.app.federation_sender`.
+            extra_config: Any extra config to use for this instances.
+            **kwargs: Options that get passed to `self.setup_test_homeserver`,
+                useful to e.g. pass some mocks for things like `http_client`
+
+        Returns:
+            The new worker HomeServer instance.
+        """
+
         config = self._get_worker_hs_config()
         config["worker_app"] = worker_app
         config.update(extra_config)
 
-        mock_federation_client = Mock(spec=["put_json"])
-        mock_federation_client.put_json.side_effect = lambda *_, **__: defer.succeed({})
-
         worker_hs = self.setup_test_homeserver(
-            http_client=mock_federation_client,
             homeserverToUse=GenericWorkerServer,
             config=config,
             reactor=self.reactor,
+            **kwargs
         )
 
         store = worker_hs.get_datastore()
