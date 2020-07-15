@@ -207,7 +207,7 @@ class ServerConfig(Config):
         # errors when attempting to search for messages.
         self.enable_search = config.get("enable_search", True)
 
-        self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
+        self.filter_timeline_limit = config.get("filter_timeline_limit", 500)
 
         # Whether we should block invites sent to users on this server
         # (other than those sent by local server admins)
@@ -693,7 +693,9 @@ class ServerConfig(Config):
         #gc_thresholds: [700, 10, 10]
 
         # Set the limit on the returned events in the timeline in the get
-        # and sync operations. The default value is -1, means no upper limit.
+        # and sync operations. The default value is 500. -1 means no upper limit.
+        #
+        # Uncomment the following to increase the limit to 5000.
         #
         #filter_timeline_limit: 5000
 
