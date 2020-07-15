@@ -21,7 +21,7 @@ from typing import Dict, Iterable, Optional, Set
 
 from typing_extensions import ContextManager
 
-from twisted.internet import address, defer, reactor
+from twisted.internet import address, reactor
 
 import synapse
 import synapse.events
@@ -374,9 +374,8 @@ class GenericWorkerPresence(BasePresenceHandler):
 
         return _user_syncing()
 
-    @defer.inlineCallbacks
-    def notify_from_replication(self, states, stream_id):
-        parties = yield get_interested_parties(self.store, states)
+    async def notify_from_replication(self, states, stream_id):
+        parties = await get_interested_parties(self.store, states)
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
@@ -386,8 +385,7 @@ class GenericWorkerPresence(BasePresenceHandler):
             users=users_to_states.keys(),
         )
 
-    @defer.inlineCallbacks
-    def process_replication_rows(self, token, rows):
+    async def process_replication_rows(self, token, rows):
         states = [
             UserPresenceState(
                 row.user_id,
@@ -405,7 +403,7 @@ class GenericWorkerPresence(BasePresenceHandler):
             self.user_to_current_state[state.user_id] = state
 
         stream_id = token
-        yield self.notify_from_replication(states, stream_id)
+        await self.notify_from_replication(states, stream_id)
 
     def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
         return [
