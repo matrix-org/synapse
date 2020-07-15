@@ -1,0 +1,1 @@
+Fix a bug introduced in Synapse 1.10.0 which could cause a "no create event in auth events" error during room creation.

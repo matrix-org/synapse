@@ -353,6 +353,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
         last_room_id = progress.get("last_room_id", "")
 
         def _background_remove_left_rooms_txn(txn):
+            # get a batch of room ids to consider
             sql = """
                 SELECT DISTINCT room_id FROM current_state_events
                 WHERE room_id > ? ORDER BY room_id LIMIT ?
@@ -363,24 +364,46 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             if not room_ids:
                 return True, set()
 
+            # exclude rooms where we have active members
             sql = """
                 SELECT room_id
-                FROM current_state_events
+                FROM local_current_membership
                 WHERE
                     room_id > ? AND room_id <= ?
-                    AND type = 'm.room.member'
                     AND membership = 'join'
-                    AND state_key LIKE ?
                 GROUP BY room_id
             """
 
-            txn.execute(sql, (last_room_id, room_ids[-1], "%:" + self.server_name))
-
+            txn.execute(sql, (last_room_id, room_ids[-1]))
             joined_room_ids = {row[0] for row in txn}
+            to_delete = set(room_ids) - joined_room_ids
 
-            left_rooms = set(room_ids) - joined_room_ids
+            # exclude rooms which we are in the process of constructing; these otherwise
+            # qualify as "rooms with no local users", and would have their
+            # forward extremities cleaned up.
 
-            logger.info("Deleting current state left rooms: %r", left_rooms)
+            # the following query will return a list of rooms which have forward
+            # extremities that are *not* also the create event in the room.
+
+            sql = """
+                SELECT DISTINCT efe.room_id
+                FROM event_forward_extremities efe
+                LEFT JOIN current_state_events cse ON
+                    cse.event_id = efe.event_id
+                    AND cse.type = 'm.room.create'
+                    AND cse.state_key = ''
+                WHERE
+                    cse.event_id IS NULL
+                    AND efe.room_id > ? AND efe.room_id <= ?
+            """
+
+            txn.execute(sql, (last_room_id, room_ids[-1]))
+            creating_rooms = to_delete.difference(row[0] for row in txn)
+            logger.info("skipping rooms which are being deleted: %s", creating_rooms)
+
+            to_delete.difference_update(creating_rooms)
+
+            logger.info("Deleting current state left rooms: %r", to_delete)
 
             # First we get all users that we still think were joined to the
             # room. This is so that we can mark those device lists as
@@ -391,7 +414,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 txn,
                 table="current_state_events",
                 column="room_id",
-                iterable=left_rooms,
+                iterable=to_delete,
                 keyvalues={"type": EventTypes.Member, "membership": Membership.JOIN},
                 retcols=("state_key",),
             )
@@ -403,7 +426,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 txn,
                 table="current_state_events",
                 column="room_id",
-                iterable=left_rooms,
+                iterable=to_delete,
                 keyvalues={},
             )
 
@@ -411,7 +434,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 txn,
                 table="event_forward_extremities",
                 column="room_id",
-                iterable=left_rooms,
+                iterable=to_delete,
                 keyvalues={},
             )
 
