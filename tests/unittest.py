@@ -19,12 +19,13 @@ import gc
 import hashlib
 import hmac
 import inspect
-import json
 import logging
 import time
 from typing import Optional, Tuple, Type, TypeVar, Union
 
 from mock import Mock
+
+from canonicaljson import json
 
 from twisted.internet.defer import Deferred, ensureDeferred, succeed
 from twisted.python.threadpool import ThreadPool

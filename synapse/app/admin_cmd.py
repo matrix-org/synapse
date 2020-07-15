@@ -14,11 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import json
 import logging
 import os
 import sys
 import tempfile
+
+from canonicaljson import json
 
 from twisted.internet import defer, task
 

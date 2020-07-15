@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import logging
 from typing import TYPE_CHECKING, List
+
+from canonicaljson import json
 
 from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase

@@ -17,7 +17,6 @@ import datetime
 import errno
 import fnmatch
 import itertools
-import json
 import logging
 import os
 import re
@@ -26,6 +25,8 @@ import sys
 import traceback
 from typing import Dict, Optional
 from urllib import parse as urlparse
+
+from canonicaljson import json
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError

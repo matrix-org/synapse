@@ -15,11 +15,13 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
-import json
+
 import logging
 import re
 from typing import List, Optional
 from urllib import parse as urlparse
+
+from canonicaljson import json
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (

@@ -14,8 +14,9 @@
 # limitations under the License.
 
 import itertools
-import json
 import logging
+
+from canonicaljson import json
 
 from synapse.api.constants import PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
