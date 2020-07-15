@@ -1,1 +1,1 @@
-Switch from simplejson to the standard library json.
+Ensure that calls to `json.dumps` are compatible with the standard library json.
