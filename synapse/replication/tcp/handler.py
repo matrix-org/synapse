@@ -16,7 +16,6 @@
 import logging
 from typing import (
     Any,
-    Deque,
     Dict,
     Iterable,
     Iterator,
@@ -29,6 +28,7 @@ from typing import (
 )
 
 from prometheus_client import Counter
+from typing_extensions import Deque
 
 from twisted.internet.protocol import ReconnectingClientFactory
 
