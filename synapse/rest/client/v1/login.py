@@ -371,7 +371,7 @@ class LoginRestServlet(RestServlet):
         token = login_submission.get("token", None)
         if token is None:
             raise LoginError(
-                401, "Token field for JWT is missing", errcode=Codes.UNAUTHORIZED
+                403, "Token field for JWT is missing", errcode=Codes.FORBIDDEN
             )
 
         import jwt
@@ -387,14 +387,12 @@ class LoginRestServlet(RestServlet):
         except jwt.PyJWTError as e:
             # A JWT error occurred, return some info back to the client.
             raise LoginError(
-                401,
-                "JWT validation failed: %s" % (str(e),),
-                errcode=Codes.UNAUTHORIZED,
+                403, "JWT validation failed: %s" % (str(e),), errcode=Codes.FORBIDDEN,
             )
 
         user = payload.get("sub", None)
         if user is None:
-            raise LoginError(401, "Invalid JWT", errcode=Codes.UNAUTHORIZED)
+            raise LoginError(403, "Invalid JWT", errcode=Codes.FORBIDDEN)
 
         user_id = UserID(user, self.hs.hostname).to_string()
         result = await self._complete_login(

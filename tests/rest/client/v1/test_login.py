@@ -547,8 +547,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     def test_login_jwt_invalid_signature(self):
         channel = self.jwt_login({"sub": "frog"}, "notsecret")
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
             "JWT validation failed: Signature verification failed",
@@ -556,8 +556,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     def test_login_jwt_expired(self):
         channel = self.jwt_login({"sub": "frog", "exp": 864000})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"], "JWT validation failed: Signature has expired"
         )
@@ -565,8 +565,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
     def test_login_jwt_not_before(self):
         now = int(time.time())
         channel = self.jwt_login({"sub": "frog", "nbf": now + 3600})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
             "JWT validation failed: The token is not yet valid (nbf)",
@@ -574,8 +574,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     def test_login_no_sub(self):
         channel = self.jwt_login({"username": "root"})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Invalid JWT")
 
     @override_config(
@@ -597,16 +597,16 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
         # An invalid issuer.
         channel = self.jwt_login({"sub": "kermit", "iss": "invalid"})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"], "JWT validation failed: Invalid issuer"
         )
 
         # Not providing an issuer.
         channel = self.jwt_login({"sub": "kermit"})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
             'JWT validation failed: Token is missing the "iss" claim',
@@ -637,16 +637,16 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
         # An invalid audience.
         channel = self.jwt_login({"sub": "kermit", "aud": "invalid"})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"], "JWT validation failed: Invalid audience"
         )
 
         # Not providing an audience.
         channel = self.jwt_login({"sub": "kermit"})
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
             'JWT validation failed: Token is missing the "aud" claim',
@@ -655,7 +655,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
     def test_login_aud_no_config(self):
         """Test providing an audience without requiring it in the configuration."""
         channel = self.jwt_login({"sub": "kermit", "aud": "invalid"})
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"], "JWT validation failed: Invalid audience"
         )
@@ -664,8 +665,8 @@ class JWTTestCase(unittest.HomeserverTestCase):
         params = json.dumps({"type": "org.matrix.login.jwt"})
         request, channel = self.make_request(b"POST", LOGIN_URL, params)
         self.render(request)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(channel.json_body["error"], "Token field for JWT is missing")
 
 
@@ -747,8 +748,8 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
 
     def test_login_jwt_invalid_signature(self):
         channel = self.jwt_login({"sub": "frog"}, self.bad_privatekey)
-        self.assertEqual(channel.result["code"], b"401", channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNAUTHORIZED")
+        self.assertEqual(channel.result["code"], b"403", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
         self.assertEqual(
             channel.json_body["error"],
             "JWT validation failed: Signature verification failed",
