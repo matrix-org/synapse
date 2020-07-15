@@ -93,8 +93,8 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         for i in range(20):
             server_name = "other_server_%d" % (i,)
             room = self.create_room_with_remote_server(user, token, server_name)
-            mock_client1.reset_mock()
-            mock_client2.reset_mock()
+            mock_client1.reset_mock()  # type: ignore[attr-defined]
+            mock_client2.reset_mock()  # type: ignore[attr-defined]
 
             self.create_and_send_event(room, UserID.from_string(user))
             self.replicate()
@@ -154,8 +154,8 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         for i in range(20):
             server_name = "other_server_%d" % (i,)
             room = self.create_room_with_remote_server(user, token, server_name)
-            mock_client1.reset_mock()
-            mock_client2.reset_mock()
+            mock_client1.reset_mock()  # type: ignore[attr-defined]
+            mock_client2.reset_mock()  # type: ignore[attr-defined]
 
             self.get_success(
                 typing_handler.started_typing(

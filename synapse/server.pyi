@@ -20,6 +20,7 @@ import synapse.handlers.room
 import synapse.handlers.room_member
 import synapse.handlers.set_password
 import synapse.http.client
+import synapse.http.matrixfederationclient
 import synapse.notifier
 import synapse.push.pusherpool
 import synapse.replication.tcp.client
@@ -140,4 +141,8 @@ class HomeServer(object):
     def get_pusherpool(self) -> synapse.push.pusherpool.PusherPool:
         pass
     def get_replication_streams(self) -> Dict[str, Stream]:
+        pass
+    def get_http_client(
+        self,
+    ) -> synapse.http.matrixfederationclient.MatrixFederationHttpClient:
         pass
