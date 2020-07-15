@@ -1,0 +1,1 @@
+Convert E2E keys and room keys handlers to async/await.
