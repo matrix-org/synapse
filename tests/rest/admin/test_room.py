@@ -1136,6 +1136,52 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(room_id_1, channel.json_body["room_id"])
 
+    def test_room_members(self):
+        """Test that room members can be requested correctly"""
+        # Create two test rooms
+        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        # Have another user join the room
+        user_1 = self.register_user("foo", "pass")
+        user_tok_1 = self.login("foo", "pass")
+        self.helper.join(room_id_1, user_1, tok=user_tok_1)
+
+        # Have another user join the room
+        user_2 = self.register_user("bar", "pass")
+        user_tok_2 = self.login("bar", "pass")
+        self.helper.join(room_id_1, user_2, tok=user_tok_2)
+        self.helper.join(room_id_2, user_2, tok=user_tok_2)
+
+        # Have another user join the room
+        user_3 = self.register_user("foobar", "pass")
+        user_tok_3 = self.login("foobar", "pass")
+        self.helper.join(room_id_2, user_3, tok=user_tok_3)
+
+        url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_1,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.assertCountEqual(
+            ["@admin:test", "@foo:test", "@bar:test"], channel.json_body["members"]
+        )
+        self.assertEqual(channel.json_body["total"], 3)
+
+        url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_2,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.assertCountEqual(
+            ["@admin:test", "@bar:test", "@foobar:test"], channel.json_body["members"]
+        )
+        self.assertEqual(channel.json_body["total"], 3)
+
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 

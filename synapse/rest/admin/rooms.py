@@ -231,6 +231,31 @@ class RoomRestServlet(RestServlet):
         return 200, ret
 
 
+class RoomMembersRestServlet(RestServlet):
+    """
+    Get members list of a room.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/members")
+
+    def __init__(self, hs):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request, room_id):
+        await assert_requester_is_admin(self.auth, request)
+
+        ret = await self.store.get_room(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        members = await self.store.get_users_in_room(room_id)
+        ret = {"members": members, "total": len(members)}
+
+        return 200, ret
+
+
 class JoinRoomAliasServlet(RestServlet):
 
     PATTERNS = admin_patterns("/join/(?P<room_identifier>[^/]*)")
