@@ -111,6 +111,7 @@ from synapse.rest.client.v1.room import (
     RoomSendEventRestServlet,
     RoomStateEventRestServlet,
     RoomStateRestServlet,
+    RoomTypingRestServlet,
 )
 from synapse.rest.client.v1.voip import VoipRestServlet
 from synapse.rest.client.v2_alpha import groups, sync, user_directory
@@ -451,37 +452,6 @@ class GenericWorkerPresence(BasePresenceHandler):
         await self._bump_active_client(user_id=user_id)
 
 
-class GenericWorkerTyping(object):
-    def __init__(self, hs):
-        self._latest_room_serial = 0
-        self._reset()
-
-    def _reset(self):
-        """
-        Reset the typing handler's data caches.
-        """
-        # map room IDs to serial numbers
-        self._room_serials = {}
-        # map room IDs to sets of users currently typing
-        self._room_typing = {}
-
-    def process_replication_rows(self, token, rows):
-        if self._latest_room_serial > token:
-            # The master has gone backwards. To prevent inconsistent data, just
-            # clear everything.
-            self._reset()
-
-        # Set the latest serial token to whatever the server gave us.
-        self._latest_room_serial = token
-
-        for row in rows:
-            self._room_serials[row.room_id] = token
-            self._room_typing[row.room_id] = row.user_ids
-
-    def get_current_token(self) -> int:
-        return self._latest_room_serial
-
-
 class GenericWorkerSlavedStore(
     # FIXME(#3714): We need to add UserDirectoryStore as we write directly
     # rather than going via the correct worker.
@@ -558,6 +528,7 @@ class GenericWorkerServer(HomeServer):
                     KeyUploadServlet(self).register(resource)
                     AccountDataServlet(self).register(resource)
                     RoomAccountDataServlet(self).register(resource)
+                    RoomTypingRestServlet(self).register(resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
@@ -668,9 +639,6 @@ class GenericWorkerServer(HomeServer):
 
     def build_presence_handler(self):
         return GenericWorkerPresence(self)
-
-    def build_typing_handler(self):
-        return GenericWorkerTyping(self)
 
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):

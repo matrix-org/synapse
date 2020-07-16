@@ -148,3 +148,5 @@ class HomeServer(object):
         self,
     ) -> synapse.http.matrixfederationclient.MatrixFederationHttpClient:
         pass
+    def should_send_federation(self) -> bool:
+        pass
