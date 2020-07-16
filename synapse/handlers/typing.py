@@ -15,7 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, List, Set, Tuple
 
 from synapse.api.errors import AuthError, SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -54,6 +54,10 @@ class FollowerTypingHandler:
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
+        self.federation = None
+        if hs.should_send_federation():
+            self.federation = hs.get_federation_sender()
+
         # map room IDs to serial numbers
         self._room_serials = {}
         # map room IDs to sets of users currently typing
@@ -87,7 +91,54 @@ class FollowerTypingHandler:
             self._handle_timeout_for_member(now, member)
 
     def _handle_timeout_for_member(self, now: int, member: RoomMember):
-        pass
+        if not self.is_typing(member):
+            # Nothing to do if they're no longer typing
+            return
+
+        # Check if we need to resend a keep alive over federation for this
+        # user.
+        if self.federation and self.is_mine_id(member.user_id):
+            last_fed_poke = self._member_last_federation_poke.get(member, None)
+            if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL <= now:
+                run_as_background_process(
+                    "typing._push_remote", self._push_remote, member=member, typing=True
+                )
+
+        # Add a paranoia timer to ensure that we always have a timer for
+        # each person typing.
+        self.wheel_timer.insert(now=now, obj=member, then=now + 60 * 1000)
+
+    def is_typing(self, member):
+        return member.user_id in self._room_typing.get(member.room_id, [])
+
+    async def _push_remote(self, member, typing):
+        if not self.federation:
+            return
+
+        try:
+            users = await self.store.get_users_in_room(member.room_id)
+            self._member_last_federation_poke[member] = self.clock.time_msec()
+
+            now = self.clock.time_msec()
+            self.wheel_timer.insert(
+                now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
+            )
+
+            for domain in {get_domain_from_id(u) for u in users}:
+                if domain != self.server_name:
+                    logger.debug("sending typing update to %s", domain)
+                    self.federation.build_and_send_edu(
+                        destination=domain,
+                        edu_type="m.typing",
+                        content={
+                            "room_id": member.room_id,
+                            "user_id": member.user_id,
+                            "typing": typing,
+                        },
+                        key=member,
+                    )
+        except Exception:
+            logger.exception("Error pushing typing notif to remotes")
 
     def process_replication_rows(
         self, token: int, rows: List[TypingStream.TypingStreamRow]
@@ -105,7 +156,32 @@ class FollowerTypingHandler:
 
         for row in rows:
             self._room_serials[row.room_id] = token
+
+            prev_typing = set(self._room_typing.get(row.room_id, []))
+            now_typing = set(row.user_ids)
             self._room_typing[row.room_id] = row.user_ids
+
+            run_as_background_process(
+                "_handle_change_in_typing",
+                self._handle_change_in_typing,
+                row.room_id,
+                prev_typing,
+                now_typing,
+            )
+
+    async def _handle_change_in_typing(
+        self, room_id: str, prev_typing: Set[str], now_typing: Set[str]
+    ):
+        """Process a change in typing of a room from replication, sending EDUs
+        for any local users.
+        """
+        for user_id in now_typing - prev_typing:
+            if self.is_mine_id(user_id):
+                await self._push_remote(RoomMember(room_id, user_id), True)
+
+        for user_id in prev_typing - now_typing:
+            if self.is_mine_id(user_id):
+                await self._push_remote(RoomMember(room_id, user_id), False)
 
     def get_current_token(self):
         return self._latest_room_serial
@@ -114,8 +190,6 @@ class FollowerTypingHandler:
 class TypingWriterHandler(FollowerTypingHandler):
     def __init__(self, hs):
         super().__init__(hs)
-
-        self.federation = hs.get_federation_sender()
 
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
@@ -145,22 +219,6 @@ class TypingWriterHandler(FollowerTypingHandler):
             logger.info("Timing out typing for: %s", member.user_id)
             self._stopped_typing(member)
             return
-
-        # Check if we need to resend a keep alive over federation for this
-        # user.
-        if self.hs.is_mine_id(member.user_id):
-            last_fed_poke = self._member_last_federation_poke.get(member, None)
-            if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL <= now:
-                run_as_background_process(
-                    "typing._push_remote", self._push_remote, member=member, typing=True
-                )
-
-        # Add a paranoia timer to ensure that we always have a timer for
-        # each person typing.
-        self.wheel_timer.insert(now=now, obj=member, then=now + 60 * 1000)
-
-    def is_typing(self, member):
-        return member.user_id in self._room_typing.get(member.room_id, [])
 
     async def started_typing(self, target_user, auth_user, room_id, timeout):
         target_user_id = target_user.to_string()
@@ -233,32 +291,6 @@ class TypingWriterHandler(FollowerTypingHandler):
             )
 
         self._push_update_local(member=member, typing=typing)
-
-    async def _push_remote(self, member, typing):
-        try:
-            users = await self.store.get_users_in_room(member.room_id)
-            self._member_last_federation_poke[member] = self.clock.time_msec()
-
-            now = self.clock.time_msec()
-            self.wheel_timer.insert(
-                now=now, obj=member, then=now + FEDERATION_PING_INTERVAL
-            )
-
-            for domain in {get_domain_from_id(u) for u in users}:
-                if domain != self.server_name:
-                    logger.debug("sending typing update to %s", domain)
-                    self.federation.build_and_send_edu(
-                        destination=domain,
-                        edu_type="m.typing",
-                        content={
-                            "room_id": member.room_id,
-                            "user_id": member.user_id,
-                            "typing": typing,
-                        },
-                        key=member,
-                    )
-        except Exception:
-            logger.exception("Error pushing typing notif to remotes")
 
     async def _recv_edu(self, origin, content):
         room_id = content["room_id"]
