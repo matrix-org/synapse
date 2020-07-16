@@ -19,6 +19,7 @@ from typing import List, Tuple
 
 from synapse.api.errors import AuthError, SynapseError
 from synapse.logging.context import run_in_background
+from synapse.replication.tcp.streams import TypingStream
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 from synapse.util.metrics import Measure
@@ -305,6 +306,45 @@ class TypingHandler(object):
         return rows, current_id, limited
 
     def get_current_token(self):
+        return self._latest_room_serial
+
+
+class FollowerTypingHandler(object):
+    """A typing handler on a different process than the writer that is updated
+    via replication.
+    """
+
+    def __init__(self, hs):
+        self._latest_room_serial = 0
+        self._reset()
+
+    def _reset(self):
+        """Reset the typing handler's data caches.
+        """
+        # map room IDs to serial numbers
+        self._room_serials = {}
+        # map room IDs to sets of users currently typing
+        self._room_typing = {}
+
+    def process_replication_rows(
+        self, token: int, rows: List[TypingStream.TypingStreamRow]
+    ):
+        """Should be called whenever we receive updates for typing stream.
+        """
+
+        if self._latest_room_serial > token:
+            # The master has gone backwards. To prevent inconsistent data, just
+            # clear everything.
+            self._reset()
+
+        # Set the latest serial token to whatever the server gave us.
+        self._latest_room_serial = token
+
+        for row in rows:
+            self._room_serials[row.room_id] = token
+            self._room_typing[row.room_id] = row.user_ids
+
+    def get_current_token(self) -> int:
         return self._latest_room_serial
 
 
