@@ -97,7 +97,7 @@ class ReplicationCommandHandler:
 
                 continue
 
-            if isinstance(stream, (TypingStream)):
+            if isinstance(stream, TypingStream):
                 # Only add TypingStream as a source on the instance in charge of
                 # typing.
                 if hs.config.worker.writers.typing == hs.get_instance_name():
