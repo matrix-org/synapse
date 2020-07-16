@@ -72,6 +72,12 @@ invalidate_cache_counter = Counter(
 user_ip_cache_counter = Counter("synapse_replication_tcp_resource_user_ip_cache", "")
 
 
+# the type of the entries in _command_queues_by_stream
+_StreamCommandQueue = Deque[
+    Tuple[Union[RdataCommand, PositionCommand], AbstractConnection]
+]
+
+
 class ReplicationCommandHandler:
     """Handles incoming commands from replication as well as sending commands
     back out to connections.
@@ -145,10 +151,7 @@ class ReplicationCommandHandler:
         # for each stream, a queue of commands that are awaiting processing, and the
         # connection that they arrived on.
         self._command_queues_by_stream = {
-            stream_name: Deque[
-                Tuple[Union[RdataCommand, PositionCommand], AbstractConnection]
-            ]()
-            for stream_name in self._streams
+            stream_name: _StreamCommandQueue() for stream_name in self._streams
         }
 
         # For each connection, the incoming stream names that have received a POSITION
