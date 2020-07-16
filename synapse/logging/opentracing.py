@@ -734,6 +734,7 @@ def trace(func=None, opname=None):
         _opname = opname if opname else func.__name__
 
         if inspect.iscoroutinefunction(func):
+
             @wraps(func)
             async def _trace_inner(*args, **kwargs):
                 scope = start_active_span(_opname)
