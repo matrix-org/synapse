@@ -705,7 +705,7 @@ class DeviceListUpdater(object):
 
     async def user_device_resync(
         self, user_id: str, mark_failed_as_stale: bool = True
-    ) -> dict:
+    ) -> Optional[dict]:
         """Fetches all devices for a user and updates the device cache with them.
 
         Args:
