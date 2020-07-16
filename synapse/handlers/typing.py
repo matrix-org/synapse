@@ -394,6 +394,12 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         return rows, current_id, limited
 
+    def process_replication_rows(
+        self, token: int, rows: List[TypingStream.TypingStreamRow]
+    ):
+        # The writing process should never get updates from replication.
+        raise Exception("Typing writer instance got typing info over replication")
+
 
 class TypingNotificationEventSource(object):
     def __init__(self, hs):
