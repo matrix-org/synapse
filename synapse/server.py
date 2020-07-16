@@ -106,7 +106,7 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStores, Storage
+from synapse.storage import DataStore, DataStores, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -312,7 +312,7 @@ class HomeServer(object):
     def get_clock(self):
         return self.clock
 
-    def get_datastore(self):
+    def get_datastore(self) -> DataStore:
         return self.datastores.main
 
     def get_datastores(self):
