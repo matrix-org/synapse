@@ -18,7 +18,7 @@ from collections import namedtuple
 from typing import TYPE_CHECKING, List, Tuple
 
 from synapse.api.errors import AuthError, SynapseError
-from synapse.logging.context import run_in_background
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.streams import TypingStream
 from synapse.types import UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -151,7 +151,9 @@ class TypingWriterHandler(FollowerTypingHandler):
         if self.hs.is_mine_id(member.user_id):
             last_fed_poke = self._member_last_federation_poke.get(member, None)
             if not last_fed_poke or last_fed_poke + FEDERATION_PING_INTERVAL <= now:
-                run_in_background(self._push_remote, member=member, typing=True)
+                run_as_background_process(
+                    "typing._push_remote", self._push_remote, member=member, typing=True
+                )
 
         # Add a paranoia timer to ensure that we always have a timer for
         # each person typing.
@@ -226,7 +228,9 @@ class TypingWriterHandler(FollowerTypingHandler):
     def _push_update(self, member, typing):
         if self.hs.is_mine_id(member.user_id):
             # Only send updates for changes to our own users.
-            run_in_background(self._push_remote, member, typing)
+            run_as_background_process(
+                "typing._push_remote", self._push_remote, member, typing
+            )
 
         self._push_update_local(member=member, typing=typing)
 
