@@ -44,7 +44,6 @@ from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
     FederationServer,
-    ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import FederationSender
@@ -378,8 +377,7 @@ class HomeServer(object):
         return PresenceHandler(self)
 
     def build_typing_handler(self):
-        # For now the writer typing handler is always on master.
-        if self.config.worker.worker_app is None:
+        if self.config.worker.writers.typing == self.get_instance_name():
             return TypingWriterHandler(self)
         else:
             return FollowerTypingHandler(self)
@@ -538,10 +536,7 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        if self.config.worker_app:
-            return ReplicationFederationHandlerRegistry(self)
-        else:
-            return FederationHandlerRegistry()
+        return FederationHandlerRegistry(self)
 
     def build_server_notices_manager(self):
         if self.config.worker_app:
