@@ -337,6 +337,11 @@ class PerDestinationQueue(object):
                     (e.retry_last_ts + e.retry_interval) / 1000.0
                 ),
             )
+
+            # don't let the pending event queues stack up
+            self._pending_pdus = []
+            self._pending_edus = []
+            self._pending_edus_keyed = {}
         except FederationDeniedError as e:
             logger.info(e)
         except HttpResponseException as e:
