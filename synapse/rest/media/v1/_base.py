@@ -18,7 +18,6 @@ import logging
 import os
 import urllib
 
-from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import Codes, SynapseError, cs_error
@@ -77,7 +76,9 @@ def respond_404(request):
     )
 
 
-async def respond_with_file(request, media_type, file_path, file_size=None, upload_name=None):
+async def respond_with_file(
+    request, media_type, file_path, file_size=None, upload_name=None
+):
     logger.debug("Responding with %r", file_path)
 
     if os.path.isfile(file_path):
@@ -197,7 +198,9 @@ def _can_encode_filename_as_token(x):
     return True
 
 
-async def respond_with_responder(request, responder, media_type, file_size, upload_name=None):
+async def respond_with_responder(
+    request, responder, media_type, file_size, upload_name=None
+):
     """Responds to the request with given responder. If responder is None then
     returns 404.
 
