@@ -20,7 +20,6 @@ from collections import OrderedDict, namedtuple
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
 import attr
-from canonicaljson import json
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -32,7 +31,7 @@ from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.logging.utils import log_function
-from synapse.storage._base import make_in_list_sql_clause
+from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.data_stores.main.search import SearchEntry
 from synapse.storage.database import Database, LoggingTransaction
 from synapse.storage.util.id_generators import StreamIdGenerator
@@ -236,7 +235,7 @@ class PersistEventsStore:
             )
 
             txn.execute(sql + clause, args)
-            results.extend(r[0] for r in txn if not json.loads(r[1]).get("soft_failed"))
+            results.extend(r[0] for r in txn if not db_to_json(r[1]).get("soft_failed"))
 
         for chunk in batch_iter(event_ids, 100):
             yield self.db.runInteraction(
@@ -297,7 +296,7 @@ class PersistEventsStore:
                     if prev_event_id in existing_prevs:
                         continue
 
-                    soft_failed = json.loads(metadata).get("soft_failed")
+                    soft_failed = db_to_json(metadata).get("soft_failed")
                     if soft_failed or rejected:
                         to_recursively_check.append(prev_event_id)
                         existing_prevs.add(prev_event_id)
@@ -583,7 +582,7 @@ class PersistEventsStore:
         txn.execute(sql, (room_id, EventTypes.Create, ""))
         row = txn.fetchone()
         if row:
-            event_json = json.loads(row[0])
+            event_json = db_to_json(row[0])
             content = event_json.get("content", {})
             creator = content.get("creator")
             room_version_id = content.get("room_version", RoomVersions.V1.identifier)

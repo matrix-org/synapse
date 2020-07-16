@@ -366,7 +366,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             for row in rows:
                 user_id = row["user_id"]
                 key_type = row["keytype"]
-                key = json.loads(row["keydata"])
+                key = db_to_json(row["keydata"])
                 user_info = result.setdefault(user_id, {})
                 user_info[key_type] = key
 

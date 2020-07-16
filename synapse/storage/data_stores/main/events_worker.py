@@ -21,7 +21,6 @@ import threading
 from collections import namedtuple
 from typing import List, Optional, Tuple
 
-from canonicaljson import json
 from constantly import NamedConstant, Names
 
 from twisted.internet import defer
@@ -40,7 +39,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import BackfillStream
 from synapse.replication.tcp.streams.events import EventsStream
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import get_domain_from_id
@@ -611,8 +610,8 @@ class EventsWorkerStore(SQLBaseStore):
             if not allow_rejected and rejected_reason:
                 continue
 
-            d = json.loads(row["json"])
-            internal_metadata = json.loads(row["internal_metadata"])
+            d = db_to_json(row["json"])
+            internal_metadata = db_to_json(row["internal_metadata"])
 
             format_version = row["format_version"]
             if format_version is None:
