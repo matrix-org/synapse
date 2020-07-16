@@ -42,6 +42,7 @@ from synapse.replication.tcp.streams import (
     EventsStream,
     FederationStream,
     Stream,
+    TypingStream,
 )
 from synapse.util.async_helpers import Linearizer
 
@@ -92,6 +93,14 @@ class ReplicationCommandHandler:
                 # Only add EventStream and BackfillStream as a source on the
                 # instance in charge of event persistence.
                 if hs.config.worker.writers.events == hs.get_instance_name():
+                    self._streams_to_replicate.append(stream)
+
+                continue
+
+            if isinstance(stream, (TypingStream)):
+                # Only add TypingStream as a source on the instance in charge of
+                # typing.
+                if hs.config.worker.writers.typing == hs.get_instance_name():
                     self._streams_to_replicate.append(stream)
 
                 continue

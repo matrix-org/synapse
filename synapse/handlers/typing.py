@@ -58,6 +58,11 @@ class FollowerTypingHandler:
         if hs.should_send_federation():
             self.federation = hs.get_federation_sender()
 
+        if hs.config.worker.writers.typing != hs.get_instance_name():
+            hs.get_federation_registry().register_instance_for_edu(
+                "m.typing", hs.config.worker.writers.typing,
+            )
+
         # map room IDs to serial numbers
         self._room_serials = {}
         # map room IDs to sets of users currently typing
@@ -190,6 +195,8 @@ class FollowerTypingHandler:
 class TypingWriterHandler(FollowerTypingHandler):
     def __init__(self, hs):
         super().__init__(hs)
+
+        assert hs.config.worker.writers.typing == hs.get_instance_name()
 
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()

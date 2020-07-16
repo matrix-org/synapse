@@ -817,8 +817,17 @@ class RoomTypingRestServlet(RestServlet):
         self.typing_handler = hs.get_typing_handler()
         self.auth = hs.get_auth()
 
+        # If we're not on the typing writer instance we should scream if we get
+        # requests.
+        self._is_typing_writer = (
+            hs.config.worker.writers.typing == hs.get_instance_name()
+        )
+
     async def on_PUT(self, request, room_id, user_id):
         requester = await self.auth.get_user_by_req(request)
+
+        if not self._is_typing_writer:
+            raise Exception("Got /typing request on instance that is not typing writer")
 
         room_id = urlparse.unquote(room_id)
         target_user = UserID.from_string(urlparse.unquote(user_id))
