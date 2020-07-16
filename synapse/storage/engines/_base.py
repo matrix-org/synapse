@@ -91,12 +91,6 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
     def lock_table(self, txn, table: str) -> None:
         ...
 
-    @abc.abstractmethod
-    def get_next_state_group_id(self, txn) -> int:
-        """Returns an int that can be used as a new state_group ID
-        """
-        ...
-
     @property
     @abc.abstractmethod
     def server_version(self) -> str:

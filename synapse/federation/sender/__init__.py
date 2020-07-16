@@ -197,7 +197,7 @@ class FederationSender(object):
                     destinations = {
                         d
                         for d in destinations
-                        if self._federation_shard_config.should_send_to(
+                        if self._federation_shard_config.should_handle(
                             self._instance_name, d
                         )
                     }
@@ -335,7 +335,7 @@ class FederationSender(object):
             d
             for d in domains
             if d != self.server_name
-            and self._federation_shard_config.should_send_to(self._instance_name, d)
+            and self._federation_shard_config.should_handle(self._instance_name, d)
         ]
         if not domains:
             return
@@ -441,7 +441,7 @@ class FederationSender(object):
         for destination in destinations:
             if destination == self.server_name:
                 continue
-            if not self._federation_shard_config.should_send_to(
+            if not self._federation_shard_config.should_handle(
                 self._instance_name, destination
             ):
                 continue
@@ -460,7 +460,7 @@ class FederationSender(object):
                 if destination == self.server_name:
                     continue
 
-                if not self._federation_shard_config.should_send_to(
+                if not self._federation_shard_config.should_handle(
                     self._instance_name, destination
                 ):
                     continue
@@ -486,7 +486,7 @@ class FederationSender(object):
             logger.info("Not sending EDU to ourselves")
             return
 
-        if not self._federation_shard_config.should_send_to(
+        if not self._federation_shard_config.should_handle(
             self._instance_name, destination
         ):
             return
@@ -507,7 +507,7 @@ class FederationSender(object):
             edu: edu to send
             key: clobbering key for this edu
         """
-        if not self._federation_shard_config.should_send_to(
+        if not self._federation_shard_config.should_handle(
             self._instance_name, edu.destination
         ):
             return
@@ -523,7 +523,7 @@ class FederationSender(object):
             logger.warning("Not sending device update to ourselves")
             return
 
-        if not self._federation_shard_config.should_send_to(
+        if not self._federation_shard_config.should_handle(
             self._instance_name, destination
         ):
             return
@@ -541,7 +541,7 @@ class FederationSender(object):
             logger.warning("Not waking up ourselves")
             return
 
-        if not self._federation_shard_config.should_send_to(
+        if not self._federation_shard_config.should_handle(
             self._instance_name, destination
         ):
             return

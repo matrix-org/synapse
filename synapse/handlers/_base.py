@@ -15,6 +15,8 @@
 
 import logging
 
+import synapse.state
+import synapse.storage
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.ratelimiting import Ratelimiter
@@ -26,10 +28,6 @@ logger = logging.getLogger(__name__)
 class BaseHandler(object):
     """
     Common base class for the event handlers.
-
-    Attributes:
-        store (synapse.storage.DataStore):
-        state_handler (synapse.state.StateHandler):
     """
 
     def __init__(self, hs):
@@ -37,10 +35,10 @@ class BaseHandler(object):
         Args:
             hs (synapse.server.HomeServer):
         """
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
-        self.state_handler = hs.get_state_handler()
+        self.state_handler = hs.get_state_handler()  # type: synapse.state.StateHandler
         self.distributor = hs.get_distributor()
         self.clock = hs.get_clock()
         self.hs = hs
