@@ -891,7 +891,7 @@ class FederationHandlerRegistry(object):
         if self._instance_name == "master":
             return await self._get_query_client(query_type=query_type, args=args)
 
-        # Uh oh, no handler! Let's raise an exception so the request reutrns an
+        # Uh oh, no handler! Let's raise an exception so the request returns an
         # error.
         logger.warning("No handler registered for query type %s", query_type)
         raise NotFoundError("No handler for Query type '%s'" % (query_type,))
