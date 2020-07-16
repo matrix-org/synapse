@@ -53,7 +53,6 @@ server {
         client_max_body_size 10M;
     }
 }
-
 ```
 
 **NOTE**: Do not add a path after the port in `proxy_pass`, otherwise nginx will
