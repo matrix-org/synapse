@@ -207,27 +207,29 @@ class ReplicationCommandHandler:
             queue.append((cmd, conn))
             return
 
-        # otherwise, process the new command.
+        # otherwise, process the new command, and take the lock to make other commands
+        # queue up behind it.
 
         # arguably we should start off a new background process here, but nothing
         # will be too upset if we don't return for ages, so let's save the overhead
         # and use the existing logcontext.
 
+        assert not queue
+
         self._processing_streams.add(stream_name)
         try:
-            # might as well skip the queue for this one, since it must be empty
-            assert not queue
-            await self._process_command(cmd, conn, stream_name)
-
-            # now process any other commands that have built up while we were
-            # dealing with that one.
-            while queue:
-                cmd, conn = queue.popleft()
+            while True:
                 try:
                     await self._process_command(cmd, conn, stream_name)
                 except Exception:
                     logger.exception("Failed to handle command %s", cmd)
 
+                # process any other commands that have built up while we were
+                # dealing with that one.
+                if not queue:
+                    break
+
+                cmd, conn = queue.popleft()
         finally:
             self._processing_streams.discard(stream_name)
 
