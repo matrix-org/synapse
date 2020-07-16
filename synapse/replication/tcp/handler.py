@@ -34,6 +34,7 @@ from typing_extensions import Deque
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.metrics import LaterGauge
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.tcp.client import DirectTcpReplicationClientFactory
 from synapse.replication.tcp.commands import (
     ClearUserSyncsCommand,
@@ -155,7 +156,7 @@ class ReplicationCommandHandler:
         # When POSITION or RDATA commands arrive, we stick them in a queue and process
         # them in order in a separate background process.
 
-        # the streams which are currently being processed by _unsafe_process_stream
+        # the streams which are currently being processed by _unsafe_process_queue
         self._processing_streams = set()  # type: Set[str]
 
         # for each stream, a queue of commands that are awaiting processing, and the
@@ -188,7 +189,7 @@ class ReplicationCommandHandler:
         if self._is_master:
             self._server_notices_sender = hs.get_server_notices_sender()
 
-    async def _add_command_to_stream_queue(
+    def _add_command_to_stream_queue(
         self, conn: AbstractConnection, cmd: Union[RdataCommand, PositionCommand]
     ) -> None:
         """Queue the given received command for processing
@@ -202,33 +203,32 @@ class ReplicationCommandHandler:
             logger.error("Got %s for unknown stream: %s", cmd.NAME, stream_name)
             return
 
-        # if we're already processing this stream, stick the new command in the
-        # queue, and we're done.
+        queue.append((cmd, conn))
+
+        # if we're already processing this stream, there's nothing more to do:
+        # the new entry on the queue will get picked up in due course
         if stream_name in self._processing_streams:
-            queue.append((cmd, conn))
             return
 
-        # otherwise, process the new command.
+        # fire off a background process to start processing the queue.
+        run_as_background_process(
+            "process-replication-data", self._unsafe_process_queue, conn, cmd
+        )
 
-        # arguably we should start off a new background process here, but nothing
-        # will be too upset if we don't return for ages, so let's save the overhead
-        # and use the existing logcontext.
+    async def _unsafe_process_queue(self, stream_name: str):
+        """Processes the command queue for the given stream, until it is empty
 
+        Does not check if there is already a thread processing the queue, hence "unsafe"
+        """
         self._processing_streams.add(stream_name)
         try:
-            # might as well skip the queue for this one, since it must be empty
-            assert not queue
-            await self._process_command(cmd, conn, stream_name)
-
-            # now process any other commands that have built up while we were
-            # dealing with that one.
+            queue = self._command_queues_by_stream.get(stream_name)
             while queue:
                 cmd, conn = queue.popleft()
                 try:
                     await self._process_command(cmd, conn, stream_name)
                 except Exception:
                     logger.exception("Failed to handle command %s", cmd)
-
         finally:
             self._processing_streams.discard(stream_name)
 
@@ -387,7 +387,7 @@ class ReplicationCommandHandler:
         assert self._server_notices_sender is not None
         await self._server_notices_sender.on_user_ip(cmd.user_id)
 
-    async def on_RDATA(self, conn: AbstractConnection, cmd: RdataCommand):
+    def on_RDATA(self, conn: AbstractConnection, cmd: RdataCommand):
         if cmd.instance_name == self._instance_name:
             # Ignore RDATA that are just our own echoes
             return
@@ -401,7 +401,7 @@ class ReplicationCommandHandler:
         #   2. so we don't race with getting a POSITION command and fetching
         #      missing RDATA.
 
-        await self._add_command_to_stream_queue(conn, cmd)
+        self._add_command_to_stream_queue(conn, cmd)
 
     async def _process_rdata(
         self, stream_name: str, conn: AbstractConnection, cmd: RdataCommand
@@ -478,14 +478,14 @@ class ReplicationCommandHandler:
             stream_name, instance_name, token, rows
         )
 
-    async def on_POSITION(self, conn: AbstractConnection, cmd: PositionCommand):
+    def on_POSITION(self, conn: AbstractConnection, cmd: PositionCommand):
         if cmd.instance_name == self._instance_name:
             # Ignore POSITION that are just our own echoes
             return
 
         logger.info("Handling '%s %s'", cmd.NAME, cmd.to_line())
 
-        await self._add_command_to_stream_queue(conn, cmd)
+        self._add_command_to_stream_queue(conn, cmd)
 
     async def _process_position(
         self, stream_name: str, conn: AbstractConnection, cmd: PositionCommand
