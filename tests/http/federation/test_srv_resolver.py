@@ -160,7 +160,8 @@ class SrvResolverTestCase(unittest.TestCase):
         cache = {}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        resolve_d = resolver.resolve_service(service_name)
+        # Old versions of Twisted don't have an ensureDeferred in failureResultOf.
+        resolve_d = defer.ensureDeferred(resolver.resolve_service(service_name))
 
         # returning a single "." should make the lookup fail with a ConenctError
         lookup_deferred.callback(
@@ -185,7 +186,8 @@ class SrvResolverTestCase(unittest.TestCase):
         cache = {}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        resolve_d = resolver.resolve_service(service_name)
+        # Old versions of Twisted don't have an ensureDeferred in successResultOf.
+        resolve_d = defer.ensureDeferred(resolver.resolve_service(service_name))
 
         lookup_deferred.callback(
             (
