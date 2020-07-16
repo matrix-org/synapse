@@ -102,8 +102,8 @@ class DeviceWorkerHandler(BaseHandler):
 
         return device
 
-    @measure_func("device.get_user_ids_changed")
     @trace
+    @measure_func("device.get_user_ids_changed")
     async def get_user_ids_changed(self, user_id, from_token):
         """Get list of users that have had the devices updated, or have newly
         joined a room, that `user_id` may be interested in.
