@@ -736,9 +736,6 @@ def trace(func=None, opname=None):
         if inspect.iscoroutinefunction(func):
             @wraps(func)
             async def _trace_inner(*args, **kwargs):
-                if opentracing is None:
-                    return await func(*args, **kwargs)
-
                 scope = start_active_span(_opname)
                 scope.__enter__()
 
@@ -757,9 +754,6 @@ def trace(func=None, opname=None):
             # decorated with inlineDeferred.
             @wraps(func)
             def _trace_inner(*args, **kwargs):
-                if opentracing is None:
-                    return func(*args, **kwargs)
-
                 scope = start_active_span(_opname)
                 scope.__enter__()
 
