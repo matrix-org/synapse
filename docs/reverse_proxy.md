@@ -45,7 +45,7 @@ server {
 
     server_name matrix.example.com;
 
-    location / {
+    location /_matrix {
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         # Nginx by default only allows file uploads up to 1M in size
