@@ -737,18 +737,12 @@ def trace(func=None, opname=None):
 
             @wraps(func)
             async def _trace_inner(*args, **kwargs):
-                scope = start_active_span(_opname)
-                scope.__enter__()
-
-                try:
-                    result = await func(*args, **kwargs)
-                    scope.__exit__(None, None, None)
-                    return result
-
-                except Exception as e:
-                    scope.span.set_tag(tags.ERROR, True)
-                    scope.__exit__(type(e), None, e.__traceback__)
-                    raise
+                with start_active_span(_opname) as scope:
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception:
+                        scope.span.set_tag(tags.ERROR, True)
+                        raise
 
         else:
             # The other case here handles both sync functions and those
