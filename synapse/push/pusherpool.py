@@ -258,14 +258,6 @@ class PusherPool:
         """
         pushers = yield self.store.get_all_pushers()
 
-        pushers = [
-            pusherdict
-            for pusherdict in pushers
-            if self._pusher_shard_config.should_handle(
-                self._instance_name, pusherdict["user_name"]
-            )
-        ]
-
         # Stagger starting up the pushers so we don't completely drown the
         # process on start up.
         yield concurrently_execute(self._start_pusher, pushers, 10)
@@ -343,9 +335,8 @@ class PusherPool:
 
         if appid_pushkey in byuser:
             logger.info("Stopping pusher %s / %s", user_id, appid_pushkey)
-            pusher = byuser[appid_pushkey]
+            pusher = byuser.pop(appid_pushkey)
             pusher.on_stop()
-            del byuser[appid_pushkey]
 
             synapse_pushers.labels(type(pusher).__name__, pusher.app_id).dec()
 
