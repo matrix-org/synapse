@@ -41,6 +41,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -649,16 +650,20 @@ class EventCreationHandler(object):
         raise ConsentNotGivenError(msg=msg, consent_uri=consent_uri)
 
     async def send_nonmember_event(
-        self, requester, event, context, ratelimit=True
+        self,
+        requester: Requester,
+        event: EventBase,
+        context: EventContext,
+        ratelimit: bool = True,
     ) -> int:
         """
         Persists and notifies local clients and federation of an event.
 
         Args:
-            event (FrozenEvent) the event to send.
-            context (Context) the context of the event.
-            ratelimit (bool): Whether to rate limit this send.
-            is_guest (bool): Whether the sender is a guest.
+            requester
+            event the event to send.
+            context: the context of the event.
+            ratelimit: Whether to rate limit this send.
 
         Return:
             The stream_id of the persisted event.
@@ -686,7 +691,9 @@ class EventCreationHandler(object):
             requester=requester, event=event, context=context, ratelimit=ratelimit
         )
 
-    async def deduplicate_state_event(self, event, context):
+    async def deduplicate_state_event(
+        self, event: EventBase, context: EventContext
+    ) -> None:
         """
         Checks whether event is in the latest resolved state in context.
 
@@ -795,7 +802,12 @@ class EventCreationHandler(object):
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
-        self, requester, event, context, ratelimit=True, extra_users=[]
+        self,
+        requester: Requester,
+        event: EventBase,
+        context: EventContext,
+        ratelimit: bool = True,
+        extra_users: List[UserID] = [],
     ) -> int:
         """Processes a new event. This includes checking auth, persisting it,
         notifying users, sending to remote servers, etc.
@@ -804,11 +816,11 @@ class EventCreationHandler(object):
         processing.
 
         Args:
-            requester (Requester)
-            event (FrozenEvent)
-            context (EventContext)
-            ratelimit (bool)
-            extra_users (list(UserID)): Any extra users to notify about event
+            requester
+            event
+            context
+            ratelimit
+            extra_users: Any extra users to notify about event
 
         Return:
             The stream_id of the persisted event.
@@ -919,7 +931,12 @@ class EventCreationHandler(object):
             )
 
     async def persist_and_notify_client_event(
-        self, requester, event, context, ratelimit=True, extra_users=[]
+        self,
+        requester: Requester,
+        event: EventBase,
+        context: EventContext,
+        ratelimit: bool = True,
+        extra_users: List[UserID] = [],
     ) -> int:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
@@ -1112,7 +1129,7 @@ class EventCreationHandler(object):
 
         return event_stream_id
 
-    async def _bump_active_time(self, user):
+    async def _bump_active_time(self, user: UserID) -> None:
         try:
             presence = self.hs.get_presence_handler()
             await presence.bump_presence_active_time(user)
