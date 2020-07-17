@@ -639,7 +639,7 @@ class EventsWorkerStore(SQLBaseStore):
             else:
                 room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
                 if not room_version:
-                    logger.error(
+                    logger.warning(
                         "Event %s in room %s has unknown room version %s",
                         event_id,
                         d["room_id"],
