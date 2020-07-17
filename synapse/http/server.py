@@ -477,7 +477,6 @@ class OptionsResource(resource.Resource):
     def render_OPTIONS(self, request):
         request.setResponseCode(204)
         request.setHeader(b"Content-Length", b"0")
-        request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
         set_cors_headers(request)
 
