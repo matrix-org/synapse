@@ -14,7 +14,7 @@
  */
 
 /**
-  Delete stuck 'enabled' bits that correspond to deleted push rules.
+  Delete stuck 'enabled' bits that correspond to deleted or non-existent push rules.
   We ignore rules that are server-default rules because they are not defined
   in the `push_rules` table.
 **/

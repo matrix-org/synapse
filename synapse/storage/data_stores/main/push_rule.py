@@ -740,7 +740,7 @@ class PushRuleStore(PushRulesWorkerStore):
                             404, "Push rule does not exist", Codes.NOT_FOUND
                         )
                     else:
-                        raise serr
+                        raise
 
             self._insert_push_rules_update_txn(
                 txn,
