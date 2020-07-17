@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from synapse.api.errors import (
-    Codes,
     NotFoundError,
     StoreError,
     SynapseError,
@@ -172,9 +171,7 @@ class PushRuleRestServlet(RestServlet):
         is_default_rule = rule_id.startswith(".")
         if is_default_rule:
             if namespaced_rule_id not in BASE_RULE_IDS:
-                raise NotFoundError(
-                    "Unknown rule %s" % (namespaced_rule_id,)
-                )
+                raise NotFoundError("Unknown rule %s" % (namespaced_rule_id,))
 
         if spec["attr"] == "enabled":
             if isinstance(val, dict) and "enabled" in val:

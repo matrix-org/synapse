@@ -21,7 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import Codes, StoreError, SynapseError
+from synapse.api.errors import Codes, StoreError
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore
