@@ -68,15 +68,15 @@ methods.
 > will be called for each login attempt where the login type matches one
 > of the keys returned by `get_supported_login_types`.
 >
-> It is passed the (possibly UNqualified) `user` provided by the client,
+> It is passed the (possibly unqualified) `user` provided by the client,
 > the login type, and a dictionary of login secrets passed by the
 > client.
 >
-> The method should return a Twisted `Deferred` object, which resolves
+> The method should return an `Awaitable` object, which resolves
 > to the canonical `@localpart:domain` user id if authentication is
 > successful, and `None` if not.
 >
-> Alternatively, the `Deferred` can resolve to a `(str, func)` tuple, in
+> Alternatively, the `Awaitable` can resolve to a `(str, func)` tuple, in
 > which case the second field is a callback which will be called with
 > the result from the `/login` call (including `access_token`,
 > `device_id`, etc.)
@@ -88,11 +88,11 @@ methods.
 > passed the medium (ex. "email"), an address (ex.
 > "<jdoe@example.com>") and the user's password.
 >
-> The method should return a Twisted `Deferred` object, which resolves
+> The method should return an `Awaitable` object, which resolves
 > to a `str` containing the user's (canonical) User ID if
 > authentication was successful, and `None` if not.
 >
-> As with `check_auth`, the `Deferred` may alternatively resolve to a
+> As with `check_auth`, the `Awaitable` may alternatively resolve to a
 > `(user_id, callback)` tuple.
 
 `someprovider.check_password`(*user_id*, *password*)
@@ -102,11 +102,11 @@ methods.
 > providers that just want to provide a mechanism for validating
 > `m.login.password` logins.
 >
-> Iif implemented, it will be called to check logins with an
+> If implemented, it will be called to check logins with an
 > `m.login.password` login type. It is passed a qualified
 > `@localpart:domain` user id, and the password provided by the user.
 >
-> The method should return a Twisted `Deferred` object, which resolves
+> The method should return an `Awaitable` object, which resolves
 > to `True` if authentication is successful, and `False` if not.
 
 `someprovider.on_logged_out`(*user_id*, *device_id*, *access_token*)
@@ -116,5 +116,5 @@ methods.
 > any: access tokens are occasionally created without an associated
 > device ID), and the (now deactivated) access token.
 >
-> It may return a Twisted `Deferred` object; the logout request will
+> It may return an `Awaitable` object; the logout request will
 > wait for the deferred to complete but the result is ignored.
