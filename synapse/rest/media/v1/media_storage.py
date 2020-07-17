@@ -24,7 +24,7 @@ from twisted.protocols.basic import FileSender
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
 from synapse.util.file_consumer import BackgroundFileConsumer
 
-from ._base import Responder
+from ._base import FileInfo, Responder
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +46,16 @@ class MediaStorage(object):
         self.filepaths = filepaths
         self.storage_providers = storage_providers
 
-    async def store_file(self, source, file_info):
+    async def store_file(self, source, file_info: FileInfo) -> str:
         """Write `source` to the on disk media store, and also any other
         configured storage providers
 
         Args:
             source: A file like object that should be written
-            file_info (FileInfo): Info about the file to store
+            file_info: Info about the file to store
 
         Returns:
-            Deferred[str]: the file path written to in the primary media store
+            the file path written to in the primary media store
         """
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
