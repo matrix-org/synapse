@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import contextlib
+import inspect
 import logging
 import os
 import shutil
@@ -104,7 +105,11 @@ class MediaStorage(object):
 
         async def finish():
             for provider in self.storage_providers:
-                await provider.store_file(path, file_info)
+                # store_file is supposed to return an Awaitable or Deferred, but
+                # guard against improper implementations.
+                result = provider.store_file(path, file_info)
+                if inspect.isawaitable(result) or isinstance(result, defer.Deferred):
+                    await result
 
             finished_called[0] = True
 
