@@ -448,6 +448,10 @@ class DeviceHandler(DeviceWorkerHandler):
         """Notify that a user's device(s) has changed. Pokes the notifier, and
         remote servers if the user is local.
         """
+        if not device_ids:
+            # No changes to notify about, so this is a no-op.
+            return
+
         users_who_share_room = yield self.store.get_users_who_share_room_with_user(
             user_id
         )
@@ -462,6 +466,10 @@ class DeviceHandler(DeviceWorkerHandler):
         position = yield self.store.add_device_change_to_streams(
             user_id, device_ids, list(hosts)
         )
+
+        if not position:
+            # This should only happen if there are no updates, so we bail.
+            return
 
         for device_id in device_ids:
             logger.debug(
