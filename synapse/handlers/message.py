@@ -282,8 +282,7 @@ class MessageHandler(object):
         # a task scheduled for a timestamp that's sooner than the provided one.
         self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
-    @defer.inlineCallbacks
-    def _schedule_next_expiry(self):
+    async def _schedule_next_expiry(self):
         """Retrieve the ID and the expiry timestamp of the next event to be expired,
         and schedule an expiry task for it.
 
@@ -291,7 +290,7 @@ class MessageHandler(object):
         future call to save_expiry_ts can schedule a new expiry task.
         """
         # Try to get the expiry timestamp of the next event to expire.
-        res = yield self.store.get_next_event_to_expire()
+        res = await self.store.get_next_event_to_expire()
         if res:
             event_id, expiry_ts = res
             self._schedule_expiry_for_event(event_id, expiry_ts)
@@ -332,8 +331,7 @@ class MessageHandler(object):
             event_id,
         )
 
-    @defer.inlineCallbacks
-    def _expire_event(self, event_id):
+    async def _expire_event(self, event_id: str):
         """Retrieve and expire an event that needs to be expired from the database.
 
         If the event doesn't exist in the database, log it and delete the expiry date
@@ -348,12 +346,12 @@ class MessageHandler(object):
         try:
             # Expire the event if we know about it. This function also deletes the expiry
             # date from the database in the same database transaction.
-            yield self.store.expire_event(event_id)
+            await self.store.expire_event(event_id)
         except Exception as e:
             logger.error("Could not expire event %s: %r", event_id, e)
 
         # Schedule the expiry of the next event to expire.
-        yield self._schedule_next_expiry()
+        await self._schedule_next_expiry()
 
 
 # The duration (in ms) after which rooms should be removed
