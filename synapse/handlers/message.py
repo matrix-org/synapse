@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
-from twisted.internet.defer import succeed
 from twisted.internet.interfaces import IDelayedCall
 
 from synapse import event_auth
@@ -41,6 +40,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
 from synapse.events import EventBase
+from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.logging.context import run_in_background
@@ -434,16 +434,15 @@ class EventCreationHandler(object):
 
         self._dummy_events_threshold = hs.config.dummy_events_threshold
 
-    @defer.inlineCallbacks
-    def create_event(
+    async def create_event(
         self,
-        requester,
-        event_dict,
-        token_id=None,
-        txn_id=None,
+        requester: Requester,
+        event_dict: dict,
+        token_id: Optional[str] = None,
+        txn_id: Optional[str] = None,
         prev_event_ids: Optional[Collection[str]] = None,
-        require_consent=True,
-    ):
+        require_consent: bool = True,
+    ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
 
@@ -454,17 +453,15 @@ class EventCreationHandler(object):
 
         Args:
             requester
-            event_dict (dict): An entire event
-            token_id (str)
-            txn_id (str)
-
+            event_dict: An entire event
+            token_id
+            txn_id
             prev_event_ids:
                 the forward extremities to use as the prev_events for the
                 new event.
 
                 If None, they will be requested from the database.
-
-            require_consent (bool): Whether to check if the requester has
+            require_consent: Whether to check if the requester has
                 consented to privacy policy.
         Raises:
             ResourceLimitError if server is blocked to some resource being
@@ -472,13 +469,13 @@ class EventCreationHandler(object):
         Returns:
             Tuple of created event (FrozenEvent), Context
         """
-        yield self.auth.check_auth_blocking(requester.user.to_string())
+        await self.auth.check_auth_blocking(requester.user.to_string())
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
             room_version = event_dict["content"]["room_version"]
         else:
             try:
-                room_version = yield self.store.get_room_version_id(
+                room_version = await self.store.get_room_version_id(
                     event_dict["room_id"]
                 )
             except NotFoundError:
@@ -499,15 +496,11 @@ class EventCreationHandler(object):
 
                 try:
                     if "displayname" not in content:
-                        displayname = yield defer.ensureDeferred(
-                            profile.get_displayname(target)
-                        )
+                        displayname = await profile.get_displayname(target)
                         if displayname is not None:
                             content["displayname"] = displayname
                     if "avatar_url" not in content:
-                        avatar_url = yield defer.ensureDeferred(
-                            profile.get_avatar_url(target)
-                        )
+                        avatar_url = await profile.get_avatar_url(target)
                         if avatar_url is not None:
                             content["avatar_url"] = avatar_url
                 except Exception as e:
@@ -515,9 +508,9 @@ class EventCreationHandler(object):
                         "Failed to get profile information for %r: %s", target, e
                     )
 
-        is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
+        is_exempt = await self._is_exempt_from_privacy_policy(builder, requester)
         if require_consent and not is_exempt:
-            yield self.assert_accepted_privacy_policy(requester)
+            await self.assert_accepted_privacy_policy(requester)
 
         if token_id is not None:
             builder.internal_metadata.token_id = token_id
@@ -525,7 +518,7 @@ class EventCreationHandler(object):
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
-        event, context = yield self.create_new_client_event(
+        event, context = await self.create_new_client_event(
             builder=builder, requester=requester, prev_event_ids=prev_event_ids,
         )
 
@@ -541,10 +534,10 @@ class EventCreationHandler(object):
             # federation as well as those created locally. As of room v3, aliases events
             # can be created by users that are not in the room, therefore we have to
             # tolerate them in event_auth.check().
-            prev_state_ids = yield context.get_prev_state_ids()
+            prev_state_ids = await context.get_prev_state_ids()
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
             prev_event = (
-                yield self.store.get_event(prev_event_id, allow_none=True)
+                await self.store.get_event(prev_event_id, allow_none=True)
                 if prev_event_id
                 else None
             )
@@ -567,27 +560,28 @@ class EventCreationHandler(object):
 
         return (event, context)
 
-    def _is_exempt_from_privacy_policy(self, builder, requester):
+    async def _is_exempt_from_privacy_policy(
+        self, builder: EventBuilder, requester: Requester
+    ) -> bool:
         """"Determine if an event to be sent is exempt from having to consent
         to the privacy policy
 
         Args:
-            builder (synapse.events.builder.EventBuilder): event being created
-            requester (Requster): user requesting this event
+            builder: event being created
+            requester: user requesting this event
 
         Returns:
-            Deferred[bool]: true if the event can be sent without the user
-                consenting
+            true if the event can be sent without the user consenting
         """
         # the only thing the user can do is join the server notices room.
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
             if membership == Membership.JOIN:
-                return self._is_server_notices_room(builder.room_id)
+                return await self._is_server_notices_room(builder.room_id)
             elif membership == Membership.LEAVE:
                 # the user is always allowed to leave (but not kick people)
                 return builder.state_key == requester.user.to_string()
-        return succeed(False)
+        return False
 
     @defer.inlineCallbacks
     def _is_server_notices_room(self, room_id):
