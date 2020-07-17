@@ -583,15 +583,13 @@ class EventCreationHandler(object):
                 return builder.state_key == requester.user.to_string()
         return False
 
-    @defer.inlineCallbacks
-    def _is_server_notices_room(self, room_id):
+    async def _is_server_notices_room(self, room_id: str) -> bool:
         if self.config.server_notices_mxid is None:
             return False
-        user_ids = yield self.store.get_users_in_room(room_id)
+        user_ids = await self.store.get_users_in_room(room_id)
         return self.config.server_notices_mxid in user_ids
 
-    @defer.inlineCallbacks
-    def assert_accepted_privacy_policy(self, requester):
+    async def assert_accepted_privacy_policy(self, requester: Requester) -> None:
         """Check if a user has accepted the privacy policy
 
         Called when the given user is about to do something that requires
@@ -600,12 +598,10 @@ class EventCreationHandler(object):
         raised.
 
         Args:
-            requester (synapse.types.Requester):
-                The user making the request
+            requester: The user making the request
 
         Returns:
-            Deferred[None]: returns normally if the user has consented or is
-                exempt
+            Returns normally if the user has consented or is exempt
 
         Raises:
             ConsentNotGivenError: if the user has not given consent yet
@@ -626,7 +622,7 @@ class EventCreationHandler(object):
         ):
             return
 
-        u = yield self.store.get_user_by_id(user_id)
+        u = await self.store.get_user_by_id(user_id)
         assert u is not None
         if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
             # support and bot users are not required to consent
