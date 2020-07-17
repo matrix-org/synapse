@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
-from twisted.internet import defer
 from twisted.internet.interfaces import IDelayedCall
 
 from synapse import event_auth
@@ -467,7 +466,7 @@ class EventCreationHandler(object):
             ResourceLimitError if server is blocked to some resource being
             exceeded
         Returns:
-            Tuple of created event (FrozenEvent), Context
+            Tuple of created event, Context
         """
         await self.auth.check_auth_blocking(requester.user.to_string())
 
@@ -736,17 +735,17 @@ class EventCreationHandler(object):
         return event, stream_id
 
     @measure_func("create_new_client_event")
-    @defer.inlineCallbacks
-    def create_new_client_event(
-        self, builder, requester=None, prev_event_ids: Optional[Collection[str]] = None
-    ):
+    async def create_new_client_event(
+        self,
+        builder: EventBuilder,
+        requester: Optional[Requester] = None,
+        prev_event_ids: Optional[Collection[str]] = None,
+    ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
         Args:
-            builder (EventBuilder):
-
-            requester (synapse.types.Requester|None):
-
+            builder:
+            requester:
             prev_event_ids:
                 the forward extremities to use as the prev_events for the
                 new event.
@@ -754,7 +753,7 @@ class EventCreationHandler(object):
                 If None, they will be requested from the database.
 
         Returns:
-            Deferred[(synapse.events.EventBase, synapse.events.snapshot.EventContext)]
+            Tuple of created event, Context
         """
 
         if prev_event_ids is not None:
@@ -763,10 +762,10 @@ class EventCreationHandler(object):
                 % (len(prev_event_ids),)
             )
         else:
-            prev_event_ids = yield self.store.get_prev_events_for_room(builder.room_id)
+            prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
 
-        event = yield builder.build(prev_event_ids=prev_event_ids)
-        context = yield self.state.compute_event_context(event)
+        event = await builder.build(prev_event_ids=prev_event_ids)
+        context = await self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service
 
@@ -780,7 +779,7 @@ class EventCreationHandler(object):
             relates_to = relation["event_id"]
             aggregation_key = relation["key"]
 
-            already_exists = yield self.store.has_user_annotated_event(
+            already_exists = await self.store.has_user_annotated_event(
                 relates_to, event.type, aggregation_key, event.sender
             )
             if already_exists:
