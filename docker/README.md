@@ -96,7 +96,7 @@ The following environment variables are supported in run mode:
 
 ## Generating an (admin) user
 
-After synapse is running, you may wish to create a user via `register_new_matrix_user`
+After synapse is running, you may wish to create a user via `register_new_matrix_user`.
 
 This requires a `registration_shared_secret` to be set in your config file. Synapse
 must be restarted to pick up this change.
