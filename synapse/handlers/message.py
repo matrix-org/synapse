@@ -887,9 +887,8 @@ class EventCreationHandler(object):
                     self.store.remove_push_actions_from_staging, event.event_id
                 )
 
-    @defer.inlineCallbacks
-    def _validate_canonical_alias(
-        self, directory_handler, room_alias_str, expected_room_id
+    async def _validate_canonical_alias(
+        self, directory_handler, room_alias_str: str, expected_room_id: str
     ):
         """
         Ensure that the given room alias points to the expected room ID.
@@ -901,9 +900,7 @@ class EventCreationHandler(object):
         """
         room_alias = RoomAlias.from_string(room_alias_str)
         try:
-            mapping = yield defer.ensureDeferred(
-                directory_handler.get_association(room_alias)
-            )
+            mapping = await directory_handler.get_association(room_alias)
         except SynapseError as e:
             # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
             if e.errcode == Codes.NOT_FOUND:
