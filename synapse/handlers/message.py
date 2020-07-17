@@ -686,19 +686,18 @@ class EventCreationHandler(object):
             requester=requester, event=event, context=context, ratelimit=ratelimit
         )
 
-    @defer.inlineCallbacks
-    def deduplicate_state_event(self, event, context):
+    async def deduplicate_state_event(self, event, context):
         """
         Checks whether event is in the latest resolved state in context.
 
         If so, returns the version of the event in context.
         Otherwise, returns None.
         """
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = await context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
             return
-        prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+        prev_event = await self.store.get_event(prev_event_id, allow_none=True)
         if not prev_event:
             return
 
