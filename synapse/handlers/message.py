@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
@@ -47,7 +47,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
-from synapse.types import Collection, RoomAlias, UserID, create_requester
+from synapse.types import Collection, RoomAlias, StreamToken, UserID, create_requester
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.metrics import measure_func
@@ -123,15 +123,14 @@ class MessageHandler(object):
 
         return data
 
-    @defer.inlineCallbacks
-    def get_state_events(
+    async def get_state_events(
         self,
-        user_id,
-        room_id,
-        state_filter=StateFilter.all(),
-        at_token=None,
-        is_guest=False,
-    ):
+        user_id: str,
+        room_id: str,
+        state_filter: StateFilter = StateFilter.all(),
+        at_token: Optional[StreamToken] = None,
+        is_guest: bool = False,
+    ) -> List[dict]:
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
         left the room return the state events from when they left. If an explicit
@@ -139,15 +138,14 @@ class MessageHandler(object):
         visible.
 
         Args:
-            user_id(str): The user requesting state events.
-            room_id(str): The room ID to get all state events from.
-            state_filter (StateFilter): The state filter used to fetch state
-                from the database.
-            at_token(StreamToken|None): the stream token of the at which we are requesting
+            user_id: The user requesting state events.
+            room_id: The room ID to get all state events from.
+            state_filter: The state filter used to fetch state from the database.
+            at_token: the stream token of the at which we are requesting
                 the stats. If the user is not allowed to view the state as of that
                 stream token, we raise a 403 SynapseError. If None, returns the current
                 state based on the current_state_events table.
-            is_guest(bool): whether this user is a guest
+            is_guest: whether this user is a guest
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         Raises:
@@ -161,20 +159,20 @@ class MessageHandler(object):
             # get_recent_events_for_room operates by topo ordering. This therefore
             # does not reliably give you the state at the given stream position.
             # (https://github.com/matrix-org/synapse/issues/3305)
-            last_events, _ = yield self.store.get_recent_events_for_room(
+            last_events, _ = await self.store.get_recent_events_for_room(
                 room_id, end_token=at_token.room_key, limit=1
             )
 
             if not last_events:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
-            visible_events = yield filter_events_for_client(
+            visible_events = await filter_events_for_client(
                 self.storage, user_id, last_events, filter_send_to_client=False
             )
 
             event = last_events[0]
             if visible_events:
-                room_state = yield self.state_store.get_state_for_events(
+                room_state = await self.state_store.get_state_for_events(
                     [event.event_id], state_filter=state_filter
                 )
                 room_state = room_state[event.event_id]
@@ -188,23 +186,23 @@ class MessageHandler(object):
             (
                 membership,
                 membership_event_id,
-            ) = yield self.auth.check_user_in_room_or_world_readable(
+            ) = await self.auth.check_user_in_room_or_world_readable(
                 room_id, user_id, allow_departed_users=True
             )
 
             if membership == Membership.JOIN:
-                state_ids = yield self.store.get_filtered_current_state_ids(
+                state_ids = await self.store.get_filtered_current_state_ids(
                     room_id, state_filter=state_filter
                 )
-                room_state = yield self.store.get_events(state_ids.values())
+                room_state = await self.store.get_events(state_ids.values())
             elif membership == Membership.LEAVE:
-                room_state = yield self.state_store.get_state_for_events(
+                room_state = await self.state_store.get_state_for_events(
                     [membership_event_id], state_filter=state_filter
                 )
                 room_state = room_state[membership_event_id]
 
         now = self.clock.time_msec()
-        events = yield self._event_serializer.serialize_events(
+        events = await self._event_serializer.serialize_events(
             room_state.values(),
             now,
             # We don't bother bundling aggregations in when asked for state
