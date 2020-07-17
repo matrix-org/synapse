@@ -47,7 +47,14 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
-from synapse.types import Collection, RoomAlias, StreamToken, UserID, create_requester
+from synapse.types import (
+    Collection,
+    Requester,
+    RoomAlias,
+    StreamToken,
+    UserID,
+    create_requester,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.metrics import measure_func
@@ -211,15 +218,14 @@ class MessageHandler(object):
         )
         return events
 
-    @defer.inlineCallbacks
-    def get_joined_members(self, requester, room_id):
+    async def get_joined_members(self, requester: Requester, room_id: str) -> dict:
         """Get all the joined members in the room and their profile information.
 
         If the user has left the room return the state events from when they left.
 
         Args:
-            requester(Requester): The user requesting state events.
-            room_id(str): The room ID to get all state events from.
+            requester: The user requesting state events.
+            room_id: The room ID to get all state events from.
         Returns:
             A dict of user_id to profile info
         """
@@ -227,7 +233,7 @@ class MessageHandler(object):
         if not requester.app_service:
             # We check AS auth after fetching the room membership, as it
             # requires us to pull out all joined members anyway.
-            membership, _ = yield self.auth.check_user_in_room_or_world_readable(
+            membership, _ = await self.auth.check_user_in_room_or_world_readable(
                 room_id, user_id, allow_departed_users=True
             )
             if membership != Membership.JOIN:
@@ -235,7 +241,7 @@ class MessageHandler(object):
                     "Getting joined members after leaving is not implemented"
                 )
 
-        users_with_profile = yield self.state.get_current_users_in_room(room_id)
+        users_with_profile = await self.state.get_current_users_in_room(room_id)
 
         # If this is an AS, double check that they are allowed to see the members.
         # This can either be because the AS user is in the room or because there
