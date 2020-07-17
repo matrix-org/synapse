@@ -105,10 +105,10 @@ class MediaStorage(object):
 
         async def finish():
             for provider in self.storage_providers:
-                # store_file is supposed to return an Awaitable or Deferred, but
-                # guard against improper implementations.
+                # store_file is supposed to return an Awaitable, but guard
+                # against improper implementations.
                 result = provider.store_file(path, file_info)
-                if inspect.isawaitable(result) or isinstance(result, defer.Deferred):
+                if inspect.isawaitable(result):
                     await result
 
             finished_called[0] = True
