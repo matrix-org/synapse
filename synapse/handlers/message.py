@@ -84,14 +84,22 @@ class MessageHandler(object):
                 "_schedule_next_expiry", self._schedule_next_expiry
             )
 
-    @defer.inlineCallbacks
-    def get_room_data(
-        self, user_id=None, room_id=None, event_type=None, state_key="", is_guest=False
-    ):
+    async def get_room_data(
+        self,
+        user_id: Optional[str] = None,
+        room_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        state_key: str = "",
+        is_guest: bool = False,
+    ) -> dict:
         """ Get data from a room.
 
         Args:
-            event : The room path event
+            user_id
+            room_id
+            event_type
+            state_key
+            is_guest
         Returns:
             The path data content.
         Raises:
@@ -100,15 +108,15 @@ class MessageHandler(object):
         (
             membership,
             membership_event_id,
-        ) = yield self.auth.check_user_in_room_or_world_readable(
+        ) = await self.auth.check_user_in_room_or_world_readable(
             room_id, user_id, allow_departed_users=True
         )
 
         if membership == Membership.JOIN:
-            data = yield self.state.get_current_state(room_id, event_type, state_key)
+            data = await self.state.get_current_state(room_id, event_type, state_key)
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
-            room_state = yield self.state_store.get_state_for_events(
+            room_state = await self.state_store.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
