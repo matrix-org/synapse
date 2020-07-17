@@ -102,7 +102,7 @@ pid_file: DATADIR/homeserver.pid
 #gc_thresholds: [700, 10, 10]
 
 # Set the limit on the returned events in the timeline in the get
-# and sync operations. The default value is 500. -1 means no upper limit.
+# and sync operations. The default value is 100. -1 means no upper limit.
 #
 # Uncomment the following to increase the limit to 5000.
 #
