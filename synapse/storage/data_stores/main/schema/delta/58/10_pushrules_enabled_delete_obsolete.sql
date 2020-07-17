@@ -19,10 +19,10 @@
   in the `push_rules` table.
 **/
 
-DELETE FROM push_rules_enable pre WHERE
-  pre.rule_id NOT LIKE 'global/%/.m.rule.%'
+DELETE FROM push_rules_enable WHERE
+  rule_id NOT LIKE 'global/%/.m.rule.%'
   AND NOT EXISTS (
-    SELECT 1 FROM push_rules pr
-    WHERE pr.user_name = pre.user_name
-      AND pr.rule_id = pre.rule_id
+    SELECT 1 FROM push_rules
+    WHERE push_rules.user_name = push_rules_enable.user_name
+      AND push_rules.rule_id = push_rules_enable.rule_id
   );
