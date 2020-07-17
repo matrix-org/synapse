@@ -262,7 +262,7 @@ class MessageHandler(object):
             for user_id, profile in users_with_profile.items()
         }
 
-    def maybe_schedule_expiry(self, event):
+    def maybe_schedule_expiry(self, event: EventBase):
         """Schedule the expiry of an event if there's not already one scheduled,
         or if the one running is for an event that will expire after the provided
         timestamp.
@@ -271,7 +271,7 @@ class MessageHandler(object):
         the master process, and therefore needs to be run on there.
 
         Args:
-            event (EventBase): The event to schedule the expiry of.
+            event: The event to schedule the expiry of.
         """
 
         expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
@@ -295,13 +295,13 @@ class MessageHandler(object):
             event_id, expiry_ts = res
             self._schedule_expiry_for_event(event_id, expiry_ts)
 
-    def _schedule_expiry_for_event(self, event_id, expiry_ts):
+    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int):
         """Schedule an expiry task for the provided event if there's not already one
         scheduled at a timestamp that's sooner than the provided one.
 
         Args:
-            event_id (str): The ID of the event to expire.
-            expiry_ts (int): The timestamp at which to expire the event.
+            event_id: The ID of the event to expire.
+            expiry_ts: The timestamp at which to expire the event.
         """
         if self._scheduled_expiry:
             # If the provided timestamp refers to a time before the scheduled time of the
@@ -705,7 +705,11 @@ class EventCreationHandler(object):
         return
 
     async def create_and_send_nonmember_event(
-        self, requester, event_dict, ratelimit=True, txn_id=None
+        self,
+        requester: Requester,
+        event_dict: EventBase,
+        ratelimit: bool = True,
+        txn_id: Optional[str] = None,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -890,7 +894,7 @@ class EventCreationHandler(object):
 
     async def _validate_canonical_alias(
         self, directory_handler, room_alias_str: str, expected_room_id: str
-    ):
+    ) -> None:
         """
         Ensure that the given room alias points to the expected room ID.
 
