@@ -172,8 +172,8 @@ class PushRuleRestServlet(RestServlet):
         is_default_rule = rule_id.startswith(".")
         if is_default_rule:
             if namespaced_rule_id not in BASE_RULE_IDS:
-                raise SynapseError(
-                    404, "Unknown rule %s" % (namespaced_rule_id,), Codes.NOT_FOUND
+                raise NotFoundError(
+                    "Unknown rule %s" % (namespaced_rule_id,)
                 )
 
         if spec["attr"] == "enabled":
