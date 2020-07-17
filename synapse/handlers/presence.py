@@ -30,8 +30,6 @@ from typing import Dict, Iterable, List, Set, Tuple
 from prometheus_client import Counter
 from typing_extensions import ContextManager
 
-from twisted.internet import defer
-
 import synapse.metrics
 from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
@@ -1296,13 +1294,14 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
     return new_state, persist_and_notify, federation_ping
 
 
-@defer.inlineCallbacks
-def get_interested_parties(store, states):
+async def get_interested_parties(
+    store, states: List[UserPresenceState]
+) -> Tuple[Dict[str, List[UserPresenceState]], Dict[str, List[UserPresenceState]]]:
     """Given a list of states return which entities (rooms, users)
     are interested in the given states.
 
     Args:
-        states (list(UserPresenceState))
+        states
 
     Returns:
         2-tuple: `(room_ids_to_states, users_to_states)`,
@@ -1311,7 +1310,7 @@ def get_interested_parties(store, states):
     room_ids_to_states = {}  # type: Dict[str, List[UserPresenceState]]
     users_to_states = {}  # type: Dict[str, List[UserPresenceState]]
     for state in states:
-        room_ids = yield store.get_rooms_for_user(state.user_id)
+        room_ids = await store.get_rooms_for_user(state.user_id)
         for room_id in room_ids:
             room_ids_to_states.setdefault(room_id, []).append(state)
 
@@ -1321,8 +1320,7 @@ def get_interested_parties(store, states):
     return room_ids_to_states, users_to_states
 
 
-@defer.inlineCallbacks
-def get_interested_remotes(store, states, state_handler):
+async def get_interested_remotes(store, states, state_handler):
     """Given a list of presence states figure out which remote servers
     should be sent which.
 
@@ -1333,7 +1331,7 @@ def get_interested_remotes(store, states, state_handler):
         states (list(UserPresenceState))
 
     Returns:
-        Deferred list of ([destinations], [UserPresenceState]), where for
+        A list of ([destinations], [UserPresenceState]), where for
         each row the list of UserPresenceState should be sent to each
         destination
     """
@@ -1342,10 +1340,10 @@ def get_interested_remotes(store, states, state_handler):
     # First we look up the rooms each user is in (as well as any explicit
     # subscriptions), then for each distinct room we look up the remote
     # hosts in those rooms.
-    room_ids_to_states, users_to_states = yield get_interested_parties(store, states)
+    room_ids_to_states, users_to_states = await get_interested_parties(store, states)
 
     for room_id, states in room_ids_to_states.items():
-        hosts = yield state_handler.get_current_hosts_in_room(room_id)
+        hosts = await state_handler.get_current_hosts_in_room(room_id)
         hosts_and_states.append((hosts, states))
 
     for user_id, states in users_to_states.items():
