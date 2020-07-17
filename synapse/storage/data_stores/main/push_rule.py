@@ -734,9 +734,9 @@ class PushRuleStore(PushRulesWorkerStore):
                         {"user_name": user_id, "rule_id": rule_id},
                         {"actions": actions_json},
                     )
-                except SynapseError as serr:
+                except StoreError as serr:
                     if serr.code == 404:
-                        raise SynapseError(
+                        raise StoreError(
                             404, "Push rule does not exist", Codes.NOT_FOUND
                         )
                     else:
