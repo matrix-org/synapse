@@ -20,11 +20,7 @@
 **/
 
 DELETE FROM push_rules_enable pre WHERE
-  pre.rule_id NOT LIKE 'global/override/.%'
-  AND pre.rule_id NOT LIKE 'global/underride/.%'
-  AND pre.rule_id NOT LIKE 'global/sender/.%'
-  AND pre.rule_id NOT LIKE 'global/room/.%'
-  AND pre.rule_id NOT LIKE 'global/content/.%'
+  pre.rule_id NOT LIKE 'global/%/.m.rule.%'
   AND NOT EXISTS (
     SELECT 1 FROM push_rules pr
     WHERE pr.user_name = pre.user_name
