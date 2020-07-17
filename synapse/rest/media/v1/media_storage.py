@@ -18,8 +18,8 @@ import inspect
 import logging
 import os
 import shutil
+from typing import Optional
 
-from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
@@ -126,17 +126,15 @@ class MediaStorage(object):
         if not finished_called:
             raise Exception("Finished callback not called")
 
-    @defer.inlineCallbacks
-    def fetch_media(self, file_info):
+    async def fetch_media(self, file_info: FileInfo) -> Optional[Responder]:
         """Attempts to fetch media described by file_info from the local cache
         and configured storage providers.
 
         Args:
-            file_info (FileInfo)
+            file_info
 
         Returns:
-            Deferred[Responder|None]: Returns a Responder if the file was found,
-                otherwise None.
+            Returns a Responder if the file was found, otherwise None.
         """
 
         path = self._file_info_to_path(file_info)
@@ -145,23 +143,26 @@ class MediaStorage(object):
             return FileResponder(open(local_path, "rb"))
 
         for provider in self.storage_providers:
-            res = yield provider.fetch(path, file_info)
+            res = provider.fetch(path, file_info)
+            # Fetch is supposed to return an Awaitable, but guard against
+            # improper implementations.
+            if inspect.isawaitable(res):
+                res = await res
             if res:
                 logger.debug("Streaming %s from %s", path, provider)
                 return res
 
         return None
 
-    @defer.inlineCallbacks
-    def ensure_media_is_in_local_cache(self, file_info):
+    async def ensure_media_is_in_local_cache(self, file_info: FileInfo) -> str:
         """Ensures that the given file is in the local cache. Attempts to
         download it from storage providers if it isn't.
 
         Args:
-            file_info (FileInfo)
+            file_info
 
         Returns:
-            Deferred[str]: Full path to local file
+            Full path to local file
         """
         path = self._file_info_to_path(file_info)
         local_path = os.path.join(self.local_media_directory, path)
@@ -173,14 +174,18 @@ class MediaStorage(object):
             os.makedirs(dirname)
 
         for provider in self.storage_providers:
-            res = yield provider.fetch(path, file_info)
+            res = provider.fetch(path, file_info)
+            # Fetch is supposed to return an Awaitable, but guard against
+            # improper implementations.
+            if inspect.isawaitable(res):
+                res = await res
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(
                         open(local_path, "wb"), self.hs.get_reactor()
                     )
-                    yield res.write_to_consumer(consumer)
-                    yield consumer.wait()
+                    await res.write_to_consumer(consumer)
+                    await consumer.wait()
                 return local_path
 
         raise Exception("file could not be found")
