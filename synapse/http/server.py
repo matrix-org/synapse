@@ -442,21 +442,6 @@ class StaticResource(File):
         return super().render_GET(request)
 
 
-def _options_handler(request):
-    """Request handler for OPTIONS requests
-
-    This is a request handler suitable for return from
-    _get_handler_for_request. It returns a 200 and an empty body.
-
-    Args:
-        request (twisted.web.http.Request):
-
-    Returns:
-        Tuple[int, dict]: http code, response body.
-    """
-    return 200, {}
-
-
 def _unrecognised_request_handler(request):
     """Request handler for unrecognised requests
 
@@ -490,11 +475,13 @@ class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
     def render_OPTIONS(self, request):
-        code, response_json_object = _options_handler(request)
+        request.setResponseCode(204)
+        request.setHeader(b"Content-Length", b"0")
+        request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
 
-        return respond_with_json(
-            request, code, response_json_object, send_cors=True, canonical_json=False,
-        )
+        set_cors_headers(request)
+
+        return b""
 
     def getChildWithDefault(self, path, request):
         if request.method == b"OPTIONS":
