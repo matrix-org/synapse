@@ -22,8 +22,6 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Collection
 
-from tests.test_utils import get_awaitable_result
-
 """
 Utility functions for poking events into the storage of the server under test.
 """
