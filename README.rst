@@ -45,7 +45,7 @@ which handle:
 - Eventually-consistent cryptographically secure synchronisation of room
   state across a global open network of federated servers and services
 - Sending and receiving extensible messages in a room with (optional)
-  end-to-end encryption[1]
+  end-to-end encryption
 - Inviting, joining, leaving, kicking, banning room members
 - Managing user accounts (registration, login, logout)
 - Using 3rd Party IDs (3PIDs) such as email addresses, phone numbers,
@@ -82,9 +82,6 @@ at the `Matrix spec <https://matrix.org/docs/spec>`_, and experiment with the
 
 Thanks for using Matrix!
 
-[1] End-to-end encryption is currently in beta: `blog post <https://matrix.org/blog/2016/11/21/matrixs-olm-end-to-end-encryption-security-assessment-released-and-implemented-cross-platform-on-riot-at-last>`_.
-
-
 Support
 =======
 
@@ -115,12 +112,11 @@ Unless you are running a test instance of Synapse on your local machine, in
 general, you will need to enable TLS support before you can successfully
 connect from a client: see `<INSTALL.md#tls-certificates>`_.
 
-An easy way to get started is to login or register via Riot at
-https://riot.im/app/#/login or https://riot.im/app/#/register respectively.
+An easy way to get started is to login or register via Element at
+https://app.element.io/#/login or https://app.element.io/#/register respectively.
 You will need to change the server you are logging into from ``matrix.org``
 and instead specify a Homeserver URL of ``https://<server_name>:8448``
 (or just ``https://<server_name>`` if you are using a reverse proxy).
-(Leave the identity server as the default - see `Identity servers`_.)
 If you prefer to use another client, refer to our
 `client breakdown <https://matrix.org/docs/projects/clients-matrix>`_.
 
@@ -137,7 +133,7 @@ it, specify ``enable_registration: true`` in ``homeserver.yaml``. (It is then
 recommended to also set up CAPTCHA - see `<docs/CAPTCHA_SETUP.md>`_.)
 
 Once ``enable_registration`` is set to ``true``, it is possible to register a
-user via `riot.im <https://riot.im/app/#/register>`_ or other Matrix clients.
+user via a Matrix client.
 
 Your new user name will be formed partly from the ``server_name``, and partly
 from a localpart you specify when you create the account. Your name will take
