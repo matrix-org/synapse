@@ -196,9 +196,6 @@ Almost all installations should opt to use PostgreSQL. Advantages include:
 * significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
 * allowing the DB to be run on separate hardware
-* allowing basic active/backup high-availability with a "hot spare" synapse
-  pointing at the same DB master, as well as enabling DB replication in
-  synapse itself.
 
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.md <docs/postgres.md>`_.
