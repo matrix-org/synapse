@@ -75,7 +75,7 @@ class InputOutput(object):
         """
 
         try:
-            m = re.match("^join (\S+)$", line)
+            m = re.match(r"^join (\S+)$", line)
             if m:
                 # The `sender` wants to join a room.
                 (room_name,) = m.groups()
@@ -84,7 +84,7 @@ class InputOutput(object):
                 # self.print_line("OK.")
                 return
 
-            m = re.match("^invite (\S+) (\S+)$", line)
+            m = re.match(r"^invite (\S+) (\S+)$", line)
             if m:
                 # `sender` wants to invite someone to a room
                 room_name, invitee = m.groups()
@@ -93,7 +93,7 @@ class InputOutput(object):
                 # self.print_line("OK.")
                 return
 
-            m = re.match("^send (\S+) (.*)$", line)
+            m = re.match(r"^send (\S+) (.*)$", line)
             if m:
                 # `sender` wants to message a room
                 room_name, body = m.groups()
@@ -102,7 +102,7 @@ class InputOutput(object):
                 # self.print_line("OK.")
                 return
 
-            m = re.match("^backfill (\S+)$", line)
+            m = re.match(r"^backfill (\S+)$", line)
             if m:
                 # we want to backfill a room
                 (room_name,) = m.groups()
