@@ -109,6 +109,9 @@ class FederationServer(FederationBase):
         # We cache responses to state queries, as they take a while and often
         # come in waves.
         self._state_resp_cache = ResponseCache(hs, "state_resp", timeout_ms=30000)
+        self._state_ids_resp_cache = ResponseCache(
+            hs, "state_ids_resp", timeout_ms=30000
+        )
 
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
@@ -376,10 +379,16 @@ class FederationServer(FederationBase):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
+        resp = await self._state_ids_resp_cache.wrap(
+            (room_id, event_id), self._on_state_ids_request_compute, room_id, event_id,
+        )
+
+        return 200, resp
+
+    async def _on_state_ids_request_compute(self, room_id, event_id):
         state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
         auth_chain_ids = await self.store.get_auth_chain_ids(state_ids)
-
-        return 200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
+        return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(
         self, room_id: str, event_id: str
