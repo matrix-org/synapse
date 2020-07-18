@@ -85,14 +85,14 @@ def time_function(f):
         id = _TIME_FUNC_ID
         _TIME_FUNC_ID += 1
 
-        start = time.clock()
+        start = time.perf_counter()
 
         try:
             _log_debug_as_f(f, "[FUNC START] {%s-%d}", (func_name, id))
 
             r = f(*args, **kwargs)
         finally:
-            end = time.clock()
+            end = time.perf_counter()
             _log_debug_as_f(
                 f, "[FUNC END] {%s-%d} %.3f sec", (func_name, id, end - start)
             )
