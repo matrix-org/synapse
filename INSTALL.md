@@ -234,9 +234,9 @@ for a number of platforms.
 
 There is an offical synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse which can be used with
-the docker-compose file available at [contrib/docker](contrib/docker). Further information on
-this including configuration options is available in the README on
-hub.docker.com.
+the docker-compose file available at [contrib/docker](contrib/docker). Further
+information on this including configuration options is available in the README
+on hub.docker.com.
 
 Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
@@ -244,7 +244,8 @@ https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Slavi Pantaleev has created an Ansible playbook,
 which installs the offical Docker image of Matrix Synapse
-along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
+along with many other Matrix-related services (Postgres database, Element, coturn,
+ma1sd, SSL support, etc.).
 For more details, see
 https://github.com/spantaleev/matrix-docker-ansible-deploy
 
@@ -419,6 +420,51 @@ so, you will need to edit `homeserver.yaml`, as follows:
 For a more detailed guide to configuring your server for federation, see
 [federate.md](docs/federate.md).
 
+## Client Well-known URI
+
+Setting up the client Well-Known URI is optional but if you set it up, it will
+allow users to enter their full username (e.g. `@user:server.com`) into clients
+which support well-known lookup to automatically configure the homeserver and
+identity server URLs. This is useful so that users don't have to memorize or think
+about the actual homeserver URL you are using.
+
+The URL `https://<server_name>/.well-known/matrix/client` should return JSON in
+the following format.
+
+```
+{
+  "m.homeserver": {
+    "base_url": "https://<matrix.example.com>"
+  }
+}
+```
+
+It can optionally contain identity server information as well.
+
+```
+{
+  "m.homeserver": {
+    "base_url": "https://<matrix.example.com>"
+  },
+  "m.identity_server": {
+    "base_url": "https://<identity.example.com>"
+  }
+}
+```
+
+To work in browser based clients, the file must be served with the appropriate
+Cross-Origin Resource Sharing (CORS) headers. A recommended value would be
+`Access-Control-Allow-Origin: *` which would allow all browser based clients to
+view it.
+
+In nginx this would be something like:
+```
+location /.well-known/matrix/client {
+    return 200 '{"m.homeserver": {"base_url": "https://matrix.example.com"}}';
+    add_header Content-Type application/json;
+    add_header Access-Control-Allow-Origin *;
+}
+```
 
 ## Email
 
@@ -437,7 +483,7 @@ email will be disabled.
 
 ## Registering a user
 
-The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
+The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
 
 Alternatively you can do so from the command line if you have installed via pip.
 
