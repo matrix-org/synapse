@@ -255,10 +255,9 @@ email address.
 Password reset
 ==============
 
-If a user has registered an email address to their account using an identity
-server, they can request a password-reset token via clients such as Riot.
-
-A manual password reset can be done via direct database access as follows.
+Users can reset their password through their client. Alternatively, a server admin
+can reset a users password using the `admin API <docs/admin_api/user_admin_api.rst#reset-password>`_
+or by directly editing the database as shown below.
 
 First calculate the hash of the new password::
 
