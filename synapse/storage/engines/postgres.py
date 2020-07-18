@@ -95,7 +95,7 @@ class PostgresEngine(BaseDatabaseEngine):
             errors.append("    - 'CTYPE' is set to %r. Should be 'C'" % (ctype,))
 
         if errors:
-            raise IncorrectDatabaseSetup(
+            logger.warning(
                 "Database is incorrectly configured:\n\n%s\n\n"
                 "See docs/postgres.md for more information." % ("\n".join(errors))
             )
