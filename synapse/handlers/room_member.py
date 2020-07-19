@@ -953,16 +953,21 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             raise SynapseError(404, "No known servers")
 
         if self.hs.config.limit_remote_rooms.enabled:
-            # Fetch the room complexity
-            too_complex = await self._is_remote_room_too_complex(
-                room_id, remote_room_hosts
-            )
-            if too_complex is True:
-                raise SynapseError(
-                    code=400,
-                    msg=self.hs.config.limit_remote_rooms.complexity_error,
-                    errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+            if self.hs.config.limit_remote_rooms.admins_can_join:
+                check_complexity = not await self.hs.auth.is_server_admin(user)
+            else:
+                check_complexity = True
+            if check_complexity:
+                # Fetch the room complexity
+                too_complex = await self._is_remote_room_too_complex(
+                    room_id, remote_room_hosts
                 )
+                if too_complex is True:
+                    raise SynapseError(
+                        code=400,
+                        msg=self.hs.config.limit_remote_rooms.complexity_error,
+                        errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
+                    )
 
         # We don't do an auth check if we are doing an invite
         # join dance for now, since we're kinda implicitly checking

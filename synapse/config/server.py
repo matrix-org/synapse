@@ -439,6 +439,9 @@ class ServerConfig(Config):
                 validator=attr.validators.instance_of(str),
                 default=ROOM_COMPLEXITY_TOO_GREAT,
             )
+            admins_can_join = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
             **(config.get("limit_remote_rooms") or {})
@@ -892,6 +895,10 @@ class ServerConfig(Config):
           # override the error which is returned when the room is too complex.
           #
           #complexity_error: "This room is too complex."
+
+          # allow server admins to join complex rooms. Default is false.
+          #
+          #admins_can_join: true
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.
