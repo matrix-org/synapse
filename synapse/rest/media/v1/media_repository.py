@@ -149,6 +149,13 @@ class MediaRepository(object):
         Returns:
             Deferred[str]: The mxc url of the stored content
         """
+        
+        if not isinstance(media_type, str):
+            raise SynapseError(400, "Invalid parameter media_type", Codes.INVALID_PARAM)
+
+        if not isinstance(upload_name, str):
+            raise SynapseError(400, "Invalid parameter upload_name", Codes.INVALID_PARAM)
+
         media_id = random_string(24)
 
         file_info = FileInfo(server_name=None, file_id=media_id)
