@@ -319,7 +319,7 @@ def filter_events_for_server(
         return True
 
     # Lets check to see if all the events have a history visibility
-    # of "shared" or "world_readable". If thats the case then we don't
+    # of "shared" or "world_readable". If that's the case then we don't
     # need to check membership (as we know the server is in the room).
     event_to_state_ids = yield storage.state.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
@@ -335,7 +335,7 @@ def filter_events_for_server(
             visibility_ids.add(hist)
 
     # If we failed to find any history visibility events then the default
-    # is "shared" visiblity.
+    # is "shared" visibility.
     if not visibility_ids:
         all_open = True
     else:

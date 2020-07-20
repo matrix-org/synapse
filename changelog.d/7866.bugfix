@@ -1,0 +1,1 @@
+Fix 'Unable to find a suitable guest user ID' error when using multiple client_reader workers.

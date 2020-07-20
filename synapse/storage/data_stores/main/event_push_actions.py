@@ -21,7 +21,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage._base import LoggingTransaction, SQLBaseStore
+from synapse.storage._base import LoggingTransaction, SQLBaseStore, db_to_json
 from synapse.storage.database import Database
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
@@ -58,7 +58,7 @@ def _deserialize_action(actions, is_highlight):
     """Custom deserializer for actions. This allows us to "compress" common actions
     """
     if actions:
-        return json.loads(actions)
+        return db_to_json(actions)
 
     if is_highlight:
         return DEFAULT_HIGHLIGHT_ACTION

@@ -23,7 +23,6 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import attr
 import yaml
-from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
@@ -136,11 +135,6 @@ class ServerConfig(Config):
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
 
-        # Whether to send federation traffic out in this process. This only
-        # applies to some federation traffic, and so shouldn't be used to
-        # "disable" federation
-        self.send_federation = config.get("send_federation", True)
-
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
 
@@ -213,7 +207,7 @@ class ServerConfig(Config):
         # errors when attempting to search for messages.
         self.enable_search = config.get("enable_search", True)
 
-        self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
+        self.filter_timeline_limit = config.get("filter_timeline_limit", 100)
 
         # Whether we should block invites sent to users on this server
         # (other than those sent by local server admins)
@@ -262,34 +256,6 @@ class ServerConfig(Config):
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
-
-        # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None  # type: Optional[dict]
-        federation_domain_whitelist = config.get("federation_domain_whitelist", None)
-
-        if federation_domain_whitelist is not None:
-            # turn the whitelist into a hash for speed of lookup
-            self.federation_domain_whitelist = {}
-
-            for domain in federation_domain_whitelist:
-                self.federation_domain_whitelist[domain] = True
-
-        self.federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", []
-        )
-
-        # Attempt to create an IPSet from the given ranges
-        try:
-            self.federation_ip_range_blacklist = IPSet(
-                self.federation_ip_range_blacklist
-            )
-
-            # Always blacklist 0.0.0.0, ::
-            self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
-        except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
-            )
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != "/":
@@ -727,7 +693,9 @@ class ServerConfig(Config):
         #gc_thresholds: [700, 10, 10]
 
         # Set the limit on the returned events in the timeline in the get
-        # and sync operations. The default value is -1, means no upper limit.
+        # and sync operations. The default value is 100. -1 means no upper limit.
+        #
+        # Uncomment the following to increase the limit to 5000.
         #
         #filter_timeline_limit: 5000
 
@@ -742,38 +710,6 @@ class ServerConfig(Config):
         # will receive errors when searching for messages. Defaults to enabled.
         #
         #enable_search: false
-
-        # Restrict federation to the following whitelist of domains.
-        # N.B. we recommend also firewalling your federation listener to limit
-        # inbound federation traffic as early as possible, rather than relying
-        # purely on this application-layer restriction.  If not specified, the
-        # default is to whitelist everything.
-        #
-        #federation_domain_whitelist:
-        #  - lon.example.com
-        #  - nyc.example.com
-        #  - syd.example.com
-
-        # Prevent federation requests from being sent to the following
-        # blacklist IP address CIDR ranges. If this option is not specified, or
-        # specified with an empty list, no ip range blacklist will be enforced.
-        #
-        # As of Synapse v1.4.0 this option also affects any outbound requests to identity
-        # servers provided by user input.
-        #
-        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-        # listed here, since they correspond to unroutable addresses.)
-        #
-        federation_ip_range_blacklist:
-          - '127.0.0.0/8'
-          - '10.0.0.0/8'
-          - '172.16.0.0/12'
-          - '192.168.0.0/16'
-          - '100.64.0.0/10'
-          - '169.254.0.0/16'
-          - '::1/128'
-          - 'fe80::/64'
-          - 'fc00::/7'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.

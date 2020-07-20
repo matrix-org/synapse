@@ -32,6 +32,11 @@ class JWTConfig(Config):
             self.jwt_secret = jwt_config["secret"]
             self.jwt_algorithm = jwt_config["algorithm"]
 
+            # The issuer and audiences are optional, if provided, it is asserted
+            # that the claims exist on the JWT.
+            self.jwt_issuer = jwt_config.get("issuer")
+            self.jwt_audiences = jwt_config.get("audiences")
+
             try:
                 import jwt
 
@@ -42,6 +47,8 @@ class JWTConfig(Config):
             self.jwt_enabled = False
             self.jwt_secret = None
             self.jwt_algorithm = None
+            self.jwt_issuer = None
+            self.jwt_audiences = None
 
     def generate_config_section(self, **kwargs):
         return """\
@@ -51,6 +58,9 @@ class JWTConfig(Config):
         #
         # Each JSON Web Token needs to contain a "sub" (subject) claim, which is
         # used as the localpart of the mxid.
+        #
+        # Additionally, the expiration time ("exp"), not before time ("nbf"),
+        # and issued at ("iat") claims are validated if present.
         #
         # Note that this is a non-standard login type and client support is
         # expected to be non-existant.
@@ -78,4 +88,22 @@ class JWTConfig(Config):
             # Required if 'enabled' is true.
             #
             #algorithm: "provided-by-your-issuer"
+
+            # The issuer to validate the "iss" claim against.
+            #
+            # Optional, if provided the "iss" claim will be required and
+            # validated for all JSON web tokens.
+            #
+            #issuer: "provided-by-your-issuer"
+
+            # A list of audiences to validate the "aud" claim against.
+            #
+            # Optional, if provided the "aud" claim will be required and
+            # validated for all JSON web tokens.
+            #
+            # Note that if the "aud" claim is included in a JSON web token then
+            # validation will fail without configuring audiences.
+            #
+            #audiences:
+            #    - "provided-by-your-issuer"
         """

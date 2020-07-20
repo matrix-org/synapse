@@ -20,12 +20,18 @@ follows:
 Note that the login type of `m.login.jwt` is supported, but is deprecated. This
 will be removed in a future version of Synapse.
 
-The `jwt` should encode the local part of the user ID as the standard `sub`
-claim. In the case that the token is not valid, the homeserver must respond with
-`401 Unauthorized` and an error code of `M_UNAUTHORIZED`.
+The `token` field should include the JSON web token with the following claims:
 
-(Note that this differs from the token based logins which return a
-`403 Forbidden` and an error code of `M_FORBIDDEN` if an error occurs.)
+* The `sub` (subject) claim is required and should encode the local part of the
+  user ID.
+* The expiration time (`exp`), not before time (`nbf`), and issued at (`iat`)
+  claims are optional, but validated if present.
+* The issuer (`iss`) claim is optional, but required and validated if configured.
+* The audience (`aud`) claim is optional, but required and validated if configured.
+  Providing the audience claim when not configured will cause validation to fail.
+
+In the case that the token is not valid, the homeserver must respond with
+`403 Forbidden` and an error code of `M_FORBIDDEN`.
 
 As with other login types, there are additional fields (e.g. `device_id` and
 `initial_device_display_name`) which can be included in the above request.
@@ -55,7 +61,8 @@ sample settings.
 Although JSON Web Tokens are typically generated from an external server, the
 examples below use [PyJWT](https://pyjwt.readthedocs.io/en/latest/) directly.
 
-1.  Configure Synapse with JWT logins:
+1.  Configure Synapse with JWT logins, note that this example uses a pre-shared
+    secret and an algorithm of HS256:
 
     ```yaml
     jwt_config:

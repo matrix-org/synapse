@@ -1,0 +1,1 @@
+Convert synapse.app and federation client to async/await.

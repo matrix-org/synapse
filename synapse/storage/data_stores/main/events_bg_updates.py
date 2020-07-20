@@ -15,12 +15,10 @@
 
 import logging
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventContentFields
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
 
 logger = logging.getLogger(__name__)
@@ -125,7 +123,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             for row in rows:
                 try:
                     event_id = row[1]
-                    event_json = json.loads(row[2])
+                    event_json = db_to_json(row[2])
                     sender = event_json["sender"]
                     content = event_json["content"]
 
@@ -208,7 +206,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
                 for row in ev_rows:
                     event_id = row["event_id"]
-                    event_json = json.loads(row["json"])
+                    event_json = db_to_json(row["json"])
                     try:
                         origin_server_ts = event_json["origin_server_ts"]
                     except (KeyError, AttributeError):
@@ -317,7 +315,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
                 soft_failed = False
                 if metadata:
-                    soft_failed = json.loads(metadata).get("soft_failed")
+                    soft_failed = db_to_json(metadata).get("soft_failed")
 
                 if soft_failed or rejected:
                     soft_failed_events_to_lookup.add(event_id)
@@ -358,7 +356,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
                     graph[event_id] = {prev_event_id}
 
-                    soft_failed = json.loads(metadata).get("soft_failed")
+                    soft_failed = db_to_json(metadata).get("soft_failed")
                     if soft_failed or rejected:
                         soft_failed_events_to_lookup.add(event_id)
                     else:
@@ -543,7 +541,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             last_row_event_id = ""
             for (event_id, event_json_raw) in results:
                 try:
-                    event_json = json.loads(event_json_raw)
+                    event_json = db_to_json(event_json_raw)
 
                     self.db.simple_insert_many_txn(
                         txn=txn,

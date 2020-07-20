@@ -48,6 +48,7 @@ from synapse.storage.data_stores.main.media_repository import (
 )
 from synapse.storage.data_stores.main.registration import (
     RegistrationBackgroundUpdateStore,
+    find_max_generated_user_id_localpart,
 )
 from synapse.storage.data_stores.main.room import RoomBackgroundUpdateStore
 from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
@@ -622,8 +623,10 @@ class Porter(object):
                 )
             )
 
-            # Step 5. Do final post-processing
+            # Step 5. Set up sequences
+            self.progress.set_state("Setting up sequence generators")
             await self._setup_state_group_id_seq()
+            await self._setup_user_id_seq()
 
             self.progress.done()
         except Exception as e:
@@ -792,6 +795,13 @@ class Porter(object):
             txn.execute("ALTER SEQUENCE state_group_id_seq RESTART WITH %s", (next_id,))
 
         return self.postgres_store.db.runInteraction("setup_state_group_id_seq", r)
+
+    def _setup_user_id_seq(self):
+        def r(txn):
+            next_id = find_max_generated_user_id_localpart(txn) + 1
+            txn.execute("ALTER SEQUENCE user_id_seq RESTART WITH %s", (next_id,))
+
+        return self.postgres_store.db.runInteraction("setup_user_id_seq", r)
 
 
 ##############################################

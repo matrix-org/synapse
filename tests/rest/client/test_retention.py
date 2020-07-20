@@ -126,7 +126,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         events.append(self.get_success(store.get_event(valid_event_id)))
 
-        # Advance the time by anothe 2 days. After this, the first event should be
+        # Advance the time by another 2 days. After this, the first event should be
         # outdated but not the second one.
         self.reactor.advance(one_day_ms * 2 / 1000)
 

@@ -1,0 +1,1 @@
+Fix a bug which allowed empty rooms to be rejoined over federation.

@@ -109,7 +109,7 @@ class Authenticator(object):
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
-        self.notifer = hs.get_notifier()
+        self.notifier = hs.get_notifier()
 
         self.replication_client = None
         if hs.config.worker.worker_app:
@@ -175,7 +175,7 @@ class Authenticator(object):
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
 
             # Inform the relevant places that the remote server is back up.
-            self.notifer.notify_remote_server_up(origin)
+            self.notifier.notify_remote_server_up(origin)
             if self.replication_client:
                 # If we're on a worker we try and inform master about this. The
                 # replication client doesn't hook into the notifier to avoid

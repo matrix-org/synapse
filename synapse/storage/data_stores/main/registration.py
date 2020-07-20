@@ -27,6 +27,8 @@ from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidati
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import Database
+from synapse.storage.types import Cursor
+from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -41,6 +43,10 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         self.config = hs.config
         self.clock = hs.get_clock()
+
+        self._user_id_seq = build_sequence_generator(
+            database.engine, find_max_generated_user_id_localpart, "user_id_seq",
+        )
 
     @cached()
     def get_user_by_id(self, user_id):
@@ -481,38 +487,16 @@ class RegistrationWorkerStore(SQLBaseStore):
         ret = yield self.db.runInteraction("count_real_users", _count_users)
         return ret
 
-    @defer.inlineCallbacks
-    def find_next_generated_user_id_localpart(self):
+    async def generate_user_id(self) -> str:
+        """Generate a suitable localpart for a guest user
+
+        Returns: a (hopefully) free localpart
         """
-        Gets the localpart of the next generated user ID.
-
-        Generated user IDs are integers, so we find the largest integer user ID
-        already taken and return that plus one.
-        """
-
-        def _find_next_generated_user_id(txn):
-            # We bound between '@0' and '@a' to avoid pulling the entire table
-            # out.
-            txn.execute("SELECT name FROM users WHERE '@0' <= name AND name < '@a'")
-
-            regex = re.compile(r"^@(\d+):")
-
-            max_found = 0
-
-            for (user_id,) in txn:
-                match = regex.search(user_id)
-                if match:
-                    max_found = max(int(match.group(1)), max_found)
-
-            return max_found + 1
-
-        return (
-            (
-                yield self.db.runInteraction(
-                    "find_next_generated_user_id", _find_next_generated_user_id
-                )
-            )
+        next_id = await self.db.runInteraction(
+            "generate_user_id", self._user_id_seq.get_next_id_txn
         )
+
+        return str(next_id)
 
     async def get_user_id_by_threepid(self, medium: str, address: str) -> Optional[str]:
         """Returns user id from threepid
@@ -1573,3 +1557,26 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             keyvalues={"user_id": user_id},
             values={"expiration_ts_ms": expiration_ts, "email_sent": False},
         )
+
+
+def find_max_generated_user_id_localpart(cur: Cursor) -> int:
+    """
+    Gets the localpart of the max current generated user ID.
+
+    Generated user IDs are integers, so we find the largest integer user ID
+    already taken and return that.
+    """
+
+    # We bound between '@0' and '@a' to avoid pulling the entire table
+    # out.
+    cur.execute("SELECT name FROM users WHERE '@0' <= name AND name < '@a'")
+
+    regex = re.compile(r"^@(\d+):")
+
+    max_found = 0
+
+    for (user_id,) in cur:
+        match = regex.search(user_id)
+        if match:
+            max_found = max(int(match.group(1)), max_found)
+    return max_found
