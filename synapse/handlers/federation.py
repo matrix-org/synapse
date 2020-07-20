@@ -19,7 +19,7 @@
 
 import itertools
 import logging
-from collections import Container
+from collections.abc import Container
 from http import HTTPStatus
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
