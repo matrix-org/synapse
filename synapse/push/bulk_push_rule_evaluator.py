@@ -19,8 +19,6 @@ from collections import namedtuple
 
 from prometheus_client import Counter
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.event_auth import get_user_power_level
 from synapse.state import POWER_KEY
@@ -134,12 +132,9 @@ class BulkPushRuleEvaluator(object):
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def action_for_event_by_user(self, event, context):
+    async def action_for_event_by_user(self, event, context) -> None:
         """Given an event and context, evaluate the push rules and insert the
         results into the event_push_actions_staging table.
-
-        Returns:
-            Deferred
         """
         rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user = {}
@@ -271,8 +266,7 @@ class RulesForRoom(object):
         # to self around in the callback.
         self.invalidate_all_cb = _Invalidation(rules_for_room_cache, room_id)
 
-    @defer.inlineCallbacks
-    def get_rules(self, event, context):
+    async def get_rules(self, event, context):
         """Given an event context return the rules for all users who are
         currently in the room.
         """
@@ -283,7 +277,7 @@ class RulesForRoom(object):
             self.room_push_rule_cache_metrics.inc_hits()
             return self.rules_by_user
 
-        with (yield self.linearizer.queue(())):
+        with (await self.linearizer.queue(())):
             if state_group and self.state_group == state_group:
                 logger.debug("Using cached rules for %r", self.room_id)
                 self.room_push_rule_cache_metrics.inc_hits()
@@ -301,9 +295,7 @@ class RulesForRoom(object):
 
                 push_rules_delta_state_cache_metric.inc_hits()
             else:
-                current_state_ids = yield defer.ensureDeferred(
-                    context.get_current_state_ids()
-                )
+                current_state_ids = await context.get_current_state_ids()
                 push_rules_delta_state_cache_metric.inc_misses()
 
             push_rules_state_size_counter.inc(len(current_state_ids))
@@ -350,7 +342,7 @@ class RulesForRoom(object):
                 # If we have some memebr events we haven't seen, look them up
                 # and fetch push rules for them if appropriate.
                 logger.debug("Found new member events %r", missing_member_event_ids)
-                yield self._update_rules_with_member_event_ids(
+                await self._update_rules_with_member_event_ids(
                     ret_rules_by_user, missing_member_event_ids, state_group, event
                 )
             else:
@@ -368,8 +360,7 @@ class RulesForRoom(object):
             )
         return ret_rules_by_user
 
-    @defer.inlineCallbacks
-    def _update_rules_with_member_event_ids(
+    async def _update_rules_with_member_event_ids(
         self, ret_rules_by_user, member_event_ids, state_group, event
     ):
         """Update the partially filled rules_by_user dict by fetching rules for
@@ -385,7 +376,7 @@ class RulesForRoom(object):
         """
         sequence = self.sequence
 
-        rows = yield self.store.get_membership_from_event_ids(member_event_ids.values())
+        rows = await self.store.get_membership_from_event_ids(member_event_ids.values())
 
         members = {row["event_id"]: (row["user_id"], row["membership"]) for row in rows}
 
@@ -407,7 +398,7 @@ class RulesForRoom(object):
 
         logger.debug("Joined: %r", interested_in_user_ids)
 
-        if_users_with_pushers = yield self.store.get_if_users_have_pushers(
+        if_users_with_pushers = await self.store.get_if_users_have_pushers(
             interested_in_user_ids, on_invalidate=self.invalidate_all_cb
         )
 
@@ -417,7 +408,7 @@ class RulesForRoom(object):
 
         logger.debug("With pushers: %r", user_ids)
 
-        users_with_receipts = yield self.store.get_users_with_read_receipts_in_room(
+        users_with_receipts = await self.store.get_users_with_read_receipts_in_room(
             self.room_id, on_invalidate=self.invalidate_all_cb
         )
 
@@ -428,7 +419,7 @@ class RulesForRoom(object):
             if uid in interested_in_user_ids:
                 user_ids.add(uid)
 
-        rules_by_user = yield self.store.bulk_get_push_rules(
+        rules_by_user = await self.store.bulk_get_push_rules(
             user_ids, on_invalidate=self.invalidate_all_cb
         )
 
