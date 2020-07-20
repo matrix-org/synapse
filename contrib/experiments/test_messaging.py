@@ -301,7 +301,7 @@ class HomeServer(ReplicationHandler):
         return self.replication_layer.backfill(dest, room_name, limit)
 
     def _get_room_remote_servers(self, room_name):
-        return [i for i in self.joined_rooms.setdefault(room_name).servers]
+        return list(self.joined_rooms.setdefault(room_name).servers)
 
     def _get_or_create_room(self, room_name):
         return self.joined_rooms.setdefault(room_name, Room(room_name))

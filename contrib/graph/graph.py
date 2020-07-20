@@ -32,7 +32,7 @@ def make_graph(pdus, room, filename_prefix):
     node_map = {}
 
     origins = set()
-    colors = set(("red", "green", "blue", "yellow", "purple"))
+    colors = {"red", "green", "blue", "yellow", "purple"}
 
     for pdu in pdus:
         origins.add(pdu.get("origin"))
