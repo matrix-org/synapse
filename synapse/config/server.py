@@ -638,7 +638,7 @@ class ServerConfig(Config):
         # (not including _matrix/...). This is the same URL a user would
         # enter into the 'custom HS URL' field on their client. If you
         # use synapse with a reverse proxy, this should be the URL to reach
-        # synapse via the proxy. If you use delegation and your synapse URL 
+        # synapse via the proxy. If you use delegation and your synapse URL
         # is different from the one specified in server_name, this URL should
         # point to Synapse itself.
         #
