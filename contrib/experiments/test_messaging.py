@@ -28,27 +28,24 @@ Currently assumes the local address is localhost:<port>
 """
 
 
-from synapse.federation import ReplicationHandler
-
-from synapse.federation.units import Pdu
-
-from synapse.util import origin_from_ucid
-
-from synapse.app.homeserver import SynapseHomeServer
-
-# from synapse.logging.utils import log_function
-
-from twisted.internet import reactor, defer
-from twisted.python import log
-
 import argparse
+import curses.wrapper
 import json
 import logging
 import os
 import re
 
 import cursesio
-import curses.wrapper
+
+from twisted.internet import defer, reactor
+from twisted.python import log
+
+from synapse.app.homeserver import SynapseHomeServer
+from synapse.federation import ReplicationHandler
+from synapse.federation.units import Pdu
+from synapse.util import origin_from_ucid
+
+# from synapse.logging.utils import log_function
 
 
 logger = logging.getLogger("example")
@@ -202,9 +199,9 @@ class HomeServer(ReplicationHandler):
             )
 
     # def on_state_change(self, pdu):
-    ##self.output.print_line("#%s (state) %s *** %s" %
-    ##(pdu.context, pdu.state_key, pdu.pdu_type)
-    ##)
+    #     self.output.print_line("#%s (state) %s *** %s" %
+    #         (pdu.context, pdu.state_key, pdu.pdu_type)
+    #     )
 
     # if "joinee" in pdu.content:
     # self._on_join(pdu.context, pdu.content["joinee"])
@@ -334,7 +331,7 @@ def main(stdscr):
     user = args.user
     server_name = origin_from_ucid(user)
 
-    ## Set up logging ##
+    # Set up logging
 
     root_logger = logging.getLogger()
 
@@ -354,7 +351,7 @@ def main(stdscr):
     observer = log.PythonLoggingObserver()
     observer.start()
 
-    ## Set up synapse server
+    # Set up synapse server
 
     curses_stdio = cursesio.CursesStdIO(stdscr)
     input_output = InputOutput(curses_stdio, user)
@@ -368,16 +365,16 @@ def main(stdscr):
 
     input_output.set_home_server(hs)
 
-    ## Add input_output logger
+    # Add input_output logger
     io_logger = IOLoggerHandler(input_output)
     io_logger.setFormatter(formatter)
     root_logger.addHandler(io_logger)
 
-    ## Start! ##
+    # Start!
 
     try:
         port = int(server_name.split(":")[1])
-    except:
+    except Exception:
         port = 12345
 
     app_hs.get_http_server().start_listening(port)

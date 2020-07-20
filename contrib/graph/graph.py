@@ -1,5 +1,13 @@
 from __future__ import print_function
 
+import argparse
+import cgi
+import datetime
+import json
+
+import pydot
+import urllib2
+
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,15 +21,6 @@ from __future__ import print_function
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-import sqlite3
-import pydot
-import cgi
-import json
-import datetime
-import argparse
-import urllib2
 
 
 def make_name(pdu_id, origin):
@@ -49,7 +48,7 @@ def make_graph(pdus, room, filename_prefix):
         try:
             c = colors.pop()
             color_map[o] = c
-        except:
+        except Exception:
             print("Run out of colours!")
             color_map[o] = "black"
 
