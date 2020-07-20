@@ -70,11 +70,11 @@ class UserErasureWorkerStore(SQLBaseStore):
 
 
 class UserErasureStore(UserErasureWorkerStore):
-    def mark_user_erased(self, user_id):
+    def mark_user_erased(self, user_id: str) -> None:
         """Indicate that user_id wishes their message history to be erased.
 
         Args:
-            user_id (str): full user_id to be erased
+            user_id: full user_id to be erased
         """
 
         def f(txn):
@@ -89,3 +89,23 @@ class UserErasureStore(UserErasureWorkerStore):
             self._invalidate_cache_and_stream(txn, self.is_user_erased, (user_id,))
 
         return self.db.runInteraction("mark_user_erased", f)
+
+    def mark_user_not_erased(self, user_id: str) -> None:
+        """Indicate that user_id is no longer erased.
+
+        Args:
+            user_id: full user_id to be un-erased
+        """
+
+        def f(txn):
+            # first check if they are already in the list
+            txn.execute("SELECT 1 FROM erased_users WHERE user_id = ?", (user_id,))
+            if not txn.fetchone():
+                return
+
+            # They are there, delete them.
+            self.simple_delete_one_txn(txn, "erased_users", keyvalues={"user_id": user_id})
+
+            self._invalidate_cache_and_stream(txn, self.is_user_erased, (user_id,))
+
+        return self.db.runInteraction("mark_user_not_erased", f)

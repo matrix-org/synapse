@@ -230,5 +230,8 @@ class DeactivateAccountHandler(BaseHandler):
         Args:
             user_id: ID of user to be deactivated
         """
-        # Mark the user as activate.
+        # Ensure the user is not marked as erased.
+        await self.store.mark_user_not_erased(user_id)
+
+        # Mark the user as active.
         await self.store.set_user_deactivated_status(user_id, False)
