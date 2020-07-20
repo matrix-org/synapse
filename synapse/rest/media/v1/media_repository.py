@@ -142,7 +142,7 @@ class MediaRepository(object):
 
         Args:
             media_type(str): The content type of the file
-            upload_name(str): The name of the file
+            upload_name(str|None): The name of the file
             content: A file like object that is the content to store
             content_length(int): The length of the content
             auth_user(str): The user_id of the uploader
@@ -154,7 +154,7 @@ class MediaRepository(object):
         if not isinstance(media_type, str):
             raise SynapseError(400, "Invalid parameter media_type", Codes.INVALID_PARAM)
 
-        if not isinstance(upload_name, str):
+        if upload_name and not isinstance(upload_name, str):
             raise SynapseError(
                 400, "Invalid parameter upload_name", Codes.INVALID_PARAM
             )
