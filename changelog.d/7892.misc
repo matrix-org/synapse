@@ -1,1 +1,1 @@
-Import ABC from collections.abc for Python 3 compatibility.
+Import ABC from `collections.abc` for Python 3.10 compatibility.
