@@ -70,8 +70,7 @@ class BulkPushRuleEvaluator(object):
             resizable=False,
         )
 
-    @defer.inlineCallbacks
-    def _get_rules_for_event(self, event, context):
+    async def _get_rules_for_event(self, event, context):
         """This gets the rules for all users in the room at the time of the event,
         as well as the push rules for the invitee if the event is an invite.
 
@@ -79,19 +78,19 @@ class BulkPushRuleEvaluator(object):
             dict of user_id -> push_rules
         """
         room_id = event.room_id
-        rules_for_room = yield self._get_rules_for_room(room_id)
+        rules_for_room = await self._get_rules_for_room(room_id)
 
-        rules_by_user = yield rules_for_room.get_rules(event, context)
+        rules_by_user = await rules_for_room.get_rules(event, context)
 
         # if this event is an invite event, we may need to run rules for the user
         # who's been invited, otherwise they won't get told they've been invited
         if event.type == "m.room.member" and event.content["membership"] == "invite":
             invited = event.state_key
             if invited and self.hs.is_mine_id(invited):
-                has_pusher = yield self.store.user_has_pusher(invited)
+                has_pusher = await self.store.user_has_pusher(invited)
                 if has_pusher:
                     rules_by_user = dict(rules_by_user)
-                    rules_by_user[invited] = yield self.store.get_push_rules_for_user(
+                    rules_by_user[invited] = await self.store.get_push_rules_for_user(
                         invited
                     )
 
@@ -114,20 +113,19 @@ class BulkPushRuleEvaluator(object):
             self.room_push_rule_cache_metrics,
         )
 
-    @defer.inlineCallbacks
-    def _get_power_levels_and_sender_level(self, event, context):
-        prev_state_ids = yield context.get_prev_state_ids()
+    async def _get_power_levels_and_sender_level(self, event, context):
+        prev_state_ids = await context.get_prev_state_ids()
         pl_event_id = prev_state_ids.get(POWER_KEY)
         if pl_event_id:
             # fastpath: if there's a power level event, that's all we need, and
             # not having a power level event is an extreme edge case
-            pl_event = yield self.store.get_event(pl_event_id)
+            pl_event = await self.store.get_event(pl_event_id)
             auth_events = {POWER_KEY: pl_event}
         else:
-            auth_events_ids = yield self.auth.compute_auth_events(
+            auth_events_ids = await self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=False
             )
-            auth_events = yield self.store.get_events(auth_events_ids)
+            auth_events = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
         sender_level = get_user_power_level(event.sender, auth_events)
@@ -136,23 +134,22 @@ class BulkPushRuleEvaluator(object):
 
         return pl_event.content if pl_event else {}, sender_level
 
-    @defer.inlineCallbacks
-    def action_for_event_by_user(self, event, context):
+    async def action_for_event_by_user(self, event, context):
         """Given an event and context, evaluate the push rules and insert the
         results into the event_push_actions_staging table.
 
         Returns:
             Deferred
         """
-        rules_by_user = yield self._get_rules_for_event(event, context)
+        rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user = {}
 
-        room_members = yield self.store.get_joined_users_from_context(event, context)
+        room_members = await self.store.get_joined_users_from_context(event, context)
 
         (
             power_levels,
             sender_power_level,
-        ) = yield self._get_power_levels_and_sender_level(event, context)
+        ) = await self._get_power_levels_and_sender_level(event, context)
 
         evaluator = PushRuleEvaluatorForEvent(
             event, len(room_members), sender_power_level, power_levels
@@ -165,7 +162,7 @@ class BulkPushRuleEvaluator(object):
                 continue
 
             if not event.is_state():
-                is_ignored = yield self.store.is_ignored_by(event.sender, uid)
+                is_ignored = await self.store.is_ignored_by(event.sender, uid)
                 if is_ignored:
                     continue
 
@@ -197,7 +194,7 @@ class BulkPushRuleEvaluator(object):
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist
         # the event)
-        yield self.store.add_push_actions_to_staging(event.event_id, actions_by_user)
+        await self.store.add_push_actions_to_staging(event.event_id, actions_by_user)
 
 
 def _condition_checker(evaluator, conditions, uid, display_name, cache):

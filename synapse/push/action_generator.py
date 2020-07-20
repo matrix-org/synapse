@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.util.metrics import Measure
 
 from .bulk_push_rule_evaluator import BulkPushRuleEvaluator
@@ -37,7 +35,6 @@ class ActionGenerator(object):
         # event stream, so we just run the rules for a client with no profile
         # tag (ie. we just need all the users).
 
-    @defer.inlineCallbacks
-    def handle_push_actions_for_event(self, event, context):
+    async def handle_push_actions_for_event(self, event, context):
         with Measure(self.clock, "action_for_event_by_user"):
-            yield self.bulk_evaluator.action_for_event_by_user(event, context)
+            await self.bulk_evaluator.action_for_event_by_user(event, context)
