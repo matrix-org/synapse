@@ -30,6 +30,7 @@ class DeactivateAccountHandler(BaseHandler):
 
     def __init__(self, hs):
         super(DeactivateAccountHandler, self).__init__(hs)
+        self.hs = hs
         self._auth_handler = hs.get_auth_handler()
         self._device_handler = hs.get_device_handler()
         self._room_member_handler = hs.get_room_member_handler()
@@ -222,14 +223,22 @@ class DeactivateAccountHandler(BaseHandler):
         """
         Activate an account that was previously deactivated.
 
-        This simply marks the user as activate in the database and does not
+        This marks the user as activate in the database, but does not
         attempt to rejoin rooms, re-add threepids, etc.
 
         The user will also need a password hash set to actually login.
 
         Args:
-            user_id: ID of user to be deactivated
+            user_id: ID of user to be re-activated
         """
+        # Add the user to the directory, if necessary.
+        user = UserID.from_string(user_id)
+        if self.hs.config.user_directory_search_all_users:
+            profile = await self.store.get_profileinfo(user.localpart)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
+
         # Ensure the user is not marked as erased.
         await self.store.mark_user_not_erased(user_id)
 
