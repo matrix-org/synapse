@@ -1,1 +1,0 @@
-Use time.perf_counter instead of time.clock for Python 3.8 compatibility.
