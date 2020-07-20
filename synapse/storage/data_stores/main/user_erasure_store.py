@@ -104,7 +104,9 @@ class UserErasureStore(UserErasureWorkerStore):
                 return
 
             # They are there, delete them.
-            self.simple_delete_one_txn(txn, "erased_users", keyvalues={"user_id": user_id})
+            self.simple_delete_one_txn(
+                txn, "erased_users", keyvalues={"user_id": user_id}
+            )
 
             self._invalidate_cache_and_stream(txn, self.is_user_erased, (user_id,))
 
