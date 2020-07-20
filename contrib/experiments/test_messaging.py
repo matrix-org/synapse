@@ -198,16 +198,6 @@ class HomeServer(ReplicationHandler):
                 % (pdu.context, pdu.pdu_type, json.dumps(pdu.content))
             )
 
-    # def on_state_change(self, pdu):
-    #     self.output.print_line("#%s (state) %s *** %s" %
-    #         (pdu.context, pdu.state_key, pdu.pdu_type)
-    #     )
-
-    # if "joinee" in pdu.content:
-    # self._on_join(pdu.context, pdu.content["joinee"])
-    # elif "invitee" in pdu.content:
-    # self._on_invite(pdu.origin, pdu.context, pdu.content["invitee"])
-
     def _on_message(self, pdu):
         """ We received a message
         """
