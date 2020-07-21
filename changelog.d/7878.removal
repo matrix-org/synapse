@@ -1,0 +1,1 @@
+Remove unused `synapse_replication_tcp_resource_invalidate_cache` prometheus metric.
