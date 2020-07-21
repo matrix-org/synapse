@@ -10,5 +10,16 @@
 # homeserver.yaml. Instead, if you are starting from scratch, please generate
 # a fresh config using Synapse by following the instructions in INSTALL.md.
 
+# Configuration options that take a time period can be set using a number
+# followed by a letter. Letters have the following meanings:
+# s = second
+# m = minute
+# h = hour
+# d = day
+# w = week
+# y = year
+# For example, setting redaction_retention_period: 5m would remove redacted
+# messages from the database after 5 minutes, rather than 5 months.
+
 ################################################################################
 
