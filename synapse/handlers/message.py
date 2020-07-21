@@ -461,7 +461,7 @@ class EventCreationHandler(object):
 
                 If None, they will be requested from the database.
             require_consent: Whether to check if the requester has
-                consented to privacy policy.
+                consented to the privacy policy.
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
