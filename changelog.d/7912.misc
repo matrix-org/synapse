@@ -1,1 +1,1 @@
-Convert room list handler to async/await.
+Convert `RoomListHandler` to async/await.
