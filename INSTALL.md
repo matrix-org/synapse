@@ -460,10 +460,19 @@ view it.
 In nginx this would be something like:
 ```
 location /.well-known/matrix/client {
-    return 200 '{"m.homeserver": {"base_url": "https://matrix.example.com"}}';
+    return 200 '{"m.homeserver": {"base_url": "https://<matrix.example.com>"}}';
     add_header Content-Type application/json;
     add_header Access-Control-Allow-Origin *;
 }
+```
+
+You should also ensure the `public_baseurl` option in `homeserver.yaml` is set
+correctly. `public_baseurl` should be set to the URL that clients will use to
+connect to your server. This is the same URL you put for the `m.homeserver`
+`base_url` above.
+
+```
+public_baseurl: "https://<matrix.example.com>"
 ```
 
 ## Email
