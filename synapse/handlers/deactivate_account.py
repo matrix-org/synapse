@@ -223,8 +223,10 @@ class DeactivateAccountHandler(BaseHandler):
         """
         Activate an account that was previously deactivated.
 
-        This marks the user as activate in the database, but does not
-        attempt to rejoin rooms, re-add threepids, etc.
+        This marks the user as active and not erased in the database, but does
+        not attempt to rejoin rooms, re-add threepids, etc.
+
+        If enabled, the user will be re-added to the user directory.
 
         The user will also need a password hash set to actually login.
 
