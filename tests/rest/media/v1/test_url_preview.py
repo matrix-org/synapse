@@ -12,10 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 import os
+import re
 
 import attr
+
+from mock import patch
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -23,6 +26,8 @@ from twisted.internet.error import DNSLookupError
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol
 from twisted.web._newclient import ResponseDone
+
+from synapse.rest.media.v1.preview_url_resource import _oembed_patterns
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -562,3 +567,107 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             ),
             server.data,
         )
+
+    def test_oembed_url(self):
+        """Test changing a URL via OEmbed."""
+        # Route the HTTP version to an HTTP endpoint so that the tests work.
+        with patch.dict(_oembed_patterns, {
+            re.compile("http://twitter\\.com/.+/status/.+"): "http://publish.twitter.com/oembed",
+        }):
+
+            self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
+            self.lookups["cdn.twitter.com"] = [(IPv4Address, "8.8.8.8")]
+
+            result = {
+                "version": "1.0",
+                "type": "photo",
+                "url": "http://cdn.twitter.com/matrixdotorg",
+            }
+            oembed_content = json.dumps(result).encode("utf-8")
+
+            end_content = (
+                b"<html><head>"
+                b"<title>Some Title</title>"
+                b'<meta property="og:description" content="hi" />'
+                b"</head></html>"
+            )
+
+            request, channel = self.make_request(
+                "GET", "url_preview?url=http://twitter.com/matrixdotorg/status/12345", shorthand=False
+            )
+            request.render(self.preview_url)
+            self.pump()
+
+            client = self.reactor.tcpClients[0][2].buildProtocol(None)
+            server = AccumulatingProtocol()
+            server.makeConnection(FakeTransport(client, self.reactor))
+            client.makeConnection(FakeTransport(server, self.reactor))
+            client.dataReceived(
+                (
+                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                    b'Content-Type: application/json; charset="utf8"\r\n\r\n'
+                )
+                % (len(oembed_content),)
+                + oembed_content
+            )
+
+            client = self.reactor.tcpClients[1][2].buildProtocol(None)
+            server = AccumulatingProtocol()
+            server.makeConnection(FakeTransport(client, self.reactor))
+            client.makeConnection(FakeTransport(server, self.reactor))
+            client.dataReceived(
+                (
+                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                    b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+                )
+                % (len(end_content),)
+                + end_content
+            )
+
+            self.pump()
+
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(
+                channel.json_body, {"og:title": "Some Title", "og:description": "hi"}
+            )
+
+    def test_oembed_html(self):
+        """Test an OEmbed endpoint which returns HTML."""
+        # Route the HTTP version to an HTTP endpoint so that the tests work.
+        with patch.dict(_oembed_patterns, {
+            re.compile("http://twitter\\.com/.+/status/.+"): "http://publish.twitter.com/oembed",
+        }):
+
+            self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
+
+            result = {
+                "version": "1.0",
+                "type": "rich",
+                "html": "<div>Content Preview</div>",
+            }
+            end_content = json.dumps(result).encode("utf-8")
+
+            request, channel = self.make_request(
+                "GET", "url_preview?url=http://twitter.com/matrixdotorg/status/12345", shorthand=False
+            )
+            request.render(self.preview_url)
+            self.pump()
+
+            client = self.reactor.tcpClients[0][2].buildProtocol(None)
+            server = AccumulatingProtocol()
+            server.makeConnection(FakeTransport(client, self.reactor))
+            client.makeConnection(FakeTransport(server, self.reactor))
+            client.dataReceived(
+                (
+                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                    b'Content-Type: application/json; charset="utf8"\r\n\r\n'
+                )
+                % (len(end_content),)
+                + end_content
+            )
+
+            self.pump()
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(
+                channel.json_body, {"og:title": None, "og:description": "Content Preview"}
+            )
