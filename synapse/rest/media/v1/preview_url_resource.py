@@ -61,7 +61,7 @@ class PreviewUrlResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo, media_storage):
-        super().__init__()
+        super().__init__(hs)
 
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()

@@ -88,7 +88,7 @@ class RemoteKey(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs):
-        super().__init__()
+        super().__init__(hs)
 
         self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastore()

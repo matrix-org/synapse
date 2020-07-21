@@ -26,7 +26,7 @@ class UploadResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo):
-        super().__init__()
+        super().__init__(hs)
 
         self.media_repo = media_repo
         self.filepaths = media_repo.filepaths

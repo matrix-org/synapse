@@ -38,7 +38,7 @@ class AdditionalResource(DirectServeJsonResource):
             handler ((twisted.web.server.Request) -> twisted.internet.defer.Deferred):
                 function to be called to handle the request.
         """
-        super().__init__()
+        super().__init__(hs)
         self._handler = handler
 
     def _async_render(self, request):

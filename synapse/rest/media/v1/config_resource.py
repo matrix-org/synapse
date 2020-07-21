@@ -21,7 +21,7 @@ class MediaConfigResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs):
-        super().__init__()
+        super().__init__(hs)
         config = hs.get_config()
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()

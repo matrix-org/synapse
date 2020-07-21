@@ -44,7 +44,7 @@ from synapse.api.errors import (
     UnrecognizedRequestError,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import preserve_fn
+from synapse.logging.context import defer_to_thread, defer_to_threadpool, preserve_fn
 from synapse.logging.opentracing import trace_servlet
 from synapse.util.caches import intern_dict
 
@@ -229,13 +229,13 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
 
                 if callback_return is not None:
                     code, response = callback_return
-                    self._send_response(request, code, response)
+                    await self._send_response(request, code, response)
         except Exception:
             # failure.Failure() fishes the original Failure out
             # of our stack, and thus gives us a sensible stack
             # trace.
             f = failure.Failure()
-            self._send_error_response(f, request)
+            await self._send_error_response(f, request)
 
     async def _async_render(self, request: Request):
         """Delegates to `_async_render_<METHOD>` methods, or returns a 400 if
@@ -260,13 +260,13 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         _unrecognised_request_handler(request)
 
     @abc.abstractmethod
-    def _send_response(
+    async def _send_response(
         self, request: SynapseRequest, code: int, response_object: Any,
     ) -> None:
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _send_error_response(
+    async def _send_error_response(
         self, f: failure.Failure, request: SynapseRequest,
     ) -> None:
         raise NotImplementedError()
@@ -277,22 +277,39 @@ class DirectServeJsonResource(_AsyncResource):
     formatting responses and errors as JSON.
     """
 
-    def _send_response(
+    def __init__(self, hs, extract_context=False):
+        super().__init__(extract_context)
+        self._hs = hs
+
+    async def _send_response(
         self, request: Request, code: int, response_object: Any,
     ):
         """Implements _AsyncResource._send_response
         """
-        # TODO: Only enable CORS for the requests that need it.
-        respond_with_json(
-            request,
-            code,
+        if request._disconnected:
+            logger.warning(
+                "Not sending response to request %s, already disconnected.", request
+            )
+            return
+
+        # encoding the json can be quite expensive in CPU time, and doesn't need to hold
+        # the GIL, so rather than blocking the reactor, we defer it to a background
+        # thread.
+        logger.debug("JSON-encoding response")
+        json_bytes = await defer_to_thread(
+            self._hs.get_reactor(),
+            _encode_json_response,
             response_object,
-            send_cors=True,
             pretty_print=_request_user_agent_is_curl(request),
             canonical_json=self.canonical_json,
         )
 
-    def _send_error_response(
+        # TODO: Only enable CORS for the requests that need it.
+        respond_with_json_bytes(
+            request, code, json_bytes, send_cors=True,
+        )
+
+    async def _send_error_response(
         self, f: failure.Failure, request: SynapseRequest,
     ) -> None:
         """Implements _AsyncResource._send_error_response
@@ -321,7 +338,7 @@ class JsonResource(DirectServeJsonResource):
     )
 
     def __init__(self, hs, canonical_json=True, extract_context=False):
-        super().__init__(extract_context)
+        super().__init__(hs, extract_context)
 
         self.canonical_json = canonical_json
         self.clock = hs.get_clock()
@@ -411,7 +428,7 @@ class DirectServeHtmlResource(_AsyncResource):
     # The error template to use for this resource
     ERROR_TEMPLATE = HTML_ERROR_TEMPLATE
 
-    def _send_response(
+    async def _send_response(
         self, request: SynapseRequest, code: int, response_object: Any,
     ):
         """Implements _AsyncResource._send_response
@@ -422,7 +439,7 @@ class DirectServeHtmlResource(_AsyncResource):
 
         respond_with_html_bytes(request, 200, html_bytes)
 
-    def _send_error_response(
+    async def _send_error_response(
         self, f: failure.Failure, request: SynapseRequest,
     ) -> None:
         """Implements _AsyncResource._send_error_response
@@ -539,16 +556,33 @@ def respond_with_json(
         )
         return None
 
-    if pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object) + b"\n"
-    else:
-        if canonical_json or synapse.events.USE_FROZEN_DICTS:
-            # canonicaljson already encodes to bytes
-            json_bytes = encode_canonical_json(json_object)
-        else:
-            json_bytes = json.dumps(json_object).encode("utf-8")
+    json_bytes = _encode_json_response(json_object, canonical_json, pretty_print)
 
     return respond_with_json_bytes(request, code, json_bytes, send_cors=send_cors)
+
+
+def _encode_json_response(
+    response_object: Any, canonical_json: bool, pretty_print: bool
+) -> bytes:
+    """Encode a response object as JSON
+
+    Args:
+        response_object: response object to be encoded
+        canonical_json: true to encode as canonicaljson
+        pretty_print: true to indentation and line-breaks in the
+            resulting JSON bytes.
+
+    Returns:
+        encoded response
+    """
+    if pretty_print:
+        return encode_pretty_printed_json(response_object) + b"\n"
+
+    if canonical_json or synapse.events.USE_FROZEN_DICTS:
+        # canonicaljson already encodes to bytes
+        return encode_canonical_json(response_object)
+
+    return json.dumps(response_object).encode("utf-8")
 
 
 def respond_with_json_bytes(
