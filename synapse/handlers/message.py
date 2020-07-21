@@ -757,7 +757,7 @@ class EventCreationHandler(object):
                 If None, they will be requested from the database.
 
         Returns:
-            Tuple of created event, Context
+            Tuple of created event, context
         """
 
         if prev_event_ids is not None:
