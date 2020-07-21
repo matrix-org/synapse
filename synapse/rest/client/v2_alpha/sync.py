@@ -183,9 +183,11 @@ class SyncRestServlet(RestServlet):
             time_now, sync_result, requester.access_token_id, filter_collection
         )
 
+        logger.debug("Event formatting complete")
         return 200, response_content
 
     async def encode_response(self, time_now, sync_result, access_token_id, filter):
+        logger.debug("Formatting events in sync response")
         if filter.event_format == "client":
             event_formatter = format_event_for_client_v2_without_room_id
         elif filter.event_format == "federation":
@@ -213,6 +215,7 @@ class SyncRestServlet(RestServlet):
             event_formatter,
         )
 
+        logger.debug("building sync response dict")
         return {
             "account_data": {"events": sync_result.account_data},
             "to_device": {"events": sync_result.to_device},
