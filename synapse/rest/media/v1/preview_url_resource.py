@@ -83,11 +83,15 @@ for endpoint, globs in _oembed_globs.items():
 @attr.s
 class OEmbedResult:
     # Content or URL must be provided.
-    html = attr.attrib(type=str)
-    url = attr.attrib(type=str)
+    html = attr.attrib(type=Optional[str])
+    url = attr.attrib(type=Optional[str])
     title = attr.attrib(type=str)
     # Number of seconds to cache the content.
     cache_age = attr.attrib(type=int)
+
+
+class OEmbedError(Exception):
+    """An error occurred processing the oEmbed object."""
 
 
 class PreviewUrlResource(DirectServeJsonResource):
@@ -357,9 +361,10 @@ class PreviewUrlResource(DirectServeJsonResource):
             if url_pattern.fullmatch(url):
                 return endpoint
 
-    async def _get_oembed_content(
-        self, endpoint: str, url: str
-    ) -> Optional[OEmbedResult]:
+        # No match.
+        return None
+
+    async def _get_oembed_content(self, endpoint: str, url: str) -> OEmbedResult:
         """
         Request content from an oEmbed endpoint.
 
@@ -368,9 +373,10 @@ class PreviewUrlResource(DirectServeJsonResource):
             url: The URL to pass to the API.
 
         Returns:
-            A tuple of a string and boolean. If the boolean is true the str is a
-            URL and should be downloaded. If it is false, the string is HTML
-            content to use.
+            An object representing the metadata returned.
+
+        Raises:
+            OEmbedError if fetching or parsing of the oEmbed information fails.
         """
         try:
             logger.debug("Trying to get oEmbed content for url '%s'", url)
@@ -383,7 +389,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             # Ensure there's a version of 1.0.
             if result.get("version") != "1.0":
-                return None
+                raise OEmbedError("Invalid version: %s" % (result.get("version"),))
 
             oembed_type = result.get("type")
 
@@ -410,13 +416,13 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_result.url = result.get("thumbnail_url")
                 return oembed_result
 
-            return None
+            raise OEmbedError("Incompatible oEmbed information.")
 
         except Exception as e:
             # Trap any exception and let the code follow as usual.
             # FIXME: pass through 404s and other error messages nicely
             logger.warning("Error downloading %s: %r", url, e)
-            return None
+            raise OEmbedError() from e
 
     async def _download_url(self, url, user):
         # TODO: we should probably honour robots.txt... except in practice
@@ -432,12 +438,15 @@ class PreviewUrlResource(DirectServeJsonResource):
         oembed_url = self._get_oembed_url(url)
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
-            oembed_result = await self._get_oembed_content(oembed_url, url)
-            if oembed_result:
+            try:
+                oembed_result = await self._get_oembed_content(oembed_url, url)
                 if oembed_result.url:
                     url_to_download = oembed_result.url
                 elif oembed_result.html:
                     url_to_download = None
+            except OEmbedError:
+                # If an error occurs, try doing a normal preview.
+                pass
 
         if url_to_download:
             with self.media_storage.store_into_file(file_info) as (f, fname, finish):
@@ -487,7 +496,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 expires = 60 * 60 * 1000
                 etag = headers["ETag"][0] if "ETag" in headers else None
         else:
-            html_bytes = oembed_result.html.encode("utf-8")
+            html_bytes = oembed_result.html.encode("utf-8")  # type: ignore
             with self.media_storage.store_into_file(file_info) as (f, fname, finish):
                 f.write(html_bytes)
                 await finish()
