@@ -16,9 +16,9 @@ import json
 import os
 import re
 
-import attr
-
 from mock import patch
+
+import attr
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -571,9 +571,14 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     def test_oembed_url(self):
         """Test changing a URL via OEmbed."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
-        with patch.dict(_oembed_patterns, {
-            re.compile("http://twitter\\.com/.+/status/.+"): "http://publish.twitter.com/oembed",
-        }):
+        with patch.dict(
+            _oembed_patterns,
+            {
+                re.compile(
+                    "http://twitter\\.com/.+/status/.+"
+                ): "http://publish.twitter.com/oembed",
+            },
+        ):
 
             self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
             self.lookups["cdn.twitter.com"] = [(IPv4Address, "8.8.8.8")]
@@ -593,7 +598,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             )
 
             request, channel = self.make_request(
-                "GET", "url_preview?url=http://twitter.com/matrixdotorg/status/12345", shorthand=False
+                "GET",
+                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                shorthand=False,
             )
             request.render(self.preview_url)
             self.pump()
@@ -634,9 +641,14 @@ class URLPreviewTests(unittest.HomeserverTestCase):
     def test_oembed_html(self):
         """Test an OEmbed endpoint which returns HTML."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
-        with patch.dict(_oembed_patterns, {
-            re.compile("http://twitter\\.com/.+/status/.+"): "http://publish.twitter.com/oembed",
-        }):
+        with patch.dict(
+            _oembed_patterns,
+            {
+                re.compile(
+                    "http://twitter\\.com/.+/status/.+"
+                ): "http://publish.twitter.com/oembed",
+            },
+        ):
 
             self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
 
@@ -648,7 +660,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             end_content = json.dumps(result).encode("utf-8")
 
             request, channel = self.make_request(
-                "GET", "url_preview?url=http://twitter.com/matrixdotorg/status/12345", shorthand=False
+                "GET",
+                "url_preview?url=http://twitter.com/matrixdotorg/status/12345",
+                shorthand=False,
             )
             request.render(self.preview_url)
             self.pump()
@@ -669,5 +683,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             self.pump()
             self.assertEqual(channel.code, 200)
             self.assertEqual(
-                channel.json_body, {"og:title": None, "og:description": "Content Preview"}
+                channel.json_body,
+                {"og:title": None, "og:description": "Content Preview"},
             )
