@@ -93,8 +93,8 @@ class MessageHandler(object):
 
     async def get_room_data(
         self,
-        user_id: Optional[str] = None,
-        room_id: Optional[str] = None,
+        user_id: str = None,
+        room_id: str = None,
         event_type: Optional[str] = None,
         state_key: str = "",
         is_guest: bool = False,
