@@ -618,6 +618,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 + oembed_content
             )
 
+            self.pump()
+
             client = self.reactor.tcpClients[1][2].buildProtocol(None)
             server = AccumulatingProtocol()
             server.makeConnection(FakeTransport(client, self.reactor))
