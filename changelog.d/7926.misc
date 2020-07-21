@@ -1,0 +1,1 @@
+Perform JSON-encoding of CS API responses in a background thread.
