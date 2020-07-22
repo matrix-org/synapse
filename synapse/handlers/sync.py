@@ -283,6 +283,7 @@ class SyncHandler(object):
             timeout,
             full_state,
         )
+        logger.debug("Returning sync response for %s", user_id)
         return res
 
     async def _wait_for_sync_for_user(
@@ -990,9 +991,13 @@ class SyncHandler(object):
             joined_room_ids=joined_room_ids,
         )
 
+        logger.debug("Fetching account data")
+
         account_data_by_room = await self._generate_sync_entry_for_account_data(
             sync_result_builder
         )
+
+        logger.debug("Fetching room data")
 
         res = await self._generate_sync_entry_for_rooms(
             sync_result_builder, account_data_by_room
@@ -1004,10 +1009,12 @@ class SyncHandler(object):
             since_token is None and sync_config.filter_collection.blocks_all_presence()
         )
         if self.hs_config.use_presence and not block_all_presence_data:
+            logger.debug("Fetching presence data")
             await self._generate_sync_entry_for_presence(
                 sync_result_builder, newly_joined_rooms, newly_joined_or_invited_users
             )
 
+        logger.debug("Fetching to-device data")
         await self._generate_sync_entry_for_to_device(sync_result_builder)
 
         device_lists = await self._generate_sync_entry_for_device_list(
@@ -1018,6 +1025,7 @@ class SyncHandler(object):
             newly_left_users=newly_left_users,
         )
 
+        logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
         one_time_key_counts = {}  # type: JsonDict
         if device_id:
@@ -1025,6 +1033,7 @@ class SyncHandler(object):
                 user_id, device_id
             )
 
+        logger.debug("Fetching group data")
         await self._generate_sync_entry_for_groups(sync_result_builder)
 
         # debug for https://github.com/matrix-org/synapse/issues/4422
@@ -1035,6 +1044,7 @@ class SyncHandler(object):
                     "Sync result for newly joined room %s: %r", room_id, joined_room
                 )
 
+        logger.debug("Sync response calculation complete")
         return SyncResult(
             presence=sync_result_builder.presence,
             account_data=sync_result_builder.account_data,
@@ -1407,8 +1417,9 @@ class SyncHandler(object):
         newly_joined_rooms = room_changes.newly_joined_rooms
         newly_left_rooms = room_changes.newly_left_rooms
 
-        def handle_room_entries(room_entry):
-            return self._generate_room_entry(
+        async def handle_room_entries(room_entry):
+            logger.debug("Generating room entry for %s", room_entry.room_id)
+            res = await self._generate_room_entry(
                 sync_result_builder,
                 ignored_users,
                 room_entry,
@@ -1417,6 +1428,8 @@ class SyncHandler(object):
                 account_data=account_data_by_room.get(room_entry.room_id, {}),
                 always_include=sync_result_builder.full_state,
             )
+            logger.debug("Generated room entry for %s", room_entry.room_id)
+            return res
 
         await concurrently_execute(handle_room_entries, room_entries, 10)
 
