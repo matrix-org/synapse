@@ -19,6 +19,7 @@
 
 import logging
 import urllib.parse
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
@@ -36,6 +37,7 @@ from synapse.api.errors import (
 )
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.client import SimpleHttpClient
+from synapse.types import Requester
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 
@@ -59,21 +61,23 @@ class IdentityHandler(BaseHandler):
         self.federation_http_client = hs.get_http_client()
         self.hs = hs
 
-    async def threepid_from_creds(self, id_server, creds):
+    async def threepid_from_creds(
+        self, id_server: str, creds: Dict[str, str]
+    ) -> Dict[str, Optional[Union[str, int]]]:
         """
         Retrieve and validate a threepid identifier from a "credentials" dictionary against a
         given identity server
 
         Args:
-            id_server (str): The identity server to validate 3PIDs against. Must be a
+            id_server: The identity server to validate 3PIDs against. Must be a
                 complete URL including the protocol (http(s)://)
 
-            creds (dict[str, str]): Dictionary containing the following keys:
+            creds: Dictionary containing the following keys:
                 * client_secret|clientSecret: A unique secret str provided by the client
                 * sid: The ID of the validation session
 
         Returns:
-            Deferred[dict[str,str|int]|None]: A dictionary consisting of response params to
+            A dictionary consisting of response params to
                 the /getValidated3pid endpoint of the Identity Service API, or None if the
                 threepid was not found
         """
@@ -119,26 +123,27 @@ class IdentityHandler(BaseHandler):
         return None
 
     async def bind_threepid(
-        self, client_secret, sid, mxid, id_server, id_access_token=None, use_v2=True
-    ):
+        self,
+        client_secret: str,
+        sid: str,
+        mxid: str,
+        id_server: str,
+        id_access_token: Optional[str] = None,
+        use_v2: bool = True,
+    ) -> dict:
         """Bind a 3PID to an identity server
 
         Args:
-            client_secret (str): A unique secret provided by the client
-
-            sid (str): The ID of the validation session
-
-            mxid (str): The MXID to bind the 3PID to
-
-            id_server (str): The domain of the identity server to query
-
-            id_access_token (str): The access token to authenticate to the identity
+            client_secret: A unique secret provided by the client
+            sid: The ID of the validation session
+            mxid: The MXID to bind the 3PID to
+            id_server: The domain of the identity server to query
+            id_access_token: The access token to authenticate to the identity
                 server with, if necessary. Required if use_v2 is true
-
-            use_v2 (bool): Whether to use v2 Identity Service API endpoints. Defaults to True
+            use_v2: Whether to use v2 Identity Service API endpoints. Defaults to True
 
         Returns:
-            Deferred[dict]: The response from the identity server
+            The response from the identity server
         """
         logger.debug("Proxying threepid bind request for %s to %s", mxid, id_server)
 
@@ -187,20 +192,20 @@ class IdentityHandler(BaseHandler):
         )
         return res
 
-    async def try_unbind_threepid(self, mxid, threepid):
+    async def try_unbind_threepid(self, mxid: str, threepid: dict) -> bool:
         """Attempt to remove a 3PID from an identity server, or if one is not provided, all
         identity servers we're aware the binding is present on
 
         Args:
-            mxid (str): Matrix user ID of binding to be removed
-            threepid (dict): Dict with medium & address of binding to be
+            mxid: Matrix user ID of binding to be removed
+            threepid: Dict with medium & address of binding to be
                 removed, and an optional id_server.
 
         Raises:
             SynapseError: If we failed to contact the identity server
 
         Returns:
-            Deferred[bool]: True on success, otherwise False if the identity
+            True on success, otherwise False if the identity
             server doesn't support unbinding (or no identity server found to
             contact).
         """
@@ -223,19 +228,21 @@ class IdentityHandler(BaseHandler):
 
         return changed
 
-    async def try_unbind_threepid_with_id_server(self, mxid, threepid, id_server):
+    async def try_unbind_threepid_with_id_server(
+        self, mxid: str, threepid: dict, id_server: str
+    ) -> bool:
         """Removes a binding from an identity server
 
         Args:
-            mxid (str): Matrix user ID of binding to be removed
-            threepid (dict): Dict with medium & address of binding to be removed
-            id_server (str): Identity server to unbind from
+            mxid: Matrix user ID of binding to be removed
+            threepid: Dict with medium & address of binding to be removed
+            id_server: Identity server to unbind from
 
         Raises:
             SynapseError: If we failed to contact the identity server
 
         Returns:
-            Deferred[bool]: True on success, otherwise False if the identity
+            True on success, otherwise False if the identity
             server doesn't support unbinding
         """
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
@@ -287,23 +294,23 @@ class IdentityHandler(BaseHandler):
 
     async def send_threepid_validation(
         self,
-        email_address,
-        client_secret,
-        send_attempt,
-        send_email_func,
-        next_link=None,
-    ):
+        email_address: str,
+        client_secret: str,
+        send_attempt: int,
+        send_email_func: Callable[[str, str, str, str], Awaitable],
+        next_link: Optional[str] = None,
+    ) -> str:
         """Send a threepid validation email for password reset or
         registration purposes
 
         Args:
-            email_address (str): The user's email address
-            client_secret (str): The provided client secret
-            send_attempt (int): Which send attempt this is
-            send_email_func (func): A function that takes an email address, token,
-                                    client_secret and session_id, sends an email
-                                    and returns a Deferred.
-            next_link (str|None): The URL to redirect the user to after validation
+            email_address: The user's email address
+            client_secret: The provided client secret
+            send_attempt: Which send attempt this is
+            send_email_func: A function that takes an email address, token,
+                             client_secret and session_id, sends an email
+                             and returns an Awaitable.
+            next_link: The URL to redirect the user to after validation
 
         Returns:
             The new session_id upon success
@@ -379,9 +386,9 @@ class IdentityHandler(BaseHandler):
         validation.
 
         Args:
-            id_server (str): The identity server to proxy to
-            email (str): The email to send the message to
-            client_secret (str): The unique client_secret sends by the user
+            id_server: The identity server to proxy to
+            email: The email to send the message to
+            client_secret: The unique client_secret sends by the user
             send_attempt (int): Which attempt this is
             next_link: A link to redirect the user to once they submit the token
 
@@ -430,10 +437,10 @@ class IdentityHandler(BaseHandler):
         Request an external server send an SMS message on our behalf for the purposes of
         threepid validation.
         Args:
-            id_server (str): The identity server to proxy to
-            country (str): The country code of the phone number
-            phone_number (str): The number to send the message to
-            client_secret (str): The unique client_secret sends by the user
+            id_server: The identity server to proxy to
+            country: The country code of the phone number
+            phone_number: The number to send the message to
+            client_secret: The unique client_secret sends by the user
             send_attempt (int): Which attempt this is
             next_link: A link to redirect the user to once they submit the token
 
@@ -485,9 +492,9 @@ class IdentityHandler(BaseHandler):
         Tries validating against any configured account_threepid_delegates as well as locally.
 
         Args:
-            client_secret (str): A secret provided by the client
+            client_secret: A secret provided by the client
 
-            sid (str): The ID of the session
+            sid: The ID of the session
 
         Returns:
             Dict[str, str|int] if validation was successful, otherwise None
@@ -523,23 +530,22 @@ class IdentityHandler(BaseHandler):
 
         return validation_session
 
-    async def proxy_msisdn_submit_token(self, id_server, client_secret, sid, token):
+    async def proxy_msisdn_submit_token(
+        self, id_server: str, client_secret: str, sid: str, token: str
+    ) -> dict:
         """Proxy a POST submitToken request to an identity server for verification purposes
 
         Args:
-            id_server (str): The identity server URL to contact
-
-            client_secret (str): Secret provided by the client
-
-            sid (str): The ID of the session
-
-            token (str): The verification token
+            id_server: The identity server URL to contact
+            client_secret: Secret provided by the client
+            sid: The ID of the session
+            token: The verification token
 
         Raises:
             SynapseError: If we failed to contact the identity server
 
         Returns:
-            Deferred[dict]: The response dict from the identity server
+            The response dict from the identity server
         """
         body = {"client_secret": client_secret, "sid": sid, "token": token}
 
@@ -554,19 +560,25 @@ class IdentityHandler(BaseHandler):
             logger.warning("Error contacting msisdn account_threepid_delegate: %s", e)
             raise SynapseError(400, "Error contacting the identity server")
 
-    async def lookup_3pid(self, id_server, medium, address, id_access_token=None):
+    async def lookup_3pid(
+        self,
+        id_server: str,
+        medium: str,
+        address: str,
+        id_access_token: Optional[str] = None,
+    ) -> Optional[str]:
         """Looks up a 3pid in the passed identity server.
 
         Args:
-            id_server (str): The server name (including port, if required)
+            id_server: The server name (including port, if required)
                 of the identity server to use.
-            medium (str): The type of the third party identifier (e.g. "email").
-            address (str): The third party identifier (e.g. "foo@example.com").
-            id_access_token (str|None): The access token to authenticate to the identity
+            medium: The type of the third party identifier (e.g. "email").
+            address: The third party identifier (e.g. "foo@example.com").
+            id_access_token: The access token to authenticate to the identity
                 server with
 
         Returns:
-            str|None: the matrix ID of the 3pid, or None if it is not recognized.
+            the matrix ID of the 3pid, or None if it is not recognized.
         """
         if id_access_token is not None:
             try:
@@ -595,10 +607,10 @@ class IdentityHandler(BaseHandler):
         """Looks up a 3pid in the passed identity server using v1 lookup.
 
         Args:
-            id_server (str): The server name (including port, if required)
+            id_server: The server name (including port, if required)
                 of the identity server to use.
-            medium (str): The type of the third party identifier (e.g. "email").
-            address (str): The third party identifier (e.g. "foo@example.com").
+            medium: The type of the third party identifier (e.g. "email").
+            address: The third party identifier (e.g. "foo@example.com").
 
         Returns:
             str: the matrix ID of the 3pid, or None if it is not recognized.
@@ -621,18 +633,20 @@ class IdentityHandler(BaseHandler):
 
         return None
 
-    async def _lookup_3pid_v2(self, id_server, id_access_token, medium, address):
+    async def _lookup_3pid_v2(
+        self, id_server, id_access_token, medium, address
+    ) -> Optional[str]:
         """Looks up a 3pid in the passed identity server using v2 lookup.
 
         Args:
-            id_server (str): The server name (including port, if required)
+            id_server: The server name (including port, if required)
                 of the identity server to use.
-            id_access_token (str): The access token to authenticate to the identity server with
-            medium (str): The type of the third party identifier (e.g. "email").
-            address (str): The third party identifier (e.g. "foo@example.com").
+            id_access_token: The access token to authenticate to the identity server with
+            medium: The type of the third party identifier (e.g. "email").
+            address: The third party identifier (e.g. "foo@example.com").
 
         Returns:
-            Deferred[str|None]: the matrix ID of the 3pid, or None if it is not recognised.
+            the matrix ID of the 3pid, or None if it is not recognised.
         """
         # Check what hashing details are supported by this identity server
         try:
@@ -757,48 +771,48 @@ class IdentityHandler(BaseHandler):
 
     async def ask_id_server_for_third_party_invite(
         self,
-        requester,
-        id_server,
-        medium,
-        address,
-        room_id,
-        inviter_user_id,
-        room_alias,
-        room_avatar_url,
-        room_join_rules,
-        room_name,
-        inviter_display_name,
-        inviter_avatar_url,
-        id_access_token=None,
-    ):
+        requester: Requester,
+        id_server: str,
+        medium: str,
+        address: str,
+        room_id: str,
+        inviter_user_id: str,
+        room_alias: str,
+        room_avatar_url: str,
+        room_join_rules: str,
+        room_name: str,
+        inviter_display_name: str,
+        inviter_avatar_url: str,
+        id_access_token: Optional[str] = None,
+    ) -> Tuple[str, List[Dict[str, str]], str]:
         """
         Asks an identity server for a third party invite.
 
         Args:
-            requester (Requester)
-            id_server (str): hostname + optional port for the identity server.
-            medium (str): The literal string "email".
-            address (str): The third party address being invited.
-            room_id (str): The ID of the room to which the user is invited.
-            inviter_user_id (str): The user ID of the inviter.
-            room_alias (str): An alias for the room, for cosmetic notifications.
-            room_avatar_url (str): The URL of the room's avatar, for cosmetic
+            requester
+            id_server: hostname + optional port for the identity server.
+            medium: The literal string "email".
+            address: The third party address being invited.
+            room_id: The ID of the room to which the user is invited.
+            inviter_user_id: The user ID of the inviter.
+            room_alias: An alias for the room, for cosmetic notifications.
+            room_avatar_url: The URL of the room's avatar, for cosmetic
                 notifications.
-            room_join_rules (str): The join rules of the email (e.g. "public").
-            room_name (str): The m.room.name of the room.
-            inviter_display_name (str): The current display name of the
+            room_join_rules: The join rules of the email (e.g. "public").
+            room_name: The m.room.name of the room.
+            inviter_display_name: The current display name of the
                 inviter.
-            inviter_avatar_url (str): The URL of the inviter's avatar.
+            inviter_avatar_url: The URL of the inviter's avatar.
             id_access_token (str|None): The access token to authenticate to the identity
                 server with
 
         Returns:
-            A deferred tuple containing:
-                token (str): The token which must be signed to prove authenticity.
+            A tuple containing:
+                token: The token which must be signed to prove authenticity.
                 public_keys ([{"public_key": str, "key_validity_url": str}]):
                     public_key is a base64-encoded ed25519 public key.
                 fallback_public_key: One element from public_keys.
-                display_name (str): A user-friendly name to represent the invited
+                display_name: A user-friendly name to represent the invited
                     user.
         """
         invite_config = {
@@ -901,7 +915,7 @@ def create_id_access_token_header(id_access_token):
     of an HTTP request.
 
     Args:
-        id_access_token (str): An identity server access token.
+        id_access_token: An identity server access token.
 
     Returns:
         list[str]: The ascii-encoded bearer token encased in a list.

@@ -1394,7 +1394,7 @@ class FederationHandler(BaseHandler):
             # it's just a best-effort thing at this point. We do want to do
             # them roughly in order, though, otherwise we'll end up making
             # lots of requests for missing prev_events which we do actually
-            # have. Hence we fire off the deferred, but don't wait for it.
+            # have. Hence we fire off the background task, but don't wait for it.
 
             run_in_background(self._handle_queued_pdus, room_queue)
 
@@ -2994,7 +2994,9 @@ class FederationHandler(BaseHandler):
         else:
             user_joined_room(self.distributor, user, room_id)
 
-    async def get_room_complexity(self, remote_room_hosts, room_id):
+    async def get_room_complexity(
+        self, remote_room_hosts: List[str], room_id: str
+    ) -> Optional[dict]:
         """
         Fetch the complexity of a remote room over federation.
 
@@ -3003,7 +3005,7 @@ class FederationHandler(BaseHandler):
             room_id (str): The room ID to ask about.
 
         Returns:
-            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            Dict contains the complexity
             metric versions, while None means we could not fetch the complexity.
         """
 
