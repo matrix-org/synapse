@@ -18,13 +18,12 @@ import abc
 import logging
 from typing import List, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import Database
 from synapse.storage.util.id_generators import StreamIdGenerator
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -327,7 +326,7 @@ class AccountDataStore(AccountDataWorkerStore):
         Returns:
             A deferred that completes once the account_data has been added.
         """
-        content_json = json.dumps(content)
+        content_json = json_encoder.encode(content)
 
         with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as room_account_data has a unique constraint
@@ -373,7 +372,7 @@ class AccountDataStore(AccountDataWorkerStore):
         Returns:
             A deferred that completes once the account_data has been added.
         """
-        content_json = json.dumps(content)
+        content_json = json_encoder.encode(content)
 
         with self._account_data_id_gen.get_next() as next_id:
             # no need to lock here as account_data has a unique constraint on
