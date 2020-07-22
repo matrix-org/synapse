@@ -575,9 +575,10 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             _oembed_patterns,
             {
                 re.compile(
-                    "http://twitter\\.com/.+/status/.+"
+                    "http\\:\\/\\/twitter\\.com\\/.+\\/status\\/.+"
                 ): "http://publish.twitter.com/oembed",
             },
+            clear=True,
         ):
 
             self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
@@ -647,9 +648,10 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             _oembed_patterns,
             {
                 re.compile(
-                    "http://twitter\\.com/.+/status/.+"
+                    "http\\:\\/\\/twitter\\.com\\/.+\\/status\\/.+"
                 ): "http://publish.twitter.com/oembed",
             },
+            clear=True,
         ):
 
             self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
