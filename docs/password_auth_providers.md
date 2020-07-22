@@ -19,14 +19,14 @@ password auth provider module implementations:
 
 Password auth provider classes must provide the following methods:
 
-* `parse_config(cls, config)`
+* `parse_config(config)`
   This method is passed the `config` object for this module from the
   homeserver configuration file.
 
   It should perform any appropriate sanity checks on the provided
   configuration, and return an object which is then passed into
 
-  This method should have the `@classmethod` decoration.
+  This method should have the `@staticmethod` decoration.
 
 * `__init__(self, config, account_handler)`
 
