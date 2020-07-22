@@ -575,7 +575,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             _oembed_patterns,
             {
                 re.compile(
-                    "http\\:\\/\\/twitter\\.com\\/.+\\/status\\/.+"
+                    "http://twitter\\.com/.+/status/.+"
                 ): "http://publish.twitter.com/oembed",
             },
             clear=True,
@@ -648,7 +648,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             _oembed_patterns,
             {
                 re.compile(
-                    "http\\:\\/\\/twitter\\.com\\/.+\\/status\\/.+"
+                    "http://twitter\\.com/.+/status/.+"
                 ): "http://publish.twitter.com/oembed",
             },
             clear=True,
