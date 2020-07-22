@@ -16,13 +16,12 @@
 
 import logging
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import LoggingTransaction, SQLBaseStore, db_to_json
 from synapse.storage.database import Database
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ def _serialize_action(actions, is_highlight):
     else:
         if actions == DEFAULT_NOTIF_ACTION:
             return ""
-    return json.dumps(actions)
+    return json_encoder.encode(actions)
 
 
 def _deserialize_action(actions, is_highlight):

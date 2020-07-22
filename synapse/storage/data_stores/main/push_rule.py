@@ -18,8 +18,6 @@ import abc
 import logging
 from typing import List, Tuple, Union
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.push.baserules import list_with_base_rules
@@ -33,6 +31,7 @@ from synapse.storage.data_stores.main.roommember import RoomMemberWorkerStore
 from synapse.storage.database import Database
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.storage.util.id_generators import ChainedIdGenerator
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -411,8 +410,8 @@ class PushRuleStore(PushRulesWorkerStore):
         before=None,
         after=None,
     ):
-        conditions_json = json.dumps(conditions)
-        actions_json = json.dumps(actions)
+        conditions_json = json_encoder.encode(conditions)
+        actions_json = json_encoder.encode(actions)
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
             if before or after:
@@ -681,7 +680,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
     @defer.inlineCallbacks
     def set_push_rule_actions(self, user_id, rule_id, actions, is_default_rule):
-        actions_json = json.dumps(actions)
+        actions_json = json_encoder.encode(actions)
 
         def set_push_rule_actions_txn(txn, stream_id, event_stream_ordering):
             if is_default_rule:
