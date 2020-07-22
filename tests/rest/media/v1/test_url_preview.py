@@ -27,8 +27,6 @@ from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol
 from twisted.web._newclient import ResponseDone
 
-from synapse.rest.media.v1.preview_url_resource import _oembed_patterns
-
 from tests import unittest
 from tests.server import FakeTransport
 
@@ -572,7 +570,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """Test changing a URL via oEmbed."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
-            _oembed_patterns,
+            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
             {
                 re.compile(
                     "http://twitter\\.com/.+/status/.+"
@@ -645,7 +643,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """Test an oEmbed endpoint which returns HTML."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
-            _oembed_patterns,
+            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
             {
                 re.compile(
                     "http://twitter\\.com/.+/status/.+"
