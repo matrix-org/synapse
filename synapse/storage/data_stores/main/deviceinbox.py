@@ -16,13 +16,12 @@
 import logging
 from typing import List, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
+from synapse.util import json_encoder
 from synapse.util.caches.expiringcache import ExpiringCache
 
 logger = logging.getLogger(__name__)
@@ -354,7 +353,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
             )
             rows = []
             for destination, edu in remote_messages_by_destination.items():
-                edu_json = json.dumps(edu)
+                edu_json = json_encoder.encode(edu)
                 rows.append((destination, stream_id, now_ms, edu_json))
             txn.executemany(sql, rows)
 
@@ -432,7 +431,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
                 # Handle wildcard device_ids.
                 sql = "SELECT device_id FROM devices WHERE user_id = ?"
                 txn.execute(sql, (user_id,))
-                message_json = json.dumps(messages_by_device["*"])
+                message_json = json_encoder.encode(messages_by_device["*"])
                 for row in txn:
                     # Add the message for all devices for this user on this
                     # server.
@@ -454,7 +453,7 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
                     # Only insert into the local inbox if the device exists on
                     # this server
                     device = row[0]
-                    message_json = json.dumps(messages_by_device[device])
+                    message_json = json_encoder.encode(messages_by_device[device])
                     messages_json_for_user[device] = message_json
 
             if messages_json_for_user:

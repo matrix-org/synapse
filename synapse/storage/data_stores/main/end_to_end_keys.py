@@ -16,7 +16,7 @@
 # limitations under the License.
 from typing import Dict, List, Tuple
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.enterprise.adbapi import Connection
 from twisted.internet import defer
@@ -24,6 +24,7 @@ from twisted.internet import defer
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import make_in_list_sql_clause
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
 
@@ -698,7 +699,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 values={
                     "user_id": user_id,
                     "keytype": key_type,
-                    "keydata": json.dumps(key),
+                    "keydata": json_encoder.encode(key),
                     "stream_id": stream_id,
                 },
             )
