@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
-from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+from canonicaljson import encode_canonical_json, encode_pretty_printed_json
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -46,6 +46,7 @@ from synapse.api.errors import (
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import preserve_fn
 from synapse.logging.opentracing import trace_servlet
+from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
@@ -546,7 +547,7 @@ def respond_with_json(
             # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = json.dumps(json_object).encode("utf-8")
+            json_bytes = json_encoder.encode(json_object).encode("utf-8")
 
     return respond_with_json_bytes(request, code, json_bytes, send_cors=send_cors)
 

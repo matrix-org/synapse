@@ -18,11 +18,14 @@ import re
 
 import attr
 
+from canonicaljson import json
 from twisted.internet import defer, task
 
 from synapse.logging import context
 
 logger = logging.getLogger(__name__)
+
+json_encoder = json.JSONEncoder(separators=(",", ":"))
 
 
 def unwrapFirstError(failure):
