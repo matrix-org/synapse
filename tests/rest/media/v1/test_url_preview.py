@@ -569,7 +569,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
     def test_oembed_url(self):
-        """Test changing a URL via OEmbed."""
+        """Test changing a URL via oEmbed."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
             _oembed_patterns,
@@ -641,7 +641,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             )
 
     def test_oembed_html(self):
-        """Test an OEmbed endpoint which returns HTML."""
+        """Test an oEmbed endpoint which returns HTML."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
             _oembed_patterns,
