@@ -573,7 +573,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
             {
                 re.compile(
-                    "http://twitter\\.com/.+/status/.+"
+                    r"http://twitter\.com/.+/status/.+"
                 ): "http://publish.twitter.com/oembed",
             },
             clear=True,
@@ -646,7 +646,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
             {
                 re.compile(
-                    "http://twitter\\.com/.+/status/.+"
+                    r"http://twitter\.com/.+/status/.+"
                 ): "http://publish.twitter.com/oembed",
             },
             clear=True,

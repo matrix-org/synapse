@@ -96,7 +96,7 @@ for endpoint, globs in _oembed_globs.items():
                 results.scheme,
                 re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
             ]
-            + list(map(lambda part: re.escape(part).replace("\\*", ".+"), results[2:]))
+            + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
         )
         _oembed_patterns[re.compile(pattern)] = endpoint
 
@@ -104,11 +104,11 @@ for endpoint, globs in _oembed_globs.items():
 @attr.s
 class OEmbedResult:
     # Content or URL must be provided.
-    html = attr.attrib(type=Optional[str])
-    url = attr.attrib(type=Optional[str])
-    title = attr.attrib(type=str)
+    html = attr.ib(type=Optional[str])
+    url = attr.ib(type=Optional[str])
+    title = attr.ib(type=str)
     # Number of seconds to cache the content.
-    cache_age = attr.attrib(type=int)
+    cache_age = attr.ib(type=int)
 
 
 class OEmbedError(Exception):
