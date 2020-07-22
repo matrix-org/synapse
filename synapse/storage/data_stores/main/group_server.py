@@ -16,12 +16,11 @@
 
 from typing import List, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.util import json_encoder
 
 # The category ID for the "default" category. We don't store as null in the
 # database to avoid the fun of null != null
@@ -750,7 +749,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if profile is None:
             insertion_values["profile"] = "{}"
         else:
-            update_values["profile"] = json.dumps(profile)
+            update_values["profile"] = json_encoder.encode(profile)
 
         if is_public is None:
             insertion_values["is_public"] = True
@@ -781,7 +780,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if profile is None:
             insertion_values["profile"] = "{}"
         else:
-            update_values["profile"] = json.dumps(profile)
+            update_values["profile"] = json_encoder.encode(profile)
 
         if is_public is None:
             insertion_values["is_public"] = True
@@ -1005,7 +1004,7 @@ class GroupServerStore(GroupServerWorkerStore):
                         "group_id": group_id,
                         "user_id": user_id,
                         "valid_until_ms": remote_attestation["valid_until_ms"],
-                        "attestation_json": json.dumps(remote_attestation),
+                        "attestation_json": json_encoder.encode(remote_attestation),
                     },
                 )
 
@@ -1129,7 +1128,7 @@ class GroupServerStore(GroupServerWorkerStore):
                     "is_admin": is_admin,
                     "membership": membership,
                     "is_publicised": is_publicised,
-                    "content": json.dumps(content),
+                    "content": json_encoder.encode(content),
                 },
             )
 
@@ -1141,7 +1140,7 @@ class GroupServerStore(GroupServerWorkerStore):
                     "group_id": group_id,
                     "user_id": user_id,
                     "type": "membership",
-                    "content": json.dumps(
+                    "content": json_encoder.encode(
                         {"membership": membership, "content": content}
                     ),
                 },
@@ -1169,7 +1168,7 @@ class GroupServerStore(GroupServerWorkerStore):
                             "group_id": group_id,
                             "user_id": user_id,
                             "valid_until_ms": remote_attestation["valid_until_ms"],
-                            "attestation_json": json.dumps(remote_attestation),
+                            "attestation_json": json_encoder.encode(remote_attestation),
                         },
                     )
             else:
@@ -1238,7 +1237,7 @@ class GroupServerStore(GroupServerWorkerStore):
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={
                 "valid_until_ms": attestation["valid_until_ms"],
-                "attestation_json": json.dumps(attestation),
+                "attestation_json": json_encoder.encode(attestation),
             },
             desc="update_remote_attestion",
         )
