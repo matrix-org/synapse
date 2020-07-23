@@ -12,26 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import re
-from io import StringIO
 
 from twisted.internet.defer import Deferred
-from twisted.python.failure import Failure
-from twisted.test.proto_helpers import AccumulatingProtocol
 from twisted.web.resource import Resource
-from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, RedirectException, SynapseError
 from synapse.config.server import parse_listener_def
 from synapse.http.server import DirectServeHtmlResource, JsonResource, OptionsResource
-from synapse.http.site import SynapseSite, logger
+from synapse.http.site import SynapseSite
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import Clock
 
 from tests import unittest
 from tests.server import (
-    FakeTransport,
     ThreadedMemoryReactorClock,
     make_request,
     render,
