@@ -18,7 +18,7 @@
 import itertools
 import logging
 from collections import deque, namedtuple
-from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
+from typing import Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter, Histogram
 
