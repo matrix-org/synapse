@@ -209,8 +209,7 @@ class StateHandler(object):
         joined_hosts = await self.store.get_joined_hosts(room_id, entry)
         return joined_hosts
 
-    @defer.inlineCallbacks
-    def compute_event_context(
+    async def compute_event_context(
         self, event: EventBase, old_state: Optional[Iterable[EventBase]] = None
     ):
         """Build an EventContext structure for the event.
@@ -275,7 +274,7 @@ class StateHandler(object):
             # otherwise, we'll need to resolve the state across the prev_events.
             logger.debug("calling resolve_state_groups from compute_event_context")
 
-            entry = yield self.resolve_state_groups_for_events(
+            entry = await self.resolve_state_groups_for_events(
                 event.room_id, event.prev_event_ids()
             )
 
@@ -292,7 +291,7 @@ class StateHandler(object):
         #
 
         if not state_group_before_event:
-            state_group_before_event = yield self.state_store.store_state_group(
+            state_group_before_event = await self.state_store.store_state_group(
                 event.event_id,
                 event.room_id,
                 prev_group=state_group_before_event_prev_group,
@@ -332,7 +331,7 @@ class StateHandler(object):
         state_ids_after_event[key] = event.event_id
         delta_ids = {key: event.event_id}
 
-        state_group_after_event = yield self.state_store.store_state_group(
+        state_group_after_event = await self.state_store.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=state_group_before_event,
