@@ -17,8 +17,11 @@
 """ This is a reference implementation of a Matrix homeserver.
 """
 
+import json
 import os
 import sys
+
+from canonicaljson import set_json_library
 
 # Check that we're not running on an unsupported Python version.
 if sys.version_info < (3, 5):
@@ -35,6 +38,9 @@ try:
     DNSDatagramProtocol.noisy = False
 except ImportError:
     pass
+
+# Use the standard library json implementation instead of simplejson.
+set_json_library(json)
 
 __version__ = "1.18.0rc1"
 
