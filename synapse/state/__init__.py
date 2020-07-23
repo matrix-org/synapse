@@ -148,8 +148,7 @@ class StateHandler(object):
 
         return state
 
-    @defer.inlineCallbacks
-    def get_current_state_ids(self, room_id, latest_event_ids=None):
+    async def get_current_state_ids(self, room_id, latest_event_ids=None):
         """Get the current state, or the state at a set of events, for a room
 
         Args:
@@ -164,10 +163,10 @@ class StateHandler(object):
                 (event_type, state_key) -> event_id
         """
         if not latest_event_ids:
-            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
 
         logger.debug("calling resolve_state_groups from get_current_state_ids")
-        ret = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
+        ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         state = ret.state
 
         return state
