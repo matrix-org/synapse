@@ -198,7 +198,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     room_id
                 )
 
-                users_with_profile = yield state.get_current_users_in_room(room_id)
+                users_with_profile = yield defer.ensureDeferred(
+                    state.get_current_users_in_room(room_id)
+                )
                 user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.

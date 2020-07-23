@@ -31,6 +31,7 @@ from synapse.events.snapshot import EventContext
 from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
+from synapse.storage.roommember import ProfileInfo
 from synapse.types import StateMap
 from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
@@ -172,24 +173,23 @@ class StateHandler(object):
 
         return state
 
-    @defer.inlineCallbacks
-    def get_current_users_in_room(self, room_id, latest_event_ids=None):
+    async def get_current_users_in_room(
+        self, room_id: str, latest_event_ids: Optional[List[str]] = None
+    ) -> Dict[str, ProfileInfo]:
         """
         Get the users who are currently in a room.
 
         Args:
-            room_id (str): The ID of the room.
-            latest_event_ids (List[str]|None): Precomputed list of latest
-                event IDs. Will be computed if None.
+            room_id: The ID of the room.
+            latest_event_ids: Precomputed list of latest event IDs. Will be computed if None.
         Returns:
-            Deferred[Dict[str,ProfileInfo]]: Dictionary of user IDs to their
-                profileinfo.
+            Dictionary of user IDs to their profileinfo.
         """
         if not latest_event_ids:
-            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
         logger.debug("calling resolve_state_groups from get_current_users_in_room")
-        entry = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
-        joined_users = yield self.store.get_joined_users_from_state(room_id, entry)
+        entry = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
+        joined_users = await self.store.get_joined_users_from_state(room_id, entry)
         return joined_users
 
     @defer.inlineCallbacks
