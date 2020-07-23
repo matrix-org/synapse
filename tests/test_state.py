@@ -100,14 +100,16 @@ class StateGroupStore(object):
         return state_group
 
     def get_events(self, event_ids, **kwargs):
-        return {
-            e_id: self._event_id_to_event[e_id]
-            for e_id in event_ids
-            if e_id in self._event_id_to_event
-        }
+        return defer.succeed(
+            {
+                e_id: self._event_id_to_event[e_id]
+                for e_id in event_ids
+                if e_id in self._event_id_to_event
+            }
+        )
 
     def get_state_group_delta(self, name):
-        return None, None
+        return defer.succeed((None, None))
 
     def register_events(self, events):
         for e in events:
@@ -120,7 +122,7 @@ class StateGroupStore(object):
         self._event_to_state_group[event_id] = state_group
 
     def get_room_version_id(self, room_id):
-        return RoomVersions.V1.identifier
+        return defer.succeed(RoomVersions.V1.identifier)
 
 
 class DictObj(dict):

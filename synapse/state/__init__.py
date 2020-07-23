@@ -16,7 +16,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Set
+from typing import Awaitable, Dict, Iterable, List, Optional, Set
 
 import attr
 from frozendict import frozendict
@@ -393,17 +393,18 @@ class StateHandler(object):
 
         room_version = yield self.store.get_room_version_id(room_id)
 
-        result = yield self._state_resolution_handler.resolve_state_groups(
-            room_id,
-            room_version,
-            state_groups_ids,
-            None,
-            state_res_store=StateResolutionStore(self.store),
+        result = yield defer.ensureDeferred(
+            self._state_resolution_handler.resolve_state_groups(
+                room_id,
+                room_version,
+                state_groups_ids,
+                None,
+                state_res_store=StateResolutionStore(self.store),
+            )
         )
         return result
 
-    @defer.inlineCallbacks
-    def resolve_events(self, room_version, state_sets, event):
+    async def resolve_events(self, room_version, state_sets, event):
         logger.info(
             "Resolving state for %s with %d groups", event.room_id, len(state_sets)
         )
@@ -414,7 +415,7 @@ class StateHandler(object):
         state_map = {ev.event_id: ev for st in state_sets for ev in st}
 
         with Measure(self.clock, "state._resolve_events"):
-            new_state = yield resolve_events_with_store(
+            new_state = await resolve_events_with_store(
                 self.clock,
                 event.room_id,
                 room_version,
@@ -451,9 +452,8 @@ class StateResolutionHandler(object):
             reset_expiry_on_get=True,
         )
 
-    @defer.inlineCallbacks
     @log_function
-    def resolve_state_groups(
+    async def resolve_state_groups(
         self, room_id, room_version, state_groups_ids, event_map, state_res_store
     ):
         """Resolves conflicts between a set of state groups
@@ -479,13 +479,13 @@ class StateResolutionHandler(object):
             state_res_store (StateResolutionStore)
 
         Returns:
-            Deferred[_StateCacheEntry]: resolved state
+            _StateCacheEntry: resolved state
         """
         logger.debug("resolve_state_groups state_groups %s", state_groups_ids.keys())
 
         group_names = frozenset(state_groups_ids.keys())
 
-        with (yield self.resolve_linearizer.queue(group_names)):
+        with (await self.resolve_linearizer.queue(group_names)):
             if self._state_cache is not None:
                 cache = self._state_cache.get(group_names, None)
                 if cache:
@@ -517,7 +517,7 @@ class StateResolutionHandler(object):
             if conflicted_state:
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
-                    new_state = yield resolve_events_with_store(
+                    new_state = await resolve_events_with_store(
                         self.clock,
                         room_id,
                         room_version,
@@ -598,7 +598,7 @@ def resolve_events_with_store(
     state_sets: List[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_res_store: "StateResolutionStore",
-):
+) -> Awaitable[StateMap[str]]:
     """
     Args:
         room_id: the room we are working in
@@ -619,8 +619,7 @@ def resolve_events_with_store(
         state_res_store: a place to fetch events from
 
     Returns:
-        Deferred[dict[(str, str), str]]:
-            a map from (type, state_key) to event_id.
+        a map from (type, state_key) to event_id.
     """
     v = KNOWN_ROOM_VERSIONS[room_version]
     if v.state_res == StateResolutionVersions.V1:
