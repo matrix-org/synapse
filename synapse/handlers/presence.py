@@ -37,6 +37,8 @@ from synapse.logging.context import run_in_background
 from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.state import StateHandler
+from synapse.storage.data_stores.main import DataStore
 from synapse.storage.presence import UserPresenceState
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
@@ -1313,19 +1315,22 @@ async def get_interested_parties(
     return room_ids_to_states, users_to_states
 
 
-async def get_interested_remotes(store, states, state_handler):
+async def get_interested_remotes(
+    store: DataStore, states: List[UserPresenceState], state_handler: StateHandler
+) -> List[Tuple[List[str], List[UserPresenceState]]]:
     """Given a list of presence states figure out which remote servers
     should be sent which.
 
     All the presence states should be for local users only.
 
     Args:
-        store (DataStore)
-        states (list(UserPresenceState))
+        store
+        states
+        state_handler
 
     Returns:
-        A list of ([destinations], [UserPresenceState]), where for
-        each row the list of UserPresenceState should be sent to each
+        A list of 2-tuples of destinations and states, where for
+        each tuple the list of UserPresenceState should be sent to each
         destination
     """
     hosts_and_states = []
