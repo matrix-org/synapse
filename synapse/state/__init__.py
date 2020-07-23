@@ -191,13 +191,11 @@ class StateHandler(object):
         joined_users = await self.store.get_joined_users_from_state(room_id, entry)
         return joined_users
 
-    @defer.inlineCallbacks
-    def get_current_hosts_in_room(self, room_id):
-        event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
-        return (yield self.get_hosts_in_room_at_events(room_id, event_ids))
+    async def get_current_hosts_in_room(self, room_id):
+        event_ids = await self.store.get_latest_event_ids_in_room(room_id)
+        return await self.get_hosts_in_room_at_events(room_id, event_ids)
 
-    @defer.inlineCallbacks
-    def get_hosts_in_room_at_events(self, room_id, event_ids):
+    async def get_hosts_in_room_at_events(self, room_id, event_ids):
         """Get the hosts that were in a room at the given event ids
 
         Args:
@@ -207,8 +205,8 @@ class StateHandler(object):
         Returns:
             Deferred[list[str]]: the hosts in the room at the given events
         """
-        entry = yield self.resolve_state_groups_for_events(room_id, event_ids)
-        joined_hosts = yield self.store.get_joined_hosts(room_id, entry)
+        entry = await self.resolve_state_groups_for_events(room_id, event_ids)
+        joined_hosts = await self.store.get_joined_hosts(room_id, entry)
         return joined_hosts
 
     @defer.inlineCallbacks
