@@ -203,7 +203,7 @@ Almost all installations should opt to use PostgreSQL. Advantages include:
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.md <docs/postgres.md>`_.
 
-By default Synapse uses SQLite in and doing so trades performance for convenience.
+By default Synapse uses SQLite and in doing so trades performance for convenience.
 SQLite is only recommended in Synapse for testing purposes or for servers with
 light workloads.
 
