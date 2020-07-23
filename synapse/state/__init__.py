@@ -109,8 +109,7 @@ class StateHandler(object):
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
-    @defer.inlineCallbacks
-    def get_current_state(
+    async def get_current_state(
         self, room_id, event_type=None, state_key="", latest_event_ids=None
     ):
         """ Retrieves the current state for the room. This is done by
@@ -127,20 +126,20 @@ class StateHandler(object):
             map from (type, state_key) to event
         """
         if not latest_event_ids:
-            latest_event_ids = yield self.store.get_latest_event_ids_in_room(room_id)
+            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
 
         logger.debug("calling resolve_state_groups from get_current_state")
-        ret = yield self.resolve_state_groups_for_events(room_id, latest_event_ids)
+        ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
         state = ret.state
 
         if event_type:
             event_id = state.get((event_type, state_key))
             event = None
             if event_id:
-                event = yield self.store.get_event(event_id, allow_none=True)
+                event = await self.store.get_event(event_id, allow_none=True)
             return event
 
-        state_map = yield self.store.get_events(
+        state_map = await self.store.get_events(
             list(state.values()), get_prev_content=False
         )
         state = {
