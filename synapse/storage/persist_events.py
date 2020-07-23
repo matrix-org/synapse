@@ -35,9 +35,6 @@ from synapse.types import StateMap
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure
 
-if TYPE_CHECKING:
-    from synapse.state import StateResolutionStore
-
 logger = logging.getLogger(__name__)
 
 # The number of times we are recalculating the current state
@@ -650,6 +647,10 @@ class EventsPersistenceStorage(object):
             room_version = await self.main_store.get_room_version_id(room_id)
 
         logger.debug("calling resolve_state_groups from preserve_events")
+
+        # Avoid a circular import.
+        from synapse.state import StateResolutionStore
+
         res = await self._state_resolution_handler.resolve_state_groups(
             room_id,
             room_version,

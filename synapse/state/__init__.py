@@ -22,8 +22,6 @@ import attr
 from frozendict import frozendict
 from prometheus_client import Histogram
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
 from synapse.events import EventBase
@@ -348,8 +346,7 @@ class StateHandler(object):
         )
 
     @measure_func()
-    @defer.inlineCallbacks
-    def resolve_state_groups_for_events(self, room_id, event_ids):
+    async def resolve_state_groups_for_events(self, room_id, event_ids):
         """ Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
@@ -368,7 +365,7 @@ class StateHandler(object):
         # map from state group id to the state in that state group (where
         # 'state' is a map from state key to event id)
         # dict[int, dict[(str, str), str]]
-        state_groups_ids = yield self.state_store.get_state_groups_ids(
+        state_groups_ids = await self.state_store.get_state_groups_ids(
             room_id, event_ids
         )
 
@@ -377,7 +374,7 @@ class StateHandler(object):
         elif len(state_groups_ids) == 1:
             name, state_list = list(state_groups_ids.items()).pop()
 
-            prev_group, delta_ids = yield self.state_store.get_state_group_delta(name)
+            prev_group, delta_ids = await self.state_store.get_state_group_delta(name)
 
             return _StateCacheEntry(
                 state=state_list,
@@ -386,16 +383,14 @@ class StateHandler(object):
                 delta_ids=delta_ids,
             )
 
-        room_version = yield self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
 
-        result = yield defer.ensureDeferred(
-            self._state_resolution_handler.resolve_state_groups(
-                room_id,
-                room_version,
-                state_groups_ids,
-                None,
-                state_res_store=StateResolutionStore(self.store),
-            )
+        result = await self._state_resolution_handler.resolve_state_groups(
+            room_id,
+            room_version,
+            state_groups_ids,
+            None,
+            state_res_store=StateResolutionStore(self.store),
         )
         return result
 
