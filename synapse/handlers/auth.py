@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import logging
 import time
 import unicodedata
@@ -870,7 +871,7 @@ class AuthHandler(BaseHandler):
                     device_id=user_info["device_id"],
                     access_token=access_token,
                 )
-                if result:
+                if inspect.isawaitable(result):
                     await result
 
         # delete pushers associated with this access token
