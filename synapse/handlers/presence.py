@@ -1290,12 +1290,13 @@ def handle_update(prev_state, new_state, is_mine, wheel_timer, now):
 
 
 async def get_interested_parties(
-    store, states: List[UserPresenceState]
+    store: DataStore, states: List[UserPresenceState]
 ) -> Tuple[Dict[str, List[UserPresenceState]], Dict[str, List[UserPresenceState]]]:
     """Given a list of states return which entities (rooms, users)
     are interested in the given states.
 
     Args:
+        store
         states
 
     Returns:
