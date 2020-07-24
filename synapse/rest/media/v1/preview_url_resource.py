@@ -57,6 +57,8 @@ _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 OG_TAG_NAME_MAXLEN = 50
 OG_TAG_VALUE_MAXLEN = 1000
 
+ONE_HOUR = 60 * 60 * 1000
+
 # A map of globs to API endpoints.
 _oembed_globs = {
     # Twitter.
@@ -157,7 +159,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             cache_name="url_previews",
             clock=self.clock,
             # don't spider URLs more often than once an hour
-            expiry_ms=60 * 60 * 1000,
+            expiry_ms=ONE_HOUR,
         )
 
         if self._worker_run_media_background_jobs:
@@ -514,7 +516,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
                 # FIXME: we should calculate a proper expiration based on the
                 # Cache-Control and Expire headers.  But for now, assume 1 hour.
-                expires = 60 * 60 * 1000
+                expires = ONE_HOUR
                 etag = headers["ETag"][0] if "ETag" in headers else None
         else:
             html_bytes = oembed_result.html.encode("utf-8")  # type: ignore
@@ -526,7 +528,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             download_name = oembed_result.title
             length = len(html_bytes)
             # If a specific cache age was not given, assume 1 hour.
-            expires = oembed_result.cache_age or (60 * 60 * 1000)
+            expires = oembed_result.cache_age or ONE_HOUR
             uri = oembed_url
             code = 200
             etag = None
@@ -618,7 +620,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # These may be cached for a bit on the client (i.e., they
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
-        expire_before = now - 2 * 24 * 60 * 60 * 1000
+        expire_before = now - 2 * 24 * ONE_HOUR
         media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
