@@ -432,8 +432,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 oembed_result.url = result.get("url")
                 return oembed_result
 
-            # TODO can we do anything better for the video type besides using
-            #  the thumbnail?
+            # TODO Handle link and video types.
 
             if "thumbnail_url" in result:
                 oembed_result.url = result.get("thumbnail_url")
