@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import itertools
 import logging
 from collections import deque, namedtuple
@@ -192,12 +193,11 @@ class EventsPersistenceStorage(object):
         self._event_persist_queue = _EventPeristenceQueue()
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
-    @defer.inlineCallbacks
-    def persist_events(
+    async def persist_events(
         self,
         events_and_contexts: List[Tuple[FrozenEvent, EventContext]],
         backfilled: bool = False,
-    ):
+    ) -> int:
         """
         Write events to the database
         Args:
@@ -207,7 +207,7 @@ class EventsPersistenceStorage(object):
                 which might update the current state etc.
 
         Returns:
-            Deferred[int]: the stream ordering of the latest persisted event
+            the stream ordering of the latest persisted event
         """
         partitioned = {}
         for event, ctx in events_and_contexts:
@@ -223,22 +223,23 @@ class EventsPersistenceStorage(object):
         for room_id in partitioned:
             self._maybe_start_persisting(room_id)
 
-        yield make_deferred_yieldable(
+        await make_deferred_yieldable(
             defer.gatherResults(deferreds, consumeErrors=True)
         )
 
-        max_persisted_id = yield self.main_store.get_current_events_token()
+        max_persisted_id = self.main_store.get_current_events_token()
+        if inspect.isawaitable(max_persisted_id):
+            max_persisted_id = await max_persisted_id
 
         return max_persisted_id
 
-    @defer.inlineCallbacks
-    def persist_event(
+    async def persist_event(
         self, event: FrozenEvent, context: EventContext, backfilled: bool = False
-    ):
+    ) -> Tuple[int, int]:
         """
         Returns:
-            Deferred[Tuple[int, int]]: the stream ordering of ``event``,
-            and the stream ordering of the latest persisted event
+            The stream ordering of ``event``, and the stream ordering of the
+            latest persisted event
         """
         deferred = self._event_persist_queue.add_to_queue(
             event.room_id, [(event, context)], backfilled=backfilled
@@ -246,9 +247,11 @@ class EventsPersistenceStorage(object):
 
         self._maybe_start_persisting(event.room_id)
 
-        yield make_deferred_yieldable(deferred)
+        await make_deferred_yieldable(deferred)
 
-        max_persisted_id = yield self.main_store.get_current_events_token()
+        max_persisted_id = self.main_store.get_current_events_token()
+        if inspect.isawaitable(max_persisted_id):
+            max_persisted_id = await max_persisted_id
         return (event.internal_metadata.stream_ordering, max_persisted_id)
 
     def _maybe_start_persisting(self, room_id: str):

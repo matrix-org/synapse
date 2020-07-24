@@ -40,7 +40,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         self.store = self.hs.get_datastore()
         self.storage = self.hs.get_storage()
 
-        yield create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM")
+        yield defer.ensureDeferred(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
     @defer.inlineCallbacks
     def test_filtering(self):
@@ -140,7 +140,9 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         event, context = yield defer.ensureDeferred(
             self.event_creation_handler.create_new_client_event(builder)
         )
-        yield self.storage.persistence.persist_event(event, context)
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(event, context)
+        )
         return event
 
     @defer.inlineCallbacks
@@ -162,7 +164,9 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.storage.persistence.persist_event(event, context)
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(event, context)
+        )
         return event
 
     @defer.inlineCallbacks
@@ -183,7 +187,9 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.storage.persistence.persist_event(event, context)
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(event, context)
+        )
         return event
 
     @defer.inlineCallbacks
