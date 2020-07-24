@@ -440,10 +440,15 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             raise OEmbedError("Incompatible oEmbed information.")
 
+        except OEmbedError as e:
+            # Trap OEmbedErrors first so we can directly re-raise them.
+            logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
+            raise
+
         except Exception as e:
             # Trap any exception and let the code follow as usual.
             # FIXME: pass through 404s and other error messages nicely
-            logger.warning("Error downloading oEmbed metadata: %s: %r", url, e)
+            logger.warning("Error downloading oEmbed metadata from %s: %r", url, e)
             raise OEmbedError() from e
 
     async def _download_url(self, url, user):
