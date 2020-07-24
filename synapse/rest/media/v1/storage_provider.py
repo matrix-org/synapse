@@ -65,7 +65,13 @@ class StorageProviderWrapper(StorageProvider):
         store_remote: Whether remote media should be uploaded
     """
 
-    def __init__(self, backend: StorageProvider, store_local: bool, store_synchronous: bool, store_remote: bool):
+    def __init__(
+        self,
+        backend: StorageProvider,
+        store_local: bool,
+        store_synchronous: bool,
+        store_remote: bool,
+    ):
         self.backend = backend
         self.store_local = store_local
         self.store_synchronous = store_synchronous
