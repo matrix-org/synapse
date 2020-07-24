@@ -17,8 +17,6 @@ from typing import TYPE_CHECKING, Optional, Union
 import attr
 from frozendict import frozendict
 
-from twisted.internet import defer
-
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -238,20 +236,19 @@ class EventContext:
         await self._ensure_fetched()
         return self._current_state_ids
 
-    @defer.inlineCallbacks
-    def get_prev_state_ids(self):
+    async def get_prev_state_ids(self):
         """
         Gets the room state map, excluding this event.
 
         For a non-state event, this will be the same as get_current_state_ids().
 
         Returns:
-            Deferred[dict[(str, str), str]|None]: Returns None if state_group
+            dict[(str, str), str]|None: Returns None if state_group
                 is None, which happens when the associated event is an outlier.
                 Maps a (type, state_key) to the event ID of the state event matching
                 this tuple.
         """
-        yield self._ensure_fetched()
+        await self._ensure_fetched()
         return self._prev_state_ids
 
     def get_cached_current_state_ids(self):
@@ -271,8 +268,8 @@ class EventContext:
 
         return self._current_state_ids
 
-    def _ensure_fetched(self):
-        return defer.succeed(None)
+    async def _ensure_fetched(self):
+        return None
 
 
 @attr.s(slots=True)
@@ -305,21 +302,20 @@ class _AsyncEventContextImpl(EventContext):
     _event_state_key = attr.ib(default=None)
     _fetching_state_deferred = attr.ib(default=None)
 
-    def _ensure_fetched(self):
+    async def _ensure_fetched(self):
         if not self._fetching_state_deferred:
             self._fetching_state_deferred = run_in_background(self._fill_out_state)
 
-        return make_deferred_yieldable(self._fetching_state_deferred)
+        return await make_deferred_yieldable(self._fetching_state_deferred)
 
-    @defer.inlineCallbacks
-    def _fill_out_state(self):
+    async def _fill_out_state(self):
         """Called to populate the _current_state_ids and _prev_state_ids
         attributes by loading from the database.
         """
         if self.state_group is None:
             return
 
-        self._current_state_ids = yield self._storage.state.get_state_ids_for_group(
+        self._current_state_ids = await self._storage.state.get_state_ids_for_group(
             self.state_group
         )
         if self._event_state_key is not None:
