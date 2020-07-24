@@ -42,7 +42,7 @@ def client_patterns(
         unstable: If true, include this endpoint under the "unstable" prefix.
         v1: If true, include this endpoint under the "api/v1" prefix.
     Returns:
-        SRE_Pattern
+        An iterable of patterns.
     """
     patterns = []
 
