@@ -754,3 +754,72 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"],
             "JWT validation failed: Signature verification failed",
         )
+
+
+class DehydrationTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        logout.register_servlets,
+        devices.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        self.hs = self.setup_test_homeserver()
+        self.hs.config.enable_registration = True
+        self.hs.config.registrations_require_3pid = []
+        self.hs.config.auto_join_rooms = []
+        self.hs.config.enable_registration_captcha = False
+
+        return self.hs
+
+    def test_dehydrate_and_rehydrate_device(self):
+        self.register_user("kermit", "monkey")
+        access_token = self.login("kermit", "monkey")
+
+        # dehydrate a device
+        params = json.dumps({
+            "device_data": "foobar"
+        })
+        request, channel = self.make_request(
+            b"POST", b"/_matrix/client/unstable/org.matrix.msc2697/device/dehydrate",
+            params,
+            access_token=access_token
+        )
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.result)
+        dehydrated_device_id = channel.json_body["device_id"]
+
+        # Log out
+        request, channel = self.make_request(
+            b"POST", "/logout", access_token=access_token
+        )
+        self.render(request)
+
+        # log in, requesting a dehydrated device
+        params = json.dumps({
+            "type": "m.login.password",
+            "user": "kermit",
+            "password": "monkey",
+            "org.matrix.msc2697.restore_device": True,
+        })
+        request, channel = self.make_request(
+            "POST", "/_matrix/client/r0/login", params
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["device_data"], "foobar")
+        self.assertEqual(channel.json_body["device_id"], dehydrated_device_id)
+        dehydration_token = channel.json_body["dehydration_token"]
+
+        params = json.dumps({
+            "rehydrate": True,
+            "dehydration_token": dehydration_token
+        })
+        request, channel = self.make_request(
+            "POST", "/_matrix/client/unstable/org.matrix.msc2697/restore_device", params
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["device_id"], dehydrated_device_id)

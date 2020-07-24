@@ -67,6 +67,7 @@ class KeyUploadServlet(RestServlet):
         super(KeyUploadServlet, self).__init__()
         self.auth = hs.get_auth()
         self.e2e_keys_handler = hs.get_e2e_keys_handler()
+        self.device_handler = hs.get_device_handler()
 
     @trace(opname="upload_keys")
     async def on_POST(self, request, device_id):
@@ -78,20 +79,22 @@ class KeyUploadServlet(RestServlet):
             # passing the device_id here is deprecated; however, we allow it
             # for now for compatibility with older clients.
             if requester.device_id is not None and device_id != requester.device_id:
-                set_tag("error", True)
-                log_kv(
-                    {
-                        "message": "Client uploading keys for a different device",
-                        "logged_in_id": requester.device_id,
-                        "key_being_uploaded": device_id,
-                    }
-                )
-                logger.warning(
-                    "Client uploading keys for a different device "
-                    "(logged in as %s, uploading for %s)",
-                    requester.device_id,
-                    device_id,
-                )
+                dehydrated_device_id, _ = await self.device_handler.get_dehydrated_device(user_id)
+                if device_id != dehydrated_device_id:
+                    set_tag("error", True)
+                    log_kv(
+                        {
+                            "message": "Client uploading keys for a different device",
+                            "logged_in_id": requester.device_id,
+                            "key_being_uploaded": device_id,
+                        }
+                    )
+                    logger.warning(
+                        "Client uploading keys for a different device "
+                        "(logged in as %s, uploading for %s)",
+                        requester.device_id,
+                        device_id,
+                    )
         else:
             device_id = requester.device_id
 

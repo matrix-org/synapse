@@ -103,6 +103,7 @@ class LoginRestServlet(RestServlet):
         self.oidc_enabled = hs.config.oidc_enabled
 
         self.auth_handler = self.hs.get_auth_handler()
+        self.device_handler = hs.get_device_handler()
         self.registration_handler = hs.get_registration_handler()
         self.handlers = hs.get_handlers()
         self._well_known_builder = WellKnownBuilder(hs)
@@ -339,6 +340,22 @@ class LoginRestServlet(RestServlet):
                 )
             user_id = canonical_uid
 
+        if login_submission.get("org.matrix.msc2697.restore_device"):
+            device_id, dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
+            if dehydrated_device:
+                token = await self.device_handler.get_dehydration_token(user_id, device_id, login_submission)
+                result = {
+                    "user_id": user_id,
+                    "home_server": self.hs.hostname,
+                    "device_data": dehydrated_device,
+                    "device_id": device_id,
+                    "dehydration_token": token,
+                }
+
+                # FIXME: call callback?
+
+                return result
+
         device_id = login_submission.get("device_id")
         initial_display_name = login_submission.get("initial_device_display_name")
         device_id, access_token = await self.registration_handler.register_device(
@@ -399,6 +416,42 @@ class LoginRestServlet(RestServlet):
             user_id, login_submission, create_non_existent_users=True
         )
         return result
+
+
+class RestoreDeviceServlet(RestServlet):
+    PATTERNS = client_patterns("/org.matrix.msc26997/restore_device")
+
+    def __init__(self, hs):
+        super(RestoreDeviceServlet, self).__init__()
+        self.hs = hs
+        self.device_handler = hs.get_device_handler()
+
+    async def on_POST(self, request: SynapseRequest):
+        submission = parse_json_object_from_request(request)
+
+        if submission.get("rehydrate"):
+            return 200, await self.device_handler.rehydrate_device(submission.get("dehydration_token"))
+        else:
+            return 200, await self.device_handler.cancel_rehydrate(submission.get("dehydration_token"))
+
+
+class StoreDeviceServlet(RestServlet):
+    PATTERNS = client_patterns("/org.matrix.msc2697/device/dehydrate")
+
+    def __init__(self, hs):
+        super(StoreDeviceServlet, self).__init__()
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.device_handler = hs.get_device_handler()
+
+    async def on_POST(self, request: SynapseRequest):
+        submission = parse_json_object_from_request(request)
+        requester = await self.auth.get_user_by_req(request)
+
+        device_id = await self.device_handler.store_dehydrated_device(
+            requester.user.to_string(), submission.get("device_data")
+        )
+        return 200, {"device_id": device_id}
 
 
 class BaseSSORedirectServlet(RestServlet):
@@ -499,6 +552,8 @@ class OIDCRedirectServlet(BaseSSORedirectServlet):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
+    RestoreDeviceServlet(hs).register(http_server)
+    StoreDeviceServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasRedirectServlet(hs).register(http_server)
         CasTicketServlet(hs).register(http_server)

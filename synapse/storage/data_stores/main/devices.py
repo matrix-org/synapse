@@ -43,7 +43,7 @@ from synapse.util.caches.descriptors import (
     cachedList,
 )
 from synapse.util.iterutils import batch_iter
-from synapse.util.stringutils import shortstr
+from synapse.util.stringutils import random_string, shortstr
 
 logger = logging.getLogger(__name__)
 
@@ -728,6 +728,129 @@ class DeviceWorkerStore(SQLBaseStore):
             _mark_remote_user_device_list_as_unsubscribed_txn,
         )
 
+    async def get_dehydrated_device(self, user_id: str) -> Tuple[str, str]:
+        row = await self.db.simple_select_one(
+            table="dehydrated_devices",
+            keyvalues={"user_id": user_id},
+            retcols=["device_id", "device_data"],
+            allow_none=True,
+        )
+        return (row["device_id"], row["device_data"]) if row else (None, None)
+
+    def _store_dehydrated_device_txn(
+            self, txn, user_id: str, device_id: str, device_data: str
+    ) -> Optional[str]:
+        old_device_id = self.db.simple_select_one_onecol_txn(
+            txn,
+            table="dehydrated_devices",
+            keyvalues={"user_id": user_id},
+            retcol="device_id",
+            allow_none=True,
+        )
+        if old_device_id is None:
+            self.db.simple_insert_txn(
+                txn,
+                table="dehydrated_devices",
+                values={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "device_data": device_data,
+                },
+            )
+        else:
+            self.db.simple_update_txn(
+                txn,
+                table="dehydrated_devices",
+                keyvalues={"user_id", user_id},
+                updatevalues={
+                    "device_id": device_id,
+                    "device_data": device_data,
+                },
+            )
+        return old_device_id
+
+    async def store_dehydrated_device(
+            self, user_id: str, device_id: str, device_data: str
+    ) -> Optional[str]:
+        return await self.db.runInteraction(
+            "store_dehydrated_device_txn",
+            self._store_dehydrated_device_txn,
+            user_id, device_id, device_data,
+        )
+
+    async def create_dehydration_token(
+            self, user_id: str, device_id: str, login_submission: str
+    ) -> str:
+        # FIXME: expire any old tokens
+
+        attempts = 0
+        while attempts < 5:
+            token = random_string(24)
+
+            try:
+                await self.db.simple_insert(
+                    table="dehydration_token",
+                    values={
+                        "token": token,
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        "login_submission": login_submission,
+                        "creation_time": self.hs.get_clock().time_msec(),
+                    },
+                    desc="create_dehydration_token",
+                )
+                return token
+            except self.db.engine.module.IntegrityError:
+                attempts += 1
+        raise StoreError(500, "Couldn't generate a token.")
+
+    def _clear_dehydration_token_txn(self, txn, token: str, dehydrate: bool) -> dict:
+        token_info = self.db.simple_select_one_txn(
+            txn,
+            "dehydration_token",
+            {
+                "token": token,
+            },
+            ["user_id", "device_id", "login_submission"],
+        )
+        self.db.simple_delete_one_txn(
+            txn,
+            "dehydration_token",
+            {
+                "token": token,
+            },
+        )
+
+        if dehydrate:
+            device = self.db.simple_select_one_txn(
+                txn,
+                "dehydrated_devices",
+                {"user_id": token_info["user_id"]},
+                ["device_id", "device_data"],
+                allow_none=True,
+            )
+            if device and device["device_id"] == token_info["device_id"]:
+                count = self.db.simple_delete_txn(
+                    txn,
+                    "dehydrated_devices",
+                    {
+                        "user_id": token_info["user_id"],
+                        "device_id": token_info["device_id"],
+                    },
+                )
+                if count != 0:
+                    token_info["dehydrated"] = True
+
+        return token_info
+
+    async def clear_dehydration_token(self, token: str, dehydrate: bool) -> dict:
+        return await self.db.runInteraction(
+            "get_users_whose_devices_changed",
+            self._clear_dehydration_token_txn,
+            token,
+            dehydrate,
+        )
+
 
 class DeviceBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: Database, db_conn, hs):
@@ -865,8 +988,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         self._clock.looping_call(self._prune_old_outbound_device_pokes, 60 * 60 * 1000)
 
-    @defer.inlineCallbacks
-    def store_device(self, user_id, device_id, initial_device_display_name):
+    async def store_device(self, user_id, device_id, initial_device_display_name):
         """Ensure the given device is known; add it to the store if not
 
         Args:
@@ -885,7 +1007,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             return False
 
         try:
-            inserted = yield self.db.simple_insert(
+            inserted = await self.db.simple_insert(
                 "devices",
                 values={
                     "user_id": user_id,
@@ -899,7 +1021,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             if not inserted:
                 # if the device already exists, check if it's a real device, or
                 # if the device ID is reserved by something else
-                hidden = yield self.db.simple_select_one_onecol(
+                hidden = await self.db.simple_select_one_onecol(
                     "devices",
                     keyvalues={"user_id": user_id, "device_id": device_id},
                     retcol="hidden",

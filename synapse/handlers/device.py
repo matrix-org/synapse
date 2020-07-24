@@ -14,8 +14,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
@@ -28,6 +29,7 @@ from synapse.api.errors import (
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import (
+    JsonDict,
     RoomStreamToken,
     get_domain_from_id,
     get_verify_key_from_cross_signing_key,
@@ -488,6 +490,80 @@ class DeviceHandler(DeviceWorkerHandler):
             # We no longer share rooms with this user, so we'll no longer
             # receive device updates. Mark this in DB.
             await self.store.mark_remote_user_device_list_as_unsubscribed(user_id)
+
+    async def store_dehydrated_device(
+            self, user_id: str, device_data: str,
+            initial_device_display_name: Optional[str] = None) -> str:
+        device_id = await self.check_device_registered(
+            user_id, None, initial_device_display_name,
+        )
+        old_device_id = await self.store.store_dehydrated_device(user_id, device_id, device_data)
+        if old_device_id is not None:
+            await self.delete_device(user_id, old_device_id)
+        return device_id
+
+    async def get_dehydrated_device(self, user_id: str) -> Tuple[str, str]:
+        return await self.store.get_dehydrated_device(user_id)
+
+    async def get_dehydration_token(self, user_id: str, device_id: str, login_submission: JsonDict) -> str:
+        return await self.store.create_dehydration_token(user_id, device_id, json.dumps(login_submission))
+
+    async def rehydrate_device(self, token: str) -> dict:
+        # FIXME: if can't find token, return 404
+        token_info = await self.store.clear_dehydration_token(token, True)
+
+        # normally, the constructor would do self.registration_handler =
+        # self.hs.get_registration_handler(), but doing that results in a
+        # circular dependency in the handlers.  So do this for now
+        registration_handler = self.hs.get_registration_handler()
+
+        if token_info["dehydrated"]:
+            # create access token for dehydrated device
+            initial_display_name = None  # FIXME: get display name from login submission?
+            device_id, access_token = await registration_handler.register_device(
+                token_info.get("user_id"), token_info.get("device_id"), initial_display_name
+            )
+
+            return {
+                "user_id": token_info.get("user_id"),
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+                "device_id": device_id,
+            }
+
+        else:
+            # create device and access token from original login submission
+            login_submission = token_info.get("login_submission")
+            device_id = login_submission.get("device_id")
+            initial_display_name = login_submission.get("initial_device_display_name")
+            device_id, access_token = await registration_handler.register_device(
+                token_info.get("user_id"), device_id, initial_display_name
+            )
+
+            return {
+                "user_id": token.info.get("user_id"),
+                "access_token": access_token,
+                "home_server": self.hs.hostname,
+                "device_id": device_id,
+            }
+
+    async def cancel_rehydrate(self, token: str) -> dict:
+        # FIXME: if can't find token, return 404
+        token_info = await self.store.clear_dehydration_token(token)
+        # create device and access token from original login submission
+        login_submission = token_info.get("login_submission")
+        device_id = login_submission.get("device_id")
+        initial_display_name = login_submission.get("initial_device_display_name")
+        device_id, access_token = await self.registration_handler.register_device(
+            token_info.get("user_id"), device_id, initial_display_name
+        )
+
+        return {
+            "user_id": token_info.get("user_id"),
+            "access_token": access_token,
+            "home_server": self.hs.hostname,
+            "device_id": device_id,
+        }
 
 
 def _update_device_from_client_ips(device, client_ips):
