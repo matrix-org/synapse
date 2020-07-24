@@ -82,7 +82,7 @@ for endpoint, globs in _oembed_globs.items():
         #
         # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
         # 2. The domain can have globs, but we limit it to characters that can
-        #    reasonably be  a domain part.
+        #    reasonably be a domain part.
         #    TODO: This does not attempt to handle Unicode domain names.
         # 3. Other parts allow a glob to be any one, or more, characters.
         results = urlparse.urlparse(glob)
@@ -103,7 +103,7 @@ for endpoint, globs in _oembed_globs.items():
 
 @attr.s
 class OEmbedResult:
-    # Content or URL must be provided.
+    # Either HTML content or URL must be provided.
     html = attr.ib(type=Optional[str])
     url = attr.ib(type=Optional[str])
     title = attr.ib(type=str)
@@ -442,7 +442,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         except Exception as e:
             # Trap any exception and let the code follow as usual.
             # FIXME: pass through 404s and other error messages nicely
-            logger.warning("Error downloading %s: %r", url, e)
+            logger.warning("Error downloading oEmbed metadata: %s: %r", url, e)
             raise OEmbedError() from e
 
     async def _download_url(self, url, user):
