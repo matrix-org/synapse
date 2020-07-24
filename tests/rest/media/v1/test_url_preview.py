@@ -566,8 +566,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             server.data,
         )
 
-    def test_oembed_url(self):
-        """Test changing a URL via oEmbed."""
+    def test_oembed_photo(self):
+        """Test an oEmbed endpoint which returns a 'photo' type which redirects the preview to a new URL."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
             "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
@@ -639,8 +639,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 channel.json_body, {"og:title": "Some Title", "og:description": "hi"}
             )
 
-    def test_oembed_html(self):
-        """Test an oEmbed endpoint which returns HTML."""
+    def test_oembed_rich(self):
+        """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
             "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
