@@ -516,7 +516,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
         """
         Args:
             orig (function)
-            cached_method_name (str): The name of the chached method.
+            cached_method_name (str): The name of the cached method.
             list_name (str): Name of the argument which is the bulk lookup list
             num_args (int): number of positional arguments (excluding ``self``,
                 but including list_name) to use as cache keys. Defaults to all

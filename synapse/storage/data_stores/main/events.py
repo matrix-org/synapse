@@ -17,11 +17,9 @@
 import itertools
 import logging
 from collections import OrderedDict, namedtuple
-from functools import wraps
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
 import attr
-from canonicaljson import json
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -33,7 +31,7 @@ from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.logging.utils import log_function
-from synapse.storage._base import make_in_list_sql_clause
+from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.data_stores.main.search import SearchEntry
 from synapse.storage.database import Database, LoggingTransaction
 from synapse.storage.util.id_generators import StreamIdGenerator
@@ -67,27 +65,6 @@ def encode_json(json_object):
 
 
 _EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
-
-
-def _retry_on_integrity_error(func):
-    """Wraps a database function so that it gets retried on IntegrityError,
-    with `delete_existing=True` passed in.
-
-    Args:
-        func: function that returns a Deferred and accepts a `delete_existing` arg
-    """
-
-    @wraps(func)
-    @defer.inlineCallbacks
-    def f(self, *args, **kwargs):
-        try:
-            res = yield func(self, *args, delete_existing=False, **kwargs)
-        except self.database_engine.module.IntegrityError:
-            logger.exception("IntegrityError, retrying.")
-            res = yield func(self, *args, delete_existing=True, **kwargs)
-        return res
-
-    return f
 
 
 @attr.s(slots=True)
@@ -134,7 +111,6 @@ class PersistEventsStore:
             hs.config.worker.writers.events == hs.get_instance_name()
         ), "Can only instantiate EventsStore on master"
 
-    @_retry_on_integrity_error
     @defer.inlineCallbacks
     def _persist_events_and_state_updates(
         self,
@@ -143,7 +119,6 @@ class PersistEventsStore:
         state_delta_for_room: Dict[str, DeltaState],
         new_forward_extremeties: Dict[str, List[str]],
         backfilled: bool = False,
-        delete_existing: bool = False,
     ):
         """Persist a set of events alongside updates to the current state and
         forward extremities tables.
@@ -157,7 +132,6 @@ class PersistEventsStore:
             new_forward_extremities: Map from room_id to list of event IDs
                 that are the new forward extremities of the room.
             backfilled
-            delete_existing
 
         Returns:
             Deferred: resolves when the events have been persisted
@@ -197,7 +171,6 @@ class PersistEventsStore:
                 self._persist_events_txn,
                 events_and_contexts=events_and_contexts,
                 backfilled=backfilled,
-                delete_existing=delete_existing,
                 state_delta_for_room=state_delta_for_room,
                 new_forward_extremeties=new_forward_extremeties,
             )
@@ -262,7 +235,7 @@ class PersistEventsStore:
             )
 
             txn.execute(sql + clause, args)
-            results.extend(r[0] for r in txn if not json.loads(r[1]).get("soft_failed"))
+            results.extend(r[0] for r in txn if not db_to_json(r[1]).get("soft_failed"))
 
         for chunk in batch_iter(event_ids, 100):
             yield self.db.runInteraction(
@@ -323,7 +296,7 @@ class PersistEventsStore:
                     if prev_event_id in existing_prevs:
                         continue
 
-                    soft_failed = json.loads(metadata).get("soft_failed")
+                    soft_failed = db_to_json(metadata).get("soft_failed")
                     if soft_failed or rejected:
                         to_recursively_check.append(prev_event_id)
                         existing_prevs.add(prev_event_id)
@@ -341,7 +314,6 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool,
-        delete_existing: bool = False,
         state_delta_for_room: Dict[str, DeltaState] = {},
         new_forward_extremeties: Dict[str, List[str]] = {},
     ):
@@ -392,13 +364,6 @@ class PersistEventsStore:
 
         # From this point onwards the events are only events that we haven't
         # seen before.
-
-        if delete_existing:
-            # For paranoia reasons, we go and delete all the existing entries
-            # for these events so we can reinsert them.
-            # This gets around any problems with some tables already having
-            # entries.
-            self._delete_existing_rows_txn(txn, events_and_contexts=events_and_contexts)
 
         self._store_event_txn(txn, events_and_contexts=events_and_contexts)
 
@@ -617,7 +582,7 @@ class PersistEventsStore:
         txn.execute(sql, (room_id, EventTypes.Create, ""))
         row = txn.fetchone()
         if row:
-            event_json = json.loads(row[0])
+            event_json = db_to_json(row[0])
             content = event_json.get("content", {})
             creator = content.get("creator")
             room_version_id = content.get("room_version", RoomVersions.V1.identifier)
@@ -796,39 +761,6 @@ class PersistEventsStore:
                 self._update_backward_extremeties(txn, [event])
 
         return [ec for ec in events_and_contexts if ec[0] not in to_remove]
-
-    @classmethod
-    def _delete_existing_rows_txn(cls, txn, events_and_contexts):
-        if not events_and_contexts:
-            # nothing to do here
-            return
-
-        logger.info("Deleting existing")
-
-        for table in (
-            "events",
-            "event_auth",
-            "event_json",
-            "event_edges",
-            "event_forward_extremities",
-            "event_reference_hashes",
-            "event_search",
-            "event_to_state_groups",
-            "state_events",
-            "rejections",
-            "redactions",
-            "room_memberships",
-        ):
-            txn.executemany(
-                "DELETE FROM %s WHERE event_id = ?" % (table,),
-                [(ev.event_id,) for ev, _ in events_and_contexts],
-            )
-
-        for table in ("event_push_actions",):
-            txn.executemany(
-                "DELETE FROM %s WHERE room_id = ? AND event_id = ?" % (table,),
-                [(ev.room_id, ev.event_id) for ev, _ in events_and_contexts],
-            )
 
     def _store_event_txn(self, txn, events_and_contexts):
         """Insert new events into the event and event_json tables

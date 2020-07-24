@@ -34,9 +34,11 @@ class WriterLocations:
 
     Attributes:
         events: The instance that writes to the event and backfill streams.
+        events: The instance that writes to the typing stream.
     """
 
     events = attr.ib(default="master", type=str)
+    typing = attr.ib(default="master", type=str)
 
 
 class WorkerConfig(Config):
@@ -93,16 +95,15 @@ class WorkerConfig(Config):
         writers = config.get("stream_writers") or {}
         self.writers = WriterLocations(**writers)
 
-        # Check that the configured writer for events also appears in
+        # Check that the configured writer for events and typing also appears in
         # `instance_map`.
-        if (
-            self.writers.events != "master"
-            and self.writers.events not in self.instance_map
-        ):
-            raise ConfigError(
-                "Instance %r is configured to write events but does not appear in `instance_map` config."
-                % (self.writers.events,)
-            )
+        for stream in ("events", "typing"):
+            instance = getattr(self.writers, stream)
+            if instance != "master" and instance not in self.instance_map:
+                raise ConfigError(
+                    "Instance %r is configured to write %s but does not appear in `instance_map` config."
+                    % (instance, stream)
+                )
 
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in

@@ -64,8 +64,8 @@ class StateStoreTestCase(tests.unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
         yield self.storage.persistence.persist_event(event, context)

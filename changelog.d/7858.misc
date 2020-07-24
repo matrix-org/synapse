@@ -1,0 +1,1 @@
+The default value of `filter_timeline_limit` was changed from -1 (no limit) to 100.

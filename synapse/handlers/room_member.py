@@ -110,7 +110,7 @@ class RoomMemberHandler(object):
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
-    ) -> Tuple[Optional[str], int]:
+    ) -> Tuple[str, int]:
         """
         Rejects an out-of-band invite we have received from a remote server
 
@@ -269,7 +269,7 @@ class RoomMemberHandler(object):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
-    ) -> Tuple[Optional[str], int]:
+    ) -> Tuple[str, int]:
         key = (room_id,)
 
         as_id = object()
@@ -319,7 +319,7 @@ class RoomMemberHandler(object):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
-    ) -> Tuple[Optional[str], int]:
+    ) -> Tuple[str, int]:
         content_specified = bool(content)
         if content is None:
             content = {}
@@ -1026,7 +1026,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
-    ) -> Tuple[Optional[str], int]:
+    ) -> Tuple[str, int]:
         """
         Rejects an out-of-band invite received from a remote user
 

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import collections
+import collections.abc
 import re
 from typing import Any, Mapping, Union
 
@@ -424,7 +424,7 @@ def copy_power_levels_contents(
     Raises:
         TypeError if the input does not look like a valid power levels event content
     """
-    if not isinstance(old_power_levels, collections.Mapping):
+    if not isinstance(old_power_levels, collections.abc.Mapping):
         raise TypeError("Not a valid power-levels content: %r" % (old_power_levels,))
 
     power_levels = {}
@@ -434,7 +434,7 @@ def copy_power_levels_contents(
             power_levels[k] = v
             continue
 
-        if isinstance(v, collections.Mapping):
+        if isinstance(v, collections.abc.Mapping):
             power_levels[k] = h = {}
             for k1, v1 in v.items():
                 # we should only have one level of nesting

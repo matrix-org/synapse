@@ -77,6 +77,20 @@ class PerDestinationQueue(object):
         self._clock = hs.get_clock()
         self._store = hs.get_datastore()
         self._transaction_manager = transaction_manager
+        self._instance_name = hs.get_instance_name()
+        self._federation_shard_config = hs.config.federation.federation_shard_config
+
+        self._should_send_on_this_instance = True
+        if not self._federation_shard_config.should_handle(
+            self._instance_name, destination
+        ):
+            # We don't raise an exception here to avoid taking out any other
+            # processing. We have a guard in `attempt_new_transaction` that
+            # ensure we don't start sending stuff.
+            logger.error(
+                "Create a per destination queue for %s on wrong worker", destination,
+            )
+            self._should_send_on_this_instance = False
 
         self._destination = destination
         self.transmission_loop_running = False
@@ -122,7 +136,7 @@ class PerDestinationQueue(object):
         )
 
     def send_pdu(self, pdu: EventBase, order: int) -> None:
-        """Add a PDU to the queue, and start the transmission loop if neccessary
+        """Add a PDU to the queue, and start the transmission loop if necessary
 
         Args:
             pdu: pdu to send
@@ -132,7 +146,7 @@ class PerDestinationQueue(object):
         self.attempt_new_transaction()
 
     def send_presence(self, states: Iterable[UserPresenceState]) -> None:
-        """Add presence updates to the queue. Start the transmission loop if neccessary.
+        """Add presence updates to the queue. Start the transmission loop if necessary.
 
         Args:
             states: presence to send
@@ -181,6 +195,14 @@ class PerDestinationQueue(object):
             # we need application-layer timeouts of some flavour of these
             # requests
             logger.debug("TX [%s] Transaction already in progress", self._destination)
+            return
+
+        if not self._should_send_on_this_instance:
+            # We don't raise an exception here to avoid taking out any other
+            # processing.
+            logger.error(
+                "Trying to start a transaction to %s on wrong worker", self._destination
+            )
             return
 
         logger.debug("TX [%s] Starting transaction loop", self._destination)

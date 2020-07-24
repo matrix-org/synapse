@@ -67,7 +67,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         txn_id: Optional[str],
         requester: Requester,
         content: dict,
-    ) -> Tuple[Optional[str], int]:
+    ) -> Tuple[str, int]:
         """
         Rejects an out-of-band invite received from a remote user
 
