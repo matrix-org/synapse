@@ -48,7 +48,6 @@ from synapse.replication.tcp.streams.federation import FederationStream
 STREAMS_MAP = {
     stream.NAME: stream
     for stream in (
-        CachesStream,
         EventsStream,
         BackfillStream,
         PresenceStream,
@@ -56,6 +55,7 @@ STREAMS_MAP = {
         ReceiptsStream,
         PushRulesStream,
         PushersStream,
+        CachesStream,
         PublicRoomsStream,
         DeviceListsStream,
         ToDeviceStream,
