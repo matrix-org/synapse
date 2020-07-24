@@ -19,7 +19,7 @@
 
 import logging
 import urllib.parse
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Union
+from typing import Awaitable, Callable, Dict, List, Optional, Tuple
 
 from canonicaljson import json
 from signedjson.key import decode_verify_key_bytes
@@ -37,7 +37,7 @@ from synapse.api.errors import (
 )
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.client import SimpleHttpClient
-from synapse.types import Requester
+from synapse.types import JsonDict, Requester
 from synapse.util.hash import sha256_and_url_safe_base64
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 
@@ -63,7 +63,7 @@ class IdentityHandler(BaseHandler):
 
     async def threepid_from_creds(
         self, id_server: str, creds: Dict[str, str]
-    ) -> Dict[str, Optional[Union[str, int]]]:
+    ) -> Optional[JsonDict]:
         """
         Retrieve and validate a threepid identifier from a "credentials" dictionary against a
         given identity server
@@ -71,15 +71,13 @@ class IdentityHandler(BaseHandler):
         Args:
             id_server: The identity server to validate 3PIDs against. Must be a
                 complete URL including the protocol (http(s)://)
-
             creds: Dictionary containing the following keys:
                 * client_secret|clientSecret: A unique secret str provided by the client
                 * sid: The ID of the validation session
 
         Returns:
-            A dictionary consisting of response params to
-                the /getValidated3pid endpoint of the Identity Service API, or None if the
-                threepid was not found
+            A dictionary consisting of response params to the /getValidated3pid
+            endpoint of the Identity Service API, or None if the threepid was not found
         """
         client_secret = creds.get("client_secret") or creds.get("clientSecret")
         if not client_secret:
@@ -130,7 +128,7 @@ class IdentityHandler(BaseHandler):
         id_server: str,
         id_access_token: Optional[str] = None,
         use_v2: bool = True,
-    ) -> dict:
+    ) -> JsonDict:
         """Bind a 3PID to an identity server
 
         Args:
@@ -379,8 +377,13 @@ class IdentityHandler(BaseHandler):
         return session_id
 
     async def requestEmailToken(
-        self, id_server, email, client_secret, send_attempt, next_link=None
-    ):
+        self,
+        id_server: str,
+        email: str,
+        client_secret: str,
+        send_attempt: int,
+        next_link: Optional[str] = None,
+    ) -> JsonDict:
         """
         Request an external server send an email on our behalf for the purposes of threepid
         validation.
@@ -389,7 +392,7 @@ class IdentityHandler(BaseHandler):
             id_server: The identity server to proxy to
             email: The email to send the message to
             client_secret: The unique client_secret sends by the user
-            send_attempt (int): Which attempt this is
+            send_attempt: Which attempt this is
             next_link: A link to redirect the user to once they submit the token
 
         Returns:
@@ -426,13 +429,13 @@ class IdentityHandler(BaseHandler):
 
     async def requestMsisdnToken(
         self,
-        id_server,
-        country,
-        phone_number,
-        client_secret,
-        send_attempt,
-        next_link=None,
-    ):
+        id_server: str,
+        country: str,
+        phone_number: str,
+        client_secret: str,
+        send_attempt: int,
+        next_link: Optional[str] = None,
+    ) -> JsonDict:
         """
         Request an external server send an SMS message on our behalf for the purposes of
         threepid validation.
@@ -441,7 +444,7 @@ class IdentityHandler(BaseHandler):
             country: The country code of the phone number
             phone_number: The number to send the message to
             client_secret: The unique client_secret sends by the user
-            send_attempt (int): Which attempt this is
+            send_attempt: Which attempt this is
             next_link: A link to redirect the user to once they submit the token
 
         Returns:
@@ -487,17 +490,18 @@ class IdentityHandler(BaseHandler):
         )
         return data
 
-    async def validate_threepid_session(self, client_secret, sid):
+    async def validate_threepid_session(
+        self, client_secret: str, sid: str
+    ) -> Optional[JsonDict]:
         """Validates a threepid session with only the client secret and session ID
         Tries validating against any configured account_threepid_delegates as well as locally.
 
         Args:
             client_secret: A secret provided by the client
-
             sid: The ID of the session
 
         Returns:
-            Dict[str, str|int] if validation was successful, otherwise None
+            The json response if validation was successful, otherwise None
         """
         # XXX: We shouldn't need to keep wrapping and unwrapping this value
         threepid_creds = {"client_secret": client_secret, "sid": sid}
@@ -532,7 +536,7 @@ class IdentityHandler(BaseHandler):
 
     async def proxy_msisdn_submit_token(
         self, id_server: str, client_secret: str, sid: str, token: str
-    ) -> dict:
+    ) -> JsonDict:
         """Proxy a POST submitToken request to an identity server for verification purposes
 
         Args:
@@ -603,7 +607,9 @@ class IdentityHandler(BaseHandler):
 
         return await self._lookup_3pid_v1(id_server, medium, address)
 
-    async def _lookup_3pid_v1(self, id_server, medium, address):
+    async def _lookup_3pid_v1(
+        self, id_server: str, medium: str, address: str
+    ) -> Optional[str]:
         """Looks up a 3pid in the passed identity server using v1 lookup.
 
         Args:
@@ -613,7 +619,7 @@ class IdentityHandler(BaseHandler):
             address: The third party identifier (e.g. "foo@example.com").
 
         Returns:
-            str: the matrix ID of the 3pid, or None if it is not recognized.
+            the matrix ID of the 3pid, or None if it is not recognized.
         """
         try:
             data = await self.blacklisting_http_client.get_json(
@@ -634,7 +640,7 @@ class IdentityHandler(BaseHandler):
         return None
 
     async def _lookup_3pid_v2(
-        self, id_server, id_access_token, medium, address
+        self, id_server: str, id_access_token: str, medium: str, address: str
     ) -> Optional[str]:
         """Looks up a 3pid in the passed identity server using v2 lookup.
 
@@ -910,7 +916,7 @@ class IdentityHandler(BaseHandler):
         return token, public_keys, fallback_public_key, display_name
 
 
-def create_id_access_token_header(id_access_token):
+def create_id_access_token_header(id_access_token: str) -> List[str]:
     """Create an Authorization header for passing to SimpleHttpClient as the header value
     of an HTTP request.
 
@@ -918,7 +924,7 @@ def create_id_access_token_header(id_access_token):
         id_access_token: An identity server access token.
 
     Returns:
-        list[str]: The ascii-encoded bearer token encased in a list.
+        The ascii-encoded bearer token encased in a list.
     """
     # Prefix with Bearer
     bearer_token = "Bearer %s" % id_access_token
