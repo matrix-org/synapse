@@ -108,7 +108,7 @@ class OEmbedResult:
     # Either HTML content or URL must be provided.
     html = attr.ib(type=Optional[str])
     url = attr.ib(type=Optional[str])
-    title = attr.ib(type=str)
+    title = attr.ib(type=Optional[str])
     # Number of seconds to cache the content.
     cache_age = attr.ib(type=int)
 
