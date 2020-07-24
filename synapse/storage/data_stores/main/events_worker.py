@@ -43,7 +43,12 @@ from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_cla
 from synapse.storage.database import Database, LoggingTransaction
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import get_domain_from_id
-from synapse.util.caches.descriptors import Cache, cached, cachedInlineCallbacks
+from synapse.util.caches.descriptors import (
+    _CacheContext,
+    Cache,
+    cached,
+    cachedInlineCallbacks,
+)
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
 
@@ -1358,12 +1363,13 @@ class EventsWorkerStore(SQLBaseStore):
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
-    @cached(tree=True)
+    @cached(tree=True, cache_context=True)
     async def get_unread_message_count_for_user(
-        self, room_id: str, user_id: str,
+        self, room_id: str, user_id: str, cache_context: _CacheContext,
     ):
         last_read_event_id = await self.get_last_receipt_event_id_for_user(
             user_id=user_id, room_id=room_id, receipt_type="m.read",
+            on_invalidate=cache_context.invalidate,
         )
 
         return await self.db.runInteraction(
