@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import attr
 from frozendict import frozendict
@@ -20,8 +20,12 @@ from frozendict import frozendict
 from twisted.internet import defer
 
 from synapse.appservice import ApplicationService
+from synapse.events import EventBase
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import StateMap
+
+if TYPE_CHECKING:
+    from synapse.storage.data_stores.main import DataStore
 
 
 @attr.s(slots=True)
@@ -129,8 +133,7 @@ class EventContext:
             delta_ids=delta_ids,
         )
 
-    @defer.inlineCallbacks
-    def serialize(self, event, store):
+    async def serialize(self, event: EventBase, store: "DataStore") -> dict:
         """Converts self to a type that can be serialized as JSON, and then
         deserialized by `deserialize`
 
@@ -146,7 +149,7 @@ class EventContext:
         # the prev_state_ids, so if we're a state event we include the event
         # id that we replaced in the state.
         if event.is_state():
-            prev_state_ids = yield self.get_prev_state_ids()
+            prev_state_ids = await self.get_prev_state_ids()
             prev_state_id = prev_state_ids.get((event.type, event.state_key))
         else:
             prev_state_id = None
@@ -214,8 +217,7 @@ class EventContext:
 
         return self._state_group
 
-    @defer.inlineCallbacks
-    def get_current_state_ids(self):
+    async def get_current_state_ids(self) -> Optional[StateMap[str]]:
         """
         Gets the room state map, including this event - ie, the state in ``state_group``
 
@@ -224,16 +226,16 @@ class EventContext:
         ``rejected`` is set.
 
         Returns:
-            Deferred[dict[(str, str), str]|None]: Returns None if state_group
-                is None, which happens when the associated event is an outlier.
+            Returns None if state_group is None, which happens when the associated
+            event is an outlier.
 
-                Maps a (type, state_key) to the event ID of the state event matching
-                this tuple.
+            Maps a (type, state_key) to the event ID of the state event matching
+            this tuple.
         """
         if self.rejected:
             raise RuntimeError("Attempt to access state_ids of rejected event")
 
-        yield self._ensure_fetched()
+        await self._ensure_fetched()
         return self._current_state_ids
 
     @defer.inlineCallbacks
