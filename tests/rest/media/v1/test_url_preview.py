@@ -134,7 +134,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.reactor.nameResolver = Resolver()
 
     def test_cache_returns_correct_type(self):
-        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://matrix.org", shorthand=False
@@ -190,7 +190,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
     def test_non_ascii_preview_httpequiv(self):
-        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         end_content = (
             b"<html><head>"
@@ -224,7 +224,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
 
     def test_non_ascii_preview_content_type(self):
-        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         end_content = (
             b"<html><head>"
@@ -257,7 +257,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.json_body["og:title"], "\u0434\u043a\u0430")
 
     def test_overlong_title(self):
-        self.lookups["matrix.org"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["matrix.org"] = [(IPv4Address, "10.1.2.3")]
 
         end_content = (
             b"<html><head>"
@@ -295,7 +295,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         IP addresses can be previewed directly.
         """
-        self.lookups["example.com"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
         request, channel = self.make_request(
             "GET", "url_preview?url=http://example.com", shorthand=False
@@ -442,7 +442,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         # Hardcode the URL resolving to the IP we want.
         self.lookups["example.com"] = [
             (IPv4Address, "1.1.1.2"),
-            (IPv4Address, "8.8.8.8"),
+            (IPv4Address, "10.1.2.3"),
         ]
 
         request, channel = self.make_request(
@@ -521,7 +521,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """
         Accept-Language header is sent to the remote server
         """
-        self.lookups["example.com"] = [(IPv4Address, "8.8.8.8")]
+        self.lookups["example.com"] = [(IPv4Address, "10.1.2.3")]
 
         # Build and make a request to the server
         request, channel = self.make_request(
@@ -579,8 +579,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             clear=True,
         ):
 
-            self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
-            self.lookups["cdn.twitter.com"] = [(IPv4Address, "8.8.8.8")]
+            self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+            self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
 
             result = {
                 "version": "1.0",
@@ -652,7 +652,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             clear=True,
         ):
 
-            self.lookups["publish.twitter.com"] = [(IPv4Address, "8.8.8.8")]
+            self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
 
             result = {
                 "version": "1.0",
