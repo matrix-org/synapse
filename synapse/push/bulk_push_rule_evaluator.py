@@ -304,7 +304,9 @@ class RulesForRoom(object):
 
                 push_rules_delta_state_cache_metric.inc_hits()
             else:
-                current_state_ids = yield context.get_current_state_ids()
+                current_state_ids = yield defer.ensureDeferred(
+                    context.get_current_state_ids()
+                )
                 push_rules_delta_state_cache_metric.inc_misses()
 
             push_rules_state_size_counter.inc(len(current_state_ids))
