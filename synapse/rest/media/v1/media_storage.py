@@ -12,13 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import contextlib
 import inspect
 import logging
 import os
 import shutil
-from typing import TYPE_CHECKING, IO, Sequence, Optional
+from typing import IO, TYPE_CHECKING, Optional, Sequence
 
 from twisted.protocols.basic import FileSender
 
@@ -30,6 +29,7 @@ from .filepath import MediaFilePaths
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
     from .storage_provider import StorageProvider
 
 logger = logging.getLogger(__name__)
