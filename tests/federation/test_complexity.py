@@ -99,6 +99,37 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400, f.value)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
+    def test_join_too_large_admin(self):
+        # Check whether an admin can join if option "admins_can_join" is undefined,
+        # this option defaults to false, so the join should fail.
+
+        u1 = self.register_user("u1", "pass", admin=True)
+
+        handler = self.hs.get_room_member_handler()
+        fed_transport = self.hs.get_federation_transport_client()
+
+        # Mock out some things, because we don't want to test the whole join
+        fed_transport.client.get_json = Mock(return_value=defer.succeed({"v1": 9999}))
+        handler.federation_handler.do_invite_join = Mock(
+            return_value=defer.succeed(("", 1))
+        )
+
+        d = handler._remote_join(
+            None,
+            ["other.example.com"],
+            "roomid",
+            UserID.from_string(u1),
+            {"membership": "join"},
+        )
+
+        self.pump()
+
+        # The request failed with a SynapseError saying the resource limit was
+        # exceeded.
+        f = self.get_failure(d, SynapseError)
+        self.assertEqual(f.value.code, 400, f.value)
+        self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
+
     def test_join_too_large_once_joined(self):
 
         u1 = self.register_user("u1", "pass")
@@ -142,36 +173,10 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.code, 400)
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def test_join_too_large_admin(self):
-        u1 = self.register_user("u1", "pass", admin=True)
-
-        handler = self.hs.get_room_member_handler()
-        fed_transport = self.hs.get_federation_transport_client()
-
-        # Mock out some things, because we don't want to test the whole join
-        fed_transport.client.get_json = Mock(return_value=defer.succeed({"v1": 9999}))
-        handler.federation_handler.do_invite_join = Mock(
-            return_value=defer.succeed(("", 1))
-        )
-
-        d = handler._remote_join(
-            None,
-            ["other.example.com"],
-            "roomid",
-            UserID.from_string(u1),
-            {"membership": "join"},
-        )
-
-        self.pump()
-
-        # The request failed with a SynapseError saying the resource limit was
-        # exceeded.
-        f = self.get_failure(d, SynapseError)
-        self.assertEqual(f.value.code, 400, f.value)
-        self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
-
 
 class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
+    # Test the behavior of joining rooms which exceed the complexity if option
+    # limit_remote_rooms.admins_can_join is True.
 
     servlets = [
         admin.register_servlets,
@@ -188,7 +193,9 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         }
         return config
 
-    def test_join_too_large_noadmin(self):
+    def test_join_too_large_no_admin(self):
+        # A user which is not an admin should not be able to join a remote room
+        # which is too complex.
 
         u1 = self.register_user("u1", "pass")
 
@@ -218,6 +225,8 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         self.assertEqual(f.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
     def test_join_too_large_admin(self):
+        # An admin should be able to join rooms where a complexity check fails.
+
         u1 = self.register_user("u1", "pass", admin=True)
 
         handler = self.hs.get_room_member_handler()
@@ -240,5 +249,4 @@ class RoomComplexityAdminTests(unittest.FederatingHomeserverTestCase):
         self.pump()
 
         # The request success since the user is an admin
-        res = self.get_success(d)
-        self.assertEqual(res, ("", 1))
+        self.get_success(d)
