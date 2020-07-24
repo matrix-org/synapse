@@ -154,7 +154,7 @@ class IdentityHandler(BaseHandler):
         bind_data = {"sid": sid, "client_secret": client_secret, "mxid": mxid}
         if use_v2:
             bind_url = "https://%s/_matrix/identity/v2/3pid/bind" % (id_server,)
-            headers["Authorization"] = create_id_access_token_header(id_access_token)
+            headers["Authorization"] = create_id_access_token_header(id_access_token)  # type: ignore
         else:
             bind_url = "https://%s/_matrix/identity/api/v1/3pid/bind" % (id_server,)
 
@@ -790,7 +790,7 @@ class IdentityHandler(BaseHandler):
         inviter_display_name: str,
         inviter_avatar_url: str,
         id_access_token: Optional[str] = None,
-    ) -> Tuple[str, List[Dict[str, str]], str]:
+    ) -> Tuple[str, List[Dict[str, str]], Dict[str, str], str]:
         """
         Asks an identity server for a third party invite.
 
@@ -818,8 +818,7 @@ class IdentityHandler(BaseHandler):
                 public_keys ([{"public_key": str, "key_validity_url": str}]):
                     public_key is a base64-encoded ed25519 public key.
                 fallback_public_key: One element from public_keys.
-                display_name: A user-friendly name to represent the invited
-                    user.
+                display_name: A user-friendly name to represent the invited user.
         """
         invite_config = {
             "medium": medium,
