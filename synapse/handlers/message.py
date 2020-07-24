@@ -872,7 +872,6 @@ class EventCreationHandler(object):
                 )
                 stream_id = result["stream_id"]
                 event.internal_metadata.stream_ordering = stream_id
-                success = True
                 return stream_id
 
             stream_id = await self.persist_and_notify_client_event(
