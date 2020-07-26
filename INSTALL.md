@@ -299,22 +299,27 @@ The fingerprint of the repository signing key (as shown by `gpg
 /usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
 `AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
-#### Downstream Debian/Ubuntu packages
+#### Downstream Debian packages
 
-If you are running Debian `buster`, `matrix-synapse` is available in
-`buster-backports`. Please see the [Debian documentation on
-backports](https://backports.debian.org/Instructions/) for information on how
-to use them.
+We do not recommend using the packages from the default Debian `buster`
+repository at this time, as they are old and suffer from known security
+vulnerabilities. You can install the latest version of Synapse from
+[our repository](#matrixorg-packages) or from `buster-backports`. Please
+see the [Debian documentation](https://backports.debian.org/Instructions/)
+for information on how to use backports.
 
-If you are using Debian `sid`, Synapse is available in the Debian repositories
-and it should be possible to install it with simply:
+If you are using Debian `sid` or testing, Synapse is available in the default
+repositories and it should be possible to install it simply with:
 
 ```
 sudo apt install matrix-synapse
 ```
 
-We do not recommend using the packages in Debian `buster` or in Ubuntu
+#### Downstream Ubuntu packages
+
+We do not recommend using the packages in the default Ubuntu repository
 at this time, as they are old and suffer from known security vulnerabilities.
+The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
 
 ### Fedora
 
