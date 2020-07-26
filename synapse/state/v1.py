@@ -15,9 +15,7 @@
 
 import hashlib
 import logging
-from typing import Callable, Dict, List, Optional
-
-from twisted.internet import defer
+from typing import Awaitable, Callable, Dict, List, Optional
 
 from synapse import event_auth
 from synapse.api.constants import EventTypes
@@ -32,12 +30,11 @@ logger = logging.getLogger(__name__)
 POWER_KEY = (EventTypes.PowerLevels, "")
 
 
-@defer.inlineCallbacks
-def resolve_events_with_store(
+async def resolve_events_with_store(
     room_id: str,
     state_sets: List[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
-    state_map_factory: Callable,
+    state_map_factory: Callable[[List[str]], Awaitable],
 ):
     """
     Args:
@@ -56,7 +53,7 @@ def resolve_events_with_store(
 
         state_map_factory: will be called
             with a list of event_ids that are needed, and should return with
-            a Deferred of dict of event_id to event.
+            an Awaitable that resolves to a dict of event_id to event.
 
     Returns:
         Deferred[dict[(str, str), str]]:
@@ -80,7 +77,7 @@ def resolve_events_with_store(
 
     # dict[str, FrozenEvent]: a map from state event id to event. Only includes
     # the state events which are in conflict (and those in event_map)
-    state_map = yield state_map_factory(needed_events)
+    state_map = await state_map_factory(needed_events)
     if event_map is not None:
         state_map.update(event_map)
 
@@ -110,7 +107,7 @@ def resolve_events_with_store(
         "Asking for %d/%d auth events", len(new_needed_events), new_needed_event_count
     )
 
-    state_map_new = yield state_map_factory(new_needed_events)
+    state_map_new = await state_map_factory(new_needed_events)
     for event in state_map_new.values():
         if event.room_id != room_id:
             raise Exception(

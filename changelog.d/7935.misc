@@ -1,0 +1,1 @@
+Convert the auth providers to be async/await.

@@ -739,7 +739,7 @@ class ServerConfig(Config):
         #       names: a list of names of HTTP resources. See below for a list of
         #           valid resource names.
         #
-        #       compress: set to true to enable HTTP comression for this resource.
+        #       compress: set to true to enable HTTP compression for this resource.
         #
         #   additional_resources: Only valid for an 'http' listener. A map of
         #        additional endpoints which should be loaded via dynamic modules.

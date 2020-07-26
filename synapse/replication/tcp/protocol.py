@@ -57,8 +57,12 @@ from prometheus_client import Counter
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
+from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics import LaterGauge
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    BackgroundProcessLoggingContext,
+    run_as_background_process,
+)
 from synapse.replication.tcp.commands import (
     VALID_CLIENT_COMMANDS,
     VALID_SERVER_COMMANDS,
@@ -160,6 +164,12 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         # The LoopingCall for sending pings.
         self._send_ping_loop = None
 
+        # a logcontext which we use for processing incoming commands. We declare it as a
+        # background process so that the CPU stats get reported to prometheus.
+        self._logging_context = BackgroundProcessLoggingContext(
+            "replication_command_handler-%s" % self.conn_id
+        )
+
     def connectionMade(self):
         logger.info("[%s] Connection established", self.id())
 
@@ -210,6 +220,10 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def lineReceived(self, line: bytes):
         """Called when we've received a line
         """
+        with PreserveLoggingContext(self._logging_context):
+            self._parse_and_dispatch_line(line)
+
+    def _parse_and_dispatch_line(self, line: bytes):
         if line.strip() == "":
             # Ignore blank lines
             return
@@ -396,6 +410,9 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         if self.transport:
             self.transport.unregisterProducer()
+
+        # mark the logging context as finished
+        self._logging_context.__exit__(None, None, None)
 
     def __str__(self):
         addr = None

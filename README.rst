@@ -184,12 +184,8 @@ Using PostgreSQL
 ================
 
 Synapse offers two database engines:
- * `SQLite <https://sqlite.org/>`_
  * `PostgreSQL <https://www.postgresql.org>`_
-
-By default Synapse uses SQLite in and doing so trades performance for convenience.
-SQLite is only recommended in Synapse for testing purposes or for servers with
-light workloads.
+ * `SQLite <https://sqlite.org/>`_
 
 Almost all installations should opt to use PostgreSQL. Advantages include:
 
@@ -199,6 +195,10 @@ Almost all installations should opt to use PostgreSQL. Advantages include:
 
 For information on how to install and use PostgreSQL, please see
 `docs/postgres.md <docs/postgres.md>`_.
+
+By default Synapse uses SQLite and in doing so trades performance for convenience.
+SQLite is only recommended in Synapse for testing purposes or for servers with
+light workloads.
 
 .. _reverse-proxy:
 

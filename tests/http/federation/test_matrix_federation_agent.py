@@ -67,6 +67,14 @@ def get_connection_factory():
     return test_server_connection_factory
 
 
+# Once Async Mocks or lambdas are supported this can go away.
+def generate_resolve_service(result):
+    async def resolve_service(_):
+        return result
+
+    return resolve_service
+
+
 class MatrixFederationAgentTests(unittest.TestCase):
     def setUp(self):
         self.reactor = ThreadedMemoryReactorClock()
@@ -373,7 +381,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the certificate on the server doesn't match the hostname
         """
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv1"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://testserv1/foo/bar")
@@ -456,7 +464,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name has no port, no SRV, and no well-known
         """
 
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://testserv/foo/bar")
@@ -510,7 +518,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Test the behaviour when the .well-known delegates elsewhere
         """
 
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
 
@@ -572,7 +580,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Test the behaviour when the server name has no port and no SRV record, but
         the .well-known has a 300 redirect
         """
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
 
@@ -661,7 +669,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name has an *invalid* well-known (and no SRV)
         """
 
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://testserv/foo/bar")
@@ -717,7 +725,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # the config left to the default, which will not trust it (since the
         # presented cert is signed by a test CA)
 
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
         config = default_config("test", parse=True)
@@ -764,9 +772,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when there is a single SRV record
         """
-        self.mock_resolver.resolve_service.side_effect = lambda _: [
-            Server(host=b"srvtarget", port=8443)
-        ]
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
+            [Server(host=b"srvtarget", port=8443)]
+        )
         self.reactor.lookups["srvtarget"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://testserv/foo/bar")
@@ -819,9 +827,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(host, "1.2.3.4")
         self.assertEqual(port, 443)
 
-        self.mock_resolver.resolve_service.side_effect = lambda _: [
-            Server(host=b"srvtarget", port=8443)
-        ]
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
+            [Server(host=b"srvtarget", port=8443)]
+        )
 
         self._handle_well_known_connection(
             client_factory,
@@ -861,7 +869,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
     def test_idna_servername(self):
         """test the behaviour when the server name has idna chars in"""
 
-        self.mock_resolver.resolve_service.side_effect = lambda _: []
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
 
         # the resolver is always called with the IDNA hostname as a native string.
         self.reactor.lookups["xn--bcher-kva.com"] = "1.2.3.4"
@@ -922,9 +930,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
     def test_idna_srv_target(self):
         """test the behaviour when the target of a SRV record has idna chars"""
 
-        self.mock_resolver.resolve_service.side_effect = lambda _: [
-            Server(host=b"xn--trget-3qa.com", port=8443)  # târget.com
-        ]
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
+            [Server(host=b"xn--trget-3qa.com", port=8443)]  # târget.com
+        )
         self.reactor.lookups["xn--trget-3qa.com"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://xn--bcher-kva.com/foo/bar")
@@ -1087,11 +1095,12 @@ class MatrixFederationAgentTests(unittest.TestCase):
     def test_srv_fallbacks(self):
         """Test that other SRV results are tried if the first one fails.
         """
-
-        self.mock_resolver.resolve_service.side_effect = lambda _: [
-            Server(host=b"target.com", port=8443),
-            Server(host=b"target.com", port=8444),
-        ]
+        self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
+            [
+                Server(host=b"target.com", port=8443),
+                Server(host=b"target.com", port=8444),
+            ]
+        )
         self.reactor.lookups["target.com"] = "1.2.3.4"
 
         test_d = self._make_get_request(b"matrix://testserv/foo/bar")

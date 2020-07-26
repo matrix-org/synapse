@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 from __future__ import print_function
-from argparse import ArgumentParser
+
 import json
-import requests
 import sys
 import urllib
+from argparse import ArgumentParser
+
+import requests
 
 try:
     raw_input
