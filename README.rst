@@ -179,27 +179,6 @@ versions of synapse.
 
 .. _UPGRADE.rst: UPGRADE.rst
 
-
-Using PostgreSQL
-================
-
-Synapse offers two database engines:
- * `PostgreSQL <https://www.postgresql.org>`_
- * `SQLite <https://sqlite.org/>`_
-
-Almost all installations should opt to use PostgreSQL. Advantages include:
-
-* significant performance improvements due to the superior threading and
-  caching model, smarter query optimiser
-* allowing the DB to be run on separate hardware
-
-For information on how to install and use PostgreSQL, please see
-`docs/postgres.md <docs/postgres.md>`_.
-
-By default Synapse uses SQLite and in doing so trades performance for convenience.
-SQLite is only recommended in Synapse for testing purposes or for servers with
-light workloads.
-
 .. _reverse-proxy:
 
 Using a reverse proxy with Synapse

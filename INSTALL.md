@@ -1,10 +1,12 @@
 - [Choosing your server name](#choosing-your-server-name)
+- [Picking a database engine](#picking-a-database-engine)
 - [Installing Synapse](#installing-synapse)
   - [Installing from source](#installing-from-source)
     - [Platform-Specific Instructions](#platform-specific-instructions)
   - [Prebuilt packages](#prebuilt-packages)
 - [Setting up Synapse](#setting-up-synapse)
   - [TLS certificates](#tls-certificates)
+  - [Client Well-known URI](#client-well-known-uri)
   - [Email](#email)
   - [Registering a user](#registering-a-user)
   - [Setting up a TURN server](#setting-up-a-turn-server)
@@ -26,6 +28,25 @@ production-ready setup, you will probably want to specify your domain
 that your email address is probably `user@example.com` rather than
 `user@email.example.com`) - but doing so may require more advanced setup: see
 [Setting up Federation](docs/federate.md).
+
+# Picking a database engine
+
+Synapse offers two database engines:
+ * [PostgreSQL](https://www.postgresql.org)
+ * [SQLite](https://sqlite.org/)
+
+Almost all installations should opt to use PostgreSQL. Advantages include:
+
+* significant performance improvements due to the superior threading and
+  caching model, smarter query optimiser
+* allowing the DB to be run on separate hardware
+
+For information on how to install and use PostgreSQL, please see
+[docs/postgres.md](docs/postgres.md)
+
+By default Synapse uses SQLite and in doing so trades performance for convenience.
+SQLite is only recommended in Synapse for testing purposes or for servers with
+light workloads.
 
 # Installing Synapse
 
