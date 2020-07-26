@@ -301,20 +301,20 @@ The fingerprint of the repository signing key (as shown by `gpg
 
 #### Downstream Debian/Ubuntu packages
 
-For `buster` and `sid`, Synapse is available in the Debian repositories and
-it should be possible to install it with simply:
+If you are running Debian `buster`, `matrix-synapse` is available in
+`buster-backports`. Please see the [Debian documentation on
+backports](https://backports.debian.org/Instructions/) for information on how
+to use them.
+
+If you are using Debian `sid`, Synapse is available in the Debian repositories
+and it should be possible to install it with simply:
 
 ```
 sudo apt install matrix-synapse
 ```
 
-There is also a version of `matrix-synapse` in `stretch-backports`. Please see
-the [Debian documentation on
-backports](https://backports.debian.org/Instructions/) for information on how
-to use them.
-
-We do not recommend using the packages in downstream Ubuntu at this time, as
-they are old and suffer from known security vulnerabilities.
+We do not recommend using the packages in Debian `buster` or in Ubuntu
+at this time, as they are old and suffer from known security vulnerabilities.
 
 ### Fedora
 
