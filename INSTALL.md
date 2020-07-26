@@ -420,7 +420,7 @@ so, you will need to edit `homeserver.yaml`, as follows:
 For a more detailed guide to configuring your server for federation, see
 [federate.md](docs/federate.md).
 
-## Client Well-known URI
+## Client Well-Known URI
 
 Setting up the client Well-Known URI is optional but if you set it up, it will
 allow users to enter their full username (e.g. `@user:server.com`) into clients
