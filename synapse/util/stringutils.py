@@ -17,7 +17,7 @@ import itertools
 import random
 import re
 import string
-from collections import Iterable
+from collections.abc import Iterable
 
 from synapse.api.errors import Codes, SynapseError
 

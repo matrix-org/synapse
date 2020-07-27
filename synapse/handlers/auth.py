@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import logging
 import time
 import unicodedata
@@ -863,11 +864,15 @@ class AuthHandler(BaseHandler):
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
             if hasattr(provider, "on_logged_out"):
-                await provider.on_logged_out(
+                # This might return an awaitable, if it does block the log out
+                # until it completes.
+                result = provider.on_logged_out(
                     user_id=str(user_info["user"]),
                     device_id=user_info["device_id"],
                     access_token=access_token,
                 )
+                if inspect.isawaitable(result):
+                    await result
 
         # delete pushers associated with this access token
         if user_info["token_id"] is not None:

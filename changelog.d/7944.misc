@@ -1,0 +1,1 @@
+Convert the interactive_auth_handler wrapper to async/await.

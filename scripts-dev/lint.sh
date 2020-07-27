@@ -11,7 +11,7 @@ if [ $# -ge 1 ]
 then
   files=$*
 else
-  files="synapse tests scripts-dev scripts"
+  files="synapse tests scripts-dev scripts contrib synctl"
 fi
 
 echo "Linting these locations: $files"
