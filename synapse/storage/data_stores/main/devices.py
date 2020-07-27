@@ -738,7 +738,7 @@ class DeviceWorkerStore(SQLBaseStore):
         return (row["device_id"], row["device_data"]) if row else (None, None)
 
     def _store_dehydrated_device_txn(
-            self, txn, user_id: str, device_id: str, device_data: str
+        self, txn, user_id: str, device_id: str, device_data: str
     ) -> Optional[str]:
         old_device_id = self.db.simple_select_one_onecol_txn(
             txn,
@@ -762,24 +762,23 @@ class DeviceWorkerStore(SQLBaseStore):
                 txn,
                 table="dehydrated_devices",
                 keyvalues={"user_id", user_id},
-                updatevalues={
-                    "device_id": device_id,
-                    "device_data": device_data,
-                },
+                updatevalues={"device_id": device_id, "device_data": device_data,},
             )
         return old_device_id
 
     async def store_dehydrated_device(
-            self, user_id: str, device_id: str, device_data: str
+        self, user_id: str, device_id: str, device_data: str
     ) -> Optional[str]:
         return await self.db.runInteraction(
             "store_dehydrated_device_txn",
             self._store_dehydrated_device_txn,
-            user_id, device_id, device_data,
+            user_id,
+            device_id,
+            device_data,
         )
 
     async def create_dehydration_token(
-            self, user_id: str, device_id: str, login_submission: str
+        self, user_id: str, device_id: str, login_submission: str
     ) -> str:
         # FIXME: expire any old tokens
 
@@ -808,17 +807,11 @@ class DeviceWorkerStore(SQLBaseStore):
         token_info = self.db.simple_select_one_txn(
             txn,
             "dehydration_token",
-            {
-                "token": token,
-            },
+            {"token": token,},
             ["user_id", "device_id", "login_submission"],
         )
         self.db.simple_delete_one_txn(
-            txn,
-            "dehydration_token",
-            {
-                "token": token,
-            },
+            txn, "dehydration_token", {"token": token,},
         )
 
         if dehydrate:

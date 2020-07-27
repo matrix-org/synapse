@@ -79,7 +79,10 @@ class KeyUploadServlet(RestServlet):
             # passing the device_id here is deprecated; however, we allow it
             # for now for compatibility with older clients.
             if requester.device_id is not None and device_id != requester.device_id:
-                dehydrated_device_id, _ = await self.device_handler.get_dehydrated_device(user_id)
+                (
+                    dehydrated_device_id,
+                    _,
+                ) = await self.device_handler.get_dehydrated_device(user_id)
                 if device_id != dehydrated_device_id:
                     set_tag("error", True)
                     log_kv(

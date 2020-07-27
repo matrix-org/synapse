@@ -341,9 +341,14 @@ class LoginRestServlet(RestServlet):
             user_id = canonical_uid
 
         if login_submission.get("org.matrix.msc2697.restore_device"):
-            device_id, dehydrated_device = await self.device_handler.get_dehydrated_device(user_id)
+            (
+                device_id,
+                dehydrated_device,
+            ) = await self.device_handler.get_dehydrated_device(user_id)
             if dehydrated_device:
-                token = await self.device_handler.get_dehydration_token(user_id, device_id, login_submission)
+                token = await self.device_handler.get_dehydration_token(
+                    user_id, device_id, login_submission
+                )
                 result = {
                     "user_id": user_id,
                     "home_server": self.hs.hostname,
@@ -430,9 +435,19 @@ class RestoreDeviceServlet(RestServlet):
         submission = parse_json_object_from_request(request)
 
         if submission.get("rehydrate"):
-            return 200, await self.device_handler.rehydrate_device(submission.get("dehydration_token"))
+            return (
+                200,
+                await self.device_handler.rehydrate_device(
+                    submission.get("dehydration_token")
+                ),
+            )
         else:
-            return 200, await self.device_handler.cancel_rehydrate(submission.get("dehydration_token"))
+            return (
+                200,
+                await self.device_handler.cancel_rehydrate(
+                    submission.get("dehydration_token")
+                ),
+            )
 
 
 class StoreDeviceServlet(RestServlet):

@@ -492,12 +492,17 @@ class DeviceHandler(DeviceWorkerHandler):
             await self.store.mark_remote_user_device_list_as_unsubscribed(user_id)
 
     async def store_dehydrated_device(
-            self, user_id: str, device_data: str,
-            initial_device_display_name: Optional[str] = None) -> str:
+        self,
+        user_id: str,
+        device_data: str,
+        initial_device_display_name: Optional[str] = None,
+    ) -> str:
         device_id = await self.check_device_registered(
             user_id, None, initial_device_display_name,
         )
-        old_device_id = await self.store.store_dehydrated_device(user_id, device_id, device_data)
+        old_device_id = await self.store.store_dehydrated_device(
+            user_id, device_id, device_data
+        )
         if old_device_id is not None:
             await self.delete_device(user_id, old_device_id)
         return device_id
@@ -505,8 +510,12 @@ class DeviceHandler(DeviceWorkerHandler):
     async def get_dehydrated_device(self, user_id: str) -> Tuple[str, str]:
         return await self.store.get_dehydrated_device(user_id)
 
-    async def get_dehydration_token(self, user_id: str, device_id: str, login_submission: JsonDict) -> str:
-        return await self.store.create_dehydration_token(user_id, device_id, json.dumps(login_submission))
+    async def get_dehydration_token(
+        self, user_id: str, device_id: str, login_submission: JsonDict
+    ) -> str:
+        return await self.store.create_dehydration_token(
+            user_id, device_id, json.dumps(login_submission)
+        )
 
     async def rehydrate_device(self, token: str) -> dict:
         # FIXME: if can't find token, return 404
@@ -519,9 +528,13 @@ class DeviceHandler(DeviceWorkerHandler):
 
         if token_info["dehydrated"]:
             # create access token for dehydrated device
-            initial_display_name = None  # FIXME: get display name from login submission?
+            initial_display_name = (
+                None  # FIXME: get display name from login submission?
+            )
             device_id, access_token = await registration_handler.register_device(
-                token_info.get("user_id"), token_info.get("device_id"), initial_display_name
+                token_info.get("user_id"),
+                token_info.get("device_id"),
+                initial_display_name,
             )
 
             return {
