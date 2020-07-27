@@ -27,9 +27,7 @@ def get_badge_count(store, user_id):
     badge = len(invites)
 
     for room_id in joins:
-        unread_count = yield defer.ensureDeferred(
-            store.get_unread_message_count_for_user(room_id, user_id)
-        )
+        unread_count = yield store.get_unread_message_count_for_user(room_id, user_id)
         # return one badge count per conversation, as count per
         # message is so noisy as to be almost useless
         badge += 1 if unread_count else 0

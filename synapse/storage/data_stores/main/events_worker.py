@@ -40,7 +40,8 @@ from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import BackfillStream
 from synapse.replication.tcp.streams.events import EventsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import Database, LoggingTransaction
+from synapse.storage.database import Database
+from synapse.storage.types import Cursor
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import get_domain_from_id
 from synapse.util.caches.descriptors import (
@@ -1366,29 +1367,39 @@ class EventsWorkerStore(SQLBaseStore):
     @cached(tree=True, cache_context=True)
     async def get_unread_message_count_for_user(
         self, room_id: str, user_id: str, cache_context: _CacheContext,
-    ):
-        last_read_event_id = await self.get_last_receipt_event_id_for_user(
-            user_id=user_id,
-            room_id=room_id,
-            receipt_type="m.read",
-            on_invalidate=cache_context.invalidate,
-        )
+    ) -> int:
+        """Retrieve the count of unread messages for the given room and user.
 
-        return await self.db.runInteraction(
-            "get_unread_message_count_for_user",
-            self._get_unread_message_count_for_user_txn,
-            user_id,
-            room_id,
-            last_read_event_id,
-        )
+        Args:
+            room_id: The ID of the room to count unread messages in.
+            user_id: The ID of the user to count unread messages for.
+
+        Returns:
+            The number of unread messages for the given user in the given room.
+        """
+        with Measure(self._clock, "get_unread_message_count_for_user"):
+            last_read_event_id = await self.get_last_receipt_event_id_for_user(
+                user_id=user_id,
+                room_id=room_id,
+                receipt_type="m.read",
+                on_invalidate=cache_context.invalidate,
+            )
+
+            return await self.db.runInteraction(
+                "get_unread_message_count_for_user",
+                self._get_unread_message_count_for_user_txn,
+                user_id,
+                room_id,
+                last_read_event_id,
+            )
 
     def _get_unread_message_count_for_user_txn(
         self,
-        txn: LoggingTransaction,
+        txn: Cursor,
         user_id: str,
         room_id: str,
         last_read_event_id: Optional[str],
-    ):
+    ) -> int:
         if last_read_event_id:
             # Get the stream ordering for the last read event.
             stream_ordering = self.db.simple_select_one_onecol_txn(
@@ -1413,6 +1424,10 @@ class EventsWorkerStore(SQLBaseStore):
                 (user_id, room_id),
             )
             row = txn.fetchone()
+
+            if row is None:
+                return 0
+
             stream_ordering = row[0]
 
         # Count the messages that qualify as unread after the stream ordering we've just

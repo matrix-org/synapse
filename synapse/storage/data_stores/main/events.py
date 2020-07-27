@@ -62,7 +62,7 @@ STATE_EVENT_TYPES_TO_MARK_UNREAD = {
 }
 
 
-def count_as_unread(event: EventBase, context: EventContext) -> bool:
+def should_count_as_unread(event: EventBase, context: EventContext) -> bool:
     # Exclude rejected and soft-failed events.
     if context.rejected or event.internal_metadata.is_soft_failed():
         return False
@@ -217,11 +217,6 @@ class PersistEventsStore:
                 new_forward_extremeties=new_forward_extremeties,
             )
             persist_event_counter.inc(len(events_and_contexts))
-
-            for event, _ in events_and_contexts:
-                self.store.get_unread_message_count_for_user.invalidate_many(
-                    (event.room_id,),
-                )
 
             if not backfilled:
                 # backfilled events have negative stream orderings, so we don't
@@ -864,7 +859,7 @@ class PersistEventsStore:
                     "contains_url": (
                         "url" in event.content and isinstance(event.content["url"], str)
                     ),
-                    "count_as_unread": count_as_unread(event, context),
+                    "count_as_unread": should_count_as_unread(event, context),
                 }
                 for event, context in events_and_contexts
             ],
@@ -963,8 +958,6 @@ class PersistEventsStore:
             elif event.type == EventTypes.Redaction and event.redacts is not None:
                 # Insert into the redactions table.
                 self._store_redaction(txn, event)
-                # Prevent the redacted event from counting towards the unread count.
-                self._handle_redacted_unread_event_txn(txn, event)
             elif event.type == EventTypes.Retention:
                 # Update the room_retention table.
                 self._store_retention_policy_for_room_txn(txn, event)
@@ -1522,12 +1515,4 @@ class PersistEventsStore:
                 for ev in events
                 if not ev.internal_metadata.is_outlier()
             ],
-        )
-
-    def _handle_redacted_unread_event_txn(self, txn: Connection, event: EventBase):
-        self.db.simple_update_txn(
-            txn=txn,
-            table="events",
-            keyvalues={"event_id": event.redacts},
-            updatevalues={"count_as_unread": False},
         )

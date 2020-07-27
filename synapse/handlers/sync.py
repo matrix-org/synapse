@@ -949,17 +949,6 @@ class SyncHandler(object):
         # count is whatever it was last time.
         return None
 
-    async def unread_messages_for_room_id(
-        self, room_id: str, sync_config: SyncConfig,
-    ) -> int:
-        """Retrieve the count of unread message for the current user in the given room.
-        """
-        with Measure(self.clock, "unread_messages_for_room_id"):
-            count = await self.store.get_unread_message_count_for_user(
-                room_id, sync_config.user.to_string(),
-            )
-            return count
-
     async def generate_sync_result(
         self,
         sync_config: SyncConfig,
@@ -1899,7 +1888,9 @@ class SyncHandler(object):
         if room_builder.rtype == "joined":
             unread_notifications = {}  # type: Dict[str, str]
 
-            unread_count = await self.unread_messages_for_room_id(room_id, sync_config)
+            unread_count = await self.store.get_unread_message_count_for_user(
+                room_id, sync_config.user.to_string(),
+            )
             room_sync = JoinedSyncResult(
                 room_id=room_id,
                 timeline=batch,
