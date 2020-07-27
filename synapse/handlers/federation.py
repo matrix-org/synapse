@@ -1904,6 +1904,7 @@ class FederationHandler(BaseHandler):
             run_in_background(
                 self.store.remove_push_actions_from_staging, event.event_id
             )
+            raise
 
         return context
 

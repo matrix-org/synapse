@@ -885,6 +885,7 @@ class EventCreationHandler(object):
             run_in_background(
                 self.store.remove_push_actions_from_staging, event.event_id
             )
+            raise
 
     async def _validate_canonical_alias(
         self, directory_handler, room_alias_str: str, expected_room_id: str
