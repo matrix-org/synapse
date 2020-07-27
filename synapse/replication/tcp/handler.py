@@ -321,7 +321,7 @@ class ReplicationCommandHandler:
                 )
             )
 
-    async def on_USER_SYNC(
+    def on_USER_SYNC(
         self, conn: AbstractConnection, cmd: UserSyncCommand
     ) -> Optional[Awaitable[None]]:
         user_sync_counter.inc()
