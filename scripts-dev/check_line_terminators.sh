@@ -24,4 +24,8 @@
 # The script will emit exit code 1 if any files that do not use unix line
 # terminators are found, 0 otherwise.
 
+# cd to the root of the repository
+cd `dirname $0`/..
+
+# Find and print files with non-unix line terminators
 find . -path './.git/*' -prune -o -type f -print0 | xargs -0 grep -I -l $'\r$' && ( echo 'found files with CRLF line endings'; exit 1 )
