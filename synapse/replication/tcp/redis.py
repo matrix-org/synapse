@@ -146,7 +146,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         # the handler might be a coroutine: fire it off as a background process
         # if so.
 
-        if hasattr(res, "__await__"):
+        if isawaitable(res):
             run_as_background_process(
                 "replication-" + cmd.get_logcontext_id(), lambda: res
             )
