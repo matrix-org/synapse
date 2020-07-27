@@ -13,7 +13,7 @@ Features
 - Allow email subjects to be customised through Synapse's configuration. ([\#7846](https://github.com/matrix-org/synapse/issues/7846))
 - Add the ability to re-activate an account from the admin API. ([\#7847](https://github.com/matrix-org/synapse/issues/7847), [\#7908](https://github.com/matrix-org/synapse/issues/7908))
 - Add experimental support for running multiple pusher workers. ([\#7855](https://github.com/matrix-org/synapse/issues/7855))
-- Add experimental support for moving typing off master. ([\#7869](https://github.com/matrix-org/synapse/issues/7869))
+- Add experimental support for moving typing off master. ([\#7869](https://github.com/matrix-org/synapse/issues/7869), [\#7959](https://github.com/matrix-org/synapse/issues/7959))
 - Report CPU metrics to prometheus for time spent processing replication commands. ([\#7879](https://github.com/matrix-org/synapse/issues/7879))
 - Support oEmbed for media previews. ([\#7920](https://github.com/matrix-org/synapse/issues/7920))
 - Abort federation requests where the client disconnects before the ratelimiter expires. ([\#7930](https://github.com/matrix-org/synapse/issues/7930))
@@ -35,7 +35,6 @@ Bugfixes
 - Fix a long standing bug where the tracing of async functions with opentracing was broken. ([\#7872](https://github.com/matrix-org/synapse/issues/7872), [\#7961](https://github.com/matrix-org/synapse/issues/7961))
 - Fix "TypeError in `synapse.notifier`" exceptions. ([\#7880](https://github.com/matrix-org/synapse/issues/7880))
 - Fix deprecation warning due to invalid escape sequences. ([\#7895](https://github.com/matrix-org/synapse/issues/7895))
-- Add experimental support for moving typing off master. ([\#7959](https://github.com/matrix-org/synapse/issues/7959))
 
 
 Updates to the Docker image
@@ -57,48 +56,37 @@ Deprecations and Removals
 -------------------------
 
 - Remove unused `synapse_replication_tcp_resource_invalidate_cache` prometheus metric. ([\#7878](https://github.com/matrix-org/synapse/issues/7878))
+- Remove Ubuntu Eoan from the list of `.deb` packages that we build as it is now end-of-life. Contributed by @gary-kim. ([\#7888](https://github.com/matrix-org/synapse/issues/7888))
 
 
 Internal Changes
 ----------------
 
-- Switch from simplejson to the standard library json. ([\#7802](https://github.com/matrix-org/synapse/issues/7802))
+- Switch parts of the codebase from `simplejson` to the standard library `json`. ([\#7802](https://github.com/matrix-org/synapse/issues/7802))
 - Add type hints to the http server code and remove an unused parameter. ([\#7813](https://github.com/matrix-org/synapse/issues/7813))
 - Add type hints to synapse.api.errors module. ([\#7820](https://github.com/matrix-org/synapse/issues/7820))
 - Ensure that calls to `json.dumps` are compatible with the standard library json. ([\#7836](https://github.com/matrix-org/synapse/issues/7836))
 - Remove redundant `retry_on_integrity_error` wrapper for event persistence code. ([\#7848](https://github.com/matrix-org/synapse/issues/7848))
 - Consistently use `db_to_json` to convert from database values to JSON objects. ([\#7849](https://github.com/matrix-org/synapse/issues/7849))
-- Convert E2E keys and room keys handlers to async/await. ([\#7851](https://github.com/matrix-org/synapse/issues/7851))
+- Convert various parts of the codebase to async/await. ([\#7851](https://github.com/matrix-org/synapse/issues/7851), [\#7860](https://github.com/matrix-org/synapse/issues/7860), [\#7868](https://github.com/matrix-org/synapse/issues/7868), [\#7871](https://github.com/matrix-org/synapse/issues/7871), [\#7873](https://github.com/matrix-org/synapse/issues/7873), [\#7874](https://github.com/matrix-org/synapse/issues/7874), [\#7884](https://github.com/matrix-org/synapse/issues/7884), [\#7912](https://github.com/matrix-org/synapse/issues/7912), [\#7935](https://github.com/matrix-org/synapse/issues/7935), [\#7939](https://github.com/matrix-org/synapse/issues/7939), [\#7942](https://github.com/matrix-org/synapse/issues/7942), [\#7944](https://github.com/matrix-org/synapse/issues/7944))
 - Add support for handling registration requests across multiple client reader workers. ([\#7853](https://github.com/matrix-org/synapse/issues/7853))
 - Small performance improvement in typing processing. ([\#7856](https://github.com/matrix-org/synapse/issues/7856))
 - The default value of `filter_timeline_limit` was changed from -1 (no limit) to 100. ([\#7858](https://github.com/matrix-org/synapse/issues/7858))
-- Convert _base, profile, and _receipts handlers to async/await. ([\#7860](https://github.com/matrix-org/synapse/issues/7860))
 - Optimise queueing of inbound replication commands. ([\#7861](https://github.com/matrix-org/synapse/issues/7861))
-- Convert synapse.app and federation client to async/await. ([\#7868](https://github.com/matrix-org/synapse/issues/7868))
 - Add some type annotations to `HomeServer` and `BaseHandler`. ([\#7870](https://github.com/matrix-org/synapse/issues/7870))
-- Convert device handler to async/await. ([\#7871](https://github.com/matrix-org/synapse/issues/7871))
-- Convert more media code to async/await. ([\#7873](https://github.com/matrix-org/synapse/issues/7873))
-- Convert the federation agent and related code to async/await. ([\#7874](https://github.com/matrix-org/synapse/issues/7874))
 - Clean up `PreserveLoggingContext`. ([\#7877](https://github.com/matrix-org/synapse/issues/7877))
 - Change "unknown room version" logging from 'error' to 'warning'. ([\#7881](https://github.com/matrix-org/synapse/issues/7881))
 - Stop using `device_max_stream_id` table and just use `device_inbox.stream_id`. ([\#7882](https://github.com/matrix-org/synapse/issues/7882))
-- Convert the message handler to async/await. ([\#7884](https://github.com/matrix-org/synapse/issues/7884))
 - Return an empty body for OPTIONS requests. ([\#7886](https://github.com/matrix-org/synapse/issues/7886))
-- Remove Ubuntu Eoan from the list of `.deb` packages that we build as it is now end-of-life. Contributed by @gary-kim. ([\#7888](https://github.com/matrix-org/synapse/issues/7888))
 - Fix typo in generated config file. Contributed by @ThiefMaster. ([\#7890](https://github.com/matrix-org/synapse/issues/7890))
 - Import ABC from `collections.abc` for Python 3.10 compatibility. ([\#7892](https://github.com/matrix-org/synapse/issues/7892))
 - Remove unused functions `time_function`, `trace_function`, `get_previous_frames`
   and `get_previous_frame` from `synapse.logging.utils` module. ([\#7897](https://github.com/matrix-org/synapse/issues/7897))
-- Convert `RoomListHandler` to async/await. ([\#7912](https://github.com/matrix-org/synapse/issues/7912))
 - Lint the `contrib/` directory in CI and linting scripts, add `synctl` to the linting script for consistency with CI. ([\#7914](https://github.com/matrix-org/synapse/issues/7914))
 - Use Element CSS and logo in notification emails when app name is Element. ([\#7919](https://github.com/matrix-org/synapse/issues/7919))
 - Optimisation to /sync handling: skip serializing the response if the client has already disconnected. ([\#7927](https://github.com/matrix-org/synapse/issues/7927))
 - When a client disconnects, don't log it as 'Error processing request'. ([\#7928](https://github.com/matrix-org/synapse/issues/7928))
 - Add debugging to `/sync` response generation (disabled by default). ([\#7929](https://github.com/matrix-org/synapse/issues/7929))
-- Convert the auth providers to be async/await. ([\#7935](https://github.com/matrix-org/synapse/issues/7935))
-- Convert presence handler helpers to async/await. ([\#7939](https://github.com/matrix-org/synapse/issues/7939))
-- Convert state resolution to async/await. ([\#7942](https://github.com/matrix-org/synapse/issues/7942))
-- Convert the interactive_auth_handler wrapper to async/await. ([\#7944](https://github.com/matrix-org/synapse/issues/7944))
 - Update comments that refer to Deferreds for async functions. ([\#7945](https://github.com/matrix-org/synapse/issues/7945))
 - Simplify error handling in federation handler. ([\#7950](https://github.com/matrix-org/synapse/issues/7950))
 
