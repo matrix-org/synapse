@@ -52,6 +52,8 @@ from synapse.types import Collection
 # python 3 does not have a maximum int value
 MAX_TXN_ID = 2 ** 63 - 1
 
+logger = logging.getLogger(__name__)
+
 sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
 perf_logger = logging.getLogger("synapse.storage.TIME")
