@@ -1,1 +1,1 @@
-Fix typing notifications on master process when using another worker for typing stream.
+Add experimental support for moving typing off master.
