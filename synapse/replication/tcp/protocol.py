@@ -50,6 +50,7 @@ import abc
 import fcntl
 import logging
 import struct
+from inspect import isawaitable
 from typing import TYPE_CHECKING, List
 
 from prometheus_client import Counter
@@ -266,13 +267,9 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
             # the handler might be a coroutine: fire it off as a background process
             # if so.
 
-            if hasattr(res, "__await__"):
-
-                async def handle_command():
-                    await res
-
+            if isawaitable(res):
                 run_as_background_process(
-                    "replication-" + cmd.get_logcontext_id(), handle_command
+                    "replication-" + cmd.get_logcontext_id(), lambda: res
                 )
 
             handled = True

@@ -220,6 +220,8 @@ class ReplicationCommandHandler:
 
         Does not check if there is already a thread processing the queue, hence "unsafe"
         """
+        assert stream_name not in self._processing_streams
+
         self._processing_streams.add(stream_name)
         try:
             queue = self._command_queues_by_stream.get(stream_name)
