@@ -15,7 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import inspect
 import itertools
 import logging
 from collections import deque, namedtuple
@@ -227,11 +226,7 @@ class EventsPersistenceStorage(object):
             defer.gatherResults(deferreds, consumeErrors=True)
         )
 
-        max_persisted_id = self.main_store.get_current_events_token()
-        if inspect.isawaitable(max_persisted_id):
-            max_persisted_id = await max_persisted_id
-
-        return max_persisted_id
+        return self.main_store.get_current_events_token()
 
     async def persist_event(
         self, event: FrozenEvent, context: EventContext, backfilled: bool = False
@@ -250,8 +245,6 @@ class EventsPersistenceStorage(object):
         await make_deferred_yieldable(deferred)
 
         max_persisted_id = self.main_store.get_current_events_token()
-        if inspect.isawaitable(max_persisted_id):
-            max_persisted_id = await max_persisted_id
         return (event.internal_metadata.stream_ordering, max_persisted_id)
 
     def _maybe_start_persisting(self, room_id: str):
