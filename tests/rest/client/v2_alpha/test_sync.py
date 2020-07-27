@@ -391,14 +391,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         res = self.helper.send(self.room_id, "hello", tok=self.tok2)
         self._check_unread_count(1)
 
-        # Check that redacting that message decreases our unread count.
-        self.helper.redact(self.room_id, res["event_id"], tok=self.tok2)
-        self._check_unread_count(0)
-
-        # Re-send a message to prepare for the next check.
-        res = self.helper.send(self.room_id, "hello", tok=self.tok2)
-        self._check_unread_count(1)
-
         # Send a read receipt to tell the server we've read the latest event.
         body = json.dumps({"m.read": res["event_id"]}).encode("utf8")
         request, channel = self.make_request(

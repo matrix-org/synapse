@@ -238,6 +238,10 @@ class PersistEventsStore:
 
                 event_counter.labels(event.type, origin_type, origin_entity).inc()
 
+                self.store.get_unread_message_count_for_user.invalidate_many(
+                    (event.room_id,),
+                )
+
             for room_id, new_state in current_state_for_room.items():
                 self.store.get_current_state_ids.prefill((room_id,), new_state)
 
