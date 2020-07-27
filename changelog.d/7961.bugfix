@@ -1,1 +1,1 @@
-Fix sometimes returning 500 instead of the actual error response when using opentracing.
+Fix a long standing bug where the tracing of async functions with opentracing was broken.
