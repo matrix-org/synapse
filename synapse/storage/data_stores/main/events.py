@@ -22,7 +22,6 @@ from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 import attr
 from prometheus_client import Counter
 
-from twisted.enterprise.adbapi import Connection
 from twisted.internet import defer
 
 import synapse.metrics
