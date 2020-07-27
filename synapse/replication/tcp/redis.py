@@ -147,12 +147,8 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         # if so.
 
         if hasattr(res, "__await__"):
-
-            async def handle_command():
-                await res
-
             run_as_background_process(
-                "replication-" + cmd.get_logcontext_id(), handle_command
+                "replication-" + cmd.get_logcontext_id(), lambda: res
             )
 
     def connectionLost(self, reason):
