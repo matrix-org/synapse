@@ -6,7 +6,7 @@
   - [Prebuilt packages](#prebuilt-packages)
 - [Setting up Synapse](#setting-up-synapse)
   - [TLS certificates](#tls-certificates)
-  - [Client Well-known URI](#client-well-known-uri)
+  - [Client Well-Known URI](#client-well-known-uri)
   - [Email](#email)
   - [Registering a user](#registering-a-user)
   - [Setting up a TURN server](#setting-up-a-turn-server)
