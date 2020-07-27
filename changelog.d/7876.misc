@@ -1,1 +1,1 @@
-Optimise handling of inbound replication commands.
+Further optimise queueing of inbound replication commands.
