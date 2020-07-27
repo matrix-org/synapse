@@ -352,7 +352,7 @@ class Database(object):
 
         for table, update_name in UNIQUE_INDEX_BACKGROUND_UPDATES.items():
             if update_name not in updates:
-                sql_logger.debug("Now safe to upsert in %s", table)
+                logger.debug("Now safe to upsert in %s", table)
                 self._unsafe_to_upsert_tables.discard(table)
 
         # If there's any updates still running, reschedule to run.
@@ -514,7 +514,7 @@ class Database(object):
         exception_callbacks = []  # type: List[_CallbackListEntry]
 
         if not current_context():
-            sql_logger.warning("Starting db txn '%s' from sentinel context", desc)
+            logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
             result = yield self.runWithConnection(
@@ -552,7 +552,7 @@ class Database(object):
         """
         parent_context = current_context()  # type: Optional[LoggingContextOrSentinel]
         if not parent_context:
-            sql_logger.warning(
+            logger.warning(
                 "Starting db connection from sentinel context: metrics will be lost"
             )
             parent_context = None
@@ -566,7 +566,7 @@ class Database(object):
                 context.add_database_scheduled(sched_duration_sec)
 
                 if self.engine.is_connection_closed(conn):
-                    sql_logger.debug("Reconnecting closed database connection")
+                    logger.debug("Reconnecting closed database connection")
                     conn.reconnect()
 
                 return func(conn, *args, **kwargs)
@@ -739,7 +739,7 @@ class Database(object):
                     raise
 
                 # presumably we raced with another transaction: let's retry.
-                sql_logger.warning(
+                logger.warning(
                     "IntegrityError when upserting into %s; retrying: %s", table, e
                 )
 
