@@ -1,0 +1,1 @@
+Fix sometimes returning 500 instead of the actual error response when using opentracing.
