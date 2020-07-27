@@ -575,8 +575,8 @@ def respond_with_json_bytes(
     if send_cors:
         set_cors_headers(request)
 
-    # todo: we can almost certainly avoid this copy and encode the json straight into
-    # the bytesIO, but it would involve faffing around with string->bytes wrappers.
+    # note that this is zero-copy (the bytesio shares a copy-on-write buffer with
+    # the original `bytes`).
     bytes_io = BytesIO(json_bytes)
 
     producer = NoRangeStaticProducer(request, bytes_io)

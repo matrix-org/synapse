@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 import synapse.state
 import synapse.storage
 import synapse.types
@@ -66,8 +64,7 @@ class BaseHandler(object):
 
         self.event_builder_factory = hs.get_event_builder_factory()
 
-    @defer.inlineCallbacks
-    def ratelimit(self, requester, update=True, is_admin_redaction=False):
+    async def ratelimit(self, requester, update=True, is_admin_redaction=False):
         """Ratelimits requests.
 
         Args:
@@ -99,7 +96,7 @@ class BaseHandler(object):
         burst_count = self._rc_message.burst_count
 
         # Check if there is a per user override in the DB.
-        override = yield self.store.get_ratelimit_for_user(user_id)
+        override = await self.store.get_ratelimit_for_user(user_id)
         if override:
             # If overridden with a null Hz then ratelimiting has been entirely
             # disabled for the user

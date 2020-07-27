@@ -18,8 +18,11 @@ from typing import TYPE_CHECKING
 
 import txredisapi
 
-from synapse.logging.context import make_deferred_yieldable
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
+from synapse.metrics.background_process_metrics import (
+    BackgroundProcessLoggingContext,
+    run_as_background_process,
+)
 from synapse.replication.tcp.commands import (
     Command,
     ReplicateCommand,
@@ -66,6 +69,15 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     stream_name = None  # type: str
     outbound_redis_connection = None  # type: txredisapi.RedisProtocol
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # a logcontext which we use for processing incoming commands. We declare it as a
+        # background process so that the CPU stats get reported to prometheus.
+        self._logging_context = BackgroundProcessLoggingContext(
+            "replication_command_handler"
+        )
+
     def connectionMade(self):
         logger.info("Connected to redis")
         super().connectionMade()
@@ -92,7 +104,10 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     def messageReceived(self, pattern: str, channel: str, message: str):
         """Received a message from redis.
         """
+        with PreserveLoggingContext(self._logging_context):
+            self._parse_and_dispatch_message(message)
 
+    def _parse_and_dispatch_message(self, message: str):
         if message.strip() == "":
             # Ignore blank lines
             return
@@ -144,6 +159,9 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         logger.info("Lost connection to redis")
         super().connectionLost(reason)
         self.handler.lost_connection(self)
+
+        # mark the logging context as finished
+        self._logging_context.__exit__(None, None, None)
 
     def send_command(self, cmd: Command):
         """Send a command if connection has been established.

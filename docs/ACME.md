@@ -12,13 +12,14 @@ introduced support for automatically provisioning certificates through
 In [March 2019](https://community.letsencrypt.org/t/end-of-life-plan-for-acmev1/88430),
 Let's Encrypt announced that they were deprecating version 1 of the ACME
 protocol, with the plan to disable the use of it for new accounts in
-November 2019, and for existing accounts in June 2020.
+November 2019, for new domains in June 2020, and for existing accounts and
+domains in June 2021.
 
 Synapse doesn't currently support version 2 of the ACME protocol, which
 means that:
 
 * for existing installs, Synapse's built-in ACME support will continue
-  to work until June 2020.
+  to work until June 2021.
 * for new installs, this feature will not work at all.
 
 Either way, it is recommended to move from Synapse's ACME support

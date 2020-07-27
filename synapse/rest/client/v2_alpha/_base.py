@@ -22,6 +22,7 @@ from twisted.internet import defer
 
 from synapse.api.errors import InteractiveAuthIncompleteError
 from synapse.api.urls import CLIENT_API_PREFIX
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,15 @@ def client_patterns(path_regex, releases=(0,), unstable=True, v1=False):
     return patterns
 
 
-def set_timeline_upper_limit(filter_json, filter_timeline_limit):
+def set_timeline_upper_limit(filter_json: JsonDict, filter_timeline_limit: int) -> None:
+    """
+    Enforces a maximum limit of a timeline query.
+
+    Params:
+        filter_json: The timeline query to modify.
+        filter_timeline_limit: The maximum limit to allow, passing -1 will
+            disable enforcing a maximum limit.
+    """
     if filter_timeline_limit < 0:
         return  # no upper limits
     timeline = filter_json.get("room", {}).get("timeline", {})

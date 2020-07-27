@@ -16,35 +16,31 @@ ARG PYTHON_VERSION=3.7
 ###
 ### Stage 0: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.11 as builder
+FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
 
-RUN apk add \
-        build-base \
-        libffi-dev \
-        libjpeg-turbo-dev \
-        libwebp-dev \
-        libressl-dev \
-        libxslt-dev \
-        linux-headers \
-        postgresql-dev \
-        zlib-dev
 
-# build things which have slow build steps, before we copy synapse, so that
-# the layer can be cached.
-#
-# (we really just care about caching a wheel here, as the "pip install" below
-# will install them again.)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+ && rm -rf /var/lib/apt/lists/*
 
+# Build dependencies that are not available as wheels, to speed up rebuilds
 RUN pip install --prefix="/install" --no-warn-script-location \
-        cryptography \
-        msgpack-python \
-        pillow \
-        pynacl
+        frozendict \
+        jaeger-client \
+        opentracing \
+        prometheus-client \
+        psycopg2 \
+        pycparser \
+        pyrsistent \
+        pyyaml \
+        simplejson \
+        threadloop \
+        thrift
 
 # now install synapse and all of the python deps to /install.
-
 COPY synapse /synapse/synapse/
 COPY scripts /synapse/scripts/
 COPY MANIFEST.in README.rst setup.py synctl /synapse/
@@ -56,20 +52,13 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 ### Stage 1: runtime
 ###
 
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.11
+FROM docker.io/python:${PYTHON_VERSION}-slim
 
-# xmlsec is required for saml support
-RUN apk add --no-cache --virtual .runtime_deps \
-        libffi \
-        libjpeg-turbo \
-        libwebp \
-        libressl \
-        libxslt \
-        libpq \
-        zlib \
-        su-exec \
-        tzdata \
-        xmlsec
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    xmlsec1 \
+    gosu \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py

@@ -20,8 +20,6 @@ import logging
 import re
 from typing import Optional, Tuple, Type
 
-from twisted.internet.defer import maybeDeferred
-
 import synapse
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
@@ -340,6 +338,12 @@ class BaseFederationServlet(object):
                 if origin:
                     with ratelimiter.ratelimit(origin) as d:
                         await d
+                        if request._disconnected:
+                            logger.warning(
+                                "client disconnected before we started processing "
+                                "request"
+                            )
+                            return -1, None
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
@@ -795,12 +799,8 @@ class PublicRoomList(BaseFederationServlet):
             # zero is a special value which corresponds to no limit.
             limit = None
 
-        data = await maybeDeferred(
-            self.handler.get_local_public_room_list,
-            limit,
-            since_token,
-            network_tuple=network_tuple,
-            from_federation=True,
+        data = await self.handler.get_local_public_room_list(
+            limit, since_token, network_tuple=network_tuple, from_federation=True
         )
         return 200, data
 
