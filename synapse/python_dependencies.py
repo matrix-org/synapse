@@ -43,8 +43,7 @@ REQUIREMENTS = [
     "jsonschema>=2.5.1",
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
-    # TODO This will require canonicaljson >= 1.2.0.
-    "canonicaljson@https://github.com/matrix-org/python-canonicaljson/archive/clokep/chooseable-json.zip",
+    "canonicaljson>=1.2.0",
     # we use the type definitions added in signedjson 1.1.
     "signedjson>=1.1.0",
     "pynacl>=1.2.1",
