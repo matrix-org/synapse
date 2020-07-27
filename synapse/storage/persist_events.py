@@ -25,7 +25,7 @@ from prometheus_client import Counter, Histogram
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.events import FrozenEvent
+from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -194,7 +194,7 @@ class EventsPersistenceStorage(object):
 
     async def persist_events(
         self,
-        events_and_contexts: List[Tuple[FrozenEvent, EventContext]],
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
     ) -> int:
         """
@@ -229,7 +229,7 @@ class EventsPersistenceStorage(object):
         return self.main_store.get_current_events_token()
 
     async def persist_event(
-        self, event: FrozenEvent, context: EventContext, backfilled: bool = False
+        self, event: EventBase, context: EventContext, backfilled: bool = False
     ) -> Tuple[int, int]:
         """
         Returns:
@@ -258,7 +258,7 @@ class EventsPersistenceStorage(object):
 
     async def _persist_events(
         self,
-        events_and_contexts: List[Tuple[FrozenEvent, EventContext]],
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
     ):
         """Calculates the change to current state and forward extremities, and
@@ -435,7 +435,7 @@ class EventsPersistenceStorage(object):
     async def _calculate_new_extremities(
         self,
         room_id: str,
-        event_contexts: List[Tuple[FrozenEvent, EventContext]],
+        event_contexts: List[Tuple[EventBase, EventContext]],
         latest_event_ids: List[str],
     ):
         """Calculates the new forward extremities for a room given events to
@@ -493,7 +493,7 @@ class EventsPersistenceStorage(object):
     async def _get_new_state_after_events(
         self,
         room_id: str,
-        events_context: List[Tuple[FrozenEvent, EventContext]],
+        events_context: List[Tuple[EventBase, EventContext]],
         old_latest_event_ids: Iterable[str],
         new_latest_event_ids: Iterable[str],
     ) -> Tuple[Optional[StateMap[str]], Optional[StateMap[str]]]:
@@ -679,7 +679,7 @@ class EventsPersistenceStorage(object):
     async def _is_server_still_joined(
         self,
         room_id: str,
-        ev_ctx_rm: List[Tuple[FrozenEvent, EventContext]],
+        ev_ctx_rm: List[Tuple[EventBase, EventContext]],
         delta: DeltaState,
         current_state: Optional[StateMap[str]],
         potentially_left_users: Set[str],
