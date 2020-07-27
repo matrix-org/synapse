@@ -17,7 +17,7 @@ import inspect
 import logging
 import os
 import shutil
-from typing import IO, TYPE_CHECKING, Optional, Sequence
+from typing import IO, TYPE_CHECKING, Any, Optional, Sequence
 
 from twisted.protocols.basic import FileSender
 
@@ -153,14 +153,14 @@ class MediaStorage(object):
             return FileResponder(open(local_path, "rb"))
 
         for provider in self.storage_providers:
-            res = provider.fetch(path, file_info)
-            # Fetch is supposed to return an Awaitable, but guard against
-            # improper implementations.
+            res = provider.fetch(path, file_info)  # type: Any
+            # Fetch is supposed to return an Awaitable[Responder], but guard
+            # against improper implementations.
             if inspect.isawaitable(res):
-                res = await res  # type: ignore
+                res = await res
             if res:
                 logger.debug("Streaming %s from %s", path, provider)
-                return res  # type: ignore
+                return res
 
         return None
 
@@ -184,17 +184,17 @@ class MediaStorage(object):
             os.makedirs(dirname)
 
         for provider in self.storage_providers:
-            res = provider.fetch(path, file_info)
-            # Fetch is supposed to return an Awaitable, but guard against
-            # improper implementations.
+            res = provider.fetch(path, file_info)  # type: Any
+            # Fetch is supposed to return an Awaitable[Responder], but guard
+            # against improper implementations.
             if inspect.isawaitable(res):
-                res = await res  # type: ignore
-            if res:  # type: ignore
-                with res:  # type: ignore
+                res = await res
+            if res:
+                with res:
                     consumer = BackgroundFileConsumer(
                         open(local_path, "wb"), self.hs.get_reactor()
                     )
-                    await res.write_to_consumer(consumer)  # type: ignore
+                    await res.write_to_consumer(consumer)
                     await consumer.wait()
                 return local_path
 
