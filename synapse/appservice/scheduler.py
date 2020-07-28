@@ -252,12 +252,11 @@ class _Recoverer(object):
             self.backoff_counter += 1
         self.recover()
 
-    @defer.inlineCallbacks
-    def retry(self):
+    async def retry(self):
         logger.info("Starting retries on %s", self.service.id)
         try:
             while True:
-                txn = yield self.store.get_oldest_unsent_txn(self.service)
+                txn = await self.store.get_oldest_unsent_txn(self.service)
                 if not txn:
                     # nothing left: we're done!
                     self.callback(self)
@@ -266,11 +265,11 @@ class _Recoverer(object):
                 logger.info(
                     "Retrying transaction %s for AS ID %s", txn.id, txn.service.id
                 )
-                sent = yield txn.send(self.as_api)
+                sent = await txn.send(self.as_api)
                 if not sent:
                     break
 
-                yield txn.complete(self.store)
+                await txn.complete(self.store)
 
                 # reset the backoff counter and then process the next transaction
                 self.backoff_counter = 1
