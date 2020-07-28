@@ -16,7 +16,7 @@ workers only work with PostgreSQL-based Synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already be
 running PostgreSQL.
 
-## Master/worker communication
+## Main process/worker communication
 
 The processes communicate with each other via a Synapse-specific protocol called
 'replication' (analogous to MySQL- or Postgres-style database replication) which
@@ -29,10 +29,11 @@ used for operations which need to wait for a reply - such as sending an event.
 As of Synapse v1.13.0, it is possible to configure Synapse to send replication
 via a [Redis pub/sub channel](https://redis.io/topics/pubsub), and is now the
 recommended way of configuring replication. This is an alternative to the old
-direct TCP connections to the master: rather than all the workers connecting to
-the master, all the workers and the master connect to Redis, which relays
-replication commands between processes. This can give a significant cpu saving
-on the master and will be a prerequisite for upcoming performance improvements.
+direct TCP connections to the main process: rather than all the workers
+connecting to the main process, all the workers and the main process connect to
+Redis, which relays replication commands between processes. This can give a
+significant cpu saving on the main process and will be a prerequisite for
+upcoming performance improvements.
 
 
 ## Configuration
@@ -85,7 +86,7 @@ For example:
 worker_app: synapse.app.generic_worker
 worker_name: worker1
 
-# The replication listener on the master synapse process.
+# The replication listener on the main synapse process.
 worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
 
@@ -116,7 +117,7 @@ recommend the use of `systemd` where available: for information on setting up
 ### Using synctl
 
 If you want to use `synctl` to manage your synapse processes, you will need to
-create an an additional configuration file for the master synapse process. That
+create an an additional configuration file for the main synapse process. That
 configuration should look like this:
 
 ```yaml
@@ -270,8 +271,8 @@ effecting events sent by real users.
 #### Stream writers
 
 Additionally, there is *experimental* support for moving writing of specific
-streams (such as events and typing) off of master to a particular worker. This
-requires use of Redis.
+streams (such as events and typing) off of the main process to a particular
+worker. This requires use of Redis.
 
 To enable this then the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
