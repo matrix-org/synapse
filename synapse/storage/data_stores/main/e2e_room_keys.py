@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 
 
 class EndToEndRoomKeyStore(SQLBaseStore):
@@ -148,7 +148,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "forwarded_count": row["forwarded_count"],
                 # is_verified must be returned to the client as a boolean
                 "is_verified": bool(row["is_verified"]),
-                "session_data": json.loads(row["session_data"]),
+                "session_data": db_to_json(row["session_data"]),
             }
 
         return sessions
@@ -222,7 +222,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 "first_message_index": row[2],
                 "forwarded_count": row[3],
                 "is_verified": row[4],
-                "session_data": json.loads(row[5]),
+                "session_data": db_to_json(row[5]),
             }
 
         return ret
@@ -319,7 +319,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 keyvalues={"user_id": user_id, "version": this_version, "deleted": 0},
                 retcols=("version", "algorithm", "auth_data", "etag"),
             )
-            result["auth_data"] = json.loads(result["auth_data"])
+            result["auth_data"] = db_to_json(result["auth_data"])
             result["version"] = str(result["version"])
             if result["etag"] is None:
                 result["etag"] = 0

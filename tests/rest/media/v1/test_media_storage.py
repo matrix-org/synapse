@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 import os
 import shutil
 import tempfile
@@ -25,9 +23,10 @@ from urllib import parse
 from mock import Mock
 
 import attr
-import PIL.Image as Image
 from parameterized import parameterized_class
+from PIL import Image as Image
 
+from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
 from synapse.logging.context import make_deferred_yieldable
@@ -79,7 +78,9 @@ class MediaStorageTests(unittest.HomeserverTestCase):
 
         # This uses a real blocking threadpool so we have to wait for it to be
         # actually done :/
-        x = self.media_storage.ensure_media_is_in_local_cache(file_info)
+        x = defer.ensureDeferred(
+            self.media_storage.ensure_media_is_in_local_cache(file_info)
+        )
 
         # Hotloop until the threadpool does its job...
         self.wait_on_thread(x)

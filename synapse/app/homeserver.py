@@ -56,6 +56,7 @@ from synapse.http.server import (
     OptionsResource,
     RootOptionsRedirectResource,
     RootRedirect,
+    StaticResource,
 )
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
@@ -228,7 +229,7 @@ class SynapseHomeServer(HomeServer):
         if name in ["static", "client"]:
             resources.update(
                 {
-                    STATIC_PREFIX: File(
+                    STATIC_PREFIX: StaticResource(
                         os.path.join(os.path.dirname(synapse.__file__), "static")
                     )
                 }
@@ -482,8 +483,7 @@ class SynapseService(service.Service):
 _stats_process = []
 
 
-@defer.inlineCallbacks
-def phone_stats_home(hs, stats, stats_process=_stats_process):
+async def phone_stats_home(hs, stats, stats_process=_stats_process):
     logger.info("Gathering stats for reporting")
     now = int(hs.get_clock().time())
     uptime = int(now - hs.start_time)
@@ -521,28 +521,28 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
     stats["python_version"] = "{}.{}.{}".format(
         version.major, version.minor, version.micro
     )
-    stats["total_users"] = yield hs.get_datastore().count_all_users()
+    stats["total_users"] = await hs.get_datastore().count_all_users()
 
-    total_nonbridged_users = yield hs.get_datastore().count_nonbridged_users()
+    total_nonbridged_users = await hs.get_datastore().count_nonbridged_users()
     stats["total_nonbridged_users"] = total_nonbridged_users
 
-    daily_user_type_results = yield hs.get_datastore().count_daily_user_type()
+    daily_user_type_results = await hs.get_datastore().count_daily_user_type()
     for name, count in daily_user_type_results.items():
         stats["daily_user_type_" + name] = count
 
-    room_count = yield hs.get_datastore().get_room_count()
+    room_count = await hs.get_datastore().get_room_count()
     stats["total_room_count"] = room_count
 
-    stats["daily_active_users"] = yield hs.get_datastore().count_daily_users()
-    stats["monthly_active_users"] = yield hs.get_datastore().count_monthly_users()
-    stats["daily_active_rooms"] = yield hs.get_datastore().count_daily_active_rooms()
-    stats["daily_messages"] = yield hs.get_datastore().count_daily_messages()
+    stats["daily_active_users"] = await hs.get_datastore().count_daily_users()
+    stats["monthly_active_users"] = await hs.get_datastore().count_monthly_users()
+    stats["daily_active_rooms"] = await hs.get_datastore().count_daily_active_rooms()
+    stats["daily_messages"] = await hs.get_datastore().count_daily_messages()
 
-    r30_results = yield hs.get_datastore().count_r30_users()
+    r30_results = await hs.get_datastore().count_r30_users()
     for name, count in r30_results.items():
         stats["r30_users_" + name] = count
 
-    daily_sent_messages = yield hs.get_datastore().count_daily_sent_messages()
+    daily_sent_messages = await hs.get_datastore().count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
     stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.caches.event_cache_size
@@ -557,7 +557,7 @@ def phone_stats_home(hs, stats, stats_process=_stats_process):
 
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:
-        yield hs.get_proxied_http_client().put_json(
+        await hs.get_proxied_http_client().put_json(
             hs.config.report_stats_endpoint, stats
         )
     except Exception as e:

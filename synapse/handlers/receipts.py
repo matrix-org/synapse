@@ -14,8 +14,6 @@
 # limitations under the License.
 import logging
 
-from twisted.internet import defer
-
 from synapse.handlers._base import BaseHandler
 from synapse.types import ReadReceipt, get_domain_from_id
 from synapse.util.async_helpers import maybe_awaitable
@@ -129,15 +127,14 @@ class ReceiptEventSource(object):
     def __init__(self, hs):
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def get_new_events(self, from_key, room_ids, **kwargs):
+    async def get_new_events(self, from_key, room_ids, **kwargs):
         from_key = int(from_key)
-        to_key = yield self.get_current_key()
+        to_key = self.get_current_key()
 
         if from_key == to_key:
             return [], to_key
 
-        events = yield self.store.get_linearized_receipts_for_rooms(
+        events = await self.store.get_linearized_receipts_for_rooms(
             room_ids, from_key=from_key, to_key=to_key
         )
 
@@ -146,8 +143,7 @@ class ReceiptEventSource(object):
     def get_current_key(self, direction="f"):
         return self.store.get_max_receipt_stream_id()
 
-    @defer.inlineCallbacks
-    def get_pagination_rows(self, user, config, key):
+    async def get_pagination_rows(self, user, config, key):
         to_key = int(config.from_key)
 
         if config.to_key:
@@ -155,8 +151,8 @@ class ReceiptEventSource(object):
         else:
             from_key = None
 
-        room_ids = yield self.store.get_rooms_for_user(user.to_string())
-        events = yield self.store.get_linearized_receipts_for_rooms(
+        room_ids = await self.store.get_rooms_for_user(user.to_string())
+        events = await self.store.get_linearized_receipts_for_rooms(
             room_ids, from_key=from_key, to_key=to_key
         )
 

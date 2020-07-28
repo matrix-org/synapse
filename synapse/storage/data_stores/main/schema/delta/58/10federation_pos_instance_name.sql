@@ -13,11 +13,10 @@
  * limitations under the License.
  */
 
--- Store the number of unread messages, i.e. messages that triggered either a notify
--- action or a mark_unread one.
-ALTER TABLE event_push_summary ADD COLUMN unread_count BIGINT NOT NULL DEFAULT 0;
+-- We need to store the stream positions by instance in a sharded config world.
+--
+-- We default to master as we want the column to be NOT NULL and we correctly
+-- reset the instance name to match the config each time we start up.
+ALTER TABLE federation_stream_position ADD COLUMN instance_name TEXT NOT NULL DEFAULT 'master';
 
--- Pre-populate the new column with the count of pending notifications.
--- We expect event_push_summary to be relatively small, so we can do this update
--- synchronously without impacting Synapse's startup time too much.
-UPDATE event_push_summary SET unread_count = notif_count;
+CREATE UNIQUE INDEX federation_stream_position_instance ON federation_stream_position(type, instance_name);

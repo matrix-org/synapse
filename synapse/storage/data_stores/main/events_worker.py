@@ -21,7 +21,6 @@ import threading
 from collections import namedtuple
 from typing import List, Optional, Tuple
 
-from canonicaljson import json
 from constantly import NamedConstant, Names
 
 from twisted.internet import defer
@@ -38,7 +37,9 @@ from synapse.events.utils import prune_event
 from synapse.logging.context import PreserveLoggingContext, current_context
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.replication.tcp.streams import BackfillStream
+from synapse.replication.tcp.streams.events import EventsStream
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import get_domain_from_id
@@ -80,10 +81,7 @@ class EventsWorkerStore(SQLBaseStore):
             # We are the process in charge of generating stream ids for events,
             # so instantiate ID generators based on the database
             self._stream_id_gen = StreamIdGenerator(
-                db_conn,
-                "events",
-                "stream_ordering",
-                extra_tables=[("local_invites", "stream_id")],
+                db_conn, "events", "stream_ordering",
             )
             self._backfill_id_gen = StreamIdGenerator(
                 db_conn,
@@ -113,9 +111,9 @@ class EventsWorkerStore(SQLBaseStore):
         self._event_fetch_ongoing = 0
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
-        if stream_name == "events":
+        if stream_name == EventsStream.NAME:
             self._stream_id_gen.advance(token)
-        elif stream_name == "backfill":
+        elif stream_name == BackfillStream.NAME:
             self._backfill_id_gen.advance(-token)
 
         super().process_replication_rows(stream_name, instance_name, token, rows)
@@ -612,8 +610,8 @@ class EventsWorkerStore(SQLBaseStore):
             if not allow_rejected and rejected_reason:
                 continue
 
-            d = json.loads(row["json"])
-            internal_metadata = json.loads(row["internal_metadata"])
+            d = db_to_json(row["json"])
+            internal_metadata = db_to_json(row["internal_metadata"])
 
             format_version = row["format_version"]
             if format_version is None:
@@ -641,7 +639,7 @@ class EventsWorkerStore(SQLBaseStore):
             else:
                 room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
                 if not room_version:
-                    logger.error(
+                    logger.warning(
                         "Event %s in room %s has unknown room version %s",
                         event_id,
                         d["room_id"],

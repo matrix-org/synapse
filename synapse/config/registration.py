@@ -18,8 +18,9 @@ from distutils.util import strtobool
 
 import pkg_resources
 
+from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
-from synapse.types import RoomAlias
+from synapse.types import RoomAlias, UserID
 from synapse.util.stringutils import random_string_with_symbols
 
 
@@ -127,7 +128,50 @@ class RegistrationConfig(Config):
         for room_alias in self.auto_join_rooms:
             if not RoomAlias.is_valid(room_alias):
                 raise ConfigError("Invalid auto_join_rooms entry %s" % (room_alias,))
+
+        # Options for creating auto-join rooms if they do not exist yet.
         self.autocreate_auto_join_rooms = config.get("autocreate_auto_join_rooms", True)
+        self.autocreate_auto_join_rooms_federated = config.get(
+            "autocreate_auto_join_rooms_federated", True
+        )
+        self.autocreate_auto_join_room_preset = (
+            config.get("autocreate_auto_join_room_preset")
+            or RoomCreationPreset.PUBLIC_CHAT
+        )
+        self.auto_join_room_requires_invite = self.autocreate_auto_join_room_preset in {
+            RoomCreationPreset.PRIVATE_CHAT,
+            RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+        }
+
+        # Pull the creater/inviter from the configuration, this gets used to
+        # send invites for invite-only rooms.
+        mxid_localpart = config.get("auto_join_mxid_localpart")
+        self.auto_join_user_id = None
+        if mxid_localpart:
+            # Convert the localpart to a full mxid.
+            self.auto_join_user_id = UserID(
+                mxid_localpart, self.server_name
+            ).to_string()
+
+        if self.autocreate_auto_join_rooms:
+            # Ensure the preset is a known value.
+            if self.autocreate_auto_join_room_preset not in {
+                RoomCreationPreset.PUBLIC_CHAT,
+                RoomCreationPreset.PRIVATE_CHAT,
+                RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
+            }:
+                raise ConfigError("Invalid value for autocreate_auto_join_room_preset")
+            # If the preset requires invitations to be sent, ensure there's a
+            # configured user to send them from.
+            if self.auto_join_room_requires_invite:
+                if not mxid_localpart:
+                    raise ConfigError(
+                        "The configuration option `auto_join_mxid_localpart` is required if "
+                        "`autocreate_auto_join_room_preset` is set to private_chat or trusted_private_chat, such that "
+                        "Synapse knows who to send invitations from. Please "
+                        "configure `auto_join_mxid_localpart`."
+                    )
+
         self.auto_join_rooms_for_guests = config.get("auto_join_rooms_for_guests", True)
 
         self.enable_set_displayname = config.get("enable_set_displayname", True)
@@ -357,7 +401,11 @@ class RegistrationConfig(Config):
         #enable_3pid_changes: false
 
         # Users who register on this homeserver will automatically be joined
-        # to these rooms
+        # to these rooms.
+        #
+        # By default, any room aliases included in this list will be created
+        # as a publicly joinable room when the first user registers for the
+        # homeserver. This behaviour can be customised with the settings below.
         #
         #auto_join_rooms:
         #  - "#example:example.com"
@@ -365,10 +413,62 @@ class RegistrationConfig(Config):
         # Where auto_join_rooms are specified, setting this flag ensures that the
         # the rooms exist by creating them when the first user on the
         # homeserver registers.
+        #
+        # By default the auto-created rooms are publicly joinable from any federated
+        # server. Use the autocreate_auto_join_rooms_federated and
+        # autocreate_auto_join_room_preset settings below to customise this behaviour.
+        #
         # Setting to false means that if the rooms are not manually created,
         # users cannot be auto-joined since they do not exist.
         #
-        #autocreate_auto_join_rooms: true
+        # Defaults to true. Uncomment the following line to disable automatically
+        # creating auto-join rooms.
+        #
+        #autocreate_auto_join_rooms: false
+
+        # Whether the auto_join_rooms that are auto-created are available via
+        # federation. Only has an effect if autocreate_auto_join_rooms is true.
+        #
+        # Note that whether a room is federated cannot be modified after
+        # creation.
+        #
+        # Defaults to true: the room will be joinable from other servers.
+        # Uncomment the following to prevent users from other homeservers from
+        # joining these rooms.
+        #
+        #autocreate_auto_join_rooms_federated: false
+
+        # The room preset to use when auto-creating one of auto_join_rooms. Only has an
+        # effect if autocreate_auto_join_rooms is true.
+        #
+        # This can be one of "public_chat", "private_chat", or "trusted_private_chat".
+        # If a value of "private_chat" or "trusted_private_chat" is used then
+        # auto_join_mxid_localpart must also be configured.
+        #
+        # Defaults to "public_chat", meaning that the room is joinable by anyone, including
+        # federated servers if autocreate_auto_join_rooms_federated is true (the default).
+        # Uncomment the following to require an invitation to join these rooms.
+        #
+        #autocreate_auto_join_room_preset: private_chat
+
+        # The local part of the user id which is used to create auto_join_rooms if
+        # autocreate_auto_join_rooms is true. If this is not provided then the
+        # initial user account that registers will be used to create the rooms.
+        #
+        # The user id is also used to invite new users to any auto-join rooms which
+        # are set to invite-only.
+        #
+        # It *must* be configured if autocreate_auto_join_room_preset is set to
+        # "private_chat" or "trusted_private_chat".
+        #
+        # Note that this must be specified in order for new users to be correctly
+        # invited to any auto-join rooms which have been set to invite-only (either
+        # at the time of creation or subsequently).
+        #
+        # Note that, if the room already exists, this user must be joined and
+        # have the appropriate permissions to invite new members.
+        #
+        #auto_join_mxid_localpart: system
 
         # When auto_join_rooms is specified, setting this flag to false prevents
         # guest accounts from being automatically joined to the rooms.

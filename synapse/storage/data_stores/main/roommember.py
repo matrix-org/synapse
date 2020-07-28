@@ -17,8 +17,6 @@
 import logging
 from typing import Iterable, List, Set
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -27,6 +25,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import (
     LoggingTransaction,
     SQLBaseStore,
+    db_to_json,
     make_in_list_sql_clause,
 )
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
@@ -498,7 +497,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             # To do this we set the state_group to a new object as object() != object()
             state_group = object()
 
-        current_state_ids = yield context.get_current_state_ids()
+        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
         result = yield self._get_joined_users_from_context(
             event.room_id, state_group, current_state_ids, event=event, context=context
         )
@@ -938,7 +937,7 @@ class RoomMemberBackgroundUpdateStore(SQLBaseStore):
                 event_id = row["event_id"]
                 room_id = row["room_id"]
                 try:
-                    event_json = json.loads(row["json"])
+                    event_json = db_to_json(row["json"])
                     content = event_json["content"]
                 except Exception:
                     continue

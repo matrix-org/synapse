@@ -15,6 +15,7 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
+
 import logging
 import re
 from typing import List, Optional
@@ -217,10 +218,8 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             )
             event_id = event.event_id
 
-        ret = {}  # type: dict
-        if event_id:
-            set_tag("event_id", event_id)
-            ret = {"event_id": event_id}
+        set_tag("event_id", event_id)
+        ret = {"event_id": event_id}
         return 200, ret
 
 
@@ -517,9 +516,9 @@ class RoomMessageListRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(request, default_limit=10)
         as_client_event = b"raw" not in request.args
-        filter_bytes = parse_string(request, b"filter", encoding=None)
-        if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes.decode("UTF-8"))
+        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
             if (
                 event_filter
@@ -629,9 +628,9 @@ class RoomEventContextServlet(RestServlet):
         limit = parse_integer(request, "limit", default=10)
 
         # picking the API shape for symmetry with /messages
-        filter_bytes = parse_string(request, "filter")
-        if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes)
+        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
         else:
             event_filter = None
@@ -818,8 +817,17 @@ class RoomTypingRestServlet(RestServlet):
         self.typing_handler = hs.get_typing_handler()
         self.auth = hs.get_auth()
 
+        # If we're not on the typing writer instance we should scream if we get
+        # requests.
+        self._is_typing_writer = (
+            hs.config.worker.writers.typing == hs.get_instance_name()
+        )
+
     async def on_PUT(self, request, room_id, user_id):
         requester = await self.auth.get_user_by_req(request)
+
+        if not self._is_typing_writer:
+            raise Exception("Got /typing request on instance that is not typing writer")
 
         room_id = urlparse.unquote(room_id)
         target_user = UserID.from_string(urlparse.unquote(user_id))

@@ -29,7 +29,7 @@ from synapse.api.errors import Codes, SynapseError
 if sys.version_info[:3] >= (3, 6, 0):
     from typing import Collection
 else:
-    from typing import Sized, Iterable, Container
+    from typing import Container, Iterable, Sized
 
     T_co = TypeVar("T_co", covariant=True)
 

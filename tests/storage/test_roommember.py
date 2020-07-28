@@ -118,18 +118,22 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
 
     def test_get_joined_users_from_context(self):
         room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
-        bob_event = event_injection.inject_member_event(
-            self.hs, room, self.u_bob, Membership.JOIN
+        bob_event = self.get_success(
+            event_injection.inject_member_event(
+                self.hs, room, self.u_bob, Membership.JOIN
+            )
         )
 
         # first, create a regular event
-        event, context = event_injection.create_event(
-            self.hs,
-            room_id=room,
-            sender=self.u_alice,
-            prev_event_ids=[bob_event.event_id],
-            type="m.test.1",
-            content={},
+        event, context = self.get_success(
+            event_injection.create_event(
+                self.hs,
+                room_id=room,
+                sender=self.u_alice,
+                prev_event_ids=[bob_event.event_id],
+                type="m.test.1",
+                content={},
+            )
         )
 
         users = self.get_success(
@@ -140,22 +144,26 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # Regression test for #7376: create a state event whose key matches bob's
         # user_id, but which is *not* a membership event, and persist that; then check
         # that `get_joined_users_from_context` returns the correct users for the next event.
-        non_member_event = event_injection.inject_event(
-            self.hs,
-            room_id=room,
-            sender=self.u_bob,
-            prev_event_ids=[bob_event.event_id],
-            type="m.test.2",
-            state_key=self.u_bob,
-            content={},
+        non_member_event = self.get_success(
+            event_injection.inject_event(
+                self.hs,
+                room_id=room,
+                sender=self.u_bob,
+                prev_event_ids=[bob_event.event_id],
+                type="m.test.2",
+                state_key=self.u_bob,
+                content={},
+            )
         )
-        event, context = event_injection.create_event(
-            self.hs,
-            room_id=room,
-            sender=self.u_alice,
-            prev_event_ids=[non_member_event.event_id],
-            type="m.test.3",
-            content={},
+        event, context = self.get_success(
+            event_injection.create_event(
+                self.hs,
+                room_id=room,
+                sender=self.u_alice,
+                prev_event_ids=[non_member_event.event_id],
+                type="m.test.3",
+                content={},
+            )
         )
         users = self.get_success(
             self.store.get_joined_users_from_context(event, context)

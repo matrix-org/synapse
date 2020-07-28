@@ -160,7 +160,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "notify_count": 0, "unread_count": 0},
+            {"highlight_count": 0, "notify_count": 0},
         )
 
         self.persist(
@@ -173,7 +173,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 0, "notify_count": 1, "unread_count": 1},
+            {"highlight_count": 0, "notify_count": 1},
         )
 
         self.persist(
@@ -188,20 +188,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_unread_event_push_actions_by_room_for_user",
             [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 1, "notify_count": 2, "unread_count": 2},
-        )
-
-        self.persist(
-            type="m.room.message",
-            msgtype="m.text",
-            body="world",
-            push_actions=[(USER_ID_2, ["org.matrix.msc2625.mark_unread"])],
-        )
-        self.replicate()
-        self.check(
-            "get_unread_event_push_actions_by_room_for_user",
-            [ROOM_ID, USER_ID_2, event1.event_id],
-            {"highlight_count": 1, "notify_count": 2, "unread_count": 3},
+            {"highlight_count": 1, "notify_count": 2},
         )
 
     def test_get_rooms_for_user_with_stream_ordering(self):
@@ -379,7 +366,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         state_handler = self.hs.get_state_handler()
         context = self.get_success(state_handler.compute_event_context(event))
 
-        self.master_store.add_push_actions_to_staging(
-            event.event_id, {user_id: actions for user_id, actions in push_actions}
+        self.get_success(
+            self.master_store.add_push_actions_to_staging(
+                event.event_id, {user_id: actions for user_id, actions in push_actions}
+            )
         )
         return event, context

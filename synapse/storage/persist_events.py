@@ -29,7 +29,6 @@ from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.state import StateResolutionStore
 from synapse.storage.data_stores import DataStores
 from synapse.storage.data_stores.main.events import DeltaState
 from synapse.types import StateMap
@@ -648,6 +647,10 @@ class EventsPersistenceStorage(object):
             room_version = await self.main_store.get_room_version_id(room_id)
 
         logger.debug("calling resolve_state_groups from preserve_events")
+
+        # Avoid a circular import.
+        from synapse.state import StateResolutionStore
+
         res = await self._state_resolution_handler.resolve_state_groups(
             room_id,
             room_version,
@@ -783,9 +786,3 @@ class EventsPersistenceStorage(object):
 
         for user_id in left_users:
             await self.main_store.mark_remote_user_device_list_as_unsubscribed(user_id)
-
-    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
-        """Mark the invite has having been rejected even though we failed to
-        create a leave event for it.
-        """
-        return await self.persist_events_store.locally_reject_invite(user_id, room_id)

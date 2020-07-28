@@ -164,12 +164,10 @@ Gotchas
   than one caller? Will all of those calling functions have be in a context
   with an active span?
 """
-
 import contextlib
 import inspect
 import logging
 import re
-import types
 from functools import wraps
 from typing import TYPE_CHECKING, Dict, Optional, Type
 
@@ -181,6 +179,7 @@ from twisted.internet import defer
 from synapse.config import ConfigError
 
 if TYPE_CHECKING:
+    from synapse.http.site import SynapseRequest
     from synapse.server import HomeServer
 
 # Helper class
@@ -227,6 +226,7 @@ except ImportError:
     tags = _DummyTagNames
 try:
     from jaeger_client import Config as JaegerConfig
+
     from synapse.logging.scopecontextmanager import LogContextScopeManager
 except ImportError:
     JaegerConfig = None  # type: ignore
@@ -733,37 +733,43 @@ def trace(func=None, opname=None):
 
         _opname = opname if opname else func.__name__
 
-        @wraps(func)
-        def _trace_inner(*args, **kwargs):
-            if opentracing is None:
-                return func(*args, **kwargs)
+        if inspect.iscoroutinefunction(func):
 
-            scope = start_active_span(_opname)
-            scope.__enter__()
+            @wraps(func)
+            async def _trace_inner(*args, **kwargs):
+                with start_active_span(_opname):
+                    return await func(*args, **kwargs)
 
-            try:
-                result = func(*args, **kwargs)
-                if isinstance(result, defer.Deferred):
+        else:
+            # The other case here handles both sync functions and those
+            # decorated with inlineDeferred.
+            @wraps(func)
+            def _trace_inner(*args, **kwargs):
+                scope = start_active_span(_opname)
+                scope.__enter__()
 
-                    def call_back(result):
+                try:
+                    result = func(*args, **kwargs)
+                    if isinstance(result, defer.Deferred):
+
+                        def call_back(result):
+                            scope.__exit__(None, None, None)
+                            return result
+
+                        def err_back(result):
+                            scope.__exit__(None, None, None)
+                            return result
+
+                        result.addCallbacks(call_back, err_back)
+
+                    else:
                         scope.__exit__(None, None, None)
-                        return result
 
-                    def err_back(result):
-                        scope.span.set_tag(tags.ERROR, True)
-                        scope.__exit__(None, None, None)
-                        return result
+                    return result
 
-                    result.addCallbacks(call_back, err_back)
-
-                else:
-                    scope.__exit__(None, None, None)
-
-                return result
-
-            except Exception as e:
-                scope.__exit__(type(e), None, e.__traceback__)
-                raise
+                except Exception as e:
+                    scope.__exit__(type(e), None, e.__traceback__)
+                    raise
 
         return _trace_inner
 
@@ -793,48 +799,42 @@ def tag_args(func):
     return _tag_args_inner
 
 
-def trace_servlet(servlet_name, extract_context=False):
-    """Decorator which traces a serlet. It starts a span with some servlet specific
-    tags such as the servlet_name and request information
+@contextlib.contextmanager
+def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
+    """Returns a context manager which traces a request. It starts a span
+    with some servlet specific tags such as the request metrics name and
+    request information.
 
     Args:
-        servlet_name (str): The name to be used for the span's operation_name
-        extract_context (bool): Whether to attempt to extract the opentracing
+        request
+        extract_context: Whether to attempt to extract the opentracing
             context from the request the servlet is handling.
-
     """
 
-    def _trace_servlet_inner_1(func):
-        if not opentracing:
-            return func
+    if opentracing is None:
+        yield
+        return
 
-        @wraps(func)
-        async def _trace_servlet_inner(request, *args, **kwargs):
-            request_tags = {
-                "request_id": request.get_request_id(),
-                tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
-                tags.HTTP_METHOD: request.get_method(),
-                tags.HTTP_URL: request.get_redacted_uri(),
-                tags.PEER_HOST_IPV6: request.getClientIP(),
-            }
+    request_tags = {
+        "request_id": request.get_request_id(),
+        tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
+        tags.HTTP_METHOD: request.get_method(),
+        tags.HTTP_URL: request.get_redacted_uri(),
+        tags.PEER_HOST_IPV6: request.getClientIP(),
+    }
 
-            if extract_context:
-                scope = start_active_span_from_request(
-                    request, servlet_name, tags=request_tags
-                )
-            else:
-                scope = start_active_span(servlet_name, tags=request_tags)
+    request_name = request.request_metrics.name
+    if extract_context:
+        scope = start_active_span_from_request(request, request_name, tags=request_tags)
+    else:
+        scope = start_active_span(request_name, tags=request_tags)
 
-            with scope:
-                result = func(request, *args, **kwargs)
+    with scope:
+        try:
+            yield
+        finally:
+            # We set the operation name again in case its changed (which happens
+            # with JsonResource).
+            scope.span.set_operation_name(request.request_metrics.name)
 
-                if not isinstance(result, (types.CoroutineType, defer.Deferred)):
-                    # Some servlets aren't async and just return results
-                    # directly, so we handle that here.
-                    return result
-
-                return await result
-
-        return _trace_servlet_inner
-
-    return _trace_servlet_inner_1
+            scope.span.set_tag("request_tag", request.request_metrics.start_context.tag)

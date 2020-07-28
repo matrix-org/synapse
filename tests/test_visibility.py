@@ -53,7 +53,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         #
 
         # before we do that, we persist some other events to act as state.
-        self.inject_visibility("@admin:hs", "joined")
+        yield self.inject_visibility("@admin:hs", "joined")
         for i in range(0, 10):
             yield self.inject_room_member("@resident%i:hs" % i)
 
@@ -64,8 +64,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             evt = yield self.inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
 
-        filtered = yield filter_events_for_server(
-            self.storage, "test_server", events_to_filter
+        filtered = yield defer.ensureDeferred(
+            filter_events_for_server(self.storage, "test_server", events_to_filter)
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
@@ -102,8 +102,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         yield self.hs.get_datastore().mark_user_erased("@erased:local_hs")
 
         # ... and the filtering happens.
-        filtered = yield filter_events_for_server(
-            self.storage, "test_server", events_to_filter
+        filtered = yield defer.ensureDeferred(
+            filter_events_for_server(self.storage, "test_server", events_to_filter)
         )
 
         for i in range(0, len(events_to_filter)):
@@ -137,8 +137,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
         yield self.storage.persistence.persist_event(event, context)
         return event
@@ -158,8 +158,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
         yield self.storage.persistence.persist_event(event, context)
@@ -179,8 +179,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
         yield self.storage.persistence.persist_event(event, context)
@@ -265,8 +265,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         storage.main = test_store
         storage.state = test_store
 
-        filtered = yield filter_events_for_server(
-            test_store, "test_server", events_to_filter
+        filtered = yield defer.ensureDeferred(
+            filter_events_for_server(test_store, "test_server", events_to_filter)
         )
         logger.info("Filtering took %f seconds", time.time() - start)
 

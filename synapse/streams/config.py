@@ -68,13 +68,13 @@ class PaginationConfig(object):
             elif from_tok:
                 from_tok = StreamToken.from_string(from_tok)
         except Exception:
-            raise SynapseError(400, "'from' paramater is invalid")
+            raise SynapseError(400, "'from' parameter is invalid")
 
         try:
             if to_tok:
                 to_tok = StreamToken.from_string(to_tok)
         except Exception:
-            raise SynapseError(400, "'to' paramater is invalid")
+            raise SynapseError(400, "'to' parameter is invalid")
 
         limit = parse_integer(request, "limit", default=default_limit)
 

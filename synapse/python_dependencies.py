@@ -66,7 +66,7 @@ REQUIREMENTS = [
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
-    "prometheus_client>=0.0.18,<0.8.0",
+    "prometheus_client>=0.0.18,<0.9.0",
     # we use attr.validators.deep_iterable, which arrived in 19.1.0
     "attrs>=19.1.0",
     "netaddr>=0.7.18",
@@ -93,6 +93,10 @@ CONDITIONAL_REQUIREMENTS = {
     "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
+    # Dependencies which are exclusively required by unit test code. This is
+    # NOT a list of all modules that are necessary to run the unit tests.
+    # Tests assume that all optional dependencies are installed.
+    #
     # parameterized_class decorator was introduced in parameterized 0.7.0
     "test": ["mock>=2.0", "parameterized>=0.7.0"],
     "sentry": ["sentry-sdk>=0.7.2"],

@@ -18,7 +18,7 @@ import logging
 from synapse.api.constants import LoginType
 from synapse.api.errors import SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
-from synapse.http.server import finish_request
+from synapse.http.server import respond_with_html
 from synapse.http.servlet import RestServlet, parse_string
 
 from ._base import client_patterns
@@ -200,13 +200,7 @@ class AuthRestServlet(RestServlet):
             raise SynapseError(404, "Unknown auth stage type")
 
         # Render the HTML and return.
-        html_bytes = html.encode("utf8")
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-        request.write(html_bytes)
-        finish_request(request)
+        respond_with_html(request, 200, html)
         return None
 
     async def on_POST(self, request, stagetype):
@@ -263,13 +257,7 @@ class AuthRestServlet(RestServlet):
             raise SynapseError(404, "Unknown auth stage type")
 
         # Render the HTML and return.
-        html_bytes = html.encode("utf8")
-        request.setResponseCode(200)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%d" % (len(html_bytes),))
-
-        request.write(html_bytes)
-        finish_request(request)
+        respond_with_html(request, 200, html)
         return None
 
     def on_OPTIONS(self, _):
