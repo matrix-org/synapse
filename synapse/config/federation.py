@@ -95,4 +95,13 @@ class FederationConfig(Config):
           - '::1/128'
           - 'fe80::/64'
           - 'fc00::/7'
+
+        # If running with federation sender worker instances then they should
+        # be listed by their `worker_name` here, as well as setting
+        # `send_federation` to false.
+        #
+        #send_federation: false
+        #
+        #federation_sender_instances:
+        #  - federation_sender1
         """

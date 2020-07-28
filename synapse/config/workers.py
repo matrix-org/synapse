@@ -105,6 +105,27 @@ class WorkerConfig(Config):
                     % (instance, stream)
                 )
 
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+        return """\
+        ## Workers ##
+
+        # When using workers this should be a map from `worker_name` to the
+        # HTTP replication listener of the worker, if configured.
+        #
+        #instance_map:
+        #  worker1:
+        #    host: localhost
+        #    port: 8034
+
+        # Experimental: When using workers you can define if workers should
+        # handle event persistence or typing notifications here. Any worker
+        # specified here must also be in the `instance_map`.
+        #
+        #stream_writers:
+        #  events: worker1
+        #  typing: worker1
+        """
+
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in
         # the config. A lot of these options have a worker_* prefix when running

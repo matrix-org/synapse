@@ -610,6 +610,15 @@ federation_ip_range_blacklist:
   - 'fe80::/64'
   - 'fc00::/7'
 
+# If running with federation sender worker instances then they should
+# be listed by their `worker_name` here, as well as setting
+# `send_federation` to false.
+#
+#send_federation: false
+#
+#federation_sender_instances:
+#  - federation_sender1
+
 
 ## Caching ##
 
@@ -2398,3 +2407,38 @@ opentracing:
     #
     #  logging:
     #    false
+
+
+## Workers ##
+
+# When using workers this should be a map from `worker_name` to the
+# HTTP replication listener of the worker, if configured.
+#
+#instance_map:
+#  worker1:
+#    host: localhost
+#    port: 8034
+
+# Experimental: When using workers you can define if workers should
+# handle event persistence or typing notifications here. Any worker
+# specified here must also be in the `instance_map`.
+#
+#stream_writers:
+#  events: worker1
+#  typing: worker1
+
+
+# Configuration for Redis when using workers.
+#
+redis:
+  #enabled: true
+
+  # Optional host and port to use to connect to redis. Defaults to
+  # localhost and 6379
+  #
+  #host: localhost
+  #port: 6379
+
+  # Optional password if configured on the Redis instance
+  #
+  #password: <secret_password>
