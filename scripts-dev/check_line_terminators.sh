@@ -28,4 +28,7 @@
 cd `dirname $0`/..
 
 # Find and print files with non-unix line terminators
-find . -path './.git/*' -prune -o -type f -print0 | xargs -0 grep -I -l $'\r$' && ( echo 'found files with CRLF line endings'; exit 1 )
+if find . -path './.git/*' -prune -o -type f -print0 | xargs -0 grep -I -l $'\r$'; then
+    echo -e '\e[31mERROR: found files with CRLF line endings. See above.\e[39m'
+    exit 1
+fi
