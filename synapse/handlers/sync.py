@@ -424,10 +424,6 @@ class SyncHandler(object):
         potential_recents: Optional[List[EventBase]] = None,
         newly_joined_room: bool = False,
     ) -> TimelineBatch:
-        """
-        Returns:
-            a Deferred TimelineBatch
-        """
         with Measure(self.clock, "load_filtered_recents"):
             timeline_limit = sync_config.filter_collection.timeline_limit()
             block_all_timeline = (

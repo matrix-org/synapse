@@ -348,7 +348,9 @@ class FederationSender(object):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains = yield self.state.get_current_hosts_in_room(room_id)
+        domains = yield defer.ensureDeferred(
+            self.state.get_current_hosts_in_room(room_id)
+        )
         domains = [
             d
             for d in domains

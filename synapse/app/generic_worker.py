@@ -87,7 +87,6 @@ from synapse.replication.tcp.streams import (
     ReceiptsStream,
     TagAccountDataStream,
     ToDeviceStream,
-    TypingStream,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events
@@ -644,7 +643,6 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
         super(GenericWorkerReplicationHandler, self).__init__(hs)
 
         self.store = hs.get_datastore()
-        self.typing_handler = hs.get_typing_handler()
         self.presence_handler = hs.get_presence_handler()  # type: GenericWorkerPresence
         self.notifier = hs.get_notifier()
 
@@ -680,11 +678,6 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
                 )
                 await self.pusher_pool.on_new_receipts(
                     token, token, {row.room_id for row in rows}
-                )
-            elif stream_name == TypingStream.NAME:
-                self.typing_handler.process_replication_rows(token, rows)
-                self.notifier.on_new_event(
-                    "typing_key", token, rooms=[row.room_id for row in rows]
                 )
             elif stream_name == ToDeviceStream.NAME:
                 entities = [row.entity for row in rows if row.entity.startswith("@")]

@@ -1,0 +1,1 @@
+Fix an `AssertionError` exception introduced in v1.18.0rc1.

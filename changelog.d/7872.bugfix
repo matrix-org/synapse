@@ -1,1 +1,0 @@
-Fix a long standing bug where the tracing of async functions with opentracing was broken.
