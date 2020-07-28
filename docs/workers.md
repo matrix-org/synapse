@@ -249,7 +249,7 @@ exercise for the reader. Admins may additionally wish to separate out `/sync`
 requests that have a `since` query parameter from those that don't (and
 `/initialSync`), as requests that don't are known as "initial sync" that happens
 when a user logs in on a new device and can be *very* resource intensive, so
-isolating these requests will stop them from intefering with other users ongoing
+isolating these requests will stop them from interfering with other users ongoing
 syncs.
 
 Federation and client requests can be balanced via simple round robin.
