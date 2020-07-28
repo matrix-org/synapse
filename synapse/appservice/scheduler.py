@@ -50,8 +50,6 @@ components.
 """
 import logging
 
-from twisted.internet import defer
-
 from synapse.appservice import ApplicationServiceState
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -160,36 +158,33 @@ class _TransactionController(object):
         # for UTs
         self.RECOVERER_CLASS = _Recoverer
 
-    @defer.inlineCallbacks
-    def send(self, service, events):
+    async def send(self, service, events):
         try:
-            txn = yield self.store.create_appservice_txn(service=service, events=events)
-            service_is_up = yield self._is_service_up(service)
+            txn = await self.store.create_appservice_txn(service=service, events=events)
+            service_is_up = await self._is_service_up(service)
             if service_is_up:
-                sent = yield txn.send(self.as_api)
+                sent = await txn.send(self.as_api)
                 if sent:
-                    yield txn.complete(self.store)
+                    await txn.complete(self.store)
                 else:
                     run_in_background(self._on_txn_fail, service)
         except Exception:
             logger.exception("Error creating appservice transaction")
             run_in_background(self._on_txn_fail, service)
 
-    @defer.inlineCallbacks
-    def on_recovered(self, recoverer):
+    async def on_recovered(self, recoverer):
         logger.info(
             "Successfully recovered application service AS ID %s", recoverer.service.id
         )
         self.recoverers.pop(recoverer.service.id)
         logger.info("Remaining active recoverers: %s", len(self.recoverers))
-        yield self.store.set_appservice_state(
+        await self.store.set_appservice_state(
             recoverer.service, ApplicationServiceState.UP
         )
 
-    @defer.inlineCallbacks
-    def _on_txn_fail(self, service):
+    async def _on_txn_fail(self, service):
         try:
-            yield self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
+            await self.store.set_appservice_state(service, ApplicationServiceState.DOWN)
             self.start_recoverer(service)
         except Exception:
             logger.exception("Error starting AS recoverer")
@@ -209,9 +204,8 @@ class _TransactionController(object):
         recoverer.recover()
         logger.info("Now %i active recoverers", len(self.recoverers))
 
-    @defer.inlineCallbacks
-    def _is_service_up(self, service):
-        state = yield self.store.get_appservice_state(service)
+    async def _is_service_up(self, service):
+        state = await self.store.get_appservice_state(service)
         return state == ApplicationServiceState.UP or state is None
 
 
