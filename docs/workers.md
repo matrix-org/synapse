@@ -35,6 +35,17 @@ Redis, which relays replication commands between processes. This can give a
 significant cpu saving on the main process and will be a prerequisite for
 upcoming performance improvements.
 
+If using Redis the appropriate dependencies must be installed. If using a
+virtual env these can be installed by:
+
+```sh
+pip install matrix-synapse[redis]
+```
+
+Note that these dependencies are included if synapse was installed with `[all]`,
+or if using the debian packages from matrix.org.
+
+
 
 ## Configuration
 
