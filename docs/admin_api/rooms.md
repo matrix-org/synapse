@@ -369,7 +369,9 @@ to the new room will have power level `-10` by default, and thus be unable to sp
 If `block` is `True` it prevents new joins to the old room.
 
 This API will remove all trace of the old room from your database after removing
-all local users. If you do not like to remove the trace set `purge` to `False`.
+all local users. If `purge` is `true` (the default), all traces of the old room will
+be removed from your database after removing all local users. If you do not want
+this to happen, set `purge` to `false`.
 Depending on the amount of history being purged a call to the API may take
 several minutes or longer.
 
