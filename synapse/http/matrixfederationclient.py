@@ -121,8 +121,7 @@ class MatrixFederationRequest(object):
         return self.json
 
 
-@defer.inlineCallbacks
-def _handle_json_response(reactor, timeout_sec, request, response):
+async def _handle_json_response(reactor, timeout_sec, request, response):
     """
     Reads the JSON body of a response, with a timeout
 
@@ -141,7 +140,7 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         d = treq.json_content(response)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
-        body = yield make_deferred_yieldable(d)
+        body = await make_deferred_yieldable(d)
     except TimeoutError as e:
         logger.warning(
             "{%s} [%s] Timed out reading response", request.txn_id, request.destination,
@@ -224,8 +223,7 @@ class MatrixFederationHttpClient(object):
 
         self._cooperator = Cooperator(scheduler=schedule)
 
-    @defer.inlineCallbacks
-    def _send_request_with_optional_trailing_slash(
+    async def _send_request_with_optional_trailing_slash(
         self, request, try_trailing_slash_on_400=False, **send_request_args
     ):
         """Wrapper for _send_request which can optionally retry the request
@@ -246,10 +244,10 @@ class MatrixFederationHttpClient(object):
                 (except 429).
 
         Returns:
-            Deferred[Dict]: Parsed JSON response body.
+            Dict: Parsed JSON response body.
         """
         try:
-            response = yield self._send_request(request, **send_request_args)
+            response = await self._send_request(request, **send_request_args)
         except HttpResponseException as e:
             # Received an HTTP error > 300. Check if it meets the requirements
             # to retry with a trailing slash
@@ -265,12 +263,11 @@ class MatrixFederationHttpClient(object):
             logger.info("Retrying request with trailing slash")
             request.path += "/"
 
-            response = yield self._send_request(request, **send_request_args)
+            response = await self._send_request(request, **send_request_args)
 
         return response
 
-    @defer.inlineCallbacks
-    def _send_request(
+    async def _send_request(
         self,
         request,
         retry_on_dns_fail=True,
@@ -311,7 +308,7 @@ class MatrixFederationHttpClient(object):
             backoff_on_404 (bool): Back off if we get a 404
 
         Returns:
-            Deferred[twisted.web.client.Response]: resolves with the HTTP
+            twisted.web.client.Response: resolves with the HTTP
             response object on success.
 
         Raises:
@@ -335,7 +332,7 @@ class MatrixFederationHttpClient(object):
         ):
             raise FederationDeniedError(request.destination)
 
-        limiter = yield synapse.util.retryutils.get_retry_limiter(
+        limiter = await synapse.util.retryutils.get_retry_limiter(
             request.destination,
             self.clock,
             self._store,
@@ -433,7 +430,7 @@ class MatrixFederationHttpClient(object):
                                 reactor=self.reactor,
                             )
 
-                            response = yield request_deferred
+                            response = await request_deferred
                     except TimeoutError as e:
                         raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
@@ -473,7 +470,7 @@ class MatrixFederationHttpClient(object):
                         )
 
                         try:
-                            body = yield make_deferred_yieldable(d)
+                            body = await make_deferred_yieldable(d)
                         except Exception as e:
                             # Eh, we're already going to raise an exception so lets
                             # ignore if this fails.
@@ -527,7 +524,7 @@ class MatrixFederationHttpClient(object):
                             delay,
                         )
 
-                        yield self.clock.sleep(delay)
+                        await self.clock.sleep(delay)
                         retries_left -= 1
                     else:
                         raise
