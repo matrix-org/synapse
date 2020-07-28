@@ -739,8 +739,7 @@ class MatrixFederationHttpClient(object):
         )
         return body
 
-    @defer.inlineCallbacks
-    def get_json(
+    async def get_json(
         self,
         destination,
         path,
@@ -772,7 +771,7 @@ class MatrixFederationHttpClient(object):
                 response we should try appending a trailing slash to the end of
                 the request. Workaround for #3622 in Synapse <= v0.99.3.
         Returns:
-            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            dict|list: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
 
         Raises:
@@ -789,7 +788,7 @@ class MatrixFederationHttpClient(object):
             method="GET", destination=destination, path=path, query=args
         )
 
-        response = yield self._send_request_with_optional_trailing_slash(
+        response = await self._send_request_with_optional_trailing_slash(
             request,
             try_trailing_slash_on_400,
             backoff_on_404=False,
@@ -798,14 +797,13 @@ class MatrixFederationHttpClient(object):
             timeout=timeout,
         )
 
-        body = yield _handle_json_response(
+        body = await _handle_json_response(
             self.reactor, self.default_timeout, request, response
         )
 
         return body
 
-    @defer.inlineCallbacks
-    def delete_json(
+    async def delete_json(
         self,
         destination,
         path,
@@ -833,7 +831,7 @@ class MatrixFederationHttpClient(object):
 
             args (dict): query params
         Returns:
-            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            dict|list: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
 
         Raises:
@@ -850,14 +848,14 @@ class MatrixFederationHttpClient(object):
             method="DELETE", destination=destination, path=path, query=args
         )
 
-        response = yield self._send_request(
+        response = await self._send_request(
             request,
             long_retries=long_retries,
             timeout=timeout,
             ignore_backoff=ignore_backoff,
         )
 
-        body = yield _handle_json_response(
+        body = await _handle_json_response(
             self.reactor, self.default_timeout, request, response
         )
         return body
