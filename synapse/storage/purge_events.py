@@ -64,7 +64,7 @@ class PurgeEventsStorage(object):
         deleted.
 
         Args:
-            state_groupsSet of state groups referenced by events
+            state_groups: Set of state groups referenced by events
                 that are going to be deleted.
 
         Returns:

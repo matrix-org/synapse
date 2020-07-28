@@ -233,7 +233,7 @@ class EventsPersistenceStorage(object):
     ) -> Tuple[int, int]:
         """
         Returns:
-            The stream ordering of ``event``, and the stream ordering of the
+            The stream ordering of `event`, and the stream ordering of the
             latest persisted event
         """
         deferred = self._event_persist_queue.add_to_queue(
