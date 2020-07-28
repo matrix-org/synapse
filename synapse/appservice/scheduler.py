@@ -73,12 +73,11 @@ class ApplicationServiceScheduler(object):
         self.txn_ctrl = _TransactionController(self.clock, self.store, self.as_api)
         self.queuer = _ServiceQueuer(self.txn_ctrl, self.clock)
 
-    @defer.inlineCallbacks
-    def start(self):
+    async def start(self):
         logger.info("Starting appservice scheduler")
 
         # check for any DOWN ASes and start recoverers for them.
-        services = yield self.store.get_appservices_by_state(
+        services = await self.store.get_appservices_by_state(
             ApplicationServiceState.DOWN
         )
 

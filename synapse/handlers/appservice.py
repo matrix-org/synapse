@@ -100,10 +100,11 @@ class ApplicationServicesHandler(object):
 
                         if not self.started_scheduler:
 
-                            def start_scheduler():
-                                return self.scheduler.start().addErrback(
-                                    log_failure, "Application Services Failure"
-                                )
+                            async def start_scheduler():
+                                try:
+                                    return self.scheduler.start()
+                                except Exception:
+                                    log_failure("Application Services Failure")
 
                             run_as_background_process("as_scheduler", start_scheduler)
                             self.started_scheduler = True
