@@ -85,7 +85,7 @@ For example:
 worker_app: synapse.app.generic_worker
 worker_name: worker1
 
-# The replication listener on the synapse to talk to.
+# The replication listener on the master synapse process.
 worker_replication_host: 127.0.0.1
 worker_replication_http_port: 9093
 
