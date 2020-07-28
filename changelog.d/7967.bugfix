@@ -1,0 +1,1 @@
+Fix experimental support for moving typing off master when worker is restarted, which is broken in v1.18.0-rc1.
