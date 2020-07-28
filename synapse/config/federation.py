@@ -96,11 +96,15 @@ class FederationConfig(Config):
           - 'fe80::/64'
           - 'fc00::/7'
 
-        # If running with federation sender worker instances then they should
-        # be listed by their `worker_name` here, as well as setting
-        # `send_federation` to false.
+        # Uncomment if using a federation sender worker.
         #
         #send_federation: false
+
+        # Multiple federation sender workers can be run, in which case the work is sharded
+        # between them. Note that this config must be shared between all instances, and if
+        # changed all federation sender workers must be stopped at the same time and then
+        # started, to ensure that all instances are running with the same config (otherwise
+        # events may be dropped).
         #
         #federation_sender_instances:
         #  - federation_sender1
