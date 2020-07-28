@@ -38,6 +38,8 @@ class RedisConfig(Config):
         # Configuration for Redis when using workers.
         #
         redis:
+          # Uncomment the below to enable using Redis to replicate data between workers.
+          #
           #enabled: true
 
           # Optional host and port to use to connect to redis. Defaults to
