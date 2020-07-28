@@ -185,7 +185,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.assertEquals(3, txn.send.call_count)
         self.assertEquals(0, txn.complete.call_count)
         self.assertEquals(0, self.callback.call_count)
-        txn.send = Mock(return_value=defer.succeed(True))  # successfully send the txn
+        txn.send = Mock(return_value=make_awaitable(True))  # successfully send the txn
         pop_txn = True  # returns the txn the first time, then no more.
         self.clock.advance_time(16)
         self.assertEquals(1, txn.send.call_count)  # new mock reset call count
