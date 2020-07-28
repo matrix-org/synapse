@@ -21,7 +21,7 @@ class RedisConfig(Config):
     section = "redis"
 
     def read_config(self, config, **kwargs):
-        redis_config = config.get("redis", {}) or {}
+        redis_config = config.get("redis") or {}
         self.redis_enabled = redis_config.get("enabled", False)
 
         if not self.redis_enabled:
