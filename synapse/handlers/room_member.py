@@ -952,7 +952,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
-        if self.hs.config.limit_remote_rooms.enabled:
+        check_complexity = self.hs.config.limit_remote_rooms.enabled
+        if check_complexity and self.hs.config.limit_remote_rooms.admins_can_join:
+            check_complexity = not await self.hs.auth.is_server_admin(user)
+
+        if check_complexity:
             # Fetch the room complexity
             too_complex = await self._is_remote_room_too_complex(
                 room_id, remote_room_hosts
@@ -975,7 +979,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         # Check the room we just joined wasn't too large, if we didn't fetch the
         # complexity of it before.
-        if self.hs.config.limit_remote_rooms.enabled:
+        if check_complexity:
             if too_complex is False:
                 # We checked, and we're under the limit.
                 return event_id, stream_id

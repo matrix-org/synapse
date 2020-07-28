@@ -314,6 +314,10 @@ limit_remote_rooms:
   #
   #complexity_error: "This room is too complex."
 
+  # allow server admins to join complex rooms. Default is false.
+  #
+  #admins_can_join: true
+
 # Whether to require a user to be in the room to add an alias to it.
 # Defaults to 'true'.
 #
