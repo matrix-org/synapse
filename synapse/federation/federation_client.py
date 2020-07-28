@@ -135,7 +135,7 @@ class FederationClient(FederationBase):
                 and try the request anyway.
 
         Returns:
-            a Deferred which will eventually yield a JSON object from the
+            a Awaitable which will eventually yield a JSON object from the
             response
         """
         sent_queries_counter.labels(query_type).inc()
@@ -157,7 +157,7 @@ class FederationClient(FederationBase):
             content (dict): The query content.
 
         Returns:
-            a Deferred which will eventually yield a JSON object from the
+            an Awaitable which will eventually yield a JSON object from the
             response
         """
         sent_queries_counter.labels("client_device_keys").inc()
@@ -180,7 +180,7 @@ class FederationClient(FederationBase):
             content (dict): The query content.
 
         Returns:
-            a Deferred which will eventually yield a JSON object from the
+            an Awaitable which will eventually yield a JSON object from the
             response
         """
         sent_queries_counter.labels("client_one_time_keys").inc()
@@ -900,7 +900,7 @@ class FederationClient(FederationBase):
                 party instance
 
         Returns:
-            Deferred[Dict[str, Any]]: The response from the remote server, or None if
+            Awaitable[Dict[str, Any]]: The response from the remote server, or None if
             `remote_server` is the same as the local server_name
 
         Raises:
