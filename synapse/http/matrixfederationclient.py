@@ -590,8 +590,7 @@ class MatrixFederationHttpClient(object):
             )
         return auth_headers
 
-    @defer.inlineCallbacks
-    def put_json(
+    async def put_json(
         self,
         destination,
         path,
@@ -635,7 +634,7 @@ class MatrixFederationHttpClient(object):
                 enabled.
 
         Returns:
-            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            dict|list: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
 
         Raises:
@@ -657,7 +656,7 @@ class MatrixFederationHttpClient(object):
             json=data,
         )
 
-        response = yield self._send_request_with_optional_trailing_slash(
+        response = await self._send_request_with_optional_trailing_slash(
             request,
             try_trailing_slash_on_400,
             backoff_on_404=backoff_on_404,
@@ -666,14 +665,13 @@ class MatrixFederationHttpClient(object):
             timeout=timeout,
         )
 
-        body = yield _handle_json_response(
+        body = await _handle_json_response(
             self.reactor, self.default_timeout, request, response
         )
 
         return body
 
-    @defer.inlineCallbacks
-    def post_json(
+    async def post_json(
         self,
         destination,
         path,
@@ -706,7 +704,7 @@ class MatrixFederationHttpClient(object):
 
             args (dict): query params
         Returns:
-            Deferred[dict|list]: Succeeds when we get a 2xx HTTP response. The
+            dict|list: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
 
         Raises:
@@ -724,7 +722,7 @@ class MatrixFederationHttpClient(object):
             method="POST", destination=destination, path=path, query=args, json=data
         )
 
-        response = yield self._send_request(
+        response = await self._send_request(
             request,
             long_retries=long_retries,
             timeout=timeout,
@@ -736,7 +734,7 @@ class MatrixFederationHttpClient(object):
         else:
             _sec_timeout = self.default_timeout
 
-        body = yield _handle_json_response(
+        body = await _handle_json_response(
             self.reactor, _sec_timeout, request, response
         )
         return body
@@ -864,8 +862,7 @@ class MatrixFederationHttpClient(object):
         )
         return body
 
-    @defer.inlineCallbacks
-    def get_file(
+    async def get_file(
         self,
         destination,
         path,
@@ -885,7 +882,7 @@ class MatrixFederationHttpClient(object):
                 and try the request anyway.
 
         Returns:
-            Deferred[tuple[int, dict]]: Resolves with an (int,dict) tuple of
+            tuple[int, dict]: Resolves with an (int,dict) tuple of
             the file length and a dict of the response headers.
 
         Raises:
@@ -902,7 +899,7 @@ class MatrixFederationHttpClient(object):
             method="GET", destination=destination, path=path, query=args
         )
 
-        response = yield self._send_request(
+        response = await self._send_request(
             request, retry_on_dns_fail=retry_on_dns_fail, ignore_backoff=ignore_backoff
         )
 
@@ -911,7 +908,7 @@ class MatrixFederationHttpClient(object):
         try:
             d = _readBodyToFile(response, output_stream, max_size)
             d.addTimeout(self.default_timeout, self.reactor)
-            length = yield make_deferred_yieldable(d)
+            length = await make_deferred_yieldable(d)
         except Exception as e:
             logger.warning(
                 "{%s} [%s] Error reading response: %s",

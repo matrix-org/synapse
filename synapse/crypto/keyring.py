@@ -632,18 +632,20 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         )
 
         try:
-            query_response = yield self.client.post_json(
-                destination=perspective_name,
-                path="/_matrix/key/v2/query",
-                data={
-                    "server_keys": {
-                        server_name: {
-                            key_id: {"minimum_valid_until_ts": min_valid_ts}
-                            for key_id, min_valid_ts in server_keys.items()
+            query_response = yield defer.ensureDeferred(
+                self.client.post_json(
+                    destination=perspective_name,
+                    path="/_matrix/key/v2/query",
+                    data={
+                        "server_keys": {
+                            server_name: {
+                                key_id: {"minimum_valid_until_ts": min_valid_ts}
+                                for key_id, min_valid_ts in server_keys.items()
+                            }
+                            for server_name, server_keys in keys_to_fetch.items()
                         }
-                        for server_name, server_keys in keys_to_fetch.items()
-                    }
-                },
+                    },
+                )
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
             # these both have str() representations which we can't really improve upon
