@@ -18,14 +18,22 @@ running PostgreSQL.
 
 ## Master/worker communication
 
-The workers communicate with the master process via a Synapse-specific protocol
-called 'replication' (analogous to MySQL- or Postgres-style database
-replication) which feeds a stream of relevant data from the master to the
-workers so they can be kept in sync with the master process and database state.
+The processes communicate with each other via a Synapse-specific protocol called
+'replication' (analogous to MySQL- or Postgres-style database replication) which
+feeds streams of newly written data between processes so they can be kept in
+sync with the database state.
 
-Additionally, workers may make HTTP requests to the master, to send information
-in the other direction. Typically this is used for operations which need to
-wait for a reply - such as sending an event.
+Additionally, processes may make HTTP requests to each other. Typically this is
+used for operations which need to wait for a reply - such as sending an event.
+
+As of Synapse v1.13.0, it is possible to configure Synapse to send replication
+via a [Redis pub/sub channel](https://redis.io/topics/pubsub), and is now the
+recommended way of configuring replication. This is an alternative to the old
+direct TCP connections to the master: rather than all the workers connecting to
+the master, all the workers and the master connect to Redis, which relays
+replication commands between processes. This can give a significant cpu saving
+on the master and will be a prerequisite for upcoming performance improvements.
+
 
 ## Configuration
 
@@ -35,26 +43,26 @@ the correct worker, or to the main synapse instance. Note that this includes
 requests made to the federation port. See [reverse_proxy.md](reverse_proxy.md)
 for information on setting up a reverse proxy.
 
-To enable workers, you need to add *two* replication listeners to the
-main Synapse configuration file (`homeserver.yaml`). For example:
+To enable workers, you need to add both a HTTP replication listener and redis
+config to the main Synapse configuration file (`homeserver.yaml`). For example:
 
 ```yaml
 listeners:
-  # The TCP replication port
-  - port: 9092
-    bind_address: '127.0.0.1'
-    type: replication
-
   # The HTTP replication port
   - port: 9093
     bind_address: '127.0.0.1'
     type: http
     resources:
      - names: [replication]
+
+redis:
+    enabled: true
 ```
 
-Under **no circumstances** should these replication API listeners be exposed to
-the public internet; they have no authentication and are unencrypted.
+See the sample config for the full documentation of each option.
+
+Under **no circumstances** should the replication API listener be exposed to the
+public internet; it has no authentication and is unencrypted.
 
 You should then create a set of configs for the various worker processes.  Each
 worker configuration file inherits the configuration of the main homeserver
@@ -64,21 +72,21 @@ configuration; etc.  You should minimise the number of overrides though to
 maintain a usable config.
 
 In the config file for each worker, you must specify the type of worker
-application (`worker_app`). The currently available worker applications are
-listed below. You must also specify the replication endpoints that it should
-talk to on the main synapse process.  `worker_replication_host` should specify
-the host of the main synapse, `worker_replication_port` should point to the TCP
-replication listener port and `worker_replication_http_port` should point to
-the HTTP replication port.
+application (`worker_app`), and you should specify a unqiue name for the worker
+(`worker_name`). The currently available worker applications are listed below.
+You must also specify the HTTP replication endpoint that it should talk to on
+the main synapse process.  `worker_replication_host` should specify the host of
+the main synapse and `worker_replication_http_port` should point to the HTTP
+replication port.
 
 For example:
 
 ```yaml
-worker_app: synapse.app.synchrotron
+worker_app: synapse.app.generic_worker
+worker_name: worker1
 
 # The replication listener on the synapse to talk to.
 worker_replication_host: 127.0.0.1
-worker_replication_port: 9092
 worker_replication_http_port: 9093
 
 worker_listeners:
@@ -88,12 +96,12 @@ worker_listeners:
      - names:
        - client
 
-worker_log_config: /home/matrix/synapse/config/synchrotron_log_config.yaml
+worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
 ```
 
-...is a full configuration for a synchrotron worker instance, which will expose a
-plain HTTP `/sync` endpoint on port 8083 separately from the `/sync` endpoint provided
-by the main synapse.
+...is a full configuration for a generic worker instance, which will expose a
+plain HTTP endpoint on port 8083 separately serving various endpoints, e.g.
+`/sync`, which are listed below.
 
 Obviously you should configure your reverse-proxy to route the relevant
 endpoints to the worker (`localhost:8083` in the above example).
@@ -104,49 +112,6 @@ recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
 [systemd-with-workers](systemd-with-workers). To use `synctl`, see below.
 
-### **Experimental** support for replication over redis
-
-As of Synapse v1.13.0, it is possible to configure Synapse to send replication
-via a [Redis pub/sub channel](https://redis.io/topics/pubsub). This is an
-alternative to direct TCP connections to the master: rather than all the
-workers connecting to the master, all the workers and the master connect to
-Redis, which relays replication commands between processes. This can give a
-significant cpu saving on the master and will be a prerequisite for upcoming
-performance improvements.
-
-Note that this support is currently experimental; you may experience lost
-messages and similar problems! It is strongly recommended that admins setting
-up workers for the first time use direct TCP replication as above.
-
-To configure Synapse to use Redis:
-
-1. Install Redis following the normal procedure for your distribution - for
-   example, on Debian, `apt install redis-server`. (It is safe to use an
-   existing Redis deployment if you have one: we use a pub/sub stream named
-   according to the `server_name` of your synapse server.)
-2. Check Redis is running and accessible: you should be able to `echo PING | nc -q1
-   localhost 6379` and get a response of `+PONG`.
-3. Install the python prerequisites. If you installed synapse into a
-   virtualenv, this can be done with:
-   ```sh
-   pip install matrix-synapse[redis]
-   ```
-   The debian packages from matrix.org already include the required
-   dependencies.
-4. Add config to the shared configuration (`homeserver.yaml`):
-    ```yaml
-    redis:
-      enabled: true
-    ```
-    Optional parameters which can go alongside `enabled` are `host`, `port`,
-    `password`. Normally none of these are required.
-5. Restart master and all workers.
-
-Once redis replication is in use, `worker_replication_port` is redundant and
-can be removed from the worker configuration files. Similarly, the
-configuration for the `listener` for the TCP replication port can be removed
-from the main configuration file. Note that the HTTP replication port is
-still required.
 
 ### Using synctl
 
@@ -163,7 +128,7 @@ to which it will write its process ID when it starts. For example, for a
 synchrotron, you might write:
 
 ```yaml
-worker_pid_file: /home/matrix/synapse/synchrotron.pid
+worker_pid_file: /home/matrix/synapse/worker1.pid
 ```
 
 Finally, to actually run your worker-based synapse, you must pass synctl the `-a`
@@ -179,50 +144,29 @@ notifications.
 
 To manipulate a specific worker, you pass the -w option to synctl:
 
-    synctl -w $CONFIG/workers/synchrotron.yaml restart
+    synctl -w $CONFIG/workers/worker1.yaml restart
 
 ## Available worker applications
 
-### `synapse.app.pusher`
+*Note:* Historically there used to be more apps, however they have been
+amalgamated into a single `synapse.app.generic_worker` app. The remaining apps
+are ones that do specific processing unrelated to requests, e.g. the `pusher`
+that handles sending out push notifications for new events. The intention is for
+all these to be folded into the `generic_worker` app and to use config to define
+which processes handle the various proccessing such as push notifications.
 
-Handles sending push notifications to sygnal and email. Doesn't handle any
-REST endpoints itself, but you should set `start_pushers: False` in the
-shared configuration file to stop the main synapse sending these notifications.
+### `synapse.app.generic_worker`
 
-Note this worker cannot be load-balanced: only one instance should be active.
+Handles the following API requests listed below matching the following regular
+expressions:
 
-### `synapse.app.synchrotron`
-
-The synchrotron handles `sync` requests from clients. In particular, it can
-handle REST endpoints matching the following regular expressions:
-
+    # Sync requests
     ^/_matrix/client/(v2_alpha|r0)/sync$
     ^/_matrix/client/(api/v1|v2_alpha|r0)/events$
     ^/_matrix/client/(api/v1|r0)/initialSync$
     ^/_matrix/client/(api/v1|r0)/rooms/[^/]+/initialSync$
 
-The above endpoints should all be routed to the synchrotron worker by the
-reverse-proxy configuration.
-
-It is possible to run multiple instances of the synchrotron to scale
-horizontally. In this case the reverse-proxy should be configured to
-load-balance across the instances, though it will be more efficient if all
-requests from a particular user are routed to a single instance. Extracting
-a userid from the access token is currently left as an exercise for the reader.
-
-### `synapse.app.appservice`
-
-Handles sending output traffic to Application Services. Doesn't handle any
-REST endpoints itself, but you should set `notify_appservices: False` in the
-shared configuration file to stop the main synapse sending these notifications.
-
-Note this worker cannot be load-balanced: only one instance should be active.
-
-### `synapse.app.federation_reader`
-
-Handles a subset of federation endpoints. In particular, it can handle REST
-endpoints matching the following regular expressions:
-
+    # Federation requests
     ^/_matrix/federation/v1/event/
     ^/_matrix/federation/v1/state/
     ^/_matrix/federation/v1/state_ids/
@@ -242,32 +186,125 @@ endpoints matching the following regular expressions:
     ^/_matrix/federation/v1/event_auth/
     ^/_matrix/federation/v1/exchange_third_party_invite/
     ^/_matrix/federation/v1/user/devices/
-    ^/_matrix/federation/v1/send/
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
+
+    # Inbound federation transaction request
+    ^/_matrix/federation/v1/send/
+
+    # Client API requests
+    ^/_matrix/client/(api/v1|r0|unstable)/publicRooms$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
+    ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
+    ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
+    ^/_matrix/client/versions$
+    ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
+    ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
+    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
+
+    # Registration/login requests
+    ^/_matrix/client/(api/v1|r0|unstable)/login$
+    ^/_matrix/client/(r0|unstable)/register$
+    ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
+
+    # Event sending requests
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state/
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
+    ^/_matrix/client/(api/v1|r0|unstable)/join/
+    ^/_matrix/client/(api/v1|r0|unstable)/profile/
+
 
 Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/federation/v1/groups/
 
-The above endpoints should all be routed to the federation_reader worker by the
-reverse-proxy configuration.
+Pagination requests can also be handled, but all requests with the same path
+room must be routed to the same instance. Additionally, care must be taken to
+ensure that the purge history admin API is not used while pagination requests
+for the room are in flight:
 
-The `^/_matrix/federation/v1/send/` endpoint must only be handled by a single
-instance.
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/messages$
 
-Note that `federation` must be added to the listener resources in the worker config:
+Note that the `client` and `federation` must be added to the listener resources
+in the worker config.
+
+
+#### Load balancing
+
+Multiple instances of this app can be run and requests load balanced between
+them. However, different endpoints have different characteristics and so admins
+may wish to run multiple groups of workers handling different endpoints so that
+load balancing can be done in different ways.
+
+For `/sync` and `/initialSync` requests it will be more efficient if all
+requests from a particular user are routed to a single instance. Extracting a
+user ID from the access token or `Authorization` header is currently left as an
+exercise for the reader. Admins may additionally wish to separate out `/sync`
+requests that have a `since` query parameter from those that don't (and
+`/initialSync`), as requests that don't are known as "initial sync" that happens
+when a user logs in on a new device and can be *very* resource intensive, so
+isolating these requests will stop them from intefering with other users ongoing
+syncs.
+
+Federation and client requests can be balanced via simple round robin.
+
+The inbound federation transaction request `^/_matrix/federation/v1/send/`
+should be balanced by source IP so that transactions from the same remote server
+go to the same process.
+
+Registration/login requests can be handled separately purely to help ensure that
+unexpected load doesn't effect new logins and sign ups.
+
+Finally, event sending requests can be  balanced by the embedded room ID (or
+URI, or even just round robin). If there is a large bridge connected that is
+sending or may send lots of events, then a dedicated set of workers can be
+provisioned to ensure that bursts or increases of event sending is isolated from
+effecting events sent by real users.
+
+#### Stream writers
+
+Additionally, there is *experimental* support for moving writing of specific
+streams (such as events and typing) off of master to a particular worker. This
+requires use of Redis.
+
+To enable this then the worker must have a HTTP replication listener configured,
+have a `worker_name` and be listed in the `instance_map` config. For example to
+move event persistence off to a dedicated worker, the main shared config would
+include:
 
 ```yaml
-worker_app: synapse.app.federation_reader
-...
-worker_listeners:
- - type: http
-   port: <port>
-   resources:
-     - names:
-       - federation
+instance_map:
+    event_persister1:
+        host: localhost
+        port: 8034
+
+streams_writers:
+    events: event_persister1
 ```
+
+
+### `synapse.app.pusher`
+
+Handles sending push notifications to sygnal and email. Doesn't handle any
+REST endpoints itself, but you should set `start_pushers: False` in the
+shared configuration file to stop the main synapse sending these notifications.
+
+Note this worker cannot be load-balanced: only one instance should be active.
+
+### `synapse.app.appservice`
+
+Handles sending output traffic to Application Services. Doesn't handle any
+REST endpoints itself, but you should set `notify_appservices: False` in the
+shared configuration file to stop the main synapse sending these notifications.
+
+Note this worker cannot be load-balanced: only one instance should be active.
+
 
 ### `synapse.app.federation_sender`
 
@@ -275,7 +312,15 @@ Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set `send_federation: False` in the
 shared configuration file to stop the main synapse sending this traffic.
 
-Note this worker cannot be load-balanced: only one instance should be active.
+Note that if running multiple federation senders then you must list each
+instance in the `federation_sender_instances` option by their `worker_name`. If
+you add or remove instances they must all be stopped and started together. For example:
+
+```yaml
+federation_sender_instances:
+    - federation_sender1
+    - federation_sender2
+```
 
 ### `synapse.app.media_repository`
 
@@ -314,46 +359,6 @@ and you must configure a single instance to run the background tasks, e.g.:
     media_instance_running_background_jobs: "media-repository-1"
 ```
 
-### `synapse.app.client_reader`
-
-Handles client API endpoints. It can handle REST endpoints matching the
-following regular expressions:
-
-    ^/_matrix/client/(api/v1|r0|unstable)/publicRooms$
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
-    ^/_matrix/client/(api/v1|r0|unstable)/login$
-    ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
-    ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
-    ^/_matrix/client/(api/v1|r0|unstable)/keys/changes$
-    ^/_matrix/client/versions$
-    ^/_matrix/client/(api/v1|r0|unstable)/voip/turnServer$
-    ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
-    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
-    ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
-
-Additionally, the following REST endpoints can be handled for GET requests:
-
-    ^/_matrix/client/(api/v1|r0|unstable)/pushrules/.*$
-    ^/_matrix/client/(api/v1|r0|unstable)/groups/.*$
-    ^/_matrix/client/(api/v1|r0|unstable)/user/[^/]*/account_data/
-    ^/_matrix/client/(api/v1|r0|unstable)/user/[^/]*/rooms/[^/]*/account_data/
-
-Additionally, the following REST endpoints can be handled, but all requests must
-be routed to the same instance:
-
-    ^/_matrix/client/(r0|unstable)/register$
-    ^/_matrix/client/(r0|unstable)/auth/.*/fallback/web$
-
-Pagination requests can also be handled, but all requests with the same path
-room must be routed to the same instance. Additionally, care must be taken to
-ensure that the purge history admin API is not used while pagination requests
-for the room are in flight:
-
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/messages$
-
 ### `synapse.app.user_dir`
 
 Handles searches in the user directory. It can handle REST endpoints matching
@@ -387,16 +392,3 @@ the `worker_main_http_uri` setting in the `frontend_proxy` worker configuration
 file. For example:
 
     worker_main_http_uri: http://127.0.0.1:8008
-
-### `synapse.app.event_creator`
-
-Handles some event creation. It can handle REST endpoints matching:
-
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/send
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state/
-    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/(join|invite|leave|ban|unban|kick)$
-    ^/_matrix/client/(api/v1|r0|unstable)/join/
-    ^/_matrix/client/(api/v1|r0|unstable)/profile/
-
-It will create events locally and then send them on to the main synapse
-instance to be persisted and handled.
