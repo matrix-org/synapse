@@ -261,7 +261,7 @@ go to the same process.
 Registration/login requests can be handled separately purely to help ensure that
 unexpected load doesn't effect new logins and sign ups.
 
-Finally, event sending requests can be  balanced by the embedded room ID (or
+Finally, event sending requests can be balanced by the embedded room ID (or
 URI, or even just round robin). If there is a large bridge connected that is
 sending or may send lots of events, then a dedicated set of workers can be
 provisioned to ensure that bursts or increases of event sending is isolated from
@@ -293,7 +293,7 @@ streams_writers:
 
 Handles sending push notifications to sygnal and email. Doesn't handle any
 REST endpoints itself, but you should set `start_pushers: False` in the
-shared configuration file to stop the main synapse sending these notifications.
+shared configuration file to stop the main synapse sending push notifications.
 
 Note this worker cannot be load-balanced: only one instance should be active.
 
@@ -301,7 +301,7 @@ Note this worker cannot be load-balanced: only one instance should be active.
 
 Handles sending output traffic to Application Services. Doesn't handle any
 REST endpoints itself, but you should set `notify_appservices: False` in the
-shared configuration file to stop the main synapse sending these notifications.
+shared configuration file to stop the main synapse sending appservice notifications.
 
 Note this worker cannot be load-balanced: only one instance should be active.
 
@@ -312,9 +312,10 @@ Handles sending federation traffic to other servers. Doesn't handle any
 REST endpoints itself, but you should set `send_federation: False` in the
 shared configuration file to stop the main synapse sending this traffic.
 
-Note that if running multiple federation senders then you must list each
-instance in the `federation_sender_instances` option by their `worker_name`. If
-you add or remove instances they must all be stopped and started together. For example:
+If running multiple federation senders then you must list each
+instance in the `federation_sender_instances` option by their `worker_name`.
+All instances must be stopped and started when adding or removing instances.
+For example:
 
 ```yaml
 federation_sender_instances:
