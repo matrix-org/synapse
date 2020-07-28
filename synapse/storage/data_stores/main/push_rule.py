@@ -39,7 +39,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 logger = logging.getLogger(__name__)
 
 
-def _load_rules(rawrules, enabled_map):
+def _load_rules(rawrules, enabled_map, use_new_defaults=False):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
@@ -49,7 +49,7 @@ def _load_rules(rawrules, enabled_map):
         ruleslist.append(rule)
 
     # We're going to be mutating this a lot, so do a deep copy
-    rules = list(list_with_base_rules(ruleslist))
+    rules = list(list_with_base_rules(ruleslist, use_new_defaults))
 
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
@@ -115,7 +115,7 @@ class PushRulesWorkerStore(
         raise NotImplementedError()
 
     @cachedInlineCallbacks(max_entries=5000)
-    def get_push_rules_for_user(self, user_id):
+    def _get_push_rules_for_user(self, user_id, use_new_defaults=False):
         rows = yield self.db.simple_select_list(
             table="push_rules",
             keyvalues={"user_name": user_id},
@@ -134,8 +134,22 @@ class PushRulesWorkerStore(
 
         enabled_map = yield self.get_push_rules_enabled_for_user(user_id)
 
-        rules = _load_rules(rows, enabled_map)
+        rules = _load_rules(rows, enabled_map, use_new_defaults)
 
+        return rules
+
+    @defer.inlineCallbacks
+    def get_push_rules_for_user(self, user_id):
+        # Temporary hack so we can use the new experimental default push rules to some
+        # users without impacting others.
+        use_new_defaults = yield self.db.simple_select_list(
+            table="new_push_rules_users_tmp",
+            keyvalues={"user_id": user_id},
+            retcols=("user_id",),
+            desc="get_user_new_default_push_rules",
+        )
+
+        rules = yield self._get_push_rules_for_user(user_id, bool(use_new_defaults))
         return rules
 
     @cachedInlineCallbacks(max_entries=5000)
@@ -194,7 +208,18 @@ class PushRulesWorkerStore(
         enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
+            # Temporary hack so we can use the new experimental default push rules to some
+            # users without impacting others.
+            use_new_defaults = yield self.db.simple_select_list(
+                table="new_push_rules_users_tmp",
+                keyvalues={"user_id": user_id},
+                retcols=("user_id",),
+                desc="get_user_new_default_push_rules",
+            )
+
+            results[user_id] = _load_rules(
+                rules, enabled_map_by_user.get(user_id, {}), bool(use_new_defaults),
+            )
 
         return results
 
