@@ -213,6 +213,15 @@ class StatsHandler:
 
                 membership = event_content.get("membership", Membership.LEAVE)
 
+                # Check whether this state event is a transition from join->join.
+                # This can happen e.g when a user changes their per-room display name.
+                is_join_to_join = (
+                    prev_membership == Membership.JOIN and membership == Membership.JOIN
+                )
+                if is_join_to_join:
+                    # This action does not currently affect any further stats
+                    continue
+
                 if prev_membership is None:
                     logger.debug("No previous membership for this user.")
                 elif membership == prev_membership:
