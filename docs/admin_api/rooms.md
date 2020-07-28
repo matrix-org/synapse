@@ -433,7 +433,7 @@ The following JSON body parameters are available:
                is not permitted and rooms in violation will be blocked.`
 * `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing
             future attempts to join the room. Defaults to `false`.
-* `purge` - Optional. If set to `true`, it will remove all trace of a room from your database.
+* `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
             Defaults to `true`.
 
 The JSON body must not be empty. The body must be at least `{}`.

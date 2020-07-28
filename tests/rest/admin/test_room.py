@@ -369,8 +369,9 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self._has_no_members(self.room_id)
 
     def test_block_room_and_not_purge(self):
-        """Test to block a room and do not purge it.
+        """Test to block a room without purging it.
         Members will not be moved to a new room and will not receive a message.
+        The room will not be purged.
         """
         # Test that room is not purged
         with self.assertRaises(AssertionError):
