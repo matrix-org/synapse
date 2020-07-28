@@ -389,7 +389,7 @@ class StateGroupStorage(object):
         """ Get the state groups for the given list of event_ids
 
         Args:
-            room_id: ID of the room for these events
+            room_id: ID of the room for these events.
             event_ids: The event IDs to retrieve state for.
 
         Returns:
@@ -443,7 +443,7 @@ class StateGroupStorage(object):
 
         Args:
             event_ids: The events to fetch the state of.
-            state_filter: The state filter used to fetch state
+            state_filter: The state filter used to fetch state.
 
         Returns:
             A dict of (event_id) -> (type, state_key) -> [state_events]
@@ -539,7 +539,7 @@ class StateGroupStorage(object):
 
         Args:
             groups: list of state groups for which we want to get the state.
-            state_filter: The state filter used to fetch state
+            state_filter: The state filter used to fetch state.
                 from the database.
         Returns:
             Deferred[dict[int, StateMap[str]]]: Dict of state group to state map.
@@ -557,7 +557,7 @@ class StateGroupStorage(object):
         """Store a new set of state, returning a newly assigned state group.
 
         Args:
-            event_id: The event ID for which the state was calculated
+            event_id: The event ID for which the state was calculated.
             room_id: ID of the room for which the state was calculated.
             prev_group: A previous state group for the room, optional.
             delta_ids: The delta between state at `prev_group` and
