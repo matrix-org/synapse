@@ -116,8 +116,7 @@ class _ServiceQueuer(object):
             "as-sender-%s" % (service.id,), self._send_request, service
         )
 
-    @defer.inlineCallbacks
-    def _send_request(self, service):
+    async def _send_request(self, service):
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
         assert service.id not in self.requests_in_flight
@@ -129,7 +128,7 @@ class _ServiceQueuer(object):
                 if not events:
                     return
                 try:
-                    yield self.txn_ctrl.send(service, events)
+                    await self.txn_ctrl.send(service, events)
                 except Exception:
                     logger.exception("AS request failed")
         finally:
