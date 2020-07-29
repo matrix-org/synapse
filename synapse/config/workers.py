@@ -15,7 +15,7 @@
 
 import attr
 
-from ._base import Config, ConfigError
+from ._base import Config, ConfigError, ShardedWorkerHandlingConfig
 from .server import ListenerConfig, parse_listener_def
 
 
@@ -85,6 +85,16 @@ class WorkerConfig(Config):
                 )
             )
 
+        # Whether to send federation traffic out in this process. This only
+        # applies to some federation traffic, and so shouldn't be used to
+        # "disable" federation
+        self.send_federation = config.get("send_federation", True)
+
+        federation_sender_instances = config.get("federation_sender_instances") or []
+        self.federation_shard_config = ShardedWorkerHandlingConfig(
+            federation_sender_instances
+        )
+
         # A map from instance name to host/port of their HTTP replication endpoint.
         instance_map = config.get("instance_map") or {}
         self.instance_map = {
@@ -108,6 +118,22 @@ class WorkerConfig(Config):
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Workers ##
+
+        # Disables sending of outbound federation transactions on the main process.
+        # Uncomment if using a federation sender worker.
+        #
+        #send_federation: false
+
+        # It is possible to run multiple federation sender workers, in which case the
+        # work is balanced across them.
+        #
+        # This configuration must be shared between all federation sender workers, and if
+        # changed all federation sender workers must be stopped at the same time and then
+        # started, to ensure that all instances are running with the same config (otherwise
+        # events may be dropped).
+        #
+        #federation_sender_instances:
+        #  - federation_sender1
 
         # When using workers this should be a map from `worker_name` to the
         # HTTP replication listener of the worker, if configured.

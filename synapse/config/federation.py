@@ -17,23 +17,13 @@ from typing import Optional
 
 from netaddr import IPSet
 
-from ._base import Config, ConfigError, ShardedWorkerHandlingConfig
+from ._base import Config, ConfigError
 
 
 class FederationConfig(Config):
     section = "federation"
 
     def read_config(self, config, **kwargs):
-        # Whether to send federation traffic out in this process. This only
-        # applies to some federation traffic, and so shouldn't be used to
-        # "disable" federation
-        self.send_federation = config.get("send_federation", True)
-
-        federation_sender_instances = config.get("federation_sender_instances") or []
-        self.federation_shard_config = ShardedWorkerHandlingConfig(
-            federation_sender_instances
-        )
-
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None  # type: Optional[dict]
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)
@@ -95,20 +85,4 @@ class FederationConfig(Config):
           - '::1/128'
           - 'fe80::/64'
           - 'fc00::/7'
-
-        # Disables sending of outbound federation transactions on the main process.
-        # Uncomment if using a federation sender worker.
-        #
-        #send_federation: false
-
-        # It is possible to run multiple federation sender workers, in which case the
-        # work is balanced across them.
-        #
-        # This configuration must be shared between all federation sender workers, and if
-        # changed all federation sender workers must be stopped at the same time and then
-        # started, to ensure that all instances are running with the same config (otherwise
-        # events may be dropped).
-        #
-        #federation_sender_instances:
-        #  - federation_sender1
         """
