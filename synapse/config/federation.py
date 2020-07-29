@@ -96,12 +96,15 @@ class FederationConfig(Config):
           - 'fe80::/64'
           - 'fc00::/7'
 
+        # Disables sending of outbound federation transactions on the main process.
         # Uncomment if using a federation sender worker.
         #
         #send_federation: false
 
-        # Multiple federation sender workers can be run, in which case the work is sharded
-        # between them. Note that this config must be shared between all instances, and if
+        # It is possible to run multiple federation sender workers, in which case the
+        # work is balanced across them.
+        #
+        # This configuration must be shared between all federation sender workers, and if
         # changed all federation sender workers must be stopped at the same time and then
         # started, to ensure that all instances are running with the same config (otherwise
         # events may be dropped).

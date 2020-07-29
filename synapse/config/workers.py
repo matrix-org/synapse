@@ -117,8 +117,8 @@ class WorkerConfig(Config):
         #    host: localhost
         #    port: 8034
 
-        # Experimental: When using workers you can define which worker should
-        # handle event persistence or typing notifications. Any worker
+        # Experimental: When using workers you can define which workers should
+        # handle event persistence and typing notifications. Any worker
         # specified here must also be in the `instance_map`.
         #
         #stream_writers:

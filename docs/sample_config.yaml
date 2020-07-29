@@ -610,12 +610,15 @@ federation_ip_range_blacklist:
   - 'fe80::/64'
   - 'fc00::/7'
 
+# Disables sending of outbound federation transactions on the main process.
 # Uncomment if using a federation sender worker.
 #
 #send_federation: false
 
-# Multiple federation sender workers can be run, in which case the work is sharded
-# between them. Note that this config must be shared between all instances, and if
+# It is possible to run multiple federation sender workers, in which case the
+# work is balanced across them.
+#
+# This configuration must be shared between all federation sender workers, and if
 # changed all federation sender workers must be stopped at the same time and then
 # started, to ensure that all instances are running with the same config (otherwise
 # events may be dropped).
@@ -2423,8 +2426,8 @@ opentracing:
 #    host: localhost
 #    port: 8034
 
-# Experimental: When using workers you can define which worker should
-# handle event persistence or typing notifications. Any worker
+# Experimental: When using workers you can define which workers should
+# handle event persistence and typing notifications. Any worker
 # specified here must also be in the `instance_map`.
 #
 #stream_writers:

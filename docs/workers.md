@@ -56,7 +56,8 @@ requests made to the federation port. See [reverse_proxy.md](reverse_proxy.md)
 for information on setting up a reverse proxy.
 
 To enable workers, you need to add both a HTTP replication listener and redis
-config to the main Synapse configuration file (`homeserver.yaml`). For example:
+config to the shared Synapse configuration file (`homeserver.yaml`). For
+example:
 
 ```yaml
 listeners:
@@ -76,8 +77,8 @@ See the sample config for the full documentation of each option.
 Under **no circumstances** should the replication API listener be exposed to the
 public internet; it has no authentication and is unencrypted.
 
-You should then create a set of configs for the various worker processes.  Each
-worker configuration file inherits the configuration of the main homeserver
+You should then create a configuration file for each worker process. Each
+worker configuration file inherits the configuration of the shared homeserver
 configuration file.  You can then override configuration specific to that
 worker, e.g. the HTTP listener that it provides (if any); logging
 configuration; etc.  You should minimise the number of overrides though to
@@ -287,7 +288,7 @@ worker. This requires use of Redis.
 
 To enable this then the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
-move event persistence off to a dedicated worker, the main shared config would
+move event persistence off to a dedicated worker, the shared configuration would
 include:
 
 ```yaml
