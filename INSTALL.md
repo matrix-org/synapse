@@ -449,7 +449,7 @@ For a more detailed guide to configuring your server for federation, see
 ## Client Well-Known URI
 
 Setting up the client Well-Known URI is optional but if you set it up, it will
-allow users to enter their full username (e.g. `@user:server.com`) into clients
+allow users to enter their full username (e.g. `@user:<server_name>`) into clients
 which support well-known lookup to automatically configure the homeserver and
 identity server URLs. This is useful so that users don't have to memorize or think
 about the actual homeserver URL you are using.
