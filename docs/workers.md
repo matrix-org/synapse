@@ -172,13 +172,6 @@ To manipulate a specific worker, you pass the -w option to synctl:
 
 ## Available worker applications
 
-*Note:* Historically there used to be more apps, however they have been
-amalgamated into a single `synapse.app.generic_worker` app. The remaining apps
-are ones that do specific processing unrelated to requests, e.g. the `pusher`
-that handles sending out push notifications for new events. The intention is for
-all these to be folded into the `generic_worker` app and to use config to define
-which processes handle the various proccessing such as push notifications.
-
 ### `synapse.app.generic_worker`
 
 This worker can handle API requests matching the following regular
@@ -418,3 +411,12 @@ the `worker_main_http_uri` setting in the `frontend_proxy` worker configuration
 file. For example:
 
     worker_main_http_uri: http://127.0.0.1:8008
+
+### Historical apps
+
+*Note:* Historically there used to be more apps, however they have been
+amalgamated into a single `synapse.app.generic_worker` app. The remaining apps
+are ones that do specific processing unrelated to requests, e.g. the `pusher`
+that handles sending out push notifications for new events. The intention is for
+all these to be folded into the `generic_worker` app and to use config to define
+which processes handle the various proccessing such as push notifications.
