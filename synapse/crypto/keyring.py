@@ -461,8 +461,7 @@ class BaseV2KeyFetcher(object):
         self.store = hs.get_datastore()
         self.config = hs.get_config()
 
-    @defer.inlineCallbacks
-    def process_v2_response(self, from_server, response_json, time_added_ms):
+    async def process_v2_response(self, from_server, response_json, time_added_ms):
         """Parse a 'Server Keys' structure from the result of a /key request
 
         This is used to parse either the entirety of the response from
@@ -534,7 +533,7 @@ class BaseV2KeyFetcher(object):
 
         key_json_bytes = encode_canonical_json(response_json)
 
-        yield make_deferred_yieldable(
+        await make_deferred_yieldable(
             defer.gatherResults(
                 [
                     run_in_background(
@@ -601,8 +600,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
         return union_of_keys
 
-    @defer.inlineCallbacks
-    def get_server_verify_key_v2_indirect(self, keys_to_fetch, key_server):
+    async def get_server_verify_key_v2_indirect(self, keys_to_fetch, key_server):
         """
         Args:
             keys_to_fetch (dict[str, dict[str, int]]):
@@ -612,7 +610,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
                 the keys
 
         Returns:
-            Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult]]]: map
+            dict[str, dict[str, synapse.storage.keys.FetchKeyResult]]: map
                 from server_name -> key_id -> FetchKeyResult
 
         Raises:
@@ -627,20 +625,18 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         )
 
         try:
-            query_response = yield defer.ensureDeferred(
-                self.client.post_json(
-                    destination=perspective_name,
-                    path="/_matrix/key/v2/query",
-                    data={
-                        "server_keys": {
-                            server_name: {
-                                key_id: {"minimum_valid_until_ts": min_valid_ts}
-                                for key_id, min_valid_ts in server_keys.items()
-                            }
-                            for server_name, server_keys in keys_to_fetch.items()
+            query_response = await self.client.post_json(
+                destination=perspective_name,
+                path="/_matrix/key/v2/query",
+                data={
+                    "server_keys": {
+                        server_name: {
+                            key_id: {"minimum_valid_until_ts": min_valid_ts}
+                            for key_id, min_valid_ts in server_keys.items()
                         }
-                    },
-                )
+                        for server_name, server_keys in keys_to_fetch.items()
+                    }
+                },
             )
         except (NotRetryingDestination, RequestSendFailed) as e:
             # these both have str() representations which we can't really improve upon
@@ -665,7 +661,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             try:
                 self._validate_perspectives_response(key_server, response)
 
-                processed_response = yield self.process_v2_response(
+                processed_response = await self.process_v2_response(
                     perspective_name, response, time_added_ms=time_now_ms
                 )
             except KeyLookupError as e:
@@ -684,7 +680,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             )
             keys.setdefault(server_name, {}).update(processed_response)
 
-        yield self.store.store_server_verify_keys(
+        await self.store.store_server_verify_keys(
             perspective_name, time_now_ms, added_keys
         )
 
@@ -765,8 +761,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
             get_key, keys_to_fetch.items()
         ).addCallback(lambda _: results)
 
-    @defer.inlineCallbacks
-    def get_server_verify_key_v2_direct(self, server_name, key_ids):
+    async def get_server_verify_key_v2_direct(self, server_name, key_ids):
         """
 
         Args:
@@ -788,25 +783,23 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
 
             time_now_ms = self.clock.time_msec()
             try:
-                response = yield defer.ensureDeferred(
-                    self.client.get_json(
-                        destination=server_name,
-                        path="/_matrix/key/v2/server/"
-                        + urllib.parse.quote(requested_key_id),
-                        ignore_backoff=True,
-                        # we only give the remote server 10s to respond. It should be an
-                        # easy request to handle, so if it doesn't reply within 10s, it's
-                        # probably not going to.
-                        #
-                        # Furthermore, when we are acting as a notary server, we cannot
-                        # wait all day for all of the origin servers, as the requesting
-                        # server will otherwise time out before we can respond.
-                        #
-                        # (Note that get_json may make 4 attempts, so this can still take
-                        # almost 45 seconds to fetch the headers, plus up to another 60s to
-                        # read the response).
-                        timeout=10000,
-                    )
+                response = await self.client.get_json(
+                    destination=server_name,
+                    path="/_matrix/key/v2/server/"
+                    + urllib.parse.quote(requested_key_id),
+                    ignore_backoff=True,
+                    # we only give the remote server 10s to respond. It should be an
+                    # easy request to handle, so if it doesn't reply within 10s, it's
+                    # probably not going to.
+                    #
+                    # Furthermore, when we are acting as a notary server, we cannot
+                    # wait all day for all of the origin servers, as the requesting
+                    # server will otherwise time out before we can respond.
+                    #
+                    # (Note that get_json may make 4 attempts, so this can still take
+                    # almost 45 seconds to fetch the headers, plus up to another 60s to
+                    # read the response).
+                    timeout=10000,
                 )
             except (NotRetryingDestination, RequestSendFailed) as e:
                 # these both have str() representations which we can't really improve
@@ -821,12 +814,12 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
                     % (server_name, response["server_name"])
                 )
 
-            response_keys = yield self.process_v2_response(
+            response_keys = await self.process_v2_response(
                 from_server=server_name,
                 response_json=response,
                 time_added_ms=time_now_ms,
             )
-            yield self.store.store_server_verify_keys(
+            await self.store.store_server_verify_keys(
                 server_name,
                 time_now_ms,
                 ((server_name, key_id, key) for key_id, key in response_keys.items()),
