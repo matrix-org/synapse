@@ -43,10 +43,10 @@ A Redis server is required to manage the communication between the processes.
 should be installed following the normal procedure for your distribution (e.g.
 `apt install redis-server` on Debian). It is safe to use an existing Redis
 deployment if you have one.
-   
-Once installed, check that Redis is
-running and accessible from the host running Synapse, for example by
-executing `echo PING | nc -q1 localhost 6379` and seeing a response of `+PONG`.
+
+Once installed, check that Redis is running and accessible from the host running
+Synapse, for example by executing `echo PING | nc -q1 localhost 6379` and seeing
+a response of `+PONG`.
 
 The appropriate dependencies must also be installed for Synapse. If using a
 virtualenv, these can be installed with:
@@ -55,18 +55,25 @@ virtualenv, these can be installed with:
 pip install matrix-synapse[redis]
 ```
 
-Note that these dependencies are included when synapse is installed with `pip install matrix-synapse[all]`.
-They are also included in the debian packages from `matrix.org` and in the docker
-images at https://hub.docker.com/r/matrixdotorg/synapse/.
+Note that these dependencies are included when synapse is installed with `pip
+install matrix-synapse[all]`. They are also included in the debian packages from
+`matrix.org` and in the docker images at
+https://hub.docker.com/r/matrixdotorg/synapse/.
 
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See [reverse_proxy.md](reverse_proxy.md)
 for information on setting up a reverse proxy.
 
-To enable workers, you need to add both a HTTP replication listener and redis
-config to the shared Synapse configuration file (`homeserver.yaml`). For
-example:
+To enable workers you should create a configuration file for each worker
+process. Each worker configuration file inherits the configuration of the shared
+homeserver configuration file.  You can then override configuration specific to
+that worker, e.g. the HTTP listener that it provides (if any); logging
+configuration; etc.  You should minimise the number of overrides though to
+maintain a usable config.
+
+Next you need to add both a HTTP replication listener and redis config to the
+shared Synapse configuration file (`homeserver.yaml`). For example:
 
 ```yaml
 # extend the existing `listeners` section. This defines the ports that the
@@ -87,13 +94,6 @@ See the sample config for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
 public internet; it has no authentication and is unencrypted.
-
-You should then create a configuration file for each worker process. Each
-worker configuration file inherits the configuration of the shared homeserver
-configuration file.  You can then override configuration specific to that
-worker, e.g. the HTTP listener that it provides (if any); logging
-configuration; etc.  You should minimise the number of overrides though to
-maintain a usable config.
 
 In the config file for each worker, you must specify the type of worker
 application (`worker_app`), and you should specify a unqiue name for the worker
@@ -286,10 +286,10 @@ go to the same process.
 Registration/login requests can be handled separately purely to help ensure that
 unexpected load doesn't affect new logins and sign ups.
 
-Finally, event sending requests can be balanced by the embedded room ID (or
-URI, or even just round robin). If there is a large bridge connected that is
-sending or may send lots of events, then a dedicated set of workers can be
-provisioned to limit the effects of bursts of events from that bridge on events sent by 
+Finally, event sending requests can be balanced by the embedded room ID (or URI,
+or even just round robin). If there is a large bridge connected that is sending
+or may send lots of events, then a dedicated set of workers can be provisioned
+to limit the effects of bursts of events from that bridge on events sent by
 normal users.
 
 #### Stream writers
