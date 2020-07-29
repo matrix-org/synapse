@@ -16,16 +16,15 @@
 
 from canonicaljson import json
 
-from twisted.internet import defer
-
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 
 
 class EndToEndRoomKeyStore(SQLBaseStore):
-    @defer.inlineCallbacks
-    def update_e2e_room_key(self, user_id, version, room_id, session_id, room_key):
+    async def update_e2e_room_key(
+        self, user_id, version, room_id, session_id, room_key
+    ):
         """Replaces the encrypted E2E room key for a given session in a given backup
 
         Args:
@@ -38,7 +37,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             StoreError
         """
 
-        yield self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="e2e_room_keys",
             keyvalues={
                 "user_id": user_id,
@@ -55,8 +54,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             desc="update_e2e_room_key",
         )
 
-    @defer.inlineCallbacks
-    def add_e2e_room_keys(self, user_id, version, room_keys):
+    async def add_e2e_room_keys(self, user_id, version, room_keys):
         """Bulk add room keys to a given backup.
 
         Args:
@@ -89,13 +87,12 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 }
             )
 
-        yield self.db_pool.simple_insert_many(
+        await self.db_pool.simple_insert_many(
             table="e2e_room_keys", values=values, desc="add_e2e_room_keys"
         )
 
     @trace
-    @defer.inlineCallbacks
-    def get_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
+    async def get_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
         """Bulk get the E2E room keys for a given backup, optionally filtered to a given
         room, or a given session.
 
@@ -110,7 +107,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 the backup (or for the specified room)
 
         Returns:
-            A deferred list of dicts giving the session_data and message metadata for
+            A list of dicts giving the session_data and message metadata for
             these room keys.
         """
 
@@ -125,7 +122,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        rows = yield self.db_pool.simple_select_list(
+        rows = await self.db_pool.simple_select_list(
             table="e2e_room_keys",
             keyvalues=keyvalues,
             retcols=(
@@ -243,8 +240,9 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         )
 
     @trace
-    @defer.inlineCallbacks
-    def delete_e2e_room_keys(self, user_id, version, room_id=None, session_id=None):
+    async def delete_e2e_room_keys(
+        self, user_id, version, room_id=None, session_id=None
+    ):
         """Bulk delete the E2E room keys for a given backup, optionally filtered to a given
         room or a given session.
 
@@ -259,7 +257,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
                 the backup (or for the specified room)
 
         Returns:
-            A deferred of the deletion transaction
+            The deletion transaction
         """
 
         keyvalues = {"user_id": user_id, "version": int(version)}
@@ -268,7 +266,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             if session_id:
                 keyvalues["session_id"] = session_id
 
-        yield self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             table="e2e_room_keys", keyvalues=keyvalues, desc="delete_e2e_room_keys"
         )
 
