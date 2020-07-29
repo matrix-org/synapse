@@ -410,7 +410,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             _get_if_maybe_push_in_range_for_user_txn,
         )
 
-    def add_push_actions_to_staging(self, event_id, user_id_actions):
+    async def add_push_actions_to_staging(self, event_id, user_id_actions):
         """Add the push actions for the event to the push action staging area.
 
         Args:
@@ -456,7 +456,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 ),
             )
 
-        return self.db.runInteraction(
+        return await self.db.runInteraction(
             "add_push_actions_to_staging", _add_push_actions_to_staging_txn
         )
 

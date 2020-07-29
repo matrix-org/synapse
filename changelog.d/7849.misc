@@ -1,1 +1,0 @@
-Consistently use `db_to_json` to convert from database values to JSON objects.

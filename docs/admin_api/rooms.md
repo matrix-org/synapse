@@ -369,7 +369,9 @@ to the new room will have power level `-10` by default, and thus be unable to sp
 If `block` is `True` it prevents new joins to the old room.
 
 This API will remove all trace of the old room from your database after removing
-all local users.
+all local users. If `purge` is `true` (the default), all traces of the old room will
+be removed from your database after removing all local users. If you do not want
+this to happen, set `purge` to `false`.
 Depending on the amount of history being purged a call to the API may take
 several minutes or longer.
 
@@ -388,7 +390,8 @@ with a body of:
     "new_room_user_id": "@someuser:example.com",
     "room_name": "Content Violation Notification",
     "message": "Bad Room has been shutdown due to content violations on this server. Please review our Terms of Service.",
-    "block": true
+    "block": true,
+    "purge": true
 }
 ```
 
@@ -430,8 +433,10 @@ The following JSON body parameters are available:
               `new_room_user_id` in the new room. Ideally this will clearly convey why the
                original room was shut down. Defaults to `Sharing illegal content on this server
                is not permitted and rooms in violation will be blocked.`
-* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing future attempts to
-  join the room. Defaults to `false`.
+* `block` - Optional. If set to `true`, this room will be added to a blocking list, preventing
+            future attempts to join the room. Defaults to `false`.
+* `purge` - Optional. If set to `true`, it will remove all traces of the room from your database.
+            Defaults to `true`.
 
 The JSON body must not be empty. The body must be at least `{}`.
 

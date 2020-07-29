@@ -16,62 +16,62 @@
 import logging
 import os
 import shutil
-
-from twisted.internet import defer
+from typing import Optional
 
 from synapse.config._base import Config
 from synapse.logging.context import defer_to_thread, run_in_background
 
+from ._base import FileInfo, Responder
 from .media_storage import FileResponder
 
 logger = logging.getLogger(__name__)
 
 
-class StorageProvider(object):
+class StorageProvider:
     """A storage provider is a service that can store uploaded media and
     retrieve them.
     """
 
-    def store_file(self, path, file_info):
+    async def store_file(self, path: str, file_info: FileInfo):
         """Store the file described by file_info. The actual contents can be
         retrieved by reading the file in file_info.upload_path.
 
         Args:
-            path (str): Relative path of file in local cache
-            file_info (FileInfo)
-
-        Returns:
-            Deferred
+            path: Relative path of file in local cache
+            file_info: The metadata of the file.
         """
-        pass
 
-    def fetch(self, path, file_info):
+    async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
         """Attempt to fetch the file described by file_info and stream it
         into writer.
 
         Args:
-            path (str): Relative path of file in local cache
-            file_info (FileInfo)
+            path: Relative path of file in local cache
+            file_info: The metadata of the file.
 
         Returns:
-            Deferred(Responder): Returns a Responder if the provider has the file,
-                otherwise returns None.
+            Returns a Responder if the provider has the file, otherwise returns None.
         """
-        pass
 
 
 class StorageProviderWrapper(StorageProvider):
     """Wraps a storage provider and provides various config options
 
     Args:
-        backend (StorageProvider)
-        store_local (bool): Whether to store new local files or not.
-        store_synchronous (bool): Whether to wait for file to be successfully
+        backend: The storage provider to wrap.
+        store_local: Whether to store new local files or not.
+        store_synchronous: Whether to wait for file to be successfully
             uploaded, or todo the upload in the background.
-        store_remote (bool): Whether remote media should be uploaded
+        store_remote: Whether remote media should be uploaded
     """
 
-    def __init__(self, backend, store_local, store_synchronous, store_remote):
+    def __init__(
+        self,
+        backend: StorageProvider,
+        store_local: bool,
+        store_synchronous: bool,
+        store_remote: bool,
+    ):
         self.backend = backend
         self.store_local = store_local
         self.store_synchronous = store_synchronous
@@ -80,15 +80,15 @@ class StorageProviderWrapper(StorageProvider):
     def __str__(self):
         return "StorageProviderWrapper[%s]" % (self.backend,)
 
-    def store_file(self, path, file_info):
+    async def store_file(self, path, file_info):
         if not file_info.server_name and not self.store_local:
-            return defer.succeed(None)
+            return None
 
         if file_info.server_name and not self.store_remote:
-            return defer.succeed(None)
+            return None
 
         if self.store_synchronous:
-            return self.backend.store_file(path, file_info)
+            return await self.backend.store_file(path, file_info)
         else:
             # TODO: Handle errors.
             def store():
@@ -98,10 +98,10 @@ class StorageProviderWrapper(StorageProvider):
                     logger.exception("Error storing file")
 
             run_in_background(store)
-            return defer.succeed(None)
+            return None
 
-    def fetch(self, path, file_info):
-        return self.backend.fetch(path, file_info)
+    async def fetch(self, path, file_info):
+        return await self.backend.fetch(path, file_info)
 
 
 class FileStorageProviderBackend(StorageProvider):
@@ -120,7 +120,7 @@ class FileStorageProviderBackend(StorageProvider):
     def __str__(self):
         return "FileStorageProviderBackend[%s]" % (self.base_directory,)
 
-    def store_file(self, path, file_info):
+    async def store_file(self, path, file_info):
         """See StorageProvider.store_file"""
 
         primary_fname = os.path.join(self.cache_directory, path)
@@ -130,11 +130,11 @@ class FileStorageProviderBackend(StorageProvider):
         if not os.path.exists(dirname):
             os.makedirs(dirname)
 
-        return defer_to_thread(
+        return await defer_to_thread(
             self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname
         )
 
-    def fetch(self, path, file_info):
+    async def fetch(self, path, file_info):
         """See StorageProvider.fetch"""
 
         backup_fname = os.path.join(self.base_directory, path)

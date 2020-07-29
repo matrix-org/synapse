@@ -330,7 +330,9 @@ class FederationSender(object):
         room_id = receipt.room_id
 
         # Work out which remote servers should be poked and poke them.
-        domains = yield self.state.get_current_hosts_in_room(room_id)
+        domains = yield defer.ensureDeferred(
+            self.state.get_current_hosts_in_room(room_id)
+        )
         domains = [
             d
             for d in domains
@@ -453,7 +455,9 @@ class FederationSender(object):
         """Given a list of states populate self.pending_presence_by_dest and
         poke to send a new transaction to each destination
         """
-        hosts_and_states = yield get_interested_remotes(self.store, states, self.state)
+        hosts_and_states = yield defer.ensureDeferred(
+            get_interested_remotes(self.store, states, self.state)
+        )
 
         for destinations, states in hosts_and_states:
             for destination in destinations:
