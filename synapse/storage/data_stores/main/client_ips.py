@@ -15,14 +15,11 @@
 
 import logging
 
-from six import iteritems
-
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import Database, make_tuple_comparison_clause
-from synapse.util.caches import CACHE_SIZE_FACTOR
 from synapse.util.caches.descriptors import Cache
 
 logger = logging.getLogger(__name__)
@@ -361,7 +358,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
     def __init__(self, database: Database, db_conn, hs):
 
         self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen", keylen=4, max_entries=50000 * CACHE_SIZE_FACTOR
+            name="client_ip_last_seen", keylen=4, max_entries=50000
         )
 
         super(ClientIpStore, self).__init__(database, db_conn, hs)
@@ -422,7 +419,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         ):
             self.database_engine.lock_table(txn, "user_ips")
 
-        for entry in iteritems(to_update):
+        for entry in to_update.items():
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             try:
@@ -531,7 +528,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 "user_agent": user_agent,
                 "last_seen": last_seen,
             }
-            for (access_token, ip), (user_agent, last_seen) in iteritems(results)
+            for (access_token, ip), (user_agent, last_seen) in results.items()
         ]
 
     @wrap_as_background_process("prune_old_user_ips")

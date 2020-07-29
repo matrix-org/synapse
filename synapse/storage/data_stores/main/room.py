@@ -21,8 +21,6 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from six import integer_types
-
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -30,7 +28,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.data_stores.main.search import SearchStore
 from synapse.storage.database import Database, LoggingTransaction
 from synapse.types import ThirdPartyInstanceID
@@ -52,12 +50,28 @@ class RoomSortOrder(Enum):
     """
     Enum to define the sorting method used when returning rooms with get_rooms_paginate
 
-    ALPHABETICAL = sort rooms alphabetically by name
-    SIZE = sort rooms by membership size, highest to lowest
+    NAME = sort rooms alphabetically by name
+    JOINED_MEMBERS = sort rooms by membership size, highest to lowest
     """
 
+    # ALPHABETICAL and SIZE are deprecated.
+    # ALPHABETICAL is the same as NAME.
     ALPHABETICAL = "alphabetical"
+    # SIZE is the same as JOINED_MEMBERS.
     SIZE = "size"
+    NAME = "name"
+    CANONICAL_ALIAS = "canonical_alias"
+    JOINED_MEMBERS = "joined_members"
+    JOINED_LOCAL_MEMBERS = "joined_local_members"
+    VERSION = "version"
+    CREATOR = "creator"
+    ENCRYPTION = "encryption"
+    FEDERATABLE = "federatable"
+    PUBLIC = "public"
+    JOIN_RULES = "join_rules"
+    GUEST_ACCESS = "guest_access"
+    HISTORY_VISIBILITY = "history_visibility"
+    STATE_EVENTS = "state_events"
 
 
 class RoomWorkerStore(SQLBaseStore):
@@ -80,6 +94,42 @@ class RoomWorkerStore(SQLBaseStore):
             retcols=("room_id", "is_public", "creator"),
             desc="get_room",
             allow_none=True,
+        )
+
+    def get_room_with_stats(self, room_id: str):
+        """Retrieve room with statistics.
+
+        Args:
+            room_id: The ID of the room to retrieve.
+        Returns:
+            A dict containing the room information, or None if the room is unknown.
+        """
+
+        def get_room_with_stats_txn(txn, room_id):
+            sql = """
+                SELECT room_id, state.name, state.canonical_alias, curr.joined_members,
+                  curr.local_users_in_room AS joined_local_members, rooms.room_version AS version,
+                  rooms.creator, state.encryption, state.is_federatable AS federatable,
+                  rooms.is_public AS public, state.join_rules, state.guest_access,
+                  state.history_visibility, curr.current_state_events AS state_events
+                FROM rooms
+                LEFT JOIN room_stats_state state USING (room_id)
+                LEFT JOIN room_stats_current curr USING (room_id)
+                WHERE room_id = ?
+                """
+            txn.execute(sql, [room_id])
+            # Catch error if sql returns empty result to return "None" instead of an error
+            try:
+                res = self.db.cursor_to_dict(txn)[0]
+            except IndexError:
+                return None
+
+            res["federatable"] = bool(res["federatable"])
+            res["public"] = bool(res["public"])
+            return res
+
+        return self.db.runInteraction(
+            "get_room_with_stats", get_room_with_stats_txn, room_id
         )
 
     def get_public_room_ids(self):
@@ -329,12 +379,52 @@ class RoomWorkerStore(SQLBaseStore):
 
         # Set ordering
         if RoomSortOrder(order_by) == RoomSortOrder.SIZE:
+            # Deprecated in favour of RoomSortOrder.JOINED_MEMBERS
             order_by_column = "curr.joined_members"
             order_by_asc = False
         elif RoomSortOrder(order_by) == RoomSortOrder.ALPHABETICAL:
-            # Sort alphabetically
+            # Deprecated in favour of RoomSortOrder.NAME
             order_by_column = "state.name"
             order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.NAME:
+            order_by_column = "state.name"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.CANONICAL_ALIAS:
+            order_by_column = "state.canonical_alias"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOINED_MEMBERS:
+            order_by_column = "curr.joined_members"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOINED_LOCAL_MEMBERS:
+            order_by_column = "curr.local_users_in_room"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.VERSION:
+            order_by_column = "rooms.room_version"
+            order_by_asc = False
+        elif RoomSortOrder(order_by) == RoomSortOrder.CREATOR:
+            order_by_column = "rooms.creator"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.ENCRYPTION:
+            order_by_column = "state.encryption"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.FEDERATABLE:
+            order_by_column = "state.is_federatable"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.PUBLIC:
+            order_by_column = "rooms.is_public"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.JOIN_RULES:
+            order_by_column = "state.join_rules"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.GUEST_ACCESS:
+            order_by_column = "state.guest_access"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.HISTORY_VISIBILITY:
+            order_by_column = "state.history_visibility"
+            order_by_asc = True
+        elif RoomSortOrder(order_by) == RoomSortOrder.STATE_EVENTS:
+            order_by_column = "curr.current_state_events"
+            order_by_asc = False
         else:
             raise StoreError(
                 500, "Incorrect value for order_by provided: %s" % order_by
@@ -349,9 +439,13 @@ class RoomWorkerStore(SQLBaseStore):
         # for, and another query for getting the total number of events that could be
         # returned. Thus allowing us to see if there are more events to paginate through
         info_sql = """
-            SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members
+            SELECT state.room_id, state.name, state.canonical_alias, curr.joined_members,
+              curr.local_users_in_room, rooms.room_version, rooms.creator,
+              state.encryption, state.is_federatable, rooms.is_public, state.join_rules,
+              state.guest_access, state.history_visibility, curr.current_state_events
             FROM room_stats_state state
             INNER JOIN room_stats_current curr USING (room_id)
+            INNER JOIN rooms USING (room_id)
             %s
             ORDER BY %s %s
             LIMIT ?
@@ -389,6 +483,16 @@ class RoomWorkerStore(SQLBaseStore):
                         "name": room[1],
                         "canonical_alias": room[2],
                         "joined_members": room[3],
+                        "joined_local_members": room[4],
+                        "version": room[5],
+                        "creator": room[6],
+                        "encryption": room[7],
+                        "federatable": room[8],
+                        "public": room[9],
+                        "join_rules": room[10],
+                        "guest_access": room[11],
+                        "history_visibility": room[12],
+                        "state_events": room[13],
                     }
                 )
 
@@ -527,35 +631,9 @@ class RoomWorkerStore(SQLBaseStore):
 
         def _quarantine_media_in_room_txn(txn):
             local_mxcs, remote_mxcs = self._get_media_mxcs_in_room_txn(txn, room_id)
-            total_media_quarantined = 0
-
-            # Now update all the tables to set the quarantined_by flag
-
-            txn.executemany(
-                """
-                UPDATE local_media_repository
-                SET quarantined_by = ?
-                WHERE media_id = ?
-            """,
-                ((quarantined_by, media_id) for media_id in local_mxcs),
+            return self._quarantine_media_txn(
+                txn, local_mxcs, remote_mxcs, quarantined_by
             )
-
-            txn.executemany(
-                """
-                    UPDATE remote_media_cache
-                    SET quarantined_by = ?
-                    WHERE media_origin = ? AND media_id = ?
-                """,
-                (
-                    (quarantined_by, origin, media_id)
-                    for origin, media_id in remote_mxcs
-                ),
-            )
-
-            total_media_quarantined += len(local_mxcs)
-            total_media_quarantined += len(remote_mxcs)
-
-            return total_media_quarantined
 
         return self.db.runInteraction(
             "quarantine_media_in_room", _quarantine_media_in_room_txn
@@ -592,7 +670,7 @@ class RoomWorkerStore(SQLBaseStore):
             next_token = None
             for stream_ordering, content_json in txn:
                 next_token = stream_ordering
-                event_json = json.loads(content_json)
+                event_json = db_to_json(content_json)
                 content = event_json["content"]
                 content_url = content.get("url")
                 thumbnail_url = content.get("info", {}).get("thumbnail_url")
@@ -706,17 +784,17 @@ class RoomWorkerStore(SQLBaseStore):
         Returns:
             The total number of media items quarantined
         """
-        total_media_quarantined = 0
-
         # Update all the tables to set the quarantined_by flag
         txn.executemany(
             """
             UPDATE local_media_repository
             SET quarantined_by = ?
-            WHERE media_id = ?
+            WHERE media_id = ? AND safe_from_quarantine = ?
         """,
-            ((quarantined_by, media_id) for media_id in local_mxcs),
+            ((quarantined_by, media_id, False) for media_id in local_mxcs),
         )
+        # Note that a rowcount of -1 can be used to indicate no rows were affected.
+        total_media_quarantined = txn.rowcount if txn.rowcount > 0 else 0
 
         txn.executemany(
             """
@@ -726,13 +804,36 @@ class RoomWorkerStore(SQLBaseStore):
             """,
             ((quarantined_by, origin, media_id) for origin, media_id in remote_mxcs),
         )
-
-        total_media_quarantined += len(local_mxcs)
-        total_media_quarantined += len(remote_mxcs)
+        total_media_quarantined += txn.rowcount if txn.rowcount > 0 else 0
 
         return total_media_quarantined
 
-    def get_all_new_public_rooms(self, prev_id, current_id, limit):
+    async def get_all_new_public_rooms(
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
+        """Get updates for public rooms replication stream.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here since there is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
+
+            The updates are a list of 2-tuples of stream ID and the row data
+        """
+        if last_id == current_id:
+            return [], current_id, False
+
         def get_all_new_public_rooms(txn):
             sql = """
                 SELECT stream_id, room_id, visibility, appservice_id, network_id
@@ -742,13 +843,17 @@ class RoomWorkerStore(SQLBaseStore):
                 LIMIT ?
             """
 
-            txn.execute(sql, (prev_id, current_id, limit))
-            return txn.fetchall()
+            txn.execute(sql, (last_id, current_id, limit))
+            updates = [(row[0], row[1:]) for row in txn]
+            limited = False
+            upto_token = current_id
+            if len(updates) >= limit:
+                upto_token = updates[-1][0]
+                limited = True
 
-        if prev_id == current_id:
-            return defer.succeed([])
+            return updates, upto_token, limited
 
-        return self.db.runInteraction(
+        return await self.db.runInteraction(
             "get_all_new_public_rooms", get_all_new_public_rooms
         )
 
@@ -810,8 +915,8 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 if not row["json"]:
                     retention_policy = {}
                 else:
-                    ev = json.loads(row["json"])
-                    retention_policy = json.dumps(ev["content"])
+                    ev = db_to_json(row["json"])
+                    retention_policy = ev["content"]
 
                 self.db.simple_insert_txn(
                     txn=txn,
@@ -866,7 +971,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
             updates = []
             for room_id, event_json in txn:
-                event_dict = json.loads(event_json)
+                event_dict = db_to_json(event_json)
                 room_version_id = event_dict.get("content", {}).get(
                     "room_version", RoomVersions.V1.identifier
                 )
@@ -1200,53 +1305,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             return row[0] or 0
 
         return self.db.runInteraction("get_rooms", f)
-
-    def _store_room_topic_txn(self, txn, event):
-        if hasattr(event, "content") and "topic" in event.content:
-            self.store_event_search_txn(
-                txn, event, "content.topic", event.content["topic"]
-            )
-
-    def _store_room_name_txn(self, txn, event):
-        if hasattr(event, "content") and "name" in event.content:
-            self.store_event_search_txn(
-                txn, event, "content.name", event.content["name"]
-            )
-
-    def _store_room_message_txn(self, txn, event):
-        if hasattr(event, "content") and "body" in event.content:
-            self.store_event_search_txn(
-                txn, event, "content.body", event.content["body"]
-            )
-
-    def _store_retention_policy_for_room_txn(self, txn, event):
-        if hasattr(event, "content") and (
-            "min_lifetime" in event.content or "max_lifetime" in event.content
-        ):
-            if (
-                "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), integer_types)
-            ) or (
-                "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), integer_types)
-            ):
-                # Ignore the event if one of the value isn't an integer.
-                return
-
-            self.db.simple_insert_txn(
-                txn=txn,
-                table="room_retention",
-                values={
-                    "room_id": event.room_id,
-                    "event_id": event.event_id,
-                    "min_lifetime": event.content.get("min_lifetime"),
-                    "max_lifetime": event.content.get("max_lifetime"),
-                },
-            )
-
-            self._invalidate_cache_and_stream(
-                txn, self.get_retention_policy_for_room, (event.room_id,)
-            )
 
     def add_event_report(
         self, room_id, event_id, user_id, reason, content, received_ts

@@ -16,12 +16,13 @@
 
 import abc
 import logging
+from typing import List, Tuple
 
 from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import Database
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
@@ -76,7 +77,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             )
 
             global_account_data = {
-                row["account_data_type"]: json.loads(row["content"]) for row in rows
+                row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
             rows = self.db.simple_select_list_txn(
@@ -89,7 +90,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             by_room = {}
             for row in rows:
                 room_data = by_room.setdefault(row["room_id"], {})
-                room_data[row["account_data_type"]] = json.loads(row["content"])
+                room_data[row["account_data_type"]] = db_to_json(row["content"])
 
             return global_account_data, by_room
 
@@ -112,7 +113,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         )
 
         if result:
-            return json.loads(result)
+            return db_to_json(result)
         else:
             return None
 
@@ -136,7 +137,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             )
 
             return {
-                row["account_data_type"]: json.loads(row["content"]) for row in rows
+                row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
         return self.db.runInteraction(
@@ -169,47 +170,70 @@ class AccountDataWorkerStore(SQLBaseStore):
                 allow_none=True,
             )
 
-            return json.loads(content_json) if content_json else None
+            return db_to_json(content_json) if content_json else None
 
         return self.db.runInteraction(
             "get_account_data_for_room_and_type", get_account_data_for_room_and_type_txn
         )
 
-    def get_all_updated_account_data(
-        self, last_global_id, last_room_id, current_id, limit
-    ):
-        """Get all the client account_data that has changed on the server
-        Args:
-            last_global_id(int): The position to fetch from for top level data
-            last_room_id(int): The position to fetch from for per room data
-            current_id(int): The position to fetch up to.
-        Returns:
-            A deferred pair of lists of tuples of stream_id int, user_id string,
-            room_id string, and type string.
-        """
-        if last_room_id == current_id and last_global_id == current_id:
-            return defer.succeed(([], []))
+    async def get_updated_global_account_data(
+        self, last_id: int, current_id: int, limit: int
+    ) -> List[Tuple[int, str, str]]:
+        """Get the global account_data that has changed, for the account_data stream
 
-        def get_updated_account_data_txn(txn):
+        Args:
+            last_id: the last stream_id from the previous batch.
+            current_id: the maximum stream_id to return up to
+            limit: the maximum number of rows to return
+
+        Returns:
+            A list of tuples of stream_id int, user_id string,
+            and type string.
+        """
+        if last_id == current_id:
+            return []
+
+        def get_updated_global_account_data_txn(txn):
             sql = (
                 "SELECT stream_id, user_id, account_data_type"
                 " FROM account_data WHERE ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC LIMIT ?"
             )
-            txn.execute(sql, (last_global_id, current_id, limit))
-            global_results = txn.fetchall()
+            txn.execute(sql, (last_id, current_id, limit))
+            return txn.fetchall()
 
+        return await self.db.runInteraction(
+            "get_updated_global_account_data", get_updated_global_account_data_txn
+        )
+
+    async def get_updated_room_account_data(
+        self, last_id: int, current_id: int, limit: int
+    ) -> List[Tuple[int, str, str, str]]:
+        """Get the global account_data that has changed, for the account_data stream
+
+        Args:
+            last_id: the last stream_id from the previous batch.
+            current_id: the maximum stream_id to return up to
+            limit: the maximum number of rows to return
+
+        Returns:
+            A list of tuples of stream_id int, user_id string,
+            room_id string and type string.
+        """
+        if last_id == current_id:
+            return []
+
+        def get_updated_room_account_data_txn(txn):
             sql = (
                 "SELECT stream_id, user_id, room_id, account_data_type"
                 " FROM room_account_data WHERE ? < stream_id AND stream_id <= ?"
                 " ORDER BY stream_id ASC LIMIT ?"
             )
-            txn.execute(sql, (last_room_id, current_id, limit))
-            room_results = txn.fetchall()
-            return global_results, room_results
+            txn.execute(sql, (last_id, current_id, limit))
+            return txn.fetchall()
 
-        return self.db.runInteraction(
-            "get_all_updated_account_data_txn", get_updated_account_data_txn
+        return await self.db.runInteraction(
+            "get_updated_room_account_data", get_updated_room_account_data_txn
         )
 
     def get_updated_account_data_for_user(self, user_id, stream_id):
@@ -231,7 +255,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
             txn.execute(sql, (user_id, stream_id))
 
-            global_account_data = {row[0]: json.loads(row[1]) for row in txn}
+            global_account_data = {row[0]: db_to_json(row[1]) for row in txn}
 
             sql = (
                 "SELECT room_id, account_data_type, content FROM room_account_data"
@@ -243,7 +267,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             account_data_by_room = {}
             for row in txn:
                 room_account_data = account_data_by_room.setdefault(row[0], {})
-                room_account_data[row[1]] = json.loads(row[2])
+                room_account_data[row[1]] = db_to_json(row[2])
 
             return global_account_data, account_data_by_room
 
@@ -273,7 +297,13 @@ class AccountDataWorkerStore(SQLBaseStore):
 class AccountDataStore(AccountDataWorkerStore):
     def __init__(self, database: Database, db_conn, hs):
         self._account_data_id_gen = StreamIdGenerator(
-            db_conn, "account_data_max_stream_id", "stream_id"
+            db_conn,
+            "account_data_max_stream_id",
+            "stream_id",
+            extra_tables=[
+                ("room_account_data", "stream_id"),
+                ("room_tags_revisions", "stream_id"),
+            ],
         )
 
         super(AccountDataStore, self).__init__(database, db_conn, hs)
@@ -363,6 +393,10 @@ class AccountDataStore(AccountDataWorkerStore):
             # doesn't sound any worse than the whole update getting lost,
             # which is what would happen if we combined the two into one
             # transaction.
+            #
+            # Note: This is only here for backwards compat to allow admins to
+            # roll back to a previous Synapse version. Next time we update the
+            # database version we can remove this table.
             yield self._update_max_stream_id(next_id)
 
             self._account_data_stream_cache.entity_has_changed(user_id, next_id)
@@ -380,6 +414,10 @@ class AccountDataStore(AccountDataWorkerStore):
         Args:
             next_id(int): The the revision to advance to.
         """
+
+        # Note: This is only here for backwards compat to allow admins to
+        # roll back to a previous Synapse version. Next time we update the
+        # database version we can remove this table.
 
         def _update(txn):
             update_max_id_sql = (

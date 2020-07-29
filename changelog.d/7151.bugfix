@@ -1,1 +1,0 @@
-Fix error page being shown when a custom SAML handler attempted to redirect when processing an auth response.

@@ -15,6 +15,7 @@
 # limitations under the License.
 
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
+from synapse.util.caches.descriptors import Cache
 
 from tests import unittest
 
@@ -129,3 +130,36 @@ class BuildInfoTests(unittest.TestCase):
         self.assertTrue(b"osversion=" in items[0])
         self.assertTrue(b"pythonversion=" in items[0])
         self.assertTrue(b"version=" in items[0])
+
+
+class CacheMetricsTests(unittest.HomeserverTestCase):
+    def test_cache_metric(self):
+        """
+        Caches produce metrics reflecting their state when scraped.
+        """
+        CACHE_NAME = "cache_metrics_test_fgjkbdfg"
+        cache = Cache(CACHE_NAME, max_entries=777)
+
+        items = {
+            x.split(b"{")[0].decode("ascii"): x.split(b" ")[1].decode("ascii")
+            for x in filter(
+                lambda x: b"cache_metrics_test_fgjkbdfg" in x,
+                generate_latest(REGISTRY).split(b"\n"),
+            )
+        }
+
+        self.assertEqual(items["synapse_util_caches_cache_size"], "0.0")
+        self.assertEqual(items["synapse_util_caches_cache_max_size"], "777.0")
+
+        cache.prefill("1", "hi")
+
+        items = {
+            x.split(b"{")[0].decode("ascii"): x.split(b" ")[1].decode("ascii")
+            for x in filter(
+                lambda x: b"cache_metrics_test_fgjkbdfg" in x,
+                generate_latest(REGISTRY).split(b"\n"),
+            )
+        }
+
+        self.assertEqual(items["synapse_util_caches_cache_size"], "1.0")
+        self.assertEqual(items["synapse_util_caches_cache_max_size"], "777.0")

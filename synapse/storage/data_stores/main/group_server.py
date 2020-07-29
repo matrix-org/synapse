@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List, Tuple
+
 from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 
 # The category ID for the "default" category. We don't store as null in the
 # database to avoid the fun of null != null
@@ -68,24 +70,78 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_invited_users_in_group",
         )
 
-    def get_rooms_in_group(self, group_id, include_private=False):
+    def get_rooms_in_group(self, group_id: str, include_private: bool = False):
+        """Retrieve the rooms that belong to a given group. Does not return rooms that
+        lack members.
+
+        Args:
+            group_id: The ID of the group to query for rooms
+            include_private: Whether to return private rooms in results
+
+        Returns:
+            Deferred[List[Dict[str, str|bool]]]: A list of dictionaries, each in the
+            form of:
+
+            {
+              "room_id": "!a_room_id:example.com",  # The ID of the room
+              "is_public": False                    # Whether this is a public room or not
+            }
+        """
         # TODO: Pagination
 
-        keyvalues = {"group_id": group_id}
-        if not include_private:
-            keyvalues["is_public"] = True
+        def _get_rooms_in_group_txn(txn):
+            sql = """
+            SELECT room_id, is_public FROM group_rooms
+                WHERE group_id = ?
+                AND room_id IN (
+                    SELECT group_rooms.room_id FROM group_rooms
+                    LEFT JOIN room_stats_current ON
+                        group_rooms.room_id = room_stats_current.room_id
+                        AND joined_members > 0
+                        AND local_users_in_room > 0
+                    LEFT JOIN rooms ON
+                        group_rooms.room_id = rooms.room_id
+                        AND (room_version <> '') = ?
+                )
+            """
+            args = [group_id, False]
 
-        return self.db.simple_select_list(
-            table="group_rooms",
-            keyvalues=keyvalues,
-            retcols=("room_id", "is_public"),
-            desc="get_rooms_in_group",
-        )
+            if not include_private:
+                sql += " AND is_public = ?"
+                args += [True]
 
-    def get_rooms_for_summary_by_category(self, group_id, include_private=False):
+            txn.execute(sql, args)
+
+            return [
+                {"room_id": room_id, "is_public": is_public}
+                for room_id, is_public in txn
+            ]
+
+        return self.db.runInteraction("get_rooms_in_group", _get_rooms_in_group_txn)
+
+    def get_rooms_for_summary_by_category(
+        self, group_id: str, include_private: bool = False,
+    ):
         """Get the rooms and categories that should be included in a summary request
 
-        Returns ([rooms], [categories])
+        Args:
+            group_id: The ID of the group to query the summary for
+            include_private: Whether to return private rooms in results
+
+        Returns:
+            Deferred[Tuple[List, Dict]]: A tuple containing:
+
+                * A list of dictionaries with the keys:
+                    * "room_id": str, the room ID
+                    * "is_public": bool, whether the room is public
+                    * "category_id": str|None, the category ID if set, else None
+                    * "order": int, the sort order of rooms
+
+                * A dictionary with the key:
+                    * category_id (str): a dictionary with the keys:
+                        * "is_public": bool, whether the category is public
+                        * "profile": str, the category profile
+                        * "order": int, the sort order of rooms in this category
         """
 
         def _get_rooms_for_summary_txn(txn):
@@ -97,13 +153,23 @@ class GroupServerWorkerStore(SQLBaseStore):
                 SELECT room_id, is_public, category_id, room_order
                 FROM group_summary_rooms
                 WHERE group_id = ?
+                AND room_id IN (
+                    SELECT group_rooms.room_id FROM group_rooms
+                    LEFT JOIN room_stats_current ON
+                        group_rooms.room_id = room_stats_current.room_id
+                        AND joined_members > 0
+                        AND local_users_in_room > 0
+                    LEFT JOIN rooms ON
+                        group_rooms.room_id = rooms.room_id
+                        AND (room_version <> '') = ?
+                )
             """
 
             if not include_private:
                 sql += " AND is_public = ?"
-                txn.execute(sql, (group_id, True))
+                txn.execute(sql, (group_id, False, True))
             else:
-                txn.execute(sql, (group_id,))
+                txn.execute(sql, (group_id, False))
 
             rooms = [
                 {
@@ -131,7 +197,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             categories = {
                 row[0]: {
                     "is_public": row[1],
-                    "profile": json.loads(row[2]),
+                    "profile": db_to_json(row[2]),
                     "order": row[3],
                 }
                 for row in txn
@@ -155,7 +221,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return {
             row["category_id"]: {
                 "is_public": row["is_public"],
-                "profile": json.loads(row["profile"]),
+                "profile": db_to_json(row["profile"]),
             }
             for row in rows
         }
@@ -169,7 +235,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group_category",
         )
 
-        category["profile"] = json.loads(category["profile"])
+        category["profile"] = db_to_json(category["profile"])
 
         return category
 
@@ -185,7 +251,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return {
             row["role_id"]: {
                 "is_public": row["is_public"],
-                "profile": json.loads(row["profile"]),
+                "profile": db_to_json(row["profile"]),
             }
             for row in rows
         }
@@ -199,7 +265,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group_role",
         )
 
-        role["profile"] = json.loads(role["profile"])
+        role["profile"] = db_to_json(role["profile"])
 
         return role
 
@@ -267,7 +333,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             roles = {
                 row[0]: {
                     "is_public": row[1],
-                    "profile": json.loads(row[2]),
+                    "profile": db_to_json(row[2]),
                     "order": row[3],
                 }
                 for row in txn
@@ -396,7 +462,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         now = int(self._clock.time_msec())
         if row and now < row["valid_until_ms"]:
-            return json.loads(row["attestation_json"])
+            return db_to_json(row["attestation_json"])
 
         return None
 
@@ -423,7 +489,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     "group_id": row[0],
                     "type": row[1],
                     "membership": row[2],
-                    "content": json.loads(row[3]),
+                    "content": db_to_json(row[3]),
                 }
                 for row in txn
             ]
@@ -453,7 +519,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     "group_id": group_id,
                     "membership": membership,
                     "type": gtype,
-                    "content": json.loads(content_json),
+                    "content": db_to_json(content_json),
                 }
                 for group_id, membership, gtype, content_json in txn
             ]
@@ -462,13 +528,35 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_groups_changes_for_user", _get_groups_changes_for_user_txn
         )
 
-    def get_all_groups_changes(self, from_token, to_token, limit):
-        from_token = int(from_token)
-        has_changed = self._group_updates_stream_cache.has_any_entity_changed(
-            from_token
-        )
+    async def get_all_groups_changes(
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
+        """Get updates for groups replication stream.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here since there is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
+
+            The updates are a list of 2-tuples of stream ID and the row data
+        """
+
+        last_id = int(last_id)
+        has_changed = self._group_updates_stream_cache.has_any_entity_changed(last_id)
+
         if not has_changed:
-            return defer.succeed([])
+            return [], current_id, False
 
         def _get_all_groups_changes_txn(txn):
             sql = """
@@ -477,13 +565,21 @@ class GroupServerWorkerStore(SQLBaseStore):
                 WHERE ? < stream_id AND stream_id <= ?
                 LIMIT ?
             """
-            txn.execute(sql, (from_token, to_token, limit))
-            return [
-                (stream_id, group_id, user_id, gtype, json.loads(content_json))
+            txn.execute(sql, (last_id, current_id, limit))
+            updates = [
+                (stream_id, (group_id, user_id, gtype, db_to_json(content_json)))
                 for stream_id, group_id, user_id, gtype, content_json in txn
             ]
 
-        return self.db.runInteraction(
+            limited = False
+            upto_token = current_id
+            if len(updates) >= limit:
+                upto_token = updates[-1][0]
+                limited = True
+
+            return updates, upto_token, limited
+
+        return await self.db.runInteraction(
             "get_all_groups_changes", _get_all_groups_changes_txn
         )
 

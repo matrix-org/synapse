@@ -21,7 +21,7 @@ from tests.utils import MockClock
 from .. import unittest
 
 
-class ExpiringCacheTestCase(unittest.TestCase):
+class ExpiringCacheTestCase(unittest.HomeserverTestCase):
     def test_get_set(self):
         clock = MockClock()
         cache = ExpiringCache("test", clock, max_len=1)

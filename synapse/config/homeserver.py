@@ -17,22 +17,27 @@
 from ._base import RootConfig
 from .api import ApiConfig
 from .appservice import AppServiceConfig
+from .cache import CacheConfig
 from .captcha import CaptchaConfig
 from .cas import CasConfig
 from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
+from .federation import FederationConfig
 from .groups import GroupsConfig
 from .jwt_config import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
+from .oidc_config import OIDCConfig
 from .password import PasswordConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
 from .ratelimiting import RatelimitConfig
+from .redis import RedisConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
+from .room import RoomConfig
 from .room_directory import RoomDirectoryConfig
 from .saml2_config import SAML2Config
 from .server import ServerConfig
@@ -53,6 +58,8 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ServerConfig,
         TlsConfig,
+        FederationConfig,
+        CacheConfig,
         DatabaseConfig,
         LoggingConfig,
         RatelimitConfig,
@@ -65,6 +72,7 @@ class HomeServerConfig(RootConfig):
         AppServiceConfig,
         KeyConfig,
         SAML2Config,
+        OIDCConfig,
         CasConfig,
         SSOConfig,
         JWTConfig,
@@ -74,6 +82,7 @@ class HomeServerConfig(RootConfig):
         PasswordAuthProviderConfig,
         PushConfig,
         SpamCheckerConfig,
+        RoomConfig,
         GroupsConfig,
         UserDirectoryConfig,
         ConsentConfig,
@@ -82,4 +91,6 @@ class HomeServerConfig(RootConfig):
         RoomDirectoryConfig,
         ThirdPartyRulesConfig,
         TracerConfig,
+        RedisConfig,
+        FederationConfig,
     ]

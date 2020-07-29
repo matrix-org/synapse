@@ -116,6 +116,8 @@ class _LogContextScope(Scope):
         if self._enter_logcontext:
             self.logcontext.__enter__()
 
+        return self
+
     def __exit__(self, type, value, traceback):
         if type == twisted.internet.defer._DefGen_Return:
             super(_LogContextScope, self).__exit__(None, None, None)

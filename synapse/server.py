@@ -44,7 +44,6 @@ from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
     FederationServer,
-    ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import FederationSender
@@ -73,14 +72,18 @@ from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
-from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
+from synapse.handlers.room import (
+    RoomContextHandler,
+    RoomCreationHandler,
+    RoomShutdownHandler,
+)
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
-from synapse.handlers.typing import TypingHandler
+from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
@@ -90,6 +93,7 @@ from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
+from synapse.replication.tcp.streams import STREAMS_MAP
 from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
@@ -101,7 +105,7 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStores, Storage
+from synapse.storage import DataStore, DataStores, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -143,6 +147,7 @@ class HomeServer(object):
         "handlers",
         "auth",
         "room_creation_handler",
+        "room_shutdown_handler",
         "state_handler",
         "state_resolution_handler",
         "presence_handler",
@@ -204,11 +209,13 @@ class HomeServer(object):
         "account_validity_handler",
         "cas_handler",
         "saml_handler",
+        "oidc_handler",
         "event_client_serializer",
         "password_policy_handler",
         "storage",
         "replication_streamer",
         "replication_data_handler",
+        "replication_streams",
     ]
 
     REQUIRED_ON_MASTER_STARTUP = ["user_directory_handler", "stats_handler"]
@@ -229,18 +236,24 @@ class HomeServer(object):
 
         self._reactor = reactor
         self.hostname = hostname
+        # the key we use to sign events and requests
+        self.signing_key = config.key.signing_key[0]
         self.config = config
         self._building = {}
         self._listening_services = []
         self.start_time = None
 
-        self.instance_id = random_string(5)
+        self._instance_id = random_string(5)
+        self._instance_name = config.worker_name or "master"
 
         self.clock = Clock(reactor)
         self.distributor = Distributor()
-        self.ratelimiter = Ratelimiter()
-        self.admin_redaction_ratelimiter = Ratelimiter()
-        self.registration_ratelimiter = Ratelimiter()
+
+        self.registration_ratelimiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=config.rc_registration.per_second,
+            burst_count=config.rc_registration.burst_count,
+        )
 
         self.datastores = None
 
@@ -254,7 +267,15 @@ class HomeServer(object):
         This is used to distinguish running instances in worker-based
         deployments.
         """
-        return self.instance_id
+        return self._instance_id
+
+    def get_instance_name(self) -> str:
+        """A unique name for this synapse process.
+
+        Used to identify the process over replication and in config. Does not
+        change over restarts.
+        """
+        return self._instance_name
 
     def setup(self):
         logger.info("Setting up.")
@@ -290,7 +311,7 @@ class HomeServer(object):
     def get_clock(self):
         return self.clock
 
-    def get_datastore(self):
+    def get_datastore(self) -> DataStore:
         return self.datastores.main
 
     def get_datastores(self):
@@ -302,14 +323,8 @@ class HomeServer(object):
     def get_distributor(self):
         return self.distributor
 
-    def get_ratelimiter(self):
-        return self.ratelimiter
-
-    def get_registration_ratelimiter(self):
+    def get_registration_ratelimiter(self) -> Ratelimiter:
         return self.registration_ratelimiter
-
-    def get_admin_redaction_ratelimiter(self):
-        return self.admin_redaction_ratelimiter
 
     def build_federation_client(self):
         return FederationClient(self)
@@ -346,6 +361,9 @@ class HomeServer(object):
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
 
+    def build_room_shutdown_handler(self):
+        return RoomShutdownHandler(self)
+
     def build_sendmail(self):
         return sendmail
 
@@ -359,7 +377,10 @@ class HomeServer(object):
         return PresenceHandler(self)
 
     def build_typing_handler(self):
-        return TypingHandler(self)
+        if self.config.worker.writers.typing == self.get_instance_name():
+            return TypingWriterHandler(self)
+        else:
+            return FollowerTypingHandler(self)
 
     def build_sync_handler(self):
         return SyncHandler(self)
@@ -515,10 +536,7 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        if self.config.worker_app:
-            return ReplicationFederationHandlerRegistry(self)
-        else:
-            return FederationHandlerRegistry()
+        return FederationHandlerRegistry(self)
 
     def build_server_notices_manager(self):
         if self.config.worker_app:
@@ -553,6 +571,11 @@ class HomeServer(object):
 
         return SamlHandler(self)
 
+    def build_oidc_handler(self):
+        from synapse.handlers.oidc_handler import OidcHandler
+
+        return OidcHandler(self)
+
     def build_event_client_serializer(self):
         return EventClientSerializer(self)
 
@@ -566,7 +589,10 @@ class HomeServer(object):
         return ReplicationStreamer(self)
 
     def build_replication_data_handler(self):
-        return ReplicationDataHandler(self.get_datastore())
+        return ReplicationDataHandler(self)
+
+    def build_replication_streams(self):
+        return {stream.NAME: stream(self) for stream in STREAMS_MAP.values()}
 
     def remove_pusher(self, app_id, push_key, user_id):
         return self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

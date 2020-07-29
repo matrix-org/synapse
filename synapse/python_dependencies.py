@@ -43,7 +43,7 @@ REQUIREMENTS = [
     "jsonschema>=2.5.1",
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
-    "canonicaljson>=1.1.3",
+    "canonicaljson>=1.2.0",
     # we use the type definitions added in signedjson 1.1.
     "signedjson>=1.1.0",
     "pynacl>=1.2.1",
@@ -66,11 +66,9 @@ REQUIREMENTS = [
     "pymacaroons>=0.13.0",
     "msgpack>=0.5.2",
     "phonenumbers>=8.2.0",
-    "six>=1.10",
-    "prometheus_client>=0.0.18,<0.8.0",
-    # we use attr.s(slots), which arrived in 16.0.0
-    # Twisted 18.7.0 requires attrs>=17.4.0
-    "attrs>=17.4.0",
+    "prometheus_client>=0.0.18,<0.9.0",
+    # we use attr.validators.deep_iterable, which arrived in 19.1.0
+    "attrs>=19.1.0",
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.3",
@@ -92,12 +90,21 @@ CONDITIONAL_REQUIREMENTS = {
         'eliot<1.8.0;python_version<"3.5.3"',
     ],
     "saml2": ["pysaml2>=4.5.0"],
+    "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
-    "test": ["mock>=2.0", "parameterized"],
+    # Dependencies which are exclusively required by unit test code. This is
+    # NOT a list of all modules that are necessary to run the unit tests.
+    # Tests assume that all optional dependencies are installed.
+    #
+    # parameterized_class decorator was introduced in parameterized 0.7.0
+    "test": ["mock>=2.0", "parameterized>=0.7.0"],
     "sentry": ["sentry-sdk>=0.7.2"],
     "opentracing": ["jaeger-client>=4.0.0", "opentracing>=2.2.0"],
     "jwt": ["pyjwt>=1.6.4"],
+    # hiredis is not a *strict* dependency, but it makes things much faster.
+    # (if it is not installed, we fall back to slow code.)
+    "redis": ["txredisapi>=1.4.7", "hiredis"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]

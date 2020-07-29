@@ -16,6 +16,7 @@
 # limitations under the License.
 import logging
 import time
+from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
     Any,
@@ -28,9 +29,6 @@ from typing import (
     Tuple,
     TypeVar,
 )
-
-from six import iteritems, iterkeys, itervalues
-from six.moves import intern, range
 
 from prometheus_client import Histogram
 
@@ -49,12 +47,12 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
-from synapse.util.stringutils import exception_to_unicode
-
-logger = logging.getLogger(__name__)
+from synapse.types import Collection
 
 # python 3 does not have a maximum int value
 MAX_TXN_ID = 2 ** 63 - 1
+
+logger = logging.getLogger(__name__)
 
 sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
@@ -212,9 +210,9 @@ class LoggingTransaction:
     def executemany(self, sql: str, *args: Any):
         self._do_execute(self.txn.executemany, sql, *args)
 
-    def _make_sql_one_line(self, sql):
+    def _make_sql_one_line(self, sql: str) -> str:
         "Strip newlines out of SQL so that the loggers in the DB are on one line"
-        return " ".join(l.strip() for l in sql.splitlines() if l.strip())
+        return " ".join(line.strip() for line in sql.splitlines() if line.strip())
 
     def _do_execute(self, func, sql, *args):
         sql = self._make_sql_one_line(sql)
@@ -235,7 +233,7 @@ class LoggingTransaction:
         try:
             return func(sql, *args)
         except Exception as e:
-            logger.debug("[SQL FAIL] {%s} %s", self.name, e)
+            sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
         finally:
             secs = time.time() - start
@@ -259,7 +257,7 @@ class PerformanceCounters(object):
 
     def interval(self, interval_duration_secs, limit=3):
         counters = []
-        for name, (count, cum_time) in iteritems(self.current_counters):
+        for name, (count, cum_time) in self.current_counters.items():
             prev_count, prev_time = self.previous_counters.get(name, (0, 0))
             counters.append(
                 (
@@ -421,35 +419,29 @@ class Database(object):
                 except self.engine.module.OperationalError as e:
                     # This can happen if the database disappears mid
                     # transaction.
-                    logger.warning(
-                        "[TXN OPERROR] {%s} %s %d/%d",
-                        name,
-                        exception_to_unicode(e),
-                        i,
-                        N,
+                    transaction_logger.warning(
+                        "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
                     )
                     if i < N:
                         i += 1
                         try:
                             conn.rollback()
                         except self.engine.module.Error as e1:
-                            logger.warning(
-                                "[TXN EROLL] {%s} %s", name, exception_to_unicode(e1)
-                            )
+                            transaction_logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
                     raise
                 except self.engine.module.DatabaseError as e:
                     if self.engine.is_deadlock(e):
-                        logger.warning("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
+                        transaction_logger.warning(
+                            "[TXN DEADLOCK] {%s} %d/%d", name, i, N
+                        )
                         if i < N:
                             i += 1
                             try:
                                 conn.rollback()
                             except self.engine.module.Error as e1:
-                                logger.warning(
-                                    "[TXN EROLL] {%s} %s",
-                                    name,
-                                    exception_to_unicode(e1),
+                                transaction_logger.warning(
+                                    "[TXN EROLL] {%s} %s", name, e1,
                                 )
                             continue
                     raise
@@ -488,7 +480,7 @@ class Database(object):
                     # [2]: https://github.com/python/cpython/blob/v3.8.0/Modules/_sqlite/cursor.c#L236
                     cursor.close()
         except Exception as e:
-            logger.debug("[TXN FAIL] {%s} %s", name, e)
+            transaction_logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
         finally:
             end = monotonic_time()
@@ -889,20 +881,24 @@ class Database(object):
         txn.execute(sql, list(allvalues.values()))
 
     def simple_upsert_many_txn(
-        self, txn, table, key_names, key_values, value_names, value_values
-    ):
+        self,
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[str]],
+    ) -> None:
         """
         Upsert, many times.
 
         Args:
-            table (str): The table to upsert into
-            key_names (list[str]): The key column names.
-            key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names. If empty, no
-                values will be used, even if value_values is provided.
-            value_values (list[list]): A list of each row's value column values.
-        Returns:
-            None
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
         """
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
             return self.simple_upsert_many_txn_native_upsert(
@@ -914,20 +910,24 @@ class Database(object):
             )
 
     def simple_upsert_many_txn_emulated(
-        self, txn, table, key_names, key_values, value_names, value_values
-    ):
+        self,
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Iterable[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[str]],
+    ) -> None:
         """
         Upsert, many times, but without native UPSERT support or batching.
 
         Args:
-            table (str): The table to upsert into
-            key_names (list[str]): The key column names.
-            key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names. If empty, no
-                values will be used, even if value_values is provided.
-            value_values (list[list]): A list of each row's value column values.
-        Returns:
-            None
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
         """
         # No value columns, therefore make a blank list so that the following
         # zip() works correctly.
@@ -941,20 +941,24 @@ class Database(object):
             self.simple_upsert_txn_emulated(txn, table, _keys, _vals)
 
     def simple_upsert_many_txn_native_upsert(
-        self, txn, table, key_names, key_values, value_names, value_values
-    ):
+        self,
+        txn: LoggingTransaction,
+        table: str,
+        key_names: Collection[str],
+        key_values: Collection[Iterable[Any]],
+        value_names: Collection[str],
+        value_values: Iterable[Iterable[Any]],
+    ) -> None:
         """
         Upsert, many times, using batching where possible.
 
         Args:
-            table (str): The table to upsert into
-            key_names (list[str]): The key column names.
-            key_values (list[list]): A list of each row's key column values.
-            value_names (list[str]): The value column names. If empty, no
-                values will be used, even if value_values is provided.
-            value_values (list[list]): A list of each row's value column values.
-        Returns:
-            None
+            table: The table to upsert into
+            key_names: The key column names.
+            key_values: A list of each row's key column values.
+            value_names: The value column names
+            value_values: A list of each row's value column values.
+                Ignored if value_names is empty.
         """
         allnames = []  # type: List[str]
         allnames.extend(key_names)
@@ -1049,7 +1053,7 @@ class Database(object):
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
         if keyvalues:
-            sql += " WHERE %s" % " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
+            sql += " WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
             txn.execute(sql, list(keyvalues.values()))
         else:
             txn.execute(sql)
@@ -1187,7 +1191,7 @@ class Database(object):
         clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
         clauses = [clause]
 
-        for key, value in iteritems(keyvalues):
+        for key, value in keyvalues.items():
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
@@ -1208,7 +1212,7 @@ class Database(object):
     @staticmethod
     def simple_update_txn(txn, table, keyvalues, updatevalues):
         if keyvalues:
-            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in iterkeys(keyvalues))
+            where = "WHERE %s" % " AND ".join("%s = ?" % k for k in keyvalues.keys())
         else:
             where = ""
 
@@ -1347,7 +1351,7 @@ class Database(object):
         clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
         clauses = [clause]
 
-        for key, value in iteritems(keyvalues):
+        for key, value in keyvalues.items():
             clauses.append("%s = ?" % (key,))
             values.append(value)
 
@@ -1384,7 +1388,7 @@ class Database(object):
         txn.close()
 
         if cache:
-            min_val = min(itervalues(cache))
+            min_val = min(cache.values())
         else:
             min_val = max_value
 

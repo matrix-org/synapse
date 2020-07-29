@@ -156,7 +156,7 @@ class PruneEventTestCase(unittest.TestCase):
                 "signatures": {},
                 "unsigned": {},
             },
-            room_version=RoomVersions.MSC2432_DEV,
+            room_version=RoomVersions.V6,
         )
 
 

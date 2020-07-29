@@ -20,14 +20,17 @@ import signal
 import socket
 import sys
 import traceback
+from typing import Iterable
 
 from daemonize import Daemonize
+from typing_extensions import NoReturn
 
 from twisted.internet import defer, error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
 from synapse.app import check_bind_error
+from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
@@ -139,9 +142,9 @@ def start_reactor(
             run()
 
 
-def quit_with_error(error_string):
+def quit_with_error(error_string: str) -> NoReturn:
     message_lines = error_string.split("\n")
-    line_length = max(len(l) for l in message_lines if len(l) < 80) + 2
+    line_length = max(len(line) for line in message_lines if len(line) < 80) + 2
     sys.stderr.write("*" * line_length + "\n")
     for line in message_lines:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
@@ -233,7 +236,7 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-def start(hs, listeners=None):
+def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
     """
     Start a Synapse server or worker.
 
@@ -244,8 +247,8 @@ def start(hs, listeners=None):
     notify systemd.
 
     Args:
-        hs (synapse.server.HomeServer)
-        listeners (list[dict]): Listener configuration ('listeners' in homeserver.yaml)
+        hs: homeserver instance
+        listeners: Listener configuration ('listeners' in homeserver.yaml)
     """
     try:
         # Set up the SIGHUP machinery.
@@ -270,7 +273,7 @@ def start(hs, listeners=None):
 
         # Start the tracer
         synapse.logging.opentracing.init_tracer(  # type: ignore[attr-defined] # noqa
-            hs.config
+            hs
         )
 
         # It is now safe to start your Synapse.
@@ -316,7 +319,7 @@ def setup_sentry(hs):
         scope.set_tag("matrix_server_name", hs.config.server_name)
 
         app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
-        name = hs.config.worker_name if hs.config.worker_name else "master"
+        name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)
 

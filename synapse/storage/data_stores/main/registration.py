@@ -17,8 +17,7 @@
 
 import logging
 import re
-
-from six import iterkeys
+from typing import Optional
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
@@ -28,6 +27,8 @@ from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidati
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import Database
+from synapse.storage.types import Cursor
+from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import UserID
 from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
 
@@ -42,6 +43,10 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         self.config = hs.config
         self.clock = hs.get_clock()
+
+        self._user_id_seq = build_sequence_generator(
+            database.engine, find_max_generated_user_id_localpart, "user_id_seq",
+        )
 
     @cached()
     def get_user_by_id(self, user_id):
@@ -273,8 +278,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="delete_account_validity_for_user",
         )
 
-    @defer.inlineCallbacks
-    def is_server_admin(self, user):
+    async def is_server_admin(self, user):
         """Determines if a user is an admin of this homeserver.
 
         Args:
@@ -283,7 +287,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns (bool):
             true iff the user is a server admin, false otherwise.
         """
-        res = yield self.db.simple_select_one_onecol(
+        res = await self.db.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user.to_string()},
             retcol="admin",
@@ -343,7 +347,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
         return res
 
-    @cachedInlineCallbacks()
+    @cached()
     def is_support_user(self, user_id):
         """Determines if the user is of type UserTypes.SUPPORT
 
@@ -353,10 +357,9 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred[bool]: True if user is of type UserTypes.SUPPORT
         """
-        res = yield self.db.runInteraction(
+        return self.db.runInteraction(
             "is_support_user", self.is_support_user_txn, user_id
         )
-        return res
 
     def is_real_user_txn(self, txn, user_id):
         res = self.db.simple_select_one_onecol_txn(
@@ -484,51 +487,28 @@ class RegistrationWorkerStore(SQLBaseStore):
         ret = yield self.db.runInteraction("count_real_users", _count_users)
         return ret
 
-    @defer.inlineCallbacks
-    def find_next_generated_user_id_localpart(self):
+    async def generate_user_id(self) -> str:
+        """Generate a suitable localpart for a guest user
+
+        Returns: a (hopefully) free localpart
         """
-        Gets the localpart of the next generated user ID.
-
-        Generated user IDs are integers, so we find the largest integer user ID
-        already taken and return that plus one.
-        """
-
-        def _find_next_generated_user_id(txn):
-            # We bound between '@0' and '@a' to avoid pulling the entire table
-            # out.
-            txn.execute("SELECT name FROM users WHERE '@0' <= name AND name < '@a'")
-
-            regex = re.compile(r"^@(\d+):")
-
-            max_found = 0
-
-            for (user_id,) in txn:
-                match = regex.search(user_id)
-                if match:
-                    max_found = max(int(match.group(1)), max_found)
-
-            return max_found + 1
-
-        return (
-            (
-                yield self.db.runInteraction(
-                    "find_next_generated_user_id", _find_next_generated_user_id
-                )
-            )
+        next_id = await self.db.runInteraction(
+            "generate_user_id", self._user_id_seq.get_next_id_txn
         )
 
-    @defer.inlineCallbacks
-    def get_user_id_by_threepid(self, medium, address):
+        return str(next_id)
+
+    async def get_user_id_by_threepid(self, medium: str, address: str) -> Optional[str]:
         """Returns user id from threepid
 
         Args:
-            medium (str): threepid medium e.g. email
-            address (str): threepid address e.g. me@example.com
+            medium: threepid medium e.g. email
+            address: threepid address e.g. me@example.com
 
         Returns:
-            Deferred[str|None]: user id or None if no user id/threepid mapping exists
+            The user ID or None if no user id/threepid mapping exists
         """
-        user_id = yield self.db.runInteraction(
+        user_id = await self.db.runInteraction(
             "get_user_id_by_threepid", self.get_user_id_by_threepid_txn, medium, address
         )
         return user_id
@@ -755,7 +735,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 last_send_attempt, validated_at
                 FROM threepid_validation_session WHERE %s
                 """ % (
-                " AND ".join("%s = ?" % k for k in iterkeys(keyvalues)),
+                " AND ".join("%s = ?" % k for k in keyvalues.keys()),
             )
 
             if validated is not None:
@@ -994,7 +974,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         Args:
             user_id (str): The desired user ID to register.
-            password_hash (str): Optional. The password hash for this user.
+            password_hash (str|None): Optional. The password hash for this user.
             was_guest (bool): Optional. Whether this is a guest account being
                 upgraded to a non-guest account.
             make_guest (boolean): True if the the new user should be guest,
@@ -1008,6 +988,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         Raises:
             StoreError if the user_id could not be registered.
+
+        Returns:
+            Deferred
         """
         return self.db.runInteraction(
             "register_user",
@@ -1574,3 +1557,26 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             keyvalues={"user_id": user_id},
             values={"expiration_ts_ms": expiration_ts, "email_sent": False},
         )
+
+
+def find_max_generated_user_id_localpart(cur: Cursor) -> int:
+    """
+    Gets the localpart of the max current generated user ID.
+
+    Generated user IDs are integers, so we find the largest integer user ID
+    already taken and return that.
+    """
+
+    # We bound between '@0' and '@a' to avoid pulling the entire table
+    # out.
+    cur.execute("SELECT name FROM users WHERE '@0' <= name AND name < '@a'")
+
+    regex = re.compile(r"^@(\d+):")
+
+    max_found = 0
+
+    for (user_id,) in cur:
+        match = regex.search(user_id)
+        if match:
+            max_found = max(int(match.group(1)), max_found)
+    return max_found

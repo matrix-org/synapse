@@ -27,7 +27,7 @@
     different thread to Synapse. This can make it more resilient to
     heavy load meaning metrics cannot be retrieved, and can be exposed
     to just internal networks easier. The served metrics are available
-    over HTTP only, and will be available at `/`.
+    over HTTP only, and will be available at `/_synapse/metrics`.
 
     Add a new listener to homeserver.yaml:
 
@@ -59,6 +59,31 @@
     `static_configs` in the above with `target_groups`.
 
 1.  Restart Prometheus.
+
+## Monitoring workers
+
+To monitor a Synapse installation using
+[workers](https://github.com/matrix-org/synapse/blob/master/docs/workers.md),
+every worker needs to be monitored independently, in addition to
+the main homeserver process. This is because workers don't send
+their metrics to the main homeserver process, but expose them
+directly (if they are configured to do so).
+
+To allow collecting metrics from a worker, you need to add a
+`metrics` listener to its configuration, by adding the following
+under `worker_listeners`:
+
+```yaml
+ - type: metrics
+   bind_address: ''
+   port: 9101
+```
+
+The `bind_address` and `port` parameters should be set so that
+the resulting listener can be reached by prometheus, and they
+don't clash with an existing worker.
+With this example, the worker's metrics would then be available
+on `http://127.0.0.1:9101`.
 
 ## Renaming of metrics & deprecation of old names in 1.2
 

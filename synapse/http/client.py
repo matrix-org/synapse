@@ -15,10 +15,8 @@
 # limitations under the License.
 
 import logging
+import urllib
 from io import BytesIO
-
-from six import raise_from, text_type
-from six.moves import urllib
 
 import treq
 from canonicaljson import encode_canonical_json, json
@@ -33,6 +31,7 @@ from twisted.internet.interfaces import (
     IReactorPluggableNameResolver,
     IResolutionReceiver,
 )
+from twisted.internet.task import Cooperator
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
 from twisted.web.client import Agent, HTTPConnectionPool, readBody
@@ -49,7 +48,6 @@ from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.util.async_helpers import timeout_deferred
-from synapse.util.caches import CACHE_SIZE_FACTOR
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +68,21 @@ def check_against_blacklist(ip_address, ip_whitelist, ip_blacklist):
         if ip_whitelist is None or ip_address not in ip_whitelist:
             return True
     return False
+
+
+_EPSILON = 0.00000001
+
+
+def _make_scheduler(reactor):
+    """Makes a schedular suitable for a Cooperator using the given reactor.
+
+    (This is effectively just a copy from `twisted.internet.task`)
+    """
+
+    def _scheduler(x):
+        return reactor.callLater(_EPSILON, x)
+
+    return _scheduler
 
 
 class IPBlacklistingResolver(object):
@@ -215,6 +228,10 @@ class SimpleHttpClient(object):
         if hs.config.user_agent_suffix:
             self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
 
+        # We use this for our body producers to ensure that they use the correct
+        # reactor.
+        self._cooperator = Cooperator(scheduler=_make_scheduler(hs.get_reactor()))
+
         self.user_agent = self.user_agent.encode("ascii")
 
         if self._ip_blacklist:
@@ -241,7 +258,10 @@ class SimpleHttpClient(object):
         # tends to do so in batches, so we need to allow the pool to keep
         # lots of idle connections around.
         pool = HTTPConnectionPool(self.reactor)
-        pool.maxPersistentPerHost = max((100 * CACHE_SIZE_FACTOR, 5))
+        # XXX: The justification for using the cache factor here is that larger instances
+        # will need both more cache and more connections.
+        # Still, this should probably be a separate dial
+        pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
         self.agent = ProxyAgent(
@@ -292,7 +312,9 @@ class SimpleHttpClient(object):
             try:
                 body_producer = None
                 if data is not None:
-                    body_producer = QuieterFileBodyProducer(BytesIO(data))
+                    body_producer = QuieterFileBodyProducer(
+                        BytesIO(data), cooperator=self._cooperator,
+                    )
 
                 request_deferred = treq.request(
                     method,
@@ -359,6 +381,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/x-www-form-urlencoded"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -370,9 +393,11 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     @defer.inlineCallbacks
     def post_json_get_json(self, uri, post_json, headers=None):
@@ -399,6 +424,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/json"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -410,9 +436,11 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     @defer.inlineCallbacks
     def get_json(self, uri, args={}, headers=None):
@@ -434,8 +462,12 @@ class SimpleHttpClient(object):
 
             ValueError: if the response was not JSON
         """
+        actual_headers = {b"Accept": [b"application/json"]}
+        if headers:
+            actual_headers.update(headers)
+
         body = yield self.get_raw(uri, args, headers=headers)
-        return json.loads(body)
+        return json.loads(body.decode("utf-8"))
 
     @defer.inlineCallbacks
     def put_json(self, uri, json_body, args={}, headers=None):
@@ -467,6 +499,7 @@ class SimpleHttpClient(object):
         actual_headers = {
             b"Content-Type": [b"application/json"],
             b"User-Agent": [self.user_agent],
+            b"Accept": [b"application/json"],
         }
         if headers:
             actual_headers.update(headers)
@@ -478,9 +511,11 @@ class SimpleHttpClient(object):
         body = yield make_deferred_yieldable(readBody(response))
 
         if 200 <= response.code < 300:
-            return json.loads(body)
+            return json.loads(body.decode("utf-8"))
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     @defer.inlineCallbacks
     def get_raw(self, uri, args={}, headers=None):
@@ -496,7 +531,7 @@ class SimpleHttpClient(object):
                header name to a list of values for that header
         Returns:
             Deferred: Succeeds when we get *any* 2xx HTTP response, with the
-            HTTP body at text.
+            HTTP body as bytes.
         Raises:
             HttpResponseException on a non-2xx HTTP response.
         """
@@ -515,7 +550,9 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             return body
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
     # The two should be factored out.
@@ -568,7 +605,7 @@ class SimpleHttpClient(object):
             # This can happen e.g. because the body is too large.
             raise
         except Exception as e:
-            raise_from(SynapseError(502, ("Failed to download remote body: %s" % e)), e)
+            raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
 
         return (
             length,
@@ -629,7 +666,7 @@ def encode_urlencode_args(args):
 
 
 def encode_urlencode_arg(arg):
-    if isinstance(arg, text_type):
+    if isinstance(arg, str):
         return arg.encode("utf-8")
     elif isinstance(arg, list):
         return [encode_urlencode_arg(i) for i in arg]

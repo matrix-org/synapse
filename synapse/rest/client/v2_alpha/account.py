@@ -15,13 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from six.moves import http_client
+from http import HTTPStatus
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour
-from synapse.http.server import finish_request
+from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -30,8 +29,8 @@ from synapse.http.servlet import (
 )
 from synapse.push.mailer import Mailer, load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
-from synapse.util.stringutils import assert_valid_client_secret
-from synapse.util.threepids import check_3pid_allowed
+from synapse.util.stringutils import assert_valid_client_secret, random_string
+from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -84,7 +83,15 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        email = body["email"]
+        # Canonicalise the email address. The addresses are all stored canonicalised
+        # in the database. This allows the user to reset his password without having to
+        # know the exact spelling (eg. upper and lower case) of address in the database.
+        # Stored in the database "foo@bar.com"
+        # User requests with "FOO@bar.com" would raise a Not Found error
+        try:
+            email = canonicalise_email(body["email"])
+        except ValueError as e:
+            raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -95,11 +102,20 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
+        # The email will be sent to the stored address.
+        # This avoids a potential account hijack by requesting a password reset to
+        # an email address which is controlled by the attacker but which, after
+        # canonicalisation, matches the one in our database.
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
         )
 
         if existing_user_id is None:
+            if self.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -194,16 +210,15 @@ class PasswordResetSubmitTokenServlet(RestServlet):
 
             # Otherwise show the success template
             html = self.config.email_password_reset_template_success_html
-            request.setResponseCode(200)
+            status_code = 200
         except ThreepidValidationError as e:
-            request.setResponseCode(e.code)
+            status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
             html = self.failure_email_template.render(**template_vars)
 
-        request.write(html.encode("utf-8"))
-        finish_request(request)
+        respond_with_html(request, status_code, html)
 
 
 class PasswordRestServlet(RestServlet):
@@ -215,11 +230,26 @@ class PasswordRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.datastore = self.hs.get_datastore()
+        self.password_policy_handler = hs.get_password_policy_handler()
         self._set_password_handler = hs.get_set_password_handler()
 
     @interactive_auth_handler
     async def on_POST(self, request):
         body = parse_json_object_from_request(request)
+
+        # we do basic sanity checks here because the auth layer will store these
+        # in sessions. Pull out the new password provided to us.
+        if "new_password" in body:
+            new_password = body.pop("new_password")
+            if not isinstance(new_password, str) or len(new_password) > 512:
+                raise SynapseError(400, "Invalid password")
+            self.password_policy_handler.validate_password(new_password)
+
+            # If the password is valid, hash it and store it back on the body.
+            # This ensures that only the hashed password is handled everywhere.
+            if "new_password_hash" in body:
+                raise SynapseError(400, "Unexpected property: new_password_hash")
+            body["new_password_hash"] = await self.auth_handler.hash(new_password)
 
         # there are two possibilities here. Either the user does not have an
         # access token, and needs to do a password reset; or they have one and
@@ -256,10 +286,13 @@ class PasswordRestServlet(RestServlet):
                 if "medium" not in threepid or "address" not in threepid:
                     raise SynapseError(500, "Malformed threepid")
                 if threepid["medium"] == "email":
-                    # For emails, transform the address to lowercase.
-                    # We store all email addreses as lowercase in the DB.
+                    # For emails, canonicalise the address.
+                    # We store all email addresses canonicalised in the DB.
                     # (See add_threepid in synapse/handlers/auth.py)
-                    threepid["address"] = threepid["address"].lower()
+                    try:
+                        threepid["address"] = canonicalise_email(threepid["address"])
+                    except ValueError as e:
+                        raise SynapseError(400, str(e))
                 # if using email, we must know about the email they're authing with!
                 threepid_user_id = await self.datastore.get_user_id_by_threepid(
                     threepid["medium"], threepid["address"]
@@ -271,12 +304,12 @@ class PasswordRestServlet(RestServlet):
                 logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        assert_params_in_dict(params, ["new_password"])
-        new_password = params["new_password"]
+        assert_params_in_dict(params, ["new_password_hash"])
+        new_password_hash = params["new_password_hash"]
         logout_devices = params.get("logout_devices", True)
 
         await self._set_password_handler.set_password(
-            user_id, new_password, logout_devices, requester
+            user_id, new_password_hash, logout_devices, requester
         )
 
         return 200, {}
@@ -301,7 +334,7 @@ class DeactivateAccountRestServlet(RestServlet):
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'erase' must be a boolean, if given",
                 Codes.BAD_JSON,
             )
@@ -374,7 +407,16 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        email = body["email"]
+        # Canonicalise the email address. The addresses are all stored canonicalised
+        # in the database.
+        # This ensures that the validation email is sent to the canonicalised address
+        # as it will later be entered into the database.
+        # Otherwise the email will be sent to "FOO@bar.com" and stored as
+        # "foo@bar.com" in database.
+        try:
+            email = canonicalise_email(body["email"])
+        except ValueError as e:
+            raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -385,11 +427,14 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
                 Codes.THREEPID_DENIED,
             )
 
-        existing_user_id = await self.store.get_user_id_by_threepid(
-            "email", body["email"]
-        )
+        existing_user_id = await self.store.get_user_id_by_threepid("email", email)
 
         if existing_user_id is not None:
+            if self.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -453,6 +498,11 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
         existing_user_id = await self.store.get_user_id_by_threepid("msisdn", msisdn)
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
 
         if not self.hs.config.account_threepid_delegate_msisdn:
@@ -541,16 +591,15 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
 
             # Otherwise show the success template
             html = self.config.email_add_threepid_template_success_html_content
-            request.setResponseCode(200)
+            status_code = 200
         except ThreepidValidationError as e:
-            request.setResponseCode(e.code)
+            status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
             html = self.failure_email_template.render(**template_vars)
 
-        request.write(html.encode("utf-8"))
-        finish_request(request)
+        respond_with_html(request, status_code, html)
 
 
 class AddThreepidMsisdnSubmitTokenServlet(RestServlet):
@@ -652,7 +701,7 @@ class ThreepidRestServlet(RestServlet):
 
 
 class ThreepidAddRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/add$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/add$")
 
     def __init__(self, hs):
         super(ThreepidAddRestServlet, self).__init__()
@@ -703,7 +752,7 @@ class ThreepidAddRestServlet(RestServlet):
 
 
 class ThreepidBindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/bind$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/bind$")
 
     def __init__(self, hs):
         super(ThreepidBindRestServlet, self).__init__()
@@ -732,7 +781,7 @@ class ThreepidBindRestServlet(RestServlet):
 
 
 class ThreepidUnbindRestServlet(RestServlet):
-    PATTERNS = client_patterns("/account/3pid/unbind$", releases=(), unstable=True)
+    PATTERNS = client_patterns("/account/3pid/unbind$")
 
     def __init__(self, hs):
         super(ThreepidUnbindRestServlet, self).__init__()

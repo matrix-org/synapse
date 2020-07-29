@@ -16,10 +16,8 @@
 """Contains functions for registering clients."""
 import logging
 
-from twisted.internet import defer
-
 from synapse import types
-from synapse.api.constants import MAX_USERID_LENGTH, LoginType
+from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import assert_params_in_dict
@@ -28,8 +26,8 @@ from synapse.replication.http.register import (
     ReplicationPostRegisterActionsServlet,
     ReplicationRegisterServlet,
 )
-from synapse.types import RoomAlias, RoomID, UserID, create_requester
-from synapse.util.async_helpers import Linearizer
+from synapse.storage.state import StateFilter
+from synapse.types import RoomAlias, UserID, create_requester
 
 from ._base import BaseHandler
 
@@ -51,14 +49,7 @@ class RegistrationHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.identity_handler = self.hs.get_handlers().identity_handler
         self.ratelimiter = hs.get_registration_ratelimiter()
-
-        self._next_generated_user_id = None
-
         self.macaroon_gen = hs.get_macaroon_generator()
-
-        self._generate_user_id_linearizer = Linearizer(
-            name="_generate_user_id_linearizer"
-        )
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         if hs.config.worker_app:
@@ -75,8 +66,9 @@ class RegistrationHandler(BaseHandler):
 
         self.session_lifetime = hs.config.session_lifetime
 
-    @defer.inlineCallbacks
-    def check_username(self, localpart, guest_access_token=None, assigned_user_id=None):
+    async def check_username(
+        self, localpart, guest_access_token=None, assigned_user_id=None
+    ):
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
@@ -113,13 +105,13 @@ class RegistrationHandler(BaseHandler):
                 Codes.INVALID_USERNAME,
             )
 
-        users = yield self.store.get_users_by_id_case_insensitive(user_id)
+        users = await self.store.get_users_by_id_case_insensitive(user_id)
         if users:
             if not guest_access_token:
                 raise SynapseError(
                     400, "User ID already taken.", errcode=Codes.USER_IN_USE
                 )
-            user_data = yield self.auth.get_user_by_access_token(guest_access_token)
+            user_data = await self.auth.get_user_by_access_token(guest_access_token)
             if not user_data["is_guest"] or user_data["user"].localpart != localpart:
                 raise AuthError(
                     403,
@@ -128,11 +120,19 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.FORBIDDEN,
                 )
 
-    @defer.inlineCallbacks
-    def register_user(
+        if guest_access_token is None:
+            try:
+                int(localpart)
+                raise SynapseError(
+                    400, "Numeric user IDs are reserved for guest users."
+                )
+            except ValueError:
+                pass
+
+    async def register_user(
         self,
         localpart=None,
-        password=None,
+        password_hash=None,
         guest_access_token=None,
         make_guest=False,
         admin=False,
@@ -141,13 +141,14 @@ class RegistrationHandler(BaseHandler):
         default_display_name=None,
         address=None,
         bind_emails=[],
+        by_admin=False,
     ):
         """Registers a new client on the server.
 
         Args:
-            localpart : The local part of the user ID to register. If None,
+            localpart: The local part of the user ID to register. If None,
               one will be generated.
-            password (unicode) : The password to assign to this user so they can
+            password_hash (str|None): The hashed password to assign to this user so they can
               login again. This can be None which means they cannot login again
               via a password (e.g. the user is an application service user).
             user_type (str|None): type of user. One of the values from
@@ -156,33 +157,23 @@ class RegistrationHandler(BaseHandler):
               will be set to this. Defaults to 'localpart'.
             address (str|None): the IP address used to perform the registration.
             bind_emails (List[str]): list of emails to bind to this account.
+            by_admin (bool): True if this registration is being made via the
+              admin api, otherwise False.
         Returns:
-            Deferred[str]: user_id
+            str: user_id
         Raises:
             SynapseError if there was a problem registering.
         """
-        yield self.check_registration_ratelimit(address)
+        self.check_registration_ratelimit(address)
 
-        yield self.auth.check_auth_blocking(threepid=threepid)
-        password_hash = None
-        if password:
-            password_hash = yield defer.ensureDeferred(
-                self._auth_handler.hash(password)
-            )
+        # do not check_auth_blocking if the call is coming through the Admin API
+        if not by_admin:
+            await self.auth.check_auth_blocking(threepid=threepid)
 
         if localpart is not None:
-            yield self.check_username(localpart, guest_access_token=guest_access_token)
+            await self.check_username(localpart, guest_access_token=guest_access_token)
 
             was_guest = guest_access_token is not None
-
-            if not was_guest:
-                try:
-                    int(localpart)
-                    raise SynapseError(
-                        400, "Numeric user IDs are reserved for guest users."
-                    )
-                except ValueError:
-                    pass
 
             user = UserID(localpart, self.hs.hostname)
             user_id = user.to_string()
@@ -194,7 +185,7 @@ class RegistrationHandler(BaseHandler):
             elif default_display_name is None:
                 default_display_name = localpart
 
-            yield self.register_with_store(
+            await self.register_with_store(
                 user_id=user_id,
                 password_hash=password_hash,
                 was_guest=was_guest,
@@ -206,8 +197,8 @@ class RegistrationHandler(BaseHandler):
             )
 
             if self.hs.config.user_directory_search_all_users:
-                profile = yield self.store.get_profileinfo(localpart)
-                yield self.user_directory_handler.handle_local_profile_change(
+                profile = await self.store.get_profileinfo(localpart)
+                await self.user_directory_handler.handle_local_profile_change(
                     user_id, profile
                 )
 
@@ -220,14 +211,14 @@ class RegistrationHandler(BaseHandler):
                 if fail_count > 10:
                     raise SynapseError(500, "Unable to find a suitable guest user ID")
 
-                localpart = yield self._generate_user_id()
+                localpart = await self.store.generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
-                yield self.check_user_id_not_appservice_exclusive(user_id)
+                self.check_user_id_not_appservice_exclusive(user_id)
                 if default_display_name is None:
                     default_display_name = localpart
                 try:
-                    yield self.register_with_store(
+                    await self.register_with_store(
                         user_id=user_id,
                         password_hash=password_hash,
                         make_guest=make_guest,
@@ -244,7 +235,13 @@ class RegistrationHandler(BaseHandler):
                     fail_count += 1
 
         if not self.hs.config.user_consent_at_registration:
-            yield self._auto_join_rooms(user_id)
+            if not self.hs.config.auto_join_rooms_for_guests and make_guest:
+                logger.info(
+                    "Skipping auto-join for %s because auto-join for guests is disabled",
+                    user_id,
+                )
+            else:
+                await self._auto_join_rooms(user_id)
         else:
             logger.info(
                 "Skipping auto-join for %s because consent is required at registration",
@@ -262,56 +259,87 @@ class RegistrationHandler(BaseHandler):
             }
 
             # Bind email to new account
-            yield self._register_email_threepid(user_id, threepid_dict, None)
+            await self._register_email_threepid(user_id, threepid_dict, None)
 
         return user_id
 
-    @defer.inlineCallbacks
-    def _auto_join_rooms(self, user_id):
-        """Automatically joins users to auto join rooms - creating the room in the first place
-        if the user is the first to be created.
+    async def _create_and_join_rooms(self, user_id: str):
+        """
+        Create the auto-join rooms and join or invite the user to them.
+
+        This should only be called when the first "real" user registers.
 
         Args:
-            user_id(str): The user to join
+            user_id: The user to join
         """
-        # auto-join the user to any rooms we're supposed to dump them into
-        fake_requester = create_requester(user_id)
+        # Getting the handlers during init gives a dependency loop.
+        room_creation_handler = self.hs.get_room_creation_handler()
+        room_member_handler = self.hs.get_room_member_handler()
 
-        # try to create the room if we're the first real user on the server. Note
-        # that an auto-generated support or bot user is not a real user and will never be
-        # the user to create the room
-        should_auto_create_rooms = False
-        is_real_user = yield self.store.is_real_user(user_id)
-        if self.hs.config.autocreate_auto_join_rooms and is_real_user:
-            count = yield self.store.count_real_users()
-            should_auto_create_rooms = count == 1
-        for r in self.hs.config.auto_join_rooms:
+        # Generate a stub for how the rooms will be configured.
+        stub_config = {
+            "preset": self.hs.config.registration.autocreate_auto_join_room_preset,
+        }
+
+        # If the configuration providers a user ID to create rooms with, use
+        # that instead of the first user registered.
+        requires_join = False
+        if self.hs.config.registration.auto_join_user_id:
+            fake_requester = create_requester(
+                self.hs.config.registration.auto_join_user_id
+            )
+
+            # If the room requires an invite, add the user to the list of invites.
+            if self.hs.config.registration.auto_join_room_requires_invite:
+                stub_config["invite"] = [user_id]
+
+            # If the room is being created by a different user, the first user
+            # registered needs to join it. Note that in the case of an invitation
+            # being necessary this will occur after the invite was sent.
+            requires_join = True
+        else:
+            fake_requester = create_requester(user_id)
+
+        # Choose whether to federate the new room.
+        if not self.hs.config.registration.autocreate_auto_join_rooms_federated:
+            stub_config["creation_content"] = {"m.federate": False}
+
+        for r in self.hs.config.registration.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)
-            try:
-                if should_auto_create_rooms:
-                    room_alias = RoomAlias.from_string(r)
-                    if self.hs.hostname != room_alias.domain:
-                        logger.warning(
-                            "Cannot create room alias %s, "
-                            "it does not match server domain",
-                            r,
-                        )
-                    else:
-                        # create room expects the localpart of the room alias
-                        room_alias_localpart = room_alias.localpart
 
-                        # getting the RoomCreationHandler during init gives a dependency
-                        # loop
-                        yield self.hs.get_room_creation_handler().create_room(
-                            fake_requester,
-                            config={
-                                "preset": "public_chat",
-                                "room_alias_name": room_alias_localpart,
-                            },
+            try:
+                room_alias = RoomAlias.from_string(r)
+
+                if self.hs.hostname != room_alias.domain:
+                    logger.warning(
+                        "Cannot create room alias %s, "
+                        "it does not match server domain",
+                        r,
+                    )
+                else:
+                    # A shallow copy is OK here since the only key that is
+                    # modified is room_alias_name.
+                    config = stub_config.copy()
+                    # create room expects the localpart of the room alias
+                    config["room_alias_name"] = room_alias.localpart
+
+                    info, _ = await room_creation_handler.create_room(
+                        fake_requester, config=config, ratelimit=False,
+                    )
+
+                    # If the room does not require an invite, but another user
+                    # created it, then ensure the first user joins it.
+                    if requires_join:
+                        await room_member_handler.update_membership(
+                            requester=create_requester(user_id),
+                            target=UserID.from_string(user_id),
+                            room_id=info["room_id"],
+                            # Since it was just created, there are no remote hosts.
+                            remote_room_hosts=[],
+                            action="join",
                             ratelimit=False,
                         )
-                else:
-                    yield self._join_user_to_room(fake_requester, r)
+
             except ConsentNotGivenError as e:
                 # Technically not necessary to pull out this error though
                 # moving away from bare excepts is a good thing to do.
@@ -319,18 +347,113 @@ class RegistrationHandler(BaseHandler):
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
 
-    @defer.inlineCallbacks
-    def post_consent_actions(self, user_id):
+    async def _join_rooms(self, user_id: str):
+        """
+        Join or invite the user to the auto-join rooms.
+
+        Args:
+            user_id: The user to join
+        """
+        room_member_handler = self.hs.get_room_member_handler()
+
+        for r in self.hs.config.registration.auto_join_rooms:
+            logger.info("Auto-joining %s to %s", user_id, r)
+
+            try:
+                room_alias = RoomAlias.from_string(r)
+
+                if RoomAlias.is_valid(r):
+                    (
+                        room_id,
+                        remote_room_hosts,
+                    ) = await room_member_handler.lookup_room_alias(room_alias)
+                    room_id = room_id.to_string()
+                else:
+                    raise SynapseError(
+                        400, "%s was not legal room ID or room alias" % (r,)
+                    )
+
+                # Calculate whether the room requires an invite or can be
+                # joined directly. Note that unless a join rule of public exists,
+                # it is treated as requiring an invite.
+                requires_invite = True
+
+                state = await self.store.get_filtered_current_state_ids(
+                    room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
+                )
+
+                event_id = state.get((EventTypes.JoinRules, ""))
+                if event_id:
+                    join_rules_event = await self.store.get_event(
+                        event_id, allow_none=True
+                    )
+                    if join_rules_event:
+                        join_rule = join_rules_event.content.get("join_rule", None)
+                        requires_invite = join_rule and join_rule != JoinRules.PUBLIC
+
+                # Send the invite, if necessary.
+                if requires_invite:
+                    await room_member_handler.update_membership(
+                        requester=create_requester(
+                            self.hs.config.registration.auto_join_user_id
+                        ),
+                        target=UserID.from_string(user_id),
+                        room_id=room_id,
+                        remote_room_hosts=remote_room_hosts,
+                        action="invite",
+                        ratelimit=False,
+                    )
+
+                # Send the join.
+                await room_member_handler.update_membership(
+                    requester=create_requester(user_id),
+                    target=UserID.from_string(user_id),
+                    room_id=room_id,
+                    remote_room_hosts=remote_room_hosts,
+                    action="join",
+                    ratelimit=False,
+                )
+
+            except ConsentNotGivenError as e:
+                # Technically not necessary to pull out this error though
+                # moving away from bare excepts is a good thing to do.
+                logger.error("Failed to join new user to %r: %r", r, e)
+            except Exception as e:
+                logger.error("Failed to join new user to %r: %r", r, e)
+
+    async def _auto_join_rooms(self, user_id: str):
+        """Automatically joins users to auto join rooms - creating the room in the first place
+        if the user is the first to be created.
+
+        Args:
+            user_id: The user to join
+        """
+        # auto-join the user to any rooms we're supposed to dump them into
+
+        # try to create the room if we're the first real user on the server. Note
+        # that an auto-generated support or bot user is not a real user and will never be
+        # the user to create the room
+        should_auto_create_rooms = False
+        is_real_user = await self.store.is_real_user(user_id)
+        if self.hs.config.registration.autocreate_auto_join_rooms and is_real_user:
+            count = await self.store.count_real_users()
+            should_auto_create_rooms = count == 1
+
+        if should_auto_create_rooms:
+            await self._create_and_join_rooms(user_id)
+        else:
+            await self._join_rooms(user_id)
+
+    async def post_consent_actions(self, user_id):
         """A series of registration actions that can only be carried out once consent
         has been granted
 
         Args:
             user_id (str): The user to join
         """
-        yield self._auto_join_rooms(user_id)
+        await self._auto_join_rooms(user_id)
 
-    @defer.inlineCallbacks
-    def appservice_register(self, user_localpart, as_token):
+    async def appservice_register(self, user_localpart, as_token):
         user = UserID(user_localpart, self.hs.hostname)
         user_id = user.to_string()
         service = self.store.get_app_service_by_token(as_token)
@@ -345,11 +468,9 @@ class RegistrationHandler(BaseHandler):
 
         service_id = service.id if service.is_exclusive_user(user_id) else None
 
-        yield self.check_user_id_not_appservice_exclusive(
-            user_id, allowed_appservice=service
-        )
+        self.check_user_id_not_appservice_exclusive(user_id, allowed_appservice=service)
 
-        yield self.register_with_store(
+        await self.register_with_store(
             user_id=user_id,
             password_hash="",
             appservice_id=service_id,
@@ -381,44 +502,6 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE,
                 )
 
-    @defer.inlineCallbacks
-    def _generate_user_id(self):
-        if self._next_generated_user_id is None:
-            with (yield self._generate_user_id_linearizer.queue(())):
-                if self._next_generated_user_id is None:
-                    self._next_generated_user_id = (
-                        yield self.store.find_next_generated_user_id_localpart()
-                    )
-
-        id = self._next_generated_user_id
-        self._next_generated_user_id += 1
-        return str(id)
-
-    @defer.inlineCallbacks
-    def _join_user_to_room(self, requester, room_identifier):
-        room_member_handler = self.hs.get_room_member_handler()
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-        elif RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = yield room_member_handler.lookup_room_alias(
-                room_alias
-            )
-            room_id = room_id.to_string()
-        else:
-            raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
-            )
-
-        yield room_member_handler.update_membership(
-            requester=requester,
-            target=requester.user,
-            room_id=room_id,
-            remote_room_hosts=remote_room_hosts,
-            action="join",
-            ratelimit=False,
-        )
-
     def check_registration_ratelimit(self, address):
         """A simple helper method to check whether the registration rate limit has been hit
         for a given IP address
@@ -433,14 +516,7 @@ class RegistrationHandler(BaseHandler):
         if not address:
             return
 
-        time_now = self.clock.time()
-
-        self.ratelimiter.ratelimit(
-            address,
-            time_now_s=time_now,
-            rate_hz=self.hs.config.rc_registration.per_second,
-            burst_count=self.hs.config.rc_registration.burst_count,
-        )
+        self.ratelimiter.ratelimit(address)
 
     def register_with_store(
         self,
@@ -498,8 +574,9 @@ class RegistrationHandler(BaseHandler):
                 user_type=user_type,
             )
 
-    @defer.inlineCallbacks
-    def register_device(self, user_id, device_id, initial_display_name, is_guest=False):
+    async def register_device(
+        self, user_id, device_id, initial_display_name, is_guest=False
+    ):
         """Register a device for a user and generate an access token.
 
         The access token will be limited by the homeserver's session_lifetime config.
@@ -513,11 +590,11 @@ class RegistrationHandler(BaseHandler):
             is_guest (bool): Whether this is a guest account
 
         Returns:
-            defer.Deferred[tuple[str, str]]: Tuple of device ID and access token
+            tuple[str, str]: Tuple of device ID and access token
         """
 
         if self.hs.config.worker_app:
-            r = yield self._register_device_client(
+            r = await self._register_device_client(
                 user_id=user_id,
                 device_id=device_id,
                 initial_display_name=initial_display_name,
@@ -533,7 +610,7 @@ class RegistrationHandler(BaseHandler):
                 )
             valid_until_ms = self.clock.time_msec() + self.session_lifetime
 
-        device_id = yield self.device_handler.check_device_registered(
+        device_id = await self.device_handler.check_device_registered(
             user_id, device_id, initial_display_name
         )
         if is_guest:
@@ -542,16 +619,13 @@ class RegistrationHandler(BaseHandler):
                 user_id, ["guest = true"]
             )
         else:
-            access_token = yield defer.ensureDeferred(
-                self._auth_handler.get_access_token_for_user_id(
-                    user_id, device_id=device_id, valid_until_ms=valid_until_ms
-                )
+            access_token = await self._auth_handler.get_access_token_for_user_id(
+                user_id, device_id=device_id, valid_until_ms=valid_until_ms
             )
 
         return (device_id, access_token)
 
-    @defer.inlineCallbacks
-    def post_registration_actions(self, user_id, auth_result, access_token):
+    async def post_registration_actions(self, user_id, auth_result, access_token):
         """A user has completed registration
 
         Args:
@@ -562,7 +636,7 @@ class RegistrationHandler(BaseHandler):
                 device, or None if `inhibit_login` enabled.
         """
         if self.hs.config.worker_app:
-            yield self._post_registration_client(
+            await self._post_registration_client(
                 user_id=user_id, auth_result=auth_result, access_token=access_token
             )
             return
@@ -574,19 +648,18 @@ class RegistrationHandler(BaseHandler):
             if is_threepid_reserved(
                 self.hs.config.mau_limits_reserved_threepids, threepid
             ):
-                yield self.store.upsert_monthly_active_user(user_id)
+                await self.store.upsert_monthly_active_user(user_id)
 
-            yield self._register_email_threepid(user_id, threepid, access_token)
+            await self._register_email_threepid(user_id, threepid, access_token)
 
         if auth_result and LoginType.MSISDN in auth_result:
             threepid = auth_result[LoginType.MSISDN]
-            yield self._register_msisdn_threepid(user_id, threepid)
+            await self._register_msisdn_threepid(user_id, threepid)
 
         if auth_result and LoginType.TERMS in auth_result:
-            yield self._on_user_consented(user_id, self.hs.config.user_consent_version)
+            await self._on_user_consented(user_id, self.hs.config.user_consent_version)
 
-    @defer.inlineCallbacks
-    def _on_user_consented(self, user_id, consent_version):
+    async def _on_user_consented(self, user_id, consent_version):
         """A user consented to the terms on registration
 
         Args:
@@ -595,11 +668,10 @@ class RegistrationHandler(BaseHandler):
                 consented to.
         """
         logger.info("%s has consented to the privacy policy", user_id)
-        yield self.store.user_set_consent_version(user_id, consent_version)
-        yield self.post_consent_actions(user_id)
+        await self.store.user_set_consent_version(user_id, consent_version)
+        await self.post_consent_actions(user_id)
 
-    @defer.inlineCallbacks
-    def _register_email_threepid(self, user_id, threepid, token):
+    async def _register_email_threepid(self, user_id, threepid, token):
         """Add an email address as a 3pid identifier
 
         Also adds an email pusher for the email address, if configured in the
@@ -612,8 +684,6 @@ class RegistrationHandler(BaseHandler):
             threepid (object): m.login.email.identity auth response
             token (str|None): access_token for the user, or None if not logged
                 in.
-        Returns:
-            defer.Deferred:
         """
         reqd = ("medium", "address", "validated_at")
         if any(x not in threepid for x in reqd):
@@ -621,13 +691,8 @@ class RegistrationHandler(BaseHandler):
             logger.info("Can't add incomplete 3pid")
             return
 
-        yield defer.ensureDeferred(
-            self._auth_handler.add_threepid(
-                user_id,
-                threepid["medium"],
-                threepid["address"],
-                threepid["validated_at"],
-            )
+        await self._auth_handler.add_threepid(
+            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
         )
 
         # And we add an email pusher for them by default, but only
@@ -643,10 +708,10 @@ class RegistrationHandler(BaseHandler):
             # It would really make more sense for this to be passed
             # up when the access token is saved, but that's quite an
             # invasive change I'd rather do separately.
-            user_tuple = yield self.store.get_user_by_access_token(token)
+            user_tuple = await self.store.get_user_by_access_token(token)
             token_id = user_tuple["token_id"]
 
-            yield self.pusher_pool.add_pusher(
+            await self.pusher_pool.add_pusher(
                 user_id=user_id,
                 access_token=token_id,
                 kind="email",
@@ -658,8 +723,7 @@ class RegistrationHandler(BaseHandler):
                 data={},
             )
 
-    @defer.inlineCallbacks
-    def _register_msisdn_threepid(self, user_id, threepid):
+    async def _register_msisdn_threepid(self, user_id, threepid):
         """Add a phone number as a 3pid identifier
 
         Must be called on master.
@@ -667,8 +731,6 @@ class RegistrationHandler(BaseHandler):
         Args:
             user_id (str): id of user
             threepid (object): m.login.msisdn auth response
-        Returns:
-            defer.Deferred:
         """
         try:
             assert_params_in_dict(threepid, ["medium", "address", "validated_at"])
@@ -679,11 +741,6 @@ class RegistrationHandler(BaseHandler):
                 return None
             raise
 
-        yield defer.ensureDeferred(
-            self._auth_handler.add_threepid(
-                user_id,
-                threepid["medium"],
-                threepid["address"],
-                threepid["validated_at"],
-            )
+        await self._auth_handler.add_threepid(
+            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
         )

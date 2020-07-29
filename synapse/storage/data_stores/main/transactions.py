@@ -16,8 +16,6 @@
 import logging
 from collections import namedtuple
 
-import six
-
 from canonicaljson import encode_canonical_json
 
 from twisted.internet import defer
@@ -27,12 +25,7 @@ from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import Database
 from synapse.util.caches.expiringcache import ExpiringCache
 
-# py2 sqlite has buffer hardcoded as only binary type, so we must use it,
-# despite being deprecated and removed in favor of memoryview
-if six.PY2:
-    db_binary_type = six.moves.builtins.buffer
-else:
-    db_binary_type = memoryview
+db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 

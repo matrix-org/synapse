@@ -1,1 +1,0 @@
-Fix missing field `default` when fetching user-defined push rules.

@@ -1,7 +1,44 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "6.7.4"
+    },
+    {
+      "type": "panel",
+      "id": "graph",
+      "name": "Graph",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "heatmap",
+      "name": "Heatmap",
+      "version": ""
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    }
+  ],
   "annotations": {
     "list": [
       {
+        "$$hashKey": "object:76",
         "builtIn": 1,
         "datasource": "$datasource",
         "enable": false,
@@ -17,8 +54,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 1,
-  "iteration": 1584612489167,
+  "id": null,
+  "iteration": 1594646317221,
   "links": [
     {
       "asDropdown": true,
@@ -34,7 +71,7 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -269,7 +306,6 @@
         "show": false
       },
       "links": [],
-      "options": {},
       "reverseYBuckets": false,
       "targets": [
         {
@@ -559,7 +595,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -577,13 +613,15 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 29
+            "y": 2
           },
+          "hiddenSeries": false,
           "id": 5,
           "legend": {
             "alignAsTable": false,
@@ -602,6 +640,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -704,12 +745,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 29
+            "y": 2
           },
+          "hiddenSeries": false,
           "id": 37,
           "legend": {
             "avg": false,
@@ -724,6 +767,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -810,13 +856,15 @@
           "editable": true,
           "error": false,
           "fill": 0,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 9
           },
+          "hiddenSeries": false,
           "id": 34,
           "legend": {
             "avg": false,
@@ -831,6 +879,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -898,13 +949,16 @@
           "datasource": "$datasource",
           "description": "Shows the time in which the given percentage of reactor ticks completed, over the sampled timespan",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 9
           },
+          "hiddenSeries": false,
           "id": 105,
+          "interval": "",
           "legend": {
             "avg": false,
             "current": false,
@@ -918,6 +972,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -952,9 +1009,10 @@
               "refId": "C"
             },
             {
-              "expr": "",
+              "expr": "rate(python_twisted_reactor_tick_time_sum{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size]) / rate(python_twisted_reactor_tick_time_count{index=~\"$index\",instance=\"$instance\",job=~\"$job\"}[$bucket_size])",
               "format": "time_series",
               "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}} mean",
               "refId": "D"
             }
           ],
@@ -1005,14 +1063,16 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "$datasource",
-          "fill": 1,
+          "fill": 0,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 43
+            "y": 16
           },
-          "id": 50,
+          "hiddenSeries": false,
+          "id": 53,
           "legend": {
             "avg": false,
             "current": false,
@@ -1026,6 +1086,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -1037,20 +1100,18 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(python_twisted_reactor_tick_time_sum{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])/rate(python_twisted_reactor_tick_time_count[$bucket_size])",
+              "expr": "min_over_time(up{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
-              "interval": "",
               "intervalFactor": 2,
               "legendFormat": "{{job}}-{{index}}",
-              "refId": "A",
-              "step": 20
+              "refId": "A"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Avg reactor tick time",
+          "title": "Up",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1066,7 +1127,7 @@
           },
           "yaxes": [
             {
-              "format": "s",
+              "format": "short",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -1079,7 +1140,7 @@
               "logBase": 1,
               "max": null,
               "min": null,
-              "show": false
+              "show": true
             }
           ],
           "yaxis": {
@@ -1094,12 +1155,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 43
+            "y": 16
           },
+          "hiddenSeries": false,
           "id": 49,
           "legend": {
             "avg": false,
@@ -1114,6 +1177,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -1188,14 +1254,17 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "$datasource",
-          "fill": 0,
+          "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 50
+            "y": 23
           },
-          "id": 53,
+          "hiddenSeries": false,
+          "id": 136,
+          "interval": "",
           "legend": {
             "avg": false,
             "current": false,
@@ -1207,11 +1276,12 @@
           },
           "lines": true,
           "linewidth": 1,
-          "links": [],
           "nullPointMode": "null",
-          "paceLength": 10,
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
-          "pointradius": 5,
+          "pointradius": 2,
           "points": false,
           "renderer": "flot",
           "seriesOverrides": [],
@@ -1220,18 +1290,21 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "min_over_time(up{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
-              "format": "time_series",
-              "intervalFactor": 2,
-              "legendFormat": "{{job}}-{{index}}",
+              "expr": "rate(synapse_http_client_requests{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "legendFormat": "{{job}}-{{index}} {{method}}",
               "refId": "A"
+            },
+            {
+              "expr": "rate(synapse_http_matrixfederationclient_requests{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}[$bucket_size])",
+              "legendFormat": "{{job}}-{{index}} {{method}} (federation)",
+              "refId": "B"
             }
           ],
           "thresholds": [],
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Up",
+          "title": "Outgoing HTTP request rate",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1247,7 +1320,7 @@
           },
           "yaxes": [
             {
-              "format": "short",
+              "format": "reqps",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -1275,12 +1348,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 50
+            "y": 23
           },
+          "hiddenSeries": false,
           "id": 120,
           "legend": {
             "avg": false,
@@ -1295,6 +1370,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 2,
           "points": false,
@@ -1307,6 +1385,7 @@
             {
               "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
+              "hide": false,
               "instant": false,
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} {{method}} {{servlet}} {{tag}}",
@@ -1315,6 +1394,7 @@
             {
               "expr": "rate(synapse_background_process_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_background_process_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
+              "hide": false,
               "instant": false,
               "interval": "",
               "intervalFactor": 1,
@@ -1379,7 +1459,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1751,7 +1831,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1770,6 +1850,7 @@
           "editable": true,
           "error": false,
           "fill": 2,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 8,
@@ -1777,6 +1858,7 @@
             "x": 0,
             "y": 31
           },
+          "hiddenSeries": false,
           "id": 4,
           "legend": {
             "alignAsTable": true,
@@ -1795,7 +1877,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1878,6 +1962,7 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 8,
@@ -1885,6 +1970,7 @@
             "x": 12,
             "y": 31
           },
+          "hiddenSeries": false,
           "id": 32,
           "legend": {
             "avg": false,
@@ -1899,7 +1985,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -1968,6 +2056,7 @@
           "editable": true,
           "error": false,
           "fill": 2,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 8,
@@ -1975,7 +2064,8 @@
             "x": 0,
             "y": 39
           },
-          "id": 23,
+          "hiddenSeries": false,
+          "id": 139,
           "legend": {
             "alignAsTable": true,
             "avg": false,
@@ -1993,7 +2083,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2004,7 +2096,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_in_flight_requests_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -2079,6 +2171,7 @@
           "editable": true,
           "error": false,
           "fill": 2,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 8,
@@ -2086,6 +2179,7 @@
             "x": 12,
             "y": 39
           },
+          "hiddenSeries": false,
           "id": 52,
           "legend": {
             "alignAsTable": true,
@@ -2104,7 +2198,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2115,7 +2211,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "(rate(synapse_http_server_response_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_response_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) / rate(synapse_http_server_response_count{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "(rate(synapse_http_server_in_flight_requests_ru_utime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])+rate(synapse_http_server_in_flight_requests_ru_stime_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])) / rate(synapse_http_server_requests_received{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -2187,6 +2283,7 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 8,
@@ -2194,6 +2291,7 @@
             "x": 0,
             "y": 47
           },
+          "hiddenSeries": false,
           "id": 7,
           "legend": {
             "alignAsTable": true,
@@ -2211,7 +2309,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2222,7 +2322,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_http_server_response_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
+              "expr": "rate(synapse_http_server_in_flight_requests_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -2280,6 +2380,7 @@
           "editable": true,
           "error": false,
           "fill": 2,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 8,
@@ -2287,6 +2388,7 @@
             "x": 12,
             "y": 47
           },
+          "hiddenSeries": false,
           "id": 47,
           "legend": {
             "alignAsTable": true,
@@ -2305,7 +2407,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2372,12 +2476,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
             "y": 55
           },
+          "hiddenSeries": false,
           "id": 103,
           "legend": {
             "avg": false,
@@ -2392,7 +2498,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -2459,7 +2567,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2475,12 +2583,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
             "y": 32
           },
+          "hiddenSeries": false,
           "id": 99,
           "legend": {
             "avg": false,
@@ -2495,7 +2605,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -2563,12 +2675,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 12,
             "y": 32
           },
+          "hiddenSeries": false,
           "id": 101,
           "legend": {
             "avg": false,
@@ -2583,7 +2697,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -2649,6 +2765,93 @@
             "align": false,
             "alignLevel": null
           }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 41
+          },
+          "hiddenSeries": false,
+          "id": 138,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_background_process_in_flight_count{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "legendFormat": "{{job}}-{{index}} {{name}}",
+              "refId": "A"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Background jobs in flight",
+          "tooltip": {
+            "shared": false,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "title": "Background jobs",
@@ -2656,7 +2859,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2677,8 +2880,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 33
+            "y": 6
           },
+          "hiddenSeries": false,
           "id": 79,
           "legend": {
             "avg": false,
@@ -2772,8 +2976,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 33
+            "y": 6
           },
+          "hiddenSeries": false,
           "id": 83,
           "legend": {
             "avg": false,
@@ -2869,8 +3074,9 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 15
           },
+          "hiddenSeries": false,
           "id": 109,
           "legend": {
             "avg": false,
@@ -2967,8 +3173,9 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 15
           },
+          "hiddenSeries": false,
           "id": 111,
           "legend": {
             "avg": false,
@@ -3045,6 +3252,241 @@
             "align": false,
             "alignLevel": null
           }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "$datasource",
+          "description": "Number of events queued up on the master process for processing by the federation sender",
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 9,
+            "w": 12,
+            "x": 0,
+            "y": 24
+          },
+          "hiddenSeries": false,
+          "id": 140,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "links": [],
+          "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
+          "paceLength": 10,
+          "percentage": false,
+          "pointradius": 5,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_federation_send_queue_presence_changed_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "format": "time_series",
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "presence changed",
+              "refId": "A"
+            },
+            {
+              "expr": "synapse_federation_send_queue_presence_map_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "presence map",
+              "refId": "B"
+            },
+            {
+              "expr": "synapse_federation_send_queue_presence_destinations_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "presence destinations",
+              "refId": "E"
+            },
+            {
+              "expr": "synapse_federation_send_queue_keyed_edu_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "keyed edus",
+              "refId": "C"
+            },
+            {
+              "expr": "synapse_federation_send_queue_edus_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "other edus",
+              "refId": "D"
+            },
+            {
+              "expr": "synapse_federation_send_queue_pos_time_size{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "format": "time_series",
+              "hide": false,
+              "interval": "",
+              "intervalFactor": 1,
+              "legendFormat": "stream positions",
+              "refId": "F"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "Outgoing EDU queues on master",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "format": "none",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "format": "short",
+              "label": null,
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "The number of events in the in-memory queues ",
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 24
+          },
+          "hiddenSeries": false,
+          "id": 142,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_federation_transaction_queue_pending_pdus{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "interval": "",
+              "legendFormat": "pending PDUs {{job}}-{{index}}",
+              "refId": "A"
+            },
+            {
+              "expr": "synapse_federation_transaction_queue_pending_edus{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "interval": "",
+              "legendFormat": "pending EDUs {{job}}-{{index}}",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "In-memory federation transmission queues",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "$$hashKey": "object:317",
+              "format": "short",
+              "label": "events",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "$$hashKey": "object:318",
+              "format": "short",
+              "label": "",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "title": "Federation",
@@ -3052,7 +3494,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3258,7 +3700,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3274,12 +3716,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 35
+            "y": 79
           },
+          "hiddenSeries": false,
           "id": 48,
           "legend": {
             "avg": false,
@@ -3294,7 +3738,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3364,12 +3810,14 @@
           "datasource": "$datasource",
           "description": "Shows the time in which the given percentage of database queries were scheduled, over the sampled timespan",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 35
+            "y": 79
           },
+          "hiddenSeries": false,
           "id": 104,
           "legend": {
             "alignAsTable": true,
@@ -3385,7 +3833,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3479,13 +3929,15 @@
           "editable": true,
           "error": false,
           "fill": 0,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 86
           },
+          "hiddenSeries": false,
           "id": 10,
           "legend": {
             "avg": false,
@@ -3502,7 +3954,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3571,13 +4025,15 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 86
           },
+          "hiddenSeries": false,
           "id": 11,
           "legend": {
             "avg": false,
@@ -3594,7 +4050,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -3662,7 +4120,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3686,8 +4144,9 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 36
+            "y": 80
           },
+          "hiddenSeries": false,
           "id": 12,
           "legend": {
             "alignAsTable": true,
@@ -3780,8 +4239,9 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 36
+            "y": 80
           },
+          "hiddenSeries": false,
           "id": 26,
           "legend": {
             "alignAsTable": true,
@@ -3874,8 +4334,9 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 49
+            "y": 93
           },
+          "hiddenSeries": false,
           "id": 13,
           "legend": {
             "alignAsTable": true,
@@ -3905,7 +4366,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\",block_name!=\"wrapped_request_handler\"}[$bucket_size])",
+              "expr": "rate(synapse_util_metrics_block_db_txn_duration_seconds{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 2,
@@ -3959,6 +4420,7 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "$datasource",
+          "description": "The time each database transaction takes to execute, on average, broken down by metrics block.",
           "editable": true,
           "error": false,
           "fill": 1,
@@ -3968,8 +4430,9 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 49
+            "y": 93
           },
+          "hiddenSeries": false,
           "id": 27,
           "legend": {
             "alignAsTable": true,
@@ -4012,7 +4475,7 @@
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Average Database Time per Block",
+          "title": "Average Database Transaction time, by Block",
           "tooltip": {
             "shared": false,
             "sort": 0,
@@ -4056,13 +4519,15 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 62
+            "y": 106
           },
+          "hiddenSeries": false,
           "id": 28,
           "legend": {
             "avg": false,
@@ -4077,7 +4542,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -4146,13 +4613,15 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 62
+            "y": 106
           },
+          "hiddenSeries": false,
           "id": 25,
           "legend": {
             "avg": false,
@@ -4167,7 +4636,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -4234,7 +4705,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4253,6 +4724,7 @@
           "editable": true,
           "error": false,
           "fill": 0,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 10,
@@ -4260,6 +4732,7 @@
             "x": 0,
             "y": 37
           },
+          "hiddenSeries": false,
           "id": 1,
           "legend": {
             "alignAsTable": true,
@@ -4277,6 +4750,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4346,6 +4822,7 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 10,
@@ -4353,6 +4830,7 @@
             "x": 12,
             "y": 37
           },
+          "hiddenSeries": false,
           "id": 8,
           "legend": {
             "alignAsTable": true,
@@ -4369,6 +4847,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4437,6 +4918,7 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 10,
@@ -4444,6 +4926,7 @@
             "x": 0,
             "y": 47
           },
+          "hiddenSeries": false,
           "id": 38,
           "legend": {
             "alignAsTable": true,
@@ -4460,6 +4943,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4525,12 +5011,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 10,
             "w": 12,
             "x": 12,
             "y": 47
           },
+          "hiddenSeries": false,
           "id": 39,
           "legend": {
             "alignAsTable": true,
@@ -4546,6 +5034,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4612,12 +5103,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
             "y": 57
           },
+          "hiddenSeries": false,
           "id": 65,
           "legend": {
             "alignAsTable": true,
@@ -4633,6 +5126,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4699,7 +5195,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4715,12 +5211,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 66
+            "y": 121
           },
+          "hiddenSeries": false,
           "id": 91,
           "legend": {
             "avg": false,
@@ -4735,6 +5233,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4805,13 +5306,15 @@
           "editable": true,
           "error": false,
           "fill": 1,
+          "fillGradient": 0,
           "grid": {},
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 66
+            "y": 121
           },
+          "hiddenSeries": false,
           "id": 21,
           "legend": {
             "alignAsTable": true,
@@ -4827,6 +5330,9 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "null as zero",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4893,12 +5399,14 @@
           "datasource": "$datasource",
           "description": "'gen 0' shows the number of objects allocated since the last gen0 GC.\n'gen 1' / 'gen 2' show the number of gen0/gen1 GCs since the last gen1/gen2 GC.",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 130
           },
+          "hiddenSeries": false,
           "id": 89,
           "legend": {
             "avg": false,
@@ -4915,6 +5423,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -4986,12 +5497,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 75
+            "y": 130
           },
+          "hiddenSeries": false,
           "id": 93,
           "legend": {
             "avg": false,
@@ -5006,6 +5519,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "connected",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -5071,12 +5587,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 84
+            "y": 139
           },
+          "hiddenSeries": false,
           "id": 95,
           "legend": {
             "avg": false,
@@ -5091,6 +5609,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 5,
           "points": false,
@@ -5164,12 +5685,12 @@
             "mode": "spectrum"
           },
           "dataFormat": "tsbuckets",
-          "datasource": "Prometheus",
+          "datasource": "${DS_PROMETHEUS}",
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 84
+            "y": 139
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -5220,7 +5741,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -5236,12 +5757,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 39
+            "y": 66
           },
+          "hiddenSeries": false,
           "id": 2,
           "legend": {
             "avg": false,
@@ -5256,7 +5779,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5356,12 +5881,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 39
+            "y": 66
           },
+          "hiddenSeries": false,
           "id": 41,
           "legend": {
             "avg": false,
@@ -5376,7 +5903,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5445,12 +5974,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 73
           },
+          "hiddenSeries": false,
           "id": 42,
           "legend": {
             "avg": false,
@@ -5465,7 +5996,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5533,12 +6066,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 73
           },
+          "hiddenSeries": false,
           "id": 43,
           "legend": {
             "avg": false,
@@ -5553,7 +6088,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5621,12 +6158,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 53
+            "y": 80
           },
+          "hiddenSeries": false,
           "id": 113,
           "legend": {
             "avg": false,
@@ -5641,7 +6180,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5658,6 +6199,13 @@
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} {{stream_name}}",
               "refId": "A"
+            },
+            {
+              "expr": "synapse_replication_tcp_resource_total_connections{job=~\"$job\",index=~\"$index\",instance=\"$instance\"}",
+              "format": "time_series",
+              "intervalFactor": 1,
+              "legendFormat": "{{job}}-{{index}}",
+              "refId": "B"
             }
           ],
           "thresholds": [],
@@ -5684,7 +6232,7 @@
               "label": null,
               "logBase": 1,
               "max": null,
-              "min": null,
+              "min": "0",
               "show": true
             },
             {
@@ -5708,12 +6256,14 @@
           "dashes": false,
           "datasource": "$datasource",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 53
+            "y": 80
           },
+          "hiddenSeries": false,
           "id": 115,
           "legend": {
             "avg": false,
@@ -5728,7 +6278,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "paceLength": 10,
           "percentage": false,
           "pointradius": 5,
@@ -5795,7 +6347,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -5818,6 +6370,7 @@
             "x": 0,
             "y": 40
           },
+          "hiddenSeries": false,
           "id": 67,
           "legend": {
             "avg": false,
@@ -5846,7 +6399,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": " synapse_event_persisted_position{instance=\"$instance\",job=\"synapse\"}  - ignoring(index, job, name) group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "max(synapse_event_persisted_position{instance=\"$instance\"}) - ignoring(instance,index, job, name) group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -5909,6 +6462,7 @@
             "x": 12,
             "y": 40
           },
+          "hiddenSeries": false,
           "id": 71,
           "legend": {
             "avg": false,
@@ -5940,6 +6494,7 @@
               "expr": "time()*1000-synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "hide": false,
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} {{name}}",
               "refId": "B"
@@ -6000,6 +6555,7 @@
             "x": 0,
             "y": 49
           },
+          "hiddenSeries": false,
           "id": 121,
           "interval": "",
           "legend": {
@@ -6086,7 +6642,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -6116,7 +6672,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 14
+            "y": 86
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -6126,7 +6682,6 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
@@ -6171,12 +6726,14 @@
           "datasource": "$datasource",
           "description": "Number of rooms with the given number of forward extremities or fewer.\n\nThis is only updated once an hour.",
           "fill": 0,
+          "fillGradient": 0,
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 14
+            "y": 86
           },
+          "hiddenSeries": false,
           "id": 124,
           "interval": "",
           "legend": {
@@ -6192,7 +6749,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 2,
           "points": false,
@@ -6273,7 +6832,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 22
+            "y": 94
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -6283,7 +6842,6 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
@@ -6328,12 +6886,14 @@
           "datasource": "$datasource",
           "description": "For a given percentage P, the number X where P% of events were persisted to rooms with X forward extremities or fewer.",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 22
+            "y": 94
           },
+          "hiddenSeries": false,
           "id": 128,
           "legend": {
             "avg": false,
@@ -6348,7 +6908,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 2,
           "points": false,
@@ -6448,7 +7010,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 30
+            "y": 102
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -6458,7 +7020,6 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
@@ -6503,12 +7064,14 @@
           "datasource": "$datasource",
           "description": "For  given percentage P, the number X where P% of events were persisted to rooms with X stale forward extremities or fewer.\n\nStale forward extremities are those that were in the previous set of extremities as well as the new.",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 30
+            "y": 102
           },
+          "hiddenSeries": false,
           "id": 130,
           "legend": {
             "avg": false,
@@ -6523,7 +7086,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 2,
           "points": false,
@@ -6623,7 +7188,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 38
+            "y": 110
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -6633,12 +7198,12 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
-              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "heatmap",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
               "refId": "A"
@@ -6678,12 +7243,14 @@
           "datasource": "$datasource",
           "description": "For a given percentage P, the number X where P% of state resolution operations took place over X state groups or fewer.",
           "fill": 1,
+          "fillGradient": 0,
           "gridPos": {
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 38
+            "y": 110
           },
+          "hiddenSeries": false,
           "id": 132,
           "interval": "",
           "legend": {
@@ -6699,7 +7266,9 @@
           "linewidth": 1,
           "links": [],
           "nullPointMode": "null",
-          "options": {},
+          "options": {
+            "dataLinks": []
+          },
           "percentage": false,
           "pointradius": 2,
           "points": false,
@@ -6710,29 +7279,33 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)) ",
+              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "50%",
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "75%",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "90%",
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "99%",
               "refId": "D"
@@ -6742,7 +7315,7 @@
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Number of state resolution performed, by number of state groups involved (quantiles)",
+          "title": "Number of state resolutions performed, by number of state groups involved (quantiles)",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -6794,7 +7367,7 @@
     "list": [
       {
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "Prometheus",
           "value": "Prometheus"
         },
@@ -6871,14 +7444,12 @@
       },
       {
         "allValue": null,
-        "current": {
-          "text": "matrix.org",
-          "value": "matrix.org"
-        },
+        "current": {},
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
         "includeAll": false,
+        "index": -1,
         "label": null,
         "multi": false,
         "name": "instance",
@@ -6897,17 +7468,13 @@
       {
         "allFormat": "regex wildcard",
         "allValue": "",
-        "current": {
-          "text": "synapse",
-          "value": [
-            "synapse"
-          ]
-        },
+        "current": {},
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
         "hideLabel": false,
         "includeAll": true,
+        "index": -1,
         "label": "Job",
         "multi": true,
         "multiFormat": "regex values",
@@ -6928,17 +7495,13 @@
       {
         "allFormat": "regex wildcard",
         "allValue": ".*",
-        "current": {
-          "text": "All",
-          "value": [
-            "$__all"
-          ]
-        },
+        "current": {},
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
         "hideLabel": false,
         "includeAll": true,
+        "index": -1,
         "label": "",
         "multi": true,
         "multiFormat": "regex values",
@@ -6991,5 +7554,8 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 19
+  "variables": {
+    "list": []
+  },
+  "version": 32
 }

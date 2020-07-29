@@ -33,7 +33,7 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         events = [(3, 2), (6, 2), (4, 6)]
 
         for event_count, extrems in events:
-            info = self.get_success(room_creator.create_room(requester, {}))
+            info, _ = self.get_success(room_creator.create_room(requester, {}))
             room_id = info["room_id"]
 
             last_event = None

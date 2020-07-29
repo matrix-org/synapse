@@ -16,14 +16,12 @@
 
 import logging
 
-from six import iteritems
-
 from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage._base import LoggingTransaction, SQLBaseStore
+from synapse.storage._base import LoggingTransaction, SQLBaseStore, db_to_json
 from synapse.storage.database import Database
 from synapse.util.caches.descriptors import cachedInlineCallbacks
 
@@ -60,7 +58,7 @@ def _deserialize_action(actions, is_highlight):
     """Custom deserializer for actions. This allows us to "compress" common actions
     """
     if actions:
-        return json.loads(actions)
+        return db_to_json(actions)
 
     if is_highlight:
         return DEFAULT_HIGHLIGHT_ACTION
@@ -413,7 +411,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             _get_if_maybe_push_in_range_for_user_txn,
         )
 
-    def add_push_actions_to_staging(self, event_id, user_id_actions):
+    async def add_push_actions_to_staging(self, event_id, user_id_actions):
         """Add the push actions for the event to the push action staging area.
 
         Args:
@@ -455,11 +453,11 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 sql,
                 (
                     _gen_entry(user_id, actions)
-                    for user_id, actions in iteritems(user_id_actions)
+                    for user_id, actions in user_id_actions.items()
                 ),
             )
 
-        return self.db.runInteraction(
+        return await self.db.runInteraction(
             "add_push_actions_to_staging", _add_push_actions_to_staging_txn
         )
 
@@ -652,69 +650,6 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             self._start_rotate_notifs, 30 * 60 * 1000
         )
 
-    def _set_push_actions_for_event_and_users_txn(
-        self, txn, events_and_contexts, all_events_and_contexts
-    ):
-        """Handles moving push actions from staging table to main
-        event_push_actions table for all events in `events_and_contexts`.
-
-        Also ensures that all events in `all_events_and_contexts` are removed
-        from the push action staging area.
-
-        Args:
-            events_and_contexts (list[(EventBase, EventContext)]): events
-                we are persisting
-            all_events_and_contexts (list[(EventBase, EventContext)]): all
-                events that we were going to persist. This includes events
-                we've already persisted, etc, that wouldn't appear in
-                events_and_context.
-        """
-
-        sql = """
-            INSERT INTO event_push_actions (
-                room_id, event_id, user_id, actions, stream_ordering,
-                topological_ordering, notif, highlight
-            )
-            SELECT ?, event_id, user_id, actions, ?, ?, notif, highlight
-            FROM event_push_actions_staging
-            WHERE event_id = ?
-        """
-
-        if events_and_contexts:
-            txn.executemany(
-                sql,
-                (
-                    (
-                        event.room_id,
-                        event.internal_metadata.stream_ordering,
-                        event.depth,
-                        event.event_id,
-                    )
-                    for event, _ in events_and_contexts
-                ),
-            )
-
-        for event, _ in events_and_contexts:
-            user_ids = self.db.simple_select_onecol_txn(
-                txn,
-                table="event_push_actions_staging",
-                keyvalues={"event_id": event.event_id},
-                retcol="user_id",
-            )
-
-            for uid in user_ids:
-                txn.call_after(
-                    self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                    (event.room_id, uid),
-                )
-
-        # Now we delete the staging area for *all* events that were being
-        # persisted.
-        txn.executemany(
-            "DELETE FROM event_push_actions_staging WHERE event_id = ?",
-            ((event.event_id,) for event, _ in all_events_and_contexts),
-        )
-
     @defer.inlineCallbacks
     def get_push_actions_for_user(
         self, user_id, before=None, limit=50, only_highlight=False
@@ -762,17 +697,6 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             "get_latest_push_action_stream_ordering", f
         )
         return result[0] or 0
-
-    def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
-        # Sad that we have to blow away the cache for the whole room here
-        txn.call_after(
-            self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-            (room_id,),
-        )
-        txn.execute(
-            "DELETE FROM event_push_actions WHERE room_id = ? AND event_id = ?",
-            (room_id, event_id),
-        )
 
     def _remove_old_push_actions_before_txn(
         self, txn, room_id, user_id, stream_ordering

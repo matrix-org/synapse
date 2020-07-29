@@ -19,9 +19,9 @@
 """Tests REST events for /rooms paths."""
 
 import json
+from urllib import parse as urlparse
 
-from mock import Mock, NonCallableMock
-from six.moves.urllib import parse as urlparse
+from mock import Mock
 
 from twisted.internet import defer
 
@@ -46,13 +46,8 @@ class RoomBase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
 
         self.hs = self.setup_test_homeserver(
-            "red",
-            http_client=None,
-            federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
+            "red", http_client=None, federation_client=Mock(),
         )
-        self.ratelimiter = self.hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
 
         self.hs.get_federation_handler = Mock(return_value=Mock())
 

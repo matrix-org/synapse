@@ -35,9 +35,13 @@ DELETE FROM background_updates WHERE update_name IN (
     'populate_stats_cleanup'
 );
 
+-- this relies on current_state_events.membership having been populated, so add
+-- a dependency on current_state_events_membership.
 INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
-    ('populate_stats_process_rooms', '{}', '');
+    ('populate_stats_process_rooms', '{}', 'current_state_events_membership');
 
+-- this also relies on current_state_events.membership having been populated, but
+-- we get that as a side-effect of depending on populate_stats_process_rooms.
 INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
     ('populate_stats_process_users', '{}', 'populate_stats_process_rooms');
 

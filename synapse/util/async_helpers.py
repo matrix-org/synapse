@@ -19,8 +19,6 @@ import logging
 from contextlib import contextmanager
 from typing import Dict, Sequence, Set, Union
 
-from six.moves import range
-
 import attr
 
 from twisted.internet import defer
@@ -95,7 +93,7 @@ class ObservableDeferred(object):
 
         This returns a brand new deferred that is resolved when the underlying
         deferred is resolved. Interacting with the returned deferred does not
-        effect the underdlying deferred.
+        effect the underlying deferred.
         """
         if not self._result:
             d = defer.Deferred()
@@ -225,6 +223,18 @@ class Linearizer(object):
             {}
         )  # type: Dict[str, Sequence[Union[int, Dict[defer.Deferred, int]]]]
 
+    def is_queued(self, key) -> bool:
+        """Checks whether there is a process queued up waiting
+        """
+        entry = self.key_to_defer.get(key)
+        if not entry:
+            # No entry so nothing is waiting.
+            return False
+
+        # There are waiting deferreds only in the OrderedDict of deferreds is
+        # non-empty.
+        return bool(entry[1])
+
     def queue(self, key):
         # we avoid doing defer.inlineCallbacks here, so that cancellation works correctly.
         # (https://twistedmatrix.com/trac/ticket/4632 meant that cancellations were not
@@ -342,7 +352,7 @@ class ReadWriteLock(object):
     # resolved when they release the lock).
     #
     # Read: We know its safe to acquire a read lock when the latest writer has
-    # been resolved. The new reader is appeneded to the list of latest readers.
+    # been resolved. The new reader is appended to the list of latest readers.
     #
     # Write: We know its safe to acquire the write lock when both the latest
     # writers and readers have been resolved. The new writer replaces the latest

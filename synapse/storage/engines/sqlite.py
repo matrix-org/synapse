@@ -85,6 +85,7 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
             prepare_database(db_conn, self, config=None)
 
         db_conn.create_function("rank", 1, _rank)
+        db_conn.execute("PRAGMA foreign_keys = ON;")
 
     def is_deadlock(self, error):
         return False
@@ -94,19 +95,6 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
 
     def lock_table(self, txn, table):
         return
-
-    def get_next_state_group_id(self, txn):
-        """Returns an int that can be used as a new state_group ID
-        """
-        # We do application locking here since if we're using sqlite then
-        # we are a single process synapse.
-        with self._current_state_group_id_lock:
-            if self._current_state_group_id is None:
-                txn.execute("SELECT COALESCE(max(id), 0) FROM state_groups")
-                self._current_state_group_id = txn.fetchone()[0]
-
-            self._current_state_group_id += 1
-            return self._current_state_group_id
 
     @property
     def server_version(self):

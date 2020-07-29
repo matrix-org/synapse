@@ -15,11 +15,11 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
+
 import logging
 import re
 from typing import List, Optional
-
-from six.moves.urllib import parse as urlparse
+from urllib import parse as urlparse
 
 from canonicaljson import json
 
@@ -93,7 +93,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request)
 
-        info = await self._room_creation_handler.create_room(
+        info, _ = await self._room_creation_handler.create_room(
             requester, self.get_room_config(request)
         )
 
@@ -202,7 +202,7 @@ class RoomStateEventRestServlet(TransactionRestServlet):
 
         if event_type == EventTypes.Member:
             membership = content.get("membership", None)
-            event = await self.room_member_handler.update_membership(
+            event_id, _ = await self.room_member_handler.update_membership(
                 requester,
                 target=UserID.from_string(state_key),
                 room_id=room_id,
@@ -210,14 +210,16 @@ class RoomStateEventRestServlet(TransactionRestServlet):
                 content=content,
             )
         else:
-            event = await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict, txn_id=txn_id
             )
+            event_id = event.event_id
 
-        ret = {}  # type: dict
-        if event:
-            set_tag("event_id", event.event_id)
-            ret = {"event_id": event.event_id}
+        set_tag("event_id", event_id)
+        ret = {"event_id": event_id}
         return 200, ret
 
 
@@ -247,7 +249,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
-        event = await self.event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
             requester, event_dict, txn_id=txn_id
         )
 
@@ -514,9 +516,9 @@ class RoomMessageListRestServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         pagination_config = PaginationConfig.from_request(request, default_limit=10)
         as_client_event = b"raw" not in request.args
-        filter_bytes = parse_string(request, b"filter", encoding=None)
-        if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes.decode("UTF-8"))
+        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
             if (
                 event_filter
@@ -626,9 +628,9 @@ class RoomEventContextServlet(RestServlet):
         limit = parse_integer(request, "limit", default=10)
 
         # picking the API shape for symmetry with /messages
-        filter_bytes = parse_string(request, "filter")
-        if filter_bytes:
-            filter_json = urlparse.unquote(filter_bytes)
+        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        if filter_str:
+            filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
         else:
             event_filter = None
@@ -781,7 +783,7 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        event = await self.event_creation_handler.create_and_send_nonmember_event(
+        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
             requester,
             {
                 "type": EventTypes.Redaction,
@@ -815,8 +817,17 @@ class RoomTypingRestServlet(RestServlet):
         self.typing_handler = hs.get_typing_handler()
         self.auth = hs.get_auth()
 
+        # If we're not on the typing writer instance we should scream if we get
+        # requests.
+        self._is_typing_writer = (
+            hs.config.worker.writers.typing == hs.get_instance_name()
+        )
+
     async def on_PUT(self, request, room_id, user_id):
         requester = await self.auth.get_user_by_req(request)
+
+        if not self._is_typing_writer:
+            raise Exception("Got /typing request on instance that is not typing writer")
 
         room_id = urlparse.unquote(room_id)
         target_user = UserID.from_string(urlparse.unquote(user_id))

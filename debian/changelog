@@ -1,8 +1,76 @@
-matrix-synapse-py3 (1.12.3ubuntu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.xx.0) stable; urgency=medium
 
+  [ Synapse Packaging team ]
+  * New synapse release 1.xx.0.
+
+  [ Aaron Raimist ]
+  * Fix outdated documentation for SYNAPSE_CACHE_FACTOR
+
+ -- Synapse Packaging team <packages@matrix.org>  XXXXX
+
+matrix-synapse-py3 (1.17.0) stable; urgency=medium
+
+  * New synapse release 1.17.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 13 Jul 2020 10:20:31 +0100
+
+matrix-synapse-py3 (1.16.1) stable; urgency=medium
+
+  * New synapse release 1.16.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 10 Jul 2020 12:09:24 +0100
+
+matrix-synapse-py3 (1.17.0rc1) stable; urgency=medium
+
+  * New synapse release 1.17.0rc1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 09 Jul 2020 16:53:12 +0100
+
+matrix-synapse-py3 (1.16.0) stable; urgency=medium
+
+  * New synapse release 1.16.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 08 Jul 2020 11:03:48 +0100
+
+matrix-synapse-py3 (1.15.2) stable; urgency=medium
+
+  * New synapse release 1.15.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 02 Jul 2020 10:34:00 -0400
+
+matrix-synapse-py3 (1.15.1) stable; urgency=medium
+
+  * New synapse release 1.15.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Jun 2020 10:27:50 +0100
+
+matrix-synapse-py3 (1.15.0) stable; urgency=medium
+
+  * New synapse release 1.15.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 11 Jun 2020 13:27:06 +0100
+
+matrix-synapse-py3 (1.14.0) stable; urgency=medium
+
+  * New synapse release 1.14.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 28 May 2020 10:37:27 +0000
+
+matrix-synapse-py3 (1.13.0) stable; urgency=medium
+
+  [ Patrick Cloke ]
   * Add information about .well-known files to Debian installation scripts.
 
- -- Patrick Cloke <patrickc@matrix.org>  Mon, 06 Apr 2020 10:10:38 -0400
+  [ Synapse Packaging team ]
+  * New synapse release 1.13.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 19 May 2020 09:16:56 -0400
+
+matrix-synapse-py3 (1.12.4) stable; urgency=medium
+
+  * New synapse release 1.12.4.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 23 Apr 2020 10:58:14 -0400
 
 matrix-synapse-py3 (1.12.3) stable; urgency=medium
 

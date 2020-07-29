@@ -110,7 +110,7 @@ class ProfileStore(ProfileWorkerStore):
         return self.db.simple_update(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
-            values={
+            updatevalues={
                 "displayname": displayname,
                 "avatar_url": avatar_url,
                 "last_check": self._clock.time_msec(),

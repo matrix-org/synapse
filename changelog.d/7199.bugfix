@@ -1,1 +1,0 @@
-Fix a bug that could cause a user to be invited to a server notices (aka System Alerts) room without any notice being sent.

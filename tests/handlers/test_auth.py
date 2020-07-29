@@ -39,8 +39,13 @@ class AuthTestCase(unittest.TestCase):
         self.hs.handlers = AuthHandlers(self.hs)
         self.auth_handler = self.hs.handlers.auth_handler
         self.macaroon_generator = self.hs.get_macaroon_generator()
+
         # MAU tests
-        self.hs.config.max_mau_value = 50
+        # AuthBlocking reads from the hs' config on initialization. We need to
+        # modify its config instead of the hs'
+        self.auth_blocking = self.hs.get_auth()._auth_blocking
+        self.auth_blocking._max_mau_value = 50
+
         self.small_number_of_users = 1
         self.large_number_of_users = 100
 
@@ -119,7 +124,7 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_mau_limits_disabled(self):
-        self.hs.config.limit_usage_by_mau = False
+        self.auth_blocking._limit_usage_by_mau = False
         # Ensure does not throw exception
         yield defer.ensureDeferred(
             self.auth_handler.get_access_token_for_user_id(
@@ -135,7 +140,7 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_mau_limits_exceeded_large(self):
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.large_number_of_users)
         )
@@ -159,11 +164,11 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_mau_limits_parity(self):
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
 
         # If not in monthly active cohort
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
         with self.assertRaises(ResourceLimitError):
             yield defer.ensureDeferred(
@@ -173,7 +178,7 @@ class AuthTestCase(unittest.TestCase):
             )
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
         with self.assertRaises(ResourceLimitError):
             yield defer.ensureDeferred(
@@ -186,7 +191,7 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
         yield defer.ensureDeferred(
             self.auth_handler.get_access_token_for_user_id(
@@ -197,7 +202,7 @@ class AuthTestCase(unittest.TestCase):
             return_value=defer.succeed(self.hs.get_clock().time_msec())
         )
         self.hs.get_datastore().get_monthly_active_count = Mock(
-            return_value=defer.succeed(self.hs.config.max_mau_value)
+            return_value=defer.succeed(self.auth_blocking._max_mau_value)
         )
         yield defer.ensureDeferred(
             self.auth_handler.validate_short_term_login_token_and_get_user_id(
@@ -207,7 +212,7 @@ class AuthTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_mau_limits_not_exceeded(self):
-        self.hs.config.limit_usage_by_mau = True
+        self.auth_blocking._limit_usage_by_mau = True
 
         self.hs.get_datastore().get_monthly_active_count = Mock(
             return_value=defer.succeed(self.small_number_of_users)

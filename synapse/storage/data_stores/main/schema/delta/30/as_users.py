@@ -13,8 +13,6 @@
 # limitations under the License.
 import logging
 
-from six.moves import range
-
 from synapse.config.appservice import load_appservices
 
 logger = logging.getLogger(__name__)

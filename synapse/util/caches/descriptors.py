@@ -13,14 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import functools
 import inspect
 import logging
 import threading
 from typing import Any, Tuple, Union, cast
 from weakref import WeakValueDictionary
-
-from six import itervalues
 
 from prometheus_client import Gauge
 from typing_extensions import Protocol
@@ -30,7 +29,6 @@ from twisted.internet import defer
 from synapse.logging.context import make_deferred_yieldable, preserve_fn
 from synapse.util import unwrapFirstError
 from synapse.util.async_helpers import ObservableDeferred
-from synapse.util.caches import get_cache_factor_for
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 
@@ -81,7 +79,6 @@ class CacheEntry(object):
 class Cache(object):
     __slots__ = (
         "cache",
-        "max_entries",
         "name",
         "keylen",
         "thread",
@@ -89,7 +86,29 @@ class Cache(object):
         "_pending_deferred_cache",
     )
 
-    def __init__(self, name, max_entries=1000, keylen=1, tree=False, iterable=False):
+    def __init__(
+        self,
+        name: str,
+        max_entries: int = 1000,
+        keylen: int = 1,
+        tree: bool = False,
+        iterable: bool = False,
+        apply_cache_factor_from_config: bool = True,
+    ):
+        """
+        Args:
+            name: The name of the cache
+            max_entries: Maximum amount of entries that the cache will hold
+            keylen: The length of the tuple used as the cache key
+            tree: Use a TreeCache instead of a dict as the underlying cache type
+            iterable: If True, count each item in the cached object as an entry,
+                rather than each cached object
+            apply_cache_factor_from_config: Whether cache factors specified in the
+                config file affect `max_entries`
+
+        Returns:
+            Cache
+        """
         cache_type = TreeCache if tree else dict
         self._pending_deferred_cache = cache_type()
 
@@ -99,6 +118,7 @@ class Cache(object):
             cache_type=cache_type,
             size_callback=(lambda d: len(d)) if iterable else None,
             evicted_callback=self._on_evicted,
+            apply_cache_factor_from_config=apply_cache_factor_from_config,
         )
 
         self.name = name
@@ -110,6 +130,10 @@ class Cache(object):
             self.cache,
             collect_callback=self._metrics_collection_callback,
         )
+
+    @property
+    def max_entries(self):
+        return self.cache.max_size
 
     def _on_evicted(self, evicted_count):
         self.metrics.inc_evictions(evicted_count)
@@ -255,7 +279,7 @@ class Cache(object):
     def invalidate_all(self):
         self.check_thread()
         self.cache.clear()
-        for entry in itervalues(self._pending_deferred_cache):
+        for entry in self._pending_deferred_cache.values():
             entry.invalidate()
         self._pending_deferred_cache.clear()
 
@@ -370,13 +394,11 @@ class CacheDescriptor(_CacheDescriptorBase):
             cache_context=cache_context,
         )
 
-        max_entries = int(max_entries * get_cache_factor_for(orig.__name__))
-
         self.max_entries = max_entries
         self.tree = tree
         self.iterable = iterable
 
-    def __get__(self, obj, objtype=None):
+    def __get__(self, obj, owner):
         cache = Cache(
             name=self.orig.__name__,
             max_entries=self.max_entries,
@@ -494,7 +516,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
         """
         Args:
             orig (function)
-            cached_method_name (str): The name of the chached method.
+            cached_method_name (str): The name of the cached method.
             list_name (str): Name of the argument which is the bulk lookup list
             num_args (int): number of positional arguments (excluding ``self``,
                 but including list_name) to use as cache keys. Defaults to all

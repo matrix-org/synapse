@@ -87,7 +87,7 @@ class FederationClient(FederationBase):
         self.transport_layer = hs.get_federation_transport_client()
 
         self.hostname = hs.hostname
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
 
         self._get_pdu_cache = ExpiringCache(
             cache_name="get_pdu_cache",
@@ -245,7 +245,7 @@ class FederationClient(FederationBase):
             event_id: event to fetch
             room_version: version of the room
             outlier: Indicates whether the PDU is an `outlier`, i.e. if
-                it's from an arbitary point in the context as opposed to part
+                it's from an arbitrary point in the context as opposed to part
                 of the current block of PDUs. Defaults to `False`
             timeout: How long to try (in ms) each destination for before
                 moving to the next destination. None indicates no timeout.
@@ -351,7 +351,7 @@ class FederationClient(FederationBase):
         outlier: bool = False,
         include_none: bool = False,
     ) -> List[EventBase]:
-        """Takes a list of PDUs and checks the signatures and hashs of each
+        """Takes a list of PDUs and checks the signatures and hashes of each
         one. If a PDU fails its signature check then we check if we have it in
         the database and if not then request if from the originating server of
         that PDU.
@@ -374,29 +374,26 @@ class FederationClient(FederationBase):
         """
         deferreds = self._check_sigs_and_hashes(room_version, pdus)
 
-        @defer.inlineCallbacks
-        def handle_check_result(pdu: EventBase, deferred: Deferred):
+        async def handle_check_result(pdu: EventBase, deferred: Deferred):
             try:
-                res = yield make_deferred_yieldable(deferred)
+                res = await make_deferred_yieldable(deferred)
             except SynapseError:
                 res = None
 
             if not res:
                 # Check local db.
-                res = yield self.store.get_event(
+                res = await self.store.get_event(
                     pdu.event_id, allow_rejected=True, allow_none=True
                 )
 
             if not res and pdu.origin != origin:
                 try:
-                    res = yield defer.ensureDeferred(
-                        self.get_pdu(
-                            destinations=[pdu.origin],
-                            event_id=pdu.event_id,
-                            room_version=room_version,
-                            outlier=outlier,
-                            timeout=10000,
-                        )
+                    res = await self.get_pdu(
+                        destinations=[pdu.origin],
+                        event_id=pdu.event_id,
+                        room_version=room_version,
+                        outlier=outlier,
+                        timeout=10000,
                     )
                 except SynapseError:
                     pass
@@ -883,18 +880,37 @@ class FederationClient(FederationBase):
 
     def get_public_rooms(
         self,
-        destination,
-        limit=None,
-        since_token=None,
-        search_filter=None,
-        include_all_networks=False,
-        third_party_instance_id=None,
+        remote_server: str,
+        limit: Optional[int] = None,
+        since_token: Optional[str] = None,
+        search_filter: Optional[Dict] = None,
+        include_all_networks: bool = False,
+        third_party_instance_id: Optional[str] = None,
     ):
-        if destination == self.server_name:
-            return
+        """Get the list of public rooms from a remote homeserver
 
+        Args:
+            remote_server: The name of the remote server
+            limit: Maximum amount of rooms to return
+            since_token: Used for result pagination
+            search_filter: A filter dictionary to send the remote homeserver
+                and filter the result set
+            include_all_networks: Whether to include results from all third party instances
+            third_party_instance_id: Whether to only include results from a specific third
+                party instance
+
+        Returns:
+            Deferred[Dict[str, Any]]: The response from the remote server, or None if
+            `remote_server` is the same as the local server_name
+
+        Raises:
+            HttpResponseException: There was an exception returned from the remote server
+            SynapseException: M_FORBIDDEN when the remote server has disallowed publicRoom
+                requests over federation
+
+        """
         return self.transport_layer.get_public_rooms(
-            destination,
+            remote_server,
             limit,
             since_token,
             search_filter,
@@ -957,14 +973,13 @@ class FederationClient(FederationBase):
 
         return signed_events
 
-    @defer.inlineCallbacks
-    def forward_third_party_invite(self, destinations, room_id, event_dict):
+    async def forward_third_party_invite(self, destinations, room_id, event_dict):
         for destination in destinations:
             if destination == self.server_name:
                 continue
 
             try:
-                yield self.transport_layer.exchange_third_party_invite(
+                await self.transport_layer.exchange_third_party_invite(
                     destination=destination, room_id=room_id, event_dict=event_dict
                 )
                 return None
@@ -977,24 +992,25 @@ class FederationClient(FederationBase):
 
         raise RuntimeError("Failed to send to any server.")
 
-    @defer.inlineCallbacks
-    def get_room_complexity(self, destination, room_id):
+    async def get_room_complexity(
+        self, destination: str, room_id: str
+    ) -> Optional[dict]:
         """
         Fetch the complexity of a remote room from another server.
 
         Args:
-            destination (str): The remote server
-            room_id (str): The room ID to ask about.
+            destination: The remote server
+            room_id: The room ID to ask about.
 
         Returns:
-            Deferred[dict] or Deferred[None]: Dict contains the complexity
-            metric versions, while None means we could not fetch the complexity.
+            Dict contains the complexity metric versions, while None means we
+            could not fetch the complexity.
         """
         try:
-            complexity = yield self.transport_layer.get_room_complexity(
+            complexity = await self.transport_layer.get_room_complexity(
                 destination=destination, room_id=room_id
             )
-            defer.returnValue(complexity)
+            return complexity
         except CodeMessageException as e:
             # We didn't manage to get it -- probably a 404. We are okay if other
             # servers don't give it to us.
@@ -1011,4 +1027,4 @@ class FederationClient(FederationBase):
 
         # If we don't manage to find it, return None. It's not an error if a
         # server doesn't give it to us.
-        defer.returnValue(None)
+        return None

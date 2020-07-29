@@ -93,10 +93,11 @@ class MetricsConfig(Config):
             #known_servers: true
 
         # Whether or not to report anonymized homeserver usage statistics.
+        #
         """
 
         if report_stats is None:
-            res += "# report_stats: true|false\n"
+            res += "#report_stats: true|false\n"
         else:
             res += "report_stats: %s\n" % ("true" if report_stats else "false")
 

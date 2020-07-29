@@ -19,6 +19,7 @@ import random
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
+from synapse.handlers.presence import format_user_presence_state
 from synapse.logging.utils import log_function
 from synapse.types import UserID
 from synapse.visibility import filter_events_for_client
@@ -97,6 +98,8 @@ class EventStreamHandler(BaseHandler):
                 explicit_room_id=room_id,
             )
 
+            time_now = self.clock.time_msec()
+
             # When the user joins a new room, or another user joins a currently
             # joined room, we need to send down presence for those users.
             to_add = []
@@ -112,18 +115,19 @@ class EventStreamHandler(BaseHandler):
                         users = await self.state.get_current_users_in_room(
                             event.room_id
                         )
-                        states = await presence_handler.get_states(users, as_event=True)
-                        to_add.extend(states)
                     else:
+                        users = [event.state_key]
 
-                        ev = await presence_handler.get_state(
-                            UserID.from_string(event.state_key), as_event=True
-                        )
-                        to_add.append(ev)
+                    states = await presence_handler.get_states(users)
+                    to_add.extend(
+                        {
+                            "type": EventTypes.Presence,
+                            "content": format_user_presence_state(state, time_now),
+                        }
+                        for state in states
+                    )
 
             events.extend(to_add)
-
-            time_now = self.clock.time_msec()
 
             chunks = await self._event_serializer.serialize_events(
                 events,

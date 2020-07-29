@@ -15,7 +15,11 @@
 # limitations under the License.
 from collections import namedtuple
 
-from synapse.replication.tcp.streams._base import Stream, db_query_to_update_function
+from synapse.replication.tcp.streams._base import (
+    Stream,
+    current_token_without_instance,
+    make_http_update_function,
+)
 
 
 class FederationStream(Stream):
@@ -35,21 +39,35 @@ class FederationStream(Stream):
     ROW_TYPE = FederationStreamRow
 
     def __init__(self, hs):
-        # Not all synapse instances will have a federation sender instance,
-        # whether that's a `FederationSender` or a `FederationRemoteSendQueue`,
-        # so we stub the stream out when that is the case.
-        if hs.config.worker_app is None or hs.should_send_federation():
+        if hs.config.worker_app is None:
+            # master process: get updates from the FederationRemoteSendQueue.
+            # (if the master is configured to send federation itself, federation_sender
+            # will be a real FederationSender, which has stubs for current_token and
+            # get_replication_rows.)
             federation_sender = hs.get_federation_sender()
-            current_token = federation_sender.get_current_token
-            update_function = db_query_to_update_function(
-                federation_sender.get_replication_rows
+            current_token = current_token_without_instance(
+                federation_sender.get_current_token
             )
-        else:
-            current_token = lambda: 0
-            update_function = self._stub_update_function
+            update_function = federation_sender.get_replication_rows
 
-        super().__init__(current_token, update_function)
+        elif hs.should_send_federation():
+            # federation sender: Query master process
+            update_function = make_http_update_function(hs, self.NAME)
+            current_token = self._stub_current_token
+
+        else:
+            # other worker: stub out the update function (we're not interested in
+            # any updates so when we get a POSITION we do nothing)
+            update_function = self._stub_update_function
+            current_token = self._stub_current_token
+
+        super().__init__(hs.get_instance_name(), current_token, update_function)
 
     @staticmethod
-    async def _stub_update_function(from_token, upto_token, limit):
+    def _stub_current_token(instance_name: str) -> int:
+        # dummy current-token method for use on workers
+        return 0
+
+    @staticmethod
+    async def _stub_update_function(instance_name, from_token, upto_token, limit):
         return [], upto_token, False

@@ -18,15 +18,12 @@ import hmac
 import logging
 from typing import List, Union
 
-from six import string_types
-
 import synapse
 import synapse.api.auth
 import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     Codes,
-    LimitExceededError,
     SynapseError,
     ThreepidValidationError,
     UnrecognizedRequestError,
@@ -39,7 +36,7 @@ from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.handlers.auth import AuthHandler
-from synapse.http.server import finish_request
+from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -49,8 +46,8 @@ from synapse.http.servlet import (
 from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
-from synapse.util.stringutils import assert_valid_client_secret
-from synapse.util.threepids import check_3pid_allowed
+from synapse.util.stringutils import assert_valid_client_secret, random_string
+from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -119,7 +116,14 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        email = body["email"]
+        # For emails, canonicalise the address.
+        # We store all email addresses canonicalised in the DB.
+        # (See on_POST in EmailThreepidRequestTokenRestServlet
+        # in synapse/rest/client/v2_alpha/account.py)
+        try:
+            email = canonicalise_email(body["email"])
+        except ValueError as e:
+            raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -131,10 +135,15 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
-            "email", body["email"]
+            "email", email
         )
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.REMOTE:
@@ -202,6 +211,11 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
         )
 
         if existing_user_id is not None:
+            if self.hs.config.request_token_inhibit_3pid_errors:
+                # Make the client think the operation succeeded. See the rationale in the
+                # comments for request_token_inhibit_3pid_errors.
+                return 200, {"sid": random_string(16)}
+
             raise SynapseError(
                 400, "Phone number is already in use", Codes.THREEPID_IN_USE
             )
@@ -297,17 +311,15 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
             # Otherwise show the success template
             html = self.config.email_registration_template_success_html_content
-
-            request.setResponseCode(200)
+            status_code = 200
         except ThreepidValidationError as e:
-            request.setResponseCode(e.code)
+            status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
             html = self.failure_email_template.render(**template_vars)
 
-        request.write(html.encode("utf-8"))
-        finish_request(request)
+        respond_with_html(request, status_code, html)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -386,20 +398,7 @@ class RegisterRestServlet(RestServlet):
 
         client_addr = request.getClientIP()
 
-        time_now = self.clock.time()
-
-        allowed, time_allowed = self.ratelimiter.can_do_action(
-            client_addr,
-            time_now_s=time_now,
-            rate_hz=self.hs.config.rc_registration.per_second,
-            burst_count=self.hs.config.rc_registration.burst_count,
-            update=False,
-        )
-
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now))
-            )
+        self.ratelimiter.ratelimit(client_addr, update=False)
 
         kind = b"user"
         if b"kind" in request.args:
@@ -416,19 +415,20 @@ class RegisterRestServlet(RestServlet):
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the username/password provided to us.
         if "password" in body:
-            if (
-                not isinstance(body["password"], string_types)
-                or len(body["password"]) > 512
-            ):
+            password = body.pop("password")
+            if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
-            self.password_policy_handler.validate_password(body["password"])
+            self.password_policy_handler.validate_password(password)
+
+            # If the password is valid, hash it and store it back on the body.
+            # This ensures that only the hashed password is handled everywhere.
+            if "password_hash" in body:
+                raise SynapseError(400, "Unexpected property: password_hash")
+            body["password_hash"] = await self.auth_handler.hash(password)
 
         desired_username = None
         if "username" in body:
-            if (
-                not isinstance(body["username"], string_types)
-                or len(body["username"]) > 512
-            ):
+            if not isinstance(body["username"], str) or len(body["username"]) > 512:
                 raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
 
@@ -453,7 +453,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, string_types):
+            if isinstance(desired_username, str):
                 result = await self._do_appservice_registration(
                     desired_username, access_token, body
                 )
@@ -474,7 +474,7 @@ class RegisterRestServlet(RestServlet):
 
         guest_access_token = body.get("guest_access_token", None)
 
-        if "initial_device_display_name" in body and "password" not in body:
+        if "initial_device_display_name" in body and "password_hash" not in body:
             # ignore 'initial_device_display_name' if sent without
             # a password to work around a client bug where it sent
             # the 'initial_device_display_name' param alone, wiping out
@@ -489,7 +489,7 @@ class RegisterRestServlet(RestServlet):
             # registered a user for this session, so we could just return the
             # user here. We carry on and go through the auth checks though,
             # for paranoia.
-            registered_user_id = self.auth_handler.get_session_data(
+            registered_user_id = await self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
             )
 
@@ -536,11 +536,11 @@ class RegisterRestServlet(RestServlet):
             registered = False
         else:
             # NB: This may be from the auth handler and NOT from the POST
-            assert_params_in_dict(params, ["password"])
+            assert_params_in_dict(params, ["password_hash"])
 
             desired_username = params.get("username", None)
             guest_access_token = params.get("guest_access_token", None)
-            new_password = params.get("password", None)
+            new_password_hash = params.get("password_hash", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
@@ -559,6 +559,15 @@ class RegisterRestServlet(RestServlet):
                     if login_type in auth_result:
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
+                        # For emails, canonicalise the address.
+                        # We store all email addresses canonicalised in the DB.
+                        # (See on_POST in EmailThreepidRequestTokenRestServlet
+                        # in synapse/rest/client/v2_alpha/account.py)
+                        if medium == "email":
+                            try:
+                                address = canonicalise_email(address)
+                            except ValueError as e:
+                                raise SynapseError(400, str(e))
 
                         existing_user_id = await self.store.get_user_id_by_threepid(
                             medium, address
@@ -573,7 +582,7 @@ class RegisterRestServlet(RestServlet):
 
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
-                password=new_password,
+                password_hash=new_password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
                 address=client_addr,
@@ -588,7 +597,7 @@ class RegisterRestServlet(RestServlet):
 
             # remember that we've now registered that user account, and with
             #  what user ID (since the user may not have specified)
-            self.auth_handler.set_session_data(
+            await self.auth_handler.set_session_data(
                 session_id, "registered_user_id", registered_user_id
             )
 

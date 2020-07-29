@@ -17,10 +17,8 @@ import cgi
 import logging
 import random
 import sys
+import urllib
 from io import BytesIO
-
-from six import PY3, raise_from, string_types
-from six.moves import urllib
 
 import attr
 import treq
@@ -70,11 +68,7 @@ incoming_responses_counter = Counter(
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
-
-if PY3:
-    MAXINT = sys.maxsize
-else:
-    MAXINT = sys.maxint
+MAXINT = sys.maxsize
 
 
 _next_id = 1
@@ -148,6 +142,11 @@ def _handle_json_response(reactor, timeout_sec, request, response):
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         body = yield make_deferred_yieldable(d)
+    except TimeoutError as e:
+        logger.warning(
+            "{%s} [%s] Timed out reading response", request.txn_id, request.destination,
+        )
+        raise RequestSendFailed(e, can_retry=True) from e
     except Exception as e:
         logger.warning(
             "{%s} [%s] Error reading response: %s",
@@ -177,7 +176,7 @@ class MatrixFederationHttpClient(object):
 
     def __init__(self, hs, tls_client_options_factory):
         self.hs = hs
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
         real_reactor = hs.get_reactor()
@@ -198,7 +197,14 @@ class MatrixFederationHttpClient(object):
 
         self.reactor = Reactor()
 
-        self.agent = MatrixFederationAgent(self.reactor, tls_client_options_factory)
+        user_agent = hs.version_string
+        if hs.config.user_agent_suffix:
+            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+        user_agent = user_agent.encode("ascii")
+
+        self.agent = MatrixFederationAgent(
+            self.reactor, tls_client_options_factory, user_agent
+        )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
@@ -408,7 +414,7 @@ class MatrixFederationHttpClient(object):
                         _sec_timeout,
                     )
 
-                    outgoing_requests_counter.labels(method_bytes).inc()
+                    outgoing_requests_counter.labels(request.method).inc()
 
                     try:
                         with Measure(self.clock, "outbound_request"):
@@ -428,27 +434,38 @@ class MatrixFederationHttpClient(object):
                             )
 
                             response = yield request_deferred
+                    except TimeoutError as e:
+                        raise RequestSendFailed(e, can_retry=True) from e
                     except DNSLookupError as e:
-                        raise_from(RequestSendFailed(e, can_retry=retry_on_dns_fail), e)
+                        raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
                         logger.info("Failed to send request: %s", e)
-                        raise_from(RequestSendFailed(e, can_retry=True), e)
+                        raise RequestSendFailed(e, can_retry=True) from e
 
-                    logger.info(
-                        "{%s} [%s] Got response headers: %d %s",
-                        request.txn_id,
-                        request.destination,
-                        response.code,
-                        response.phrase.decode("ascii", errors="replace"),
-                    )
-
-                    incoming_responses_counter.labels(method_bytes, response.code).inc()
+                    incoming_responses_counter.labels(
+                        request.method, response.code
+                    ).inc()
 
                     set_tag(tags.HTTP_STATUS_CODE, response.code)
+                    response_phrase = response.phrase.decode("ascii", errors="replace")
 
                     if 200 <= response.code < 300:
+                        logger.debug(
+                            "{%s} [%s] Got response headers: %d %s",
+                            request.txn_id,
+                            request.destination,
+                            response.code,
+                            response_phrase,
+                        )
                         pass
                     else:
+                        logger.info(
+                            "{%s} [%s] Got response headers: %d %s",
+                            request.txn_id,
+                            request.destination,
+                            response.code,
+                            response_phrase,
+                        )
                         # :'(
                         # Update transactions table?
                         d = treq.content(response)
@@ -471,12 +488,12 @@ class MatrixFederationHttpClient(object):
                             )
                             body = None
 
-                        e = HttpResponseException(response.code, response.phrase, body)
+                        e = HttpResponseException(response.code, response_phrase, body)
 
                         # Retry if the error is a 429 (Too Many Requests),
                         # otherwise just raise a standard HttpResponseException
                         if response.code == 429:
-                            raise_from(RequestSendFailed(e, can_retry=True), e)
+                            raise RequestSendFailed(e, can_retry=True) from e
                         else:
                             raise e
 
@@ -546,13 +563,17 @@ class MatrixFederationHttpClient(object):
         Returns:
             list[bytes]: a list of headers to be added as "Authorization:" headers
         """
-        request = {"method": method, "uri": url_bytes, "origin": self.server_name}
+        request = {
+            "method": method.decode("ascii"),
+            "uri": url_bytes.decode("ascii"),
+            "origin": self.server_name,
+        }
 
         if destination is not None:
-            request["destination"] = destination
+            request["destination"] = destination.decode("ascii")
 
         if destination_is is not None:
-            request["destination_is"] = destination_is
+            request["destination_is"] = destination_is.decode("ascii")
 
         if content is not None:
             request["content"] = content
@@ -987,7 +1008,7 @@ def encode_query_args(args):
 
     encoded_args = {}
     for k, vs in args.items():
-        if isinstance(vs, string_types):
+        if isinstance(vs, str):
             vs = [vs]
         encoded_args[k] = [v.encode("UTF-8") for v in vs]
 

@@ -64,10 +64,12 @@ class ExampleSpamChecker:
 Modify the `spam_checker` section of your `homeserver.yaml` in the following
 manner:
 
-`module` should point to the fully qualified Python class that implements your
-custom logic, e.g. `my_module.ExampleSpamChecker`.
+Create a list entry with the keys `module` and `config`.
 
-`config` is a dictionary that gets passed to the spam checker class.
+* `module` should point to the fully qualified Python class that implements your
+  custom logic, e.g. `my_module.ExampleSpamChecker`.
+
+* `config` is a dictionary that gets passed to the spam checker class.
 
 ### Example
 
@@ -75,11 +77,14 @@ This section might look like:
 
 ```yaml
 spam_checker:
-  module: my_module.ExampleSpamChecker
-  config:
-    # Enable or disable a specific option in ExampleSpamChecker.
-    my_custom_option: true
+  - module: my_module.ExampleSpamChecker
+    config:
+      # Enable or disable a specific option in ExampleSpamChecker.
+      my_custom_option: true
 ```
+
+More spam checkers can be added in tandem by appending more items to the list. An
+action is blocked when at least one of the configured spam checkers flags it.
 
 ## Examples
 
