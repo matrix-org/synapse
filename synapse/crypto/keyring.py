@@ -388,7 +388,7 @@ class Keyring(object):
                     verify_request.minimum_valid_until_ts,
                 )
 
-        results = yield fetcher.get_keys(missing_keys)
+        results = yield defer.ensureDeferred(fetcher.get_keys(missing_keys))
 
         completed = []
         for verify_request in remaining_requests:
@@ -421,7 +421,7 @@ class Keyring(object):
 
 
 class KeyFetcher(object):
-    def get_keys(self, keys_to_fetch):
+    async def get_keys(self, keys_to_fetch):
         """
         Args:
             keys_to_fetch (dict[str, dict[str, int]]):
@@ -440,8 +440,7 @@ class StoreKeyFetcher(KeyFetcher):
     def __init__(self, hs):
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def get_keys(self, keys_to_fetch):
+    async def get_keys(self, keys_to_fetch):
         """see KeyFetcher.get_keys"""
 
         keys_to_fetch = (
@@ -450,7 +449,7 @@ class StoreKeyFetcher(KeyFetcher):
             for key_id in keys_for_server.keys()
         )
 
-        res = yield self.store.get_server_verify_keys(keys_to_fetch)
+        res = await self.store.get_server_verify_keys(keys_to_fetch)
         keys = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
@@ -565,14 +564,12 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         self.client = hs.get_http_client()
         self.key_servers = self.config.key_servers
 
-    @defer.inlineCallbacks
-    def get_keys(self, keys_to_fetch):
+    async def get_keys(self, keys_to_fetch):
         """see KeyFetcher.get_keys"""
 
-        @defer.inlineCallbacks
-        def get_key(key_server):
+        async def get_key(key_server):
             try:
-                result = yield self.get_server_verify_key_v2_indirect(
+                result = await self.get_server_verify_key_v2_indirect(
                     keys_to_fetch, key_server
                 )
                 return result
@@ -590,7 +587,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
 
             return {}
 
-        results = yield make_deferred_yieldable(
+        results = await make_deferred_yieldable(
             defer.gatherResults(
                 [run_in_background(get_key, server) for server in self.key_servers],
                 consumeErrors=True,
@@ -739,24 +736,23 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
         self.clock = hs.get_clock()
         self.client = hs.get_http_client()
 
-    def get_keys(self, keys_to_fetch):
+    async def get_keys(self, keys_to_fetch):
         """
         Args:
             keys_to_fetch (dict[str, iterable[str]]):
                 the keys to be fetched. server_name -> key_ids
 
         Returns:
-            Deferred[dict[str, dict[str, synapse.storage.keys.FetchKeyResult|None]]]:
+            dict[str, dict[str, synapse.storage.keys.FetchKeyResult|None]]:
                 map from server_name -> key_id -> FetchKeyResult
         """
 
         results = {}
 
-        @defer.inlineCallbacks
-        def get_key(key_to_fetch_item):
+        async def get_key(key_to_fetch_item):
             server_name, key_ids = key_to_fetch_item
             try:
-                keys = yield self.get_server_verify_key_v2_direct(server_name, key_ids)
+                keys = await self.get_server_verify_key_v2_direct(server_name, key_ids)
                 results[server_name] = keys
             except KeyLookupError as e:
                 logger.warning(
@@ -765,9 +761,9 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
             except Exception:
                 logger.exception("Error getting keys %s from %s", key_ids, server_name)
 
-        return yieldable_gather_results(get_key, keys_to_fetch.items()).addCallback(
-            lambda _: results
-        )
+        return await yieldable_gather_results(
+            get_key, keys_to_fetch.items()
+        ).addCallback(lambda _: results)
 
     @defer.inlineCallbacks
     def get_server_verify_key_v2_direct(self, server_name, key_ids):
