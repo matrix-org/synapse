@@ -352,28 +352,30 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Change the power levels of the room so that the second user can send state
         # events.
-        self.power_levels = {
-            "users": {self.user_id: 100, self.user2: 100},
-            "users_default": 0,
-            "events": {
-                "m.room.name": 50,
-                "m.room.power_levels": 100,
-                "m.room.history_visibility": 100,
-                "m.room.canonical_alias": 50,
-                "m.room.avatar": 50,
-                "m.room.tombstone": 100,
-                "m.room.server_acl": 100,
-                "m.room.encryption": 100,
-            },
-            "events_default": 0,
-            "state_default": 50,
-            "ban": 50,
-            "kick": 50,
-            "redact": 50,
-            "invite": 0,
-        }
         self.helper.send_state(
-            self.room_id, EventTypes.PowerLevels, self.power_levels, tok=self.tok,
+            self.room_id,
+            EventTypes.PowerLevels,
+            {
+                "users": {self.user_id: 100, self.user2: 100},
+                "users_default": 0,
+                "events": {
+                    "m.room.name": 50,
+                    "m.room.power_levels": 100,
+                    "m.room.history_visibility": 100,
+                    "m.room.canonical_alias": 50,
+                    "m.room.avatar": 50,
+                    "m.room.tombstone": 100,
+                    "m.room.server_acl": 100,
+                    "m.room.encryption": 100,
+                },
+                "events_default": 0,
+                "state_default": 50,
+                "ban": 50,
+                "kick": 50,
+                "redact": 50,
+                "invite": 0,
+            },
+            tok=self.tok,
         )
 
     def test_unread_counts(self):
@@ -427,13 +429,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         )
         self._check_unread_count(4)
 
-        # Check that power level changes increase the unread counter.
-        self.power_levels["invite"] = 50
-        self.helper.send_state(
-            self.room_id, EventTypes.PowerLevels, self.power_levels, tok=self.tok2,
-        )
-        self._check_unread_count(5)
-
         # Check that edits don't increase the unread counter.
         self.helper.send_event(
             room_id=self.room_id,
@@ -445,13 +440,23 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             },
             tok=self.tok2,
         )
-        self._check_unread_count(5)
+        self._check_unread_count(4)
 
         # Check that notices don't increase the unread counter.
         self.helper.send_event(
             room_id=self.room_id,
             type=EventTypes.Message,
             content={"body": "hello", "msgtype": "m.notice"},
+            tok=self.tok2,
+        )
+        self._check_unread_count(4)
+
+        # Check that tombstone events changes increase the unread counter.
+        self.power_levels["invite"] = 50
+        self.helper.send_state(
+            self.room_id,
+            EventTypes.Tombstone,
+            {"replacement_room": "!someroom:test"},
             tok=self.tok2,
         )
         self._check_unread_count(5)
