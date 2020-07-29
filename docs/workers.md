@@ -282,11 +282,11 @@ go to the same process.
 Registration/login requests can be handled separately purely to help ensure that
 unexpected load doesn't affect new logins and sign ups.
 
-Finally, event sending requests can be balanced by the embedded room ID (or URI,
-or even just round robin). If there is a large bridge connected that is sending
-or may send lots of events, then a dedicated set of workers can be provisioned
-to limit the effects of bursts of events from that bridge on events sent by
-normal users.
+Finally, event sending requests can be balanced by the room ID in the URI (or
+the full URI, or even just round robin), the room ID is the path component after
+`/rooms/`. If there is a large bridge connected that is sending or may send lots
+of events, then a dedicated set of workers can be provisioned to limit the
+effects of bursts of events from that bridge on events sent by normal users.
 
 #### Stream writers
 
