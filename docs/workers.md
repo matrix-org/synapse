@@ -38,26 +38,30 @@ upcoming performance improvements.
 
 ## Setting up workers
 
-Redis is recommended over the old direct TCP connection configuration, so this
+A Redis server is required to manage the communication between the processes.
+(The older direct TCP connections are now deprecated.) The Redis server
 should be installed following the normal procedure for your distribution (e.g.
-`apt install redis-server` on Debian). Once installed check thta Redis is
-running and accessible from the host running Synapse, e.g. by on Debian by
+`apt install redis-server` on Debian). It is safe to use an existing Redis
+deployment if you have one.
+   
+Once installed, check that Redis is
+running and accessible from the host running Synapse, for example by
 executing `echo PING | nc -q1 localhost 6379` and seeing a response of `+PONG`.
 
 The appropriate dependencies must also be installed for Synapse. If using a
-virtual env these can be installed by:
+virtualenv, these can be installed with:
 
 ```sh
 pip install matrix-synapse[redis]
 ```
 
-Note that these dependencies are included if synapse was installed with `[all]`,
-or if using the debian packages from matrix.org.
+Note that these dependencies are included when synapse is installed with `pip install matrix-synapse[all]`.
+They are also included in the debian packages from `matrix.org` and in the docker
+images at https://hub.docker.com/r/matrixdotorg/synapse/.
 
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
-the correct worker, or to the main synapse instance. Note that this includes
-requests made to the federation port. See [reverse_proxy.md](reverse_proxy.md)
+the correct worker, or to the main synapse instance. See [reverse_proxy.md](reverse_proxy.md)
 for information on setting up a reverse proxy.
 
 To enable workers, you need to add both a HTTP replication listener and redis
@@ -65,6 +69,8 @@ config to the shared Synapse configuration file (`homeserver.yaml`). For
 example:
 
 ```yaml
+# extend the existing `listeners` section. This defines the ports that the
+# main process will listen on.
 listeners:
   # The HTTP replication port
   - port: 9093
@@ -79,7 +85,7 @@ redis:
 
 See the sample config for the full documentation of each option.
 
-Under **no circumstances** should the replication API listener be exposed to the
+Under **no circumstances** should the replication listener be exposed to the
 public internet; it has no authentication and is unencrypted.
 
 You should then create a configuration file for each worker process. Each
@@ -175,7 +181,7 @@ which processes handle the various proccessing such as push notifications.
 
 ### `synapse.app.generic_worker`
 
-Handles the following API requests listed below matching the following regular
+This worker can handle API requests matching the following regular
 expressions:
 
     # Sync requests
@@ -242,7 +248,7 @@ Additionally, the following REST endpoints can be handled for GET requests:
 
     ^/_matrix/federation/v1/groups/
 
-Pagination requests can also be handled, but all requests with the same path
+Pagination requests can also be handled, but all requests for a given
 room must be routed to the same instance. Additionally, care must be taken to
 ensure that the purge history admin API is not used while pagination requests
 for the room are in flight:
@@ -255,8 +261,9 @@ in the worker config.
 
 #### Load balancing
 
-Multiple instances of this app can be run and requests load balanced between
-them. However, different endpoints have different characteristics and so admins
+It is possible to run multiple instances of this worker app, with incoming requests
+being load-balanced between them by the reverse-proxy. However, different endpoints
+have different characteristics and so admins
 may wish to run multiple groups of workers handling different endpoints so that
 load balancing can be done in different ways.
 
@@ -277,21 +284,21 @@ should be balanced by source IP so that transactions from the same remote server
 go to the same process.
 
 Registration/login requests can be handled separately purely to help ensure that
-unexpected load doesn't effect new logins and sign ups.
+unexpected load doesn't affect new logins and sign ups.
 
 Finally, event sending requests can be balanced by the embedded room ID (or
 URI, or even just round robin). If there is a large bridge connected that is
 sending or may send lots of events, then a dedicated set of workers can be
-provisioned to ensure that bursts or increases of event sending is isolated from
-effecting events sent by real users.
+provisioned to limit the effects of bursts of events from that bridge on events sent by 
+normal users.
 
 #### Stream writers
 
 Additionally, there is *experimental* support for moving writing of specific
 streams (such as events and typing) off of the main process to a particular
-worker. This requires use of Redis.
+worker. (This is only supported with Redis-based replication.)
 
-To enable this then the worker must have a HTTP replication listener configured,
+To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
 move event persistence off to a dedicated worker, the shared configuration would
 include:
