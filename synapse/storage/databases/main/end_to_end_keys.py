@@ -14,12 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
 from twisted.enterprise.adbapi import Connection
-from twisted.internet import defer
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -30,8 +29,7 @@ from synapse.util.iterutils import batch_iter
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
     @trace
-    @defer.inlineCallbacks
-    def get_e2e_device_keys(
+    async def get_e2e_device_keys(
         self, query_list, include_all_devices=False, include_deleted_devices=False
     ):
         """Fetch a list of device keys.
@@ -51,7 +49,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         if not query_list:
             return {}
 
-        results = yield self.db_pool.runInteraction(
+        results = await self.db_pool.runInteraction(
             "get_e2e_device_keys",
             self._get_e2e_device_keys_txn,
             query_list,
@@ -174,8 +172,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         log_kv(result)
         return result
 
-    @defer.inlineCallbacks
-    def get_e2e_one_time_keys(self, user_id, device_id, key_ids):
+    async def get_e2e_one_time_keys(
+        self, user_id: str, device_id: str, key_ids: List[str]
+    ) -> Dict[Tuple[str, str], str]:
         """Retrieve a number of one-time keys for a user
 
         Args:
@@ -185,11 +184,10 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 retrieve
 
         Returns:
-            deferred resolving to Dict[(str, str), str]: map from (algorithm,
-            key_id) to json string for key
+            A map from (algorithm, key_id) to json string for key
         """
 
-        rows = yield self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="e2e_one_time_keys_json",
             column="key_id",
             iterable=key_ids,
@@ -201,17 +199,21 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         log_kv({"message": "Fetched one time keys for user", "one_time_keys": result})
         return result
 
-    @defer.inlineCallbacks
-    def add_e2e_one_time_keys(self, user_id, device_id, time_now, new_keys):
+    async def add_e2e_one_time_keys(
+        self,
+        user_id: str,
+        device_id: str,
+        time_now: int,
+        new_keys: Iterable[Tuple[str, str, str]],
+    ) -> None:
         """Insert some new one time keys for a device. Errors if any of the
         keys already exist.
 
         Args:
-            user_id(str): id of user to get keys for
-            device_id(str): id of device to get keys for
-            time_now(long): insertion time to record (ms since epoch)
-            new_keys(iterable[(str, str, str)]: keys to add - each a tuple of
-                (algorithm, key_id, key json)
+            user_id: id of user to get keys for
+            device_id: id of device to get keys for
+            time_now: insertion time to record (ms since epoch)
+            new_keys: keys to add - each a tuple of (algorithm, key_id, key json)
         """
 
         def _add_e2e_one_time_keys(txn):
@@ -241,7 +243,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
 
-        yield self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "add_e2e_one_time_keys_insert", _add_e2e_one_time_keys
         )
 
@@ -268,22 +270,23 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             "count_e2e_one_time_keys", _count_e2e_one_time_keys
         )
 
-    @defer.inlineCallbacks
-    def get_e2e_cross_signing_key(self, user_id, key_type, from_user_id=None):
+    async def get_e2e_cross_signing_key(
+        self, user_id: str, key_type: str, from_user_id: Optional[str] = None
+    ) -> Optional[dict]:
         """Returns a user's cross-signing key.
 
         Args:
-            user_id (str): the user whose key is being requested
-            key_type (str): the type of key that is being requested: either 'master'
+            user_id: the user whose key is being requested
+            key_type: the type of key that is being requested: either 'master'
                 for a master key, 'self_signing' for a self-signing key, or
                 'user_signing' for a user-signing key
-            from_user_id (str): if specified, signatures made by this user on
+            from_user_id: if specified, signatures made by this user on
                 the self-signing key will be included in the result
 
         Returns:
             dict of the key data or None if not found
         """
-        res = yield self.get_e2e_cross_signing_keys_bulk([user_id], from_user_id)
+        res = await self.get_e2e_cross_signing_keys_bulk([user_id], from_user_id)
         user_keys = res.get(user_id)
         if not user_keys:
             return None
@@ -449,28 +452,26 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
         return keys
 
-    @defer.inlineCallbacks
-    def get_e2e_cross_signing_keys_bulk(
-        self, user_ids: List[str], from_user_id: str = None
-    ) -> defer.Deferred:
+    async def get_e2e_cross_signing_keys_bulk(
+        self, user_ids: List[str], from_user_id: Optional[str] = None
+    ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing keys for a set of users.
 
         Args:
-            user_ids (list[str]): the users whose keys are being requested
-            from_user_id (str): if specified, signatures made by this user on
+            user_ids: the users whose keys are being requested
+            from_user_id: if specified, signatures made by this user on
                 the self-signing keys will be included in the result
 
         Returns:
-            Deferred[dict[str, dict[str, dict]]]: map of user ID to key type to
-                key data.  If a user's cross-signing keys were not found, either
-                their user ID will not be in the dict, or their user ID will map
-                to None.
+            A map of user ID to key type to key data.  If a user's cross-signing
+            keys were not found, either their user ID will not be in the dict,
+            or their user ID will map to None.
         """
 
-        result = yield self._get_bare_e2e_cross_signing_keys_bulk(user_ids)
+        result = await self._get_bare_e2e_cross_signing_keys_bulk(user_ids)
 
         if from_user_id:
-            result = yield self.db_pool.runInteraction(
+            result = await self.db_pool.runInteraction(
                 "get_e2e_cross_signing_signatures",
                 self._get_e2e_cross_signing_signatures_txn,
                 result,
