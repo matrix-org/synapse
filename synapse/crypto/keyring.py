@@ -282,15 +282,14 @@ class Keyring(object):
         except Exception:
             logger.exception("Error starting key lookups")
 
-    @defer.inlineCallbacks
-    def wait_for_previous_lookups(self, server_names):
+    async def wait_for_previous_lookups(self, server_names) -> None:
         """Waits for any previous key lookups for the given servers to finish.
 
         Args:
             server_names (Iterable[str]): list of servers which we want to look up
 
         Returns:
-            Deferred[None]: resolves once all key lookups for the given servers have
+            Resolves once all key lookups for the given servers have
                 completed. Follows the synapse rules of logcontext preservation.
         """
         loop_count = 1
@@ -308,7 +307,7 @@ class Keyring(object):
                 loop_count,
             )
             with PreserveLoggingContext():
-                yield defer.DeferredList((w[1] for w in wait_on))
+                await defer.DeferredList((w[1] for w in wait_on))
 
             loop_count += 1
 
