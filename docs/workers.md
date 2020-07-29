@@ -291,8 +291,10 @@ effects of bursts of events from that bridge on events sent by normal users.
 #### Stream writers
 
 Additionally, there is *experimental* support for moving writing of specific
-streams (such as events and typing) off of the main process to a particular
-worker. (This is only supported with Redis-based replication.)
+streams (such as events) off of the main process to a particular worker. (This
+is only supported with Redis-based replication.)
+
+Currently support streams are `events` and `typing`.
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
