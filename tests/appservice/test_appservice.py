@@ -196,8 +196,9 @@ class ApplicationServiceTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_member_list_match(self):
         self.service.namespaces[ApplicationService.NS_USERS].append(_regex("@irc_.*"))
+        # Note that @irc_fo:here is the AS user.
         self.store.get_users_in_room.return_value = defer.succeed(
-            ["@alice:here", "@irc_fo:here", "@bob:here"]  # AS user
+            ["@alice:here", "@irc_fo:here", "@bob:here"]
         )
         self.store.get_aliases_for_room.return_value = defer.succeed([])
 

@@ -41,7 +41,7 @@ class AppServiceTransaction(object):
         Args:
             as_api(ApplicationServiceApi): The API to use to send.
         Returns:
-            A Deferred which resolves to True if the transaction was sent.
+            An Awaitable which resolves to True if the transaction was sent.
         """
         return as_api.push_bulk(
             service=self.service, events=self.events, txn_id=self.id
