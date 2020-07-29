@@ -35,10 +35,11 @@ class RedisConfig(Config):
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
-        # Configuration for Redis when using workers.
+        # Configuration for Redis when using workers. This *must* be enabled when
+        # using workers (unless using old style direct TCP configuration).
         #
         redis:
-          # Uncomment the below to enable using Redis to replicate data between workers.
+          # Uncomment the below to enable Redis support.
           #
           #enabled: true
 
