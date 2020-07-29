@@ -1,5 +1,0 @@
-Replaced a call to SSLv23 with call to TLSv1_2 in ServerContextFactory constructor.
-SSLv23 is unsupported, not secure, and explicitly disabled when the constructor calls configure_context, which subsequently explicitly disables deprecated SSL/TLS protocols on line 63 of synapse/crypto/context_factory.py
-This change ensures that defects in the user's python environment or openSSL libraries do not adversely impact behavior and allow a downgrade in protocol via "client" action.
-
-Contributed by David Blevins <blevinsd@ieee.org>
