@@ -96,6 +96,9 @@ class SamlHandler:
             relay_state=client_redirect_url
         )
 
+        # Since SAML sessions timeout it is useful to log when they were created.
+        logger.info("Initiating a new SAML session: %s" % (reqid,))
+
         now = self._clock.time_msec()
         self._outstanding_requests_dict[reqid] = Saml2SessionData(
             creation_time=now, ui_auth_session_id=ui_auth_session_id,

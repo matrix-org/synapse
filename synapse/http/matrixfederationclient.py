@@ -447,6 +447,7 @@ class MatrixFederationHttpClient(object):
                     ).inc()
 
                     set_tag(tags.HTTP_STATUS_CODE, response.code)
+                    response_phrase = response.phrase.decode("ascii", errors="replace")
 
                     if 200 <= response.code < 300:
                         logger.debug(
@@ -454,7 +455,7 @@ class MatrixFederationHttpClient(object):
                             request.txn_id,
                             request.destination,
                             response.code,
-                            response.phrase.decode("ascii", errors="replace"),
+                            response_phrase,
                         )
                         pass
                     else:
@@ -463,7 +464,7 @@ class MatrixFederationHttpClient(object):
                             request.txn_id,
                             request.destination,
                             response.code,
-                            response.phrase.decode("ascii", errors="replace"),
+                            response_phrase,
                         )
                         # :'(
                         # Update transactions table?
@@ -487,7 +488,7 @@ class MatrixFederationHttpClient(object):
                             )
                             body = None
 
-                        e = HttpResponseException(response.code, response.phrase, body)
+                        e = HttpResponseException(response.code, response_phrase, body)
 
                         # Retry if the error is a 429 (Too Many Requests),
                         # otherwise just raise a standard HttpResponseException
