@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import inspect
 import logging
 
 from prometheus_client import Counter
@@ -297,11 +296,7 @@ class HttpPusher(object):
                     )
                 else:
                     logger.info("Pushkey %s was rejected: removing", pk)
-                    # remove_pusher might return an awaitable (for the main
-                    # process) or None (for a worker process).
-                    result = self.hs.remove_pusher(self.app_id, pk, self.user_id)
-                    if inspect.isawaitable(result):
-                        await result
+                    await self.hs.remove_pusher(self.app_id, pk, self.user_id)
         return True
 
     async def _build_notification_dict(self, event, tweaks, badge):
