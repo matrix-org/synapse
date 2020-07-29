@@ -27,7 +27,6 @@ from synapse.metrics import (
     event_processing_loop_room_count,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.util import log_failure
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -104,7 +103,7 @@ class ApplicationServicesHandler(object):
                                 try:
                                     return self.scheduler.start()
                                 except Exception:
-                                    log_failure("Application Services Failure")
+                                    logger.error("Application Services Failure")
 
                             run_as_background_process("as_scheduler", start_scheduler)
                             self.started_scheduler = True
