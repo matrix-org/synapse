@@ -54,10 +54,10 @@ event_counter = Counter(
 )
 
 STATE_EVENT_TYPES_TO_MARK_UNREAD = {
-    EventTypes.PowerLevels,
     EventTypes.Topic,
     EventTypes.Name,
     EventTypes.RoomAvatar,
+    EventTypes.Tombstone,
 }
 
 
