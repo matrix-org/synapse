@@ -89,8 +89,27 @@ class RestHelper(object):
         )
 
     def change_membership(
-        self, room, src, targ, membership, extra_data={}, tok=None, expect_code=200
-    ):
+        self,
+        room: str,
+        src: str,
+        targ: str,
+        membership: str,
+        extra_data: dict = {},
+        tok: Optional[str] = None,
+        expect_code: int = 200,
+    ) -> None:
+        """
+        Send a membership state event into a room.
+
+        Args:
+            room: The ID of the room to send to
+            src: The mxid of the event sender
+            targ: The mxid of the event's target. The state key
+            membership: The type of membership event
+            extra_data: Extra information to include in the content of the event
+            tok: The user access token to use
+            expect_code: The expected HTTP response code
+        """
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
