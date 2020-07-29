@@ -48,7 +48,7 @@ class ServerContextFactory(ContextFactory):
     connections."""
 
     def __init__(self, config):
-        self._context = SSL.Context(SSL.TLSv1_2_method)
+        self._context = SSL.Context(SSL.TLSv1_2_METHOD)
         self.configure_context(self._context, config)
 
     @staticmethod
