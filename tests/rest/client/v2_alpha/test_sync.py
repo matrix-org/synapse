@@ -452,7 +452,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         self._check_unread_count(4)
 
         # Check that tombstone events changes increase the unread counter.
-        self.power_levels["invite"] = 50
         self.helper.send_state(
             self.room_id,
             EventTypes.Tombstone,
