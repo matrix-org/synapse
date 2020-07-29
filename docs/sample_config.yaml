@@ -2398,3 +2398,57 @@ opentracing:
     #
     #  logging:
     #    false
+
+
+## Workers ##
+
+# Disables sending of outbound federation transactions on the main process.
+# Uncomment if using a federation sender worker.
+#
+#send_federation: false
+
+# It is possible to run multiple federation sender workers, in which case the
+# work is balanced across them.
+#
+# This configuration must be shared between all federation sender workers, and if
+# changed all federation sender workers must be stopped at the same time and then
+# started, to ensure that all instances are running with the same config (otherwise
+# events may be dropped).
+#
+#federation_sender_instances:
+#  - federation_sender1
+
+# When using workers this should be a map from `worker_name` to the
+# HTTP replication listener of the worker, if configured.
+#
+#instance_map:
+#  worker1:
+#    host: localhost
+#    port: 8034
+
+# Experimental: When using workers you can define which workers should
+# handle event persistence and typing notifications. Any worker
+# specified here must also be in the `instance_map`.
+#
+#stream_writers:
+#  events: worker1
+#  typing: worker1
+
+
+# Configuration for Redis when using workers. This *must* be enabled when
+# using workers (unless using old style direct TCP configuration).
+#
+redis:
+  # Uncomment the below to enable Redis support.
+  #
+  #enabled: true
+
+  # Optional host and port to use to connect to redis. Defaults to
+  # localhost and 6379
+  #
+  #host: localhost
+  #port: 6379
+
+  # Optional password if configured on the Redis instance
+  #
+  #password: <secret_password>
