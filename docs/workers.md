@@ -101,7 +101,9 @@ application (`worker_app`), and you should specify a unqiue name for the worker
 You must also specify the HTTP replication endpoint that it should talk to on
 the main synapse process.  `worker_replication_host` should specify the host of
 the main synapse and `worker_replication_http_port` should point to the HTTP
-replication port.
+replication port. If the worker will handle HTTP requests then the
+`worker_listeners` option should be set with a `http` listener, in the same way
+as the `listeners` option in the shared config.
 
 For example:
 
@@ -119,6 +121,7 @@ worker_listeners:
    resources:
      - names:
        - client
+       - federation
 
 worker_log_config: /home/matrix/synapse/config/worker1_log_config.yaml
 ```
@@ -248,8 +251,8 @@ for the room are in flight:
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/messages$
 
-Note that the `client` and `federation` must be added to the listener resources
-in the worker config.
+Note that a HTTP listener with `client` and `federation` resources must be
+configured in the `worker_listeners` option in the worker config.
 
 
 #### Load balancing
