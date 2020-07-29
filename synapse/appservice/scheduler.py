@@ -253,7 +253,7 @@ class _Recoverer(object):
                 txn = await self.store.get_oldest_unsent_txn(self.service)
                 if not txn:
                     # nothing left: we're done!
-                    self.callback(self)
+                    await self.callback(self)
                     return
 
                 logger.info(
