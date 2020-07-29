@@ -223,8 +223,7 @@ class Keyring(object):
 
         return results
 
-    @defer.inlineCallbacks
-    def _start_key_lookups(self, verify_requests):
+    async def _start_key_lookups(self, verify_requests):
         """Sets off the key fetches for each verify request
 
         Once each fetch completes, verify_request.key_ready will be resolved.
@@ -245,7 +244,7 @@ class Keyring(object):
                 server_to_request_ids.setdefault(server_name, set()).add(request_id)
 
             # Wait for any previous lookups to complete before proceeding.
-            yield self.wait_for_previous_lookups(server_to_request_ids.keys())
+            await self.wait_for_previous_lookups(server_to_request_ids.keys())
 
             # take out a lock on each of the servers by sticking a Deferred in
             # key_downloads
