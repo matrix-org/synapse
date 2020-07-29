@@ -88,7 +88,9 @@ class RestHelper(object):
             expect_code=expect_code,
         )
 
-    def change_membership(self, room, src, targ, membership, tok=None, expect_code=200):
+    def change_membership(
+        self, room, src, targ, membership, extra_data={}, tok=None, expect_code=200
+    ):
         temp_id = self.auth_user_id
         self.auth_user_id = src
 
@@ -97,6 +99,7 @@ class RestHelper(object):
             path = path + "?access_token=%s" % tok
 
         data = {"membership": membership}
+        data.update(extra_data)
 
         request, channel = make_request(
             self.hs.get_reactor(), "PUT", path, json.dumps(data).encode("utf8")

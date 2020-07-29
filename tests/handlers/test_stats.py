@@ -346,6 +346,37 @@ class StatsRoomTests(unittest.HomeserverTestCase):
 
         self.assertEqual(r1stats_post["total_events"] - r1stats_ante["total_events"], 1)
 
+    def test_updating_profile_information_does_not_increase_joined_members_count(self):
+        """
+        Check that the joined_members count does not increase when a user changes their
+        profile information (which is done by sending another join membership event into
+        the room.
+        """
+        self._perform_background_initial_update()
+
+        # Create a user and room
+        u1 = self.register_user("u1", "pass")
+        u1token = self.login("u1", "pass")
+        r1 = self.helper.create_room_as(u1, tok=u1token)
+
+        # Get the current room stats
+        r1stats_ante = self._get_current_stats("room", r1)
+
+        # Send a profile update into the room
+        new_profile = {"displayname": "bob"}
+        self.helper.change_membership(
+            r1, u1, u1, "join", extra_data=new_profile, tok=u1token
+        )
+
+        # Get the new room stats
+        r1stats_post = self._get_current_stats("room", r1)
+
+        # Ensure that the user count did not changed
+        self.assertEqual(r1stats_post["joined_members"], r1stats_ante["joined_members"])
+        self.assertEqual(
+            r1stats_post["local_users_in_room"], r1stats_ante["local_users_in_room"]
+        )
+
     def test_send_state_event_nonoverwriting(self):
         """
         When we send a non-overwriting state event, it increments total_events AND current_state_events
