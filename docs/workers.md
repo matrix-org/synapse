@@ -35,6 +35,9 @@ Redis, which relays replication commands between processes. This can give a
 significant cpu saving on the main process and will be a prerequisite for
 upcoming performance improvements.
 
+(See the [Architectural diagram](#architectural-diagram) section at the end for
+a visualisation of what this looks like)
+
 
 ## Setting up workers
 
@@ -393,3 +396,40 @@ are ones that do specific processing unrelated to requests, e.g. the `pusher`
 that handles sending out push notifications for new events. The intention is for
 all these to be folded into the `generic_worker` app and to use config to define
 which processes handle the various proccessing such as push notifications.
+
+
+## Architectural diagram
+
+The following shows an example setup using Redis and a reverse proxy:
+
+```
+                     Clients & Federation
+                              |
+                              v
+                        +-----------+
+                        |           |
+                        |  Reverse  |
+                        |  Proxy    |
+                        |           |
+                        +-----------+
+                            | | |
+                            | | | HTTP requests
+        +-------------------+ | +-----------+
+        |                 +---+             |
+        |                 |                 |
+        v                 v                 v
++--------------+  +--------------+  +--------------+  +--------------+
+|   Main       |  |   Generic    |  |   Generic    |  |  Event       |
+|   Process    |  |   Worker 1   |  |   Worker 2   |  |  Persister   |
++--------------+  +--------------+  +--------------+  +--------------+
+      ^    ^          |   ^   |         |   ^   |          ^    ^
+      |    |          |   |   |         |   |   |          |    |
+      |    |          |   |   |  HTTP   |   |   |          |    |
+      |    +----------+<--|---|---------+   |   |          |    |
+      |                   |   +-------------|-->+----------+    |
+      |                   |                 |                   |
+      |                   |                 |                   |
+      v                   v                 v                   v
+====================================================================
+                                                         Redis pub/sub channel
+```
