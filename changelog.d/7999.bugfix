@@ -1,0 +1,1 @@
+Fix a long standing bug where HEAD requests were not properly rendered.
