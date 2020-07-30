@@ -54,7 +54,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             self.store.db.simple_insert(
                 "background_updates",
                 {
-                    "update_name": "populate_stats_process_rooms",
+                    "update_name": "populate_stats_process_rooms_2",
                     "progress_json": "{}",
                     "depends_on": "populate_stats_prepare",
                 },
@@ -66,7 +66,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 {
                     "update_name": "populate_stats_process_users",
                     "progress_json": "{}",
-                    "depends_on": "populate_stats_process_rooms",
+                    "depends_on": "populate_stats_process_rooms_2",
                 },
             )
         )
@@ -219,7 +219,10 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         self.get_success(
             self.store.db.simple_insert(
                 "background_updates",
-                {"update_name": "populate_stats_process_rooms", "progress_json": "{}"},
+                {
+                    "update_name": "populate_stats_process_rooms_2",
+                    "progress_json": "{}",
+                },
             )
         )
         self.get_success(
@@ -228,7 +231,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 {
                     "update_name": "populate_stats_cleanup",
                     "progress_json": "{}",
-                    "depends_on": "populate_stats_process_rooms",
+                    "depends_on": "populate_stats_process_rooms_2",
                 },
             )
         )
@@ -725,7 +728,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             self.store.db.simple_insert(
                 "background_updates",
                 {
-                    "update_name": "populate_stats_process_rooms",
+                    "update_name": "populate_stats_process_rooms_2",
                     "progress_json": "{}",
                     "depends_on": "populate_stats_prepare",
                 },
@@ -737,7 +740,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
                 {
                     "update_name": "populate_stats_process_users",
                     "progress_json": "{}",
-                    "depends_on": "populate_stats_process_rooms",
+                    "depends_on": "populate_stats_process_rooms_2",
                 },
             )
         )
