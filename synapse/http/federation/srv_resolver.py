@@ -17,10 +17,10 @@
 import logging
 import random
 import time
+from typing import List
 
 import attr
 
-from twisted.internet import defer
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
 from twisted.names.error import DNSNameError, DomainError
@@ -113,16 +113,14 @@ class SrvResolver(object):
         self._cache = cache
         self._get_time = get_time
 
-    @defer.inlineCallbacks
-    def resolve_service(self, service_name):
+    async def resolve_service(self, service_name: bytes) -> List[Server]:
         """Look up a SRV record
 
         Args:
             service_name (bytes): record to look up
 
         Returns:
-            Deferred[list[Server]]:
-                a list of the SRV records, or an empty list if none found
+            a list of the SRV records, or an empty list if none found
         """
         now = int(self._get_time())
 
@@ -136,7 +134,7 @@ class SrvResolver(object):
                 return _sort_server_list(servers)
 
         try:
-            answers, _, _ = yield make_deferred_yieldable(
+            answers, _, _ = await make_deferred_yieldable(
                 self._dns_client.lookupService(service_name)
             )
         except DNSNameError:

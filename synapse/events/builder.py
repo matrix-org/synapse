@@ -106,8 +106,8 @@ class EventBuilder(object):
             Deferred[FrozenEvent]
         """
 
-        state_ids = yield self._state.get_current_state_ids(
-            self.room_id, prev_event_ids
+        state_ids = yield defer.ensureDeferred(
+            self._state.get_current_state_ids(self.room_id, prev_event_ids)
         )
         auth_ids = yield self._auth.compute_auth_events(self, state_ids)
 

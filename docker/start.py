@@ -120,7 +120,7 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
 
     if ownership is not None:
         subprocess.check_output(["chown", "-R", ownership, "/data"])
-        args = ["su-exec", ownership] + args
+        args = ["gosu", ownership] + args
 
     subprocess.check_output(args)
 
@@ -172,8 +172,8 @@ def run_generate_config(environ, ownership):
         # make sure that synapse has perms to write to the data dir.
         subprocess.check_output(["chown", ownership, data_dir])
 
-        args = ["su-exec", ownership] + args
-        os.execv("/sbin/su-exec", args)
+        args = ["gosu", ownership] + args
+        os.execv("/usr/sbin/gosu", args)
     else:
         os.execv("/usr/local/bin/python", args)
 
@@ -189,7 +189,7 @@ def main(args, environ):
         ownership = "{}:{}".format(desired_uid, desired_gid)
 
     if ownership is None:
-        log("Will not perform chmod/su-exec as UserID already matches request")
+        log("Will not perform chmod/gosu as UserID already matches request")
 
     # In generate mode, generate a configuration and missing keys, then exit
     if mode == "generate":
@@ -236,8 +236,8 @@ running with 'migrate_config'. See the README for more details.
 
     args = ["python", "-m", synapse_worker, "--config-path", config_path]
     if ownership is not None:
-        args = ["su-exec", ownership] + args
-        os.execv("/sbin/su-exec", args)
+        args = ["gosu", ownership] + args
+        os.execv("/usr/sbin/gosu", args)
     else:
         os.execv("/usr/local/bin/python", args)
 

@@ -102,7 +102,9 @@ pid_file: DATADIR/homeserver.pid
 #gc_thresholds: [700, 10, 10]
 
 # Set the limit on the returned events in the timeline in the get
-# and sync operations. The default value is -1, means no upper limit.
+# and sync operations. The default value is 100. -1 means no upper limit.
+#
+# Uncomment the following to increase the limit to 5000.
 #
 #filter_timeline_limit: 5000
 
@@ -117,38 +119,6 @@ pid_file: DATADIR/homeserver.pid
 # will receive errors when searching for messages. Defaults to enabled.
 #
 #enable_search: false
-
-# Restrict federation to the following whitelist of domains.
-# N.B. we recommend also firewalling your federation listener to limit
-# inbound federation traffic as early as possible, rather than relying
-# purely on this application-layer restriction.  If not specified, the
-# default is to whitelist everything.
-#
-#federation_domain_whitelist:
-#  - lon.example.com
-#  - nyc.example.com
-#  - syd.example.com
-
-# Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges. If this option is not specified, or
-# specified with an empty list, no ip range blacklist will be enforced.
-#
-# As of Synapse v1.4.0 this option also affects any outbound requests to identity
-# servers provided by user input.
-#
-# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-# listed here, since they correspond to unroutable addresses.)
-#
-federation_ip_range_blacklist:
-  - '127.0.0.0/8'
-  - '10.0.0.0/8'
-  - '172.16.0.0/12'
-  - '192.168.0.0/16'
-  - '100.64.0.0/10'
-  - '169.254.0.0/16'
-  - '::1/128'
-  - 'fe80::/64'
-  - 'fc00::/7'
 
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
@@ -178,7 +148,7 @@ federation_ip_range_blacklist:
 #       names: a list of names of HTTP resources. See below for a list of
 #           valid resource names.
 #
-#       compress: set to true to enable HTTP comression for this resource.
+#       compress: set to true to enable HTTP compression for this resource.
 #
 #   additional_resources: Only valid for an 'http' listener. A map of
 #        additional endpoints which should be loaded via dynamic modules.
@@ -608,6 +578,39 @@ acme:
 
 
 
+# Restrict federation to the following whitelist of domains.
+# N.B. we recommend also firewalling your federation listener to limit
+# inbound federation traffic as early as possible, rather than relying
+# purely on this application-layer restriction.  If not specified, the
+# default is to whitelist everything.
+#
+#federation_domain_whitelist:
+#  - lon.example.com
+#  - nyc.example.com
+#  - syd.example.com
+
+# Prevent federation requests from being sent to the following
+# blacklist IP address CIDR ranges. If this option is not specified, or
+# specified with an empty list, no ip range blacklist will be enforced.
+#
+# As of Synapse v1.4.0 this option also affects any outbound requests to identity
+# servers provided by user input.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+federation_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/64'
+  - 'fc00::/7'
+
+
 ## Caching ##
 
 # Caching can be configured through the following options.
@@ -682,7 +685,7 @@ caches:
 #database:
 #  name: psycopg2
 #  args:
-#    user: synapse
+#    user: synapse_user
 #    password: secretpassword
 #    database: synapse
 #    host: localhost
@@ -1811,6 +1814,9 @@ sso:
 # Each JSON Web Token needs to contain a "sub" (subject) claim, which is
 # used as the localpart of the mxid.
 #
+# Additionally, the expiration time ("exp"), not before time ("nbf"),
+# and issued at ("iat") claims are validated if present.
+#
 # Note that this is a non-standard login type and client support is
 # expected to be non-existant.
 #
@@ -1837,6 +1843,24 @@ sso:
     # Required if 'enabled' is true.
     #
     #algorithm: "provided-by-your-issuer"
+
+    # The issuer to validate the "iss" claim against.
+    #
+    # Optional, if provided the "iss" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    #issuer: "provided-by-your-issuer"
+
+    # A list of audiences to validate the "aud" claim against.
+    #
+    # Optional, if provided the "aud" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    # Note that if the "aud" claim is included in a JSON web token then
+    # validation will fail without configuring audiences.
+    #
+    #audiences:
+    #    - "provided-by-your-issuer"
 
 
 password_config:
@@ -1927,8 +1951,8 @@ email:
   #
   #notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
 
-  # app_name defines the default value for '%(app)s' in notif_from. It
-  # defaults to 'Matrix'.
+  # app_name defines the default value for '%(app)s' in notif_from and email
+  # subjects. It defaults to 'Matrix'.
   #
   #app_name: my_branded_matrix_server
 
@@ -1996,6 +2020,73 @@ email:
   # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
   #
   #template_dir: "res/templates"
+
+  # Subjects to use when sending emails from Synapse.
+  #
+  # The placeholder '%(app)s' will be replaced with the value of the 'app_name'
+  # setting above, or by a value dictated by the Matrix client application.
+  #
+  # If a subject isn't overridden in this configuration file, the value used as
+  # its example will be used.
+  #
+  #subjects:
+
+    # Subjects for notification emails.
+    #
+    # On top of the '%(app)s' placeholder, these can use the following
+    # placeholders:
+    #
+    #   * '%(person)s', which will be replaced by the display name of the user(s)
+    #      that sent the message(s), e.g. "Alice and Bob".
+    #   * '%(room)s', which will be replaced by the name of the room the
+    #      message(s) have been sent to, e.g. "My super room".
+    #
+    # See the example provided for each setting to see which placeholder can be
+    # used and how to use them.
+    #
+    # Subject to use to notify about one message from one or more user(s) in a
+    # room which has a name.
+    #message_from_person_in_room: "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room..."
+    #
+    # Subject to use to notify about one message from one or more user(s) in a
+    # room which doesn't have a name.
+    #message_from_person: "[%(app)s] You have a message on %(app)s from %(person)s..."
+    #
+    # Subject to use to notify about multiple messages from one or more users in
+    # a room which doesn't have a name.
+    #messages_from_person: "[%(app)s] You have messages on %(app)s from %(person)s..."
+    #
+    # Subject to use to notify about multiple messages in a room which has a
+    # name.
+    #messages_in_room: "[%(app)s] You have messages on %(app)s in the %(room)s room..."
+    #
+    # Subject to use to notify about multiple messages in multiple rooms.
+    #messages_in_room_and_others: "[%(app)s] You have messages on %(app)s in the %(room)s room and others..."
+    #
+    # Subject to use to notify about multiple messages from multiple persons in
+    # multiple rooms. This is similar to the setting above except it's used when
+    # the room in which the notification was triggered has no name.
+    #messages_from_person_and_others: "[%(app)s] You have messages on %(app)s from %(person)s and others..."
+    #
+    # Subject to use to notify about an invite to a room which has a name.
+    #invite_from_person_to_room: "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s..."
+    #
+    # Subject to use to notify about an invite to a room which doesn't have a
+    # name.
+    #invite_from_person: "[%(app)s] %(person)s has invited you to chat on %(app)s..."
+
+    # Subject for emails related to account administration.
+    #
+    # On top of the '%(app)s' placeholder, these one can use the
+    # '%(server_name)s' placeholder, which will be replaced by the value of the
+    # 'server_name' setting in your Synapse configuration.
+    #
+    # Subject to use when sending a password reset email.
+    #password_reset: "[%(server_name)s] Password reset"
+    #
+    # Subject to use when sending a verification email to assert an address's
+    # ownership.
+    #email_validation: "[%(server_name)s] Validate your email"
 
 
 # Password providers allow homeserver administrators to integrate
@@ -2307,3 +2398,57 @@ opentracing:
     #
     #  logging:
     #    false
+
+
+## Workers ##
+
+# Disables sending of outbound federation transactions on the main process.
+# Uncomment if using a federation sender worker.
+#
+#send_federation: false
+
+# It is possible to run multiple federation sender workers, in which case the
+# work is balanced across them.
+#
+# This configuration must be shared between all federation sender workers, and if
+# changed all federation sender workers must be stopped at the same time and then
+# started, to ensure that all instances are running with the same config (otherwise
+# events may be dropped).
+#
+#federation_sender_instances:
+#  - federation_sender1
+
+# When using workers this should be a map from `worker_name` to the
+# HTTP replication listener of the worker, if configured.
+#
+#instance_map:
+#  worker1:
+#    host: localhost
+#    port: 8034
+
+# Experimental: When using workers you can define which workers should
+# handle event persistence and typing notifications. Any worker
+# specified here must also be in the `instance_map`.
+#
+#stream_writers:
+#  events: worker1
+#  typing: worker1
+
+
+# Configuration for Redis when using workers. This *must* be enabled when
+# using workers (unless using old style direct TCP configuration).
+#
+redis:
+  # Uncomment the below to enable Redis support.
+  #
+  #enabled: true
+
+  # Optional host and port to use to connect to redis. Defaults to
+  # localhost and 6379
+  #
+  #host: localhost
+  #port: 6379
+
+  # Optional password if configured on the Redis instance
+  #
+  #password: <secret_password>
