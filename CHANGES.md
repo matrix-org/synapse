@@ -1,3 +1,12 @@
+Synapse 1.18.0 (2020-07-30)
+===========================
+
+Improved Documentation
+----------------------
+
+- Update worker docs with latest enhancements. ([\#7969](https://github.com/matrix-org/synapse/issues/7969))
+
+
 Synapse 1.18.0rc2 (2020-07-28)
 ==============================
 
