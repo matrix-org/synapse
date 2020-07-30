@@ -255,7 +255,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         self._instance_name = hs.get_instance_name()
         self._send_federation = hs.should_send_federation()
-        self._federation_shard_config = hs.config.federation.federation_shard_config
+        self._federation_shard_config = hs.config.worker.federation_shard_config
 
         # If we're a process that sends federation we may need to reset the
         # `federation_stream_position` table to match the current sharding
