@@ -278,7 +278,7 @@ instance_map:
         host: localhost
         port: 8034
 
-streams_writers:
+stream_writers:
     events: event_persister1
 ```
 
