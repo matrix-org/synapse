@@ -330,7 +330,9 @@ class Keyring(object):
                 for f in self._key_fetchers:
                     if not remaining_requests:
                         return
-                    yield self._attempt_key_fetches_with_fetcher(f, remaining_requests)
+                    yield defer.ensureDeferred(
+                        self._attempt_key_fetches_with_fetcher(f, remaining_requests)
+                    )
 
                 # look for any requests which weren't satisfied
                 with PreserveLoggingContext():
@@ -360,8 +362,7 @@ class Keyring(object):
 
         run_in_background(do_iterations).addErrback(on_err)
 
-    @defer.inlineCallbacks
-    def _attempt_key_fetches_with_fetcher(self, fetcher, remaining_requests):
+    async def _attempt_key_fetches_with_fetcher(self, fetcher, remaining_requests):
         """Use a key fetcher to attempt to satisfy some key requests
 
         Args:
@@ -388,7 +389,7 @@ class Keyring(object):
                     verify_request.minimum_valid_until_ts,
                 )
 
-        results = yield defer.ensureDeferred(fetcher.get_keys(missing_keys))
+        results = await fetcher.get_keys(missing_keys)
 
         completed = []
         for verify_request in remaining_requests:
