@@ -79,6 +79,7 @@ Upgrading to v1.18.0
 ====================
 
 Docker `-py3` suffix will be removed in future versions
+-------------------------------------------------------
 
 From 10th August 2020, we will no longer publish Docker images with the `-py3` tag suffix. The images tagged with the `-py3` suffix have been identical to the non-suffixed tags since release 0.99.0, and the suffix is obsolete.
 

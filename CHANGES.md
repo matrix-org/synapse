@@ -6,8 +6,6 @@ Deprecation Warnings
 
 ### Docker Tags with `-py3` Suffix
 
-Docker `-py3` suffix will be removed in future versions
-
 From 10th August 2020, we will no longer publish Docker images with the `-py3` tag suffix. The images tagged with the `-py3` suffix have been identical to the non-suffixed tags since release 0.99.0, and the suffix is obsolete.
 
 On 10th August, we will remove the `latest-py3` tag. Existing per-release tags (such as `v1.18.0-py3`) will not be removed, but no new `-py3` tags will be added.
