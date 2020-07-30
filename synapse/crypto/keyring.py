@@ -330,7 +330,9 @@ class Keyring(object):
                     for f in self._key_fetchers:
                         if not remaining_requests:
                             return
-                        await self._attempt_key_fetches_with_fetcher(f, remaining_requests)
+                        await self._attempt_key_fetches_with_fetcher(
+                            f, remaining_requests
+                        )
 
                     # look for any requests which weren't satisfied
                     with PreserveLoggingContext():
