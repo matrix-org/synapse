@@ -58,6 +58,7 @@ RUN apt-get update && apt-get install -y \
     libpq5 \
     xmlsec1 \
     gosu \
+    wget \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
