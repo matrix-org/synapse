@@ -1,10 +1,10 @@
 # Scaling synapse via workers
 
-For small instances it recommended to run Synapse in monolith mode (the
-default). For larger instances where performance is a concern it can be helpful
-to split out functionality into multiple separate python processes. These
-processes are called 'workers', and are (eventually) intended to scale
-horizontally independently.
+For small instances it recommended to run Synapse in the default monolith mode.
+For larger instances where performance is a concern it can be helpful to split
+out functionality into multiple separate python processes. These processes are
+called 'workers', and are (eventually) intended to scale horizontally
+independently.
 
 Synapse's worker support is under active development and subject to change as
 we attempt to rapidly scale ever larger Synapse instances. However we are
@@ -23,29 +23,30 @@ The processes communicate with each other via a Synapse-specific protocol called
 feeds streams of newly written data between processes so they can be kept in
 sync with the database state.
 
-Additionally, processes may make HTTP requests to each other. Typically this is
-used for operations which need to wait for a reply - such as sending an event.
+When configured to do so, Synapse uses a 
+[Redis pub/sub channel](https://redis.io/topics/pubsub) to send the replication
+stream between all configured Synapse processes. Additionally, processes may
+make HTTP requests to each other, primarily for operations which need to wait
+for a reply ─ such as sending an event.
 
-As of Synapse v1.13.0, it is possible to configure Synapse to send replication
-via a [Redis pub/sub channel](https://redis.io/topics/pubsub), and is now the
-recommended way of configuring replication. This is an alternative to the old
-direct TCP connections to the main process: rather than all the workers
-connecting to the main process, all the workers and the main process connect to
-Redis, which relays replication commands between processes. This can give a
-significant cpu saving on the main process and will be a prerequisite for
-upcoming performance improvements.
+Redis support was added in v1.13.0 with it becoming the recommended method in
+v1.18.0. It replaced the old direct TCP connections (which is deprecated as of
+v1.18.0) to the main process. With Redis, rather than all the workers connecting
+to the main process, all the workers and the main process connect to Redis,
+which relays replication commands between processes. This can give a significant
+cpu saving on the main process and will be a prerequisite for upcoming
+performance improvements.
 
-(See the [Architectural diagram](#architectural-diagram) section at the end for
-a visualisation of what this looks like)
+See the [Architectural diagram](#architectural-diagram) section at the end for
+a visualisation of what this looks like.
 
 
 ## Setting up workers
 
 A Redis server is required to manage the communication between the processes.
-(The older direct TCP connections are now deprecated.) The Redis server
-should be installed following the normal procedure for your distribution (e.g.
-`apt install redis-server` on Debian). It is safe to use an existing Redis
-deployment if you have one.
+The Redis server should be installed following the normal procedure for your
+distribution (e.g. `apt install redis-server` on Debian). It is safe to use an
+existing Redis deployment if you have one.
 
 Once installed, check that Redis is running and accessible from the host running
 Synapse, for example by executing `echo PING | nc -q1 localhost 6379` and seeing
@@ -65,8 +66,9 @@ https://hub.docker.com/r/matrixdotorg/synapse/.
 
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
-the correct worker, or to the main synapse instance. See [reverse_proxy.md](reverse_proxy.md)
-for information on setting up a reverse proxy.
+the correct worker, or to the main synapse instance. See 
+[reverse_proxy.md](reverse_proxy.md) for information on setting up a reverse
+proxy.
 
 To enable workers you should create a configuration file for each worker
 process. Each worker configuration file inherits the configuration of the shared
@@ -75,8 +77,12 @@ that worker, e.g. the HTTP listener that it provides (if any); logging
 configuration; etc.  You should minimise the number of overrides though to
 maintain a usable config.
 
-Next you need to add both a HTTP replication listener and redis config to the
-shared Synapse configuration file (`homeserver.yaml`). For example:
+
+### Shared Configuration
+
+Next you need to add both a HTTP replication listener, used for HTTP requests
+between processes, and redis config to the shared Synapse configuration file
+(`homeserver.yaml`). For example:
 
 ```yaml
 # extend the existing `listeners` section. This defines the ports that the
@@ -97,6 +103,9 @@ See the sample config for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
 public internet; it has no authentication and is unencrypted.
+
+
+### Worker Configuration
 
 In the config file for each worker, you must specify the type of worker
 application (`worker_app`), and you should specify a unqiue name for the worker
