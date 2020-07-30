@@ -293,7 +293,7 @@ class RestServlet(object):
                         method, patterns, method_handler, servlet_classname
                     )
 
-                    # If there's not HEAD handler, but there is a GET handler,
+                    # If there's no HEAD handler, but there is a GET handler,
                     # register it again.
                     if method == "GET" and not hasattr(self, "on_HEAD"):
                         http_server.register_paths(
