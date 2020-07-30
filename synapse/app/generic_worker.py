@@ -940,7 +940,7 @@ def start(config_options):
         config.server.update_user_directory = False
 
     if config.worker_app == "synapse.app.federation_sender":
-        if config.federation.send_federation:
+        if config.worker.send_federation:
             sys.stderr.write(
                 "\nThe send_federation must be disabled in the main synapse process"
                 "\nbefore they can be run in a separate worker."
@@ -950,10 +950,10 @@ def start(config_options):
             sys.exit(1)
 
         # Force the pushers to start since they will be disabled in the main config
-        config.federation.send_federation = True
+        config.worker.send_federation = True
     else:
         # For other worker types we force this to off.
-        config.federation.send_federation = False
+        config.worker.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
