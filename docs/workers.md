@@ -27,10 +27,10 @@ When configured to do so, Synapse uses a
 [Redis pub/sub channel](https://redis.io/topics/pubsub) to send the replication
 stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
-for a reply - such as sending an event.
+for a reply ─ such as sending an event.
 
 Redis support was added in v1.13.0 with it becoming the recommended method in
-v1.18.0. It replaced the old direct TCP connections (which are deprecated as of
+v1.18.0. It replaced the old direct TCP connections (which is deprecated as of
 v1.18.0) to the main process. With Redis, rather than all the workers connecting
 to the main process, all the workers and the main process connect to Redis,
 which relays replication commands between processes. This can give a significant
