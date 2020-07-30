@@ -324,15 +324,12 @@ class Keyring(object):
 
         remaining_requests = {rq for rq in verify_requests if not rq.key_ready.called}
 
-        @defer.inlineCallbacks
-        def do_iterations():
+        async def do_iterations():
             with Measure(self.clock, "get_server_verify_keys"):
                 for f in self._key_fetchers:
                     if not remaining_requests:
                         return
-                    yield defer.ensureDeferred(
-                        self._attempt_key_fetches_with_fetcher(f, remaining_requests)
-                    )
+                    await self._attempt_key_fetches_with_fetcher(f, remaining_requests)
 
                 # look for any requests which weren't satisfied
                 with PreserveLoggingContext():
