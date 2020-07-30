@@ -23,7 +23,7 @@ The processes communicate with each other via a Synapse-specific protocol called
 feeds streams of newly written data between processes so they can be kept in
 sync with the database state.
 
-When configured to do so, Synapse uses a 
+When configured to do so, Synapse uses a
 [Redis pub/sub channel](https://redis.io/topics/pubsub) to send the replication
 stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
@@ -66,23 +66,28 @@ https://hub.docker.com/r/matrixdotorg/synapse/.
 
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
-the correct worker, or to the main synapse instance. See 
+the correct worker, or to the main synapse instance. See
 [reverse_proxy.md](reverse_proxy.md) for information on setting up a reverse
 proxy.
 
-To enable workers you should create a configuration file for each worker
-process. Each worker configuration file inherits the configuration of the shared
-homeserver configuration file.  You can then override configuration specific to
-that worker, e.g. the HTTP listener that it provides (if any); logging
-configuration; etc.  You should minimise the number of overrides though to
-maintain a usable config.
+When using workers, each worker process has its own configuration file which
+contains settings specific to that worker, such as the HTTP listener that it
+provides (if any), logging configuration, etc.
 
+Normally,  the worker processes are configured to read from a shared
+configuration file as well as the worker-specific configuration files. This
+makes it easier to keep common configuration settings synchronised across all the
+processes.
 
-### Shared Configuration
+The main process is somewhat special in this respect: it does not normally
+need its own configuration file and can take all of its configuration from the
+shared configuration file.
 
-Next you need to add both a HTTP replication listener, used for HTTP requests
-between processes, and redis config to the shared Synapse configuration file
-(`homeserver.yaml`). For example:
+Normally, only a couple of changes are needed to make an existing configuration
+file suitable for use with workers. First, you need to enable an "HTTP replication
+listener" for the main process; and secondly, you need to enable redis-based
+replication. For example:
+
 
 ```yaml
 # extend the existing `listeners` section. This defines the ports that the
@@ -103,9 +108,6 @@ See the sample config for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
 public internet; it has no authentication and is unencrypted.
-
-
-### Worker Configuration
 
 In the config file for each worker, you must specify the type of worker
 application (`worker_app`), and you should specify a unqiue name for the worker
