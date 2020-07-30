@@ -63,7 +63,7 @@ class ServerNoticesManager(object):
             is_state_event(bool): Is the event a state event
 
         Returns:
-            Deferred[FrozenEvent]
+            FrozenEvent
         """
         room_id = await self.get_or_create_notice_room_for_user(user_id)
         await self.maybe_invite_user_to_room(user_id, room_id)

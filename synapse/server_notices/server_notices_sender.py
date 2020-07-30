@@ -34,20 +34,20 @@ class ServerNoticesSender(object):
             ResourceLimitsServerNotices(hs),
         )
 
-    async def on_user_syncing(self, user_id):
+    async def on_user_syncing(self, user_id: str) -> None:
         """Called when the user performs a sync operation.
 
         Args:
-            user_id (str): mxid of user who synced
+            user_id: mxid of user who synced
         """
         for sn in self._server_notices:
             await sn.maybe_send_server_notice_to_user(user_id)
 
-    async def on_user_ip(self, user_id):
+    async def on_user_ip(self, user_id: str) -> None:
         """Called on the master when a worker process saw a client request.
 
         Args:
-            user_id (str): mxid
+            user_id: mxid
         """
         # The synchrotrons use a stubbed version of ServerNoticesSender, so
         # we check for notices to send to the user in on_user_ip as well as
