@@ -49,7 +49,7 @@ class TransportLayerClient(object):
             event_id (str): The event we want the context at.
 
         Returns:
-            Deferred: Results in a dict received from the remote homeserver.
+            Awaitable: Results in a dict received from the remote homeserver.
         """
         logger.debug("get_room_state_ids dest=%s, room=%s", destination, room_id)
 
@@ -73,7 +73,7 @@ class TransportLayerClient(object):
                 giving up. None indicates no timeout.
 
         Returns:
-            Deferred: Results in a dict received from the remote homeserver.
+            Awaitable: Results in a dict received from the remote homeserver.
         """
         logger.debug("get_pdu dest=%s, event_id=%s", destination, event_id)
 
@@ -94,7 +94,7 @@ class TransportLayerClient(object):
             limit (int)
 
         Returns:
-            Deferred: Results in a dict received from the remote homeserver.
+            Awaitable: Results in a dict received from the remote homeserver.
         """
         logger.debug(
             "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
@@ -124,7 +124,7 @@ class TransportLayerClient(object):
             transaction (Transaction)
 
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body.
 
             Fails with ``HTTPRequestException`` if we get an HTTP response
@@ -197,7 +197,7 @@ class TransportLayerClient(object):
                 request.
 
         Returns:
-            Deferred: Succeeds when we get a 2xx HTTP response. The result
+            Succeeds when we get a 2xx HTTP response. The result
             will be the decoded JSON body (ie, the new event).
 
             Fails with ``HTTPRequestException`` if we get an HTTP response
