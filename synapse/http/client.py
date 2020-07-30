@@ -395,7 +395,9 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             return json.loads(body.decode("utf-8"))
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     @defer.inlineCallbacks
     def post_json_get_json(self, uri, post_json, headers=None):
@@ -436,7 +438,9 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             return json.loads(body.decode("utf-8"))
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     @defer.inlineCallbacks
     def get_json(self, uri, args={}, headers=None):
@@ -509,7 +513,9 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             return json.loads(body.decode("utf-8"))
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     @defer.inlineCallbacks
     def get_raw(self, uri, args={}, headers=None):
@@ -544,7 +550,9 @@ class SimpleHttpClient(object):
         if 200 <= response.code < 300:
             return body
         else:
-            raise HttpResponseException(response.code, response.phrase, body)
+            raise HttpResponseException(
+                response.code, response.phrase.decode("ascii", errors="replace"), body
+            )
 
     # XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
     # The two should be factored out.
