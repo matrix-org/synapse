@@ -829,22 +829,18 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
         return keys
 
 
-@defer.inlineCallbacks
-def _handle_key_deferred(verify_request):
+async def _handle_key_deferred(verify_request) -> None:
     """Waits for the key to become available, and then performs a verification
 
     Args:
         verify_request (VerifyJsonRequest):
-
-    Returns:
-        Deferred[None]
 
     Raises:
         SynapseError if there was a problem performing the verification
     """
     server_name = verify_request.server_name
     with PreserveLoggingContext():
-        _, key_id, verify_key = yield verify_request.key_ready
+        _, key_id, verify_key = await verify_request.key_ready
 
     json_object = verify_request.json_object
 
