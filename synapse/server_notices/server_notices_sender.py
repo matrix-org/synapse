@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Iterable, Union
+
 from synapse.server_notices.consent_server_notices import ConsentServerNotices
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
@@ -32,7 +34,7 @@ class ServerNoticesSender(object):
         self._server_notices = (
             ConsentServerNotices(hs),
             ResourceLimitsServerNotices(hs),
-        )
+        )  # type: Iterable[Union[ConsentServerNotices, ResourceLimitsServerNotices]]
 
     async def on_user_syncing(self, user_id: str) -> None:
         """Called when the user performs a sync operation.

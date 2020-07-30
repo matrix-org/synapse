@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -135,7 +135,7 @@ class ResourceLimitsServerNotices(object):
         )
 
     async def _apply_limit_block_notification(
-        self, user_id: str, event_body: str, event_limit_type: str
+        self, user_id: str, event_body: str, event_limit_type: Optional[str]
     ) -> None:
         """Utility method to apply limit block notifications in the server
         notices room.
@@ -206,7 +206,7 @@ class ResourceLimitsServerNotices(object):
             # The user has yet to join the server notices room
             pass
 
-        referenced_events = []
+        referenced_events = []  # type: List[str]
         if pinned_state_event is not None:
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 
