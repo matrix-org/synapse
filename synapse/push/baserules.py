@@ -96,9 +96,17 @@ def make_base_append_rules(kind, modified_base_rules, use_new_defaults=False):
     rules = []
 
     if kind == "override":
-        rules = NEW_APPEND_OVERRIDE_RULES if use_new_defaults else BASE_APPEND_OVERRIDE_RULES
+        rules = (
+            NEW_APPEND_OVERRIDE_RULES
+            if use_new_defaults
+            else BASE_APPEND_OVERRIDE_RULES
+        )
     elif kind == "underride":
-        rules = NEW_APPEND_UNDERRIDE_RULES if use_new_defaults else BASE_APPEND_UNDERRIDE_RULES
+        rules = (
+            NEW_APPEND_UNDERRIDE_RULES
+            if use_new_defaults
+            else BASE_APPEND_UNDERRIDE_RULES
+        )
     elif kind == "content":
         rules = BASE_APPEND_CONTENT_RULES
 
@@ -117,7 +125,11 @@ def make_base_prepend_rules(kind, modified_base_rules, use_new_defaults=False):
     rules = []
 
     if kind == "override":
-        rules = NEW_PREPEND_OVERRIDE_RULES if use_new_defaults else BASE_PREPEND_OVERRIDE_RULES
+        rules = (
+            NEW_PREPEND_OVERRIDE_RULES
+            if use_new_defaults
+            else BASE_PREPEND_OVERRIDE_RULES
+        )
 
     # Copy the rules before modifying them
     rules = copy.deepcopy(rules)
@@ -315,7 +327,7 @@ NEW_APPEND_OVERRIDE_RULES = [
                 "key": "content.msgtype",
                 "pattern": "m.notice",
                 "_id": "_suppress_notices",
-            }
+            },
         ],
         "actions": [],
     },
@@ -348,10 +360,7 @@ NEW_APPEND_OVERRIDE_RULES = [
             },
             {"kind": "event_match", "key": "state_key", "pattern_type": "user_id"},
         ],
-        "actions": [
-            "notify",
-            {"set_tweak": "sound", "value": "default"},
-        ],
+        "actions": ["notify", {"set_tweak": "sound", "value": "default"}],
     },
     {
         "rule_id": "global/override/.m.rule.contains_display_name",
@@ -415,11 +424,8 @@ NEW_APPEND_OVERRIDE_RULES = [
                 "_id": "_call",
             }
         ],
-        "actions": [
-            "notify",
-            {"set_tweak": "sound", "value": "ring"},
-        ],
-    }
+        "actions": ["notify", {"set_tweak": "sound", "value": "ring"}],
+    },
 ]
 
 
@@ -512,17 +518,24 @@ NEW_APPEND_UNDERRIDE_RULES = [
         "rule_id": "global/underride/.m.rule.room_one_to_one",
         "conditions": [
             {"kind": "room_member_count", "is": "2", "_id": "member_count"},
-            {"kind": "event_match", "key": "content.body", "pattern": "*", "_id": "body"},
+            {
+                "kind": "event_match",
+                "key": "content.body",
+                "pattern": "*",
+                "_id": "body",
+            },
         ],
-        "actions": [
-            "notify",
-            {"set_tweak": "sound", "value": "default"},
-        ],
+        "actions": ["notify", {"set_tweak": "sound", "value": "default"}],
     },
     {
         "rule_id": "global/underride/.m.rule.message",
         "conditions": [
-            {"kind": "event_match", "key": "content.body", "pattern": "*", "_id": "body"},
+            {
+                "kind": "event_match",
+                "key": "content.body",
+                "pattern": "*",
+                "_id": "body",
+            },
         ],
         "actions": ["notify"],
         "enabled": False,
