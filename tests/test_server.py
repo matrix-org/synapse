@@ -312,3 +312,18 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         self.assertEqual(location_headers, [b"/no/over/there"])
         cookies_headers = [v for k, v in headers if k == b"Set-Cookie"]
         self.assertEqual(cookies_headers, [b"session=yespls"])
+
+    def test_head_request(self):
+        """A head request should work by being turned into a GET request."""
+        def callback(request):
+            request.write(b"response")
+            request.finish()
+
+        res = WrapHtmlRequestHandlerTests.TestResource()
+        res.callback = callback
+
+        request, channel = make_request(self.reactor, b"HEAD", b"/path")
+        render(request, res, self.reactor)
+
+        self.assertEqual(channel.result["code"], b"200")
+        self.assertNotIn("body", channel.result)
