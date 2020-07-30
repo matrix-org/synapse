@@ -16,8 +16,6 @@ import logging
 
 from mock import Mock
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory
 from synapse.rest.admin import register_servlets_for_client_rest_resource
@@ -25,6 +23,7 @@ from synapse.rest.client.v1 import login, room
 from synapse.types import UserID
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
+from tests.test_utils import make_awaitable
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new event.
         """
         mock_client = Mock(spec=["put_json"])
-        mock_client.put_json.side_effect = lambda *_, **__: defer.succeed({})
+        mock_client.put_json.side_effect = lambda *_, **__: make_awaitable({})
 
         self.make_worker_hs(
             "synapse.app.federation_sender",
@@ -74,7 +73,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new events.
         """
         mock_client1 = Mock(spec=["put_json"])
-        mock_client1.put_json.side_effect = lambda *_, **__: defer.succeed({})
+        mock_client1.put_json.side_effect = lambda *_, **__: make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
@@ -86,7 +85,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         mock_client2 = Mock(spec=["put_json"])
-        mock_client2.put_json.side_effect = lambda *_, **__: defer.succeed({})
+        mock_client2.put_json.side_effect = lambda *_, **__: make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
@@ -137,7 +136,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         new typing EDUs.
         """
         mock_client1 = Mock(spec=["put_json"])
-        mock_client1.put_json.side_effect = lambda *_, **__: defer.succeed({})
+        mock_client1.put_json.side_effect = lambda *_, **__: make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
@@ -149,7 +148,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         mock_client2 = Mock(spec=["put_json"])
-        mock_client2.put_json.side_effect = lambda *_, **__: defer.succeed({})
+        mock_client2.put_json.side_effect = lambda *_, **__: make_awaitable({})
         self.make_worker_hs(
             "synapse.app.federation_sender",
             {
