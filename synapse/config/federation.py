@@ -17,23 +17,13 @@ from typing import Optional
 
 from netaddr import IPSet
 
-from ._base import Config, ConfigError, ShardedWorkerHandlingConfig
+from ._base import Config, ConfigError
 
 
 class FederationConfig(Config):
     section = "federation"
 
     def read_config(self, config, **kwargs):
-        # Whether to send federation traffic out in this process. This only
-        # applies to some federation traffic, and so shouldn't be used to
-        # "disable" federation
-        self.send_federation = config.get("send_federation", True)
-
-        federation_sender_instances = config.get("federation_sender_instances") or []
-        self.federation_shard_config = ShardedWorkerHandlingConfig(
-            federation_sender_instances
-        )
-
         # FIXME: federation_domain_whitelist needs sytests
         self.federation_domain_whitelist = None  # type: Optional[dict]
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)

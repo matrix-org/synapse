@@ -82,7 +82,7 @@ class Auth(object):
 
     @defer.inlineCallbacks
     def check_from_context(self, room_version: str, event, context, do_sig_check=True):
-        prev_state_ids = yield context.get_prev_state_ids()
+        prev_state_ids = yield defer.ensureDeferred(context.get_prev_state_ids())
         auth_events_ids = yield self.compute_auth_events(
             event, prev_state_ids, for_verification=True
         )
@@ -127,8 +127,10 @@ class Auth(object):
         if current_state:
             member = current_state.get((EventTypes.Member, user_id), None)
         else:
-            member = yield self.state.get_current_state(
-                room_id=room_id, event_type=EventTypes.Member, state_key=user_id
+            member = yield defer.ensureDeferred(
+                self.state.get_current_state(
+                    room_id=room_id, event_type=EventTypes.Member, state_key=user_id
+                )
             )
         membership = member.membership if member else None
 
@@ -665,8 +667,10 @@ class Auth(object):
             )
             return member_event.membership, member_event.event_id
         except AuthError:
-            visibility = yield self.state.get_current_state(
-                room_id, EventTypes.RoomHistoryVisibility, ""
+            visibility = yield defer.ensureDeferred(
+                self.state.get_current_state(
+                    room_id, EventTypes.RoomHistoryVisibility, ""
+                )
             )
             if (
                 visibility

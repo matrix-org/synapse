@@ -1,2 +1,0 @@
-Remove unused functions `time_function`, `trace_function`, `get_previous_frames`
-and `get_previous_frame` from `synapse.logging.utils` module.

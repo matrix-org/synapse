@@ -139,10 +139,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             "get_state_group_delta", _get_state_group_delta_txn
         )
 
-    @defer.inlineCallbacks
-    def _get_state_groups_from_groups(
+    async def _get_state_groups_from_groups(
         self, groups: List[int], state_filter: StateFilter
-    ):
+    ) -> Dict[int, StateMap[str]]:
         """Returns the state groups for a given set of groups from the
         database, filtering on types of state events.
 
@@ -151,13 +150,13 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             state_filter: The state filter used to fetch state
                 from the database.
         Returns:
-            Deferred[Dict[int, StateMap[str]]]: Dict of state group to state map.
+            Dict of state group to state map.
         """
         results = {}
 
         chunks = [groups[i : i + 100] for i in range(0, len(groups), 100)]
         for chunk in chunks:
-            res = yield self.db.runInteraction(
+            res = await self.db.runInteraction(
                 "_get_state_groups_from_groups",
                 self._get_state_groups_from_groups_txn,
                 chunk,
@@ -206,10 +205,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         return state_filter.filter_state(state_dict_ids), not missing_types
 
-    @defer.inlineCallbacks
-    def _get_state_for_groups(
+    async def _get_state_for_groups(
         self, groups: Iterable[int], state_filter: StateFilter = StateFilter.all()
-    ):
+    ) -> Dict[int, StateMap[str]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key
 
@@ -219,7 +217,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             state_filter: The state filter used to fetch state
                 from the database.
         Returns:
-            Deferred[Dict[int, StateMap[str]]]: Dict of state group to state map.
+            Dict of state group to state map.
         """
 
         member_filter, non_member_filter = state_filter.get_member_split()
@@ -228,14 +226,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         (
             non_member_state,
             incomplete_groups_nm,
-        ) = yield self._get_state_for_groups_using_cache(
+        ) = self._get_state_for_groups_using_cache(
             groups, self._state_group_cache, state_filter=non_member_filter
         )
 
-        (
-            member_state,
-            incomplete_groups_m,
-        ) = yield self._get_state_for_groups_using_cache(
+        (member_state, incomplete_groups_m,) = self._get_state_for_groups_using_cache(
             groups, self._state_group_members_cache, state_filter=member_filter
         )
 
@@ -256,7 +251,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # Help the cache hit ratio by expanding the filter a bit
         db_state_filter = state_filter.return_expanded()
 
-        group_to_state_dict = yield self._get_state_groups_from_groups(
+        group_to_state_dict = await self._get_state_groups_from_groups(
             list(incomplete_groups), state_filter=db_state_filter
         )
 
@@ -576,19 +571,19 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             ((sg,) for sg in state_groups_to_delete),
         )
 
-    @defer.inlineCallbacks
-    def get_previous_state_groups(self, state_groups):
+    async def get_previous_state_groups(
+        self, state_groups: Iterable[int]
+    ) -> Dict[int, int]:
         """Fetch the previous groups of the given state groups.
 
         Args:
-            state_groups (Iterable[int])
+            state_groups
 
         Returns:
-            Deferred[dict[int, int]]: mapping from state group to previous
-            state group.
+            A mapping from state group to previous state group.
         """
 
-        rows = yield self.db.simple_select_many_batch(
+        rows = await self.db.simple_select_many_batch(
             table="state_group_edges",
             column="prev_state_group",
             iterable=state_groups,

@@ -16,8 +16,6 @@
 import logging
 import re
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes
 
 logger = logging.getLogger(__name__)
@@ -29,8 +27,7 @@ ALIAS_RE = re.compile(r"^#.*:.+$")
 ALL_ALONE = "Empty Room"
 
 
-@defer.inlineCallbacks
-def calculate_room_name(
+async def calculate_room_name(
     store,
     room_state_ids,
     user_id,
@@ -53,7 +50,7 @@ def calculate_room_name(
     """
     # does it have a name?
     if (EventTypes.Name, "") in room_state_ids:
-        m_room_name = yield store.get_event(
+        m_room_name = await store.get_event(
             room_state_ids[(EventTypes.Name, "")], allow_none=True
         )
         if m_room_name and m_room_name.content and m_room_name.content["name"]:
@@ -61,7 +58,7 @@ def calculate_room_name(
 
     # does it have a canonical alias?
     if (EventTypes.CanonicalAlias, "") in room_state_ids:
-        canon_alias = yield store.get_event(
+        canon_alias = await store.get_event(
             room_state_ids[(EventTypes.CanonicalAlias, "")], allow_none=True
         )
         if (
@@ -81,7 +78,7 @@ def calculate_room_name(
 
     my_member_event = None
     if (EventTypes.Member, user_id) in room_state_ids:
-        my_member_event = yield store.get_event(
+        my_member_event = await store.get_event(
             room_state_ids[(EventTypes.Member, user_id)], allow_none=True
         )
 
@@ -90,7 +87,7 @@ def calculate_room_name(
         and my_member_event.content["membership"] == "invite"
     ):
         if (EventTypes.Member, my_member_event.sender) in room_state_ids:
-            inviter_member_event = yield store.get_event(
+            inviter_member_event = await store.get_event(
                 room_state_ids[(EventTypes.Member, my_member_event.sender)],
                 allow_none=True,
             )
@@ -107,7 +104,7 @@ def calculate_room_name(
     # we're going to have to generate a name based on who's in the room,
     # so find out who is in the room that isn't the user.
     if EventTypes.Member in room_state_bytype_ids:
-        member_events = yield store.get_events(
+        member_events = await store.get_events(
             list(room_state_bytype_ids[EventTypes.Member].values())
         )
         all_members = [

@@ -103,6 +103,14 @@ class DeleteRoomRestServlet(RestServlet):
                 Codes.BAD_JSON,
             )
 
+        purge = content.get("purge", True)
+        if not isinstance(purge, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'purge' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         ret = await self.room_shutdown_handler.shutdown_room(
             room_id=room_id,
             new_room_user_id=content.get("new_room_user_id"),
@@ -113,7 +121,8 @@ class DeleteRoomRestServlet(RestServlet):
         )
 
         # Purge room
-        await self.pagination_handler.purge_room(room_id)
+        if purge:
+            await self.pagination_handler.purge_room(room_id)
 
         return (200, ret)
 
