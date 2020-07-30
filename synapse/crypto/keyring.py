@@ -325,39 +325,39 @@ class Keyring(object):
         remaining_requests = {rq for rq in verify_requests if not rq.key_ready.called}
 
         async def do_iterations():
-            with Measure(self.clock, "get_server_verify_keys"):
-                for f in self._key_fetchers:
-                    if not remaining_requests:
-                        return
-                    await self._attempt_key_fetches_with_fetcher(f, remaining_requests)
+            try:
+                with Measure(self.clock, "get_server_verify_keys"):
+                    for f in self._key_fetchers:
+                        if not remaining_requests:
+                            return
+                        await self._attempt_key_fetches_with_fetcher(f, remaining_requests)
 
-                # look for any requests which weren't satisfied
+                    # look for any requests which weren't satisfied
+                    with PreserveLoggingContext():
+                        for verify_request in remaining_requests:
+                            verify_request.key_ready.errback(
+                                SynapseError(
+                                    401,
+                                    "No key for %s with ids in %s (min_validity %i)"
+                                    % (
+                                        verify_request.server_name,
+                                        verify_request.key_ids,
+                                        verify_request.minimum_valid_until_ts,
+                                    ),
+                                    Codes.UNAUTHORIZED,
+                                )
+                            )
+            except Exception as err:
+                # we don't really expect to get here, because any errors should already
+                # have been caught and logged. But if we do, let's log the error and make
+                # sure that all of the deferreds are resolved.
+                logger.error("Unexpected error in _get_server_verify_keys: %s", err)
                 with PreserveLoggingContext():
                     for verify_request in remaining_requests:
-                        verify_request.key_ready.errback(
-                            SynapseError(
-                                401,
-                                "No key for %s with ids in %s (min_validity %i)"
-                                % (
-                                    verify_request.server_name,
-                                    verify_request.key_ids,
-                                    verify_request.minimum_valid_until_ts,
-                                ),
-                                Codes.UNAUTHORIZED,
-                            )
-                        )
+                        if not verify_request.key_ready.called:
+                            verify_request.key_ready.errback(err)
 
-        def on_err(err):
-            # we don't really expect to get here, because any errors should already
-            # have been caught and logged. But if we do, let's log the error and make
-            # sure that all of the deferreds are resolved.
-            logger.error("Unexpected error in _get_server_verify_keys: %s", err)
-            with PreserveLoggingContext():
-                for verify_request in remaining_requests:
-                    if not verify_request.key_ready.called:
-                        verify_request.key_ready.errback(err)
-
-        run_in_background(do_iterations).addErrback(on_err)
+        run_in_background(do_iterations)
 
     async def _attempt_key_fetches_with_fetcher(self, fetcher, remaining_requests):
         """Use a key fetcher to attempt to satisfy some key requests
