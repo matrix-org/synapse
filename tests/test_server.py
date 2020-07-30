@@ -315,6 +315,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
 
     def test_head_request(self):
         """A head request should work by being turned into a GET request."""
+
         def callback(request):
             request.write(b"response")
             request.finish()
