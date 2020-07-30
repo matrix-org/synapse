@@ -27,7 +27,6 @@ from typing import Dict, Optional
 from urllib import parse as urlparse
 
 import attr
-from canonicaljson import json
 
 from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
@@ -43,6 +42,7 @@ from synapse.http.servlet import parse_integer, parse_string
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
+from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.stringutils import random_string
@@ -355,7 +355,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("Calculated OG for %s as %s", url, og)
 
-        jsonog = json.dumps(og)
+        jsonog = json_encoder.encode(og)
 
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
