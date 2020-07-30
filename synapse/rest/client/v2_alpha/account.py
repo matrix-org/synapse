@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 from http import HTTPStatus
 
 from synapse.api.constants import LoginType
@@ -114,6 +115,9 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             if self.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
@@ -433,6 +437,9 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             if self.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "Email is already in use", Codes.THREEPID_IN_USE)
@@ -501,6 +508,9 @@ class MsisdnThreepidRequestTokenRestServlet(RestServlet):
             if self.hs.config.request_token_inhibit_3pid_errors:
                 # Make the client think the operation succeeded. See the rationale in the
                 # comments for request_token_inhibit_3pid_errors.
+                # Also wait for some random amount of time between 100ms and 1s to make it
+                # look like we did something.
+                await self.hs.clock.sleep(random.randint(1, 10) / 10)
                 return 200, {"sid": random_string(16)}
 
             raise SynapseError(400, "MSISDN is already in use", Codes.THREEPID_IN_USE)
