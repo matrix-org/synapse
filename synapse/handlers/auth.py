@@ -207,7 +207,7 @@ class AuthHandler(BaseHandler):
         flows = [[login_type] for login_type in self._supported_ui_auth_types]
 
         try:
-            result, params, _ = await self.check_auth(
+            result, params, _ = await self.check_ui_auth(
                 flows, request, request_body, clientip, description
             )
         except LoginError:
@@ -240,7 +240,7 @@ class AuthHandler(BaseHandler):
         """
         return self.checkers.keys()
 
-    async def check_auth(
+    async def check_ui_auth(
         self,
         flows: List[List[str]],
         request: SynapseRequest,

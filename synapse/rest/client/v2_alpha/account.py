@@ -273,7 +273,7 @@ class PasswordRestServlet(RestServlet):
             user_id = requester.user.to_string()
         else:
             requester = None
-            result, params, _ = await self.auth_handler.check_auth(
+            result, params, _ = await self.auth_handler.check_ui_auth(
                 [[LoginType.EMAIL_IDENTITY]],
                 request,
                 body,
