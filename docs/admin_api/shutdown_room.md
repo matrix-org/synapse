@@ -84,8 +84,7 @@ to recover at all:
 
 * If the room was invite-only, your users will need to be re-invited.
 * If the room no longer has any members at all, it'll be impossible to rejoin.
-* If the room was purged from your server, it may be inaccessible.
- * the first user to rejoin will have to do so via an alias on a different server
+  * The first user to rejoin will have to do so via an alias on a different server.
 
 With all that being said, if you still want to try and recover the room:
 
