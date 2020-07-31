@@ -768,7 +768,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         self.db.simple_insert_txn(txn, "push_rules_stream", values=values)
 
-        txn.call_after(self.get_push_rules_for_user.invalidate, (user_id,))
+        txn.call_after(self._get_push_rules_for_user.invalidate, (user_id,))
         txn.call_after(self.get_push_rules_enabled_for_user.invalidate, (user_id,))
         txn.call_after(
             self.push_rules_stream_cache.entity_has_changed, user_id, stream_id

@@ -34,7 +34,7 @@ class SlavedPushRuleStore(SlavedEventStore, PushRulesWorkerStore):
         if stream_name == PushRulesStream.NAME:
             self._push_rules_stream_id_gen.advance(token)
             for row in rows:
-                self.get_push_rules_for_user.invalidate((row.user_id,))
+                self._get_push_rules_for_user.invalidate((row.user_id,))
                 self.get_push_rules_enabled_for_user.invalidate((row.user_id,))
                 self.push_rules_stream_cache.entity_has_changed(row.user_id, token)
         return super().process_replication_rows(stream_name, instance_name, token, rows)
