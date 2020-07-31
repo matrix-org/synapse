@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet
 
 from ._base import client_patterns
@@ -46,7 +46,9 @@ class UserSharedRoomsServlet(RestServlet):
                 errcode=Codes.BAD_JSON,
             )
 
-        rooms = await self.store.get_rooms_in_common_for_users(requester.user.to_string(), user_id)
+        rooms = await self.store.get_rooms_in_common_for_users(
+            requester.user.to_string(), user_id
+        )
 
         return 200, {"joined": rooms}
 
