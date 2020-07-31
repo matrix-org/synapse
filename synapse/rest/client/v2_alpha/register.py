@@ -24,6 +24,7 @@ import synapse.types
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     Codes,
+    InteractiveAuthIncompleteError,
     SynapseError,
     ThreepidValidationError,
     UnrecognizedRequestError,
@@ -465,21 +466,18 @@ class RegisterRestServlet(RestServlet):
         # Check if this account is upgrading from a guest account.
         guest_access_token = body.get("guest_access_token", None)
 
-        # Pull out the provided password and do basic sanity checks early since
-        # the auth layer will store these in sessions.
-        if "password" in body:
-            password = body.pop("password")
+        # Pull out the provided password and do basic sanity checks early.
+        #
+        # Note that we remove the password from the body since the auth layer
+        # will store the body in the session and we don't want a plaintext
+        # password store there.
+        password = body.pop("password", None)
+        if password is not None:
             if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(password)
 
-            # If the password is valid, hash it and store it back on the body.
-            # This ensures that only the hashed password is handled everywhere.
-            if "password_hash" in body:
-                raise SynapseError(400, "Unexpected property: password_hash")
-            body["password_hash"] = await self.auth_handler.hash(password)
-
-        if "initial_device_display_name" in body and "password_hash" not in body:
+        if "initial_device_display_name" in body and password is None:
             # ignore 'initial_device_display_name' if sent without
             # a password to work around a client bug where it sent
             # the 'initial_device_display_name' param alone, wiping out
@@ -489,6 +487,7 @@ class RegisterRestServlet(RestServlet):
 
         session_id = self.auth_handler.get_session_id(body)
         registered_user_id = None
+        password_hash = None
         if session_id:
             # if we get a registered user id out of here, it means we previously
             # registered a user for this session, so we could just return the
@@ -496,6 +495,15 @@ class RegisterRestServlet(RestServlet):
             # for paranoia.
             registered_user_id = await self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
+            )
+            # If a password hash was previously stored we will not attempt to
+            # re-hash and store it.
+            #
+            # Note that if the password changes throughout the authentication
+            # flow this might break, but the data is meant to be consistent
+            # throughout the flow.
+            password_hash = await self.auth_handler.get_session_data(
+                session_id, "password_hash", None
             )
 
         # Ensure that the username is valid.
@@ -508,13 +516,27 @@ class RegisterRestServlet(RestServlet):
 
         # Check if the user-interactive authentication flows are complete, if
         # not this will raise a user-interactive auth error.
-        auth_result, params, session_id = await self.auth_handler.check_auth(
-            self._registration_flows,
-            request,
-            body,
-            self.hs.get_ip_from_request(request),
-            "register a new account",
-        )
+        try:
+            auth_result, params, session_id = await self.auth_handler.check_auth(
+                self._registration_flows,
+                request,
+                body,
+                self.hs.get_ip_from_request(request),
+                "register a new account",
+            )
+        except InteractiveAuthIncompleteError as e:
+            # The user needs to provide more steps to complete auth, but they're
+            # not required to provide the password again.
+            #
+            # If a password hash was not provided with a previous request and a
+            # password is available now, hash the provided password and store it
+            # for later.
+            if not password_hash and password:
+                password_hash = await self.auth_handler.hash(password)
+                await self.auth_handler.set_session_data(
+                    e.session_id, "password_hash", password_hash
+                )
+            raise
 
         # Check that we're not trying to register a denied 3pid.
         #
@@ -542,13 +564,13 @@ class RegisterRestServlet(RestServlet):
             # don't re-register the threepids
             registered = False
         else:
-            # Note that this data might be returned from the auth handler
-            # (stored with the session) OR it may be from the the POST itself.
-            assert_params_in_dict(params, ["password_hash"])
+            # If we have a password in this request, prefer it. Otherwise, there
+            # might be a password hash from an earlier request.
+            if password:
+                password_hash = await self.auth_handler.hash(password)
 
             desired_username = params.get("username", None)
             guest_access_token = params.get("guest_access_token", None)
-            new_password_hash = params.get("password_hash", None)
 
             if desired_username is not None:
                 desired_username = desired_username.lower()
@@ -590,7 +612,7 @@ class RegisterRestServlet(RestServlet):
 
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
-                password_hash=new_password_hash,
+                password_hash=password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
                 address=client_addr,

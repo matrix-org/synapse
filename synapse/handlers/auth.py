@@ -363,7 +363,7 @@ class AuthHandler(BaseHandler):
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session.session_id)
+                session.session_id, self._auth_dict_for_flows(flows, session.session_id)
             )
 
         # check auth type currently being presented
@@ -410,7 +410,7 @@ class AuthHandler(BaseHandler):
         ret = self._auth_dict_for_flows(flows, session.session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
-        raise InteractiveAuthIncompleteError(ret)
+        raise InteractiveAuthIncompleteError(session.session_id, ret)
 
     async def add_oob_auth(
         self, stagetype: str, authdict: Dict[str, Any], clientip: str
