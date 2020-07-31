@@ -231,16 +231,16 @@ class PreviewUrlResource(DirectServeJsonResource):
         og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
-    async def _do_preview(self, url, user, ts):
+    async def _do_preview(self, url: str, user: str, ts: int) -> bytes:
         """Check the db, and download the URL and build a preview
 
         Args:
-            url (str):
-            user (str):
-            ts (int):
+            url: The URL to preview.
+            user: The user requesting the preview.
+            ts: The timestamp requested for the preview.
 
         Returns:
-            Deferred[bytes]: json-encoded og data
+            json-encoded og data
         """
         # check the URL cache in the DB (which will also provide us with
         # historical previews, if we have any)

@@ -1,3 +1,45 @@
+Synapse 1.18.0 (2020-07-30)
+===========================
+
+Deprecation Warnings
+--------------------
+
+### Docker Tags with `-py3` Suffix
+
+From 10th August 2020, we will no longer publish Docker images with the `-py3` tag suffix. The images tagged with the `-py3` suffix have been identical to the non-suffixed tags since release 0.99.0, and the suffix is obsolete.
+
+On 10th August, we will remove the `latest-py3` tag. Existing per-release tags (such as `v1.18.0-py3`) will not be removed, but no new `-py3` tags will be added.
+
+Scripts relying on the `-py3` suffix will need to be updated.
+
+
+### TCP-based Replication
+
+When setting up worker processes, we now recommend the use of a Redis server for replication. The old direct TCP connection method is deprecated and will be removed in a future release. See [docs/workers.md](https://github.com/matrix-org/synapse/blob/release-v1.18.0/docs/workers.md) for more details.
+
+
+Improved Documentation
+----------------------
+
+- Update worker docs with latest enhancements. ([\#7969](https://github.com/matrix-org/synapse/issues/7969))
+
+
+Synapse 1.18.0rc2 (2020-07-28)
+==============================
+
+Bugfixes
+--------
+
+- Fix an `AssertionError` exception introduced in v1.18.0rc1. ([\#7876](https://github.com/matrix-org/synapse/issues/7876))
+- Fix experimental support for moving typing off master when worker is restarted, which is broken in v1.18.0rc1. ([\#7967](https://github.com/matrix-org/synapse/issues/7967))
+
+
+Internal Changes
+----------------
+
+- Further optimise queueing of inbound replication commands. ([\#7876](https://github.com/matrix-org/synapse/issues/7876))
+
+
 Synapse 1.18.0rc1 (2020-07-27)
 ==============================
 
