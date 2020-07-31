@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet
 
 from ._base import client_patterns
