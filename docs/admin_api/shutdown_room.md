@@ -79,13 +79,20 @@ Response:
 the structure can and does change without notice.
 
 First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
-never happened - work has to be done to move forward instead of resetting the past.
+never happened - work has to be done to move forward instead of resetting the past. In fact, in some cases it might not be possible
+to recover at all:
 
-1. For safety reasons, it is recommended to shut down Synapse prior to continuing.
+* If the room was invite only, your users will need to be re-invited.
+* If the room became empty, it'll be impossible to rejoin.
+* If the room was purged from your server, it may be inaccessible.
+
+With all that being said, if you still want to try and recover the room:
+
+1. For safety reasons, shut down Synapse.
 2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
    * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
    * The room ID is the same one supplied to the shutdown room API, not the Content Violation room.
-3. Restart Synapse (required).
+3. Restart Synapse.
 
 You will have to manually handle, if you so choose, the following:
 
