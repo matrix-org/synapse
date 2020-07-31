@@ -33,7 +33,7 @@ You will need to authenticate with an access token for an admin user.
 * `message` - Optional. A string containing the first message that will be sent as
               `new_room_user_id` in the new room. Ideally this will clearly convey why the
                original room was shut down.
-              
+
 If not specified, the default value of `room_name` is "Content Violation
 Notification". The default value of `message` is "Sharing illegal content on
 othis server is not permitted and rooms in violation will be blocked."
@@ -72,3 +72,23 @@ Response:
     "new_room_id": "!newroomid:example.com",
 },
 ```
+
+## Undoing room shutdowns
+
+*Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
+the structure can and does change without notice.
+
+First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
+never happened - work has to be done to move forward instead of resetting the past.
+
+1. For safety reasons, it is recommended to shut down Synapse prior to continuing.
+2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
+   * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
+   * The room ID is the same one supplied to the shutdown room API, not the Content Violation room.
+3. Restart Synapse (required).
+
+You will have to manually handle, if you so choose, the following:
+
+* Aliases that would have been redirected to the Content Violation room.
+* Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
+* Removal of the Content Violation room if desired.

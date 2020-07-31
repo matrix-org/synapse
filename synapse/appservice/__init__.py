@@ -15,11 +15,9 @@
 import logging
 import re
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes
 from synapse.types import GroupID, get_domain_from_id
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +41,7 @@ class AppServiceTransaction(object):
         Args:
             as_api(ApplicationServiceApi): The API to use to send.
         Returns:
-            A Deferred which resolves to True if the transaction was sent.
+            An Awaitable which resolves to True if the transaction was sent.
         """
         return as_api.push_bulk(
             service=self.service, events=self.events, txn_id=self.id
@@ -172,8 +170,7 @@ class ApplicationService(object):
             return regex_obj["exclusive"]
         return False
 
-    @defer.inlineCallbacks
-    def _matches_user(self, event, store):
+    async def _matches_user(self, event, store):
         if not event:
             return False
 
@@ -188,12 +185,12 @@ class ApplicationService(object):
         if not store:
             return False
 
-        does_match = yield self._matches_user_in_member_list(event.room_id, store)
+        does_match = await self._matches_user_in_member_list(event.room_id, store)
         return does_match
 
-    @cachedInlineCallbacks(num_args=1, cache_context=True)
-    def _matches_user_in_member_list(self, room_id, store, cache_context):
-        member_list = yield store.get_users_in_room(
+    @cached(num_args=1, cache_context=True)
+    async def _matches_user_in_member_list(self, room_id, store, cache_context):
+        member_list = await store.get_users_in_room(
             room_id, on_invalidate=cache_context.invalidate
         )
 
@@ -208,35 +205,33 @@ class ApplicationService(object):
             return self.is_interested_in_room(event.room_id)
         return False
 
-    @defer.inlineCallbacks
-    def _matches_aliases(self, event, store):
+    async def _matches_aliases(self, event, store):
         if not store or not event:
             return False
 
-        alias_list = yield store.get_aliases_for_room(event.room_id)
+        alias_list = await store.get_aliases_for_room(event.room_id)
         for alias in alias_list:
             if self.is_interested_in_alias(alias):
                 return True
         return False
 
-    @defer.inlineCallbacks
-    def is_interested(self, event, store=None):
+    async def is_interested(self, event, store=None) -> bool:
         """Check if this service is interested in this event.
 
         Args:
             event(Event): The event to check.
             store(DataStore)
         Returns:
-            bool: True if this service would like to know about this event.
+            True if this service would like to know about this event.
         """
         # Do cheap checks first
         if self._matches_room_id(event):
             return True
 
-        if (yield self._matches_aliases(event, store)):
+        if await self._matches_aliases(event, store):
             return True
 
-        if (yield self._matches_user(event, store)):
+        if await self._matches_user(event, store):
             return True
 
         return False

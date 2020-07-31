@@ -17,6 +17,7 @@
 """ This is a reference implementation of a Matrix homeserver.
 """
 
+import json
 import os
 import sys
 
@@ -25,6 +26,9 @@ if sys.version_info < (3, 5):
     print("Synapse requires Python 3.5 or above.")
     sys.exit(1)
 
+# Twisted and canonicaljson will fail to import when this file is executed to
+# get the __version__ during a fresh install. That's OK and subsequent calls to
+# actually start Synapse will import these libraries fine.
 try:
     from twisted.internet import protocol
     from twisted.internet.protocol import Factory
@@ -33,6 +37,14 @@ try:
     protocol.Factory.noisy = False
     Factory.noisy = False
     DNSDatagramProtocol.noisy = False
+except ImportError:
+    pass
+
+# Use the standard library json implementation instead of simplejson.
+try:
+    from canonicaljson import set_json_library
+
+    set_json_library(json)
 except ImportError:
     pass
 

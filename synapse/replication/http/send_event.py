@@ -77,7 +77,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             extra_users (list(UserID)): Any extra users to notify about event
         """
 
-        serialized_context = yield context.serialize(event, store)
+        serialized_context = yield defer.ensureDeferred(context.serialize(event, store))
 
         payload = {
             "event": event.get_pdu_json(),
