@@ -74,14 +74,17 @@ When using workers, each worker process has its own configuration file which
 contains settings specific to that worker, such as the HTTP listener that it
 provides (if any), logging configuration, etc.
 
-Normally,  the worker processes are configured to read from a shared
+Normally, the worker processes are configured to read from a shared
 configuration file as well as the worker-specific configuration files. This
-makes it easier to keep common configuration settings synchronised across all the
-processes.
+makes it easier to keep common configuration settings synchronised across all
+the processes.
 
 The main process is somewhat special in this respect: it does not normally
 need its own configuration file and can take all of its configuration from the
 shared configuration file.
+
+
+### Shared configuration
 
 Normally, only a couple of changes are needed to make an existing configuration
 file suitable for use with workers. First, you need to enable an "HTTP replication
@@ -108,6 +111,9 @@ See the sample config for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
 public internet; it has no authentication and is unencrypted.
+
+
+### Worker configuration
 
 In the config file for each worker, you must specify the type of worker
 application (`worker_app`), and you should specify a unqiue name for the worker
@@ -146,6 +152,9 @@ plain HTTP endpoint on port 8083 separately serving various endpoints, e.g.
 
 Obviously you should configure your reverse-proxy to route the relevant
 endpoints to the worker (`localhost:8083` in the above example).
+
+
+### Running Synapse with workers
 
 Finally, you need to start your worker processes. This can be done with either
 `synctl` or your distribution's preferred service manager such as `systemd`. We
