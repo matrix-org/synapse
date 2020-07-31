@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
-from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+from canonicaljson import _canonical_encoder, _pretty_encoder, json
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -492,6 +492,38 @@ class RootOptionsRedirectResource(OptionsResource, RootRedirect):
     pass
 
 
+class _JsonProducer:
+    """
+    Iteratively write JSON to the request.
+    """
+
+    def __init__(self, request, json_encoder, json_object):
+        self.request = request
+        self._generator = json_encoder.iterencode(json_object)
+
+    def start(self):
+        self.request.registerProducer(self, False)
+
+    def resumeProducing(self):
+        # We've stopped producing in the meantime.
+        if not self.request:
+            return
+
+        # Get the next chunk and write it to the request. Calling write will
+        # spin the reactor (and might be re-entrant).
+        try:
+            data = next(self._generator)
+            self.request.write(data.encode("utf-8"))
+        except StopIteration:
+            self.request.unregisterProducer()
+            self.request.finish()
+            self.stopProducing()
+
+    def stopProducing(self):
+        self._generator = None
+        self.request = None
+
+
 def respond_with_json(
     request: Request,
     code: int,
@@ -526,15 +558,24 @@ def respond_with_json(
         return None
 
     if pretty_print:
-        json_bytes = encode_pretty_printed_json(json_object) + b"\n"
+        encoder = _pretty_encoder
     else:
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
-            # canonicaljson already encodes to bytes
-            json_bytes = encode_canonical_json(json_object)
+            encoder = _canonical_encoder
         else:
-            json_bytes = json.dumps(json_object).encode("utf-8")
+            # TODO Re-use this.
+            encoder = json.JSONEncoder(separators=(",", ":"))
 
-    return respond_with_json_bytes(request, code, json_bytes, send_cors=send_cors)
+    request.setResponseCode(code)
+    request.setHeader(b"Content-Type", b"application/json")
+    request.setHeader(b"Cache-Control", b"no-cache, no-store, must-revalidate")
+
+    if send_cors:
+        set_cors_headers(request)
+
+    producer = _JsonProducer(request, encoder, json_object)
+    producer.start()
+    return NOT_DONE_YET
 
 
 def respond_with_json_bytes(
