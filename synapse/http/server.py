@@ -216,14 +216,6 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         defer.ensureDeferred(self._async_render_wrapper(request))
         return NOT_DONE_YET
 
-    def _async_render_HEAD(self, request):
-        """
-        The default handling of HEAD method is to treat it as a GET request.
-
-        This is an async version of twisted.web.resource.Resource.render_HEAD.
-        """
-        return self._async_render_GET(request)
-
     @wrap_async_request_handler
     async def _async_render_wrapper(self, request: SynapseRequest):
         """This is a wrapper that delegates to `_async_render` and handles
@@ -250,10 +242,12 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         no appropriate method exists. Can be overriden in sub classes for
         different routing.
         """
+        method = request.method.decode("ascii")
+        # Treat HEAD requests as GET requests.
+        if method == "HEAD":
+            method = "GET"
 
-        method_handler = getattr(
-            self, "_async_render_%s" % (request.method.decode("ascii"),), None
-        )
+        method_handler = getattr(self, "_async_render_%s" % (method,), None)
         if method_handler:
             raw_callback_return = method_handler(request)
 
