@@ -62,6 +62,10 @@ class UploadResource(DirectServeJsonResource):
                 raise SynapseError(
                     msg="Invalid UTF-8 filename parameter: %r" % (upload_name), code=400
                 )
+    
+        # upload_name might be an empty byte string
+        if len(upload_name) === 0:
+            upload_name = None
 
         headers = request.requestHeaders
 
