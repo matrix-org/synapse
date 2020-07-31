@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -113,7 +113,7 @@ class ResourceLimitsServerNotices(object):
             elif not currently_blocked and limit_msg:
                 # Room is not notifying of a block, when it ought to be.
                 await self._apply_limit_block_notification(
-                    user_id, limit_msg, limit_type
+                    user_id, limit_msg, limit_type  # type: ignore
                 )
         except SynapseError as e:
             logger.error("Error sending resource limits server notice: %s", e)
@@ -135,7 +135,7 @@ class ResourceLimitsServerNotices(object):
         )
 
     async def _apply_limit_block_notification(
-        self, user_id: str, event_body: str, event_limit_type: Optional[str]
+        self, user_id: str, event_body: str, event_limit_type: str
     ) -> None:
         """Utility method to apply limit block notifications in the server
         notices room.
