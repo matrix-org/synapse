@@ -181,7 +181,7 @@ class PushRulesWorkerStore(
             )
 
     @cachedList(
-        cached_method_name="get_push_rules_for_user",
+        cached_method_name="_get_push_rules_for_user",
         list_name="user_ids",
         num_args=1,
         inlineCallbacks=True,
