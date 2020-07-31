@@ -387,6 +387,7 @@ class RegisterRestServlet(RestServlet):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
+        self._registration_enabled = self.hs.config.enable_registration
 
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
@@ -469,7 +470,7 @@ class RegisterRestServlet(RestServlet):
             desired_username = desired_username.lower()
 
         # == Normal User Registration == (everyone else)
-        if not self.hs.config.enable_registration:
+        if not self._registration_enabled:
             raise SynapseError(403, "Registration has been disabled")
 
         guest_access_token = body.get("guest_access_token", None)
