@@ -737,24 +737,14 @@ def trace(func=None, opname=None):
 
             @wraps(func)
             async def _trace_inner(*args, **kwargs):
-                if opentracing is None:
+                with start_active_span(_opname):
                     return await func(*args, **kwargs)
-
-                with start_active_span(_opname) as scope:
-                    try:
-                        return await func(*args, **kwargs)
-                    except Exception:
-                        scope.span.set_tag(tags.ERROR, True)
-                        raise
 
         else:
             # The other case here handles both sync functions and those
             # decorated with inlineDeferred.
             @wraps(func)
             def _trace_inner(*args, **kwargs):
-                if opentracing is None:
-                    return func(*args, **kwargs)
-
                 scope = start_active_span(_opname)
                 scope.__enter__()
 
@@ -767,7 +757,6 @@ def trace(func=None, opname=None):
                             return result
 
                         def err_back(result):
-                            scope.span.set_tag(tags.ERROR, True)
                             scope.__exit__(None, None, None)
                             return result
 
