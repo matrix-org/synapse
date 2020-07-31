@@ -568,6 +568,8 @@ class RegisterRestServlet(RestServlet):
             # might be a password hash from an earlier request.
             if password:
                 password_hash = await self.auth_handler.hash(password)
+            if not password_hash:
+                raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
 
             desired_username = params.get("username", None)
             guest_access_token = params.get("guest_access_token", None)
