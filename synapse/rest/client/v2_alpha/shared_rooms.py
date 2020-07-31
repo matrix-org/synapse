@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 
-from synapse.api.errors import AuthError
+from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
 
 from ._base import client_patterns
@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 class UserSharedRoomsServlet(RestServlet):
     """
-    GET /uk.half-shot.msc2666/user/{user_id}/shared_rooms/{other_user_id} HTTP/1.1
+    GET /uk.half-shot.msc2666/user/shared_rooms/{user_id} HTTP/1.1
     """
 
     PATTERNS = client_patterns(
-        "/uk.half-shot.msc2666/user/(?P<user_id>[^/]*)/shared_rooms/(?P<other_user_id>[^/]*)",
+        "/uk.half-shot.msc2666/user/shared_rooms/(?P<user_id>[^/]*)",
         releases=(),  # This is an unstable feature
     )
 
@@ -37,14 +37,18 @@ class UserSharedRoomsServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request, user_id, other_user_id):
+    async def on_GET(self, request, user_id):
         requester = await self.auth.get_user_by_req(request)
-        if user_id != requester.user.to_string():
-            raise AuthError(403, "Cannot get shared rooms for other users.")
+        if user_id == requester.user.to_string():
+            raise SynapseError(
+                code=400,
+                msg="'user_id' must not be the authenticated user",
+                errcode=Codes.BAD_JSON,
+            )
 
-        rooms = await self.store.get_rooms_in_common_for_users(user_id, other_user_id)
+        rooms = await self.store.get_rooms_in_common_for_users(requester.user.to_string(), user_id)
 
-        return 200, {"rooms": rooms}
+        return 200, {"joined": rooms}
 
 
 def register_servlets(hs, http_server):
