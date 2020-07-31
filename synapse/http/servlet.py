@@ -270,7 +270,6 @@ class RestServlet(object):
     instance methods associated with the corresponding HTTP method:
 
       on_GET
-      on_HEAD
       on_PUT
       on_POST
       on_DELETE
@@ -285,20 +284,13 @@ class RestServlet(object):
         if hasattr(self, "PATTERNS"):
             patterns = self.PATTERNS
 
-            for method in ("GET", "HEAD", "PUT", "POST", "OPTIONS", "DELETE"):
+            for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
                     servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))
                     http_server.register_paths(
                         method, patterns, method_handler, servlet_classname
                     )
-
-                    # If there's no HEAD handler, but there is a GET handler,
-                    # register it again.
-                    if method == "GET" and not hasattr(self, "on_HEAD"):
-                        http_server.register_paths(
-                            "HEAD", patterns, method_handler, servlet_classname
-                        )
 
         else:
             raise NotImplementedError("RestServlet must register something.")

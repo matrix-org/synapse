@@ -157,6 +157,29 @@ class JsonResourceTests(unittest.TestCase):
         self.assertEqual(channel.json_body["error"], "Unrecognized request")
         self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
+    def test_head_request(self):
+        """
+        JsonResource.handler_for_request gives correctly decoded URL args to
+        the callback, while Twisted will give the raw bytes of URL query
+        arguments.
+        """
+
+        def _callback(request, **kwargs):
+            return 200, {"result": True}
+
+        res = JsonResource(self.homeserver)
+        res.register_paths(
+            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet",
+        )
+
+        # The path was registered as GET, but this is a HEAD request.
+        request, channel = make_request(self.reactor, b"HEAD", b"/_matrix/foo")
+        render(request, res, self.reactor)
+
+        self.assertEqual(channel.result["code"], b"200")
+        self.assertNotIn("body", channel.result)
+        self.assertEqual(channel.headers.getRawHeaders(b"Content-Length"), [b"15"])
+
 
 class OptionsResourceTests(unittest.TestCase):
     def setUp(self):
@@ -255,7 +278,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         self.reactor = ThreadedMemoryReactorClock()
 
     def test_good_response(self):
-        def callback(request):
+        async def callback(request):
             request.write(b"response")
             request.finish()
 
@@ -275,7 +298,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         with the right location.
         """
 
-        def callback(request, **kwargs):
+        async def callback(request, **kwargs):
             raise RedirectException(b"/look/an/eagle", 301)
 
         res = WrapHtmlRequestHandlerTests.TestResource()
@@ -295,7 +318,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
         returned too
         """
 
-        def callback(request, **kwargs):
+        async def callback(request, **kwargs):
             e = RedirectException(b"/no/over/there", 304)
             e.cookies.append(b"session=yespls")
             raise e
@@ -316,7 +339,7 @@ class WrapHtmlRequestHandlerTests(unittest.TestCase):
     def test_head_request(self):
         """A head request should work by being turned into a GET request."""
 
-        def callback(request):
+        async def callback(request):
             request.write(b"response")
             request.finish()
 
