@@ -15,7 +15,7 @@
 
 import attr
 
-from ._base import Config, ConfigError
+from ._base import Config, ConfigError, ShardedWorkerHandlingConfig
 from .server import ListenerConfig, parse_listener_def
 
 
@@ -34,9 +34,11 @@ class WriterLocations:
 
     Attributes:
         events: The instance that writes to the event and backfill streams.
+        events: The instance that writes to the typing stream.
     """
 
     events = attr.ib(default="master", type=str)
+    typing = attr.ib(default="master", type=str)
 
 
 class WorkerConfig(Config):
@@ -83,6 +85,16 @@ class WorkerConfig(Config):
                 )
             )
 
+        # Whether to send federation traffic out in this process. This only
+        # applies to some federation traffic, and so shouldn't be used to
+        # "disable" federation
+        self.send_federation = config.get("send_federation", True)
+
+        federation_sender_instances = config.get("federation_sender_instances") or []
+        self.federation_shard_config = ShardedWorkerHandlingConfig(
+            federation_sender_instances
+        )
+
         # A map from instance name to host/port of their HTTP replication endpoint.
         instance_map = config.get("instance_map") or {}
         self.instance_map = {
@@ -93,16 +105,52 @@ class WorkerConfig(Config):
         writers = config.get("stream_writers") or {}
         self.writers = WriterLocations(**writers)
 
-        # Check that the configured writer for events also appears in
+        # Check that the configured writer for events and typing also appears in
         # `instance_map`.
-        if (
-            self.writers.events != "master"
-            and self.writers.events not in self.instance_map
-        ):
-            raise ConfigError(
-                "Instance %r is configured to write events but does not appear in `instance_map` config."
-                % (self.writers.events,)
-            )
+        for stream in ("events", "typing"):
+            instance = getattr(self.writers, stream)
+            if instance != "master" and instance not in self.instance_map:
+                raise ConfigError(
+                    "Instance %r is configured to write %s but does not appear in `instance_map` config."
+                    % (instance, stream)
+                )
+
+    def generate_config_section(self, config_dir_path, server_name, **kwargs):
+        return """\
+        ## Workers ##
+
+        # Disables sending of outbound federation transactions on the main process.
+        # Uncomment if using a federation sender worker.
+        #
+        #send_federation: false
+
+        # It is possible to run multiple federation sender workers, in which case the
+        # work is balanced across them.
+        #
+        # This configuration must be shared between all federation sender workers, and if
+        # changed all federation sender workers must be stopped at the same time and then
+        # started, to ensure that all instances are running with the same config (otherwise
+        # events may be dropped).
+        #
+        #federation_sender_instances:
+        #  - federation_sender1
+
+        # When using workers this should be a map from `worker_name` to the
+        # HTTP replication listener of the worker, if configured.
+        #
+        #instance_map:
+        #  worker1:
+        #    host: localhost
+        #    port: 8034
+
+        # Experimental: When using workers you can define which workers should
+        # handle event persistence and typing notifications. Any worker
+        # specified here must also be in the `instance_map`.
+        #
+        #stream_writers:
+        #  events: worker1
+        #  typing: worker1
+        """
 
     def read_arguments(self, args):
         # We support a bunch of command line arguments that override options in

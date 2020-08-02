@@ -19,7 +19,7 @@
 
 import itertools
 import logging
-from collections import Container
+from collections.abc import Container
 from http import HTTPStatus
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
@@ -44,6 +44,7 @@ from synapse.api.errors import (
     FederationDeniedError,
     FederationError,
     HttpResponseException,
+    NotFoundError,
     RequestSendFailed,
     SynapseError,
 )
@@ -61,6 +62,7 @@ from synapse.logging.context import (
     run_in_background,
 )
 from synapse.logging.utils import log_function
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
@@ -618,6 +620,11 @@ class FederationHandler(BaseHandler):
         will be omitted from the result. Likewise, any events which turn out not to
         be in the given room.
 
+        This function *does not* automatically get missing auth events of the
+        newly fetched events. Callers must include the full auth chain of
+        of the missing events in the `event_ids` argument, to ensure that any
+        missing auth events are correctly fetched.
+
         Returns:
             map from event_id to event
         """
@@ -784,15 +791,25 @@ class FederationHandler(BaseHandler):
                     resync = True
 
             if resync:
-                await self.store.mark_remote_user_device_cache_as_stale(event.sender)
+                run_as_background_process(
+                    "resync_device_due_to_pdu", self._resync_device, event.sender
+                )
 
-                # Immediately attempt a resync in the background
-                if self.config.worker_app:
-                    return run_in_background(self._user_device_resync, event.sender)
-                else:
-                    return run_in_background(
-                        self._device_list_updater.user_device_resync, event.sender
-                    )
+    async def _resync_device(self, sender: str) -> None:
+        """We have detected that the device list for the given user may be out
+        of sync, so we try and resync them.
+        """
+
+        try:
+            await self.store.mark_remote_user_device_cache_as_stale(sender)
+
+            # Immediately attempt a resync in the background
+            if self.config.worker_app:
+                await self._user_device_resync(user_id=sender)
+            else:
+                await self._device_list_updater.user_device_resync(sender)
+        except Exception:
+            logger.exception("Failed to resync device for %s", sender)
 
     @log_function
     async def backfill(self, dest, room_id, limit, extremities):
@@ -1131,12 +1148,16 @@ class FederationHandler(BaseHandler):
     ):
         """Fetch the given events from a server, and persist them as outliers.
 
+        This function *does not* recursively get missing auth events of the
+        newly fetched events. Callers must include in the `events` argument
+        any missing events from the auth chain.
+
         Logs a warning if we can't find the given event.
         """
 
         room_version = await self.store.get_room_version(room_id)
 
-        event_infos = []
+        event_map = {}  # type: Dict[str, EventBase]
 
         async def get_event(event_id: str):
             with nested_logging_context(event_id):
@@ -1150,17 +1171,7 @@ class FederationHandler(BaseHandler):
                         )
                         return
 
-                    # recursively fetch the auth events for this event
-                    auth_events = await self._get_events_from_store_or_dest(
-                        destination, room_id, event.auth_event_ids()
-                    )
-                    auth = {}
-                    for auth_event_id in event.auth_event_ids():
-                        ae = auth_events.get(auth_event_id)
-                        if ae:
-                            auth[(ae.type, ae.state_key)] = ae
-
-                    event_infos.append(_NewEventInfo(event, None, auth))
+                    event_map[event.event_id] = event
 
                 except Exception as e:
                     logger.warning(
@@ -1171,6 +1182,32 @@ class FederationHandler(BaseHandler):
                     )
 
         await concurrently_execute(get_event, events, 5)
+
+        # Make a map of auth events for each event. We do this after fetching
+        # all the events as some of the events' auth events will be in the list
+        # of requested events.
+
+        auth_events = [
+            aid
+            for event in event_map.values()
+            for aid in event.auth_event_ids()
+            if aid not in event_map
+        ]
+        persisted_events = await self.store.get_events(
+            auth_events, allow_rejected=True,
+        )
+
+        event_infos = []
+        for event in event_map.values():
+            auth = {}
+            for auth_event_id in event.auth_event_ids():
+                ae = persisted_events.get(auth_event_id) or event_map.get(auth_event_id)
+                if ae:
+                    auth[(ae.type, ae.state_key)] = ae
+                else:
+                    logger.info("Missing auth event %s", auth_event_id)
+
+            event_infos.append(_NewEventInfo(event, None, auth))
 
         await self._handle_new_events(
             destination, event_infos,
@@ -1357,7 +1394,7 @@ class FederationHandler(BaseHandler):
             # it's just a best-effort thing at this point. We do want to do
             # them roughly in order, though, otherwise we'll end up making
             # lots of requests for missing prev_events which we do actually
-            # have. Hence we fire off the deferred, but don't wait for it.
+            # have. Hence we fire off the background task, but don't wait for it.
 
             run_in_background(self._handle_queued_pdus, room_queue)
 
@@ -1403,9 +1440,19 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        event_content = {"membership": Membership.JOIN}
-
+        # checking the room version will check that we've actually heard of the room
+        # (and return a 404 otherwise)
         room_version = await self.store.get_room_version_id(room_id)
+
+        # now check that we are *still* in the room
+        is_in_room = await self.auth.check_host_in_room(room_id, self.server_name)
+        if not is_in_room:
+            logger.info(
+                "Got /make_join request for room %s we are no longer in", room_id,
+            )
+            raise NotFoundError("Not an active room on this server")
+
+        event_content = {"membership": Membership.JOIN}
 
         builder = self.event_builder_factory.new(
             room_version,
@@ -1567,7 +1614,7 @@ class FederationHandler(BaseHandler):
                 room_version,
                 event.get_pdu_json(),
                 self.hs.hostname,
-                self.hs.config.signing_key[0],
+                self.hs.signing_key,
             )
         )
 
@@ -1840,9 +1887,6 @@ class FederationHandler(BaseHandler):
             origin, event, state=state, auth_events=auth_events, backfilled=backfilled
         )
 
-        # reraise does not allow inlineCallbacks to preserve the stacktrace, so we
-        # hack around with a try/finally instead.
-        success = False
         try:
             if (
                 not event.internal_metadata.is_outlier()
@@ -1856,12 +1900,11 @@ class FederationHandler(BaseHandler):
             await self.persist_events_and_notify(
                 [(event, context)], backfilled=backfilled
             )
-            success = True
-        finally:
-            if not success:
-                run_in_background(
-                    self.store.remove_push_actions_from_staging, event.event_id
-                )
+        except Exception:
+            run_in_background(
+                self.store.remove_push_actions_from_staging, event.event_id
+            )
+            raise
 
         return context
 
@@ -2427,7 +2470,7 @@ class FederationHandler(BaseHandler):
         }
 
         current_state_ids = await context.get_current_state_ids()
-        current_state_ids = dict(current_state_ids)
+        current_state_ids = dict(current_state_ids)  # type: ignore
 
         current_state_ids.update(state_updates)
 
@@ -2947,7 +2990,9 @@ class FederationHandler(BaseHandler):
         else:
             user_joined_room(self.distributor, user, room_id)
 
-    async def get_room_complexity(self, remote_room_hosts, room_id):
+    async def get_room_complexity(
+        self, remote_room_hosts: List[str], room_id: str
+    ) -> Optional[dict]:
         """
         Fetch the complexity of a remote room over federation.
 
@@ -2956,7 +3001,7 @@ class FederationHandler(BaseHandler):
             room_id (str): The room ID to ask about.
 
         Returns:
-            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            Dict contains the complexity
             metric versions, while None means we could not fetch the complexity.
         """
 

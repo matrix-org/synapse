@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from synapse.rest.client.v1 import room
 
 from tests.unittest import HomeserverTestCase
@@ -49,7 +51,9 @@ class PurgeTests(HomeserverTestCase):
         event = self.successResultOf(event)
 
         # Purge everything before this topological token
-        purge = storage.purge_events.purge_history(self.room_id, event, True)
+        purge = defer.ensureDeferred(
+            storage.purge_events.purge_history(self.room_id, event, True)
+        )
         self.pump()
         self.assertEqual(self.successResultOf(purge), None)
 
@@ -88,7 +92,7 @@ class PurgeTests(HomeserverTestCase):
         )
 
         # Purge everything before this topological token
-        purge = storage.purge_history(self.room_id, event, True)
+        purge = defer.ensureDeferred(storage.purge_history(self.room_id, event, True))
         self.pump()
         f = self.failureResultOf(purge)
         self.assertIn("greater than forward", f.value.args[0])

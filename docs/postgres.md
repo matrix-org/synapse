@@ -188,6 +188,9 @@ to do step 2.
 
 It is safe to at any time kill the port script and restart it.
 
+Note that the database may take up significantly more (25% - 100% more)
+space on disk after porting to Postgres.
+
 ### Using the port script
 
 Firstly, shut down the currently running synapse server and copy its

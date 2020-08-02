@@ -91,9 +91,13 @@ Body parameters:
 
 - ``admin``, optional, defaults to ``false``.
 
-- ``deactivated``, optional, defaults to ``false``.
+- ``deactivated``, optional. If unspecified, deactivation state will be left
+  unchanged on existing accounts and set to ``false`` for new accounts.
 
 If the user already exists then optional parameters default to the current value.
+
+In order to re-activate an account ``deactivated`` must be set to ``false``. If
+users do not login via single-sign-on, a new ``password`` must be provided.
 
 List Accounts
 =============

@@ -17,8 +17,6 @@ from typing import Optional
 import attr
 from nacl.signing import SigningKey
 
-from twisted.internet import defer
-
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
@@ -95,31 +93,30 @@ class EventBuilder(object):
     def is_state(self):
         return self._state_key is not None
 
-    @defer.inlineCallbacks
-    def build(self, prev_event_ids):
+    async def build(self, prev_event_ids):
         """Transform into a fully signed and hashed event
 
         Args:
             prev_event_ids (list[str]): The event IDs to use as the prev events
 
         Returns:
-            Deferred[FrozenEvent]
+            FrozenEvent
         """
 
-        state_ids = yield self._state.get_current_state_ids(
+        state_ids = await self._state.get_current_state_ids(
             self.room_id, prev_event_ids
         )
-        auth_ids = yield self._auth.compute_auth_events(self, state_ids)
+        auth_ids = await self._auth.compute_auth_events(self, state_ids)
 
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
-            auth_events = yield self._store.add_event_hashes(auth_ids)
-            prev_events = yield self._store.add_event_hashes(prev_event_ids)
+            auth_events = await self._store.add_event_hashes(auth_ids)
+            prev_events = await self._store.add_event_hashes(prev_event_ids)
         else:
             auth_events = auth_ids
             prev_events = prev_event_ids
 
-        old_depth = yield self._store.get_max_depth_of(prev_event_ids)
+        old_depth = await self._store.get_max_depth_of(prev_event_ids)
         depth = old_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
@@ -162,7 +159,7 @@ class EventBuilderFactory(object):
     def __init__(self, hs):
         self.clock = hs.get_clock()
         self.hostname = hs.hostname
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()

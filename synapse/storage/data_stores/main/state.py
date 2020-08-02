@@ -16,12 +16,12 @@
 import collections.abc
 import logging
 from collections import namedtuple
-
-from twisted.internet import defer
+from typing import Iterable, Optional, Set
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import NotFoundError, UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
 from synapse.storage.data_stores.main.roommember import RoomMemberWorkerStore
@@ -108,28 +108,27 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         create_event = await self.get_create_event_for_room(room_id)
         return create_event.content.get("room_version", "1")
 
-    @defer.inlineCallbacks
-    def get_room_predecessor(self, room_id):
+    async def get_room_predecessor(self, room_id: str) -> Optional[dict]:
         """Get the predecessor of an upgraded room if it exists.
         Otherwise return None.
 
         Args:
-            room_id (str)
+            room_id: The room ID.
 
         Returns:
-            Deferred[dict|None]: A dictionary containing the structure of the predecessor
-                field from the room's create event. The structure is subject to other servers,
-                but it is expected to be:
-                    * room_id (str): The room ID of the predecessor room
-                    * event_id (str): The ID of the tombstone event in the predecessor room
+            A dictionary containing the structure of the predecessor
+            field from the room's create event. The structure is subject to other servers,
+            but it is expected to be:
+                * room_id (str): The room ID of the predecessor room
+                * event_id (str): The ID of the tombstone event in the predecessor room
 
-                None if a predecessor key is not found, or is not a dictionary.
+            None if a predecessor key is not found, or is not a dictionary.
 
         Raises:
             NotFoundError if the given room is unknown
         """
         # Retrieve the room's create event
-        create_event = yield self.get_create_event_for_room(room_id)
+        create_event = await self.get_create_event_for_room(room_id)
 
         # Retrieve the predecessor key of the create event
         predecessor = create_event.content.get("predecessor", None)
@@ -140,20 +139,19 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return predecessor
 
-    @defer.inlineCallbacks
-    def get_create_event_for_room(self, room_id):
+    async def get_create_event_for_room(self, room_id: str) -> EventBase:
         """Get the create state event for a room.
 
         Args:
-            room_id (str)
+            room_id: The room ID.
 
         Returns:
-            Deferred[EventBase]: The room creation event.
+            The room creation event.
 
         Raises:
             NotFoundError if the room is unknown
         """
-        state_ids = yield self.get_current_state_ids(room_id)
+        state_ids = await self.get_current_state_ids(room_id)
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
@@ -161,7 +159,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             raise NotFoundError("Unknown room %s" % (room_id,))
 
         # Retrieve the room's create event and return
-        create_event = yield self.get_event(create_id)
+        create_event = await self.get_event(create_id)
         return create_event
 
     @cached(max_entries=100000, iterable=True)
@@ -237,18 +235,17 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
 
-    @defer.inlineCallbacks
-    def get_canonical_alias_for_room(self, room_id):
+    async def get_canonical_alias_for_room(self, room_id: str) -> Optional[str]:
         """Get canonical alias for room, if any
 
         Args:
-            room_id (str)
+            room_id: The room ID
 
         Returns:
-            Deferred[str|None]: The canonical alias, if any
+            The canonical alias, if any
         """
 
-        state = yield self.get_filtered_current_state_ids(
+        state = await self.get_filtered_current_state_ids(
             room_id, StateFilter.from_types([(EventTypes.CanonicalAlias, "")])
         )
 
@@ -256,7 +253,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         if not event_id:
             return
 
-        event = yield self.get_event(event_id, allow_none=True)
+        event = await self.get_event(event_id, allow_none=True)
         if not event:
             return
 
@@ -292,19 +289,19 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return {row["event_id"]: row["state_group"] for row in rows}
 
-    @defer.inlineCallbacks
-    def get_referenced_state_groups(self, state_groups):
+    async def get_referenced_state_groups(
+        self, state_groups: Iterable[int]
+    ) -> Set[int]:
         """Check if the state groups are referenced by events.
 
         Args:
-            state_groups (Iterable[int])
+            state_groups
 
         Returns:
-            Deferred[set[int]]: The subset of state groups that are
-            referenced.
+            The subset of state groups that are referenced.
         """
 
-        rows = yield self.db.simple_select_many_batch(
+        rows = await self.db.simple_select_many_batch(
             table="event_to_state_groups",
             column="state_group",
             iterable=state_groups,
@@ -353,6 +350,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
         last_room_id = progress.get("last_room_id", "")
 
         def _background_remove_left_rooms_txn(txn):
+            # get a batch of room ids to consider
             sql = """
                 SELECT DISTINCT room_id FROM current_state_events
                 WHERE room_id > ? ORDER BY room_id LIMIT ?
@@ -363,24 +361,68 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             if not room_ids:
                 return True, set()
 
+            ###########################################################################
+            #
+            # exclude rooms where we have active members
+
             sql = """
                 SELECT room_id
-                FROM current_state_events
+                FROM local_current_membership
                 WHERE
                     room_id > ? AND room_id <= ?
-                    AND type = 'm.room.member'
                     AND membership = 'join'
-                    AND state_key LIKE ?
                 GROUP BY room_id
             """
 
-            txn.execute(sql, (last_room_id, room_ids[-1], "%:" + self.server_name))
-
+            txn.execute(sql, (last_room_id, room_ids[-1]))
             joined_room_ids = {row[0] for row in txn}
+            to_delete = set(room_ids) - joined_room_ids
 
-            left_rooms = set(room_ids) - joined_room_ids
+            ###########################################################################
+            #
+            # exclude rooms which we are in the process of constructing; these otherwise
+            # qualify as "rooms with no local users", and would have their
+            # forward extremities cleaned up.
 
-            logger.info("Deleting current state left rooms: %r", left_rooms)
+            # the following query will return a list of rooms which have forward
+            # extremities that are *not* also the create event in the room - ie
+            # those that are not being created currently.
+
+            sql = """
+                SELECT DISTINCT efe.room_id
+                FROM event_forward_extremities efe
+                LEFT JOIN current_state_events cse ON
+                    cse.event_id = efe.event_id
+                    AND cse.type = 'm.room.create'
+                    AND cse.state_key = ''
+                WHERE
+                    cse.event_id IS NULL
+                    AND efe.room_id > ? AND efe.room_id <= ?
+            """
+
+            txn.execute(sql, (last_room_id, room_ids[-1]))
+
+            # build a set of those rooms within `to_delete` that do not appear in
+            # the above, leaving us with the rooms in `to_delete` that *are* being
+            # created.
+            creating_rooms = to_delete.difference(row[0] for row in txn)
+            logger.info("skipping rooms which are being created: %s", creating_rooms)
+
+            # now remove the rooms being created from the list of those to delete.
+            #
+            # (we could have just taken the intersection of `to_delete` with the result
+            # of the sql query, but it's useful to be able to log `creating_rooms`; and
+            # having done so, it's quicker to remove the (few) creating rooms from
+            # `to_delete` than it is to form the intersection with the (larger) list of
+            # not-creating-rooms)
+
+            to_delete -= creating_rooms
+
+            ###########################################################################
+            #
+            # now clear the state for the rooms
+
+            logger.info("Deleting current state left rooms: %r", to_delete)
 
             # First we get all users that we still think were joined to the
             # room. This is so that we can mark those device lists as
@@ -391,7 +433,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 txn,
                 table="current_state_events",
                 column="room_id",
-                iterable=left_rooms,
+                iterable=to_delete,
                 keyvalues={"type": EventTypes.Member, "membership": Membership.JOIN},
                 retcols=("state_key",),
             )
@@ -403,7 +445,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 txn,
                 table="current_state_events",
                 column="room_id",
-                iterable=left_rooms,
+                iterable=to_delete,
                 keyvalues={},
             )
 
@@ -411,7 +453,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 txn,
                 table="event_forward_extremities",
                 column="room_id",
-                iterable=left_rooms,
+                iterable=to_delete,
                 keyvalues={},
             )
 

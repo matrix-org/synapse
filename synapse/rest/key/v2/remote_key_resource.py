@@ -202,9 +202,11 @@ class RemoteKey(DirectServeJsonResource):
 
                 if miss:
                     cache_misses.setdefault(server_name, set()).add(key_id)
+                # Cast to bytes since postgresql returns a memoryview.
                 json_results.add(bytes(most_recent_result["key_json"]))
             else:
                 for ts_added, result in results:
+                    # Cast to bytes since postgresql returns a memoryview.
                     json_results.add(bytes(result["key_json"]))
 
         if cache_misses and query_remote_on_cache_miss:
@@ -213,7 +215,7 @@ class RemoteKey(DirectServeJsonResource):
         else:
             signed_keys = []
             for key_json in json_results:
-                key_json = json.loads(key_json)
+                key_json = json.loads(key_json.decode("utf-8"))
                 for signing_key in self.config.key_server_signing_keys:
                     key_json = sign_json(key_json, self.config.server_name, signing_key)
 

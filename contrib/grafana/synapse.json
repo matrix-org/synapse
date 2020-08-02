@@ -1,7 +1,44 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "6.7.4"
+    },
+    {
+      "type": "panel",
+      "id": "graph",
+      "name": "Graph",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "heatmap",
+      "name": "Heatmap",
+      "version": ""
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    }
+  ],
   "annotations": {
     "list": [
       {
+        "$$hashKey": "object:76",
         "builtIn": 1,
         "datasource": "$datasource",
         "enable": false,
@@ -17,8 +54,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 1,
-  "iteration": 1591098104645,
+  "id": null,
+  "iteration": 1594646317221,
   "links": [
     {
       "asDropdown": true,
@@ -34,7 +71,7 @@
   "panels": [
     {
       "collapsed": false,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -269,7 +306,6 @@
         "show": false
       },
       "links": [],
-      "options": {},
       "reverseYBuckets": false,
       "targets": [
         {
@@ -559,7 +595,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1423,7 +1459,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -1795,7 +1831,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2531,7 +2567,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2823,7 +2859,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -2844,7 +2880,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 33
+            "y": 6
           },
           "hiddenSeries": false,
           "id": 79,
@@ -2940,7 +2976,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 33
+            "y": 6
           },
           "hiddenSeries": false,
           "id": 83,
@@ -3038,7 +3074,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 42
+            "y": 15
           },
           "hiddenSeries": false,
           "id": 109,
@@ -3137,7 +3173,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 42
+            "y": 15
           },
           "hiddenSeries": false,
           "id": 111,
@@ -3223,14 +3259,14 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "$datasource",
-          "description": "",
+          "description": "Number of events queued up on the master process for processing by the federation sender",
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 51
+            "y": 24
           },
           "hiddenSeries": false,
           "id": 140,
@@ -3354,6 +3390,103 @@
             "align": false,
             "alignLevel": null
           }
+        },
+        {
+          "aliasColors": {},
+          "bars": false,
+          "dashLength": 10,
+          "dashes": false,
+          "datasource": "${DS_PROMETHEUS}",
+          "description": "The number of events in the in-memory queues ",
+          "fill": 1,
+          "fillGradient": 0,
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 24
+          },
+          "hiddenSeries": false,
+          "id": 142,
+          "legend": {
+            "avg": false,
+            "current": false,
+            "max": false,
+            "min": false,
+            "show": true,
+            "total": false,
+            "values": false
+          },
+          "lines": true,
+          "linewidth": 1,
+          "nullPointMode": "null",
+          "options": {
+            "dataLinks": []
+          },
+          "percentage": false,
+          "pointradius": 2,
+          "points": false,
+          "renderer": "flot",
+          "seriesOverrides": [],
+          "spaceLength": 10,
+          "stack": false,
+          "steppedLine": false,
+          "targets": [
+            {
+              "expr": "synapse_federation_transaction_queue_pending_pdus{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "interval": "",
+              "legendFormat": "pending PDUs {{job}}-{{index}}",
+              "refId": "A"
+            },
+            {
+              "expr": "synapse_federation_transaction_queue_pending_edus{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "interval": "",
+              "legendFormat": "pending EDUs {{job}}-{{index}}",
+              "refId": "B"
+            }
+          ],
+          "thresholds": [],
+          "timeFrom": null,
+          "timeRegions": [],
+          "timeShift": null,
+          "title": "In-memory federation transmission queues",
+          "tooltip": {
+            "shared": true,
+            "sort": 0,
+            "value_type": "individual"
+          },
+          "type": "graph",
+          "xaxis": {
+            "buckets": null,
+            "mode": "time",
+            "name": null,
+            "show": true,
+            "values": []
+          },
+          "yaxes": [
+            {
+              "$$hashKey": "object:317",
+              "format": "short",
+              "label": "events",
+              "logBase": 1,
+              "max": null,
+              "min": "0",
+              "show": true
+            },
+            {
+              "$$hashKey": "object:318",
+              "format": "short",
+              "label": "",
+              "logBase": 1,
+              "max": null,
+              "min": null,
+              "show": true
+            }
+          ],
+          "yaxis": {
+            "align": false,
+            "alignLevel": null
+          }
         }
       ],
       "title": "Federation",
@@ -3361,7 +3494,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3567,7 +3700,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -3588,7 +3721,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 52
+            "y": 79
           },
           "hiddenSeries": false,
           "id": 48,
@@ -3682,7 +3815,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 52
+            "y": 79
           },
           "hiddenSeries": false,
           "id": 104,
@@ -3802,7 +3935,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 59
+            "y": 86
           },
           "hiddenSeries": false,
           "id": 10,
@@ -3898,7 +4031,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 59
+            "y": 86
           },
           "hiddenSeries": false,
           "id": 11,
@@ -3987,7 +4120,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -4011,7 +4144,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 67
+            "y": 80
           },
           "hiddenSeries": false,
           "id": 12,
@@ -4106,7 +4239,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 67
+            "y": 80
           },
           "hiddenSeries": false,
           "id": 26,
@@ -4201,7 +4334,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 80
+            "y": 93
           },
           "hiddenSeries": false,
           "id": 13,
@@ -4297,7 +4430,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 80
+            "y": 93
           },
           "hiddenSeries": false,
           "id": 27,
@@ -4392,7 +4525,7 @@
             "h": 13,
             "w": 12,
             "x": 0,
-            "y": 93
+            "y": 106
           },
           "hiddenSeries": false,
           "id": 28,
@@ -4486,7 +4619,7 @@
             "h": 13,
             "w": 12,
             "x": 12,
-            "y": 93
+            "y": 106
           },
           "hiddenSeries": false,
           "id": 25,
@@ -4572,7 +4705,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -5062,7 +5195,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -5083,7 +5216,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 66
+            "y": 121
           },
           "hiddenSeries": false,
           "id": 91,
@@ -5179,7 +5312,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 66
+            "y": 121
           },
           "hiddenSeries": false,
           "id": 21,
@@ -5271,7 +5404,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 75
+            "y": 130
           },
           "hiddenSeries": false,
           "id": 89,
@@ -5369,7 +5502,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 75
+            "y": 130
           },
           "hiddenSeries": false,
           "id": 93,
@@ -5459,7 +5592,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 84
+            "y": 139
           },
           "hiddenSeries": false,
           "id": 95,
@@ -5552,12 +5685,12 @@
             "mode": "spectrum"
           },
           "dataFormat": "tsbuckets",
-          "datasource": "Prometheus",
+          "datasource": "${DS_PROMETHEUS}",
           "gridPos": {
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 84
+            "y": 139
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -5567,7 +5700,6 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
@@ -5609,7 +5741,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -5630,7 +5762,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 39
+            "y": 66
           },
           "hiddenSeries": false,
           "id": 2,
@@ -5754,7 +5886,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 39
+            "y": 66
           },
           "hiddenSeries": false,
           "id": 41,
@@ -5847,7 +5979,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 73
           },
           "hiddenSeries": false,
           "id": 42,
@@ -5939,7 +6071,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 73
           },
           "hiddenSeries": false,
           "id": 43,
@@ -6031,7 +6163,7 @@
             "h": 7,
             "w": 12,
             "x": 0,
-            "y": 53
+            "y": 80
           },
           "hiddenSeries": false,
           "id": 113,
@@ -6129,7 +6261,7 @@
             "h": 7,
             "w": 12,
             "x": 12,
-            "y": 53
+            "y": 80
           },
           "hiddenSeries": false,
           "id": 115,
@@ -6215,7 +6347,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -6236,7 +6368,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 58
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 67,
@@ -6267,7 +6399,7 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": " synapse_event_persisted_position{instance=\"$instance\",job=\"synapse\"}  - ignoring(index, job, name) group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
+              "expr": "max(synapse_event_persisted_position{instance=\"$instance\"}) - ignoring(instance,index, job, name) group_right() synapse_event_processing_positions{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "interval": "",
               "intervalFactor": 1,
@@ -6328,7 +6460,7 @@
             "h": 9,
             "w": 12,
             "x": 12,
-            "y": 58
+            "y": 40
           },
           "hiddenSeries": false,
           "id": 71,
@@ -6362,6 +6494,7 @@
               "expr": "time()*1000-synapse_event_processing_last_ts{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}",
               "format": "time_series",
               "hide": false,
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "{{job}}-{{index}} {{name}}",
               "refId": "B"
@@ -6420,7 +6553,7 @@
             "h": 9,
             "w": 12,
             "x": 0,
-            "y": 67
+            "y": 49
           },
           "hiddenSeries": false,
           "id": 121,
@@ -6509,7 +6642,7 @@
     },
     {
       "collapsed": true,
-      "datasource": null,
+      "datasource": "${DS_PROMETHEUS}",
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -6539,7 +6672,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 41
+            "y": 86
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -6549,7 +6682,6 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
@@ -6599,7 +6731,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 41
+            "y": 86
           },
           "hiddenSeries": false,
           "id": 124,
@@ -6700,7 +6832,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 49
+            "y": 94
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -6710,7 +6842,6 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
@@ -6760,7 +6891,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 49
+            "y": 94
           },
           "hiddenSeries": false,
           "id": 128,
@@ -6879,7 +7010,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 57
+            "y": 102
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -6889,7 +7020,6 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
@@ -6939,7 +7069,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 57
+            "y": 102
           },
           "hiddenSeries": false,
           "id": 130,
@@ -7058,7 +7188,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 65
+            "y": 110
           },
           "heatmap": {},
           "hideZeroBuckets": true,
@@ -7068,12 +7198,12 @@
             "show": true
           },
           "links": [],
-          "options": {},
           "reverseYBuckets": false,
           "targets": [
             {
-              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)",
+              "expr": "rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size])",
               "format": "heatmap",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "{{le}}",
               "refId": "A"
@@ -7118,7 +7248,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 65
+            "y": 110
           },
           "hiddenSeries": false,
           "id": 132,
@@ -7149,29 +7279,33 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0)) ",
+              "expr": "histogram_quantile(0.5, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "50%",
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.75, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "75%",
               "refId": "B"
             },
             {
-              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.90, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "90%",
               "refId": "C"
             },
             {
-              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\"}[$bucket_size]) and on (index, instance, job) (synapse_storage_events_persisted_events > 0))",
+              "expr": "histogram_quantile(0.99, rate(synapse_state_number_state_groups_in_resolution_bucket{instance=\"$instance\",job=~\"$job\",index=~\"$index\"}[$bucket_size]))",
               "format": "time_series",
+              "interval": "",
               "intervalFactor": 1,
               "legendFormat": "99%",
               "refId": "D"
@@ -7181,7 +7315,7 @@
           "timeFrom": null,
           "timeRegions": [],
           "timeShift": null,
-          "title": "Number of state resolution performed, by number of state groups involved (quantiles)",
+          "title": "Number of state resolutions performed, by number of state groups involved (quantiles)",
           "tooltip": {
             "shared": true,
             "sort": 0,
@@ -7233,6 +7367,7 @@
     "list": [
       {
         "current": {
+          "selected": false,
           "text": "Prometheus",
           "value": "Prometheus"
         },
@@ -7309,14 +7444,12 @@
       },
       {
         "allValue": null,
-        "current": {
-          "text": "matrix.org",
-          "value": "matrix.org"
-        },
+        "current": {},
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
         "includeAll": false,
+        "index": -1,
         "label": null,
         "multi": false,
         "name": "instance",
@@ -7335,17 +7468,13 @@
       {
         "allFormat": "regex wildcard",
         "allValue": "",
-        "current": {
-          "text": "synapse",
-          "value": [
-            "synapse"
-          ]
-        },
+        "current": {},
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
         "hideLabel": false,
         "includeAll": true,
+        "index": -1,
         "label": "Job",
         "multi": true,
         "multiFormat": "regex values",
@@ -7366,16 +7495,13 @@
       {
         "allFormat": "regex wildcard",
         "allValue": ".*",
-        "current": {
-          "selected": false,
-          "text": "All",
-          "value": "$__all"
-        },
+        "current": {},
         "datasource": "$datasource",
         "definition": "",
         "hide": 0,
         "hideLabel": false,
         "includeAll": true,
+        "index": -1,
         "label": "",
         "multi": true,
         "multiFormat": "regex values",
@@ -7428,5 +7554,8 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 29
+  "variables": {
+    "list": []
+  },
+  "version": 32
 }

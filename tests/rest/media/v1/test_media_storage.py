@@ -26,6 +26,7 @@ import attr
 from parameterized import parameterized_class
 from PIL import Image as Image
 
+from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
 from synapse.logging.context import make_deferred_yieldable
@@ -77,7 +78,9 @@ class MediaStorageTests(unittest.HomeserverTestCase):
 
         # This uses a real blocking threadpool so we have to wait for it to be
         # actually done :/
-        x = self.media_storage.ensure_media_is_in_local_cache(file_info)
+        x = defer.ensureDeferred(
+            self.media_storage.ensure_media_is_in_local_cache(file_info)
+        )
 
         # Hotloop until the threadpool does its job...
         self.wait_on_thread(x)

@@ -104,7 +104,7 @@ class CasHandler:
         return user, displayname
 
     def _parse_cas_response(
-        self, cas_response_body: str
+        self, cas_response_body: bytes
     ) -> Tuple[str, Dict[str, Optional[str]]]:
         """
         Retrieve the user and other parameters from the CAS response.

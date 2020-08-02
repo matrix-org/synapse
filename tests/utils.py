@@ -154,6 +154,10 @@ def default_config(name, parse=False):
             "account": {"per_second": 10000, "burst_count": 10000},
             "failed_attempts": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_joins": {
+            "local": {"per_second": 10000, "burst_count": 10000},
+            "remote": {"per_second": 10000, "burst_count": 10000},
+        },
         "saml2_enabled": False,
         "public_baseurl": None,
         "default_identity_server": None,
@@ -638,14 +642,8 @@ class DeferredMockCallable(object):
             )
 
 
-@defer.inlineCallbacks
-def create_room(hs, room_id, creator_id):
+async def create_room(hs, room_id: str, creator_id: str):
     """Creates and persist a creation event for the given room
-
-    Args:
-        hs
-        room_id (str)
-        creator_id (str)
     """
 
     persistence_store = hs.get_storage().persistence
@@ -653,7 +651,7 @@ def create_room(hs, room_id, creator_id):
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
 
-    yield store.store_room(
+    await store.store_room(
         room_id=room_id,
         room_creator_user_id=creator_id,
         is_public=False,
@@ -671,6 +669,6 @@ def create_room(hs, room_id, creator_id):
         },
     )
 
-    event, context = yield event_creation_handler.create_new_client_event(builder)
+    event, context = await event_creation_handler.create_new_client_event(builder)
 
-    yield persistence_store.persist_event(event, context)
+    await persistence_store.persist_event(event, context)

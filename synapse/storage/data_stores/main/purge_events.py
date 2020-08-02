@@ -62,6 +62,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         #     event_json
         #     event_push_actions
         #     event_reference_hashes
+        #     event_relations
         #     event_search
         #     event_to_state_groups
         #     events
@@ -209,6 +210,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             "event_edges",
             "event_forward_extremities",
             "event_reference_hashes",
+            "event_relations",
             "event_search",
             "rejections",
         ):
@@ -361,7 +363,6 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             "event_push_summary",
             "pusher_throttle",
             "group_summary_rooms",
-            "local_invites",
             "room_account_data",
             "room_tags",
             "local_current_membership",
