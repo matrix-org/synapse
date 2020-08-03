@@ -1,0 +1,1 @@
+Convert the device message and pagination handlers to async/await.
