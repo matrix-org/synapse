@@ -496,6 +496,7 @@ class _JsonProducer:
     """
     Iteratively write JSON to the request.
     """
+
     # The minimum number of bytes for each chunk. Note that the last chunk will
     # usually be smaller than this.
     min_chunk_size = 1024
