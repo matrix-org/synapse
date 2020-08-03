@@ -496,12 +496,7 @@ class RegisterRestServlet(RestServlet):
             registered_user_id = await self.auth_handler.get_session_data(
                 session_id, "registered_user_id", None
             )
-            # If a password hash was previously stored we will not attempt to
-            # re-hash and store it.
-            #
-            # Note that if the password changes throughout the authentication
-            # flow this might break, but the data is meant to be consistent
-            # throughout the flow.
+            # Extract the previously-hashed password from the session.
             password_hash = await self.auth_handler.get_session_data(
                 session_id, "password_hash", None
             )
@@ -525,12 +520,15 @@ class RegisterRestServlet(RestServlet):
                 "register a new account",
             )
         except InteractiveAuthIncompleteError as e:
-            # The user needs to provide more steps to complete auth, but they're
-            # not required to provide the password again.
+            # The user needs to provide more steps to complete auth.
             #
-            # If a password hash was not provided with a previous request and a
-            # password is available now, hash the provided password and store it
-            # for later.
+            # Hash the password and store it with the session since the client
+            # is not required to provide the password again.
+            #
+            # If a password hash was previously stored we will not attempt to
+            # re-hash and store it for efficiency. This assumes the password
+            # does not change throughout the authentication flow, but this
+            # should be fine since the data is meant to be consistent.
             if not password_hash and password:
                 password_hash = await self.auth_handler.hash(password)
                 await self.auth_handler.set_session_data(
