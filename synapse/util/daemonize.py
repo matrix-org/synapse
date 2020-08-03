@@ -89,7 +89,7 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     # now that we have redirected stderr to /dev/null, any uncaught exceptions will
     # get sent to /dev/null, so make sure we log them.
     #
-    # (we don't normally except reactor.run to raise any exceptions, but this will
+    # (we don't normally expect reactor.run to raise any exceptions, but this will
     # also catch any other uncaught exceptions before we get that far.)
 
     def excepthook(type_, value, traceback):
