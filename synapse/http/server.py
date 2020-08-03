@@ -22,7 +22,7 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Callable, Dict, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple, Union
 
 import jinja2
 from canonicaljson import _canonical_encoder, _pretty_encoder, json
@@ -496,6 +496,9 @@ class _JsonProducer:
     """
     Iteratively write JSON to the request.
     """
+    # The minimum number of bytes for each chunk. Note that the last chunk will
+    # usually be smaller than this.
+    min_chunk_size = 1024
 
     def __init__(self, request, json_encoder, json_object):
         self.request = request
@@ -504,6 +507,14 @@ class _JsonProducer:
     def start(self):
         self.request.registerProducer(self, False)
 
+    def _send_data(self, data: List[str]):
+        """
+        Send a list of strings as a response to the request.
+        """
+        if not data:
+            return
+        self.request.write("".join(data).encode("utf-8"))
+
     def resumeProducing(self):
         # We've stopped producing in the meantime.
         if not self.request:
@@ -511,13 +522,23 @@ class _JsonProducer:
 
         # Get the next chunk and write it to the request. Calling write will
         # spin the reactor (and might be re-entrant).
-        try:
-            data = next(self._generator)
-            self.request.write(data.encode("utf-8"))
-        except StopIteration:
-            self.request.unregisterProducer()
-            self.request.finish()
-            self.stopProducing()
+        buffer = []
+        buffered_bytes = 0
+        while buffered_bytes < self.min_chunk_size:
+            try:
+                data = next(self._generator)
+                buffer.append(data)
+                buffered_bytes += len(data)
+            except StopIteration:
+                # Everything is serialized, write any data, then finalize the
+                # producer.
+                self._send_data(buffer)
+                self.request.unregisterProducer()
+                self.request.finish()
+                self.stopProducing()
+                return
+
+        self._send_data(data)
 
     def stopProducing(self):
         self._generator = None
