@@ -45,6 +45,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.push.mailer import load_jinja2_templates
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -390,6 +391,8 @@ class RegisterRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self._registration_enabled = self.hs.config.enable_registration
 
+        self.spam_checker = hs.get_spam_checker()
+
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
         )
@@ -610,12 +613,35 @@ class RegisterRestServlet(RestServlet):
                                 Codes.THREEPID_IN_USE,
                             )
 
+            entries = await self.store.get_user_agents_ips_to_ui_auth_session(
+                session_id
+            )
+
+            result = self.spam_checker.check_registration_for_spam(
+                threepid, desired_username, entries,
+            )
+
+            if result == RegistrationBehaviour.DENY:
+                logger.info(
+                    "Blocked registration of %r", desired_username,
+                )
+                # We return a 429 to make it not obvious that they've been
+                # denied.
+                raise SynapseError(429, "Rate limited")
+
+            shadow_banned = result == RegistrationBehaviour.SHADOW_BAN
+            if shadow_banned:
+                logger.info(
+                    "Shadow banning registration of %r", desired_username,
+                )
+
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
                 password_hash=password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
                 address=client_addr,
+                shadow_banned=shadow_banned,
             )
             # Necessary due to auth checks prior to the threepid being
             # written to the db
