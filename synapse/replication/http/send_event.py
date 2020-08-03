@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
@@ -62,8 +60,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    @defer.inlineCallbacks
-    def _serialize_payload(
+    async def _serialize_payload(
         event_id, store, event, context, requester, ratelimit, extra_users
     ):
         """
@@ -77,7 +74,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             extra_users (list(UserID)): Any extra users to notify about event
         """
 
-        serialized_context = yield defer.ensureDeferred(context.serialize(event, store))
+        serialized_context = await context.serialize(event, store)
 
         payload = {
             "event": event.get_pdu_json(),
