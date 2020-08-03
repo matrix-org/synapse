@@ -1,1 +1,1 @@
-Fix a long standing bug where HEAD requests were not properly rendered.
+Fix a long standing bug where HTTP HEAD requests resulted in a 400 error.
