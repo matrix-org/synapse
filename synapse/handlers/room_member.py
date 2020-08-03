@@ -15,6 +15,7 @@
 
 import abc
 import logging
+import random
 from http import HTTPStatus
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
@@ -22,7 +23,13 @@ from unpaddedbase64 import encode_base64
 
 from synapse import types
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    ShadowBanError,
+    SynapseError,
+)
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import EventFormatVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
@@ -281,6 +288,14 @@ class RoomMemberHandler(object):
         content: Optional[dict] = None,
         require_consent: bool = True,
     ) -> Tuple[str, int]:
+        if action == Membership.INVITE and await self.store.is_shadow_banned(
+            requester.user.to_string()
+        ):
+            # We randomly sleep a bit just to annoy the requester a bit.
+            await self.clock.sleep(random.randint(1, 10))
+            # We return a response that looks roughly legit.
+            raise ShadowBanError({})
+
         key = (room_id,)
 
         with (await self.member_linearizer.queue(key)):
@@ -775,6 +790,13 @@ class RoomMemberHandler(object):
                 raise SynapseError(
                     403, "Invites have been disabled on this server", Codes.FORBIDDEN
                 )
+
+        if await self.store.is_shadow_banned(requester.user.to_string()):
+            # We randomly sleep a bit just to annoy the requester a bit.
+            await self.clock.sleep(random.randint(1, 10))
+
+            # We return a response that looks roughly legit.
+            raise ShadowBanError({})
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.

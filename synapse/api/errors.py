@@ -145,6 +145,22 @@ class SynapseError(CodeMessageException):
         return cs_error(self.msg, self.errcode)
 
 
+class ShadowBanError(SynapseError):
+    """An exception that returns a 200 OK with a fake body.
+    """
+
+    def __init__(self, body=None):
+        if body is None:
+            body = {}
+
+        self.body = body
+
+        super().__init__(200, "")
+
+    def error_dict(self):
+        return self.body
+
+
 class ProxiedRequestError(SynapseError):
     """An error from a general matrix endpoint, eg. from a proxied Matrix API call.
 

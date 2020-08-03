@@ -20,6 +20,7 @@
 import itertools
 import logging
 import math
+import random
 import string
 from collections import OrderedDict
 from typing import Optional, Tuple
@@ -614,6 +615,7 @@ class RoomCreationHandler(BaseHandler):
         else:
             room_alias = None
 
+        invite_3pid_list = config.get("invite_3pid", [])
         invite_list = config.get("invite", [])
         for i in invite_list:
             try:
@@ -621,6 +623,17 @@ class RoomCreationHandler(BaseHandler):
                 parse_and_validate_server_name(uid.domain)
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
+
+        if (invite_list or invite_3pid_list) and await self.store.is_shadow_banned(
+            user_id
+        ):
+            # We randomly sleep a bit just to annoy the requester a bit.
+            await self.clock.sleep(random.randint(1, 10))
+
+            # We actually allow this request to go through, but remove any
+            # associated invites
+            invite_list = []
+            invite_3pid_list = []
 
         await self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
@@ -635,8 +648,6 @@ class RoomCreationHandler(BaseHandler):
                 "Not a valid power_level_content_override: 'users' did not contain %s"
                 % (user_id,),
             )
-
-        invite_3pid_list = config.get("invite_3pid", [])
 
         visibility = config.get("visibility", None)
         is_public = visibility == "public"
@@ -802,7 +813,7 @@ class RoomCreationHandler(BaseHandler):
                 _,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                creator, event, ratelimit=False
+                creator, event, ratelimit=False, ignore_shadow_ban=True,
             )
             return last_stream_id
 

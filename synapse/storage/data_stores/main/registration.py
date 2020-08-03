@@ -69,6 +69,15 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_user_by_id",
         )
 
+    async def is_shadow_banned(self, user_id):
+        return await self.db.simple_select_one_onecol(
+            table="users",
+            keyvalues={"name": user_id},
+            retcol="shadow_banned",
+            allow_none=True,
+            desc="is_shadow_banned",
+        )
+
     @defer.inlineCallbacks
     def is_trial_user(self, user_id):
         """Checks if user is in the "trial" period, i.e. within the first
@@ -969,6 +978,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         create_profile_with_displayname=None,
         admin=False,
         user_type=None,
+        shadow_banned=False,
     ):
         """Attempts to register an account.
 
@@ -985,6 +995,8 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
+            shadow_banned (bool): Whether the user is shadow banned,
+                i.e. they may be told their requests succeeded but we ignored them.
 
         Raises:
             StoreError if the user_id could not be registered.
@@ -1003,6 +1015,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             create_profile_with_displayname,
             admin,
             user_type,
+            shadow_banned,
         )
 
     def _register_user(
@@ -1016,6 +1029,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         create_profile_with_displayname,
         admin,
         user_type,
+        shadow_banned,
     ):
         user_id_obj = UserID.from_string(user_id)
 
@@ -1045,6 +1059,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
+                        "shadow_banned": shadow_banned,
                     },
                 )
             else:
@@ -1059,6 +1074,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                         "appservice_id": appservice_id,
                         "admin": 1 if admin else 0,
                         "user_type": user_type,
+                        "shadow_banned": shadow_banned,
                     },
                 )
 
