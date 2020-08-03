@@ -338,7 +338,7 @@ class MediaRepository(object):
 
         with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             request_path = "/".join(
-                ("/_matrix/media/v1/download", server_name, media_id)
+                ("/_matrix/media/r0/download", server_name, media_id)
             )
             try:
                 length, headers = await self.client.get_file(
@@ -703,7 +703,7 @@ class MediaRepositoryResource(Resource):
     Uploads are POSTed to a resource which returns a token which is used to GET
     the download::
 
-        => POST /_matrix/media/v1/upload HTTP/1.1
+        => POST /_matrix/media/r0/upload HTTP/1.1
            Content-Type: <media-type>
            Content-Length: <content-length>
 
@@ -714,7 +714,7 @@ class MediaRepositoryResource(Resource):
 
            { "content_uri": "mxc://<server-name>/<media-id>" }
 
-        => GET /_matrix/media/v1/download/<server-name>/<media-id> HTTP/1.1
+        => GET /_matrix/media/r0/download/<server-name>/<media-id> HTTP/1.1
 
         <= HTTP/1.1 200 OK
            Content-Type: <media-type>
@@ -725,7 +725,7 @@ class MediaRepositoryResource(Resource):
     Clients can get thumbnails by supplying a desired width and height and
     thumbnailing method::
 
-        => GET /_matrix/media/v1/thumbnail/<server_name>
+        => GET /_matrix/media/r0/thumbnail/<server_name>
                 /<media-id>?width=<w>&height=<h>&method=<m> HTTP/1.1
 
         <= HTTP/1.1 200 OK
