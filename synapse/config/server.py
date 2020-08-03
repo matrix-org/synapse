@@ -530,6 +530,16 @@ class ServerConfig(Config):
             "request_token_inhibit_3pid_errors", False,
         )
 
+        # List of users trialing the new experimental default push rules. This setting is
+        # not included in the sample configuration file on purpose as it's a temporary
+        # hack, so that some users can trial the new defaults without impacting every
+        # user on the homeserver.
+        self.users_new_default_push_rules = (
+            config.get("users_new_default_push_rules") or []
+        )
+        if not isinstance(self.users_new_default_push_rules, list):
+            raise ConfigError("'users_new_default_push_rules' must be a list")
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 

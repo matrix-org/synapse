@@ -105,6 +105,8 @@ class PushRulesWorkerStore(
             prefilled_cache=push_rules_prefill,
         )
 
+        self.users_new_default_push_rules = hs.config.users_new_default_push_rules
+
     @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
         """Get the position of the push rules stream.
@@ -115,7 +117,7 @@ class PushRulesWorkerStore(
         raise NotImplementedError()
 
     @cachedInlineCallbacks(max_entries=5000)
-    def _get_push_rules_for_user(self, user_id, use_new_defaults=False):
+    def get_push_rules_for_user(self, user_id):
         rows = yield self.db.simple_select_list(
             table="push_rules",
             keyvalues={"user_name": user_id},
@@ -134,22 +136,10 @@ class PushRulesWorkerStore(
 
         enabled_map = yield self.get_push_rules_enabled_for_user(user_id)
 
+        use_new_defaults = user_id in self.users_new_default_push_rules
+
         rules = _load_rules(rows, enabled_map, use_new_defaults)
 
-        return rules
-
-    @defer.inlineCallbacks
-    def get_push_rules_for_user(self, user_id):
-        # Temporary hack so we can use the new experimental default push rules to some
-        # users without impacting others.
-        use_new_defaults = yield self.db.simple_select_list(
-            table="new_push_rules_users_tmp",
-            keyvalues={"user_id": user_id},
-            retcols=("user_id",),
-            desc="get_user_new_default_push_rules",
-        )
-
-        rules = yield self._get_push_rules_for_user(user_id, bool(use_new_defaults))
         return rules
 
     @cachedInlineCallbacks(max_entries=5000)
@@ -181,7 +171,7 @@ class PushRulesWorkerStore(
             )
 
     @cachedList(
-        cached_method_name="_get_push_rules_for_user",
+        cached_method_name="get_push_rules_for_user",
         list_name="user_ids",
         num_args=1,
         inlineCallbacks=True,
@@ -208,17 +198,10 @@ class PushRulesWorkerStore(
         enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            # Temporary hack so we can use the new experimental default push rules to some
-            # users without impacting others.
-            use_new_defaults = yield self.db.simple_select_list(
-                table="new_push_rules_users_tmp",
-                keyvalues={"user_id": user_id},
-                retcols=("user_id",),
-                desc="get_user_new_default_push_rules",
-            )
+            use_new_defaults = user_id in self.users_new_default_push_rules
 
             results[user_id] = _load_rules(
-                rules, enabled_map_by_user.get(user_id, {}), bool(use_new_defaults),
+                rules, enabled_map_by_user.get(user_id, {}), use_new_defaults,
             )
 
         return results
@@ -768,7 +751,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         self.db.simple_insert_txn(txn, "push_rules_stream", values=values)
 
-        txn.call_after(self._get_push_rules_for_user.invalidate, (user_id,))
+        txn.call_after(self.get_push_rules_for_user.invalidate, (user_id,))
         txn.call_after(self.get_push_rules_enabled_for_user.invalidate, (user_id,))
         txn.call_after(
             self.push_rules_stream_cache.entity_has_changed, user_id, stream_id
