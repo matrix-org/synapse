@@ -1,1 +1,1 @@
-Fix a bug that caused room membership counts to increase when changing per-room profile information. Introduced in Synapse v1.7.2.
+Fix a bug introduced in Synapse v1.7.2 which caused inaccurate membership counts in the room directory.
