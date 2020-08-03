@@ -86,6 +86,17 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     os.dup2(devnull_fd, 2)
     os.close(devnull_fd)
 
+    # now that we have redirected stderr to /dev/null, any uncaught exceptions will
+    # get sent to /dev/null, so make sure we log them.
+    #
+    # (we don't normally except reactor.run to raise any exceptions, but this will
+    # also catch any other uncaught exceptions before we get that far.)
+
+    def excepthook(type_, value, traceback):
+        logger.critical("Unhanded exception", exc_info=(type_, value, traceback))
+
+    sys.excepthook = excepthook
+
     # Set umask to default to safe file permissions when running as a root daemon. 027
     # is an octal number which we are typing as 0o27 for Python3 compatibility.
     os.umask(0o27)
