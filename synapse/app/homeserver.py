@@ -56,6 +56,7 @@ from synapse.http.server import (
     OptionsResource,
     RootOptionsRedirectResource,
     RootRedirect,
+    StaticResource,
 )
 from synapse.http.site import SynapseSite
 from synapse.logging.context import LoggingContext
@@ -228,7 +229,7 @@ class SynapseHomeServer(HomeServer):
         if name in ["static", "client"]:
             resources.update(
                 {
-                    STATIC_PREFIX: File(
+                    STATIC_PREFIX: StaticResource(
                         os.path.join(os.path.dirname(synapse.__file__), "static")
                     )
                 }
