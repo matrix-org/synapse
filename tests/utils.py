@@ -21,9 +21,9 @@ import time
 import uuid
 import warnings
 from inspect import getcallargs
+from urllib import parse as urlparse
 
 from mock import Mock, patch
-from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 

@@ -17,7 +17,7 @@
 import logging
 import re
 
-from six.moves import http_client
+from http import HTTPStatus
 
 from twisted.internet import defer
 
@@ -348,7 +348,7 @@ class DeactivateAccountRestServlet(RestServlet):
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'erase' must be a boolean, if given",
                 Codes.BAD_JSON,
             )

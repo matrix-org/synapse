@@ -20,8 +20,6 @@ import logging
 import re
 from typing import List, Union
 
-from six import string_types
-
 import synapse
 import synapse.api.auth
 import synapse.types
@@ -412,7 +410,7 @@ class RegisterRestServlet(RestServlet):
         desired_password_hash = None
         if "password" in body:
             password = body.pop("password")
-            if not isinstance(password, string_types) or len(password) > 512:
+            if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(password)
 
@@ -456,7 +454,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, string_types):
+            if isinstance(desired_username, str):
                 result = await self._do_appservice_registration(
                     desired_username,
                     desired_password_hash,

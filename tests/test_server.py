@@ -14,8 +14,7 @@
 
 import logging
 import re
-
-from six import StringIO
+from io import StringIO
 
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure

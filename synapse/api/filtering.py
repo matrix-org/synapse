@@ -17,8 +17,6 @@
 # limitations under the License.
 from typing import List
 
-from six import text_type
-
 import jsonschema
 from canonicaljson import json
 from jsonschema import FormatChecker
@@ -313,7 +311,7 @@ class Filter(object):
 
             content = event.get("content", {})
             # check if there is a string url field in the content for filtering purposes
-            contains_url = isinstance(content.get("url"), text_type)
+            contains_url = isinstance(content.get("url"), str)
             labels = content.get(EventContentFields.LABELS, [])
 
         return self.check_fields(room_id, sender, ev_type, labels, contains_url)

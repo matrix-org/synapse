@@ -18,8 +18,7 @@
 import logging
 import re
 from typing import List, Optional
-
-from six.moves.urllib import parse as urlparse
+from urllib import parse as urlparse
 
 from canonicaljson import json
 

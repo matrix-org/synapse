@@ -26,8 +26,6 @@ import subprocess
 import sys
 import time
 
-from six import iteritems
-
 import yaml
 
 from synapse.config import find_config_files
@@ -251,7 +249,7 @@ def main():
         os.environ["SYNAPSE_CACHE_FACTOR"] = str(cache_factor)
 
     cache_factors = config.get("synctl_cache_factors", {})
-    for cache_name, factor in iteritems(cache_factors):
+    for cache_name, factor in cache_factors.items():
         os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
     worker_configfiles = []
@@ -362,7 +360,7 @@ def main():
             if worker.cache_factor:
                 os.environ["SYNAPSE_CACHE_FACTOR"] = str(worker.cache_factor)
 
-            for cache_name, factor in iteritems(worker.cache_factors):
+            for cache_name, factor in worker.cache_factors.items():
                 os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
             if not start_worker(worker.app, configfile, worker.configfile):

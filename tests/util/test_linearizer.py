@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six.moves import range
-
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 

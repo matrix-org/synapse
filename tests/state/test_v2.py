@@ -15,8 +15,6 @@
 
 import itertools
 
-from six.moves import zip
-
 import attr
 
 from synapse.api.constants import EventTypes, JoinRules, Membership

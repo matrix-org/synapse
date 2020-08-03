@@ -17,8 +17,6 @@
 
 import logging
 
-from six import string_types
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
@@ -513,7 +511,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         for keyname in ("name", "avatar_url", "short_description", "long_description"):
             if keyname in content:
                 value = content[keyname]
-                if not isinstance(value, string_types):
+                if not isinstance(value, str):
                     raise SynapseError(400, "%r value is not a string" % (keyname,))
                 profile[keyname] = value
 

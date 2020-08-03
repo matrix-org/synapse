@@ -17,8 +17,6 @@ import logging
 from collections import namedtuple
 from typing import Iterable, List
 
-import six
-
 from twisted.internet import defer
 from twisted.internet.defer import Deferred, DeferredList
 from twisted.python.failure import Failure
@@ -294,7 +292,7 @@ def event_from_pdu_json(
     assert_params_in_dict(pdu_json, ("type", "depth"))
 
     depth = pdu_json["depth"]
-    if not isinstance(depth, six.integer_types):
+    if not isinstance(depth, int):
         raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
 
     if depth < 0:

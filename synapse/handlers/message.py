@@ -17,8 +17,6 @@
 import logging
 from typing import Optional, Tuple
 
-from six import string_types
-
 from canonicaljson import encode_canonical_json, json
 
 from twisted.internet import defer
@@ -715,7 +713,7 @@ class EventCreationHandler(object):
 
             spam_error = self.spam_checker.check_event_for_spam(event)
             if spam_error:
-                if not isinstance(spam_error, string_types):
+                if not isinstance(spam_error, str):
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 

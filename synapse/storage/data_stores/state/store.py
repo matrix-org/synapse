@@ -17,8 +17,6 @@ import logging
 from collections import namedtuple
 from typing import Dict, Iterable, List, Set, Tuple
 
-from six.moves import range
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes

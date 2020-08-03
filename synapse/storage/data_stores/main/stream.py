@@ -40,8 +40,6 @@ import abc
 import logging
 from collections import namedtuple
 
-from six.moves import range
-
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background

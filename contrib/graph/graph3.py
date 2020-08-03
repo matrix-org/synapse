@@ -24,8 +24,6 @@ import argparse
 from synapse.events import FrozenEvent
 from synapse.util.frozenutils import unfreeze
 
-from six import string_types
-
 
 def make_graph(file_name, room_id, file_prefix, limit):
     print("Reading lines")
@@ -62,7 +60,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
         for key, value in unfreeze(event.get_dict()["content"]).items():
             if value is None:
                 value = "<null>"
-            elif isinstance(value, string_types):
+            elif isinstance(value, str):
                 pass
             else:
                 value = json.dumps(value)

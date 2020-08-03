@@ -16,9 +16,7 @@ import hashlib
 import hmac
 import logging
 import re
-
-from six import text_type
-from six.moves import http_client
+from http import HTTPStatus
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, NotFoundError, SynapseError
@@ -215,10 +213,7 @@ class UserRestServletV2(RestServlet):
                     await self.store.set_server_admin(target_user, set_admin_to)
 
             if "password" in body:
-                if (
-                    not isinstance(body["password"], text_type)
-                    or len(body["password"]) > 512
-                ):
+                if not isinstance(body["password"], str) or len(body["password"]) > 512:
                     raise SynapseError(400, "Invalid password")
                 else:
                     new_password = body["password"]
@@ -252,7 +247,7 @@ class UserRestServletV2(RestServlet):
             password = body.get("password")
             password_hash = None
             if password is not None:
-                if not isinstance(password, text_type) or len(password) > 512:
+                if not isinstance(password, str) or len(password) > 512:
                     raise SynapseError(400, "Invalid password")
                 password_hash = await self.auth_handler.hash(password)
 
@@ -370,10 +365,7 @@ class UserRegisterServlet(RestServlet):
                 400, "username must be specified", errcode=Codes.BAD_JSON
             )
         else:
-            if (
-                not isinstance(body["username"], text_type)
-                or len(body["username"]) > 512
-            ):
+            if not isinstance(body["username"], str) or len(body["username"]) > 512:
                 raise SynapseError(400, "Invalid username")
 
             username = body["username"].encode("utf-8")
@@ -386,7 +378,7 @@ class UserRegisterServlet(RestServlet):
             )
         else:
             password = body["password"]
-            if not isinstance(password, text_type) or len(password) > 512:
+            if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
 
             password_bytes = password.encode("utf-8")
@@ -477,7 +469,7 @@ class DeactivateAccountRestServlet(RestServlet):
         erase = body.get("erase", False)
         if not isinstance(erase, bool):
             raise SynapseError(
-                http_client.BAD_REQUEST,
+                HTTPStatus.BAD_REQUEST,
                 "Param 'erase' must be a boolean, if given",
                 Codes.BAD_JSON,
             )

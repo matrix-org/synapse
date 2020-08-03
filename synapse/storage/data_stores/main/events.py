@@ -21,9 +21,6 @@ from collections import OrderedDict, namedtuple
 from functools import wraps
 from typing import TYPE_CHECKING, Dict, Iterable, List, Tuple
 
-from six import integer_types, text_type
-from six.moves import range
-
 import attr
 from canonicaljson import json
 from prometheus_client import Counter
@@ -893,8 +890,7 @@ class PersistEventsStore:
                     "received_ts": self._clock.time_msec(),
                     "sender": event.sender,
                     "contains_url": (
-                        "url" in event.content
-                        and isinstance(event.content["url"], text_type)
+                        "url" in event.content and isinstance(event.content["url"], str)
                     ),
                 }
                 for event, _ in events_and_contexts
@@ -1345,10 +1341,10 @@ class PersistEventsStore:
         ):
             if (
                 "min_lifetime" in event.content
-                and not isinstance(event.content.get("min_lifetime"), integer_types)
+                and not isinstance(event.content.get("min_lifetime"), int)
             ) or (
                 "max_lifetime" in event.content
-                and not isinstance(event.content.get("max_lifetime"), integer_types)
+                and not isinstance(event.content.get("max_lifetime"), int)
             ):
                 # Ignore the event if one of the value isn't an integer.
                 return

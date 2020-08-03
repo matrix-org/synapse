@@ -16,8 +16,6 @@
 
 import logging
 
-from six.moves import range
-
 from canonicaljson import json
 
 from twisted.internet import defer

@@ -20,8 +20,6 @@ import logging
 from collections import deque, namedtuple
 from typing import Iterable, List, Optional, Set, Tuple
 
-from six.moves import range
-
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer

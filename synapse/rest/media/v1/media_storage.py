@@ -17,9 +17,6 @@ import contextlib
 import logging
 import os
 import shutil
-import sys
-
-import six
 
 from twisted.internet import defer
 from twisted.protocols.basic import FileSender
@@ -117,12 +114,11 @@ class MediaStorage(object):
             with open(fname, "wb") as f:
                 yield f, fname, finish
         except Exception:
-            t, v, tb = sys.exc_info()
             try:
                 os.remove(fname)
             except Exception:
                 pass
-            six.reraise(t, v, tb)
+            raise
 
         if not finished_called:
             raise Exception("Finished callback not called")
