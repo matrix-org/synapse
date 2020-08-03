@@ -539,7 +539,7 @@ class _JsonProducer:
                 self.stopProducing()
                 return
 
-        self._send_data(data)
+        self._send_data(buffer)
 
     def stopProducing(self):
         self._generator = None
