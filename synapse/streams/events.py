@@ -38,14 +38,14 @@ class EventSources(object):
         }  # type: Dict[str, Any]
         self.store = hs.get_datastore()
 
-    async def get_current_token(self) -> StreamToken:
+    def get_current_token(self) -> StreamToken:
         push_rules_key, _ = self.store.get_push_rules_stream_token()
         to_device_key = self.store.get_to_device_stream_token()
         device_list_key = self.store.get_device_stream_token()
         groups_key = self.store.get_group_stream_token()
 
         token = StreamToken(
-            room_key=await self.sources["room"].get_current_key(),
+            room_key=self.sources["room"].get_current_key(),
             presence_key=self.sources["presence"].get_current_key(),
             typing_key=self.sources["typing"].get_current_key(),
             receipt_key=self.sources["receipt"].get_current_key(),
@@ -57,7 +57,7 @@ class EventSources(object):
         )
         return token
 
-    async def get_current_token_for_pagination(self) -> StreamToken:
+    def get_current_token_for_pagination(self) -> StreamToken:
         """Get the current token for a given room to be used to paginate
         events.
 
@@ -68,7 +68,7 @@ class EventSources(object):
             The current token for pagination.
         """
         token = StreamToken(
-            room_key=await self.sources["room"].get_current_key(),
+            room_key=self.sources["room"].get_current_key(),
             presence_key=0,
             typing_key=0,
             receipt_key=0,
