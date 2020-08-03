@@ -213,6 +213,9 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(body, b"result")
 
     def test_https_request_via_proxy(self):
+        # XXX needed to unsilence logging
+        logging.root.handlers = [logging.StreamHandler()]
+
         agent = ProxyAgent(
             self.reactor,
             contextFactory=get_test_https_policy(),
