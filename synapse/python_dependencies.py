@@ -93,6 +93,10 @@ CONDITIONAL_REQUIREMENTS = {
     "oidc": ["authlib>=0.14.0"],
     "systemd": ["systemd-python>=231"],
     "url_preview": ["lxml>=3.5.0"],
+    # Dependencies which are exclusively required by unit test code. This is
+    # NOT a list of all modules that are necessary to run the unit tests.
+    # Tests assume that all optional dependencies are installed.
+    #
     # parameterized_class decorator was introduced in parameterized 0.7.0
     "test": ["mock>=2.0", "parameterized>=0.7.0"],
     "sentry": ["sentry-sdk>=0.7.2"],
