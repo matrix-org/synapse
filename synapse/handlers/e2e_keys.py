@@ -17,8 +17,6 @@
 
 import logging
 
-from six import iteritems
-
 import attr
 from canonicaljson import encode_canonical_json, json
 from signedjson.key import decode_verify_key_bytes
@@ -135,7 +133,7 @@ class E2eKeysHandler(object):
         remote_queries_not_in_cache = {}
         if remote_queries:
             query_list = []
-            for user_id, device_ids in iteritems(remote_queries):
+            for user_id, device_ids in remote_queries.items():
                 if device_ids:
                     query_list.extend((user_id, device_id) for device_id in device_ids)
                 else:
@@ -145,9 +143,9 @@ class E2eKeysHandler(object):
                 user_ids_not_in_cache,
                 remote_results,
             ) = yield self.store.get_user_devices_from_cache(query_list)
-            for user_id, devices in iteritems(remote_results):
+            for user_id, devices in remote_results.items():
                 user_devices = results.setdefault(user_id, {})
-                for device_id, device in iteritems(devices):
+                for device_id, device in devices.items():
                     keys = device.get("keys", None)
                     device_display_name = device.get("device_display_name", None)
                     if keys:
@@ -446,9 +444,9 @@ class E2eKeysHandler(object):
             ",".join(
                 (
                     "%s for %s:%s" % (key_id, user_id, device_id)
-                    for user_id, user_keys in iteritems(json_result)
-                    for device_id, device_keys in iteritems(user_keys)
-                    for key_id, _ in iteritems(device_keys)
+                    for user_id, user_keys in json_result.items()
+                    for device_id, device_keys in user_keys.items()
+                    for key_id, _ in device_keys.items()
                 )
             ),
         )

@@ -60,10 +60,18 @@ def login_id_thirdparty_from_phone(identifier):
 
     Returns: Login identifier dict of type 'm.id.threepid'
     """
-    if "country" not in identifier or "number" not in identifier:
+    if "country" not in identifier or (
+        # The specification requires a "phone" field, while Synapse used to require a "number"
+        # field. Accept both for backwards compatibility.
+        "phone" not in identifier
+        and "number" not in identifier
+    ):
         raise SynapseError(400, "Invalid phone-type identifier")
 
-    msisdn = phone_number_to_msisdn(identifier["country"], identifier["number"])
+    # Accept both "phone" and "number" as valid keys in m.id.phone
+    phone_number = identifier.get("phone", identifier["number"])
+
+    msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
 
     return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
 

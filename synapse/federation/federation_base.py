@@ -93,8 +93,8 @@ class FederationBase(object):
                     # *actual* redacted copy to be on the safe side.)
                     redacted_event = prune_event(pdu)
                     if set(redacted_event.keys()) == set(pdu.keys()) and set(
-                        six.iterkeys(redacted_event.content)
-                    ) == set(six.iterkeys(pdu.content)):
+                        redacted_event.content.keys()
+                    ) == set(pdu.content.keys()):
                         logger.info(
                             "Event %s seems to have been redacted; using our redacted "
                             "copy",

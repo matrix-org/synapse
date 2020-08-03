@@ -24,6 +24,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import NOT_DONE_YET
 
 from synapse.api.errors import Codes, RedirectException, SynapseError
+from synapse.config.server import parse_listener_def
 from synapse.http.server import (
     DirectServeResource,
     JsonResource,
@@ -189,7 +190,13 @@ class OptionsResourceTests(unittest.TestCase):
         request.prepath = []  # This doesn't get set properly by make_request.
 
         # Create a site and query for the resource.
-        site = SynapseSite("test", "site_tag", {}, self.resource, "1.0")
+        site = SynapseSite(
+            "test",
+            "site_tag",
+            parse_listener_def({"type": "http", "port": 0}),
+            self.resource,
+            "1.0",
+        )
         request.site = site
         resource = site.getResourceFor(request)
 
@@ -348,7 +355,9 @@ class SiteTestCase(unittest.HomeserverTestCase):
         # time out the request while it's 'processing'
         base_resource = Resource()
         base_resource.putChild(b"", HangingResource())
-        site = SynapseSite("test", "site_tag", {}, base_resource, "1.0")
+        site = SynapseSite(
+            "test", "site_tag", self.hs.config.listeners[0], base_resource, "1.0"
+        )
 
         server = site.buildProtocol(None)
         client = AccumulatingProtocol()

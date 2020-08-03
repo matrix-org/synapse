@@ -17,7 +17,6 @@ import logging
 from collections import namedtuple
 from typing import Dict, Iterable, List, Set, Tuple
 
-from six import iteritems
 from six.moves import range
 
 from twisted.internet import defer
@@ -263,7 +262,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         # And finally update the result dict, by filtering out any extra
         # stuff we pulled out of the database.
-        for group, group_state_dict in iteritems(group_to_state_dict):
+        for group, group_state_dict in group_to_state_dict.items():
             # We just replace any existing entries, as we will have loaded
             # everything we need from the database anyway.
             state[group] = state_filter.filter_state(group_state_dict)
@@ -341,11 +340,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         else:
             non_member_types = non_member_filter.concrete_types()
 
-        for group, group_state_dict in iteritems(group_to_state_dict):
+        for group, group_state_dict in group_to_state_dict.items():
             state_dict_members = {}
             state_dict_non_members = {}
 
-            for k, v in iteritems(group_state_dict):
+            for k, v in group_state_dict.items():
                 if k[0] == EventTypes.Member:
                     state_dict_members[k] = v
                 else:
@@ -432,7 +431,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                             "state_key": key[1],
                             "event_id": state_id,
                         }
-                        for key, state_id in iteritems(delta_ids)
+                        for key, state_id in delta_ids.items()
                     ],
                 )
             else:
@@ -447,7 +446,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                             "state_key": key[1],
                             "event_id": state_id,
                         }
-                        for key, state_id in iteritems(current_state_ids)
+                        for key, state_id in current_state_ids.items()
                     ],
                 )
 
@@ -458,7 +457,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
             current_member_state_ids = {
                 s: ev
-                for (s, ev) in iteritems(current_state_ids)
+                for (s, ev) in current_state_ids.items()
                 if s[0] == EventTypes.Member
             }
             txn.call_after(
@@ -470,7 +469,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
             current_non_member_state_ids = {
                 s: ev
-                for (s, ev) in iteritems(current_state_ids)
+                for (s, ev) in current_state_ids.items()
                 if s[0] != EventTypes.Member
             }
             txn.call_after(
@@ -555,7 +554,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                         "state_key": key[1],
                         "event_id": state_id,
                     }
-                    for key, state_id in iteritems(curr_state)
+                    for key, state_id in curr_state.items()
                 ],
             )
 

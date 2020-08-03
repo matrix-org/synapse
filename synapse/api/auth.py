@@ -16,8 +16,6 @@
 import logging
 from typing import Optional
 
-from six import itervalues
-
 import pymacaroons
 from netaddr import IPAddress
 
@@ -90,7 +88,7 @@ class Auth(object):
             event, prev_state_ids, for_verification=True
         )
         auth_events = yield self.store.get_events(auth_events_ids)
-        auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
+        auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
         event_auth.check(

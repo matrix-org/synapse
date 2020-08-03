@@ -186,7 +186,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         # The clientdict gets stored as JSON.
         clientdict_json = json.dumps(clientdict)
 
-        self.db.simple_update_one(
+        await self.db.simple_update_one(
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             updatevalues={"clientdict": clientdict_json},

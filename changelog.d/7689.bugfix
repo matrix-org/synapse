@@ -1,0 +1,1 @@
+Compare the URI and method during user interactive authentication (instead of the URI twice). Bug introduced in 1.13.0rc1.

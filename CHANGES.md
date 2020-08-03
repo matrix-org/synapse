@@ -1,3 +1,13 @@
+Synapse 1.15.1 (2020-06-16)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in v1.15.0 that would crash Synapse on start when using certain password auth providers. ([\#7684](https://github.com/matrix-org/synapse/issues/7684))
+- Fix a bug introduced in v1.15.0 which meant that some 3PID management endpoints were not accessible on the correct URL. ([\#7685](https://github.com/matrix-org/synapse/issues/7685))
+
+
 Synapse 1.15.0 (2020-06-11)
 ===========================
 

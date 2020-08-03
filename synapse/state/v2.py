@@ -18,8 +18,6 @@ import itertools
 import logging
 from typing import Dict, List, Optional
 
-from six import iteritems, itervalues
-
 from twisted.internet import defer
 
 import synapse.state
@@ -87,7 +85,7 @@ def resolve_events_with_store(
 
     full_conflicted_set = set(
         itertools.chain(
-            itertools.chain.from_iterable(itervalues(conflicted_state)), auth_diff
+            itertools.chain.from_iterable(conflicted_state.values()), auth_diff
         )
     )
 
@@ -572,7 +570,7 @@ def lexicographical_topological_sort(graph, key):
     # `(key(node), node)` so that sorting does the right thing
     zero_outdegree = []
 
-    for node, edges in iteritems(graph):
+    for node, edges in graph.items():
         if len(edges) == 0:
             zero_outdegree.append((key(node), node))
 

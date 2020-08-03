@@ -18,6 +18,7 @@ from parameterized import parameterized
 
 from synapse.app.generic_worker import GenericWorkerServer
 from synapse.app.homeserver import SynapseHomeServer
+from synapse.config.server import parse_listener_def
 
 from tests.unittest import HomeserverTestCase
 
@@ -35,6 +36,7 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         # have to tell the FederationHandler not to try to access stuff that is only
         # in the primary store.
         conf["worker_app"] = "yes"
+
         return conf
 
     @parameterized.expand(
@@ -53,12 +55,13 @@ class FederationReaderOpenIDListenerTests(HomeserverTestCase):
         """
         config = {
             "port": 8080,
+            "type": "http",
             "bind_addresses": ["0.0.0.0"],
             "resources": [{"names": names}],
         }
 
         # Listen with the config
-        self.hs._listen_http(config)
+        self.hs._listen_http(parse_listener_def(config))
 
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]
@@ -101,12 +104,13 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         """
         config = {
             "port": 8080,
+            "type": "http",
             "bind_addresses": ["0.0.0.0"],
             "resources": [{"names": names}],
         }
 
         # Listen with the config
-        self.hs._listener_http(config, config)
+        self.hs._listener_http(self.hs.get_config(), parse_listener_def(config))
 
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]

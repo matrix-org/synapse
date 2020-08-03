@@ -36,6 +36,7 @@ from .ratelimiting import RatelimitConfig
 from .redis import RedisConfig
 from .registration import RegistrationConfig
 from .repository import ContentRepositoryConfig
+from .room import RoomConfig
 from .room_directory import RoomDirectoryConfig
 from .saml2_config import SAML2Config
 from .server import ServerConfig
@@ -79,6 +80,7 @@ class HomeServerConfig(RootConfig):
         PasswordAuthProviderConfig,
         PushConfig,
         SpamCheckerConfig,
+        RoomConfig,
         GroupsConfig,
         UserDirectoryConfig,
         ConsentConfig,

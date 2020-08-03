@@ -20,7 +20,6 @@
 import logging
 from typing import Dict, List
 
-from six import iteritems
 from six.moves import http_client
 
 from canonicaljson import json
@@ -505,7 +504,7 @@ def cs_error(msg, code=Codes.UNKNOWN, **kwargs):
         A dict representing the error response JSON.
     """
     err = {"error": msg, "errcode": code}
-    for key, value in iteritems(kwargs):
+    for key, value in kwargs.items():
         err[key] = value
     return err
 

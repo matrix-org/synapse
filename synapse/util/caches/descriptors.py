@@ -21,8 +21,6 @@ import threading
 from typing import Any, Tuple, Union, cast
 from weakref import WeakValueDictionary
 
-from six import itervalues
-
 from prometheus_client import Gauge
 from typing_extensions import Protocol
 
@@ -281,7 +279,7 @@ class Cache(object):
     def invalidate_all(self):
         self.check_thread()
         self.cache.clear()
-        for entry in itervalues(self._pending_deferred_cache):
+        for entry in self._pending_deferred_cache.values():
             entry.invalidate()
         self._pending_deferred_cache.clear()
 
