@@ -1,1 +1,1 @@
-Remove the signature check for v1 Identity Service lookup responses as they are effectively useless.
+Remove redundant and unreliable signature check for v1 Identity Service lookup responses.
