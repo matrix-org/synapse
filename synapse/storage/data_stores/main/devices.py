@@ -763,7 +763,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 txn,
                 table="dehydrated_devices",
                 keyvalues={"user_id": user_id},
-                updatevalues={"device_id": device_id, "device_data": device_data,},
+                updatevalues={"device_id": device_id, "device_data": device_data},
             )
         return old_device_id
 
@@ -808,11 +808,11 @@ class DeviceWorkerStore(SQLBaseStore):
         token_info = self.db.simple_select_one_txn(
             txn,
             "dehydration_token",
-            {"token": token,},
+            {"token": token},
             ["user_id", "device_id", "login_submission"],
         )
         self.db.simple_delete_one_txn(
-            txn, "dehydration_token", {"token": token,},
+            txn, "dehydration_token", {"token": token},
         )
 
         if dehydrate:
