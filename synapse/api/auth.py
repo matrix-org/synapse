@@ -100,7 +100,7 @@ class Auth(object):
         user_id: str,
         current_state: Optional[StateMap[EventBase]] = None,
         allow_departed_users: bool = False,
-    ) -> Optional[EventBase]:
+    ) -> EventBase:
         """Check if the user is in the room, or was at some point.
         Args:
             room_id: The room to check.
@@ -128,17 +128,19 @@ class Auth(object):
             member = await self.state.get_current_state(
                 room_id=room_id, event_type=EventTypes.Member, state_key=user_id
             )
-        membership = member.membership if member else None
 
-        if membership == Membership.JOIN:
-            return member
+        if member:
+            membership = member.membership
 
-        # XXX this looks totally bogus. Why do we not allow users who have been banned,
-        # or those who were members previously and have been re-invited?
-        if allow_departed_users and membership == Membership.LEAVE:
-            forgot = await self.store.did_forget(user_id, room_id)
-            if not forgot:
+            if membership == Membership.JOIN:
                 return member
+
+            # XXX this looks totally bogus. Why do we not allow users who have been banned,
+            # or those who were members previously and have been re-invited?
+            if allow_departed_users and membership == Membership.LEAVE:
+                forgot = await self.store.did_forget(user_id, room_id)
+                if not forgot:
+                    return member
 
         raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
