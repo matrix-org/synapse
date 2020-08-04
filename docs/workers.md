@@ -418,6 +418,23 @@ all these to be folded into the `generic_worker` app and to use config to define
 which processes handle the various proccessing such as push notifications.
 
 
+## Migration from old config
+
+There are two main independent changes that have been made: introducing Redis
+support and merging apps into `synapse.app.generic_worker`. Both these changes
+are backwards compatible and so no changes to the config are required, however
+server admins are encouraged to plan to migrate to Redis as the old style direct
+TCP replication config is deprecated.
+
+To migrate to Redis add the `redis` config as above, and optionally remove the
+TCP `replication` listener from master and `worker_replication_port` from worker
+config.
+
+To migrate apps to use `synapse.app.generic_worker` simply update the
+`worker_app` option in the worker configs, and where worker are started (e.g.
+in systemd service files, but not required for synctl).
+
+
 ## Architectural diagram
 
 The following shows an example setup using Redis and a reverse proxy:
