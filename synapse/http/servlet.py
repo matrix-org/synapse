@@ -14,8 +14,10 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
-import json
+
 import logging
+
+from canonicaljson import json
 
 from synapse.api.errors import Codes, SynapseError
 

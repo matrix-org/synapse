@@ -14,10 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import logging
 from typing import Any, Callable, Dict, List, Match, Optional, Tuple, Union
 
+from canonicaljson import json
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
