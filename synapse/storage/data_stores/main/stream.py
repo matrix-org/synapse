@@ -39,6 +39,7 @@ what sort order was used:
 import abc
 import logging
 from collections import namedtuple
+from typing import Optional
 
 from twisted.internet import defer
 
@@ -557,19 +558,18 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return self.db.runInteraction("get_room_event_before_stream_ordering", _f)
 
-    @defer.inlineCallbacks
-    def get_room_events_max_id(self, room_id=None):
+    async def get_room_events_max_id(self, room_id: Optional[str] = None) -> str:
         """Returns the current token for rooms stream.
 
         By default, it returns the current global stream token. Specifying a
         `room_id` causes it to return the current room specific topological
         token.
         """
-        token = yield self.get_room_max_stream_ordering()
+        token = self.get_room_max_stream_ordering()
         if room_id is None:
             return "s%d" % (token,)
         else:
-            topo = yield self.db.runInteraction(
+            topo = await self.db.runInteraction(
                 "_get_max_topological_txn", self._get_max_topological_txn, room_id
             )
             return "t%d-%d" % (topo, token)
