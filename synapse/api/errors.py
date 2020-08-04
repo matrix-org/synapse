@@ -16,12 +16,10 @@
 # limitations under the License.
 
 """Contains exceptions and error codes."""
-
+import json
 import logging
 from http import HTTPStatus
 from typing import Dict, List
-
-from canonicaljson import json
 
 from twisted.web import http
 
@@ -581,7 +579,7 @@ class HttpResponseException(CodeMessageException):
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
         try:
-            j = json.loads(self.response)
+            j = json.loads(self.response.decode("utf-8"))
         except ValueError:
             j = {}
 
