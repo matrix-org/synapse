@@ -1,0 +1,1 @@
+Fix bug where state (e.g. power levels) would reset incorrectly when receiving an event from a remote server.
