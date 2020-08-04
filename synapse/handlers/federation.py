@@ -2242,8 +2242,6 @@ class FederationHandler(BaseHandler):
                 at the event's position in the DAG, though occasionally (eg if the
                 event is an outlier), may be the auth events claimed by the remote
                 server.
-
-                Also NB that this function adds entries to it.
         Returns:
             updated context object
         """
@@ -2251,7 +2249,7 @@ class FederationHandler(BaseHandler):
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
         try:
-            context = await self._update_auth_events_and_context_for_auth(
+            context = await self._fetch_missing_auth_events(
                 origin, event, context, auth_events
             )
         except Exception:
@@ -2273,7 +2271,7 @@ class FederationHandler(BaseHandler):
 
         return context
 
-    async def _update_auth_events_and_context_for_auth(
+    async def _fetch_missing_auth_events(
         self,
         origin: str,
         event: EventBase,
@@ -2282,14 +2280,8 @@ class FederationHandler(BaseHandler):
     ) -> EventContext:
         """Helper for do_auth. See there for docs.
 
-        Checks whether a given event has the expected auth events. If it
-        doesn't then we talk to the remote server to compare state to see if
-        we can come to a consensus (e.g. if one server missed some valid
-        state).
-
-        This attempts to resolve any potential divergence of state between
-        servers, but is not essential and so failures should not block further
-        processing of the event.
+        Checks and fetches if there are any auth events that we don't have,
+        and if so fetch them.
 
         Args:
             origin:
@@ -2303,8 +2295,6 @@ class FederationHandler(BaseHandler):
                 at the event's position in the DAG, though occasionally (eg if the
                 event is an outlier), may be the auth events claimed by the remote
                 server.
-
-                Also NB that this function adds entries to it.
 
         Returns:
             updated context
@@ -2363,140 +2353,13 @@ class FederationHandler(BaseHandler):
                             "do_auth %s missing_auth: %s", event.event_id, e.event_id
                         )
                         await self._handle_new_event(origin, e, auth_events=auth)
-
-                        if e.event_id in event_auth_events:
-                            auth_events[(e.type, e.state_key)] = e
                     except AuthError:
                         pass
 
             except Exception:
                 logger.exception("Failed to get auth chain")
 
-        if event.internal_metadata.is_outlier():
-            # XXX: given that, for an outlier, we'll be working with the
-            # event's *claimed* auth events rather than those we calculated:
-            # (a) is there any point in this test, since different_auth below will
-            # obviously be empty
-            # (b) alternatively, why don't we do it earlier?
-            logger.info("Skipping auth_event fetch for outlier")
-            return context
-
-        different_auth = event_auth_events.difference(
-            e.event_id for e in auth_events.values()
-        )
-
-        if not different_auth:
-            return context
-
-        logger.info(
-            "auth_events refers to events which are not in our calculated auth "
-            "chain: %s",
-            different_auth,
-        )
-
-        # XXX: currently this checks for redactions but I'm not convinced that is
-        # necessary?
-        different_events = await self.store.get_events_as_list(different_auth)
-
-        for d in different_events:
-            if d.room_id != event.room_id:
-                logger.warning(
-                    "Event %s refers to auth_event %s which is in a different room",
-                    event.event_id,
-                    d.event_id,
-                )
-
-                # don't attempt to resolve the claimed auth events against our own
-                # in this case: just use our own auth events.
-                #
-                # XXX: should we reject the event in this case? It feels like we should,
-                # but then shouldn't we also do so if we've failed to fetch any of the
-                # auth events?
-                return context
-
-        # now we state-resolve between our own idea of the auth events, and the remote's
-        # idea of them.
-
-        local_state = auth_events.values()
-        remote_auth_events = dict(auth_events)
-        remote_auth_events.update({(d.type, d.state_key): d for d in different_events})
-        remote_state = remote_auth_events.values()
-
-        room_version = await self.store.get_room_version_id(event.room_id)
-        new_state = await self.state_handler.resolve_events(
-            room_version, (local_state, remote_state), event
-        )
-
-        logger.info(
-            "After state res: updating auth_events with new state %s",
-            {
-                (d.type, d.state_key): d.event_id
-                for d in new_state.values()
-                if auth_events.get((d.type, d.state_key)) != d
-            },
-        )
-
-        auth_events.update(new_state)
-
-        context = await self._update_context_for_auth_events(
-            event, context, auth_events
-        )
-
         return context
-
-    async def _update_context_for_auth_events(
-        self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
-    ) -> EventContext:
-        """Update the state_ids in an event context after auth event resolution,
-        storing the changes as a new state group.
-
-        Args:
-            event: The event we're handling the context for
-
-            context: initial event context
-
-            auth_events: Events to update in the event context.
-
-        Returns:
-            new event context
-        """
-        # exclude the state key of the new event from the current_state in the context.
-        if event.is_state():
-            event_key = (event.type, event.state_key)  # type: Optional[Tuple[str, str]]
-        else:
-            event_key = None
-        state_updates = {
-            k: a.event_id for k, a in auth_events.items() if k != event_key
-        }
-
-        current_state_ids = await context.get_current_state_ids()
-        current_state_ids = dict(current_state_ids)  # type: ignore
-
-        current_state_ids.update(state_updates)
-
-        prev_state_ids = await context.get_prev_state_ids()
-        prev_state_ids = dict(prev_state_ids)
-
-        prev_state_ids.update({k: a.event_id for k, a in auth_events.items()})
-
-        # create a new state group as a delta from the existing one.
-        prev_group = context.state_group
-        state_group = await self.state_store.store_state_group(
-            event.event_id,
-            event.room_id,
-            prev_group=prev_group,
-            delta_ids=state_updates,
-            current_state_ids=current_state_ids,
-        )
-
-        return EventContext.with_state(
-            state_group=state_group,
-            state_group_before_event=context.state_group_before_event,
-            current_state_ids=current_state_ids,
-            prev_state_ids=prev_state_ids,
-            prev_group=prev_group,
-            delta_ids=state_updates,
-        )
 
     async def construct_auth_difference(
         self, local_auth: Iterable[EventBase], remote_auth: Iterable[EventBase]
