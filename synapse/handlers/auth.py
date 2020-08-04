@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import time
 import unicodedata
@@ -24,7 +23,6 @@ import attr
 import bcrypt  # type: ignore[import]
 import pymacaroons
 
-import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     AuthError,
@@ -45,6 +43,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
 from synapse.push.mailer import load_jinja2_templates
 from synapse.types import Requester, UserID
+from synapse.util import stringutils as stringutils
 from synapse.util.threepids import canonicalise_email
 
 from ._base import BaseHandler

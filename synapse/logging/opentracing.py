@@ -164,7 +164,6 @@ Gotchas
   than one caller? Will all of those calling functions have be in a context
   with an active span?
 """
-
 import contextlib
 import inspect
 import logging
@@ -180,8 +179,8 @@ from twisted.internet import defer
 from synapse.config import ConfigError
 
 if TYPE_CHECKING:
-    from synapse.server import HomeServer
     from synapse.http.site import SynapseRequest
+    from synapse.server import HomeServer
 
 # Helper class
 
@@ -227,6 +226,7 @@ except ImportError:
     tags = _DummyTagNames
 try:
     from jaeger_client import Config as JaegerConfig
+
     from synapse.logging.scopecontextmanager import LogContextScopeManager
 except ImportError:
     JaegerConfig = None  # type: ignore

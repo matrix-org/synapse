@@ -1,1 +1,0 @@
-Fix incorrect error message when database CTYPE was set incorrectly.

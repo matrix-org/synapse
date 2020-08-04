@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 import os
 import shutil
 import tempfile
@@ -25,8 +23,8 @@ from urllib import parse
 from mock import Mock
 
 import attr
-import PIL.Image as Image
 from parameterized import parameterized_class
+from PIL import Image as Image
 
 from twisted.internet.defer import Deferred
 
