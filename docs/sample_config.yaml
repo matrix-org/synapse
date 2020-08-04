@@ -1987,6 +1987,9 @@ sso:
 # Each JSON Web Token needs to contain a "sub" (subject) claim, which is
 # used as the localpart of the mxid.
 #
+# Additionally, the expiration time ("exp"), not before time ("nbf"),
+# and issued at ("iat") claims are validated if present.
+#
 # Note that this is a non-standard login type and client support is
 # expected to be non-existant.
 #
@@ -2013,6 +2016,24 @@ sso:
     # Required if 'enabled' is true.
     #
     #algorithm: "provided-by-your-issuer"
+
+    # The issuer to validate the "iss" claim against.
+    #
+    # Optional, if provided the "iss" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    #issuer: "provided-by-your-issuer"
+
+    # A list of audiences to validate the "aud" claim against.
+    #
+    # Optional, if provided the "aud" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    # Note that if the "aud" claim is included in a JSON web token then
+    # validation will fail without configuring audiences.
+    #
+    #audiences:
+    #    - "provided-by-your-issuer"
 
 
 password_config:
