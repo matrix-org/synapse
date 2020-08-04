@@ -673,6 +673,8 @@ def create_room(hs, room_id, creator_id):
         },
     )
 
-    event, context = yield event_creation_handler.create_new_client_event(builder)
+    event, context = yield defer.ensureDeferred(
+        event_creation_handler.create_new_client_event(builder)
+    )
 
     yield persistence_store.persist_event(event, context)
