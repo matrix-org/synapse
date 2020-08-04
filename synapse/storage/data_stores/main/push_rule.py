@@ -21,7 +21,7 @@ from canonicaljson import json
 
 from twisted.internet import defer
 
-from synapse.api.errors import Codes, StoreError
+from synapse.api.errors import NotFoundError, StoreError
 from synapse.push.baserules import list_with_base_rules
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.storage._base import SQLBaseStore
@@ -651,7 +651,27 @@ class PushRuleStore(PushRulesWorkerStore):
             )
 
     @defer.inlineCallbacks
-    def set_push_rule_enabled(self, user_id, rule_id, enabled, is_default_rule):
+    def set_push_rule_enabled(
+        self, user_id: str, rule_id: str, enabled: bool, is_default_rule: bool
+    ):
+        """
+        Sets the `enabled` state of a push rule.
+
+        Will throw NotFoundError if the rule does not exist; the Code for this
+        is NOT_FOUND.
+
+        Args:
+            user_id: the user ID of the user who wishes to enable/disable the rule
+                e.g. '@tina:example.org'
+            rule_id: the full rule ID of the rule to be enabled/disabled
+                e.g. 'global/override/.m.rule.roomnotif'
+                  or 'global/override/myCustomRule'
+            enabled: True if the rule is to be enabled, False if it is to be
+                disabled
+            is_default_rule: True if and only if this is a server-default rule.
+                This skips the check for existence (as only user-created rules
+                are always stored in the database `push_rules` table).
+        """
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
             yield self.db.runInteraction(
@@ -679,13 +699,16 @@ class PushRuleStore(PushRulesWorkerStore):
 
         if not is_default_rule:
             try:
-                # first check it exists
+                # first check it exists XXX need SELECT FOR KEY SHARE
                 self.db.simple_select_one_onecol_txn(
                     txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}, "id"
                 )
             except StoreError as serr:
                 if serr.code == 404:
-                    raise StoreError(404, "Push rule does not exist.", Codes.NOT_FOUND)
+                    # needed to set NOT_FOUND code.
+                    raise NotFoundError("Push rule does not exist.")
+                else:
+                    raise
 
         self.db.simple_upsert_txn(
             txn,
@@ -705,7 +728,31 @@ class PushRuleStore(PushRulesWorkerStore):
         )
 
     @defer.inlineCallbacks
-    def set_push_rule_actions(self, user_id, rule_id, actions, is_default_rule):
+    def set_push_rule_actions(
+        self,
+        user_id: str,
+        rule_id: str,
+        actions: List[Union[dict, str]],
+        is_default_rule: bool,
+    ):
+        """
+        Sets the `actions` state of a push rule.
+
+        Will throw NotFoundError if the rule does not exist; the Code for this
+        is NOT_FOUND.
+
+        Args:
+            user_id: the user ID of the user who wishes to enable/disable the rule
+                e.g. '@tina:example.org'
+            rule_id: the full rule ID of the rule to be enabled/disabled
+                e.g. 'global/override/.m.rule.roomnotif'
+                  or 'global/override/myCustomRule'
+            actions: A list of actions (each action being a dict or string),
+                e.g. ["notify", {"set_tweak": "highlight", "value": false}]
+            is_default_rule: True if and only if this is a server-default rule.
+                This skips the check for existence (as only user-created rules
+                are always stored in the database `push_rules` table).
+        """
         actions_json = json.dumps(actions)
 
         def set_push_rule_actions_txn(txn, stream_id, event_stream_ordering):
@@ -736,9 +783,8 @@ class PushRuleStore(PushRulesWorkerStore):
                     )
                 except StoreError as serr:
                     if serr.code == 404:
-                        raise StoreError(
-                            404, "Push rule does not exist", Codes.NOT_FOUND
-                        )
+                        # this sets the NOT_FOUND error Code
+                        raise NotFoundError("Push rule does not exist")
                     else:
                         raise
 
