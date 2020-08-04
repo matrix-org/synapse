@@ -1,1 +1,0 @@
-Update postgres image in example `docker-compose.yaml` to tag `12-alpine`.

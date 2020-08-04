@@ -1,0 +1,1 @@
+Add early returns to `_check_for_soft_fail`.

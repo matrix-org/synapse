@@ -15,18 +15,14 @@
 import logging
 
 import synapse.http.servlet
-from synapse.http.server import (
-    DirectServeResource,
-    set_cors_headers,
-    wrap_json_request_handler,
-)
+from synapse.http.server import DirectServeJsonResource, set_cors_headers
 
 from ._base import parse_media_id, respond_404
 
 logger = logging.getLogger(__name__)
 
 
-class DownloadResource(DirectServeResource):
+class DownloadResource(DirectServeJsonResource):
     isLeaf = True
 
     def __init__(self, hs, media_repo):
@@ -34,10 +30,6 @@ class DownloadResource(DirectServeResource):
         self.media_repo = media_repo
         self.server_name = hs.hostname
 
-        # this is expected by @wrap_json_request_handler
-        self.clock = hs.get_clock()
-
-    @wrap_json_request_handler
     async def _async_render_GET(self, request):
         set_cors_headers(request)
         request.setHeader(

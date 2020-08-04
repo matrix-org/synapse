@@ -1,0 +1,1 @@
+Fix up `synapse.handlers.federation` to pass mypy.
