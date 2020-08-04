@@ -41,7 +41,8 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
-        hs.get_reactor().callWhenRunning(self._start_user_parting)
+        if hs.config.worker_app is None:
+            hs.get_reactor().callWhenRunning(self._start_user_parting)
 
         self._account_validity_enabled = hs.config.account_validity.enabled
 
