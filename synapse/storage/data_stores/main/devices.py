@@ -729,6 +729,7 @@ class DeviceWorkerStore(SQLBaseStore):
         )
 
     async def get_dehydrated_device(self, user_id: str) -> Tuple[str, str]:
+        # FIXME: make sure device ID still exists in devices table
         row = await self.db.simple_select_one(
             table="dehydrated_devices",
             keyvalues={"user_id": user_id},
@@ -761,7 +762,7 @@ class DeviceWorkerStore(SQLBaseStore):
             self.db.simple_update_txn(
                 txn,
                 table="dehydrated_devices",
-                keyvalues={"user_id", user_id},
+                keyvalues={"user_id": user_id},
                 updatevalues={"device_id": device_id, "device_data": device_data,},
             )
         return old_device_id

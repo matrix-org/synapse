@@ -779,13 +779,12 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         access_token = self.login("kermit", "monkey")
 
         # dehydrate a device
-        params = json.dumps({
-            "device_data": "foobar"
-        })
+        params = json.dumps({"device_data": "foobar"})
         request, channel = self.make_request(
-            b"POST", b"/_matrix/client/unstable/org.matrix.msc2697/device/dehydrate",
+            b"POST",
+            b"/_matrix/client/unstable/org.matrix.msc2697/device/dehydrate",
             params,
-            access_token=access_token
+            access_token=access_token,
         )
         self.render(request)
         self.assertEquals(channel.code, 200, channel.result)
@@ -798,25 +797,22 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.render(request)
 
         # log in, requesting a dehydrated device
-        params = json.dumps({
-            "type": "m.login.password",
-            "user": "kermit",
-            "password": "monkey",
-            "org.matrix.msc2697.restore_device": True,
-        })
-        request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", params
+        params = json.dumps(
+            {
+                "type": "m.login.password",
+                "user": "kermit",
+                "password": "monkey",
+                "org.matrix.msc2697.restore_device": True,
+            }
         )
+        request, channel = self.make_request("POST", "/_matrix/client/r0/login", params)
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual(channel.json_body["device_data"], "foobar")
         self.assertEqual(channel.json_body["device_id"], dehydrated_device_id)
         dehydration_token = channel.json_body["dehydration_token"]
 
-        params = json.dumps({
-            "rehydrate": True,
-            "dehydration_token": dehydration_token
-        })
+        params = json.dumps({"rehydrate": True, "dehydration_token": dehydration_token})
         request, channel = self.make_request(
             "POST", "/_matrix/client/unstable/org.matrix.msc2697/restore_device", params
         )

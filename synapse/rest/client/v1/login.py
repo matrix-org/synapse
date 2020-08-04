@@ -424,7 +424,7 @@ class LoginRestServlet(RestServlet):
 
 
 class RestoreDeviceServlet(RestServlet):
-    PATTERNS = client_patterns("/org.matrix.msc26997/restore_device")
+    PATTERNS = client_patterns("/org.matrix.msc2697/restore_device")
 
     def __init__(self, hs):
         super(RestoreDeviceServlet, self).__init__()

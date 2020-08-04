@@ -562,7 +562,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
     async def cancel_rehydrate(self, token: str) -> dict:
         # FIXME: if can't find token, return 404
-        token_info = await self.store.clear_dehydration_token(token)
+        token_info = await self.store.clear_dehydration_token(token, False)
         # create device and access token from original login submission
         login_submission = token_info.get("login_submission")
         device_id = login_submission.get("device_id")
