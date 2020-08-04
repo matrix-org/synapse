@@ -28,7 +28,6 @@ from synapse.replication.http.register import (
 )
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
-from synapse.util.async_helpers import Linearizer
 
 from ._base import BaseHandler
 
@@ -51,14 +50,7 @@ class RegistrationHandler(BaseHandler):
         self.http_client = hs.get_simple_http_client()
         self.identity_handler = self.hs.get_handlers().identity_handler
         self.ratelimiter = hs.get_registration_ratelimiter()
-
-        self._next_generated_user_id = None
-
         self.macaroon_gen = hs.get_macaroon_generator()
-
-        self._generate_user_id_linearizer = Linearizer(
-            name="_generate_user_id_linearizer"
-        )
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self._show_in_user_directory = self.hs.config.show_users_in_user_directory
@@ -239,7 +231,7 @@ class RegistrationHandler(BaseHandler):
                 if fail_count > 10:
                     raise SynapseError(500, "Unable to find a suitable guest user ID")
 
-                localpart = await self._generate_user_id()
+                localpart = await self.store.generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 self.check_user_id_not_appservice_exclusive(user_id)

@@ -488,11 +488,15 @@ class EventCreationHandler(object):
 
                 try:
                     if "displayname" not in content:
-                        displayname = yield profile.get_displayname(target)
+                        displayname = yield defer.ensureDeferred(
+                            profile.get_displayname(target)
+                        )
                         if displayname is not None:
                             content["displayname"] = displayname
                     if "avatar_url" not in content:
-                        avatar_url = yield profile.get_avatar_url(target)
+                        avatar_url = yield defer.ensureDeferred(
+                            profile.get_avatar_url(target)
+                        )
                         if avatar_url is not None:
                             content["avatar_url"] = avatar_url
                 except Exception as e:

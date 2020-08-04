@@ -334,10 +334,12 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
 
         res = None
         try:
-            yield self.hs.get_device_handler().check_device_registered(
-                user_id=local_user,
-                device_id="nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
-                initial_device_display_name="new display name",
+            yield defer.ensureDeferred(
+                self.hs.get_device_handler().check_device_registered(
+                    user_id=local_user,
+                    device_id="nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                    initial_device_display_name="new display name",
+                )
             )
         except errors.SynapseError as e:
             res = e.code

@@ -1,0 +1,1 @@
+Lint the `contrib/` directory in CI and linting scripts, add `synctl` to the linting script for consistency with CI.

@@ -319,11 +319,43 @@ Response:
 }
 ```
 
+# Room Members API
+
+The Room Members admin API allows server admins to get a list of all members of a room.
+
+The response includes the following fields:
+
+* `members` - A list of all the members that are present in the room, represented by their ids.
+* `total` - Total number of members in the room.
+
+## Usage
+
+A standard request:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/members
+
+{}
+```
+
+Response:
+
+```
+{
+  "members": [
+    "@foo:matrix.org",
+    "@bar:matrix.org",
+    "@foobar:matrix.org
+    ],
+  "total": 3
+}
+```
+
 # Delete Room API
 
 The Delete Room admin API allows server admins to remove rooms from server
 and block these rooms.
-It is a combination and improvement of "[Shutdown room](shutdown_room.md)" 
+It is a combination and improvement of "[Shutdown room](shutdown_room.md)"
 and "[Purge room](purge_room.md)" API.
 
 Shuts down a room. Moves all local users and room aliases automatically to a

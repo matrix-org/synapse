@@ -294,11 +294,12 @@ class TypingStream(Stream):
     def __init__(self, hs):
         typing_handler = hs.get_typing_handler()
 
-        if hs.config.worker_app is None:
-            # on the master, query the typing handler
+        writer_instance = hs.config.worker.writers.typing
+        if writer_instance == hs.get_instance_name():
+            # On the writer, query the typing handler
             update_function = typing_handler.get_all_typing_updates
         else:
-            # Query master process
+            # Query the typing writer process
             update_function = make_http_update_function(hs, self.NAME)
 
         super().__init__(

@@ -28,7 +28,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.data_stores.main.search import SearchStore
 from synapse.storage.database import Database, LoggingTransaction
 from synapse.types import ThirdPartyInstanceID
@@ -693,7 +693,7 @@ class RoomWorkerStore(SQLBaseStore):
             next_token = None
             for stream_ordering, content_json in txn:
                 next_token = stream_ordering
-                event_json = json.loads(content_json)
+                event_json = db_to_json(content_json)
                 content = event_json["content"]
                 content_url = content.get("url")
                 thumbnail_url = content.get("info", {}).get("thumbnail_url")
@@ -938,7 +938,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 if not row["json"]:
                     retention_policy = {}
                 else:
-                    ev = json.loads(row["json"])
+                    ev = db_to_json(row["json"])
                     retention_policy = ev["content"]
 
                 self.db.simple_insert_txn(
@@ -994,7 +994,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
             updates = []
             for room_id, event_json in txn:
-                event_dict = json.loads(event_json)
+                event_dict = db_to_json(event_json)
                 room_version_id = event_dict.get("content", {}).get(
                     "room_version", RoomVersions.V1.identifier
                 )

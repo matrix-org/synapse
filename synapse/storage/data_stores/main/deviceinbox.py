@@ -21,7 +21,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import Database
 from synapse.util.caches.expiringcache import ExpiringCache
 
@@ -65,7 +65,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             messages = []
             for row in txn:
                 stream_pos = row[0]
-                messages.append(json.loads(row[1]))
+                messages.append(db_to_json(row[1]))
             if len(messages) < limit:
                 stream_pos = current_stream_id
             return messages, stream_pos
@@ -173,7 +173,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             messages = []
             for row in txn:
                 stream_pos = row[0]
-                messages.append(json.loads(row[1]))
+                messages.append(db_to_json(row[1]))
             if len(messages) < limit:
                 log_kv({"message": "Set stream position to current position"})
                 stream_pos = current_stream_id
@@ -424,9 +424,6 @@ class DeviceInboxStore(DeviceInboxWorkerStore, DeviceInboxBackgroundUpdateStore)
     def _add_messages_to_local_device_inbox_txn(
         self, txn, stream_id, messages_by_user_then_device
     ):
-        sql = "UPDATE device_max_stream_id" " SET stream_id = ?" " WHERE stream_id < ?"
-        txn.execute(sql, (stream_id, stream_id))
-
         local_by_user_then_device = {}
         for user_id, messages_by_device in messages_by_user_then_device.items():
             messages_json_for_user = {}

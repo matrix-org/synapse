@@ -55,7 +55,7 @@ DEFAULT_CONFIG = """\
 #database:
 #  name: psycopg2
 #  args:
-#    user: synapse
+#    user: synapse_user
 #    password: secretpassword
 #    database: synapse
 #    host: localhost

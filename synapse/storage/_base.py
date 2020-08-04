@@ -100,8 +100,8 @@ def db_to_json(db_content):
     if isinstance(db_content, memoryview):
         db_content = db_content.tobytes()
 
-    # Decode it to a Unicode string before feeding it to json.loads, so we
-    # consistenty get a Unicode-containing object out.
+    # Decode it to a Unicode string before feeding it to json.loads, since
+    # Python 3.5 does not support deserializing bytes.
     if isinstance(db_content, (bytes, bytearray)):
         db_content = db_content.decode("utf8")
 
