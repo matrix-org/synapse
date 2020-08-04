@@ -178,6 +178,12 @@ class SyncRestServlet(RestServlet):
                 full_state=full_state,
             )
 
+        # the client may have disconnected by now; don't bother to serialize the
+        # response if so.
+        if request._disconnected:
+            logger.info("Client has disconnected; not serializing response.")
+            return 200, {}
+
         time_now = self.clock.time_msec()
         response_content = await self.encode_response(
             time_now, sync_result, requester.access_token_id, filter_collection
