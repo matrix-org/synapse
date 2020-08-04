@@ -16,7 +16,6 @@
 # limitations under the License.
 import logging
 import re
-
 from http import HTTPStatus
 
 from twisted.internet import defer

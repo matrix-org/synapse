@@ -69,7 +69,7 @@ class IdentityHandler(BaseHandler):
         self._enable_lookup = hs.config.enable_3pid_lookup
 
     async def threepid_from_creds(
-            self, id_server_url: str, creds: Dict[str, str]
+        self, id_server_url: str, creds: Dict[str, str]
     ) -> Optional[JsonDict]:
         """
         Retrieve and validate a threepid identifier from a "credentials" dictionary against a

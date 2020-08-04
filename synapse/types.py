@@ -19,10 +19,9 @@ import sys
 from collections import namedtuple
 from typing import Any, Dict, Tuple, TypeVar
 
-from six.moves import filter
-
 import attr
 from signedjson.key import decode_verify_key_bytes
+from six.moves import filter
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError

@@ -15,8 +15,8 @@
 # limitations under the License.
 
 import logging
-
 from typing import List
+
 from signedjson.sign import sign_json
 
 from twisted.internet import defer, reactor
