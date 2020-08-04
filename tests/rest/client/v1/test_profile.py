@@ -70,8 +70,8 @@ class MockHandlerProfileTestCase(unittest.TestCase):
             profile_handler=self.mock_handler,
         )
 
-        def _get_user_by_req(request=None, allow_guest=False):
-            return defer.succeed(synapse.types.create_requester(myid))
+        async def _get_user_by_req(request=None, allow_guest=False):
+            return synapse.types.create_requester(myid)
 
         hs.get_auth().get_user_by_req = _get_user_by_req
 

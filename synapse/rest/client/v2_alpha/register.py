@@ -434,7 +434,7 @@ class RegisterRestServlet(RestServlet):
 
         appservice = None
         if self.auth.has_access_token(request):
-            appservice = await self.auth.get_appservice_by_req(request)
+            appservice = self.auth.get_appservice_by_req(request)
 
         # fork off as soon as possible for ASes which have completely
         # different registration flows to normal users

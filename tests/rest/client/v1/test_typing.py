@@ -46,7 +46,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         hs.get_handlers().federation_handler = Mock()
 
-        def get_user_by_access_token(token=None, allow_guest=False):
+        async def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,

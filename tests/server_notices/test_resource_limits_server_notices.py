@@ -258,7 +258,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
         self.user_id = "@user_id:test"
 
     def test_server_notice_only_sent_once(self):
-        self.store.get_monthly_active_count = Mock(return_value=1000)
+        self.store.get_monthly_active_count = Mock(return_value=defer.succeed(1000))
 
         self.store.user_last_seen_monthly_active = Mock(
             return_value=defer.succeed(1000)

@@ -106,7 +106,7 @@ class EventBuilder(object):
         state_ids = await self._state.get_current_state_ids(
             self.room_id, prev_event_ids
         )
-        auth_ids = await self._auth.compute_auth_events(self, state_ids)
+        auth_ids = self._auth.compute_auth_events(self, state_ids)
 
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
