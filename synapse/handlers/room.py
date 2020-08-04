@@ -119,7 +119,7 @@ class RoomCreationHandler(BaseHandler):
 
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
-    ):
+    ) -> str:
         """Replace a room with a new room with a different version
 
         Args:
@@ -128,7 +128,7 @@ class RoomCreationHandler(BaseHandler):
             new_version: the new room version to use
 
         Returns:
-            Deferred[unicode]: the new room id
+            the new room id
         """
         await self.ratelimit(requester)
 
@@ -239,7 +239,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_id: str,
         new_room_id: str,
         old_room_state: StateMap[str],
-    ):
+    ) -> None:
         """Send updated power levels in both rooms after an upgrade
 
         Args:
@@ -247,9 +247,6 @@ class RoomCreationHandler(BaseHandler):
             old_room_id: the id of the room to be replaced
             new_room_id: the id of the replacement room
             old_room_state: the state map for the old room
-
-        Returns:
-            Deferred
         """
         old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
 
@@ -322,7 +319,7 @@ class RoomCreationHandler(BaseHandler):
         new_room_id: str,
         new_room_version: RoomVersion,
         tombstone_event_id: str,
-    ):
+    ) -> None:
         """Populate a new room based on an old room
 
         Args:
@@ -332,8 +329,6 @@ class RoomCreationHandler(BaseHandler):
                 created with _gemerate_room_id())
             new_room_version: the new room version to use
             tombstone_event_id: the ID of the tombstone event in the old room.
-        Returns:
-            Deferred
         """
         user_id = requester.user.to_string()
 

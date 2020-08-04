@@ -127,8 +127,10 @@ class Auth(object):
         if current_state:
             member = current_state.get((EventTypes.Member, user_id), None)
         else:
-            member = yield self.state.get_current_state(
-                room_id=room_id, event_type=EventTypes.Member, state_key=user_id
+            member = yield defer.ensureDeferred(
+                self.state.get_current_state(
+                    room_id=room_id, event_type=EventTypes.Member, state_key=user_id
+                )
             )
         membership = member.membership if member else None
 
@@ -670,8 +672,10 @@ class Auth(object):
             )
             return member_event.membership, member_event.event_id
         except AuthError:
-            visibility = yield self.state.get_current_state(
-                room_id, EventTypes.RoomHistoryVisibility, ""
+            visibility = yield defer.ensureDeferred(
+                self.state.get_current_state(
+                    room_id, EventTypes.RoomHistoryVisibility, ""
+                )
             )
             if (
                 visibility

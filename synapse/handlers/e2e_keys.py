@@ -16,10 +16,11 @@
 # limitations under the License.
 
 import logging
+from typing import Dict, List, Optional, Tuple
 
 import attr
 from canonicaljson import encode_canonical_json, json
-from signedjson.key import decode_verify_key_bytes
+from signedjson.key import VerifyKey, decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
@@ -265,7 +266,9 @@ class E2eKeysHandler(object):
 
         return ret
 
-    async def get_cross_signing_keys_from_cache(self, query, from_user_id):
+    async def get_cross_signing_keys_from_cache(
+        self, query, from_user_id
+    ) -> Dict[str, Dict[str, dict]]:
         """Get cross-signing keys for users from the database
 
         Args:
@@ -277,8 +280,7 @@ class E2eKeysHandler(object):
                 can see.
 
         Returns:
-            defer.Deferred[dict[str, dict[str, dict]]]: map from
-                (master_keys|self_signing_keys|user_signing_keys) -> user_id -> key
+            A map from (master_keys|self_signing_keys|user_signing_keys) -> user_id -> key
         """
         master_keys = {}
         self_signing_keys = {}
@@ -312,16 +314,17 @@ class E2eKeysHandler(object):
         }
 
     @trace
-    async def query_local_devices(self, query):
+    async def query_local_devices(
+        self, query: Dict[str, Optional[List[str]]]
+    ) -> Dict[str, Dict[str, dict]]:
         """Get E2E device keys for local users
 
         Args:
-            query (dict[string, list[string]|None): map from user_id to a list
+            query: map from user_id to a list
                  of devices to query (None for all devices)
 
         Returns:
-            defer.Deferred: (resolves to dict[string, dict[string, dict]]):
-                 map from user_id -> device_id -> device details
+            A map from user_id -> device_id -> device details
         """
         set_tag("local_query", query)
         local_query = []
@@ -1004,7 +1007,7 @@ class E2eKeysHandler(object):
 
     async def _retrieve_cross_signing_keys_for_remote_user(
         self, user: UserID, desired_key_type: str,
-    ):
+    ) -> Tuple[Optional[dict], Optional[str], Optional[VerifyKey]]:
         """Queries cross-signing keys for a remote user and saves them to the database
 
         Only the key specified by `key_type` will be returned, while all retrieved keys
@@ -1015,8 +1018,7 @@ class E2eKeysHandler(object):
             desired_key_type: The type of key to receive. One of "master", "self_signing"
 
         Returns:
-            Deferred[Tuple[Optional[Dict], Optional[str], Optional[VerifyKey]]]: A tuple
-            of the retrieved key content, the key's ID and the matching VerifyKey.
+            A tuple of the retrieved key content, the key's ID and the matching VerifyKey.
             If the key cannot be retrieved, all values in the tuple will instead be None.
         """
         try:

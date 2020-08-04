@@ -1397,7 +1397,7 @@ class FederationHandler(BaseHandler):
             # it's just a best-effort thing at this point. We do want to do
             # them roughly in order, though, otherwise we'll end up making
             # lots of requests for missing prev_events which we do actually
-            # have. Hence we fire off the deferred, but don't wait for it.
+            # have. Hence we fire off the background task, but don't wait for it.
 
             run_in_background(self._handle_queued_pdus, room_queue)
 
@@ -1897,9 +1897,6 @@ class FederationHandler(BaseHandler):
             origin, event, state=state, auth_events=auth_events, backfilled=backfilled
         )
 
-        # reraise does not allow inlineCallbacks to preserve the stacktrace, so we
-        # hack around with a try/finally instead.
-        success = False
         try:
             if (
                 not event.internal_metadata.is_outlier()
@@ -1913,12 +1910,11 @@ class FederationHandler(BaseHandler):
             await self.persist_events_and_notify(
                 [(event, context)], backfilled=backfilled
             )
-            success = True
-        finally:
-            if not success:
-                run_in_background(
-                    self.store.remove_push_actions_from_staging, event.event_id
-                )
+        except Exception:
+            run_in_background(
+                self.store.remove_push_actions_from_staging, event.event_id
+            )
+            raise
 
         return context
 
@@ -3004,7 +3000,9 @@ class FederationHandler(BaseHandler):
         else:
             user_joined_room(self.distributor, user, room_id)
 
-    async def get_room_complexity(self, remote_room_hosts, room_id):
+    async def get_room_complexity(
+        self, remote_room_hosts: List[str], room_id: str
+    ) -> Optional[dict]:
         """
         Fetch the complexity of a remote room over federation.
 
@@ -3013,7 +3011,7 @@ class FederationHandler(BaseHandler):
             room_id (str): The room ID to ask about.
 
         Returns:
-            Deferred[dict] or Deferred[None]: Dict contains the complexity
+            Dict contains the complexity
             metric versions, while None means we could not fetch the complexity.
         """
 

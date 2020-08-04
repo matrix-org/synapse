@@ -1,1 +1,0 @@
-Optimisation to /sync handling: skip serializing the response if the client has already disconnected.
