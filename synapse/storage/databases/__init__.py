@@ -51,12 +51,12 @@ class Databases(object):
 
                 engine.check_database(db_conn)
                 prepare_database(
-                    db_conn, engine, hs.config, data_stores=database_config.data_stores,
+                    db_conn, engine, hs.config, databases=database_config.databases,
                 )
 
                 database = DatabasePool(hs, database_config, engine)
 
-                if "main" in database_config.data_stores:
+                if "main" in database_config.databases:
                     logger.info("Starting 'main' data store")
 
                     # Sanity check we don't try and configure the main store on
@@ -73,7 +73,7 @@ class Databases(object):
                             hs, database, self.main
                         )
 
-                if "state" in database_config.data_stores:
+                if "state" in database_config.databases:
                     logger.info("Starting 'state' data store")
 
                     # Sanity check we don't try and configure the state store on
