@@ -22,7 +22,7 @@ from canonicaljson import json
 from twisted.internet import defer
 
 from synapse.storage._base import db_to_json
-from synapse.storage.data_stores.main.account_data import AccountDataWorkerStore
+from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)

@@ -21,7 +21,7 @@ from typing import Tuple
 from twisted.internet.defer import DeferredLock
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.storage.data_stores.main.state_deltas import StateDeltasStore
+from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.util.caches.descriptors import cached

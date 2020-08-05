@@ -16,7 +16,7 @@
 import logging
 from typing import Optional
 
-from synapse.storage.data_stores.main.cache import CacheInvalidationWorkerStore
+from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator

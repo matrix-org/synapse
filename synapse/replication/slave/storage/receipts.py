@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from synapse.replication.tcp.streams import ReceiptsStream
-from synapse.storage.data_stores.main.receipts import ReceiptsWorkerStore
+from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.database import DatabasePool
 
 from ._base import BaseSlavedStore

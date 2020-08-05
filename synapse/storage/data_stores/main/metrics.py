@@ -20,7 +20,7 @@ from twisted.internet import defer
 from synapse.metrics import BucketCollector
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.data_stores.main.event_push_actions import (
+from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )
 from synapse.storage.database import DatabasePool

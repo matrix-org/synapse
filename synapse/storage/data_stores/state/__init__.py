@@ -13,4 +13,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.data_stores.state.store import StateGroupDataStore  # noqa: F401
+from synapse.storage.databases.state.store import StateGroupDataStore  # noqa: F401

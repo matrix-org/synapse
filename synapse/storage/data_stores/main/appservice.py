@@ -23,7 +23,7 @@ from twisted.internet import defer
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.database import DatabasePool
 
 logger = logging.getLogger(__name__)

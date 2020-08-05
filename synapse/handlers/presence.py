@@ -38,7 +38,7 @@ from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateHandler
-from synapse.storage.data_stores.main import DataStore
+from synapse.storage.databases.main import DataStore
 from synapse.storage.presence import UserPresenceState
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer

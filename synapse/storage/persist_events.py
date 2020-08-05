@@ -29,8 +29,8 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.data_stores import DataStores
-from synapse.storage.data_stores.main.events import DeltaState
+from synapse.storage.databases import DataStores
+from synapse.storage.databases.main.events import DeltaState
 from synapse.types import StateMap
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure

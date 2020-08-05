@@ -32,7 +32,7 @@ from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
-from synapse.storage.data_stores.main.search import SearchEntry
+from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import StateMap, get_domain_from_id
@@ -41,7 +41,7 @@ from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-    from synapse.storage.data_stores.main import DataStore
+    from synapse.storage.databases.main import DataStore
 
 
 logger = logging.getLogger(__name__)

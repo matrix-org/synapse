@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.data_stores.state.bg_updates import StateBackgroundUpdateStore
+from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.state import StateFilter
 from synapse.storage.types import Cursor

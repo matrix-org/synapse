@@ -27,8 +27,8 @@ data stores associated with them (e.g. the schema version tables), which are
 stored in `synapse.storage.schema`.
 """
 
-from synapse.storage.data_stores import DataStores
-from synapse.storage.data_stores.main import DataStore
+from synapse.storage.databases import DataStores
+from synapse.storage.databases.main import DataStore
 from synapse.storage.persist_events import EventsPersistenceStorage
 from synapse.storage.purge_events import PurgeEventsStorage
 from synapse.storage.state import StateGroupStorage

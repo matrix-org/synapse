@@ -18,7 +18,7 @@ from typing import Any, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.data_stores.main.state import StateGroupWorkerStore
+from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.types import RoomStreamToken
 
 logger = logging.getLogger(__name__)

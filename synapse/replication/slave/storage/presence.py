@@ -15,7 +15,7 @@
 
 from synapse.replication.tcp.streams import PresenceStream
 from synapse.storage import DataStore
-from synapse.storage.data_stores.main.presence import PresenceStore
+from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.database import DatabasePool
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 

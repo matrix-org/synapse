@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from synapse.replication.tcp.streams import PublicRoomsStream
-from synapse.storage.data_stores.main.room import RoomWorkerStore
+from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.database import DatabasePool
 
 from ._base import BaseSlavedStore

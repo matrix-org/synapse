@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from synapse.replication.tcp.streams import PushersStream
-from synapse.storage.data_stores.main.pusher import PusherWorkerStore
+from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.database import DatabasePool
 
 from ._base import BaseSlavedStore

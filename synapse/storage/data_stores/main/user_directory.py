@@ -19,8 +19,8 @@ import re
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules
-from synapse.storage.data_stores.main.state import StateFilter
-from synapse.storage.data_stores.main.state_deltas import StateDeltasStore
+from synapse.storage.databases.main.state import StateFilter
+from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.types import get_domain_from_id, get_localpart_from_id
