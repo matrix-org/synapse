@@ -177,12 +177,12 @@ def _setup_new_database(cur, database_engine, databases):
         os.path.join(
             dir_path,
             "databases",
-            data_store,
+            database,
             "schema",
             "full_schemas",
             str(max_current_ver),
         )
-        for data_store in databases
+        for database in databases
     )
 
     directory_entries = []
@@ -330,11 +330,9 @@ def _upgrade_existing_database(
         # First we find the directories to search in
         delta_dir = os.path.join(dir_path, "schema", "delta", str(v))
         directories = [delta_dir]
-        for data_store in databases:
+        for database in databases:
             directories.append(
-                os.path.join(
-                    dir_path, "databases", data_store, "schema", "delta", str(v)
-                )
+                os.path.join(dir_path, "databases", database, "schema", "delta", str(v))
             )
 
         # Used to check if we have any duplicate file names
