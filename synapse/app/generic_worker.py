@@ -125,15 +125,15 @@ from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer
-from synapse.storage.data_stores.main.censor_events import CensorEventsStore
-from synapse.storage.data_stores.main.media_repository import MediaRepositoryStore
-from synapse.storage.data_stores.main.monthly_active_users import (
+from synapse.storage.databases.main.censor_events import CensorEventsStore
+from synapse.storage.databases.main.media_repository import MediaRepositoryStore
+from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
-from synapse.storage.data_stores.main.presence import UserPresenceState
-from synapse.storage.data_stores.main.search import SearchWorkerStore
-from synapse.storage.data_stores.main.ui_auth import UIAuthWorkerStore
-from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
+from synapse.storage.databases.main.presence import UserPresenceState
+from synapse.storage.databases.main.search import SearchWorkerStore
+from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
+from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree

@@ -441,7 +441,7 @@ def setup(config_options):
 
             _base.start(hs, config.listeners)
 
-            hs.get_datastore().db.updates.start_doing_background_updates()
+            hs.get_datastore().db_pool.updates.start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.
             print("Error during startup:", file=sys.stderr)
@@ -551,8 +551,8 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     #
 
     # This only reports info about the *main* database.
-    stats["database_engine"] = hs.get_datastore().db.engine.module.__name__
-    stats["database_server_version"] = hs.get_datastore().db.engine.server_version
+    stats["database_engine"] = hs.get_datastore().db_pool.engine.module.__name__
+    stats["database_server_version"] = hs.get_datastore().db_pool.engine.server_version
 
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:
