@@ -28,7 +28,7 @@ from synapse.storage.data_stores.main.appservice import (
     ApplicationServiceStore,
     ApplicationServiceTransactionStore,
 )
-from synapse.storage.database import Database, make_conn
+from synapse.storage.database import DatabasePool, make_conn
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
@@ -391,7 +391,7 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
 
 # required for ApplicationServiceTransactionStoreTestCase tests
 class TestTransactionStore(ApplicationServiceTransactionStore, ApplicationServiceStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(TestTransactionStore, self).__init__(database, db_conn, hs)
 
 

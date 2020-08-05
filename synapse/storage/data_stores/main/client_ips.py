@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import Database, make_tuple_comparison_clause
+from synapse.storage.database import DatabasePool, make_tuple_comparison_clause
 from synapse.util.caches.descriptors import Cache
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ LAST_SEEN_GRANULARITY = 120 * 1000
 
 
 class ClientIpBackgroundUpdateStore(SQLBaseStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(ClientIpBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         self.db.updates.register_background_index_update(
@@ -355,7 +355,7 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
 
 
 class ClientIpStore(ClientIpBackgroundUpdateStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
 
         self.client_ip_last_seen = Cache(
             name="client_ip_last_seen", keylen=4, max_entries=50000

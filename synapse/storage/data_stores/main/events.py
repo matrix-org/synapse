@@ -33,7 +33,7 @@ from synapse.events.snapshot import EventContext  # noqa: F401
 from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.data_stores.main.search import SearchEntry
-from synapse.storage.database import Database, LoggingTransaction
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util.frozenutils import frozendict_json_encoder
@@ -132,7 +132,9 @@ class PersistEventsStore:
     Note: This is not part of the `DataStore` mixin.
     """
 
-    def __init__(self, hs: "HomeServer", db: Database, main_data_store: "DataStore"):
+    def __init__(
+        self, hs: "HomeServer", db: DatabasePool, main_data_store: "DataStore"
+    ):
         self.hs = hs
         self.db = db
         self.store = main_data_store

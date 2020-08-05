@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 from tests.unittest import HomeserverTestCase
@@ -27,7 +27,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.db = self.store.db  # type: Database
+        self.db = self.store.db  # type: DatabasePool
 
         self.get_success(self.db.runInteraction("_setup_db", self._setup_db))
 

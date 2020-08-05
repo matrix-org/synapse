@@ -19,7 +19,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventContentFields
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
     EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
     DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
 
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(EventsBackgroundUpdatesStore, self).__init__(database, db_conn, hs)
 
         self.db.updates.register_background_update_handler(

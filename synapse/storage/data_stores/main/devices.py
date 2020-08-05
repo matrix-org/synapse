@@ -31,7 +31,7 @@ from synapse.logging.opentracing import (
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import (
-    Database,
+    DatabasePool,
     LoggingTransaction,
     make_tuple_comparison_clause,
 )
@@ -730,7 +730,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
 
 class DeviceBackgroundUpdateStore(SQLBaseStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(DeviceBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         self.db.updates.register_background_index_update(
@@ -854,7 +854,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
 
 class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(DeviceStore, self).__init__(database, db_conn, hs)
 
         # Map of (user_id, device_id) -> bool. If there is an entry that implies

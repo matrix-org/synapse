@@ -24,7 +24,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.data_stores.main.events import encode_json
 from synapse.storage.data_stores.main.events_worker import EventsWorkerStore
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBaseStore):
-    def __init__(self, database: Database, db_conn, hs: "HomeServer"):
+    def __init__(self, database: DatabasePool, db_conn, hs: "HomeServer"):
         super().__init__(database, db_conn, hs)
 
         def _censor_redactions():

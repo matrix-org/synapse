@@ -23,7 +23,7 @@ from canonicaljson import json
 
 from synapse.storage.database import LoggingTransaction  # noqa: F401
 from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 from synapse.types import Collection, get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class SQLBaseStore(metaclass=ABCMeta):
     per data store (and not one per physical database).
     """
 
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine

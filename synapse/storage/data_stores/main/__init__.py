@@ -21,7 +21,7 @@ import time
 
 from synapse.api.constants import PresenceState
 from synapse.config.homeserver import HomeServerConfig
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     IdGenerator,
@@ -119,7 +119,7 @@ class DataStore(
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
 ):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine

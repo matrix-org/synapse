@@ -18,7 +18,7 @@ from typing import List
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import Database, make_in_list_sql_clause
+from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ LAST_SEEN_GRANULARITY = 60 * 60 * 1000
 
 
 class MonthlyActiveUsersWorkerStore(SQLBaseStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(MonthlyActiveUsersWorkerStore, self).__init__(database, db_conn, hs)
         self._clock = hs.get_clock()
         self.hs = hs
@@ -119,7 +119,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
 
 class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(MonthlyActiveUsersStore, self).__init__(database, db_conn, hs)
 
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau

@@ -17,7 +17,7 @@ import logging
 
 from synapse.storage.data_stores.main.events import PersistEventsStore
 from synapse.storage.data_stores.state import StateGroupDataStore
-from synapse.storage.database import Database, make_conn
+from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 
@@ -54,7 +54,7 @@ class DataStores(object):
                     db_conn, engine, hs.config, data_stores=database_config.data_stores,
                 )
 
-                database = Database(hs, database_config, engine)
+                database = DatabasePool(hs, database_config, engine)
 
                 if "main" in database_config.data_stores:
                     logger.info("Starting 'main' data store")

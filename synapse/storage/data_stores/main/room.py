@@ -28,7 +28,7 @@ from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.data_stores.main.search import SearchStore
-from synapse.storage.database import Database, LoggingTransaction
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached
 
@@ -73,7 +73,7 @@ class RoomSortOrder(Enum):
 
 
 class RoomWorkerStore(SQLBaseStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(RoomWorkerStore, self).__init__(database, db_conn, hs)
 
         self.config = hs.config
@@ -857,7 +857,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
     ADD_ROOMS_ROOM_VERSION_COLUMN = "add_rooms_room_version_column"
 
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(RoomBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
         self.config = hs.config
@@ -1068,7 +1068,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
 
 class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super(RoomStore, self).__init__(database, db_conn, hs)
 
         self.config = hs.config

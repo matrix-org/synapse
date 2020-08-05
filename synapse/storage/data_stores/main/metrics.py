@@ -23,7 +23,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.main.event_push_actions import (
     EventPushActionsWorkerStore,
 )
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 
 
 class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
@@ -31,7 +31,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     stats and prometheus metrics.
     """
 
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
         # Collect metrics on the number of forward extremities that exist.
