@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.databases.main.filtering import FilteringStore
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.filtering import FilteringStore
 
 from ._base import BaseSlavedStore
 

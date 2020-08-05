@@ -15,9 +15,9 @@
 
 import logging
 
+from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.databases.main.events import PersistEventsStore
 from synapse.storage.databases.state import StateGroupDataStore
-from synapse.storage.database import DatabasePool, make_conn
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 

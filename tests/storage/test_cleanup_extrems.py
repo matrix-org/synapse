@@ -52,7 +52,7 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
 
         schema_path = os.path.join(
             prepare_database.dir_path,
-            "data_stores",
+            "databases",
             "main",
             "schema",
             "delta",

@@ -27,8 +27,8 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.databases.main.search import SearchStore
 from synapse.types import ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached
 

@@ -35,31 +35,29 @@ from synapse.logging.context import (
     make_deferred_yieldable,
     run_in_background,
 )
-from synapse.storage.data_stores.main.client_ips import ClientIpBackgroundUpdateStore
-from synapse.storage.data_stores.main.deviceinbox import (
-    DeviceInboxBackgroundUpdateStore,
-)
-from synapse.storage.data_stores.main.devices import DeviceBackgroundUpdateStore
-from synapse.storage.data_stores.main.events_bg_updates import (
+from synapse.storage.database import Database, make_conn
+from synapse.storage.databases.main.client_ips import ClientIpBackgroundUpdateStore
+from synapse.storage.databases.main.deviceinbox import DeviceInboxBackgroundUpdateStore
+from synapse.storage.databases.main.devices import DeviceBackgroundUpdateStore
+from synapse.storage.databases.main.events_bg_updates import (
     EventsBackgroundUpdatesStore,
 )
-from synapse.storage.data_stores.main.media_repository import (
+from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
-from synapse.storage.data_stores.main.registration import (
+from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
     find_max_generated_user_id_localpart,
 )
-from synapse.storage.data_stores.main.room import RoomBackgroundUpdateStore
-from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
-from synapse.storage.data_stores.main.search import SearchBackgroundUpdateStore
-from synapse.storage.data_stores.main.state import MainStateBackgroundUpdateStore
-from synapse.storage.data_stores.main.stats import StatsStore
-from synapse.storage.data_stores.main.user_directory import (
+from synapse.storage.databases.main.room import RoomBackgroundUpdateStore
+from synapse.storage.databases.main.roommember import RoomMemberBackgroundUpdateStore
+from synapse.storage.databases.main.search import SearchBackgroundUpdateStore
+from synapse.storage.databases.main.state import MainStateBackgroundUpdateStore
+from synapse.storage.databases.main.stats import StatsStore
+from synapse.storage.databases.main.user_directory import (
     UserDirectoryBackgroundUpdateStore,
 )
-from synapse.storage.data_stores.state.bg_updates import StateBackgroundUpdateStore
-from synapse.storage.database import Database, make_conn
+from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStore
 from synapse.storage.engines import create_engine
 from synapse.storage.prepare_database import prepare_database
 from synapse.util import Clock

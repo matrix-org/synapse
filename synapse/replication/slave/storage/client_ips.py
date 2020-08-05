@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.client_ips import LAST_SEEN_GRANULARITY
 from synapse.util.caches.descriptors import Cache
 
 from ._base import BaseSlavedStore

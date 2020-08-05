@@ -22,9 +22,9 @@ from twisted.internet import defer
 from synapse.api.errors import StoreError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
-from synapse.storage.database import DatabasePool
 from synapse.util.caches.descriptors import cached
 from synapse.util.iterutils import batch_iter
 

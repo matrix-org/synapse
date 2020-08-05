@@ -15,6 +15,7 @@
 # limitations under the License.
 import logging
 
+from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.event_federation import EventFederationWorkerStore
 from synapse.storage.databases.main.event_push_actions import (
     EventPushActionsWorkerStore,
@@ -26,7 +27,6 @@ from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.storage.databases.main.stream import StreamWorkerStore
 from synapse.storage.databases.main.user_erasure_store import UserErasureWorkerStore
-from synapse.storage.database import DatabasePool
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 from ._base import BaseSlavedStore

@@ -176,7 +176,7 @@ def _setup_new_database(cur, database_engine, data_stores):
     directories.extend(
         os.path.join(
             dir_path,
-            "data_stores",
+            "databases",
             data_store,
             "schema",
             "full_schemas",
@@ -333,7 +333,7 @@ def _upgrade_existing_database(
         for data_store in data_stores:
             directories.append(
                 os.path.join(
-                    dir_path, "data_stores", data_store, "schema", "delta", str(v)
+                    dir_path, "databases", data_store, "schema", "delta", str(v)
                 )
             )
 

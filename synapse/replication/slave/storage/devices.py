@@ -16,9 +16,9 @@
 from synapse.replication.slave.storage._base import BaseSlavedStore
 from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams._base import DeviceListsStream, UserSignatureStream
+from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.devices import DeviceWorkerStore
 from synapse.storage.databases.main.end_to_end_keys import EndToEndKeyWorkerStore
-from synapse.storage.database import DatabasePool
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 

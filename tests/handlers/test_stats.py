@@ -15,7 +15,7 @@
 
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
-from synapse.storage.data_stores.main import stats
+from synapse.storage.databases.main import stats
 
 from tests import unittest
 

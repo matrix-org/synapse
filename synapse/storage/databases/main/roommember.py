@@ -28,8 +28,8 @@ from synapse.storage._base import (
     db_to_json,
     make_in_list_sql_clause,
 )
-from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import Sqlite3Engine
 from synapse.storage.roommember import (
     GetRoomsForUserWithStreamOrdering,
