@@ -56,7 +56,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             return
 
         if not (
-            await self.db.updates.has_completed_background_update(
+            await self.db_pool.updates.has_completed_background_update(
                 "redactions_have_censored_ts_idx"
             )
         ):
@@ -85,7 +85,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             LIMIT ?
         """
 
-        rows = await self.db.execute(
+        rows = await self.db_pool.execute(
             "_censor_redactions_fetch", None, sql, before_ts, 100
         )
 
@@ -123,14 +123,14 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
                 if pruned_json:
                     self._censor_event_txn(txn, event_id, pruned_json)
 
-                self.db.simple_update_one_txn(
+                self.db_pool.simple_update_one_txn(
                     txn,
                     table="redactions",
                     keyvalues={"event_id": redaction_id},
                     updatevalues={"have_censored": True},
                 )
 
-        await self.db.runInteraction("_update_censor_txn", _update_censor_txn)
+        await self.db_pool.runInteraction("_update_censor_txn", _update_censor_txn)
 
     def _censor_event_txn(self, txn, event_id, pruned_json):
         """Censor an event by replacing its JSON in the event_json table with the
@@ -141,7 +141,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             event_id (str): The ID of the event to censor.
             pruned_json (str): The pruned JSON
         """
-        self.db.simple_update_one_txn(
+        self.db_pool.simple_update_one_txn(
             txn,
             table="event_json",
             keyvalues={"event_id": event_id},
@@ -193,7 +193,9 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
                 txn, "_get_event_cache", (event.event_id,)
             )
 
-        yield self.db.runInteraction("delete_expired_event", delete_expired_event_txn)
+        yield self.db_pool.runInteraction(
+            "delete_expired_event", delete_expired_event_txn
+        )
 
     def _delete_event_expiry_txn(self, txn, event_id):
         """Delete the expiry timestamp associated with an event ID without deleting the
@@ -203,6 +205,6 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
             txn (LoggingTransaction): The transaction to use to perform the deletion.
             event_id (str): The event ID to delete the associated expiry timestamp of.
         """
-        return self.db.simple_delete_txn(
+        return self.db_pool.simple_delete_txn(
             txn=txn, table="event_expiry", keyvalues={"event_id": event_id}
         )

@@ -91,7 +91,7 @@ class PushRulesWorkerStore(
                 db_conn, "push_rules_stream", "stream_id"
             )
 
-        push_rules_prefill, push_rules_id = self.db.get_cache_dict(
+        push_rules_prefill, push_rules_id = self.db_pool.get_cache_dict(
             db_conn,
             "push_rules_stream",
             entity_column="user_id",
@@ -116,7 +116,7 @@ class PushRulesWorkerStore(
 
     @cachedInlineCallbacks(max_entries=5000)
     def get_push_rules_for_user(self, user_id):
-        rows = yield self.db.simple_select_list(
+        rows = yield self.db_pool.simple_select_list(
             table="push_rules",
             keyvalues={"user_name": user_id},
             retcols=(
@@ -140,7 +140,7 @@ class PushRulesWorkerStore(
 
     @cachedInlineCallbacks(max_entries=5000)
     def get_push_rules_enabled_for_user(self, user_id):
-        results = yield self.db.simple_select_list(
+        results = yield self.db_pool.simple_select_list(
             table="push_rules_enable",
             keyvalues={"user_name": user_id},
             retcols=("user_name", "rule_id", "enabled"),
@@ -162,7 +162,7 @@ class PushRulesWorkerStore(
                 (count,) = txn.fetchone()
                 return bool(count)
 
-            return self.db.runInteraction(
+            return self.db_pool.runInteraction(
                 "have_push_rules_changed", have_push_rules_changed_txn
             )
 
@@ -178,7 +178,7 @@ class PushRulesWorkerStore(
 
         results = {user_id: [] for user_id in user_ids}
 
-        rows = yield self.db.simple_select_many_batch(
+        rows = yield self.db_pool.simple_select_many_batch(
             table="push_rules",
             column="user_name",
             iterable=user_ids,
@@ -336,7 +336,7 @@ class PushRulesWorkerStore(
 
         results = {user_id: {} for user_id in user_ids}
 
-        rows = yield self.db.simple_select_many_batch(
+        rows = yield self.db_pool.simple_select_many_batch(
             table="push_rules_enable",
             column="user_name",
             iterable=user_ids,
@@ -394,7 +394,7 @@ class PushRulesWorkerStore(
 
             return updates, upper_bound, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_push_rule_updates", get_all_push_rule_updates_txn
         )
 
@@ -416,7 +416,7 @@ class PushRuleStore(PushRulesWorkerStore):
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
             if before or after:
-                yield self.db.runInteraction(
+                yield self.db_pool.runInteraction(
                     "_add_push_rule_relative_txn",
                     self._add_push_rule_relative_txn,
                     stream_id,
@@ -430,7 +430,7 @@ class PushRuleStore(PushRulesWorkerStore):
                     after,
                 )
             else:
-                yield self.db.runInteraction(
+                yield self.db_pool.runInteraction(
                     "_add_push_rule_highest_priority_txn",
                     self._add_push_rule_highest_priority_txn,
                     stream_id,
@@ -461,7 +461,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         relative_to_rule = before or after
 
-        res = self.db.simple_select_one_txn(
+        res = self.db_pool.simple_select_one_txn(
             txn,
             table="push_rules",
             keyvalues={"user_name": user_id, "rule_id": relative_to_rule},
@@ -584,7 +584,7 @@ class PushRuleStore(PushRulesWorkerStore):
             # We didn't update a row with the given rule_id so insert one
             push_rule_id = self._push_rule_id_gen.get_next()
 
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="push_rules",
                 values={
@@ -627,7 +627,7 @@ class PushRuleStore(PushRulesWorkerStore):
         """
 
         def delete_push_rule_txn(txn, stream_id, event_stream_ordering):
-            self.db.simple_delete_one_txn(
+            self.db_pool.simple_delete_one_txn(
                 txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}
             )
 
@@ -637,7 +637,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "delete_push_rule",
                 delete_push_rule_txn,
                 stream_id,
@@ -648,7 +648,7 @@ class PushRuleStore(PushRulesWorkerStore):
     def set_push_rule_enabled(self, user_id, rule_id, enabled):
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "_set_push_rule_enabled_txn",
                 self._set_push_rule_enabled_txn,
                 stream_id,
@@ -662,7 +662,7 @@ class PushRuleStore(PushRulesWorkerStore):
         self, txn, stream_id, event_stream_ordering, user_id, rule_id, enabled
     ):
         new_id = self._push_rules_enable_id_gen.get_next()
-        self.db.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             "push_rules_enable",
             {"user_name": user_id, "rule_id": rule_id},
@@ -702,7 +702,7 @@ class PushRuleStore(PushRulesWorkerStore):
                     update_stream=False,
                 )
             else:
-                self.db.simple_update_one_txn(
+                self.db_pool.simple_update_one_txn(
                     txn,
                     "push_rules",
                     {"user_name": user_id, "rule_id": rule_id},
@@ -721,7 +721,7 @@ class PushRuleStore(PushRulesWorkerStore):
 
         with self._push_rules_stream_id_gen.get_next() as ids:
             stream_id, event_stream_ordering = ids
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "set_push_rule_actions",
                 set_push_rule_actions_txn,
                 stream_id,
@@ -741,7 +741,7 @@ class PushRuleStore(PushRulesWorkerStore):
         if data is not None:
             values.update(data)
 
-        self.db.simple_insert_txn(txn, "push_rules_stream", values=values)
+        self.db_pool.simple_insert_txn(txn, "push_rules_stream", values=values)
 
         txn.call_after(self.get_push_rules_for_user.invalidate, (user_id,))
         txn.call_after(self.get_push_rules_enabled_for_user.invalidate, (user_id,))

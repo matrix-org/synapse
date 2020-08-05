@@ -67,7 +67,7 @@ class DeviceWorkerStore(SQLBaseStore):
         Raises:
             StoreError: if the device is not found
         """
-        return self.db.simple_select_one(
+        return self.db_pool.simple_select_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
@@ -86,7 +86,7 @@ class DeviceWorkerStore(SQLBaseStore):
             containing "device_id", "user_id" and "display_name" for each
             device.
         """
-        devices = yield self.db.simple_select_list(
+        devices = yield self.db_pool.simple_select_list(
             table="devices",
             keyvalues={"user_id": user_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
@@ -118,7 +118,7 @@ class DeviceWorkerStore(SQLBaseStore):
         if not has_changed:
             return now_stream_id, []
 
-        updates = yield self.db.runInteraction(
+        updates = yield self.db_pool.runInteraction(
             "get_device_updates_by_remote",
             self._get_device_updates_by_remote_txn,
             destination,
@@ -255,7 +255,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         """
         devices = (
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "_get_e2e_device_keys_txn",
                 self._get_e2e_device_keys_txn,
                 query_map.keys(),
@@ -326,12 +326,12 @@ class DeviceWorkerStore(SQLBaseStore):
             rows = txn.fetchall()
             return rows[0][0]
 
-        return self.db.runInteraction("get_last_device_update_for_remote_user", f)
+        return self.db_pool.runInteraction("get_last_device_update_for_remote_user", f)
 
     def mark_as_sent_devices_by_remote(self, destination, stream_id):
         """Mark that updates have successfully been sent to the destination.
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "mark_as_sent_devices_by_remote",
             self._mark_as_sent_devices_by_remote_txn,
             destination,
@@ -350,7 +350,7 @@ class DeviceWorkerStore(SQLBaseStore):
         txn.execute(sql, (destination, stream_id))
         rows = txn.fetchall()
 
-        self.db.simple_upsert_many_txn(
+        self.db_pool.simple_upsert_many_txn(
             txn=txn,
             table="device_lists_outbound_last_success",
             key_names=("destination", "user_id"),
@@ -376,7 +376,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """
 
         with self._device_list_id_gen.get_next() as stream_id:
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "add_user_sig_change_to_streams",
                 self._add_user_signature_change_txn,
                 from_user_id,
@@ -391,7 +391,7 @@ class DeviceWorkerStore(SQLBaseStore):
             from_user_id,
             stream_id,
         )
-        self.db.simple_insert_txn(
+        self.db_pool.simple_insert_txn(
             txn,
             "user_signature_stream",
             values={
@@ -449,7 +449,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=2, tree=True)
     def _get_cached_user_device(self, user_id, device_id):
-        content = yield self.db.simple_select_one_onecol(
+        content = yield self.db_pool.simple_select_one_onecol(
             table="device_lists_remote_cache",
             keyvalues={"user_id": user_id, "device_id": device_id},
             retcol="content",
@@ -459,7 +459,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
     @cachedInlineCallbacks()
     def get_cached_devices_for_user(self, user_id):
-        devices = yield self.db.simple_select_list(
+        devices = yield self.db_pool.simple_select_list(
             table="device_lists_remote_cache",
             keyvalues={"user_id": user_id},
             retcols=("device_id", "content"),
@@ -475,7 +475,7 @@ class DeviceWorkerStore(SQLBaseStore):
         Returns:
             (stream_id, devices)
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_devices_with_keys_by_user",
             self._get_devices_with_keys_by_user_txn,
             user_id,
@@ -555,7 +555,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
             return changes
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
         )
 
@@ -574,7 +574,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 SELECT DISTINCT user_ids FROM user_signature_stream
                 WHERE from_user_id = ? AND stream_id > ?
             """
-            rows = yield self.db.execute(
+            rows = yield self.db_pool.execute(
                 "get_users_whose_signatures_changed", None, sql, user_id, from_key
             )
             return {user for row in rows for user in db_to_json(row[0])}
@@ -631,7 +631,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
             return updates, upto_token, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_device_list_changes_for_remotes",
             _get_all_device_list_changes_for_remotes,
         )
@@ -641,7 +641,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """Get the last stream_id we got for a user. May be None if we haven't
         got any information for them.
         """
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="device_lists_remote_extremeties",
             keyvalues={"user_id": user_id},
             retcol="stream_id",
@@ -655,7 +655,7 @@ class DeviceWorkerStore(SQLBaseStore):
         inlineCallbacks=True,
     )
     def get_device_list_last_stream_id_for_remotes(self, user_ids):
-        rows = yield self.db.simple_select_many_batch(
+        rows = yield self.db_pool.simple_select_many_batch(
             table="device_lists_remote_extremeties",
             column="user_id",
             iterable=user_ids,
@@ -680,7 +680,7 @@ class DeviceWorkerStore(SQLBaseStore):
             The IDs of users whose device lists need resync.
         """
         if user_ids:
-            rows = yield self.db.simple_select_many_batch(
+            rows = yield self.db_pool.simple_select_many_batch(
                 table="device_lists_remote_resync",
                 column="user_id",
                 iterable=user_ids,
@@ -688,7 +688,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 desc="get_user_ids_requiring_device_list_resync_with_iterable",
             )
         else:
-            rows = yield self.db.simple_select_list(
+            rows = yield self.db_pool.simple_select_list(
                 table="device_lists_remote_resync",
                 keyvalues=None,
                 retcols=("user_id",),
@@ -701,7 +701,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """Records that the server has reason to believe the cache of the devices
         for the remote users is out of date.
         """
-        return self.db.simple_upsert(
+        return self.db_pool.simple_upsert(
             table="device_lists_remote_resync",
             keyvalues={"user_id": user_id},
             values={},
@@ -714,7 +714,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """
 
         def _mark_remote_user_device_list_as_unsubscribed_txn(txn):
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="device_lists_remote_extremeties",
                 keyvalues={"user_id": user_id},
@@ -723,7 +723,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 txn, self.get_device_list_last_stream_id_for_remote, (user_id,)
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "mark_remote_user_device_list_as_unsubscribed",
             _mark_remote_user_device_list_as_unsubscribed_txn,
         )
@@ -733,7 +733,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(DeviceBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "device_lists_stream_idx",
             index_name="device_lists_stream_user_id",
             table="device_lists_stream",
@@ -741,7 +741,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         )
 
         # create a unique index on device_lists_remote_cache
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "device_lists_remote_cache_unique_idx",
             index_name="device_lists_remote_cache_unique_id",
             table="device_lists_remote_cache",
@@ -750,7 +750,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         )
 
         # And one on device_lists_remote_extremeties
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "device_lists_remote_extremeties_unique_idx",
             index_name="device_lists_remote_extremeties_unique_idx",
             table="device_lists_remote_extremeties",
@@ -759,22 +759,22 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
         )
 
         # once they complete, we can remove the old non-unique indexes.
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES,
             self._drop_device_list_streams_non_unique_indexes,
         )
 
         # clear out duplicate device list outbound pokes
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, self._remove_duplicate_outbound_pokes,
         )
 
         # a pair of background updates that were added during the 1.14 release cycle,
         # but replaced with 58/06dlols_unique_idx.py
-        self.db.updates.register_noop_background_update(
+        self.db_pool.updates.register_noop_background_update(
             "device_lists_outbound_last_success_unique_idx",
         )
-        self.db.updates.register_noop_background_update(
+        self.db_pool.updates.register_noop_background_update(
             "drop_device_lists_outbound_last_success_non_unique_idx",
         )
 
@@ -786,8 +786,8 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             txn.execute("DROP INDEX IF EXISTS device_lists_remote_extremeties_id")
             txn.close()
 
-        yield self.db.runWithConnection(f)
-        yield self.db.updates._end_background_update(
+        yield self.db_pool.runWithConnection(f)
+        yield self.db_pool.updates._end_background_update(
             DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES
         )
         return 1
@@ -807,7 +807,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         def _txn(txn):
             clause, args = make_tuple_comparison_clause(
-                self.db.engine, [(x, last_row[x]) for x in KEY_COLS]
+                self.db_pool.engine, [(x, last_row[x]) for x in KEY_COLS]
             )
             sql = """
                 SELECT stream_id, destination, user_id, device_id, MAX(ts) AS ts
@@ -823,30 +823,32 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
                 ",".join(KEY_COLS),  # ORDER BY
             )
             txn.execute(sql, args + [batch_size])
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
 
             row = None
             for row in rows:
-                self.db.simple_delete_txn(
+                self.db_pool.simple_delete_txn(
                     txn, "device_lists_outbound_pokes", {x: row[x] for x in KEY_COLS},
                 )
 
                 row["sent"] = False
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn, "device_lists_outbound_pokes", row,
                 )
 
             if row:
-                self.db.updates._background_update_progress_txn(
+                self.db_pool.updates._background_update_progress_txn(
                     txn, BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, {"last_row": row},
                 )
 
             return len(rows)
 
-        rows = await self.db.runInteraction(BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, _txn)
+        rows = await self.db_pool.runInteraction(
+            BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, _txn
+        )
 
         if not rows:
-            await self.db.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES
             )
 
@@ -885,7 +887,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             return False
 
         try:
-            inserted = yield self.db.simple_insert(
+            inserted = yield self.db_pool.simple_insert(
                 "devices",
                 values={
                     "user_id": user_id,
@@ -899,7 +901,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             if not inserted:
                 # if the device already exists, check if it's a real device, or
                 # if the device ID is reserved by something else
-                hidden = yield self.db.simple_select_one_onecol(
+                hidden = yield self.db_pool.simple_select_one_onecol(
                     "devices",
                     keyvalues={"user_id": user_id, "device_id": device_id},
                     retcol="hidden",
@@ -934,7 +936,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         Returns:
             defer.Deferred
         """
-        yield self.db.simple_delete_one(
+        yield self.db_pool.simple_delete_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             desc="delete_device",
@@ -952,7 +954,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         Returns:
             defer.Deferred
         """
-        yield self.db.simple_delete_many(
+        yield self.db_pool.simple_delete_many(
             table="devices",
             column="device_id",
             iterable=device_ids,
@@ -981,7 +983,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             updates["display_name"] = new_display_name
         if not updates:
             return defer.succeed(None)
-        return self.db.simple_update_one(
+        return self.db_pool.simple_update_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             updatevalues=updates,
@@ -1005,7 +1007,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         Returns:
             Deferred[None]
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "update_remote_device_list_cache_entry",
             self._update_remote_device_list_cache_entry_txn,
             user_id,
@@ -1018,7 +1020,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         self, txn, user_id, device_id, content, stream_id
     ):
         if content.get("deleted"):
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="device_lists_remote_cache",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -1026,7 +1028,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
             txn.call_after(self.device_id_exists_cache.invalidate, (user_id, device_id))
         else:
-            self.db.simple_upsert_txn(
+            self.db_pool.simple_upsert_txn(
                 txn,
                 table="device_lists_remote_cache",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -1042,7 +1044,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             self.get_device_list_last_stream_id_for_remote.invalidate, (user_id,)
         )
 
-        self.db.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="device_lists_remote_extremeties",
             keyvalues={"user_id": user_id},
@@ -1066,7 +1068,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         Returns:
             Deferred[None]
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "update_remote_device_list_cache",
             self._update_remote_device_list_cache_txn,
             user_id,
@@ -1075,11 +1077,11 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         )
 
     def _update_remote_device_list_cache_txn(self, txn, user_id, devices, stream_id):
-        self.db.simple_delete_txn(
+        self.db_pool.simple_delete_txn(
             txn, table="device_lists_remote_cache", keyvalues={"user_id": user_id}
         )
 
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_remote_cache",
             values=[
@@ -1098,7 +1100,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             self.get_device_list_last_stream_id_for_remote.invalidate, (user_id,)
         )
 
-        self.db.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="device_lists_remote_extremeties",
             keyvalues={"user_id": user_id},
@@ -1111,7 +1113,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         # If we're replacing the remote user's device list cache presumably
         # we've done a full resync, so we remove the entry that says we need
         # to resync
-        self.db.simple_delete_txn(
+        self.db_pool.simple_delete_txn(
             txn, table="device_lists_remote_resync", keyvalues={"user_id": user_id},
         )
 
@@ -1124,7 +1126,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             return
 
         with self._device_list_id_gen.get_next_mult(len(device_ids)) as stream_ids:
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "add_device_change_to_stream",
                 self._add_device_change_to_stream_txn,
                 user_id,
@@ -1139,7 +1141,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         with self._device_list_id_gen.get_next_mult(
             len(hosts) * len(device_ids)
         ) as stream_ids:
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "add_device_outbound_poke_to_stream",
                 self._add_device_outbound_poke_to_stream_txn,
                 user_id,
@@ -1174,7 +1176,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             [(user_id, device_id, min_stream_id) for device_id in device_ids],
         )
 
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_stream",
             values=[
@@ -1196,7 +1198,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         now = self._clock.time_msec()
         next_stream_id = iter(stream_ids)
 
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="device_lists_outbound_pokes",
             values=[
@@ -1303,7 +1305,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         return run_as_background_process(
             "prune_old_outbound_device_pokes",
-            self.db.runInteraction,
+            self.db_pool.runInteraction,
             "_prune_old_outbound_device_pokes",
             _prune_txn,
         )

@@ -62,7 +62,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             count = 0
 
             while next_group:
-                next_group = self.db.simple_select_one_onecol_txn(
+                next_group = self.db_pool.simple_select_one_onecol_txn(
                     txn,
                     table="state_group_edges",
                     keyvalues={"state_group": next_group},
@@ -165,7 +165,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     ):
                         break
 
-                    next_group = self.db.simple_select_one_onecol_txn(
+                    next_group = self.db_pool.simple_select_one_onecol_txn(
                         txn,
                         table="state_group_edges",
                         keyvalues={"state_group": next_group},
@@ -184,14 +184,14 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(StateBackgroundUpdateStore, self).__init__(database, db_conn, hs)
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME,
             self._background_deduplicate_state,
         )
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.STATE_GROUP_INDEX_UPDATE_NAME, self._background_index_state
         )
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             self.STATE_GROUPS_ROOM_INDEX_UPDATE_NAME,
             index_name="state_groups_room_id_idx",
             table="state_groups",
@@ -212,7 +212,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
         batch_size = max(1, int(batch_size / BATCH_SIZE_SCALE_FACTOR))
 
         if max_group is None:
-            rows = yield self.db.execute(
+            rows = yield self.db_pool.execute(
                 "_background_deduplicate_state",
                 None,
                 "SELECT coalesce(max(id), 0) FROM state_groups",
@@ -282,13 +282,13 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                             if prev_state.get(key, None) != value
                         }
 
-                        self.db.simple_delete_txn(
+                        self.db_pool.simple_delete_txn(
                             txn,
                             table="state_group_edges",
                             keyvalues={"state_group": state_group},
                         )
 
-                        self.db.simple_insert_txn(
+                        self.db_pool.simple_insert_txn(
                             txn,
                             table="state_group_edges",
                             values={
@@ -297,13 +297,13 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                             },
                         )
 
-                        self.db.simple_delete_txn(
+                        self.db_pool.simple_delete_txn(
                             txn,
                             table="state_groups_state",
                             keyvalues={"state_group": state_group},
                         )
 
-                        self.db.simple_insert_many_txn(
+                        self.db_pool.simple_insert_many_txn(
                             txn,
                             table="state_groups_state",
                             values=[
@@ -324,18 +324,18 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                 "max_group": max_group,
             }
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, progress
             )
 
             return False, batch_size
 
-        finished, result = yield self.db.runInteraction(
+        finished, result = yield self.db_pool.runInteraction(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, reindex_txn
         )
 
         if finished:
-            yield self.db.updates._end_background_update(
+            yield self.db_pool.updates._end_background_update(
                 self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME
             )
 
@@ -365,8 +365,10 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                 )
                 txn.execute("DROP INDEX IF EXISTS state_groups_state_id")
 
-        yield self.db.runWithConnection(reindex_txn)
+        yield self.db_pool.runWithConnection(reindex_txn)
 
-        yield self.db.updates._end_background_update(self.STATE_GROUP_INDEX_UPDATE_NAME)
+        yield self.db_pool.updates._end_background_update(
+            self.STATE_GROUP_INDEX_UPDATE_NAME
+        )
 
         return 1

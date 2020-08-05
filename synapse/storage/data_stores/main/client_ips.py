@@ -34,37 +34,37 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(ClientIpBackgroundUpdateStore, self).__init__(database, db_conn, hs)
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "user_ips_device_index",
             index_name="user_ips_device_id",
             table="user_ips",
             columns=["user_id", "device_id", "last_seen"],
         )
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "user_ips_last_seen_index",
             index_name="user_ips_last_seen",
             table="user_ips",
             columns=["user_id", "last_seen"],
         )
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "user_ips_last_seen_only_index",
             index_name="user_ips_last_seen_only",
             table="user_ips",
             columns=["last_seen"],
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "user_ips_analyze", self._analyze_user_ip
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "user_ips_remove_dupes", self._remove_user_ip_dupes
         )
 
         # Register a unique index
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "user_ips_device_unique_index",
             index_name="user_ips_user_token_ip_unique_index",
             table="user_ips",
@@ -73,12 +73,12 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
         )
 
         # Drop the old non-unique index
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "user_ips_drop_nonunique_index", self._remove_user_ip_nonunique
         )
 
         # Update the last seen info in devices.
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "devices_last_seen", self._devices_last_seen_update
         )
 
@@ -89,8 +89,10 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
             txn.execute("DROP INDEX IF EXISTS user_ips_user_ip")
             txn.close()
 
-        yield self.db.runWithConnection(f)
-        yield self.db.updates._end_background_update("user_ips_drop_nonunique_index")
+        yield self.db_pool.runWithConnection(f)
+        yield self.db_pool.updates._end_background_update(
+            "user_ips_drop_nonunique_index"
+        )
         return 1
 
     @defer.inlineCallbacks
@@ -104,9 +106,9 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
         def user_ips_analyze(txn):
             txn.execute("ANALYZE user_ips")
 
-        yield self.db.runInteraction("user_ips_analyze", user_ips_analyze)
+        yield self.db_pool.runInteraction("user_ips_analyze", user_ips_analyze)
 
-        yield self.db.updates._end_background_update("user_ips_analyze")
+        yield self.db_pool.updates._end_background_update("user_ips_analyze")
 
         return 1
 
@@ -138,7 +140,7 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
                 return None
 
         # Get a last seen that has roughly `batch_size` since `begin_last_seen`
-        end_last_seen = yield self.db.runInteraction(
+        end_last_seen = yield self.db_pool.runInteraction(
             "user_ips_dups_get_last_seen", get_last_seen
         )
 
@@ -269,14 +271,14 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
                     (user_id, access_token, ip, device_id, user_agent, last_seen),
                 )
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, "user_ips_remove_dupes", {"last_seen": end_last_seen}
             )
 
-        yield self.db.runInteraction("user_ips_dups_remove", remove)
+        yield self.db_pool.runInteraction("user_ips_dups_remove", remove)
 
         if last:
-            yield self.db.updates._end_background_update("user_ips_remove_dupes")
+            yield self.db_pool.updates._end_background_update("user_ips_remove_dupes")
 
         return batch_size
 
@@ -336,7 +338,7 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
             txn.execute_batch(sql, rows)
 
             _, _, _, user_id, device_id = rows[-1]
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn,
                 "devices_last_seen",
                 {"last_user_id": user_id, "last_device_id": device_id},
@@ -344,12 +346,12 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
 
             return len(rows)
 
-        updated = yield self.db.runInteraction(
+        updated = yield self.db_pool.runInteraction(
             "_devices_last_seen_update", _devices_last_seen_update_txn
         )
 
         if not updated:
-            yield self.db.updates._end_background_update("devices_last_seen")
+            yield self.db_pool.updates._end_background_update("devices_last_seen")
 
         return updated
 
@@ -403,18 +405,18 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
     def _update_client_ips_batch(self):
 
         # If the DB pool has already terminated, don't try updating
-        if not self.db.is_running():
+        if not self.db_pool.is_running():
             return
 
         to_update = self._batch_row_update
         self._batch_row_update = {}
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
         )
 
     def _update_client_ips_batch_txn(self, txn, to_update):
-        if "user_ips" in self.db._unsafe_to_upsert_tables or (
+        if "user_ips" in self.db_pool._unsafe_to_upsert_tables or (
             not self.database_engine.can_native_upsert
         ):
             self.database_engine.lock_table(txn, "user_ips")
@@ -423,7 +425,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
 
             try:
-                self.db.simple_upsert_txn(
+                self.db_pool.simple_upsert_txn(
                     txn,
                     table="user_ips",
                     keyvalues={
@@ -445,7 +447,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                     # this is always an update rather than an upsert: the row should
                     # already exist, and if it doesn't, that may be because it has been
                     # deleted, and we don't want to re-create it.
-                    self.db.simple_update_txn(
+                    self.db_pool.simple_update_txn(
                         txn,
                         table="devices",
                         keyvalues={"user_id": user_id, "device_id": device_id},
@@ -477,7 +479,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         if device_id is not None:
             keyvalues["device_id"] = device_id
 
-        res = yield self.db.simple_select_list(
+        res = yield self.db_pool.simple_select_list(
             table="devices",
             keyvalues=keyvalues,
             retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
@@ -510,7 +512,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
                 user_agent, _, last_seen = self._batch_row_update[key]
                 results[(access_token, ip)] = (user_agent, last_seen)
 
-        rows = yield self.db.simple_select_list(
+        rows = yield self.db_pool.simple_select_list(
             table="user_ips",
             keyvalues={"user_id": user_id},
             retcols=["access_token", "ip", "user_agent", "last_seen"],
@@ -540,7 +542,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
             # Nothing to do
             return
 
-        if not await self.db.updates.has_completed_background_update(
+        if not await self.db_pool.updates.has_completed_background_update(
             "devices_last_seen"
         ):
             # Only start pruning if we have finished populating the devices
@@ -573,4 +575,6 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         def _prune_old_user_ips_txn(txn):
             txn.execute(sql, (timestamp,))
 
-        await self.db.runInteraction("_prune_old_user_ips", _prune_old_user_ips_txn)
+        await self.db_pool.runInteraction(
+            "_prune_old_user_ips", _prune_old_user_ips_txn
+        )

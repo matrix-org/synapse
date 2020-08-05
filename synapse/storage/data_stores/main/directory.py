@@ -37,7 +37,7 @@ class DirectoryWorkerStore(SQLBaseStore):
             Deferred: results in namedtuple with keys "room_id" and
             "servers" or None if no association can be found
         """
-        room_id = yield self.db.simple_select_one_onecol(
+        room_id = yield self.db_pool.simple_select_one_onecol(
             "room_aliases",
             {"room_alias": room_alias.to_string()},
             "room_id",
@@ -48,7 +48,7 @@ class DirectoryWorkerStore(SQLBaseStore):
         if not room_id:
             return None
 
-        servers = yield self.db.simple_select_onecol(
+        servers = yield self.db_pool.simple_select_onecol(
             "room_alias_servers",
             {"room_alias": room_alias.to_string()},
             "server",
@@ -61,7 +61,7 @@ class DirectoryWorkerStore(SQLBaseStore):
         return RoomAliasMapping(room_id, room_alias.to_string(), servers)
 
     def get_room_alias_creator(self, room_alias):
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="room_aliases",
             keyvalues={"room_alias": room_alias},
             retcol="creator",
@@ -70,7 +70,7 @@ class DirectoryWorkerStore(SQLBaseStore):
 
     @cached(max_entries=5000)
     def get_aliases_for_room(self, room_id):
-        return self.db.simple_select_onecol(
+        return self.db_pool.simple_select_onecol(
             "room_aliases",
             {"room_id": room_id},
             "room_alias",
@@ -94,7 +94,7 @@ class DirectoryStore(DirectoryWorkerStore):
         """
 
         def alias_txn(txn):
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 "room_aliases",
                 {
@@ -104,7 +104,7 @@ class DirectoryStore(DirectoryWorkerStore):
                 },
             )
 
-            self.db.simple_insert_many_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn,
                 table="room_alias_servers",
                 values=[
@@ -118,7 +118,7 @@ class DirectoryStore(DirectoryWorkerStore):
             )
 
         try:
-            ret = yield self.db.runInteraction(
+            ret = yield self.db_pool.runInteraction(
                 "create_room_alias_association", alias_txn
             )
         except self.database_engine.module.IntegrityError:
@@ -129,7 +129,7 @@ class DirectoryStore(DirectoryWorkerStore):
 
     @defer.inlineCallbacks
     def delete_room_alias(self, room_alias):
-        room_id = yield self.db.runInteraction(
+        room_id = yield self.db_pool.runInteraction(
             "delete_room_alias", self._delete_room_alias_txn, room_alias
         )
 
@@ -190,6 +190,6 @@ class DirectoryStore(DirectoryWorkerStore):
                 txn, self.get_aliases_for_room, (new_room_id,)
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "_update_aliases_for_room_txn", _update_aliases_for_room_txn
         )

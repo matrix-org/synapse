@@ -66,7 +66,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             )
             return txn.fetchall()
 
-        res = await self.db.runInteraction("read_forward_extremities", fetch)
+        res = await self.db_pool.runInteraction("read_forward_extremities", fetch)
         self._current_forward_extremities_amount = Counter([x[0] for x in res])
 
     @defer.inlineCallbacks
@@ -88,7 +88,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.db.runInteraction("count_messages", _count_messages)
+        ret = yield self.db_pool.runInteraction("count_messages", _count_messages)
         return ret
 
     @defer.inlineCallbacks
@@ -109,7 +109,9 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.db.runInteraction("count_daily_sent_messages", _count_messages)
+        ret = yield self.db_pool.runInteraction(
+            "count_daily_sent_messages", _count_messages
+        )
         return ret
 
     @defer.inlineCallbacks
@@ -124,5 +126,5 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.db.runInteraction("count_daily_active_rooms", _count)
+        ret = yield self.db_pool.runInteraction("count_daily_active_rooms", _count)
         return ret

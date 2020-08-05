@@ -64,7 +64,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     @cached(num_args=2)
     def get_receipts_for_room(self, room_id, receipt_type):
-        return self.db.simple_select_list(
+        return self.db_pool.simple_select_list(
             table="receipts_linearized",
             keyvalues={"room_id": room_id, "receipt_type": receipt_type},
             retcols=("user_id", "event_id"),
@@ -73,7 +73,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     @cached(num_args=3)
     def get_last_receipt_event_id_for_user(self, user_id, room_id, receipt_type):
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="receipts_linearized",
             keyvalues={
                 "room_id": room_id,
@@ -87,7 +87,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=2)
     def get_receipts_for_user(self, user_id, receipt_type):
-        rows = yield self.db.simple_select_list(
+        rows = yield self.db_pool.simple_select_list(
             table="receipts_linearized",
             keyvalues={"user_id": user_id, "receipt_type": receipt_type},
             retcols=("room_id", "event_id"),
@@ -111,7 +111,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
             txn.execute(sql, (user_id,))
             return txn.fetchall()
 
-        rows = yield self.db.runInteraction("get_receipts_for_user_with_orderings", f)
+        rows = yield self.db_pool.runInteraction(
+            "get_receipts_for_user_with_orderings", f
+        )
         return {
             row[0]: {
                 "event_id": row[1],
@@ -190,11 +192,11 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
                 txn.execute(sql, (room_id, to_key))
 
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
 
             return rows
 
-        rows = yield self.db.runInteraction("get_linearized_receipts_for_room", f)
+        rows = yield self.db_pool.runInteraction("get_linearized_receipts_for_room", f)
 
         if not rows:
             return []
@@ -240,9 +242,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
                 txn.execute(sql + clause, [to_key] + list(args))
 
-            return self.db.cursor_to_dict(txn)
+            return self.db_pool.cursor_to_dict(txn)
 
-        txn_results = yield self.db.runInteraction(
+        txn_results = yield self.db_pool.runInteraction(
             "_get_linearized_receipts_for_rooms", f
         )
 
@@ -288,7 +290,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
             return [r[0] for r in txn]
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_users_sent_receipts_between", _get_users_sent_receipts_between_txn
         )
 
@@ -340,7 +342,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
             return updates, upper_bound, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_updated_receipts", get_all_updated_receipts_txn
         )
 
@@ -393,7 +395,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             otherwise, the rx timestamp of the event that the RR corresponds to
                 (or 0 if the event is unknown)
         """
-        res = self.db.simple_select_one_txn(
+        res = self.db_pool.simple_select_one_txn(
             txn,
             table="events",
             retcols=["stream_ordering", "received_ts"],
@@ -446,7 +448,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             (user_id, room_id, receipt_type),
         )
 
-        self.db.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="receipts_linearized",
             keyvalues={
@@ -506,13 +508,13 @@ class ReceiptsStore(ReceiptsWorkerStore):
                 else:
                     raise RuntimeError("Unrecognized event_ids: %r" % (event_ids,))
 
-            linearized_event_id = yield self.db.runInteraction(
+            linearized_event_id = yield self.db_pool.runInteraction(
                 "insert_receipt_conv", graph_to_linear
             )
 
         stream_id_manager = self._receipts_id_gen.get_next()
         with stream_id_manager as stream_id:
-            event_ts = yield self.db.runInteraction(
+            event_ts = yield self.db_pool.runInteraction(
                 "insert_linearized_receipt",
                 self.insert_linearized_receipt_txn,
                 room_id,
@@ -541,7 +543,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
         return stream_id, max_persisted_id
 
     def insert_graph_receipt(self, room_id, receipt_type, user_id, event_ids, data):
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "insert_graph_receipt",
             self.insert_graph_receipt_txn,
             room_id,
@@ -567,7 +569,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             self._get_linearized_receipts_for_room.invalidate_many, (room_id,)
         )
 
-        self.db.simple_delete_txn(
+        self.db_pool.simple_delete_txn(
             txn,
             table="receipts_graph",
             keyvalues={
@@ -576,7 +578,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
                 "user_id": user_id,
             },
         )
-        self.db.simple_insert_txn(
+        self.db_pool.simple_insert_txn(
             txn,
             table="receipts_graph",
             values={

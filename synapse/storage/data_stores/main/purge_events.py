@@ -43,7 +43,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             deleted events.
         """
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "purge_history",
             self._purge_history_txn,
             room_id,
@@ -293,7 +293,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             Deferred[List[int]]: The list of state groups to delete.
         """
 
-        return self.db.runInteraction("purge_room", self._purge_room_txn, room_id)
+        return self.db_pool.runInteraction("purge_room", self._purge_room_txn, room_id)
 
     def _purge_room_txn(self, txn, room_id):
         # First we fetch all the state groups that should be deleted, before

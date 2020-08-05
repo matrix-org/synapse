@@ -86,7 +86,7 @@ class RoomWorkerStore(SQLBaseStore):
         Returns:
             A dict containing the room information, or None if the room is unknown.
         """
-        return self.db.simple_select_one(
+        return self.db_pool.simple_select_one(
             table="rooms",
             keyvalues={"room_id": room_id},
             retcols=("room_id", "is_public", "creator"),
@@ -118,7 +118,7 @@ class RoomWorkerStore(SQLBaseStore):
             txn.execute(sql, [room_id])
             # Catch error if sql returns empty result to return "None" instead of an error
             try:
-                res = self.db.cursor_to_dict(txn)[0]
+                res = self.db_pool.cursor_to_dict(txn)[0]
             except IndexError:
                 return None
 
@@ -126,12 +126,12 @@ class RoomWorkerStore(SQLBaseStore):
             res["public"] = bool(res["public"])
             return res
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_room_with_stats", get_room_with_stats_txn, room_id
         )
 
     def get_public_room_ids(self):
-        return self.db.simple_select_onecol(
+        return self.db_pool.simple_select_onecol(
             table="rooms",
             keyvalues={"is_public": True},
             retcol="room_id",
@@ -188,7 +188,9 @@ class RoomWorkerStore(SQLBaseStore):
             txn.execute(sql, query_args)
             return txn.fetchone()[0]
 
-        return self.db.runInteraction("count_public_rooms", _count_public_rooms_txn)
+        return self.db_pool.runInteraction(
+            "count_public_rooms", _count_public_rooms_txn
+        )
 
     async def get_largest_public_rooms(
         self,
@@ -320,21 +322,21 @@ class RoomWorkerStore(SQLBaseStore):
         def _get_largest_public_rooms_txn(txn):
             txn.execute(sql, query_args)
 
-            results = self.db.cursor_to_dict(txn)
+            results = self.db_pool.cursor_to_dict(txn)
 
             if not forwards:
                 results.reverse()
 
             return results
 
-        ret_val = await self.db.runInteraction(
+        ret_val = await self.db_pool.runInteraction(
             "get_largest_public_rooms", _get_largest_public_rooms_txn
         )
         return ret_val
 
     @cached(max_entries=10000)
     def is_room_blocked(self, room_id):
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
             retcol="1",
@@ -502,7 +504,7 @@ class RoomWorkerStore(SQLBaseStore):
             room_count = txn.fetchone()
             return rooms, room_count[0]
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_rooms_paginate", _get_rooms_paginate_txn,
         )
 
@@ -519,7 +521,7 @@ class RoomWorkerStore(SQLBaseStore):
             of RatelimitOverride are None or 0 then ratelimitng has been
             disabled for that user entirely.
         """
-        row = await self.db.simple_select_one(
+        row = await self.db_pool.simple_select_one(
             table="ratelimit_override",
             keyvalues={"user_id": user_id},
             retcols=("messages_per_second", "burst_count"),
@@ -561,9 +563,9 @@ class RoomWorkerStore(SQLBaseStore):
                 (room_id,),
             )
 
-            return self.db.cursor_to_dict(txn)
+            return self.db_pool.cursor_to_dict(txn)
 
-        ret = await self.db.runInteraction(
+        ret = await self.db_pool.runInteraction(
             "get_retention_policy_for_room", get_retention_policy_for_room_txn,
         )
 
@@ -613,7 +615,7 @@ class RoomWorkerStore(SQLBaseStore):
 
             return local_media_mxcs, remote_media_mxcs
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_media_ids_in_room", _get_media_mxcs_in_room_txn
         )
 
@@ -630,7 +632,7 @@ class RoomWorkerStore(SQLBaseStore):
                 txn, local_mxcs, remote_mxcs, quarantined_by
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "quarantine_media_in_room", _quarantine_media_in_room_txn
         )
 
@@ -714,7 +716,7 @@ class RoomWorkerStore(SQLBaseStore):
                 txn, local_mxcs, remote_mxcs, quarantined_by
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "quarantine_media_by_user", _quarantine_media_by_id_txn
         )
 
@@ -730,7 +732,7 @@ class RoomWorkerStore(SQLBaseStore):
             local_media_ids = self._get_media_ids_by_user_txn(txn, user_id)
             return self._quarantine_media_txn(txn, local_media_ids, [], quarantined_by)
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "quarantine_media_by_user", _quarantine_media_by_user_txn
         )
 
@@ -848,7 +850,7 @@ class RoomWorkerStore(SQLBaseStore):
 
             return updates, upto_token, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_new_public_rooms", get_all_new_public_rooms
         )
 
@@ -862,16 +864,16 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
         self.config = hs.config
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "insert_room_retention", self._background_insert_retention,
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE,
             self._remove_tombstoned_rooms_from_directory,
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.ADD_ROOMS_ROOM_VERSION_COLUMN,
             self._background_add_rooms_room_version_column,
         )
@@ -900,7 +902,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 (last_room, batch_size),
             )
 
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
 
             if not rows:
                 return True
@@ -912,7 +914,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                     ev = db_to_json(row["json"])
                     retention_policy = ev["content"]
 
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn=txn,
                     table="room_retention",
                     values={
@@ -925,7 +927,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
             logger.info("Inserted %d rows into room_retention", len(rows))
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, "insert_room_retention", {"room_id": rows[-1]["room_id"]}
             )
 
@@ -934,12 +936,12 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             else:
                 return False
 
-        end = await self.db.runInteraction(
+        end = await self.db_pool.runInteraction(
             "insert_room_retention", _background_insert_retention_txn,
         )
 
         if end:
-            await self.db.updates._end_background_update("insert_room_retention")
+            await self.db_pool.updates._end_background_update("insert_room_retention")
 
         return batch_size
 
@@ -983,7 +985,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 # mainly for paranoia as much badness would happen if we don't
                 # insert the row and then try and get the room version for the
                 # room.
-                self.db.simple_upsert_txn(
+                self.db_pool.simple_upsert_txn(
                     txn,
                     table="rooms",
                     keyvalues={"room_id": room_id},
@@ -992,19 +994,19 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 )
                 new_last_room_id = room_id
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, self.ADD_ROOMS_ROOM_VERSION_COLUMN, {"room_id": new_last_room_id}
             )
 
             return False
 
-        end = await self.db.runInteraction(
+        end = await self.db_pool.runInteraction(
             "_background_add_rooms_room_version_column",
             _background_add_rooms_room_version_column_txn,
         )
 
         if end:
-            await self.db.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 self.ADD_ROOMS_ROOM_VERSION_COLUMN
             )
 
@@ -1038,12 +1040,12 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
             return [row[0] for row in txn]
 
-        rooms = await self.db.runInteraction(
+        rooms = await self.db_pool.runInteraction(
             "get_tombstoned_directory_rooms", _get_rooms
         )
 
         if not rooms:
-            await self.db.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE
             )
             return 0
@@ -1052,7 +1054,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             logger.info("Removing tombstoned room %s from the directory", room_id)
             await self.set_room_is_public(room_id, False)
 
-        await self.db.updates._background_update_progress(
+        await self.db_pool.updates._background_update_progress(
             self.REMOVE_TOMESTONED_ROOMS_BG_UPDATE, {"room_id": rooms[-1]}
         )
 
@@ -1079,7 +1081,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         Called when we join a room over federation, and overwrites any room version
         currently in the table.
         """
-        await self.db.simple_upsert(
+        await self.db_pool.simple_upsert(
             desc="upsert_room_on_join",
             table="rooms",
             keyvalues={"room_id": room_id},
@@ -1111,7 +1113,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         try:
 
             def store_room_txn(txn, next_id):
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn,
                     "rooms",
                     {
@@ -1122,7 +1124,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
                 if is_public:
-                    self.db.simple_insert_txn(
+                    self.db_pool.simple_insert_txn(
                         txn,
                         table="public_room_list_stream",
                         values={
@@ -1133,7 +1135,9 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     )
 
             with self._public_room_id_gen.get_next() as next_id:
-                await self.db.runInteraction("store_room_txn", store_room_txn, next_id)
+                await self.db_pool.runInteraction(
+                    "store_room_txn", store_room_txn, next_id
+                )
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
@@ -1143,7 +1147,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         When we receive an invite over federation, store the version of the room if we
         don't already know the room version.
         """
-        await self.db.simple_upsert(
+        await self.db_pool.simple_upsert(
             desc="maybe_store_room_on_invite",
             table="rooms",
             keyvalues={"room_id": room_id},
@@ -1160,14 +1164,14 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
     async def set_room_is_public(self, room_id, is_public):
         def set_room_is_public_txn(txn, next_id):
-            self.db.simple_update_one_txn(
+            self.db_pool.simple_update_one_txn(
                 txn,
                 table="rooms",
                 keyvalues={"room_id": room_id},
                 updatevalues={"is_public": is_public},
             )
 
-            entries = self.db.simple_select_list_txn(
+            entries = self.db_pool.simple_select_list_txn(
                 txn,
                 table="public_room_list_stream",
                 keyvalues={
@@ -1185,7 +1189,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 add_to_stream = bool(entries[-1]["visibility"]) != is_public
 
             if add_to_stream:
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn,
                     table="public_room_list_stream",
                     values={
@@ -1198,7 +1202,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 )
 
         with self._public_room_id_gen.get_next() as next_id:
-            await self.db.runInteraction(
+            await self.db_pool.runInteraction(
                 "set_room_is_public", set_room_is_public_txn, next_id
             )
         self.hs.get_notifier().on_new_replication_data()
@@ -1224,7 +1228,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         def set_room_is_public_appservice_txn(txn, next_id):
             if is_public:
                 try:
-                    self.db.simple_insert_txn(
+                    self.db_pool.simple_insert_txn(
                         txn,
                         table="appservice_room_list",
                         values={
@@ -1237,7 +1241,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     # We've already inserted, nothing to do.
                     return
             else:
-                self.db.simple_delete_txn(
+                self.db_pool.simple_delete_txn(
                     txn,
                     table="appservice_room_list",
                     keyvalues={
@@ -1247,7 +1251,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
 
-            entries = self.db.simple_select_list_txn(
+            entries = self.db_pool.simple_select_list_txn(
                 txn,
                 table="public_room_list_stream",
                 keyvalues={
@@ -1265,7 +1269,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 add_to_stream = bool(entries[-1]["visibility"]) != is_public
 
             if add_to_stream:
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn,
                     table="public_room_list_stream",
                     values={
@@ -1278,7 +1282,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 )
 
         with self._public_room_id_gen.get_next() as next_id:
-            await self.db.runInteraction(
+            await self.db_pool.runInteraction(
                 "set_room_is_public_appservice",
                 set_room_is_public_appservice_txn,
                 next_id,
@@ -1295,13 +1299,13 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             row = txn.fetchone()
             return row[0] or 0
 
-        return self.db.runInteraction("get_rooms", f)
+        return self.db_pool.runInteraction("get_rooms", f)
 
     def add_event_report(
         self, room_id, event_id, user_id, reason, content, received_ts
     ):
         next_id = self._event_reports_id_gen.get_next()
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             table="event_reports",
             values={
                 "id": next_id,
@@ -1325,14 +1329,14 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             room_id: Room to block
             user_id: Who blocked it
         """
-        await self.db.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
             values={},
             insertion_values={"user_id": user_id},
             desc="block_room",
         )
-        await self.db.runInteraction(
+        await self.db_pool.runInteraction(
             "block_room_invalidation",
             self._invalidate_cache_and_stream,
             self.is_room_blocked,
@@ -1388,7 +1392,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
             txn.execute(sql, args)
 
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
             rooms_dict = {}
 
             for row in rows:
@@ -1404,7 +1408,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
                 txn.execute(sql)
 
-                rows = self.db.cursor_to_dict(txn)
+                rows = self.db_pool.cursor_to_dict(txn)
 
                 # If a room isn't already in the dict (i.e. it doesn't have a retention
                 # policy in its state), add it with a null policy.
@@ -1417,7 +1421,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
             return rooms_dict
 
-        rooms = await self.db.runInteraction(
+        rooms = await self.db_pool.runInteraction(
             "get_rooms_for_retention_period_in_range",
             get_rooms_for_retention_period_in_range_txn,
         )

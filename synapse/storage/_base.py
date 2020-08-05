@@ -41,7 +41,7 @@ class SQLBaseStore(metaclass=ABCMeta):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
-        self.db = database
+        self.db_pool = database
         self.rand = random.SystemRandom()
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):

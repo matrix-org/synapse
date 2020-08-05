@@ -265,7 +265,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         self._need_to_reset_federation_stream_positions = self._send_federation
 
         events_max = self.get_room_max_stream_ordering()
-        event_cache_prefill, min_event_val = self.db.get_cache_dict(
+        event_cache_prefill, min_event_val = self.db_pool.get_cache_dict(
             db_conn,
             "events",
             entity_column="room_id",
@@ -410,7 +410,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             rows = [_EventDictReturn(row[0], None, row[1]) for row in txn]
             return rows
 
-        rows = yield self.db.runInteraction("get_room_events_stream_for_room", f)
+        rows = yield self.db_pool.runInteraction("get_room_events_stream_for_room", f)
 
         ret = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
@@ -460,7 +460,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return rows
 
-        rows = yield self.db.runInteraction("get_membership_changes_for_user", f)
+        rows = yield self.db_pool.runInteraction("get_membership_changes_for_user", f)
 
         ret = yield self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
@@ -519,7 +519,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         end_token = RoomStreamToken.parse(end_token)
 
-        rows, token = yield self.db.runInteraction(
+        rows, token = yield self.db_pool.runInteraction(
             "get_recent_event_ids_for_room",
             self._paginate_room_events_txn,
             room_id,
@@ -556,7 +556,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             txn.execute(sql, (room_id, stream_ordering))
             return txn.fetchone()
 
-        return self.db.runInteraction("get_room_event_before_stream_ordering", _f)
+        return self.db_pool.runInteraction("get_room_event_before_stream_ordering", _f)
 
     async def get_room_events_max_id(self, room_id: Optional[str] = None) -> str:
         """Returns the current token for rooms stream.
@@ -569,7 +569,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if room_id is None:
             return "s%d" % (token,)
         else:
-            topo = await self.db.runInteraction(
+            topo = await self.db_pool.runInteraction(
                 "_get_max_topological_txn", self._get_max_topological_txn, room_id
             )
             return "t%d-%d" % (topo, token)
@@ -583,7 +583,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             A deferred "s%d" stream token.
         """
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="events", keyvalues={"event_id": event_id}, retcol="stream_ordering"
         ).addCallback(lambda row: "s%d" % (row,))
 
@@ -596,7 +596,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             A deferred "t%d-%d" topological token.
         """
-        return self.db.simple_select_one(
+        return self.db_pool.simple_select_one(
             table="events",
             keyvalues={"event_id": event_id},
             retcols=("stream_ordering", "topological_ordering"),
@@ -620,7 +620,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "SELECT coalesce(max(topological_ordering), 0) FROM events"
             " WHERE room_id = ? AND stream_ordering < ?"
         )
-        return self.db.execute(
+        return self.db_pool.execute(
             "get_max_topological_token", None, sql, room_id, stream_key
         ).addCallback(lambda r: r[0][0] if r else 0)
 
@@ -674,7 +674,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             dict
         """
 
-        results = yield self.db.runInteraction(
+        results = yield self.db_pool.runInteraction(
             "get_events_around",
             self._get_events_around_txn,
             room_id,
@@ -716,7 +716,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             dict
         """
 
-        results = self.db.simple_select_one_txn(
+        results = self.db_pool.simple_select_one_txn(
             txn,
             "events",
             keyvalues={"event_id": event_id, "room_id": room_id},
@@ -795,7 +795,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return upper_bound, [row[1] for row in rows]
 
-        upper_bound, event_ids = yield self.db.runInteraction(
+        upper_bound, event_ids = yield self.db_pool.runInteraction(
             "get_all_new_events_stream", get_all_new_events_stream_txn
         )
 
@@ -805,12 +805,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     async def get_federation_out_pos(self, typ: str) -> int:
         if self._need_to_reset_federation_stream_positions:
-            await self.db.runInteraction(
+            await self.db_pool.runInteraction(
                 "_reset_federation_positions_txn", self._reset_federation_positions_txn
             )
             self._need_to_reset_federation_stream_positions = False
 
-        return await self.db.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="federation_stream_position",
             retcol="stream_id",
             keyvalues={"type": typ, "instance_name": self._instance_name},
@@ -819,12 +819,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     async def update_federation_out_pos(self, typ, stream_id):
         if self._need_to_reset_federation_stream_positions:
-            await self.db.runInteraction(
+            await self.db_pool.runInteraction(
                 "_reset_federation_positions_txn", self._reset_federation_positions_txn
             )
             self._need_to_reset_federation_stream_positions = False
 
-        return await self.db.simple_update_one(
+        return await self.db_pool.simple_update_one(
             table="federation_stream_position",
             keyvalues={"type": typ, "instance_name": self._instance_name},
             updatevalues={"stream_id": stream_id},
@@ -854,7 +854,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         elif self._instance_name not in configured_instances:
             return
 
-        instances_in_table = self.db.simple_select_onecol_txn(
+        instances_in_table = self.db_pool.simple_select_onecol_txn(
             txn,
             table="federation_stream_position",
             keyvalues={},
@@ -885,7 +885,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         txn.execute(sql % (clause,), args)
 
         for typ, stream_id in min_positions.items():
-            self.db.simple_upsert_txn(
+            self.db_pool.simple_upsert_txn(
                 txn,
                 table="federation_stream_position",
                 keyvalues={"type": typ, "instance_name": self._instance_name},
@@ -1036,7 +1036,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if to_key:
             to_key = RoomStreamToken.parse(to_key)
 
-        rows, token = yield self.db.runInteraction(
+        rows, token = yield self.db_pool.runInteraction(
             "paginate_room_events",
             self._paginate_room_events_txn,
             room_id,

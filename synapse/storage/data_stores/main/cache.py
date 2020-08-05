@@ -92,7 +92,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
 
             return updates, upto_token, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_updated_caches", get_all_updated_caches_txn
         )
 
@@ -203,7 +203,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             return
 
         cache_func.invalidate(keys)
-        await self.db.runInteraction(
+        await self.db_pool.runInteraction(
             "invalidate_cache_and_stream",
             self._send_invalidation_to_replication,
             cache_func.__name__,
@@ -288,7 +288,7 @@ class CacheInvalidationWorkerStore(SQLBaseStore):
             if keys is not None:
                 keys = list(keys)
 
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="cache_invalidation_stream_by_instance",
                 values={

@@ -31,7 +31,7 @@ _DEFAULT_ROLE_ID = ""
 
 class GroupServerWorkerStore(SQLBaseStore):
     def get_group(self, group_id):
-        return self.db.simple_select_one(
+        return self.db_pool.simple_select_one(
             table="groups",
             keyvalues={"group_id": group_id},
             retcols=(
@@ -53,7 +53,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         if not include_private:
             keyvalues["is_public"] = True
 
-        return self.db.simple_select_list(
+        return self.db_pool.simple_select_list(
             table="group_users",
             keyvalues=keyvalues,
             retcols=("user_id", "is_public", "is_admin"),
@@ -63,7 +63,7 @@ class GroupServerWorkerStore(SQLBaseStore):
     def get_invited_users_in_group(self, group_id):
         # TODO: Pagination
 
-        return self.db.simple_select_onecol(
+        return self.db_pool.simple_select_onecol(
             table="group_invites",
             keyvalues={"group_id": group_id},
             retcol="user_id",
@@ -117,7 +117,9 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for room_id, is_public in txn
             ]
 
-        return self.db.runInteraction("get_rooms_in_group", _get_rooms_in_group_txn)
+        return self.db_pool.runInteraction(
+            "get_rooms_in_group", _get_rooms_in_group_txn
+        )
 
     def get_rooms_for_summary_by_category(
         self, group_id: str, include_private: bool = False,
@@ -205,13 +207,13 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return rooms, categories
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_rooms_for_summary", _get_rooms_for_summary_txn
         )
 
     @defer.inlineCallbacks
     def get_group_categories(self, group_id):
-        rows = yield self.db.simple_select_list(
+        rows = yield self.db_pool.simple_select_list(
             table="group_room_categories",
             keyvalues={"group_id": group_id},
             retcols=("category_id", "is_public", "profile"),
@@ -228,7 +230,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_group_category(self, group_id, category_id):
-        category = yield self.db.simple_select_one(
+        category = yield self.db_pool.simple_select_one(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             retcols=("is_public", "profile"),
@@ -241,7 +243,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_group_roles(self, group_id):
-        rows = yield self.db.simple_select_list(
+        rows = yield self.db_pool.simple_select_list(
             table="group_roles",
             keyvalues={"group_id": group_id},
             retcols=("role_id", "is_public", "profile"),
@@ -258,7 +260,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_group_role(self, group_id, role_id):
-        role = yield self.db.simple_select_one(
+        role = yield self.db_pool.simple_select_one(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             retcols=("is_public", "profile"),
@@ -277,7 +279,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             Deferred[list[str]]: A twisted.Deferred containing a list of group ids
                 containing this room
         """
-        return self.db.simple_select_onecol(
+        return self.db_pool.simple_select_onecol(
             table="group_rooms",
             keyvalues={"room_id": room_id},
             retcol="group_id",
@@ -341,12 +343,12 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return users, roles
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_users_for_summary_by_role", _get_users_for_summary_txn
         )
 
     def is_user_in_group(self, user_id, group_id):
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="group_users",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcol="user_id",
@@ -355,7 +357,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         ).addCallback(lambda r: bool(r))
 
     def is_user_admin_in_group(self, group_id, user_id):
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="group_users",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcol="is_admin",
@@ -366,7 +368,7 @@ class GroupServerWorkerStore(SQLBaseStore):
     def is_user_invited_to_local_group(self, group_id, user_id):
         """Has the group server invited a user?
         """
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="group_invites",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcol="user_id",
@@ -389,7 +391,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         """
 
         def _get_users_membership_in_group_txn(txn):
-            row = self.db.simple_select_one_txn(
+            row = self.db_pool.simple_select_one_txn(
                 txn,
                 table="group_users",
                 keyvalues={"group_id": group_id, "user_id": user_id},
@@ -404,7 +406,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     "is_privileged": row["is_admin"],
                 }
 
-            row = self.db.simple_select_one_onecol_txn(
+            row = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="group_invites",
                 keyvalues={"group_id": group_id, "user_id": user_id},
@@ -417,14 +419,14 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return {}
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_users_membership_info_in_group", _get_users_membership_in_group_txn
         )
 
     def get_publicised_groups_for_user(self, user_id):
         """Get all groups a user is publicising
         """
-        return self.db.simple_select_onecol(
+        return self.db_pool.simple_select_onecol(
             table="local_group_membership",
             keyvalues={"user_id": user_id, "membership": "join", "is_publicised": True},
             retcol="group_id",
@@ -441,9 +443,9 @@ class GroupServerWorkerStore(SQLBaseStore):
                 WHERE valid_until_ms <= ?
             """
             txn.execute(sql, (valid_until_ms,))
-            return self.db.cursor_to_dict(txn)
+            return self.db_pool.cursor_to_dict(txn)
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_attestations_need_renewals", _get_attestations_need_renewals_txn
         )
 
@@ -452,7 +454,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         """Get the attestation that proves the remote agrees that the user is
         in the group.
         """
-        row = yield self.db.simple_select_one(
+        row = yield self.db_pool.simple_select_one(
             table="group_attestations_remote",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcols=("valid_until_ms", "attestation_json"),
@@ -467,7 +469,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return None
 
     def get_joined_groups(self, user_id):
-        return self.db.simple_select_onecol(
+        return self.db_pool.simple_select_onecol(
             table="local_group_membership",
             keyvalues={"user_id": user_id, "membership": "join"},
             retcol="group_id",
@@ -494,7 +496,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for row in txn
             ]
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_all_groups_for_user", _get_all_groups_for_user_txn
         )
 
@@ -524,7 +526,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for group_id, membership, gtype, content_json in txn
             ]
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_groups_changes_for_user", _get_groups_changes_for_user_txn
         )
 
@@ -579,7 +581,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return updates, upto_token, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_groups_changes", _get_all_groups_changes_txn
         )
 
@@ -592,7 +594,7 @@ class GroupServerStore(GroupServerWorkerStore):
          * "invite"
          * "open"
         """
-        return self.db.simple_update_one(
+        return self.db_pool.simple_update_one(
             table="groups",
             keyvalues={"group_id": group_id},
             updatevalues={"join_policy": join_policy},
@@ -600,7 +602,7 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def add_room_to_summary(self, group_id, room_id, category_id, order, is_public):
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "add_room_to_summary",
             self._add_room_to_summary_txn,
             group_id,
@@ -624,7 +626,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 an order of 1 will put the room first. Otherwise, the room gets
                 added to the end.
         """
-        room_in_group = self.db.simple_select_one_onecol_txn(
+        room_in_group = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="group_rooms",
             keyvalues={"group_id": group_id, "room_id": room_id},
@@ -637,7 +639,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if category_id is None:
             category_id = _DEFAULT_CATEGORY_ID
         else:
-            cat_exists = self.db.simple_select_one_onecol_txn(
+            cat_exists = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="group_room_categories",
                 keyvalues={"group_id": group_id, "category_id": category_id},
@@ -648,7 +650,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 raise SynapseError(400, "Category doesn't exist")
 
             # TODO: Check category is part of summary already
-            cat_exists = self.db.simple_select_one_onecol_txn(
+            cat_exists = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="group_summary_room_categories",
                 keyvalues={"group_id": group_id, "category_id": category_id},
@@ -668,7 +670,7 @@ class GroupServerStore(GroupServerWorkerStore):
                     (group_id, category_id, group_id, category_id),
                 )
 
-        existing = self.db.simple_select_one_txn(
+        existing = self.db_pool.simple_select_one_txn(
             txn,
             table="group_summary_rooms",
             keyvalues={
@@ -701,7 +703,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 to_update["room_order"] = order
             if is_public is not None:
                 to_update["is_public"] = is_public
-            self.db.simple_update_txn(
+            self.db_pool.simple_update_txn(
                 txn,
                 table="group_summary_rooms",
                 keyvalues={
@@ -715,7 +717,7 @@ class GroupServerStore(GroupServerWorkerStore):
             if is_public is None:
                 is_public = True
 
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="group_summary_rooms",
                 values={
@@ -731,7 +733,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if category_id is None:
             category_id = _DEFAULT_CATEGORY_ID
 
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             table="group_summary_rooms",
             keyvalues={
                 "group_id": group_id,
@@ -757,7 +759,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db.simple_upsert(
+        return self.db_pool.simple_upsert(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             values=update_values,
@@ -766,7 +768,7 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def remove_group_category(self, group_id, category_id):
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             desc="remove_group_category",
@@ -788,7 +790,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db.simple_upsert(
+        return self.db_pool.simple_upsert(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             values=update_values,
@@ -797,14 +799,14 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def remove_group_role(self, group_id, role_id):
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             desc="remove_group_role",
         )
 
     def add_user_to_summary(self, group_id, user_id, role_id, order, is_public):
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "add_user_to_summary",
             self._add_user_to_summary_txn,
             group_id,
@@ -828,7 +830,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 an order of 1 will put the user first. Otherwise, the user gets
                 added to the end.
         """
-        user_in_group = self.db.simple_select_one_onecol_txn(
+        user_in_group = self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="group_users",
             keyvalues={"group_id": group_id, "user_id": user_id},
@@ -841,7 +843,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if role_id is None:
             role_id = _DEFAULT_ROLE_ID
         else:
-            role_exists = self.db.simple_select_one_onecol_txn(
+            role_exists = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="group_roles",
                 keyvalues={"group_id": group_id, "role_id": role_id},
@@ -852,7 +854,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 raise SynapseError(400, "Role doesn't exist")
 
             # TODO: Check role is part of the summary already
-            role_exists = self.db.simple_select_one_onecol_txn(
+            role_exists = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="group_summary_roles",
                 keyvalues={"group_id": group_id, "role_id": role_id},
@@ -872,7 +874,7 @@ class GroupServerStore(GroupServerWorkerStore):
                     (group_id, role_id, group_id, role_id),
                 )
 
-        existing = self.db.simple_select_one_txn(
+        existing = self.db_pool.simple_select_one_txn(
             txn,
             table="group_summary_users",
             keyvalues={"group_id": group_id, "user_id": user_id, "role_id": role_id},
@@ -901,7 +903,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 to_update["user_order"] = order
             if is_public is not None:
                 to_update["is_public"] = is_public
-            self.db.simple_update_txn(
+            self.db_pool.simple_update_txn(
                 txn,
                 table="group_summary_users",
                 keyvalues={
@@ -915,7 +917,7 @@ class GroupServerStore(GroupServerWorkerStore):
             if is_public is None:
                 is_public = True
 
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="group_summary_users",
                 values={
@@ -931,7 +933,7 @@ class GroupServerStore(GroupServerWorkerStore):
         if role_id is None:
             role_id = _DEFAULT_ROLE_ID
 
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             table="group_summary_users",
             keyvalues={"group_id": group_id, "role_id": role_id, "user_id": user_id},
             desc="remove_user_from_summary",
@@ -940,7 +942,7 @@ class GroupServerStore(GroupServerWorkerStore):
     def add_group_invite(self, group_id, user_id):
         """Record that the group server has invited a user
         """
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             table="group_invites",
             values={"group_id": group_id, "user_id": user_id},
             desc="add_group_invite",
@@ -970,7 +972,7 @@ class GroupServerStore(GroupServerWorkerStore):
         """
 
         def _add_user_to_group_txn(txn):
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="group_users",
                 values={
@@ -981,14 +983,14 @@ class GroupServerStore(GroupServerWorkerStore):
                 },
             )
 
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_invites",
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
 
             if local_attestation:
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn,
                     table="group_attestations_renewals",
                     values={
@@ -998,7 +1000,7 @@ class GroupServerStore(GroupServerWorkerStore):
                     },
                 )
             if remote_attestation:
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn,
                     table="group_attestations_remote",
                     values={
@@ -1009,49 +1011,49 @@ class GroupServerStore(GroupServerWorkerStore):
                     },
                 )
 
-        return self.db.runInteraction("add_user_to_group", _add_user_to_group_txn)
+        return self.db_pool.runInteraction("add_user_to_group", _add_user_to_group_txn)
 
     def remove_user_from_group(self, group_id, user_id):
         def _remove_user_from_group_txn(txn):
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_users",
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_invites",
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_attestations_renewals",
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_attestations_remote",
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_summary_users",
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "remove_user_from_group", _remove_user_from_group_txn
         )
 
     def add_room_to_group(self, group_id, room_id, is_public):
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             table="group_rooms",
             values={"group_id": group_id, "room_id": room_id, "is_public": is_public},
             desc="add_room_to_group",
         )
 
     def update_room_in_group_visibility(self, group_id, room_id, is_public):
-        return self.db.simple_update(
+        return self.db_pool.simple_update(
             table="group_rooms",
             keyvalues={"group_id": group_id, "room_id": room_id},
             updatevalues={"is_public": is_public},
@@ -1060,26 +1062,26 @@ class GroupServerStore(GroupServerWorkerStore):
 
     def remove_room_from_group(self, group_id, room_id):
         def _remove_room_from_group_txn(txn):
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_rooms",
                 keyvalues={"group_id": group_id, "room_id": room_id},
             )
 
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="group_summary_rooms",
                 keyvalues={"group_id": group_id, "room_id": room_id},
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "remove_room_from_group", _remove_room_from_group_txn
         )
 
     def update_group_publicity(self, group_id, user_id, publicise):
         """Update whether the user is publicising their membership of the group
         """
-        return self.db.simple_update_one(
+        return self.db_pool.simple_update_one(
             table="local_group_membership",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={"is_publicised": publicise},
@@ -1115,12 +1117,12 @@ class GroupServerStore(GroupServerWorkerStore):
 
         def _register_user_group_membership_txn(txn, next_id):
             # TODO: Upsert?
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="local_group_membership",
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="local_group_membership",
                 values={
@@ -1133,7 +1135,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 },
             )
 
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="local_group_updates",
                 values={
@@ -1152,7 +1154,7 @@ class GroupServerStore(GroupServerWorkerStore):
 
             if membership == "join":
                 if local_attestation:
-                    self.db.simple_insert_txn(
+                    self.db_pool.simple_insert_txn(
                         txn,
                         table="group_attestations_renewals",
                         values={
@@ -1162,7 +1164,7 @@ class GroupServerStore(GroupServerWorkerStore):
                         },
                     )
                 if remote_attestation:
-                    self.db.simple_insert_txn(
+                    self.db_pool.simple_insert_txn(
                         txn,
                         table="group_attestations_remote",
                         values={
@@ -1173,12 +1175,12 @@ class GroupServerStore(GroupServerWorkerStore):
                         },
                     )
             else:
-                self.db.simple_delete_txn(
+                self.db_pool.simple_delete_txn(
                     txn,
                     table="group_attestations_renewals",
                     keyvalues={"group_id": group_id, "user_id": user_id},
                 )
-                self.db.simple_delete_txn(
+                self.db_pool.simple_delete_txn(
                     txn,
                     table="group_attestations_remote",
                     keyvalues={"group_id": group_id, "user_id": user_id},
@@ -1187,7 +1189,7 @@ class GroupServerStore(GroupServerWorkerStore):
             return next_id
 
         with self._group_updates_id_gen.get_next() as next_id:
-            res = yield self.db.runInteraction(
+            res = yield self.db_pool.runInteraction(
                 "register_user_group_membership",
                 _register_user_group_membership_txn,
                 next_id,
@@ -1198,7 +1200,7 @@ class GroupServerStore(GroupServerWorkerStore):
     def create_group(
         self, group_id, user_id, name, avatar_url, short_description, long_description
     ):
-        yield self.db.simple_insert(
+        yield self.db_pool.simple_insert(
             table="groups",
             values={
                 "group_id": group_id,
@@ -1213,7 +1215,7 @@ class GroupServerStore(GroupServerWorkerStore):
 
     @defer.inlineCallbacks
     def update_group_profile(self, group_id, profile):
-        yield self.db.simple_update_one(
+        yield self.db_pool.simple_update_one(
             table="groups",
             keyvalues={"group_id": group_id},
             updatevalues=profile,
@@ -1223,7 +1225,7 @@ class GroupServerStore(GroupServerWorkerStore):
     def update_attestation_renewal(self, group_id, user_id, attestation):
         """Update an attestation that we have renewed
         """
-        return self.db.simple_update_one(
+        return self.db_pool.simple_update_one(
             table="group_attestations_renewals",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={"valid_until_ms": attestation["valid_until_ms"]},
@@ -1233,7 +1235,7 @@ class GroupServerStore(GroupServerWorkerStore):
     def update_remote_attestion(self, group_id, user_id, attestation):
         """Update an attestation that a remote has renewed
         """
-        return self.db.simple_update_one(
+        return self.db_pool.simple_update_one(
             table="group_attestations_remote",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={
@@ -1252,7 +1254,7 @@ class GroupServerStore(GroupServerWorkerStore):
             group_id (str)
             user_id (str)
         """
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             table="group_attestations_renewals",
             keyvalues={"group_id": group_id, "user_id": user_id},
             desc="remove_attestation_renewal",
@@ -1288,8 +1290,8 @@ class GroupServerStore(GroupServerWorkerStore):
             ]
 
             for table in tables:
-                self.db.simple_delete_txn(
+                self.db_pool.simple_delete_txn(
                     txn, table=table, keyvalues={"group_id": group_id}
                 )
 
-        return self.db.runInteraction("delete_group", _delete_group_txn)
+        return self.db_pool.runInteraction("delete_group", _delete_group_txn)

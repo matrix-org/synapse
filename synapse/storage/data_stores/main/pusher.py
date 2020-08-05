@@ -50,7 +50,7 @@ class PusherWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def user_has_pusher(self, user_id):
-        ret = yield self.db.simple_select_one_onecol(
+        ret = yield self.db_pool.simple_select_one_onecol(
             "pushers", {"user_name": user_id}, "id", allow_none=True
         )
         return ret is not None
@@ -63,7 +63,7 @@ class PusherWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_pushers_by(self, keyvalues):
-        ret = yield self.db.simple_select_list(
+        ret = yield self.db_pool.simple_select_list(
             "pushers",
             keyvalues,
             [
@@ -91,11 +91,11 @@ class PusherWorkerStore(SQLBaseStore):
     def get_all_pushers(self):
         def get_pushers(txn):
             txn.execute("SELECT * FROM pushers")
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
 
             return self._decode_pushers_rows(rows)
 
-        rows = yield self.db.runInteraction("get_all_pushers", get_pushers)
+        rows = yield self.db_pool.runInteraction("get_all_pushers", get_pushers)
         return rows
 
     async def get_all_updated_pushers_rows(
@@ -160,7 +160,7 @@ class PusherWorkerStore(SQLBaseStore):
 
             return updates, upper_bound, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_updated_pushers_rows", get_all_updated_pushers_rows_txn
         )
 
@@ -176,7 +176,7 @@ class PusherWorkerStore(SQLBaseStore):
         inlineCallbacks=True,
     )
     def get_if_users_have_pushers(self, user_ids):
-        rows = yield self.db.simple_select_many_batch(
+        rows = yield self.db_pool.simple_select_many_batch(
             table="pushers",
             column="user_name",
             iterable=user_ids,
@@ -193,7 +193,7 @@ class PusherWorkerStore(SQLBaseStore):
     def update_pusher_last_stream_ordering(
         self, app_id, pushkey, user_id, last_stream_ordering
     ):
-        yield self.db.simple_update_one(
+        yield self.db_pool.simple_update_one(
             "pushers",
             {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             {"last_stream_ordering": last_stream_ordering},
@@ -216,7 +216,7 @@ class PusherWorkerStore(SQLBaseStore):
         Returns:
             Deferred[bool]: True if the pusher still exists; False if it has been deleted.
         """
-        updated = yield self.db.simple_update(
+        updated = yield self.db_pool.simple_update(
             table="pushers",
             keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             updatevalues={
@@ -230,7 +230,7 @@ class PusherWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def update_pusher_failing_since(self, app_id, pushkey, user_id, failing_since):
-        yield self.db.simple_update(
+        yield self.db_pool.simple_update(
             table="pushers",
             keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             updatevalues={"failing_since": failing_since},
@@ -239,7 +239,7 @@ class PusherWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def get_throttle_params_by_room(self, pusher_id):
-        res = yield self.db.simple_select_list(
+        res = yield self.db_pool.simple_select_list(
             "pusher_throttle",
             {"pusher": pusher_id},
             ["room_id", "last_sent_ts", "throttle_ms"],
@@ -259,7 +259,7 @@ class PusherWorkerStore(SQLBaseStore):
     def set_throttle_params(self, pusher_id, room_id, params):
         # no need to lock because `pusher_throttle` has a primary key on
         # (pusher, room_id) so simple_upsert will retry
-        yield self.db.simple_upsert(
+        yield self.db_pool.simple_upsert(
             "pusher_throttle",
             {"pusher": pusher_id, "room_id": room_id},
             params,
@@ -291,7 +291,7 @@ class PusherStore(PusherWorkerStore):
         with self._pushers_id_gen.get_next() as stream_id:
             # no need to lock because `pushers` has a unique key on
             # (app_id, pushkey, user_name) so simple_upsert will retry
-            yield self.db.simple_upsert(
+            yield self.db_pool.simple_upsert(
                 table="pushers",
                 keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
                 values={
@@ -316,7 +316,7 @@ class PusherStore(PusherWorkerStore):
 
             if user_has_pusher is not True:
                 # invalidate, since we the user might not have had a pusher before
-                yield self.db.runInteraction(
+                yield self.db_pool.runInteraction(
                     "add_pusher",
                     self._invalidate_cache_and_stream,
                     self.get_if_user_has_pusher,
@@ -330,7 +330,7 @@ class PusherStore(PusherWorkerStore):
                 txn, self.get_if_user_has_pusher, (user_id,)
             )
 
-            self.db.simple_delete_one_txn(
+            self.db_pool.simple_delete_one_txn(
                 txn,
                 "pushers",
                 {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
@@ -339,7 +339,7 @@ class PusherStore(PusherWorkerStore):
             # it's possible for us to end up with duplicate rows for
             # (app_id, pushkey, user_id) at different stream_ids, but that
             # doesn't really matter.
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="deleted_pushers",
                 values={
@@ -351,4 +351,6 @@ class PusherStore(PusherWorkerStore):
             )
 
         with self._pushers_id_gen.get_next() as stream_id:
-            yield self.db.runInteraction("delete_pusher", delete_pusher_txn, stream_id)
+            yield self.db_pool.runInteraction(
+                "delete_pusher", delete_pusher_txn, stream_id
+            )

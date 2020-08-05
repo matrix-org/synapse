@@ -59,7 +59,7 @@ class SlavedEventStore(
         super(SlavedEventStore, self).__init__(database, db_conn, hs)
 
         events_max = self._stream_id_gen.get_current_token()
-        curr_state_delta_prefill, min_curr_state_delta_id = self.db.get_cache_dict(
+        curr_state_delta_prefill, min_curr_state_delta_id = self.db_pool.get_cache_dict(
             db_conn,
             "current_state_delta_stream",
             entity_column="room_id",

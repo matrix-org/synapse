@@ -51,7 +51,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         if not query_list:
             return {}
 
-        results = yield self.db.runInteraction(
+        results = yield self.db_pool.runInteraction(
             "get_e2e_device_keys",
             self._get_e2e_device_keys_txn,
             query_list,
@@ -128,7 +128,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
         txn.execute(sql, query_params)
-        rows = self.db.cursor_to_dict(txn)
+        rows = self.db_pool.cursor_to_dict(txn)
 
         result = {}
         for row in rows:
@@ -146,7 +146,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         )
 
         txn.execute(signature_sql, signature_query_params)
-        rows = self.db.cursor_to_dict(txn)
+        rows = self.db_pool.cursor_to_dict(txn)
 
         # add each cross-signing signature to the correct device in the result dict.
         for row in rows:
@@ -189,7 +189,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             key_id) to json string for key
         """
 
-        rows = yield self.db.simple_select_many_batch(
+        rows = yield self.db_pool.simple_select_many_batch(
             table="e2e_one_time_keys_json",
             column="key_id",
             iterable=key_ids,
@@ -222,7 +222,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             # a unique constraint. If there is a race of two calls to
             # `add_e2e_one_time_keys` then they'll conflict and we will only
             # insert one set.
-            self.db.simple_insert_many_txn(
+            self.db_pool.simple_insert_many_txn(
                 txn,
                 table="e2e_one_time_keys_json",
                 values=[
@@ -241,7 +241,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
 
-        yield self.db.runInteraction(
+        yield self.db_pool.runInteraction(
             "add_e2e_one_time_keys_insert", _add_e2e_one_time_keys
         )
 
@@ -264,7 +264,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 result[algorithm] = key_count
             return result
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "count_e2e_one_time_keys", _count_e2e_one_time_keys
         )
 
@@ -318,7 +318,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 to None.
 
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_bare_e2e_cross_signing_keys_bulk",
             self._get_bare_e2e_cross_signing_keys_bulk_txn,
             user_ids,
@@ -361,7 +361,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             )
 
             txn.execute(sql, params)
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
 
             for row in rows:
                 user_id = row["user_id"]
@@ -420,7 +420,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
                 query_params.extend(item)
 
             txn.execute(sql, query_params)
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
 
             # and add the signatures to the appropriate keys
             for row in rows:
@@ -470,7 +470,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         result = yield self._get_bare_e2e_cross_signing_keys_bulk(user_ids)
 
         if from_user_id:
-            result = yield self.db.runInteraction(
+            result = yield self.db_pool.runInteraction(
                 "get_e2e_cross_signing_signatures",
                 self._get_e2e_cross_signing_signatures_txn,
                 result,
@@ -531,7 +531,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
             return updates, upto_token, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_user_signature_changes_for_remotes",
             _get_all_user_signature_changes_for_remotes_txn,
         )
@@ -549,7 +549,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             set_tag("time_now", time_now)
             set_tag("device_keys", device_keys)
 
-            old_key_json = self.db.simple_select_one_onecol_txn(
+            old_key_json = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="e2e_device_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -565,7 +565,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 log_kv({"Message": "Device key already stored."})
                 return False
 
-            self.db.simple_upsert_txn(
+            self.db_pool.simple_upsert_txn(
                 txn,
                 table="e2e_device_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -574,7 +574,9 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             log_kv({"message": "Device keys stored."})
             return True
 
-        return self.db.runInteraction("set_e2e_device_keys", _set_e2e_device_keys_txn)
+        return self.db_pool.runInteraction(
+            "set_e2e_device_keys", _set_e2e_device_keys_txn
+        )
 
     def claim_e2e_one_time_keys(self, query_list):
         """Take a list of one time keys out of the database"""
@@ -613,7 +615,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 )
             return result
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
         )
 
@@ -626,12 +628,12 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                     "user_id": user_id,
                 }
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="e2e_device_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="e2e_one_time_keys_json",
                 keyvalues={"user_id": user_id, "device_id": device_id},
@@ -640,7 +642,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
                 txn, self.count_e2e_one_time_keys, (user_id, device_id)
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "delete_e2e_keys_by_device", delete_e2e_keys_by_device_txn
         )
 
@@ -679,7 +681,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
         # We only need to do this for local users, since remote servers should be
         # responsible for checking this for their own users.
         if self.hs.is_mine_id(user_id):
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 "devices",
                 values={
@@ -692,7 +694,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
 
         # and finally, store the key itself
         with self._cross_signing_id_gen.get_next() as stream_id:
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 "e2e_cross_signing_keys",
                 values={
@@ -715,7 +717,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             key_type (str): the type of cross-signing key to set
             key (dict): the key data
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "add_e2e_cross_signing_key",
             self._set_e2e_cross_signing_key_txn,
             user_id,
@@ -730,7 +732,7 @@ class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
             user_id (str): the user who made the signatures
             signatures (iterable[SignatureListItem]): signatures to add
         """
-        return self.db.simple_insert_many(
+        return self.db_pool.simple_insert_many(
             "e2e_cross_signing_signatures",
             [
                 {

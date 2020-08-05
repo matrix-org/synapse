@@ -81,7 +81,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             session_id = stringutils.random_string(24)
 
             try:
-                await self.db.simple_insert(
+                await self.db_pool.simple_insert(
                     table="ui_auth_sessions",
                     values={
                         "session_id": session_id,
@@ -97,7 +97,7 @@ class UIAuthWorkerStore(SQLBaseStore):
                 return UIAuthSessionData(
                     session_id, clientdict, uri, method, description
                 )
-            except self.db.engine.module.IntegrityError:
+            except self.db_pool.engine.module.IntegrityError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a session ID.")
 
@@ -111,7 +111,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         Raises:
             StoreError if the session is not found.
         """
-        result = await self.db.simple_select_one(
+        result = await self.db_pool.simple_select_one(
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             retcols=("clientdict", "uri", "method", "description"),
@@ -140,13 +140,13 @@ class UIAuthWorkerStore(SQLBaseStore):
         # Note that we need to allow for the same stage to complete multiple
         # times here so that registration is idempotent.
         try:
-            await self.db.simple_upsert(
+            await self.db_pool.simple_upsert(
                 table="ui_auth_sessions_credentials",
                 keyvalues={"session_id": session_id, "stage_type": stage_type},
                 values={"result": json.dumps(result)},
                 desc="mark_ui_auth_stage_complete",
             )
-        except self.db.engine.module.IntegrityError:
+        except self.db_pool.engine.module.IntegrityError:
             raise StoreError(400, "Unknown session ID: %s" % (session_id,))
 
     async def get_completed_ui_auth_stages(
@@ -162,7 +162,7 @@ class UIAuthWorkerStore(SQLBaseStore):
             that auth-type.
         """
         results = {}
-        for row in await self.db.simple_select_list(
+        for row in await self.db_pool.simple_select_list(
             table="ui_auth_sessions_credentials",
             keyvalues={"session_id": session_id},
             retcols=("stage_type", "result"),
@@ -186,7 +186,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         # The clientdict gets stored as JSON.
         clientdict_json = json.dumps(clientdict)
 
-        await self.db.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             updatevalues={"clientdict": clientdict_json},
@@ -206,7 +206,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         Raises:
             StoreError if the session cannot be found.
         """
-        await self.db.runInteraction(
+        await self.db_pool.runInteraction(
             "set_ui_auth_session_data",
             self._set_ui_auth_session_data_txn,
             session_id,
@@ -216,7 +216,7 @@ class UIAuthWorkerStore(SQLBaseStore):
 
     def _set_ui_auth_session_data_txn(self, txn, session_id: str, key: str, value: Any):
         # Get the current value.
-        result = self.db.simple_select_one_txn(
+        result = self.db_pool.simple_select_one_txn(
             txn,
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
@@ -227,7 +227,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         serverdict = db_to_json(result["serverdict"])
         serverdict[key] = value
 
-        self.db.simple_update_one_txn(
+        self.db_pool.simple_update_one_txn(
             txn,
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
@@ -247,7 +247,7 @@ class UIAuthWorkerStore(SQLBaseStore):
         Raises:
             StoreError if the session cannot be found.
         """
-        result = await self.db.simple_select_one(
+        result = await self.db_pool.simple_select_one(
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             retcols=("serverdict",),
@@ -269,7 +269,7 @@ class UIAuthStore(UIAuthWorkerStore):
                 This is an epoch time in milliseconds.
 
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "delete_old_ui_auth_sessions",
             self._delete_old_ui_auth_sessions_txn,
             expiration_time,
@@ -282,7 +282,7 @@ class UIAuthStore(UIAuthWorkerStore):
         session_ids = [r[0] for r in txn.fetchall()]
 
         # Delete the corresponding completed credentials.
-        self.db.simple_delete_many_txn(
+        self.db_pool.simple_delete_many_txn(
             txn,
             table="ui_auth_sessions_credentials",
             column="session_id",
@@ -291,7 +291,7 @@ class UIAuthStore(UIAuthWorkerStore):
         )
 
         # Finally, delete the sessions.
-        self.db.simple_delete_many_txn(
+        self.db_pool.simple_delete_many_txn(
             txn,
             table="ui_auth_sessions",
             column="session_id",

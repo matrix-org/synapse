@@ -136,7 +136,7 @@ class PersistEventsStore:
         self, hs: "HomeServer", db: DatabasePool, main_data_store: "DataStore"
     ):
         self.hs = hs
-        self.db = db
+        self.db_pool = db
         self.store = main_data_store
         self.database_engine = db.engine
         self._clock = hs.get_clock()
@@ -209,7 +209,7 @@ class PersistEventsStore:
             for (event, context), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "persist_events",
                 self._persist_events_txn,
                 events_and_contexts=events_and_contexts,
@@ -285,7 +285,7 @@ class PersistEventsStore:
             results.extend(r[0] for r in txn if not db_to_json(r[1]).get("soft_failed"))
 
         for chunk in batch_iter(event_ids, 100):
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "_get_events_which_are_prevs", _get_events_which_are_prevs_txn, chunk
             )
 
@@ -349,7 +349,7 @@ class PersistEventsStore:
                         existing_prevs.add(prev_event_id)
 
         for chunk in batch_iter(event_ids, 100):
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "_get_prevs_before_rejected", _get_prevs_before_rejected_txn, chunk
             )
 
@@ -423,7 +423,7 @@ class PersistEventsStore:
         # event's auth chain, but its easier for now just to store them (and
         # it doesn't take much storage compared to storing the entire event
         # anyway).
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_auth",
             values=[
@@ -486,7 +486,7 @@ class PersistEventsStore:
                 """
                 txn.execute(sql, (stream_id, room_id))
 
-                self.db.simple_delete_txn(
+                self.db_pool.simple_delete_txn(
                     txn, table="current_state_events", keyvalues={"room_id": room_id},
                 )
             else:
@@ -634,7 +634,7 @@ class PersistEventsStore:
             creator = content.get("creator")
             room_version_id = content.get("room_version", RoomVersions.V1.identifier)
 
-            self.db.simple_upsert_txn(
+            self.db_pool.simple_upsert_txn(
                 txn,
                 table="rooms",
                 keyvalues={"room_id": room_id},
@@ -646,14 +646,14 @@ class PersistEventsStore:
         self, txn, new_forward_extremities, max_stream_order
     ):
         for room_id, new_extrem in new_forward_extremities.items():
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
             txn.call_after(
                 self.store.get_latest_event_ids_in_room.invalidate, (room_id,)
             )
 
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_forward_extremities",
             values=[
@@ -666,7 +666,7 @@ class PersistEventsStore:
         # new stream_ordering to new forward extremeties in the room.
         # This allows us to later efficiently look up the forward extremeties
         # for a room before a given stream_ordering
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="stream_ordering_to_exterm",
             values=[
@@ -790,7 +790,7 @@ class PersistEventsStore:
                 # change in outlier status to our workers.
                 stream_order = event.internal_metadata.stream_ordering
                 state_group_id = context.state_group
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn,
                     table="ex_outlier_stream",
                     values={
@@ -828,7 +828,7 @@ class PersistEventsStore:
             d.pop("redacted_because", None)
             return d
 
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_json",
             values=[
@@ -845,7 +845,7 @@ class PersistEventsStore:
             ],
         )
 
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="events",
             values=[
@@ -875,7 +875,7 @@ class PersistEventsStore:
                 # If we're persisting an unredacted event we go and ensure
                 # that we mark any redactions that reference this event as
                 # requiring censoring.
-                self.db.simple_update_txn(
+                self.db_pool.simple_update_txn(
                     txn,
                     table="redactions",
                     keyvalues={"redacts": event.event_id},
@@ -1017,7 +1017,9 @@ class PersistEventsStore:
 
             state_values.append(vals)
 
-        self.db.simple_insert_many_txn(txn, table="state_events", values=state_values)
+        self.db_pool.simple_insert_many_txn(
+            txn, table="state_events", values=state_values
+        )
 
         # Prefill the event cache
         self._add_to_cache(txn, events_and_contexts)
@@ -1048,7 +1050,7 @@ class PersistEventsStore:
             )
 
             txn.execute(sql + clause, args)
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
             for row in rows:
                 event = ev_map[row["event_id"]]
                 if not row["rejects"] and not row["redacts"]:
@@ -1068,7 +1070,7 @@ class PersistEventsStore:
         # invalidate the cache for the redacted event
         txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
 
-        self.db.simple_insert_txn(
+        self.db_pool.simple_insert_txn(
             txn,
             table="redactions",
             values={
@@ -1091,7 +1093,7 @@ class PersistEventsStore:
             room_id (str): The ID of the room the event was sent to.
             topological_ordering (int): The position of the event in the room's topology.
         """
-        return self.db.simple_insert_many_txn(
+        return self.db_pool.simple_insert_many_txn(
             txn=txn,
             table="event_labels",
             values=[
@@ -1113,7 +1115,7 @@ class PersistEventsStore:
             event_id (str): The event ID the expiry timestamp is associated with.
             expiry_ts (int): The timestamp at which to expire (delete) the event.
         """
-        return self.db.simple_insert_txn(
+        return self.db_pool.simple_insert_txn(
             txn=txn,
             table="event_expiry",
             values={"event_id": event_id, "expiry_ts": expiry_ts},
@@ -1137,12 +1139,14 @@ class PersistEventsStore:
                 }
             )
 
-        self.db.simple_insert_many_txn(txn, table="event_reference_hashes", values=vals)
+        self.db_pool.simple_insert_many_txn(
+            txn, table="event_reference_hashes", values=vals
+        )
 
     def _store_room_members_txn(self, txn, events, backfilled):
         """Store a room member in the database.
         """
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="room_memberships",
             values=[
@@ -1182,7 +1186,7 @@ class PersistEventsStore:
                 and event.internal_metadata.is_outlier()
                 and event.internal_metadata.is_out_of_band_membership()
             ):
-                self.db.simple_upsert_txn(
+                self.db_pool.simple_upsert_txn(
                     txn,
                     table="local_current_membership",
                     keyvalues={"room_id": event.room_id, "user_id": event.state_key},
@@ -1220,7 +1224,7 @@ class PersistEventsStore:
 
         aggregation_key = relation.get("key")
 
-        self.db.simple_insert_txn(
+        self.db_pool.simple_insert_txn(
             txn,
             table="event_relations",
             values={
@@ -1248,7 +1252,7 @@ class PersistEventsStore:
             redacted_event_id (str): The event that was redacted.
         """
 
-        self.db.simple_delete_txn(
+        self.db_pool.simple_delete_txn(
             txn, table="event_relations", keyvalues={"event_id": redacted_event_id}
         )
 
@@ -1284,7 +1288,7 @@ class PersistEventsStore:
                 # Ignore the event if one of the value isn't an integer.
                 return
 
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn=txn,
                 table="room_retention",
                 values={
@@ -1365,7 +1369,7 @@ class PersistEventsStore:
             )
 
         for event, _ in events_and_contexts:
-            user_ids = self.db.simple_select_onecol_txn(
+            user_ids = self.db_pool.simple_select_onecol_txn(
                 txn,
                 table="event_push_actions_staging",
                 keyvalues={"event_id": event.event_id},
@@ -1397,7 +1401,7 @@ class PersistEventsStore:
         )
 
     def _store_rejections_txn(self, txn, event_id, reason):
-        self.db.simple_insert_txn(
+        self.db_pool.simple_insert_txn(
             txn,
             table="rejections",
             values={
@@ -1423,7 +1427,7 @@ class PersistEventsStore:
 
             state_groups[event.event_id] = context.state_group
 
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_to_state_groups",
             values=[
@@ -1445,7 +1449,7 @@ class PersistEventsStore:
         if min_depth is not None and depth >= min_depth:
             return
 
-        self.db.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="room_depth",
             keyvalues={"room_id": room_id},
@@ -1457,7 +1461,7 @@ class PersistEventsStore:
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
-        self.db.simple_insert_many_txn(
+        self.db_pool.simple_insert_many_txn(
             txn,
             table="event_edges",
             values=[

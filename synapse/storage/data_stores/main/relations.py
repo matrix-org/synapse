@@ -129,7 +129,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_recent_references_for_event", _get_recent_references_for_event_txn
         )
 
@@ -223,7 +223,7 @@ class RelationsWorkerStore(SQLBaseStore):
                 chunk=list(events[:limit]), next_batch=next_batch, prev_batch=from_token
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
         )
 
@@ -268,7 +268,7 @@ class RelationsWorkerStore(SQLBaseStore):
             if row:
                 return row[0]
 
-        edit_id = yield self.db.runInteraction(
+        edit_id = yield self.db_pool.runInteraction(
             "get_applicable_edit", _get_applicable_edit_txn
         )
 
@@ -318,7 +318,7 @@ class RelationsWorkerStore(SQLBaseStore):
 
             return bool(txn.fetchone())
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_if_user_has_annotated_event", _get_if_user_has_annotated_event
         )
 

@@ -136,7 +136,7 @@ class EventsWorkerStore(SQLBaseStore):
             Deferred[int|None]: Timestamp in milliseconds, or None for events
             that were persisted before received_ts was implemented.
         """
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="events",
             keyvalues={"event_id": event_id},
             retcol="received_ts",
@@ -175,7 +175,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             return ts
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_approximate_received_ts", _get_approximate_received_ts_txn
         )
 
@@ -543,7 +543,7 @@ class EventsWorkerStore(SQLBaseStore):
                     event_id for events, _ in event_list for event_id in events
                 }
 
-                row_dict = self.db.new_transaction(
+                row_dict = self.db_pool.new_transaction(
                     conn, "do_fetch", [], [], self._fetch_event_rows, events_to_fetch
                 )
 
@@ -720,7 +720,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         if should_start:
             run_as_background_process(
-                "fetch_events", self.db.runWithConnection, self._do_fetch
+                "fetch_events", self.db_pool.runWithConnection, self._do_fetch
             )
 
         logger.debug("Loading %d events: %s", len(events), events)
@@ -889,7 +889,7 @@ class EventsWorkerStore(SQLBaseStore):
         """Given a list of event ids, check if we have already processed and
         stored them as non outliers.
         """
-        rows = yield self.db.simple_select_many_batch(
+        rows = yield self.db_pool.simple_select_many_batch(
             table="events",
             retcols=("event_id",),
             column="event_id",
@@ -924,7 +924,7 @@ class EventsWorkerStore(SQLBaseStore):
         # break the input up into chunks of 100
         input_iterator = iter(event_ids)
         for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)), []):
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "have_seen_events", have_seen_events_txn, chunk
             )
         return results
@@ -953,7 +953,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             Deferred[int]
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_total_state_event_counts",
             self._get_total_state_event_counts_txn,
             room_id,
@@ -978,7 +978,7 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             Deferred[int]
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_current_state_event_counts",
             self._get_current_state_event_counts_txn,
             room_id,
@@ -1043,7 +1043,7 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id, limit))
             return txn.fetchall()
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_all_new_forward_event_rows", get_all_new_forward_event_rows
         )
 
@@ -1077,7 +1077,7 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id))
             return txn.fetchall()
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_ex_outlier_stream_rows", get_ex_outlier_stream_rows_txn
         )
 
@@ -1151,7 +1151,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             return new_event_updates, upper_bound, limited
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_new_backfill_event_rows", get_all_new_backfill_event_rows
         )
 
@@ -1199,7 +1199,7 @@ class EventsWorkerStore(SQLBaseStore):
         # we need to make sure that, for every stream id in the results, we get *all*
         # the rows with that stream id.
 
-        rows = await self.db.runInteraction(
+        rows = await self.db_pool.runInteraction(
             "get_all_updated_current_state_deltas",
             get_all_updated_current_state_deltas_txn,
         )  # type: List[Tuple]
@@ -1222,7 +1222,7 @@ class EventsWorkerStore(SQLBaseStore):
         # stream id. let's run the query again, without a row limit, but for
         # just one stream id.
         to_token += 1
-        rows = await self.db.runInteraction(
+        rows = await self.db_pool.runInteraction(
             "get_deltas_for_stream_id", get_deltas_for_stream_id_txn, to_token
         )
 
@@ -1317,7 +1317,7 @@ class EventsWorkerStore(SQLBaseStore):
                 backward_ex_outliers,
             )
 
-        return self.db.runInteraction("get_all_new_events", get_all_new_events_txn)
+        return self.db_pool.runInteraction("get_all_new_events", get_all_new_events_txn)
 
     async def is_event_after(self, event_id1, event_id2):
         """Returns True if event_id1 is after event_id2 in the stream
@@ -1328,7 +1328,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     @cachedInlineCallbacks(max_entries=5000)
     def get_event_ordering(self, event_id):
-        res = yield self.db.simple_select_one(
+        res = yield self.db_pool.simple_select_one(
             table="events",
             retcols=["topological_ordering", "stream_ordering"],
             keyvalues={"event_id": event_id},
@@ -1360,7 +1360,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             return txn.fetchone()
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
 
@@ -1385,7 +1385,7 @@ class EventsWorkerStore(SQLBaseStore):
                 on_invalidate=cache_context.invalidate,
             )
 
-            return await self.db.runInteraction(
+            return await self.db_pool.runInteraction(
                 "get_unread_message_count_for_user",
                 self._get_unread_message_count_for_user_txn,
                 user_id,
@@ -1402,7 +1402,7 @@ class EventsWorkerStore(SQLBaseStore):
     ) -> int:
         if last_read_event_id:
             # Get the stream ordering for the last read event.
-            stream_ordering = self.db.simple_select_one_onecol_txn(
+            stream_ordering = self.db_pool.simple_select_one_onecol_txn(
                 txn=txn,
                 table="events",
                 keyvalues={"room_id": room_id, "event_id": last_read_event_id},

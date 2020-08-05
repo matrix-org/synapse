@@ -69,7 +69,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         """
 
         def get_account_data_for_user_txn(txn):
-            rows = self.db.simple_select_list_txn(
+            rows = self.db_pool.simple_select_list_txn(
                 txn,
                 "account_data",
                 {"user_id": user_id},
@@ -80,7 +80,7 @@ class AccountDataWorkerStore(SQLBaseStore):
                 row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
-            rows = self.db.simple_select_list_txn(
+            rows = self.db_pool.simple_select_list_txn(
                 txn,
                 "room_account_data",
                 {"user_id": user_id},
@@ -94,7 +94,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
             return global_account_data, by_room
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_account_data_for_user", get_account_data_for_user_txn
         )
 
@@ -104,7 +104,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         Returns:
             Deferred: A dict
         """
-        result = yield self.db.simple_select_one_onecol(
+        result = yield self.db_pool.simple_select_one_onecol(
             table="account_data",
             keyvalues={"user_id": user_id, "account_data_type": data_type},
             retcol="content",
@@ -129,7 +129,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         """
 
         def get_account_data_for_room_txn(txn):
-            rows = self.db.simple_select_list_txn(
+            rows = self.db_pool.simple_select_list_txn(
                 txn,
                 "room_account_data",
                 {"user_id": user_id, "room_id": room_id},
@@ -140,7 +140,7 @@ class AccountDataWorkerStore(SQLBaseStore):
                 row["account_data_type"]: db_to_json(row["content"]) for row in rows
             }
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_account_data_for_room", get_account_data_for_room_txn
         )
 
@@ -158,7 +158,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         """
 
         def get_account_data_for_room_and_type_txn(txn):
-            content_json = self.db.simple_select_one_onecol_txn(
+            content_json = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 table="room_account_data",
                 keyvalues={
@@ -172,7 +172,7 @@ class AccountDataWorkerStore(SQLBaseStore):
 
             return db_to_json(content_json) if content_json else None
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_account_data_for_room_and_type", get_account_data_for_room_and_type_txn
         )
 
@@ -202,7 +202,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id, limit))
             return txn.fetchall()
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_updated_global_account_data", get_updated_global_account_data_txn
         )
 
@@ -232,7 +232,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id, limit))
             return txn.fetchall()
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_updated_room_account_data", get_updated_room_account_data_txn
         )
 
@@ -277,7 +277,7 @@ class AccountDataWorkerStore(SQLBaseStore):
         if not changed:
             return defer.succeed(({}, {}))
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_updated_account_data_for_user", get_updated_account_data_for_user_txn
         )
 
@@ -333,7 +333,7 @@ class AccountDataStore(AccountDataWorkerStore):
             # no need to lock here as room_account_data has a unique constraint
             # on (user_id, room_id, account_data_type) so simple_upsert will
             # retry if there is a conflict.
-            yield self.db.simple_upsert(
+            yield self.db_pool.simple_upsert(
                 desc="add_room_account_data",
                 table="room_account_data",
                 keyvalues={
@@ -379,7 +379,7 @@ class AccountDataStore(AccountDataWorkerStore):
             # no need to lock here as account_data has a unique constraint on
             # (user_id, account_data_type) so simple_upsert will retry if
             # there is a conflict.
-            yield self.db.simple_upsert(
+            yield self.db_pool.simple_upsert(
                 desc="add_user_account_data",
                 table="account_data",
                 keyvalues={"user_id": user_id, "account_data_type": account_data_type},
@@ -427,4 +427,4 @@ class AccountDataStore(AccountDataWorkerStore):
             )
             txn.execute(update_max_id_sql, (next_id, next_id))
 
-        return self.db.runInteraction("update_account_data_max_stream_id", _update)
+        return self.db_pool.runInteraction("update_account_data_max_stream_id", _update)

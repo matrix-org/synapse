@@ -50,7 +50,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     @cached()
     def get_user_by_id(self, user_id):
-        return self.db.simple_select_one(
+        return self.db_pool.simple_select_one(
             table="users",
             keyvalues={"name": user_id},
             retcols=[
@@ -101,7 +101,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 including the keys `name`, `is_guest`, `device_id`, `token_id`,
                 `valid_until_ms`.
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_user_by_access_token", self._query_for_auth, token
         )
 
@@ -116,7 +116,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 otherwise int representation of the timestamp (as a number of
                 milliseconds since epoch).
         """
-        res = yield self.db.simple_select_one_onecol(
+        res = yield self.db_pool.simple_select_one_onecol(
             table="account_validity",
             keyvalues={"user_id": user_id},
             retcol="expiration_ts_ms",
@@ -144,7 +144,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         """
 
         def set_account_validity_for_user_txn(txn):
-            self.db.simple_update_txn(
+            self.db_pool.simple_update_txn(
                 txn=txn,
                 table="account_validity",
                 keyvalues={"user_id": user_id},
@@ -158,7 +158,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 txn, self.get_expiration_ts_for_user, (user_id,)
             )
 
-        yield self.db.runInteraction(
+        yield self.db_pool.runInteraction(
             "set_account_validity_for_user", set_account_validity_for_user_txn
         )
 
@@ -174,7 +174,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Raises:
             StoreError: The provided token is already set for another user.
         """
-        yield self.db.simple_update_one(
+        yield self.db_pool.simple_update_one(
             table="account_validity",
             keyvalues={"user_id": user_id},
             updatevalues={"renewal_token": renewal_token},
@@ -191,7 +191,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             defer.Deferred[str]: The ID of the user to which the token belongs.
         """
-        res = yield self.db.simple_select_one_onecol(
+        res = yield self.db_pool.simple_select_one_onecol(
             table="account_validity",
             keyvalues={"renewal_token": renewal_token},
             retcol="user_id",
@@ -210,7 +210,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             defer.Deferred[str]: The renewal token associated with this user ID.
         """
-        res = yield self.db.simple_select_one_onecol(
+        res = yield self.db_pool.simple_select_one_onecol(
             table="account_validity",
             keyvalues={"user_id": user_id},
             retcol="renewal_token",
@@ -236,9 +236,9 @@ class RegistrationWorkerStore(SQLBaseStore):
             )
             values = [False, now_ms, renew_at]
             txn.execute(sql, values)
-            return self.db.cursor_to_dict(txn)
+            return self.db_pool.cursor_to_dict(txn)
 
-        res = yield self.db.runInteraction(
+        res = yield self.db_pool.runInteraction(
             "get_users_expiring_soon",
             select_users_txn,
             self.clock.time_msec(),
@@ -257,7 +257,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             email_sent (bool): Flag which indicates whether a renewal email has been sent
                 to this user.
         """
-        yield self.db.simple_update_one(
+        yield self.db_pool.simple_update_one(
             table="account_validity",
             keyvalues={"user_id": user_id},
             updatevalues={"email_sent": email_sent},
@@ -272,7 +272,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Args:
             user_id (str): ID of the user to remove from the account validity table.
         """
-        yield self.db.simple_delete_one(
+        yield self.db_pool.simple_delete_one(
             table="account_validity",
             keyvalues={"user_id": user_id},
             desc="delete_account_validity_for_user",
@@ -287,7 +287,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns (bool):
             true iff the user is a server admin, false otherwise.
         """
-        res = await self.db.simple_select_one_onecol(
+        res = await self.db_pool.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user.to_string()},
             retcol="admin",
@@ -307,14 +307,14 @@ class RegistrationWorkerStore(SQLBaseStore):
         """
 
         def set_server_admin_txn(txn):
-            self.db.simple_update_one_txn(
+            self.db_pool.simple_update_one_txn(
                 txn, "users", {"name": user.to_string()}, {"admin": 1 if admin else 0}
             )
             self._invalidate_cache_and_stream(
                 txn, self.get_user_by_id, (user.to_string(),)
             )
 
-        return self.db.runInteraction("set_server_admin", set_server_admin_txn)
+        return self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
 
     def _query_for_auth(self, txn, token):
         sql = (
@@ -326,7 +326,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
         txn.execute(sql, (token,))
-        rows = self.db.cursor_to_dict(txn)
+        rows = self.db_pool.cursor_to_dict(txn)
         if rows:
             return rows[0]
 
@@ -342,7 +342,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred[bool]: True if user 'user_type' is null or empty string
         """
-        res = yield self.db.runInteraction(
+        res = yield self.db_pool.runInteraction(
             "is_real_user", self.is_real_user_txn, user_id
         )
         return res
@@ -357,12 +357,12 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred[bool]: True if user is of type UserTypes.SUPPORT
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "is_support_user", self.is_support_user_txn, user_id
         )
 
     def is_real_user_txn(self, txn, user_id):
-        res = self.db.simple_select_one_onecol_txn(
+        res = self.db_pool.simple_select_one_onecol_txn(
             txn=txn,
             table="users",
             keyvalues={"name": user_id},
@@ -372,7 +372,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         return res is None
 
     def is_support_user_txn(self, txn, user_id):
-        res = self.db.simple_select_one_onecol_txn(
+        res = self.db_pool.simple_select_one_onecol_txn(
             txn=txn,
             table="users",
             keyvalues={"name": user_id},
@@ -391,7 +391,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             txn.execute(sql, (user_id,))
             return dict(txn)
 
-        return self.db.runInteraction("get_users_by_id_case_insensitive", f)
+        return self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
@@ -405,7 +405,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             str|None: the mxid of the user, or None if they are not known
         """
-        return await self.db.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="user_external_ids",
             keyvalues={"auth_provider": auth_provider, "external_id": external_id},
             retcol="user_id",
@@ -419,12 +419,12 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         def _count_users(txn):
             txn.execute("SELECT COUNT(*) AS users FROM users")
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
             if rows:
                 return rows[0]["users"]
             return 0
 
-        ret = yield self.db.runInteraction("count_users", _count_users)
+        ret = yield self.db_pool.runInteraction("count_users", _count_users)
         return ret
 
     def count_daily_user_type(self):
@@ -456,7 +456,9 @@ class RegistrationWorkerStore(SQLBaseStore):
                 results[row[0]] = row[1]
             return results
 
-        return self.db.runInteraction("count_daily_user_type", _count_daily_user_type)
+        return self.db_pool.runInteraction(
+            "count_daily_user_type", _count_daily_user_type
+        )
 
     @defer.inlineCallbacks
     def count_nonbridged_users(self):
@@ -470,7 +472,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        ret = yield self.db.runInteraction("count_users", _count_users)
+        ret = yield self.db_pool.runInteraction("count_users", _count_users)
         return ret
 
     @defer.inlineCallbacks
@@ -479,12 +481,12 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         def _count_users(txn):
             txn.execute("SELECT COUNT(*) AS users FROM users where user_type is null")
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
             if rows:
                 return rows[0]["users"]
             return 0
 
-        ret = yield self.db.runInteraction("count_real_users", _count_users)
+        ret = yield self.db_pool.runInteraction("count_real_users", _count_users)
         return ret
 
     async def generate_user_id(self) -> str:
@@ -492,7 +494,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         Returns: a (hopefully) free localpart
         """
-        next_id = await self.db.runInteraction(
+        next_id = await self.db_pool.runInteraction(
             "generate_user_id", self._user_id_seq.get_next_id_txn
         )
 
@@ -508,7 +510,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             The user ID or None if no user id/threepid mapping exists
         """
-        user_id = await self.db.runInteraction(
+        user_id = await self.db_pool.runInteraction(
             "get_user_id_by_threepid", self.get_user_id_by_threepid_txn, medium, address
         )
         return user_id
@@ -524,7 +526,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             str|None: user id or None if no user id/threepid mapping exists
         """
-        ret = self.db.simple_select_one_txn(
+        ret = self.db_pool.simple_select_one_txn(
             txn,
             "user_threepids",
             {"medium": medium, "address": address},
@@ -537,7 +539,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
-        yield self.db.simple_upsert(
+        yield self.db_pool.simple_upsert(
             "user_threepids",
             {"medium": medium, "address": address},
             {"user_id": user_id, "validated_at": validated_at, "added_at": added_at},
@@ -545,7 +547,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     @defer.inlineCallbacks
     def user_get_threepids(self, user_id):
-        ret = yield self.db.simple_select_list(
+        ret = yield self.db_pool.simple_select_list(
             "user_threepids",
             {"user_id": user_id},
             ["medium", "address", "validated_at", "added_at"],
@@ -554,7 +556,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         return ret
 
     def user_delete_threepid(self, user_id, medium, address):
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
             desc="user_delete_threepid",
@@ -567,7 +569,7 @@ class RegistrationWorkerStore(SQLBaseStore):
              user_id: The user id to delete all threepids of
 
         """
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id},
             desc="user_delete_threepids",
@@ -589,7 +591,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         """
         # We need to use an upsert, in case they user had already bound the
         # threepid
-        return self.db.simple_upsert(
+        return self.db_pool.simple_upsert(
             table="user_threepid_id_server",
             keyvalues={
                 "user_id": user_id,
@@ -615,7 +617,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 medium (str): The medium of the threepid (e.g "email")
                 address (str): The address of the threepid (e.g "bob@example.com")
         """
-        return self.db.simple_select_list(
+        return self.db_pool.simple_select_list(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id},
             retcols=["medium", "address"],
@@ -636,7 +638,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred
         """
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             table="user_threepid_id_server",
             keyvalues={
                 "user_id": user_id,
@@ -659,7 +661,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         Returns:
             Deferred[list[str]]: Resolves to a list of identity servers
         """
-        return self.db.simple_select_onecol(
+        return self.db_pool.simple_select_onecol(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
             retcol="id_server",
@@ -677,7 +679,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             defer.Deferred(bool): The requested value.
         """
 
-        res = yield self.db.simple_select_one_onecol(
+        res = yield self.db_pool.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user_id},
             retcol="deactivated",
@@ -744,13 +746,13 @@ class RegistrationWorkerStore(SQLBaseStore):
             sql += " LIMIT 1"
 
             txn.execute(sql, list(keyvalues.values()))
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
             if not rows:
                 return None
 
             return rows[0]
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_threepid_validation_session", get_threepid_validation_session_txn
         )
 
@@ -764,18 +766,18 @@ class RegistrationWorkerStore(SQLBaseStore):
         """
 
         def delete_threepid_session_txn(txn):
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="threepid_validation_token",
                 keyvalues={"session_id": session_id},
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 table="threepid_validation_session",
                 keyvalues={"session_id": session_id},
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "delete_threepid_session", delete_threepid_session_txn
         )
 
@@ -787,14 +789,14 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         self.clock = hs.get_clock()
         self.config = hs.config
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "access_tokens_device_index",
             index_name="access_tokens_device_id",
             table="access_tokens",
             columns=["user_id", "device_id"],
         )
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "users_creation_ts",
             index_name="users_creation_ts",
             table="users",
@@ -804,13 +806,15 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         # we no longer use refresh tokens, but it's possible that some people
         # might have a background update queued to build this index. Just
         # clear the background update.
-        self.db.updates.register_noop_background_update("refresh_tokens_device_index")
+        self.db_pool.updates.register_noop_background_update(
+            "refresh_tokens_device_index"
+        )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "user_threepids_grandfather", self._bg_user_threepids_grandfather
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "users_set_deactivated_flag", self._background_update_set_deactivated_flag
         )
 
@@ -843,7 +847,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
                 (last_user, batch_size),
             )
 
-            rows = self.db.cursor_to_dict(txn)
+            rows = self.db_pool.cursor_to_dict(txn)
 
             if not rows:
                 return True, 0
@@ -857,7 +861,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
 
             logger.info("Marked %d rows as deactivated", rows_processed_nb)
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, "users_set_deactivated_flag", {"user_id": rows[-1]["name"]}
             )
 
@@ -866,12 +870,14 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             else:
                 return False, len(rows)
 
-        end, nb_processed = yield self.db.runInteraction(
+        end, nb_processed = yield self.db_pool.runInteraction(
             "users_set_deactivated_flag", _background_update_set_deactivated_flag_txn
         )
 
         if end:
-            yield self.db.updates._end_background_update("users_set_deactivated_flag")
+            yield self.db_pool.updates._end_background_update(
+                "users_set_deactivated_flag"
+            )
 
         return nb_processed
 
@@ -897,11 +903,11 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
             txn.executemany(sql, [(id_server,) for id_server in id_servers])
 
         if id_servers:
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "_bg_user_threepids_grandfather", _bg_user_threepids_grandfather_txn
             )
 
-        yield self.db.updates._end_background_update("user_threepids_grandfather")
+        yield self.db_pool.updates._end_background_update("user_threepids_grandfather")
 
         return 1
 
@@ -947,7 +953,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         """
         next_id = self._access_tokens_id_gen.get_next()
 
-        yield self.db.simple_insert(
+        yield self.db_pool.simple_insert(
             "access_tokens",
             {
                 "id": next_id,
@@ -992,7 +998,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         Returns:
             Deferred
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "register_user",
             self._register_user,
             user_id,
@@ -1026,7 +1032,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 # Ensure that the guest user actually exists
                 # ``allow_none=False`` makes this raise an exception
                 # if the row isn't in the database.
-                self.db.simple_select_one_txn(
+                self.db_pool.simple_select_one_txn(
                     txn,
                     "users",
                     keyvalues={"name": user_id, "is_guest": 1},
@@ -1034,7 +1040,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                     allow_none=False,
                 )
 
-                self.db.simple_update_one_txn(
+                self.db_pool.simple_update_one_txn(
                     txn,
                     "users",
                     keyvalues={"name": user_id, "is_guest": 1},
@@ -1048,7 +1054,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                     },
                 )
             else:
-                self.db.simple_insert_txn(
+                self.db_pool.simple_insert_txn(
                     txn,
                     "users",
                     values={
@@ -1103,7 +1109,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
@@ -1121,12 +1127,12 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         """
 
         def user_set_password_hash_txn(txn):
-            self.db.simple_update_one_txn(
+            self.db_pool.simple_update_one_txn(
                 txn, "users", {"name": user_id}, {"password_hash": password_hash}
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "user_set_password_hash", user_set_password_hash_txn
         )
 
@@ -1143,7 +1149,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         """
 
         def f(txn):
-            self.db.simple_update_one_txn(
+            self.db_pool.simple_update_one_txn(
                 txn,
                 table="users",
                 keyvalues={"name": user_id},
@@ -1151,7 +1157,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db.runInteraction("user_set_consent_version", f)
+        return self.db_pool.runInteraction("user_set_consent_version", f)
 
     def user_set_consent_server_notice_sent(self, user_id, consent_version):
         """Updates the user table to record that we have sent the user a server
@@ -1167,7 +1173,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         """
 
         def f(txn):
-            self.db.simple_update_one_txn(
+            self.db_pool.simple_update_one_txn(
                 txn,
                 table="users",
                 keyvalues={"name": user_id},
@@ -1175,7 +1181,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db.runInteraction("user_set_consent_server_notice_sent", f)
+        return self.db_pool.runInteraction("user_set_consent_server_notice_sent", f)
 
     def user_delete_access_tokens(self, user_id, except_token_id=None, device_id=None):
         """
@@ -1221,11 +1227,11 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
             return tokens_and_devices
 
-        return self.db.runInteraction("user_delete_access_tokens", f)
+        return self.db_pool.runInteraction("user_delete_access_tokens", f)
 
     def delete_access_token(self, access_token):
         def f(txn):
-            self.db.simple_delete_one_txn(
+            self.db_pool.simple_delete_one_txn(
                 txn, table="access_tokens", keyvalues={"token": access_token}
             )
 
@@ -1233,11 +1239,11 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 txn, self.get_user_by_access_token, (access_token,)
             )
 
-        return self.db.runInteraction("delete_access_token", f)
+        return self.db_pool.runInteraction("delete_access_token", f)
 
     @cachedInlineCallbacks()
     def is_guest(self, user_id):
-        res = yield self.db.simple_select_one_onecol(
+        res = yield self.db_pool.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user_id},
             retcol="is_guest",
@@ -1252,7 +1258,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         Adds a user to the table of users who need to be parted from all the rooms they're
         in
         """
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             "users_pending_deactivation",
             values={"user_id": user_id},
             desc="add_user_pending_deactivation",
@@ -1265,7 +1271,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         """
         # XXX: This should be simple_delete_one but we failed to put a unique index on
         # the table, so somehow duplicate entries have ended up in it.
-        return self.db.simple_delete(
+        return self.db_pool.simple_delete(
             "users_pending_deactivation",
             keyvalues={"user_id": user_id},
             desc="del_user_pending_deactivation",
@@ -1276,7 +1282,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         Gets one user from the table of users waiting to be parted from all the rooms
         they're in.
         """
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             "users_pending_deactivation",
             keyvalues={},
             retcol="user_id",
@@ -1306,7 +1312,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         # Insert everything into a transaction in order to run atomically
         def validate_threepid_session_txn(txn):
-            row = self.db.simple_select_one_txn(
+            row = self.db_pool.simple_select_one_txn(
                 txn,
                 table="threepid_validation_session",
                 keyvalues={"session_id": session_id},
@@ -1324,7 +1330,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                     400, "This client_secret does not match the provided session_id"
                 )
 
-            row = self.db.simple_select_one_txn(
+            row = self.db_pool.simple_select_one_txn(
                 txn,
                 table="threepid_validation_token",
                 keyvalues={"session_id": session_id, "token": token},
@@ -1349,7 +1355,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 )
 
             # Looks good. Validate the session
-            self.db.simple_update_txn(
+            self.db_pool.simple_update_txn(
                 txn,
                 table="threepid_validation_session",
                 keyvalues={"session_id": session_id},
@@ -1359,7 +1365,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             return next_link
 
         # Return next_link if it exists
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "validate_threepid_session_txn", validate_threepid_session_txn
         )
 
@@ -1392,7 +1398,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         if validated_at:
             insertion_values["validated_at"] = validated_at
 
-        return self.db.simple_upsert(
+        return self.db_pool.simple_upsert(
             table="threepid_validation_session",
             keyvalues={"session_id": session_id},
             values={"last_send_attempt": send_attempt},
@@ -1430,7 +1436,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         def start_or_continue_validation_session_txn(txn):
             # Create or update a validation session
-            self.db.simple_upsert_txn(
+            self.db_pool.simple_upsert_txn(
                 txn,
                 table="threepid_validation_session",
                 keyvalues={"session_id": session_id},
@@ -1443,7 +1449,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
 
             # Create a new validation token with this session ID
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="threepid_validation_token",
                 values={
@@ -1454,7 +1460,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 },
             )
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "start_or_continue_validation_session",
             start_or_continue_validation_session_txn,
         )
@@ -1469,7 +1475,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             """
             return txn.execute(sql, (ts,))
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "cull_expired_threepid_validation_tokens",
             cull_expired_threepid_validation_tokens_txn,
             self.clock.time_msec(),
@@ -1484,7 +1490,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             deactivated (bool): The value to set for `deactivated`.
         """
 
-        yield self.db.runInteraction(
+        yield self.db_pool.runInteraction(
             "set_user_deactivated_status",
             self.set_user_deactivated_status_txn,
             user_id,
@@ -1492,7 +1498,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         )
 
     def set_user_deactivated_status_txn(self, txn, user_id, deactivated):
-        self.db.simple_update_one_txn(
+        self.db_pool.simple_update_one_txn(
             txn=txn,
             table="users",
             keyvalues={"name": user_id},
@@ -1520,14 +1526,14 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             txn.execute(sql, [])
 
-            res = self.db.cursor_to_dict(txn)
+            res = self.db_pool.cursor_to_dict(txn)
             if res:
                 for user in res:
                     self.set_expiration_date_for_user_txn(
                         txn, user["name"], use_delta=True
                     )
 
-        yield self.db.runInteraction(
+        yield self.db_pool.runInteraction(
             "get_users_with_no_expiration_date",
             select_users_with_no_expiration_date_txn,
         )
@@ -1551,7 +1557,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 expiration_ts,
             )
 
-        self.db.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             "account_validity",
             keyvalues={"user_id": user_id},

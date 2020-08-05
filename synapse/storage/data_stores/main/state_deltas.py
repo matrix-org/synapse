@@ -100,14 +100,14 @@ class StateDeltasStore(SQLBaseStore):
                 ORDER BY stream_id ASC
             """
             txn.execute(sql, (prev_stream_id, clipped_stream_id))
-            return clipped_stream_id, self.db.cursor_to_dict(txn)
+            return clipped_stream_id, self.db_pool.cursor_to_dict(txn)
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_current_state_deltas", get_current_state_deltas_txn
         )
 
     def _get_max_stream_id_in_current_state_deltas_txn(self, txn):
-        return self.db.simple_select_one_onecol_txn(
+        return self.db_pool.simple_select_one_onecol_txn(
             txn,
             table="current_state_delta_stream",
             keyvalues={},
@@ -115,7 +115,7 @@ class StateDeltasStore(SQLBaseStore):
         )
 
     def get_max_stream_id_in_current_state_deltas(self):
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_max_stream_id_in_current_state_deltas",
             self._get_max_stream_id_in_current_state_deltas_txn,
         )

@@ -71,7 +71,7 @@ class TransactionStore(SQLBaseStore):
             this transaction or a 2-tuple of (int, dict)
         """
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_received_txn_response",
             self._get_received_txn_response,
             transaction_id,
@@ -79,7 +79,7 @@ class TransactionStore(SQLBaseStore):
         )
 
     def _get_received_txn_response(self, txn, transaction_id, origin):
-        result = self.db.simple_select_one_txn(
+        result = self.db_pool.simple_select_one_txn(
             txn,
             table="received_transactions",
             keyvalues={"transaction_id": transaction_id, "origin": origin},
@@ -113,7 +113,7 @@ class TransactionStore(SQLBaseStore):
             response_json (str)
         """
 
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             table="received_transactions",
             values={
                 "transaction_id": transaction_id,
@@ -142,7 +142,7 @@ class TransactionStore(SQLBaseStore):
         if result is not SENTINEL:
             return result
 
-        result = yield self.db.runInteraction(
+        result = yield self.db_pool.runInteraction(
             "get_destination_retry_timings",
             self._get_destination_retry_timings,
             destination,
@@ -154,7 +154,7 @@ class TransactionStore(SQLBaseStore):
         return result
 
     def _get_destination_retry_timings(self, txn, destination):
-        result = self.db.simple_select_one_txn(
+        result = self.db_pool.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
@@ -181,7 +181,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         self._destination_retry_cache.pop(destination, None)
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
             destination,
@@ -221,7 +221,7 @@ class TransactionStore(SQLBaseStore):
         # We need to be careful here as the data may have changed from under us
         # due to a worker setting the timings.
 
-        prev_row = self.db.simple_select_one_txn(
+        prev_row = self.db_pool.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
@@ -230,7 +230,7 @@ class TransactionStore(SQLBaseStore):
         )
 
         if not prev_row:
-            self.db.simple_insert_txn(
+            self.db_pool.simple_insert_txn(
                 txn,
                 table="destinations",
                 values={
@@ -241,7 +241,7 @@ class TransactionStore(SQLBaseStore):
                 },
             )
         elif retry_interval == 0 or prev_row["retry_interval"] < retry_interval:
-            self.db.simple_update_one_txn(
+            self.db_pool.simple_update_one_txn(
                 txn,
                 "destinations",
                 keyvalues={"destination": destination},
@@ -264,6 +264,6 @@ class TransactionStore(SQLBaseStore):
         def _cleanup_transactions_txn(txn):
             txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "_cleanup_transactions", _cleanup_transactions_txn
         )

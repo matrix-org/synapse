@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 class RejectionsStore(SQLBaseStore):
     def get_rejection_reason(self, event_id):
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="rejections",
             retcol="reason",
             keyvalues={"event_id": event_id},

@@ -33,15 +33,15 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(EventsBackgroundUpdatesStore, self).__init__(database, db_conn, hs)
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
         )
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME,
             self._background_reindex_fields_sender,
         )
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "event_contains_url_index",
             index_name="event_contains_url_index",
             table="events",
@@ -52,7 +52,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         # an event_id index on event_search is useful for the purge_history
         # api. Plus it means we get to enforce some integrity with a UNIQUE
         # clause
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "event_search_event_id_idx",
             index_name="event_search_event_id_idx",
             table="event_search",
@@ -61,16 +61,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             psql_only=True,
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.DELETE_SOFT_FAILED_EXTREMITIES, self._cleanup_extremities_bg_update
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "redactions_received_ts", self._redactions_received_ts
         )
 
         # This index gets deleted in `event_fix_redactions_bytes` update
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "event_fix_redactions_bytes_create_index",
             index_name="redactions_censored_redacts",
             table="redactions",
@@ -78,15 +78,15 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             where_clause="have_censored",
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "event_fix_redactions_bytes", self._event_fix_redactions_bytes
         )
 
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             "event_store_labels", self._event_store_labels
         )
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             "redactions_have_censored_ts_idx",
             index_name="redactions_have_censored_ts",
             table="redactions",
@@ -149,18 +149,18 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 "rows_inserted": rows_inserted + len(rows),
             }
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, progress
             )
 
             return len(rows)
 
-        result = yield self.db.runInteraction(
+        result = yield self.db_pool.runInteraction(
             self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, reindex_txn
         )
 
         if not result:
-            yield self.db.updates._end_background_update(
+            yield self.db_pool.updates._end_background_update(
                 self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME
             )
 
@@ -195,7 +195,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             chunks = [event_ids[i : i + 100] for i in range(0, len(event_ids), 100)]
             for chunk in chunks:
-                ev_rows = self.db.simple_select_many_txn(
+                ev_rows = self.db_pool.simple_select_many_txn(
                     txn,
                     table="event_json",
                     column="event_id",
@@ -228,18 +228,18 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 "rows_inserted": rows_inserted + len(rows_to_update),
             }
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, self.EVENT_ORIGIN_SERVER_TS_NAME, progress
             )
 
             return len(rows_to_update)
 
-        result = yield self.db.runInteraction(
+        result = yield self.db_pool.runInteraction(
             self.EVENT_ORIGIN_SERVER_TS_NAME, reindex_search_txn
         )
 
         if not result:
-            yield self.db.updates._end_background_update(
+            yield self.db_pool.updates._end_background_update(
                 self.EVENT_ORIGIN_SERVER_TS_NAME
             )
 
@@ -374,7 +374,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             to_delete.intersection_update(original_set)
 
-            deleted = self.db.simple_delete_many_txn(
+            deleted = self.db_pool.simple_delete_many_txn(
                 txn=txn,
                 table="event_forward_extremities",
                 column="event_id",
@@ -390,7 +390,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             if deleted:
                 # We now need to invalidate the caches of these rooms
-                rows = self.db.simple_select_many_txn(
+                rows = self.db_pool.simple_select_many_txn(
                     txn,
                     table="events",
                     column="event_id",
@@ -404,7 +404,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                         self.get_latest_event_ids_in_room.invalidate, (room_id,)
                     )
 
-            self.db.simple_delete_many_txn(
+            self.db_pool.simple_delete_many_txn(
                 txn=txn,
                 table="_extremities_to_check",
                 column="event_id",
@@ -414,19 +414,19 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             return len(original_set)
 
-        num_handled = yield self.db.runInteraction(
+        num_handled = yield self.db_pool.runInteraction(
             "_cleanup_extremities_bg_update", _cleanup_extremities_bg_update_txn
         )
 
         if not num_handled:
-            yield self.db.updates._end_background_update(
+            yield self.db_pool.updates._end_background_update(
                 self.DELETE_SOFT_FAILED_EXTREMITIES
             )
 
             def _drop_table_txn(txn):
                 txn.execute("DROP TABLE _extremities_to_check")
 
-            yield self.db.runInteraction(
+            yield self.db_pool.runInteraction(
                 "_cleanup_extremities_bg_update_drop_table", _drop_table_txn
             )
 
@@ -474,18 +474,18 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             txn.execute(sql, (self._clock.time_msec(), last_event_id, upper_event_id))
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, "redactions_received_ts", {"last_event_id": upper_event_id}
             )
 
             return len(rows)
 
-        count = yield self.db.runInteraction(
+        count = yield self.db_pool.runInteraction(
             "_redactions_received_ts", _redactions_received_ts_txn
         )
 
         if not count:
-            yield self.db.updates._end_background_update("redactions_received_ts")
+            yield self.db_pool.updates._end_background_update("redactions_received_ts")
 
         return count
 
@@ -511,11 +511,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
             txn.execute("DROP INDEX redactions_censored_redacts")
 
-        yield self.db.runInteraction(
+        yield self.db_pool.runInteraction(
             "_event_fix_redactions_bytes", _event_fix_redactions_bytes_txn
         )
 
-        yield self.db.updates._end_background_update("event_fix_redactions_bytes")
+        yield self.db_pool.updates._end_background_update("event_fix_redactions_bytes")
 
         return 1
 
@@ -543,7 +543,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 try:
                     event_json = db_to_json(event_json_raw)
 
-                    self.db.simple_insert_many_txn(
+                    self.db_pool.simple_insert_many_txn(
                         txn=txn,
                         table="event_labels",
                         values=[
@@ -569,17 +569,17 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 nbrows += 1
                 last_row_event_id = event_id
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn, "event_store_labels", {"last_event_id": last_row_event_id}
             )
 
             return nbrows
 
-        num_rows = yield self.db.runInteraction(
+        num_rows = yield self.db_pool.runInteraction(
             desc="event_store_labels", func=_event_store_labels_txn
         )
 
         if not num_rows:
-            yield self.db.updates._end_background_update("event_store_labels")
+            yield self.db_pool.updates._end_background_update("event_store_labels")
 
         return num_rows

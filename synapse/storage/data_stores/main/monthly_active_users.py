@@ -48,7 +48,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        return self.db.runInteraction("count_users", _count_users)
+        return self.db_pool.runInteraction("count_users", _count_users)
 
     @cached(num_args=0)
     def get_monthly_active_count_by_service(self):
@@ -76,7 +76,9 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             result = txn.fetchall()
             return dict(result)
 
-        return self.db.runInteraction("count_users_by_service", _count_users_by_service)
+        return self.db_pool.runInteraction(
+            "count_users_by_service", _count_users_by_service
+        )
 
     async def get_registered_reserved_users(self) -> List[str]:
         """Of the reserved threepids defined in config, retrieve those that are associated
@@ -109,7 +111,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
 
         """
 
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
             retcol="timestamp",
@@ -128,7 +130,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
 
         # Do not add more reserved users than the total allowable number
         # cur = LoggingTransaction(
-        self.db.new_transaction(
+        self.db_pool.new_transaction(
             db_conn,
             "initialise_mau_threepids",
             [],
@@ -162,7 +164,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
                 is_support = self.is_support_user_txn(txn, user_id)
                 if not is_support:
                     # We do this manually here to avoid hitting #6791
-                    self.db.simple_upsert_txn(
+                    self.db_pool.simple_upsert_txn(
                         txn,
                         table="monthly_active_users",
                         keyvalues={"user_id": user_id},
@@ -246,7 +248,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
             self._invalidate_cache_and_stream(txn, self.get_monthly_active_count, ())
 
         reserved_users = await self.get_registered_reserved_users()
-        await self.db.runInteraction(
+        await self.db_pool.runInteraction(
             "reap_monthly_active_users", _reap_users, reserved_users
         )
 
@@ -273,7 +275,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         if is_support:
             return
 
-        yield self.db.runInteraction(
+        yield self.db_pool.runInteraction(
             "upsert_monthly_active_user", self.upsert_monthly_active_user_txn, user_id
         )
 
@@ -303,7 +305,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
         # See https://github.com/matrix-org/synapse/issues/3854 for more
-        is_insert = self.db.simple_upsert_txn(
+        is_insert = self.db_pool.simple_upsert_txn(
             txn,
             table="monthly_active_users",
             keyvalues={"user_id": user_id},

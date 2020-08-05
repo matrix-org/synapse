@@ -38,7 +38,7 @@ class SignatureWorkerStore(SQLBaseStore):
                 for event_id in event_ids
             }
 
-        return self.db.runInteraction("get_event_reference_hashes", f)
+        return self.db_pool.runInteraction("get_event_reference_hashes", f)
 
     @defer.inlineCallbacks
     def add_event_hashes(self, event_ids):

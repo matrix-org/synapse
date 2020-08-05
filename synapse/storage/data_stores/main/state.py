@@ -93,7 +93,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         # We really should have an entry in the rooms table for every room we
         # care about, but let's be a bit paranoid (at least while the background
         # update is happening) to avoid breaking existing rooms.
-        version = await self.db.simple_select_one_onecol(
+        version = await self.db_pool.simple_select_one_onecol(
             table="rooms",
             keyvalues={"room_id": room_id},
             retcol="room_version",
@@ -184,7 +184,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_current_state_ids", _get_current_state_ids_txn
         )
 
@@ -231,7 +231,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return results
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_filtered_current_state_ids", _get_filtered_current_state_ids_txn
         )
 
@@ -261,7 +261,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     @cached(max_entries=50000)
     def _get_state_group_for_event(self, event_id):
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             table="event_to_state_groups",
             keyvalues={"event_id": event_id},
             retcol="state_group",
@@ -278,7 +278,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
     def _get_state_group_for_events(self, event_ids):
         """Returns mapping event_id -> state_group
         """
-        rows = yield self.db.simple_select_many_batch(
+        rows = yield self.db_pool.simple_select_many_batch(
             table="event_to_state_groups",
             column="event_id",
             iterable=event_ids,
@@ -301,7 +301,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             The subset of state groups that are referenced.
         """
 
-        rows = await self.db.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="event_to_state_groups",
             column="state_group",
             iterable=state_groups,
@@ -324,20 +324,20 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
         self.server_name = hs.hostname
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             self.CURRENT_STATE_INDEX_UPDATE_NAME,
             index_name="current_state_events_member_index",
             table="current_state_events",
             columns=["state_key"],
             where_clause="type='m.room.member'",
         )
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             self.EVENT_STATE_GROUP_INDEX_UPDATE_NAME,
             index_name="event_to_state_groups_sg_index",
             table="event_to_state_groups",
             columns=["state_group"],
         )
-        self.db.updates.register_background_update_handler(
+        self.db_pool.updates.register_background_update_handler(
             self.DELETE_CURRENT_STATE_UPDATE_NAME, self._background_remove_left_rooms,
         )
 
@@ -429,7 +429,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             # potentially stale, since there may have been a period where the
             # server didn't share a room with the remote user and therefore may
             # have missed any device updates.
-            rows = self.db.simple_select_many_txn(
+            rows = self.db_pool.simple_select_many_txn(
                 txn,
                 table="current_state_events",
                 column="room_id",
@@ -441,7 +441,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             potentially_left_users = {row["state_key"] for row in rows}
 
             # Now lets actually delete the rooms from the DB.
-            self.db.simple_delete_many_txn(
+            self.db_pool.simple_delete_many_txn(
                 txn,
                 table="current_state_events",
                 column="room_id",
@@ -449,7 +449,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 keyvalues={},
             )
 
-            self.db.simple_delete_many_txn(
+            self.db_pool.simple_delete_many_txn(
                 txn,
                 table="event_forward_extremities",
                 column="room_id",
@@ -457,7 +457,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
                 keyvalues={},
             )
 
-            self.db.updates._background_update_progress_txn(
+            self.db_pool.updates._background_update_progress_txn(
                 txn,
                 self.DELETE_CURRENT_STATE_UPDATE_NAME,
                 {"last_room_id": room_ids[-1]},
@@ -465,12 +465,12 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
             return False, potentially_left_users
 
-        finished, potentially_left_users = await self.db.runInteraction(
+        finished, potentially_left_users = await self.db_pool.runInteraction(
             "_background_remove_left_rooms", _background_remove_left_rooms_txn
         )
 
         if finished:
-            await self.db.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 self.DELETE_CURRENT_STATE_UPDATE_NAME
             )
 

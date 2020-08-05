@@ -22,7 +22,7 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             database, db_conn, hs
         )
 
-        self.db.updates.register_background_index_update(
+        self.db_pool.updates.register_background_index_update(
             update_name="local_media_repository_url_idx",
             index_name="local_media_repository_url_idx",
             table="local_media_repository",
@@ -42,7 +42,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         Returns:
             None if the media_id doesn't exist.
         """
-        return self.db.simple_select_one(
+        return self.db_pool.simple_select_one(
             "local_media_repository",
             {"media_id": media_id},
             (
@@ -67,7 +67,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         user_id,
         url_cache=None,
     ):
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             "local_media_repository",
             {
                 "media_id": media_id,
@@ -83,7 +83,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
     def mark_local_media_as_safe(self, media_id: str):
         """Mark a local media as safe from quarantining."""
-        return self.db.simple_update_one(
+        return self.db_pool.simple_update_one(
             table="local_media_repository",
             keyvalues={"media_id": media_id},
             updatevalues={"safe_from_quarantine": True},
@@ -136,12 +136,12 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 )
             )
 
-        return self.db.runInteraction("get_url_cache", get_url_cache_txn)
+        return self.db_pool.runInteraction("get_url_cache", get_url_cache_txn)
 
     def store_url_cache(
         self, url, response_code, etag, expires_ts, og, media_id, download_ts
     ):
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             "local_media_repository_url_cache",
             {
                 "url": url,
@@ -156,7 +156,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     def get_local_media_thumbnails(self, media_id):
-        return self.db.simple_select_list(
+        return self.db_pool.simple_select_list(
             "local_media_repository_thumbnails",
             {"media_id": media_id},
             (
@@ -178,7 +178,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             "local_media_repository_thumbnails",
             {
                 "media_id": media_id,
@@ -192,7 +192,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     def get_cached_remote_media(self, origin, media_id):
-        return self.db.simple_select_one(
+        return self.db_pool.simple_select_one(
             "remote_media_cache",
             {"media_origin": origin, "media_id": media_id},
             (
@@ -217,7 +217,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         upload_name,
         filesystem_id,
     ):
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             "remote_media_cache",
             {
                 "media_origin": origin,
@@ -262,12 +262,12 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
             txn.executemany(sql, ((time_ms, media_id) for media_id in local_media))
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "update_cached_last_access_time", update_cache_txn
         )
 
     def get_remote_media_thumbnails(self, origin, media_id):
-        return self.db.simple_select_list(
+        return self.db_pool.simple_select_list(
             "remote_media_cache_thumbnails",
             {"media_origin": origin, "media_id": media_id},
             (
@@ -292,7 +292,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        return self.db.simple_insert(
+        return self.db_pool.simple_insert(
             "remote_media_cache_thumbnails",
             {
                 "media_origin": origin,
@@ -314,24 +314,26 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             " WHERE last_access_ts < ?"
         )
 
-        return self.db.execute(
-            "get_remote_media_before", self.db.cursor_to_dict, sql, before_ts
+        return self.db_pool.execute(
+            "get_remote_media_before", self.db_pool.cursor_to_dict, sql, before_ts
         )
 
     def delete_remote_media(self, media_origin, media_id):
         def delete_remote_media_txn(txn):
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 "remote_media_cache",
                 keyvalues={"media_origin": media_origin, "media_id": media_id},
             )
-            self.db.simple_delete_txn(
+            self.db_pool.simple_delete_txn(
                 txn,
                 "remote_media_cache_thumbnails",
                 keyvalues={"media_origin": media_origin, "media_id": media_id},
             )
 
-        return self.db.runInteraction("delete_remote_media", delete_remote_media_txn)
+        return self.db_pool.runInteraction(
+            "delete_remote_media", delete_remote_media_txn
+        )
 
     def get_expired_url_cache(self, now_ts):
         sql = (
@@ -345,7 +347,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             txn.execute(sql, (now_ts,))
             return [row[0] for row in txn]
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_expired_url_cache", _get_expired_url_cache_txn
         )
 
@@ -358,7 +360,9 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         def _delete_url_cache_txn(txn):
             txn.executemany(sql, [(media_id,) for media_id in media_ids])
 
-        return await self.db.runInteraction("delete_url_cache", _delete_url_cache_txn)
+        return await self.db_pool.runInteraction(
+            "delete_url_cache", _delete_url_cache_txn
+        )
 
     def get_url_cache_media_before(self, before_ts):
         sql = (
@@ -372,7 +376,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             txn.execute(sql, (before_ts,))
             return [row[0] for row in txn]
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_url_cache_media_before", _get_url_cache_media_before_txn
         )
 
@@ -389,6 +393,6 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
             txn.executemany(sql, [(media_id,) for media_id in media_ids])
 
-        return await self.db.runInteraction(
+        return await self.db_pool.runInteraction(
             "delete_url_cache_media", _delete_url_cache_media_txn
         )
