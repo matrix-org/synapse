@@ -47,7 +47,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         def _create(conn):
             return MultiWriterIdGenerator(
                 conn,
-                self.db,
+                self.db_pool,
                 instance_name=instance_name,
                 table="foobar",
                 instance_column="instance_name",
