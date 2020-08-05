@@ -24,8 +24,8 @@ from synapse.storage.prepare_database import prepare_database
 logger = logging.getLogger(__name__)
 
 
-class DataStores(object):
-    """The various data stores.
+class Databases(object):
+    """The various databases.
 
     These are low level interfaces to physical databases.
 
