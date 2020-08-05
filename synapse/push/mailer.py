@@ -679,7 +679,7 @@ def load_jinja2_templates(
         env.filters["format_ts"] = format_ts_filter
 
     if apply_mxc_to_http_filter and public_baseurl:
-        env.filters["mxc_to_http"] = _create_mxc_to_http_filter(public_baseurl)
+        env.filters["mxc_to_http"] = create_mxc_to_http_filter(public_baseurl)
 
     templates = []
     for template_filename in template_filenames:
@@ -689,7 +689,7 @@ def load_jinja2_templates(
     return templates
 
 
-def _create_mxc_to_http_filter(public_baseurl):
+def create_mxc_to_http_filter(public_baseurl):
     def mxc_to_http_filter(value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":
             return ""
