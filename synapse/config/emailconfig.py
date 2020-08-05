@@ -20,9 +20,10 @@ from __future__ import print_function
 import email.utils
 import os
 from enum import Enum
-from typing import Optional
+from typing import Callable, Dict, List, Optional
 
 import attr
+import jinja2
 import pkg_resources
 
 from ._base import Config, ConfigError
@@ -98,14 +99,19 @@ class EmailConfig(Config):
             if parsed[1] == "":
                 raise RuntimeError("Invalid notif_from address")
 
-        template_dir = email_config.get("template_dir")
-        # we need an absolute path, because we change directory after starting (and
+        # Get the path to the default Synapse template directory
+        self.default_template_dir = pkg_resources.resource_filename(
+            "synapse", "res/templates"
+        )
+
+        # A user-configurable template directory. Templates will first be looked for here,
+        # and if not found, will be taken from the default template directory instead.
+        template_dir = email_config.get("template_dir") or self.default_template_dir
+
+        # We need an absolute path, because we change directory after starting (and
         # we don't yet know what auxiliary templates like mail.css we will need).
         # (Note that loading as package_resources with jinja.PackageLoader doesn't
         # work for the same reason.)
-        if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
-
         self.email_template_dir = os.path.abspath(template_dir)
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
@@ -166,19 +172,6 @@ class EmailConfig(Config):
             email_config.get("validation_token_lifetime", "1h")
         )
 
-        if (
-            self.email_enable_notifs
-            or account_validity_renewal_enabled
-            or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-        ):
-            # make sure we can import the required deps
-            import bleach
-            import jinja2
-
-            # prevent unused warnings
-            jinja2
-            bleach
-
         if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             missing = []
             if not self.email_notif_from:
@@ -214,7 +207,6 @@ class EmailConfig(Config):
             self.email_add_threepid_template_text = email_config.get(
                 "add_threepid_template_text", "add_threepid.txt"
             )
-
             self.email_password_reset_template_failure_html = email_config.get(
                 "password_reset_template_failure_html", "password_reset_failure.html"
             )
@@ -237,43 +229,28 @@ class EmailConfig(Config):
                 "add_threepid_template_success_html", "add_threepid_success.html"
             )
 
-            # Check templates exist
-            for f in [
-                self.email_password_reset_template_html,
-                self.email_password_reset_template_text,
-                self.email_registration_template_html,
-                self.email_registration_template_text,
-                self.email_add_threepid_template_html,
-                self.email_add_threepid_template_text,
-                self.email_password_reset_template_failure_html,
-                self.email_registration_template_failure_html,
-                self.email_add_threepid_template_failure_html,
-                email_password_reset_template_success_html,
-                email_registration_template_success_html,
-                email_add_threepid_template_success_html,
-            ]:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find template file %s" % (p,))
+            # Read and render web templates
+            (
+                password_reset_template_success_html_template,
+                registration_template_success_html_template,
+                add_threepid_template_success_html_template,
+            ) = self.read_templates(
+                [
+                    email_password_reset_template_success_html,
+                    email_registration_template_success_html,
+                    email_add_threepid_template_success_html,
+                ],
+                self.email_template_dir,
+            )
 
-            # Retrieve content of web templates
-            filepath = os.path.join(
-                self.email_template_dir, email_password_reset_template_success_html
+            self.email_password_reset_template_success_html = (
+                password_reset_template_success_html_template.render()
             )
-            self.email_password_reset_template_success_html = self.read_file(
-                filepath, "email.password_reset_template_success_html"
+            self.email_registration_template_success_html_content = (
+                registration_template_success_html_template.render()
             )
-            filepath = os.path.join(
-                self.email_template_dir, email_registration_template_success_html
-            )
-            self.email_registration_template_success_html_content = self.read_file(
-                filepath, "email.registration_template_success_html"
-            )
-            filepath = os.path.join(
-                self.email_template_dir, email_add_threepid_template_success_html
-            )
-            self.email_add_threepid_template_success_html_content = self.read_file(
-                filepath, "email.add_threepid_template_success_html"
+            self.email_add_threepid_template_success_html_content = (
+                add_threepid_template_success_html_template.render()
             )
 
         if self.email_enable_notifs:
@@ -297,11 +274,6 @@ class EmailConfig(Config):
                 "notif_template_text", "notif_mail.txt"
             )
 
-            for f in self.email_notif_template_text, self.email_notif_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
-
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
             )
@@ -316,11 +288,6 @@ class EmailConfig(Config):
             self.email_expiry_template_text = email_config.get(
                 "expiry_template_text", "notice_expiry.txt"
             )
-
-            for f in self.email_expiry_template_text, self.email_expiry_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
 
         subjects_config = email_config.get("subjects", {})
         subjects = {}
@@ -400,9 +367,7 @@ class EmailConfig(Config):
           # Directory in which Synapse will try to find the template files below.
           # If not set, default templates from within the Synapse package will be used.
           #
-          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-          # If you *do* uncomment it, you will need to make sure that all the templates
-          # below are in the directory.
+          # Do not uncomment this setting unless you want to customise the templates.
           #
           # Synapse will look for the following templates in this directory:
           #
@@ -508,6 +473,63 @@ class EmailConfig(Config):
         """
             % DEFAULT_SUBJECTS
         )
+
+    def read_templates(
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
+        autoescape: bool = True,
+        filters: Dict[str, Callable] = {},
+    ) -> List[jinja2.Template]:
+        """Load a list of template files from disk using the given variables and filters.
+
+        This function will attempt to load the given templates from the default Synapse
+        template directory. If `custom_template_directory` is supplied, that directory
+        is tried first.
+
+        Files read are treated as Jinja templates. These templates are not rendered yet.
+
+        Args:
+            filenames: A list of template filenames to read.
+
+            custom_template_directory: A directory to try to look for the templates
+                before using the default Synapse template directory instead.
+
+            autoescape: Whether to automatically escape template variables when the templates
+                are rendered.
+
+            filters: Custom functions which can modify the given template variables upon
+                render, if the template file specifies them.
+
+        Raises:
+            ConfigError: if the file's path is incorrect or otherwise cannot be read.
+
+        Returns:
+            A list of jinja2 templates.
+        """
+        templates = []
+        for filename in filenames:
+            template_directory = self.default_template_dir
+
+            # Check whether the template exists in the user-configured template directory
+            if custom_template_directory:
+                filepath = os.path.join(template_directory, filename)
+                if self.path_exists(filepath):
+                    # Use the custom template directory instead
+                    template_directory = custom_template_directory
+
+            # Set up jinja with the template directory
+            loader = jinja2.FileSystemLoader(template_directory)
+            env = jinja2.Environment(loader=loader, autoescape=autoescape)
+
+            # Apply any custom filters
+            env.filters.update(filters)
+
+            # Load the template
+            template = env.get_template(filename)
+            templates.append(template)
+
+        return templates
 
 
 class ThreepidBehaviour(Enum):
