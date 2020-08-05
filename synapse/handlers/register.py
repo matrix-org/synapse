@@ -26,6 +26,7 @@ from synapse.replication.http.register import (
     ReplicationPostRegisterActionsServlet,
     ReplicationRegisterServlet,
 )
+from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
 
@@ -51,6 +52,8 @@ class RegistrationHandler(BaseHandler):
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
         self._server_notices_mxid = hs.config.server_notices_mxid
+
+        self.spam_checker = hs.get_spam_checker()
 
         if hs.config.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
@@ -142,7 +145,7 @@ class RegistrationHandler(BaseHandler):
         address=None,
         bind_emails=[],
         by_admin=False,
-        shadow_banned=False,
+        user_agent_ips=None,
     ):
         """Registers a new client on the server.
 
@@ -160,13 +163,32 @@ class RegistrationHandler(BaseHandler):
             bind_emails (List[str]): list of emails to bind to this account.
             by_admin (bool): True if this registration is being made via the
               admin api, otherwise False.
-            shadow_banned (bool): Shadow-ban the created user.
+            user_agent_ips (List[(str, str)]): Tuples of IP addresses and user-agents used
+                during the registration process.
         Returns:
             str: user_id
         Raises:
             SynapseError if there was a problem registering.
         """
         self.check_registration_ratelimit(address)
+
+        result = self.spam_checker.check_registration_for_spam(
+            threepid, localpart, user_agent_ips or [],
+        )
+
+        if result == RegistrationBehaviour.DENY:
+            logger.info(
+                "Blocked registration of %r", localpart,
+            )
+            # We return a 429 to make it not obvious that they've been
+            # denied.
+            raise SynapseError(429, "Rate limited")
+
+        shadow_banned = result == RegistrationBehaviour.SHADOW_BAN
+        if shadow_banned:
+            logger.info(
+                "Shadow banning registration of %r", localpart,
+            )
 
         # do not check_auth_blocking if the call is coming through the Admin API
         if not by_admin:
