@@ -24,6 +24,7 @@ from twisted.internet.protocol import ReconnectingClientFactory
 from synapse.api.constants import EventTypes
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
+from synapse.replication.tcp.streams import TypingStream
 from synapse.replication.tcp.streams.events import (
     EventsStream,
     EventsStreamEventRow,
@@ -104,6 +105,7 @@ class ReplicationDataHandler:
         self._clock = hs.get_clock()
         self._streams = hs.get_replication_streams()
         self._instance_name = hs.get_instance_name()
+        self._typing_handler = hs.get_typing_handler()
 
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
@@ -126,6 +128,12 @@ class ReplicationDataHandler:
             rows: a list of Stream.ROW_TYPE objects as returned by Stream.parse_row.
         """
         self.store.process_replication_rows(stream_name, instance_name, token, rows)
+
+        if stream_name == TypingStream.NAME:
+            self._typing_handler.process_replication_rows(token, rows)
+            self.notifier.on_new_event(
+                "typing_key", token, rooms=[row.room_id for row in rows]
+            )
 
         if stream_name == EventsStream.NAME:
             # We shouldn't get multiple rows per token for events stream, so

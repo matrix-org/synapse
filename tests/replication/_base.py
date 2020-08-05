@@ -65,7 +65,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         # Since we use sqlite in memory databases we need to make sure the
         # databases objects are the same.
-        self.worker_hs.get_datastore().db = hs.get_datastore().db
+        self.worker_hs.get_datastore().db_pool = hs.get_datastore().db_pool
 
         self.test_handler = self._build_replication_data_handler()
         self.worker_hs.replication_data_handler = self.test_handler
@@ -198,7 +198,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         self.streamer = self.hs.get_replication_streamer()
 
         store = self.hs.get_datastore()
-        self.database = store.db
+        self.database_pool = store.db_pool
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
 
@@ -254,7 +254,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         )
 
         store = worker_hs.get_datastore()
-        store.db._db_pool = self.database._db_pool
+        store.db_pool._db_pool = self.database_pool._db_pool
 
         repl_handler = ReplicationCommandHandler(worker_hs)
         client = ClientReplicationStreamProtocol(

@@ -31,6 +31,7 @@ import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
 from synapse.events.builder import EventBuilderFactory
+from synapse.handlers.typing import FollowerTypingHandler
 from synapse.replication.tcp.streams import Stream
 
 class HomeServer(object):
@@ -149,4 +150,6 @@ class HomeServer(object):
     ) -> synapse.http.matrixfederationclient.MatrixFederationHttpClient:
         pass
     def should_send_federation(self) -> bool:
+        pass
+    def get_typing_handler(self) -> FollowerTypingHandler:
         pass

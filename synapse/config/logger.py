@@ -214,7 +214,7 @@ def setup_logging(
     Set up the logging subsystem.
 
     Args:
-        config (LoggingConfig | synapse.config.workers.WorkerConfig):
+        config (LoggingConfig | synapse.config.worker.WorkerConfig):
             configuration data
 
         use_worker_options (bool): True to use the 'worker_log_config' option

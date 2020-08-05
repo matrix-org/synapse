@@ -237,7 +237,9 @@ class RedactionTestCase(unittest.HomeserverTestCase):
 
             @defer.inlineCallbacks
             def build(self, prev_event_ids):
-                built_event = yield self._base_builder.build(prev_event_ids)
+                built_event = yield defer.ensureDeferred(
+                    self._base_builder.build(prev_event_ids)
+                )
 
                 built_event._event_id = self._event_id
                 built_event._dict["event_id"] = self._event_id
@@ -341,7 +343,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
         event_json = self.get_success(
-            self.store.db.simple_select_one_onecol(
+            self.store.db_pool.simple_select_one_onecol(
                 table="event_json",
                 keyvalues={"event_id": msg_event.event_id},
                 retcol="json",
@@ -359,7 +361,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(60 * 60 * 2)
 
         event_json = self.get_success(
-            self.store.db.simple_select_one_onecol(
+            self.store.db_pool.simple_select_one_onecol(
                 table="event_json",
                 keyvalues={"event_id": msg_event.event_id},
                 retcol="json",

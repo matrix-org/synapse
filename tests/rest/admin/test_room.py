@@ -283,6 +283,23 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
+    def test_purge_is_not_bool(self):
+        """
+        If parameter `purge` is not boolean, return an error
+        """
+        body = json.dumps({"purge": "NotBool"})
+
+        request, channel = self.make_request(
+            "POST",
+            self.url,
+            content=body.encode(encoding="utf_8"),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
+
     def test_purge_room_and_block(self):
         """Test to purge a room and block it.
         Members will not be moved to a new room and will not receive a message.
@@ -297,7 +314,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": True})
+        body = json.dumps({"block": True, "purge": True})
 
         request, channel = self.make_request(
             "POST",
@@ -331,7 +348,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": False})
+        body = json.dumps({"block": False, "purge": True})
 
         request, channel = self.make_request(
             "POST",
@@ -348,6 +365,42 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("local_aliases", channel.json_body)
 
         self._is_purged(self.room_id)
+        self._is_blocked(self.room_id, expect=False)
+        self._has_no_members(self.room_id)
+
+    def test_block_room_and_not_purge(self):
+        """Test to block a room without purging it.
+        Members will not be moved to a new room and will not receive a message.
+        The room will not be purged.
+        """
+        # Test that room is not purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+
+        # Test that room is not blocked
+        self._is_blocked(self.room_id, expect=False)
+
+        # Assert one user in room
+        self._is_member(room_id=self.room_id, user_id=self.other_user)
+
+        body = json.dumps({"block": False, "purge": False})
+
+        request, channel = self.make_request(
+            "POST",
+            self.url.encode("ascii"),
+            content=body.encode(encoding="utf_8"),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(None, channel.json_body["new_room_id"])
+        self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
+        self.assertIn("failed_to_kick_users", channel.json_body)
+        self.assertIn("local_aliases", channel.json_body)
+
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
         self._is_blocked(self.room_id, expect=False)
         self._has_no_members(self.room_id)
 
@@ -513,7 +566,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",
@@ -614,7 +667,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",

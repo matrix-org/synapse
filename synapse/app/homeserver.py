@@ -380,13 +380,12 @@ def setup(config_options):
 
     hs.setup_master()
 
-    @defer.inlineCallbacks
-    def do_acme():
+    async def do_acme() -> bool:
         """
         Reprovision an ACME certificate, if it's required.
 
         Returns:
-            Deferred[bool]: Whether the cert has been updated.
+            Whether the cert has been updated.
         """
         acme = hs.get_acme_handler()
 
@@ -405,7 +404,7 @@ def setup(config_options):
             provision = True
 
         if provision:
-            yield acme.provision_certificate()
+            await acme.provision_certificate()
 
         return provision
 
@@ -415,7 +414,7 @@ def setup(config_options):
         Provision a certificate from ACME, if required, and reload the TLS
         certificate if it's renewed.
         """
-        reprovisioned = yield do_acme()
+        reprovisioned = yield defer.ensureDeferred(do_acme())
         if reprovisioned:
             _base.refresh_certificate(hs)
 
@@ -427,8 +426,8 @@ def setup(config_options):
                 acme = hs.get_acme_handler()
                 # Start up the webservices which we will respond to ACME
                 # challenges with, and then provision.
-                yield acme.start_listening()
-                yield do_acme()
+                yield defer.ensureDeferred(acme.start_listening())
+                yield defer.ensureDeferred(do_acme())
 
                 # Check if it needs to be reprovisioned every day.
                 hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
@@ -442,7 +441,7 @@ def setup(config_options):
 
             _base.start(hs, config.listeners)
 
-            hs.get_datastore().db.updates.start_doing_background_updates()
+            hs.get_datastore().db_pool.updates.start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.
             print("Error during startup:", file=sys.stderr)
@@ -552,8 +551,8 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     #
 
     # This only reports info about the *main* database.
-    stats["database_engine"] = hs.get_datastore().db.engine.module.__name__
-    stats["database_server_version"] = hs.get_datastore().db.engine.server_version
+    stats["database_engine"] = hs.get_datastore().db_pool.engine.module.__name__
+    stats["database_server_version"] = hs.get_datastore().db_pool.engine.server_version
 
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:

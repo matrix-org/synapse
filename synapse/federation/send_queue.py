@@ -57,7 +57,7 @@ class FederationRemoteSendQueue(object):
 
         # We may have multiple federation sender instances, so we need to track
         # their positions separately.
-        self._sender_instances = hs.config.federation.federation_shard_config.instances
+        self._sender_instances = hs.config.worker.federation_shard_config.instances
         self._sender_positions = {}
 
         # Pending presence map user_id -> UserPresenceState
