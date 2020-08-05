@@ -27,7 +27,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.db_pool = self.store.db  # type: DatabasePool
+        self.db_pool = self.store.db_pool  # type: DatabasePool
 
         self.get_success(self.db_pool.runInteraction("_setup_db", self._setup_db))
 
