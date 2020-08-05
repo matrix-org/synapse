@@ -1,0 +1,1 @@
+Fix a long-standing bug which caused two copies of some log lines to be written when synctl was used along with a MemoryHandler logger.
