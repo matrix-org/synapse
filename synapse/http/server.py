@@ -30,8 +30,9 @@ from canonicaljson import (
     iterencode_pretty_printed_json,
     json,
 )
+from zope.interface import implementer
 
-from twisted.internet import defer
+from twisted.internet import defer, interfaces
 from twisted.python import failure
 from twisted.web import resource
 from twisted.web.server import NOT_DONE_YET, Request
@@ -496,6 +497,7 @@ class RootOptionsRedirectResource(OptionsResource, RootRedirect):
     pass
 
 
+@implementer(interfaces.IPullProducer)
 class _JsonProducer:
     """
     Iteratively write JSON to the request.
