@@ -534,10 +534,10 @@ class ServerConfig(Config):
         # not included in the sample configuration file on purpose as it's a temporary
         # hack, so that some users can trial the new defaults without impacting every
         # user on the homeserver.
-        self.users_new_default_push_rules = (
+        users_new_default_push_rules = (
             config.get("users_new_default_push_rules") or []
         )
-        if not isinstance(self.users_new_default_push_rules, list):
+        if not isinstance(users_new_default_push_rules, list):
             raise ConfigError("'users_new_default_push_rules' must be a list")
 
         # Turn the list into a set to improve lookup speed.
