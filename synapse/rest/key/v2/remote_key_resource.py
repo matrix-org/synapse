@@ -22,12 +22,13 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
 from synapse.http.server import DirectServeJsonResource, respond_with_json_bytes
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
+from synapse.util import json_decoder
 
 logger = logging.getLogger(__name__)
 
 
 class RemoteKey(DirectServeJsonResource):
-    """HTTP resource for retreiving the TLS certificate and NACL signature
+    """HTTP resource for retrieving the TLS certificate and NACL signature
     verification keys for a collection of servers. Checks that the reported
     X.509 TLS certificate matches the one used in the HTTPS connection. Checks
     that the NACL signature for the remote server is valid. Returns a dict of
@@ -209,13 +210,15 @@ class RemoteKey(DirectServeJsonResource):
                     # Cast to bytes since postgresql returns a memoryview.
                     json_results.add(bytes(result["key_json"]))
 
+        # If there is a cache miss, request the missing keys, then recurse (and
+        # ensure the result is sent).
         if cache_misses and query_remote_on_cache_miss:
             await self.fetcher.get_keys(cache_misses)
             await self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
             signed_keys = []
             for key_json in json_results:
-                key_json = json.loads(key_json.decode("utf-8"))
+                key_json = json_decoder.decode(key_json.decode("utf-8"))
                 for signing_key in self.config.key_server_signing_keys:
                     key_json = sign_json(key_json, self.config.server_name, signing_key)
 
