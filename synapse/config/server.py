@@ -540,6 +540,9 @@ class ServerConfig(Config):
         if not isinstance(self.users_new_default_push_rules, list):
             raise ConfigError("'users_new_default_push_rules' must be a list")
 
+        # Turn the list into a set to improve lookup speed.
+        self.users_new_default_push_rules = set(self.users_new_default_push_rules)
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 

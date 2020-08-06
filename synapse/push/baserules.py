@@ -24,6 +24,8 @@ def list_with_base_rules(rawrules, use_new_defaults=False):
 
     Args:
         rawrules(list): The rules the user has modified or set.
+        use_new_defaults(bool): Whether to use the new experimental default rules when
+            appending or prepending default rules.
 
     Returns:
         A new list with the rules set by the user combined with the defaults.
@@ -125,11 +127,7 @@ def make_base_prepend_rules(kind, modified_base_rules, use_new_defaults=False):
     rules = []
 
     if kind == "override":
-        rules = (
-            NEW_PREPEND_OVERRIDE_RULES
-            if use_new_defaults
-            else BASE_PREPEND_OVERRIDE_RULES
-        )
+        rules = BASE_PREPEND_OVERRIDE_RULES
 
     # Copy the rules before modifying them
     rules = copy.deepcopy(rules)
@@ -167,16 +165,6 @@ BASE_PREPEND_OVERRIDE_RULES = [
         "enabled": False,
         "conditions": [],
         "actions": ["dont_notify"],
-    }
-]
-
-
-NEW_PREPEND_OVERRIDE_RULES = [
-    {
-        "rule_id": "global/override/.m.rule.master",
-        "enabled": False,
-        "conditions": [],
-        "actions": [],
     }
 ]
 
@@ -573,7 +561,7 @@ for r in BASE_APPEND_CONTENT_RULES:
     r["default"] = True
     NEW_RULE_IDS.add(r["rule_id"])
 
-for r in NEW_PREPEND_OVERRIDE_RULES:
+for r in BASE_PREPEND_OVERRIDE_RULES:
     r["priority_class"] = PRIORITY_CLASS_MAP["override"]
     r["default"] = True
     NEW_RULE_IDS.add(r["rule_id"])

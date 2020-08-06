@@ -105,7 +105,7 @@ class PushRulesWorkerStore(
             prefilled_cache=push_rules_prefill,
         )
 
-        self.users_new_default_push_rules = hs.config.users_new_default_push_rules
+        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
 
     @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
@@ -136,7 +136,7 @@ class PushRulesWorkerStore(
 
         enabled_map = yield self.get_push_rules_enabled_for_user(user_id)
 
-        use_new_defaults = user_id in self.users_new_default_push_rules
+        use_new_defaults = user_id in self._users_new_default_push_rules
 
         rules = _load_rules(rows, enabled_map, use_new_defaults)
 
@@ -198,7 +198,7 @@ class PushRulesWorkerStore(
         enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            use_new_defaults = user_id in self.users_new_default_push_rules
+            use_new_defaults = user_id in self._users_new_default_push_rules
 
             results[user_id] = _load_rules(
                 rules, enabled_map_by_user.get(user_id, {}), use_new_defaults,

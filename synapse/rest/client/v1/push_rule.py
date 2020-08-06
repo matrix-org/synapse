@@ -45,7 +45,7 @@ class PushRuleRestServlet(RestServlet):
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None
 
-        self.users_new_default_push_rules = hs.config.users_new_default_push_rules
+        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
 
     async def on_PUT(self, request, path):
         if self._is_worker:
@@ -181,7 +181,7 @@ class PushRuleRestServlet(RestServlet):
             rule_id = spec["rule_id"]
             is_default_rule = rule_id.startswith(".")
             if is_default_rule:
-                if user_id in self.users_new_default_push_rules:
+                if user_id in self._users_new_default_push_rules:
                     rule_ids = NEW_RULE_IDS
                 else:
                     rule_ids = BASE_RULE_IDS
