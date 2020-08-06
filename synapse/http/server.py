@@ -559,7 +559,9 @@ _json_encoder = json.JSONEncoder(separators=(",", ":"))
 
 
 def _encode_json_bytes(json_object: Any) -> Iterator[bytes]:
-    """"""
+    """
+    Encode an object into JSON. Returns an iterator of bytes.
+    """
     for chunk in _json_encoder.iterencode(json_object):
         yield chunk.encode("utf-8")
 
