@@ -76,7 +76,6 @@ handlers:
     buffer:
         class: logging.handlers.MemoryHandler
         formatter: precise
-        level: DEBUG
         target: file
         capacity: 100
 
