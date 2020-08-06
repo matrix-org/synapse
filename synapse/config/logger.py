@@ -69,6 +69,17 @@ handlers:
         backupCount: 10
         filters: [context]
         encoding: utf8
+
+    # Default to buffering writes to log file for efficiency. This means that
+    # will be a delay for WARNING/INFO/DEBUG logs to get written, but ERROR
+    # logs will still be flushed immediately.
+    buffer:
+        class: logging.handlers.MemoryHandler
+        formatter: precise
+        level: DEBUG
+        target: file
+        capacity: 100
+
     console:
         class: logging.StreamHandler
         formatter: precise
@@ -82,7 +93,7 @@ loggers:
 
 root:
     level: INFO
-    handlers: [file, console]
+    handlers: [buffer, console]
 
 disable_existing_loggers: false
 """
