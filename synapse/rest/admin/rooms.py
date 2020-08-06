@@ -31,7 +31,7 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
     historical_admin_path_patterns,
 )
-from synapse.storage.data_stores.main.room import RoomSortOrder
+from synapse.storage.databases.main.room import RoomSortOrder
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 
 logger = logging.getLogger(__name__)

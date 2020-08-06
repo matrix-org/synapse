@@ -219,7 +219,7 @@ class ModuleApi(object):
         Returns:
             Deferred[object]: result of func
         """
-        return self._store.db.runInteraction(desc, func, *args, **kwargs)
+        return self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
 
     def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str

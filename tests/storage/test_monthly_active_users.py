@@ -78,7 +78,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         # XXX why are we doing this here? this function is only run at startup
         # so it is odd to re-run it here.
         self.get_success(
-            self.store.db.runInteraction(
+            self.store.db_pool.runInteraction(
                 "initialise", self.store._initialise_reserved_users, threepids
             )
         )
@@ -204,7 +204,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
                     self.store.user_add_threepid(user, "email", email, now, now)
                 )
 
-        d = self.store.db.runInteraction(
+        d = self.store.db_pool.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         self.get_success(d)
@@ -280,7 +280,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
         ]
 
         self.hs.config.mau_limits_reserved_threepids = threepids
-        d = self.store.db.runInteraction(
+        d = self.store.db_pool.runInteraction(
             "initialise", self.store._initialise_reserved_users, threepids
         )
         self.get_success(d)
