@@ -15,21 +15,12 @@
 
 import logging
 
+from synapse.push.emailpusher import EmailPusher
+from synapse.push.mailer import Mailer, create_mxc_to_http_filter, format_ts_filter
+
 from .httppusher import HttpPusher
 
 logger = logging.getLogger(__name__)
-
-# We try importing this if we can (it will fail if we don't
-# have the optional email dependencies installed). We don't
-# yet have the config to know if we need the email pusher,
-# but importing this after daemonizing seems to fail
-# (even though a simple test of importing from a daemonized
-# process works fine)
-try:
-    from synapse.push.emailpusher import EmailPusher
-    from synapse.push.mailer import Mailer, load_jinja2_templates
-except Exception:
-    pass
 
 
 class PusherFactory(object):
@@ -43,15 +34,19 @@ class PusherFactory(object):
         if hs.config.email_enable_notifs:
             self.mailers = {}  # app_name -> Mailer
 
-            self.notif_template_html, self.notif_template_text = load_jinja2_templates(
-                self.config.email_template_dir,
+            (
+                self.notif_template_html,
+                self.notif_template_text,
+            ) = hs.config.read_templates(
                 [
                     self.config.email_notif_template_html,
                     self.config.email_notif_template_text,
                 ],
-                apply_format_ts_filter=True,
-                apply_mxc_to_http_filter=True,
-                public_baseurl=self.config.public_baseurl,
+                self.config.email_template_dir,
+                filters={
+                    "format_ts": format_ts_filter,
+                    "mxc_to_http": create_mxc_to_http_filter(hs.config.public_baseurl),
+                },
             )
 
             self.pusher_types["email"] = self._create_email_pusher
