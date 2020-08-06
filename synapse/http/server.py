@@ -22,10 +22,14 @@ import types
 import urllib
 from http import HTTPStatus
 from io import BytesIO
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Tuple, Union
 
 import jinja2
-from canonicaljson import _canonical_encoder, _pretty_encoder, json
+from canonicaljson import (
+    iterencode_canonical_json,
+    iterencode_pretty_printed_json,
+    json,
+)
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -501,24 +505,29 @@ class _JsonProducer:
     # usually be smaller than this.
     min_chunk_size = 1024
 
-    def __init__(self, request, json_encoder, json_object):
-        self.request = request
-        self._generator = json_encoder.iterencode(json_object)
+    def __init__(
+        self,
+        request: Request,
+        json_encoder: Callable[[Any], Iterator[bytes]],
+        json_object: Any,
+    ):
+        self._request = request
+        self._generator = json_encoder(json_object)
 
     def start(self):
-        self.request.registerProducer(self, False)
+        self._request.registerProducer(self, False)
 
-    def _send_data(self, data: List[str]):
+    def _send_data(self, data: List[bytes]) -> None:
         """
         Send a list of strings as a response to the request.
         """
         if not data:
             return
-        self.request.write("".join(data).encode("utf-8"))
+        self._request.write(b"".join(data))
 
     def resumeProducing(self):
         # We've stopped producing in the meantime.
-        if not self.request:
+        if not self._request:
             return
 
         # Get the next chunk and write it to the request. Calling write will
@@ -534,16 +543,25 @@ class _JsonProducer:
                 # Everything is serialized, write any data, then finalize the
                 # producer.
                 self._send_data(buffer)
-                self.request.unregisterProducer()
-                self.request.finish()
+                self._request.unregisterProducer()
+                self._request.finish()
                 self.stopProducing()
                 return
 
         self._send_data(buffer)
 
     def stopProducing(self):
-        self._generator = None
-        self.request = None
+        self._generator = None  # type: ignore
+        self._request = None
+
+
+_json_encoder = json.JSONEncoder(separators=(",", ":"))
+
+
+def _encode_json_bytes(json_object: Any) -> Iterator[bytes]:
+    """"""
+    for chunk in _json_encoder.iterencode(json_object):
+        yield chunk.encode("utf-8")
 
 
 def respond_with_json(
@@ -580,13 +598,13 @@ def respond_with_json(
         return None
 
     if pretty_print:
-        encoder = _pretty_encoder
+        encoder = iterencode_pretty_printed_json
     else:
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
-            encoder = _canonical_encoder
+            encoder = iterencode_canonical_json
         else:
             # TODO Re-use this.
-            encoder = json.JSONEncoder(separators=(",", ":"))
+            encoder = _encode_json_bytes
 
     request.setResponseCode(code)
     request.setHeader(b"Content-Type", b"application/json")
