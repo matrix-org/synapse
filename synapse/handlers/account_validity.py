@@ -23,13 +23,9 @@ from typing import List
 from synapse.api.errors import StoreError
 from synapse.logging.context import make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.push.mailer import create_mxc_to_http_filter, format_ts_filter
 from synapse.types import UserID
 from synapse.util import stringutils
-
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except ImportError:
-    load_jinja2_templates = None
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +43,6 @@ class AccountValidityHandler(object):
         if (
             self._account_validity.enabled
             and self._account_validity.renew_by_email_enabled
-            and load_jinja2_templates
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
             try:
@@ -65,15 +60,16 @@ class AccountValidityHandler(object):
 
             self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
-            self._template_html, self._template_text = load_jinja2_templates(
-                self.config.email_template_dir,
+            self._template_html, self._template_text = hs.config.read_templates(
                 [
                     self.config.email_expiry_template_html,
                     self.config.email_expiry_template_text,
                 ],
-                apply_format_ts_filter=True,
-                apply_mxc_to_http_filter=True,
-                public_baseurl=self.config.public_baseurl,
+                self.config.email_template_dir,
+                filters={
+                    "format_ts": format_ts_filter,
+                    "mxc_to_http": create_mxc_to_http_filter(hs.config.public_baseurl),
+                },
             )
 
             # Check the renewal emails to send and send them every 30min.
