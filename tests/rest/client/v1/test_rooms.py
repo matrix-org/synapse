@@ -1993,7 +1993,7 @@ class ShadowBanTestCase(unittest.HomeserverTestCase):
         self.store = self.hs.get_datastore()
 
         self.get_success(
-            self.store.db.simple_update(
+            self.store.db_pool.simple_update(
                 table="users",
                 keyvalues={"name": self.banned_user_id},
                 updatevalues={"shadow_banned": True},

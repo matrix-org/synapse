@@ -70,7 +70,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
     async def is_shadow_banned(self, user_id):
-        return await self.db.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user_id},
             retcol="shadow_banned",
