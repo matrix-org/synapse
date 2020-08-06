@@ -16,8 +16,6 @@
 import logging
 import re
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state import StateFilter
@@ -664,32 +662,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         users = set(pub_rows)
         users.update(rows)
         return list(users)
-
-    @defer.inlineCallbacks
-    def get_rooms_in_common_for_users(self, user_id, other_user_id):
-        """Given two user_ids find out the list of rooms they share.
-        """
-        sql = """
-            SELECT room_id FROM (
-                SELECT c.room_id FROM current_state_events AS c
-                INNER JOIN room_memberships AS m USING (event_id)
-                WHERE type = 'm.room.member'
-                    AND m.membership = 'join'
-                    AND state_key = ?
-            ) AS f1 INNER JOIN (
-                SELECT c.room_id FROM current_state_events AS c
-                INNER JOIN room_memberships AS m USING (event_id)
-                WHERE type = 'm.room.member'
-                    AND m.membership = 'join'
-                    AND state_key = ?
-            ) f2 USING (room_id)
-        """
-
-        rows = yield self.db_pool.execute(
-            "get_rooms_in_common_for_users", None, sql, user_id, other_user_id
-        )
-
-        return [room_id for room_id, in rows]
 
     def get_user_directory_stream_pos(self):
         return self.db_pool.simple_select_one_onecol(
