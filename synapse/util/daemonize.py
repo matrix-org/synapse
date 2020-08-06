@@ -60,8 +60,14 @@ def daemonize_process(pid_file: str, logger: logging.Logger, chdir: str = "/") -
     process_id = os.fork()
 
     if process_id != 0:
-        # parent process
-        sys.exit(0)
+        # parent process: exit.
+
+        # we use os._exit to avoid running the atexit handlers. In particular, that
+        # means we don't flush the logs. This is important because if we are using
+        # a MemoryHandler, we could have logs buffered which are now buffered in both
+        # the main and the child process, so if we let the main process flush the logs,
+        # we'll get two copies.
+        os._exit(0)
 
     # This is the child process. Continue.
 

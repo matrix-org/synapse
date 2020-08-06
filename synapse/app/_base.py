@@ -268,7 +268,7 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
-        hs.get_datastore().db.start_profiling()
+        hs.get_datastore().db_pool.start_profiling()
         hs.get_pusherpool().start()
 
         setup_sentry(hs)

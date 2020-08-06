@@ -418,8 +418,8 @@ class HomeserverTestCase(TestCase):
 
         async def run_bg_updates():
             with LoggingContext("run_bg_updates", request="run_bg_updates-1"):
-                while not await stor.db.updates.has_completed_background_updates():
-                    await stor.db.updates.do_next_background_update(1)
+                while not await stor.db_pool.updates.has_completed_background_updates():
+                    await stor.db_pool.updates.do_next_background_update(1)
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
@@ -567,7 +567,7 @@ class HomeserverTestCase(TestCase):
         Add the given event as an extremity to the room.
         """
         self.get_success(
-            self.hs.get_datastore().db.simple_insert(
+            self.hs.get_datastore().db_pool.simple_insert(
                 table="event_forward_extremities",
                 values={"room_id": room_id, "event_id": event_id},
                 desc="test_add_extremity",
