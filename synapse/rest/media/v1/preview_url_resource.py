@@ -29,7 +29,6 @@ from urllib import parse as urlparse
 import attr
 from canonicaljson import json
 
-from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 
 from synapse.api.errors import Codes, SynapseError
@@ -228,7 +227,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         else:
             logger.info("Returning cached response")
 
-        og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
+        og = await make_deferred_yieldable(observable.observe())
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
     async def _do_preview(self, url: str, user: str, ts: int) -> bytes:
