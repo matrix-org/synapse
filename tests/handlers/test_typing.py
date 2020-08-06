@@ -126,10 +126,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.room_members = []
 
-        def check_user_in_room(room_id, user_id):
+        async def check_user_in_room(room_id, user_id):
             if user_id not in [u.to_string() for u in self.room_members]:
                 raise AuthError(401, "User is not in the room")
-            return defer.succeed(None)
+            return None
 
         hs.get_auth().check_user_in_room = check_user_in_room
 

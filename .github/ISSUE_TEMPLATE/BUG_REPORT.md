@@ -4,11 +4,11 @@ about: Create a report to help us improve
 
 ---
 
+<!--
+
 **THIS IS NOT A SUPPORT CHANNEL!**
 **IF YOU HAVE SUPPORT QUESTIONS ABOUT RUNNING OR CONFIGURING YOUR OWN HOME SERVER**,
 please ask in **#synapse:matrix.org** (using a matrix.org account if necessary)
-
-<!--
 
 If you want to report a security issue, please see https://matrix.org/security-disclosure-policy/
 

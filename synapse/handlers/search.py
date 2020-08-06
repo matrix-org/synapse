@@ -340,7 +340,7 @@ class SearchHandler(BaseHandler):
         # If client has asked for "context" for each event (i.e. some surrounding
         # events and state), fetch that
         if event_context is not None:
-            now_token = await self.hs.get_event_sources().get_current_token()
+            now_token = self.hs.get_event_sources().get_current_token()
 
             contexts = {}
             for event in allowed_events:

@@ -279,7 +279,7 @@ class PerformanceCounters(object):
         return top_n_counters
 
 
-class Database(object):
+class DatabasePool(object):
     """Wraps a single physical database and connection pool.
 
     A single database may be used by multiple data stores.
