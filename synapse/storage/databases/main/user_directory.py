@@ -59,8 +59,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "populate_user_directory_cleanup", self._populate_user_directory_cleanup
         )
 
-    @defer.inlineCallbacks
-    def _populate_user_directory_createtables(self, progress, batch_size):
+    async def _populate_user_directory_createtables(self, progress, batch_size):
 
         # Get all the rooms that we want to process.
         def _make_staging_area(txn):
@@ -102,45 +101,43 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
                 self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
 
-        new_pos = yield self.get_max_stream_id_in_current_state_deltas()
-        yield self.db_pool.runInteraction(
+        new_pos = await self.get_max_stream_id_in_current_state_deltas()
+        await self.db_pool.runInteraction(
             "populate_user_directory_temp_build", _make_staging_area
         )
-        yield self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             TEMP_TABLE + "_position", {"position": new_pos}
         )
 
-        yield self.db_pool.updates._end_background_update(
+        await self.db_pool.updates._end_background_update(
             "populate_user_directory_createtables"
         )
         return 1
 
-    @defer.inlineCallbacks
-    def _populate_user_directory_cleanup(self, progress, batch_size):
+    async def _populate_user_directory_cleanup(self, progress, batch_size):
         """
         Update the user directory stream position, then clean up the old tables.
         """
-        position = yield self.db_pool.simple_select_one_onecol(
+        position = await self.db_pool.simple_select_one_onecol(
             TEMP_TABLE + "_position", None, "position"
         )
-        yield self.update_user_directory_stream_pos(position)
+        await self.update_user_directory_stream_pos(position)
 
         def _delete_staging_area(txn):
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_rooms")
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_users")
             txn.execute("DROP TABLE IF EXISTS " + TEMP_TABLE + "_position")
 
-        yield self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "populate_user_directory_cleanup", _delete_staging_area
         )
 
-        yield self.db_pool.updates._end_background_update(
+        await self.db_pool.updates._end_background_update(
             "populate_user_directory_cleanup"
         )
         return 1
 
-    @defer.inlineCallbacks
-    def _populate_user_directory_process_rooms(self, progress, batch_size):
+    async def _populate_user_directory_process_rooms(self, progress, batch_size):
         """
         Args:
             progress (dict)
@@ -151,7 +148,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         # If we don't have progress filed, delete everything.
         if not progress:
-            yield self.delete_all_from_user_dir()
+            await self.delete_all_from_user_dir()
 
         def _get_next_batch(txn):
             # Only fetch 250 rooms, so we don't fetch too many at once, even
@@ -176,13 +173,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
             return rooms_to_work_on
 
-        rooms_to_work_on = yield self.db_pool.runInteraction(
+        rooms_to_work_on = await self.db_pool.runInteraction(
             "populate_user_directory_temp_read", _get_next_batch
         )
 
         # No more rooms -- complete the transaction.
         if not rooms_to_work_on:
-            yield self.db_pool.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 "populate_user_directory_process_rooms"
             )
             return 1
@@ -195,21 +192,19 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         processed_event_count = 0
 
         for room_id, event_count in rooms_to_work_on:
-            is_in_room = yield self.is_host_joined(room_id, self.server_name)
+            is_in_room = await self.is_host_joined(room_id, self.server_name)
 
             if is_in_room:
-                is_public = yield self.is_room_world_readable_or_publicly_joinable(
+                is_public = await self.is_room_world_readable_or_publicly_joinable(
                     room_id
                 )
 
-                users_with_profile = yield defer.ensureDeferred(
-                    state.get_current_users_in_room(room_id)
-                )
+                users_with_profile = await state.get_current_users_in_room(room_id)
                 user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.
                 for user_id, profile in users_with_profile.items():
-                    yield self.update_profile_in_user_dir(
+                    await self.update_profile_in_user_dir(
                         user_id, profile.display_name, profile.avatar_url
                     )
 
@@ -223,7 +218,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         to_insert.add(user_id)
 
                     if to_insert:
-                        yield self.add_users_in_public_rooms(room_id, to_insert)
+                        await self.add_users_in_public_rooms(room_id, to_insert)
                         to_insert.clear()
                 else:
                     for user_id in user_ids:
@@ -243,22 +238,22 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                             # If it gets too big, stop and write to the database
                             # to prevent storing too much in RAM.
                             if len(to_insert) >= self.SHARE_PRIVATE_WORKING_SET:
-                                yield self.add_users_who_share_private_room(
+                                await self.add_users_who_share_private_room(
                                     room_id, to_insert
                                 )
                                 to_insert.clear()
 
                     if to_insert:
-                        yield self.add_users_who_share_private_room(room_id, to_insert)
+                        await self.add_users_who_share_private_room(room_id, to_insert)
                         to_insert.clear()
 
             # We've finished a room. Delete it from the table.
-            yield self.db_pool.simple_delete_one(
+            await self.db_pool.simple_delete_one(
                 TEMP_TABLE + "_rooms", {"room_id": room_id}
             )
             # Update the remaining counter.
             progress["remaining"] -= 1
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "populate_user_directory",
                 self.db_pool.updates._background_update_progress_txn,
                 "populate_user_directory_process_rooms",
@@ -273,13 +268,12 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return processed_event_count
 
-    @defer.inlineCallbacks
-    def _populate_user_directory_process_users(self, progress, batch_size):
+    async def _populate_user_directory_process_users(self, progress, batch_size):
         """
         If search_all_users is enabled, add all of the users to the user directory.
         """
         if not self.hs.config.user_directory_search_all_users:
-            yield self.db_pool.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 "populate_user_directory_process_users"
             )
             return 1
@@ -305,13 +299,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
             return users_to_work_on
 
-        users_to_work_on = yield self.db_pool.runInteraction(
+        users_to_work_on = await self.db_pool.runInteraction(
             "populate_user_directory_temp_read", _get_next_batch
         )
 
         # No more users -- complete the transaction.
         if not users_to_work_on:
-            yield self.db_pool.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 "populate_user_directory_process_users"
             )
             return 1
@@ -322,18 +316,18 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
         for user_id in users_to_work_on:
-            profile = yield self.get_profileinfo(get_localpart_from_id(user_id))
-            yield self.update_profile_in_user_dir(
+            profile = await self.get_profileinfo(get_localpart_from_id(user_id))
+            await self.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
 
             # We've finished processing a user. Delete it from the table.
-            yield self.db_pool.simple_delete_one(
+            await self.db_pool.simple_delete_one(
                 TEMP_TABLE + "_users", {"user_id": user_id}
             )
             # Update the remaining counter.
             progress["remaining"] -= 1
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "populate_user_directory",
                 self.db_pool.updates._background_update_progress_txn,
                 "populate_user_directory_process_users",
@@ -342,8 +336,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return len(users_to_work_on)
 
-    @defer.inlineCallbacks
-    def is_room_world_readable_or_publicly_joinable(self, room_id):
+    async def is_room_world_readable_or_publicly_joinable(self, room_id):
         """Check if the room is either world_readable or publically joinable
         """
 
@@ -353,20 +346,20 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             (EventTypes.RoomHistoryVisibility, ""),
         )
 
-        current_state_ids = yield self.get_filtered_current_state_ids(
+        current_state_ids = await self.get_filtered_current_state_ids(
             room_id, StateFilter.from_types(types_to_filter)
         )
 
         join_rules_id = current_state_ids.get((EventTypes.JoinRules, ""))
         if join_rules_id:
-            join_rule_ev = yield self.get_event(join_rules_id, allow_none=True)
+            join_rule_ev = await self.get_event(join_rules_id, allow_none=True)
             if join_rule_ev:
                 if join_rule_ev.content.get("join_rule") == JoinRules.PUBLIC:
                     return True
 
         hist_vis_id = current_state_ids.get((EventTypes.RoomHistoryVisibility, ""))
         if hist_vis_id:
-            hist_vis_ev = yield self.get_event(hist_vis_id, allow_none=True)
+            hist_vis_ev = await self.get_event(hist_vis_id, allow_none=True)
             if hist_vis_ev:
                 if hist_vis_ev.content.get("history_visibility") == "world_readable":
                     return True
@@ -590,19 +583,18 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             "remove_from_user_dir", _remove_from_user_dir_txn
         )
 
-    @defer.inlineCallbacks
-    def get_users_in_dir_due_to_room(self, room_id):
+    async def get_users_in_dir_due_to_room(self, room_id):
         """Get all user_ids that are in the room directory because they're
         in the given room_id
         """
-        user_ids_share_pub = yield self.db_pool.simple_select_onecol(
+        user_ids_share_pub = await self.db_pool.simple_select_onecol(
             table="users_in_public_rooms",
             keyvalues={"room_id": room_id},
             retcol="user_id",
             desc="get_users_in_dir_due_to_room",
         )
 
-        user_ids_share_priv = yield self.db_pool.simple_select_onecol(
+        user_ids_share_priv = await self.db_pool.simple_select_onecol(
             table="users_who_share_private_rooms",
             keyvalues={"room_id": room_id},
             retcol="other_user_id",
@@ -645,8 +637,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             "remove_user_who_share_room", _remove_user_who_share_room_txn
         )
 
-    @defer.inlineCallbacks
-    def get_user_dir_rooms_user_is_in(self, user_id):
+    async def get_user_dir_rooms_user_is_in(self, user_id):
         """
         Returns the rooms that a user is in.
 
@@ -656,14 +647,14 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         Returns:
             list: user_id
         """
-        rows = yield self.db_pool.simple_select_onecol(
+        rows = await self.db_pool.simple_select_onecol(
             table="users_who_share_private_rooms",
             keyvalues={"user_id": user_id},
             retcol="room_id",
             desc="get_rooms_user_is_in",
         )
 
-        pub_rows = yield self.db_pool.simple_select_onecol(
+        pub_rows = await self.db_pool.simple_select_onecol(
             table="users_in_public_rooms",
             keyvalues={"user_id": user_id},
             retcol="room_id",
@@ -708,8 +699,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             desc="get_user_directory_stream_pos",
         )
 
-    @defer.inlineCallbacks
-    def search_user_dir(self, user_id, search_term, limit):
+    async def search_user_dir(self, user_id, search_term, limit):
         """Searches for users in directory
 
         Returns:
@@ -806,7 +796,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
 
-        results = yield self.db_pool.execute(
+        results = await self.db_pool.execute(
             "search_user_dir", self.db_pool.cursor_to_dict, sql, *args
         )
 
