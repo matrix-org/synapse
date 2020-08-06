@@ -201,8 +201,6 @@ def run_as_background_process(desc: str, func, *args, **kwargs):
             try:
                 result = func(*args, **kwargs)
 
-                # But we need this check because await doesn't like being
-                # called on immediate values (as opposed to Deferreds or coroutines).
                 if inspect.isawaitable(result):
                     result = await result
 
