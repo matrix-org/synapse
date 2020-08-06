@@ -60,11 +60,11 @@ in_flight = InFlightGauge(
 
 def measure_func(name=None):
     """
-    Used to decorator an async function with a `Measure` context manager.
+    Used to decorate an async function with a `Measure` context manager.
 
     Usage:
 
-    @measure_func
+    @measure_func()
     async def foo(...):
         ...
 
