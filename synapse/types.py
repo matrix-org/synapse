@@ -388,7 +388,7 @@ class StreamToken(
             while len(keys) < len(cls._fields):
                 # i.e. old token from before receipt_key
                 keys.append("0")
-            return cls(*keys)
+            return cls(EventStreamToken(keys[0]), *keys[1:])
         except Exception:
             raise SynapseError(400, "Invalid Token")
 
@@ -399,10 +399,10 @@ class StreamToken(
     def room_stream_id(self):
         # TODO(markjh): Awful hack to work around hacks in the presence tests
         # which assume that the keys are integers.
-        if type(self.room_key) is int:
-            return self.room_key
+        if type(self.room_key.token) is int:
+            return self.room_key.token
         else:
-            return int(self.room_key[1:].split("-")[-1])
+            return int(self.room_key.token[1:].split("-")[-1])
 
     def is_after(self, other):
         """Does this token contain events that the other doesn't?"""
@@ -438,7 +438,15 @@ class StreamToken(
         return self._replace(**{key: new_value})
 
 
-StreamToken.START = StreamToken(*(["s0"] + ["0"] * (len(StreamToken._fields) - 1)))
+@attr.s(eq=True, order=True, frozen=True, slots=True)
+class EventStreamToken:
+    token = attr.ib()
+
+    def __str__(self) -> str:
+        return str(self.token)
+
+
+StreamToken.START = StreamToken.from_string("s0_0")
 
 
 class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):

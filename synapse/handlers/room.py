@@ -23,7 +23,7 @@ import math
 import random
 import string
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -40,6 +40,7 @@ from synapse.events.utils import copy_power_levels_contents
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
+    EventStreamToken,
     JsonDict,
     MutableStateMap,
     Requester,
@@ -1093,20 +1094,20 @@ class RoomEventSource(object):
     async def get_new_events(
         self,
         user: UserID,
-        from_key: str,
+        from_key: EventStreamToken,
         limit: int,
         room_ids: List[str],
         is_guest: bool,
-        explicit_room_id: Optional[str] = None,
-    ) -> Tuple[List[EventBase], str]:
+        explicit_room_id: str = None,
+    ) -> Tuple[List[EventBase], EventStreamToken]:
         # We just ignore the key for now.
 
         to_key = self.get_current_key()
 
-        from_token = RoomStreamToken.parse(from_key)
+        from_token = RoomStreamToken.parse(from_key.token)
         if from_token.topological:
             logger.warning("Stream has topological part!!!! %r", from_key)
-            from_key = "s%s" % (from_token.stream,)
+            from_key = EventStreamToken(from_token.stream)
 
         app_service = self.store.get_app_service_by_user_id(user.to_string())
         if app_service:
@@ -1135,17 +1136,14 @@ class RoomEventSource(object):
                 events[:] = events[:limit]
 
             if events:
-                end_key = events[-1].internal_metadata.after
+                end_key = EventStreamToken(events[-1].internal_metadata.after)
             else:
                 end_key = to_key
 
         return (events, end_key)
 
-    def get_current_key(self) -> str:
-        return "s%d" % (self.store.get_room_max_stream_ordering(),)
-
-    def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
-        return self.store.get_room_events_max_id(room_id)
+    def get_current_key(self) -> EventStreamToken:
+        return EventStreamToken("s%d" % (self.store.get_room_max_stream_ordering(),))
 
 
 class RoomShutdownHandler(object):

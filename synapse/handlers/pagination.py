@@ -338,7 +338,7 @@ class PaginationHandler(object):
             )
             room_token = pagin_config.from_token.room_key
 
-        room_token = RoomStreamToken.parse(room_token)
+        room_token = RoomStreamToken.parse(room_token.token)
 
         pagin_config.from_token = pagin_config.from_token.copy_and_replace(
             "room_key", str(room_token)
