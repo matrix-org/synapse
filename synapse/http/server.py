@@ -605,7 +605,6 @@ def respond_with_json(
         if canonical_json or synapse.events.USE_FROZEN_DICTS:
             encoder = iterencode_canonical_json
         else:
-            # TODO Re-use this.
             encoder = _encode_json_bytes
 
     request.setResponseCode(code)
