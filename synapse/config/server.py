@@ -536,7 +536,7 @@ class ServerConfig(Config):
         # user on the homeserver.
         users_new_default_push_rules = (
             config.get("users_new_default_push_rules") or []
-        )
+        )  # type: list
         if not isinstance(users_new_default_push_rules, list):
             raise ConfigError("'users_new_default_push_rules' must be a list")
 
