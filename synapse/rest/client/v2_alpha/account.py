@@ -210,7 +210,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
                     return None
 
             # Otherwise show the success template
-            html = self.config.email_password_reset_template_success_html
+            html = self.config.email_password_reset_template_success_html_content
             status_code = 200
         except ThreepidValidationError as e:
             status_code = e.code

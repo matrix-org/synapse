@@ -243,7 +243,7 @@ class EmailConfig(Config):
                 self.email_template_dir,
             )
 
-            self.email_password_reset_template_success_html = (
+            self.email_password_reset_template_success_html_content = (
                 password_reset_template_success_html_template.render()
             )
             self.email_registration_template_success_html_content = (
