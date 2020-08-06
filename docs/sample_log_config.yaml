@@ -18,11 +18,11 @@ filters:
 
 handlers:
     file:
-        class: logging.handlers.RotatingFileHandler
+        class: logging.handlers.TimedRotatingFileHandler
         formatter: precise
         filename: /var/log/matrix-synapse/homeserver.log
-        maxBytes: 104857600
-        backupCount: 10
+        when: midnight
+        backupCount: 3  # Does not include the current log file.
         filters: [context]
         encoding: utf8
 

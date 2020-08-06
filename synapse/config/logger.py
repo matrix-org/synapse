@@ -62,11 +62,11 @@ filters:
 
 handlers:
     file:
-        class: logging.handlers.RotatingFileHandler
+        class: logging.handlers.TimedRotatingFileHandler
         formatter: precise
         filename: ${log_file}
-        maxBytes: 104857600
-        backupCount: 10
+        when: midnight
+        backupCount: 3  # Does not include the current log file.
         filters: [context]
         encoding: utf8
 
