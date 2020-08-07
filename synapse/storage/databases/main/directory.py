@@ -28,7 +28,7 @@ class DirectoryWorkerStore(SQLBaseStore):
     async def get_association_from_room_alias(
         self, room_alias: RoomAlias
     ) -> Optional[RoomAliasMapping]:
-        """ Get's the room_id and server list for a given room_alias
+        """Gets the room_id and server list for a given room_alias
 
         Args:
             room_alias: The alias to translate to an ID.
