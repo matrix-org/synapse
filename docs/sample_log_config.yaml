@@ -11,6 +11,11 @@ formatters:
     precise:
         format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s'
 
+filters:
+    context:
+        (): synapse.logging.context.LoggingContextFilter
+        request: ""
+
 handlers:
     file:
         class: logging.handlers.TimedRotatingFileHandler
@@ -25,6 +30,7 @@ handlers:
     # logs will still be flushed immediately.
     buffer:
         class: logging.handlers.MemoryHandler
+        filters: [context]
         target: file
         capacity: 100
         flushLevel: 30  # Flush for WARNING logs as well
@@ -32,6 +38,7 @@ handlers:
     console:
         class: logging.StreamHandler
         formatter: precise
+        filters: [context]
 
 loggers:
     synapse.storage.SQL:
