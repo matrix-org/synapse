@@ -120,7 +120,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
         self.mock_as_api.query_alias.return_value = make_awaitable(True)
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_association_from_room_alias.return_value = defer.succeed(
+        self.mock_store.get_association_from_room_alias.return_value = make_awaitable(
             Mock(room_id=room_id, servers=servers)
         )
 
