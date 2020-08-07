@@ -1,0 +1,1 @@
+Remove the need to set `filters` in the logging config. This change is backwards compatible, as setting the filters explicitly still works.
