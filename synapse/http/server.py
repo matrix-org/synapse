@@ -504,9 +504,9 @@ class RootOptionsRedirectResource(OptionsResource, RootRedirect):
 
 
 @implementer(interfaces.IPullProducer)
-class _JsonProducer:
+class _ByteProducer:
     """
-    Iteratively write JSON to the request.
+    Iteratively write bytes to the request.
     """
 
     # The minimum number of bytes for each chunk. Note that the last chunk will
@@ -514,13 +514,10 @@ class _JsonProducer:
     min_chunk_size = 1024
 
     def __init__(
-        self,
-        request: Request,
-        json_encoder: Callable[[Any], Iterator[bytes]],
-        json_object: Any,
+        self, request: Request, iterator: Iterator[bytes],
     ):
         self._request = request
-        self._generator = json_encoder(json_object)
+        self._iterator = iterator
 
     def start(self):
         self._request.registerProducer(self, False)
@@ -544,7 +541,7 @@ class _JsonProducer:
         buffered_bytes = 0
         while buffered_bytes < self.min_chunk_size:
             try:
-                data = next(self._generator)
+                data = next(self._iterator)
                 buffer.append(data)
                 buffered_bytes += len(data)
             except StopIteration:
@@ -622,7 +619,7 @@ def respond_with_json(
     if send_cors:
         set_cors_headers(request)
 
-    producer = _JsonProducer(request, encoder, json_object)
+    producer = _ByteProducer(request, encoder(json_object))
     producer.start()
     return NOT_DONE_YET
 
