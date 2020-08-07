@@ -143,6 +143,6 @@ connecting to Synapse from a client.
 
 ## Health check endpoint
 
-Synapse exposes a `/health` endpoint on every configured HTTP listener that
-always returns 200 OK (and doesn't get logged) for use by reverse proxies as a
-health check endpoint.
+Synapse exposes a health check endpoint for use by reverse proxies.
+Each configured HTTP listener has a `/health` endpoint which always returns
+200 OK (and doesn't get logged).
