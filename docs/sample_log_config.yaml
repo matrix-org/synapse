@@ -11,11 +11,6 @@ formatters:
     precise:
         format: '%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(request)s - %(message)s'
 
-filters:
-    context:
-        (): synapse.logging.context.LoggingContextFilter
-        request: ""
-
 handlers:
     file:
         class: logging.handlers.TimedRotatingFileHandler
@@ -30,7 +25,6 @@ handlers:
     # logs will still be flushed immediately.
     buffer:
         class: logging.handlers.MemoryHandler
-        filters: [context]
         target: file
         # The capacity is the number of log lines that are buffered before
         # being written to disk. Increasing this will lead to better
@@ -44,7 +38,6 @@ handlers:
     console:
         class: logging.StreamHandler
         formatter: precise
-        filters: [context]
 
 loggers:
     synapse.storage.SQL:
