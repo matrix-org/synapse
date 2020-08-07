@@ -23,7 +23,7 @@ class HealthCheckTests(unittest.HomeserverTestCase):
     def setUp(self):
         super().setUp()
 
-        # replace the JsonResource with a WellKnownResource
+        # replace the JsonResource with a HealthResource.
         self.resource = HealthResource()
 
     def test_health(self):
