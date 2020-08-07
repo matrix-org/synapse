@@ -586,7 +586,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("Running url preview cache expiry")
 
-        if not (await self.store.db.updates.has_completed_background_updates()):
+        if not (await self.store.db_pool.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
             return
 

@@ -103,7 +103,6 @@ class JoinedSyncResult:
     account_data = attr.ib(type=List[JsonDict])
     unread_notifications = attr.ib(type=JsonDict)
     summary = attr.ib(type=Optional[JsonDict])
-    unread_count = attr.ib(type=int)
 
     def __nonzero__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -961,7 +960,7 @@ class SyncHandler(object):
         # this is due to some of the underlying streams not supporting the ability
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
-        now_token = await self.event_sources.get_current_token()
+        now_token = self.event_sources.get_current_token()
 
         logger.debug(
             "Calculating sync response for %r between %s and %s",
@@ -1887,10 +1886,6 @@ class SyncHandler(object):
 
         if room_builder.rtype == "joined":
             unread_notifications = {}  # type: Dict[str, str]
-
-            unread_count = await self.store.get_unread_message_count_for_user(
-                room_id, sync_config.user.to_string(),
-            )
             room_sync = JoinedSyncResult(
                 room_id=room_id,
                 timeline=batch,
@@ -1899,7 +1894,6 @@ class SyncHandler(object):
                 account_data=account_data_events,
                 unread_notifications=unread_notifications,
                 summary=summary,
-                unread_count=unread_count,
             )
 
             if room_sync or always_include:
