@@ -19,6 +19,9 @@ from twisted.web.resource import Resource
 class HealthResource(Resource):
     """A resource that does nothing except return a 200 with a body of `OK`,
     which can be used as a health check.
+
+    Note: `SynapseRequest._should_log_request` ensures that requests to
+    `/health` do not get logged at INFO.
     """
 
     isLeaf = 1
