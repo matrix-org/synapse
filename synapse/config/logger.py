@@ -67,7 +67,6 @@ handlers:
         filename: ${log_file}
         when: midnight
         backupCount: 3  # Does not include the current log file.
-        filters: [context]
         encoding: utf8
 
     # Default to buffering writes to log file for efficiency. This means that
@@ -75,7 +74,7 @@ handlers:
     # logs will still be flushed immediately.
     buffer:
         class: logging.handlers.MemoryHandler
-        formatter: precise
+        filters: [context]
         target: file
         capacity: 100
 
@@ -90,9 +89,15 @@ loggers:
         # information such as access tokens.
         level: INFO
 
+    twisted:
+        # We send the twisted logging directly to the file handler,
+        # to work around https://github.com/matrix-org/synapse/issues/3471
+        handlers: [file]
+        propagate: false
+
 root:
     level: INFO
-    handlers: [buffer, console]
+    handlers: [buffer]
 
 disable_existing_loggers: false
 """
