@@ -21,12 +21,13 @@ handlers:
         encoding: utf8
 
     # Default to buffering writes to log file for efficiency. This means that
-    # will be a delay for WARNING/INFO/DEBUG logs to get written, but ERROR
+    # will be a delay for INFO/DEBUG logs to get written, but WARNING/ERROR
     # logs will still be flushed immediately.
     buffer:
         class: logging.handlers.MemoryHandler
         target: file
         capacity: 100
+        flushLevel: 30  # Flush for WARNING logs as well
 
     console:
         class: logging.StreamHandler
