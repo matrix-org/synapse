@@ -27,11 +27,11 @@ RoomAliasMapping = namedtuple("RoomAliasMapping", ("room_id", "room_alias", "ser
 class DirectoryWorkerStore(SQLBaseStore):
     async def get_association_from_room_alias(
         self, room_alias: RoomAlias
-    ) -> RoomAliasMapping:
+    ) -> Optional[RoomAliasMapping]:
         """ Get's the room_id and server list for a given room_alias
 
         Args:
-            room_alias: The alias to traverse to an ID.
+            room_alias: The alias to translate to an ID.
 
         Returns:
             The room alias mapping or None if no association can be found.
@@ -90,7 +90,7 @@ class DirectoryStore(DirectoryWorkerStore):
         Args:
             room_alias: The alias to create.
             room_id: The target of the alias.
-            servers:
+            servers: A list of servers through which it may be possible to join the room
             creator: Optional user_id of creator.
         """
 
