@@ -1,0 +1,1 @@
+Log `OPTIONS` requests at `DEBUG` rather than `INFO` level to reduce amount logged at `INFO`.

@@ -15,8 +15,6 @@
 
 from unpaddedbase64 import encode_base64
 
-from twisted.internet import defer
-
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
 
@@ -40,9 +38,8 @@ class SignatureWorkerStore(SQLBaseStore):
 
         return self.db_pool.runInteraction("get_event_reference_hashes", f)
 
-    @defer.inlineCallbacks
-    def add_event_hashes(self, event_ids):
-        hashes = yield self.get_event_reference_hashes(event_ids)
+    async def add_event_hashes(self, event_ids):
+        hashes = await self.get_event_reference_hashes(event_ids)
         hashes = {
             e_id: {k: encode_base64(v) for k, v in h.items() if k == "sha256"}
             for e_id, h in hashes.items()

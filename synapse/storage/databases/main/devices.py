@@ -17,8 +17,6 @@
 import logging
 from typing import List, Optional, Set, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, StoreError
@@ -36,6 +34,7 @@ from synapse.storage.database import (
     make_tuple_comparison_clause,
 )
 from synapse.types import Collection, get_verify_key_from_cross_signing_key
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import (
     Cache,
     cached,
@@ -399,7 +398,7 @@ class DeviceWorkerStore(SQLBaseStore):
             values={
                 "stream_id": stream_id,
                 "from_user_id": from_user_id,
-                "user_ids": json.dumps(user_ids),
+                "user_ids": json_encoder.encode(user_ids),
             },
         )
 
@@ -1034,7 +1033,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 txn,
                 table="device_lists_remote_cache",
                 keyvalues={"user_id": user_id, "device_id": device_id},
-                values={"content": json.dumps(content)},
+                values={"content": json_encoder.encode(content)},
                 # we don't need to lock, because we assume we are the only thread
                 # updating this user's devices.
                 lock=False,
@@ -1090,7 +1089,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 {
                     "user_id": user_id,
                     "device_id": content["device_id"],
-                    "content": json.dumps(content),
+                    "content": json_encoder.encode(content),
                 }
                 for content in devices
             ],
@@ -1211,7 +1210,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     "device_id": device_id,
                     "sent": False,
                     "ts": now,
-                    "opentracing_context": json.dumps(context)
+                    "opentracing_context": json_encoder.encode(context)
                     if whitelisted_homeserver(destination)
                     else "{}",
                 }
