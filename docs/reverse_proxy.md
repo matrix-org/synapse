@@ -139,3 +139,10 @@ client IP addresses are recorded correctly.
 Having done so, you can then use `https://matrix.example.com` (instead
 of `https://matrix.example.com:8448`) as the "Custom server" when
 connecting to Synapse from a client.
+
+
+## Health check endpoint
+
+Synapse exposes a health check endpoint for use by reverse proxies.
+Each configured HTTP listener has a `/health` endpoint which always returns
+200 OK (and doesn't get logged).
