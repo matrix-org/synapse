@@ -28,7 +28,6 @@ import jinja2
 from canonicaljson import (
     iterencode_canonical_json,
     iterencode_pretty_printed_json,
-    json,
 )
 from zope.interface import implementer
 
@@ -51,6 +50,7 @@ from synapse.api.errors import (
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import preserve_fn
 from synapse.logging.opentracing import trace_servlet
+from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
@@ -560,14 +560,11 @@ class _ByteProducer:
         self._request = None
 
 
-_json_encoder = json.JSONEncoder(separators=(",", ":"))
-
-
 def _encode_json_bytes(json_object: Any) -> Iterator[bytes]:
     """
     Encode an object into JSON. Returns an iterator of bytes.
     """
-    for chunk in _json_encoder.iterencode(json_object):
+    for chunk in json_encoder.iterencode(json_object):
         yield chunk.encode("utf-8")
 
 

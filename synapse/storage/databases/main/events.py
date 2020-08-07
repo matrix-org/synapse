@@ -53,47 +53,6 @@ event_counter = Counter(
     ["type", "origin_type", "origin_entity"],
 )
 
-STATE_EVENT_TYPES_TO_MARK_UNREAD = {
-    EventTypes.Topic,
-    EventTypes.Name,
-    EventTypes.RoomAvatar,
-    EventTypes.Tombstone,
-}
-
-
-def should_count_as_unread(event: EventBase, context: EventContext) -> bool:
-    # Exclude rejected and soft-failed events.
-    if context.rejected or event.internal_metadata.is_soft_failed():
-        return False
-
-    # Exclude notices.
-    if (
-        not event.is_state()
-        and event.type == EventTypes.Message
-        and event.content.get("msgtype") == "m.notice"
-    ):
-        return False
-
-    # Exclude edits.
-    relates_to = event.content.get("m.relates_to", {})
-    if relates_to.get("rel_type") == RelationTypes.REPLACE:
-        return False
-
-    # Mark events that have a non-empty string body as unread.
-    body = event.content.get("body")
-    if isinstance(body, str) and body:
-        return True
-
-    # Mark some state events as unread.
-    if event.is_state() and event.type in STATE_EVENT_TYPES_TO_MARK_UNREAD:
-        return True
-
-    # Mark encrypted events as unread.
-    if not event.is_state() and event.type == EventTypes.Encrypted:
-        return True
-
-    return False
-
 
 def encode_json(json_object):
     """
@@ -238,10 +197,6 @@ class PersistEventsStore:
                     origin_entity = get_domain_from_id(event.sender)
 
                 event_counter.labels(event.type, origin_type, origin_entity).inc()
-
-                self.store.get_unread_message_count_for_user.invalidate_many(
-                    (event.room_id,),
-                )
 
             for room_id, new_state in current_state_for_room.items():
                 self.store.get_current_state_ids.prefill((room_id,), new_state)
@@ -864,9 +819,8 @@ class PersistEventsStore:
                     "contains_url": (
                         "url" in event.content and isinstance(event.content["url"], str)
                     ),
-                    "count_as_unread": should_count_as_unread(event, context),
                 }
-                for event, context in events_and_contexts
+                for event, _ in events_and_contexts
             ],
         )
 
