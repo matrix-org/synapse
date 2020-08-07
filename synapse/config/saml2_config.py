@@ -15,7 +15,9 @@
 # limitations under the License.
 
 import logging
+from typing import Any, List
 
+import attr
 import jinja2
 import pkg_resources
 
@@ -23,6 +25,7 @@ from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
 
 from ._base import Config, ConfigError
+from ._util import validate_config
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +82,11 @@ class SAML2Config(Config):
             raise ConfigError(e.message)
 
         self.saml2_enabled = True
+
+        attribute_requirements = saml2_config.get("attribute_requirements") or []
+        self.attribute_requirements = _parse_attribute_requirements_def(
+            attribute_requirements
+        )
 
         self.saml2_grandfathered_mxid_source_attribute = saml2_config.get(
             "grandfathered_mxid_source_attribute", "uid"
@@ -341,6 +349,17 @@ class SAML2Config(Config):
           #
           #grandfathered_mxid_source_attribute: upn
 
+          # It is possible to configure Synapse to only allow logins if SAML attributes
+          # match particular values. The requirements can be listed under
+          # `attribute_requirements` as shown below. All of the listed attributes must
+          # match for the login to be permitted.
+          #
+          #attribute_requirements:
+          #  - attribute: userGroup
+          #    value: "staff"
+          #  - attribute: department
+          #    value: "sales"
+
           # Directory in which Synapse will try to find the template files below.
           # If not set, default templates from within the Synapse package will be used.
           #
@@ -368,3 +387,34 @@ class SAML2Config(Config):
         """ % {
             "config_dir_path": config_dir_path
         }
+
+
+@attr.s(frozen=True)
+class SamlAttributeRequirement:
+    """Object describing a single requirement for SAML attributes."""
+
+    attribute = attr.ib(type=str)
+    value = attr.ib(type=str)
+
+    JSON_SCHEMA = {
+        "type": "object",
+        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
+        "required": ["attribute", "value"],
+    }
+
+
+ATTRIBUTE_REQUIREMENTS_SCHEMA = {
+    "type": "array",
+    "items": SamlAttributeRequirement.JSON_SCHEMA,
+}
+
+
+def _parse_attribute_requirements_def(
+    attribute_requirements: Any,
+) -> List[SamlAttributeRequirement]:
+    validate_config(
+        ATTRIBUTE_REQUIREMENTS_SCHEMA,
+        attribute_requirements,
+        config_path=["saml2_config", "attribute_requirements"],
+    )
+    return [SamlAttributeRequirement(**x) for x in attribute_requirements]
