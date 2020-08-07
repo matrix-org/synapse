@@ -32,7 +32,11 @@ handlers:
         class: logging.handlers.MemoryHandler
         filters: [context]
         target: file
-        capacity: 100
+        # The capacity is the number of log lines that are buffered before
+        # being written to disk. Increasing this will lead to better
+        # performance, at the expensive of it taking longer for log lines to
+        # be written to disk.
+        capacity: 10
         flushLevel: 30  # Flush for WARNING logs as well
 
     console:
