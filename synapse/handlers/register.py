@@ -160,7 +160,7 @@ class RegistrationHandler(BaseHandler):
             bind_emails (List[str]): list of emails to bind to this account.
             by_admin (bool): True if this registration is being made via the
               admin api, otherwise False.
-            shadow_banned (bool): Shadow ban the created user.
+            shadow_banned (bool): Shadow-ban the created user.
         Returns:
             str: user_id
         Raises:
@@ -551,7 +551,7 @@ class RegistrationHandler(BaseHandler):
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
             address (str|None): the IP address used to perform the registration.
-            shadow_banned (bool): Whether to shadow ban the user
+            shadow_banned (bool): Whether to shadow-ban the user
 
         Returns:
             Awaitable

@@ -1001,8 +1001,8 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             admin (boolean): is an admin user?
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
-            shadow_banned (bool): Whether the user is shadow banned,
-                i.e. they may be told their requests succeeded but we ignored them.
+            shadow_banned (bool): Whether the user is shadow-banned,
+                i.e. they may be told their requests succeeded but we ignore them.
 
         Raises:
             StoreError if the user_id could not be registered.
