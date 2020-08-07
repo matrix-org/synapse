@@ -25,6 +25,7 @@ from synapse.logging import context
 
 logger = logging.getLogger(__name__)
 
+# Create a custom encoder to reduce the whitespace produced by JSON encoding.
 json_encoder = json.JSONEncoder(separators=(",", ":"))
 
 
