@@ -60,7 +60,7 @@ class ReplicationUserDevicesResyncRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    def _serialize_payload(user_id):
+    async def _serialize_payload(user_id):
         return {}
 
     async def _handle_request(self, request, user_id):

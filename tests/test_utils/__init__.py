@@ -17,7 +17,7 @@
 """
 Utilities for running the unit tests
 """
-from typing import Awaitable, TypeVar
+from typing import Any, Awaitable, TypeVar
 
 TV = TypeVar("TV")
 
@@ -36,3 +36,8 @@ def get_awaitable_result(awaitable: Awaitable[TV]) -> TV:
 
     # if next didn't raise, the awaitable hasn't completed.
     raise Exception("awaitable has not yet completed")
+
+
+async def make_awaitable(result: Any):
+    """Create an awaitable that just returns a result."""
+    return result

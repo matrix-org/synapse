@@ -1,1 +1,0 @@
-Fix bug where Synapse fails to process an incoming event over federation if the server is missing too much of the event's auth chain.

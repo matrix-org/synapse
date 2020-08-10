@@ -283,6 +283,23 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
+    def test_purge_is_not_bool(self):
+        """
+        If parameter `purge` is not boolean, return an error
+        """
+        body = json.dumps({"purge": "NotBool"})
+
+        request, channel = self.make_request(
+            "POST",
+            self.url,
+            content=body.encode(encoding="utf_8"),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
+
     def test_purge_room_and_block(self):
         """Test to purge a room and block it.
         Members will not be moved to a new room and will not receive a message.
@@ -297,7 +314,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": True})
+        body = json.dumps({"block": True, "purge": True})
 
         request, channel = self.make_request(
             "POST",
@@ -331,7 +348,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         # Assert one user in room
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
-        body = json.dumps({"block": False})
+        body = json.dumps({"block": False, "purge": True})
 
         request, channel = self.make_request(
             "POST",
@@ -348,6 +365,42 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("local_aliases", channel.json_body)
 
         self._is_purged(self.room_id)
+        self._is_blocked(self.room_id, expect=False)
+        self._has_no_members(self.room_id)
+
+    def test_block_room_and_not_purge(self):
+        """Test to block a room without purging it.
+        Members will not be moved to a new room and will not receive a message.
+        The room will not be purged.
+        """
+        # Test that room is not purged
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
+
+        # Test that room is not blocked
+        self._is_blocked(self.room_id, expect=False)
+
+        # Assert one user in room
+        self._is_member(room_id=self.room_id, user_id=self.other_user)
+
+        body = json.dumps({"block": False, "purge": False})
+
+        request, channel = self.make_request(
+            "POST",
+            self.url.encode("ascii"),
+            content=body.encode(encoding="utf_8"),
+            access_token=self.admin_user_tok,
+        )
+        self.render(request)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(None, channel.json_body["new_room_id"])
+        self.assertEqual(self.other_user, channel.json_body["kicked_users"][0])
+        self.assertIn("failed_to_kick_users", channel.json_body)
+        self.assertIn("local_aliases", channel.json_body)
+
+        with self.assertRaises(AssertionError):
+            self._is_purged(self.room_id)
         self._is_blocked(self.room_id, expect=False)
         self._has_no_members(self.room_id)
 
@@ -513,7 +566,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",
@@ -614,7 +667,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",
@@ -1135,6 +1188,52 @@ class RoomTestCase(unittest.HomeserverTestCase):
         self.assertIn("state_events", channel.json_body)
 
         self.assertEqual(room_id_1, channel.json_body["room_id"])
+
+    def test_room_members(self):
+        """Test that room members can be requested correctly"""
+        # Create two test rooms
+        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_id_2 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        # Have another user join the room
+        user_1 = self.register_user("foo", "pass")
+        user_tok_1 = self.login("foo", "pass")
+        self.helper.join(room_id_1, user_1, tok=user_tok_1)
+
+        # Have another user join the room
+        user_2 = self.register_user("bar", "pass")
+        user_tok_2 = self.login("bar", "pass")
+        self.helper.join(room_id_1, user_2, tok=user_tok_2)
+        self.helper.join(room_id_2, user_2, tok=user_tok_2)
+
+        # Have another user join the room
+        user_3 = self.register_user("foobar", "pass")
+        user_tok_3 = self.login("foobar", "pass")
+        self.helper.join(room_id_2, user_3, tok=user_tok_3)
+
+        url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_1,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.assertCountEqual(
+            ["@admin:test", "@foo:test", "@bar:test"], channel.json_body["members"]
+        )
+        self.assertEqual(channel.json_body["total"], 3)
+
+        url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_2,)
+        request, channel = self.make_request(
+            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+        )
+        self.render(request)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.assertCountEqual(
+            ["@admin:test", "@bar:test", "@foobar:test"], channel.json_body["members"]
+        )
+        self.assertEqual(channel.json_body["total"], 3)
 
 
 class JoinAliasRoomTestCase(unittest.HomeserverTestCase):

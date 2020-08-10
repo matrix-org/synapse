@@ -119,7 +119,9 @@ class EventsStreamTestCase(BaseStreamTestCase):
         OTHER_USER = "@other_user:localhost"
 
         # have the user join
-        inject_member_event(self.hs, self.room_id, OTHER_USER, Membership.JOIN)
+        self.get_success(
+            inject_member_event(self.hs, self.room_id, OTHER_USER, Membership.JOIN)
+        )
 
         # Update existing power levels with mod at PL50
         pls = self.helper.get_state(
@@ -157,14 +159,16 @@ class EventsStreamTestCase(BaseStreamTestCase):
         # roll back all the state by de-modding the user
         prev_events = fork_point
         pls["users"][OTHER_USER] = 0
-        pl_event = inject_event(
-            self.hs,
-            prev_event_ids=prev_events,
-            type=EventTypes.PowerLevels,
-            state_key="",
-            sender=self.user_id,
-            room_id=self.room_id,
-            content=pls,
+        pl_event = self.get_success(
+            inject_event(
+                self.hs,
+                prev_event_ids=prev_events,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                sender=self.user_id,
+                room_id=self.room_id,
+                content=pls,
+            )
         )
 
         # one more bit of state that doesn't get rolled back
@@ -268,7 +272,9 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # have the users join
         for u in user_ids:
-            inject_member_event(self.hs, self.room_id, u, Membership.JOIN)
+            self.get_success(
+                inject_member_event(self.hs, self.room_id, u, Membership.JOIN)
+            )
 
         # Update existing power levels with mod at PL50
         pls = self.helper.get_state(
@@ -306,14 +312,16 @@ class EventsStreamTestCase(BaseStreamTestCase):
         pl_events = []
         for u in user_ids:
             pls["users"][u] = 0
-            e = inject_event(
-                self.hs,
-                prev_event_ids=prev_events,
-                type=EventTypes.PowerLevels,
-                state_key="",
-                sender=self.user_id,
-                room_id=self.room_id,
-                content=pls,
+            e = self.get_success(
+                inject_event(
+                    self.hs,
+                    prev_event_ids=prev_events,
+                    type=EventTypes.PowerLevels,
+                    state_key="",
+                    sender=self.user_id,
+                    room_id=self.room_id,
+                    content=pls,
+                )
             )
             prev_events = [e.event_id]
             pl_events.append(e)
@@ -434,13 +442,15 @@ class EventsStreamTestCase(BaseStreamTestCase):
             body = "event %i" % (self.event_count,)
             self.event_count += 1
 
-        return inject_event(
-            self.hs,
-            room_id=self.room_id,
-            sender=sender,
-            type="test_event",
-            content={"body": body},
-            **kwargs
+        return self.get_success(
+            inject_event(
+                self.hs,
+                room_id=self.room_id,
+                sender=sender,
+                type="test_event",
+                content={"body": body},
+                **kwargs
+            )
         )
 
     def _inject_state_event(
@@ -459,11 +469,13 @@ class EventsStreamTestCase(BaseStreamTestCase):
         if body is None:
             body = "state event %s" % (state_key,)
 
-        return inject_event(
-            self.hs,
-            room_id=self.room_id,
-            sender=sender,
-            type="test_state_event",
-            state_key=state_key,
-            content={"body": body},
+        return self.get_success(
+            inject_event(
+                self.hs,
+                room_id=self.room_id,
+                sender=sender,
+                type="test_state_event",
+                state_key=state_key,
+                content={"body": body},
+            )
         )

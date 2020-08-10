@@ -15,11 +15,13 @@
 # limitations under the License.
 
 """Contains exceptions and error codes."""
-import json
+
 import logging
 import typing
 from http import HTTPStatus
 from typing import Dict, List, Optional, Union
+
+from canonicaljson import json
 
 from twisted.web import http
 
@@ -236,14 +238,16 @@ class InteractiveAuthIncompleteError(Exception):
     (This indicates we should return a 401 with 'result' as the body)
 
     Attributes:
+        session_id: The ID of the ongoing interactive auth session.
         result: the server response to the request, which should be
             passed back to the client
     """
 
-    def __init__(self, result: "JsonDict"):
+    def __init__(self, session_id: str, result: "JsonDict"):
         super(InteractiveAuthIncompleteError, self).__init__(
             "Interactive auth not yet complete"
         )
+        self.session_id = session_id
         self.result = result
 
 

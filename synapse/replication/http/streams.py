@@ -54,7 +54,7 @@ class ReplicationGetStreamUpdates(ReplicationEndpoint):
         self.streams = hs.get_replication_streams()
 
     @staticmethod
-    def _serialize_payload(stream_name, from_token, upto_token):
+    async def _serialize_payload(stream_name, from_token, upto_token):
         return {"from_token": from_token, "upto_token": upto_token}
 
     async def _handle_request(self, request, stream_name):

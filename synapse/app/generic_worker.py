@@ -21,7 +21,7 @@ from typing import Dict, Iterable, Optional, Set
 
 from typing_extensions import ContextManager
 
-from twisted.internet import address, defer, reactor
+from twisted.internet import address, reactor
 
 import synapse
 import synapse.events
@@ -87,7 +87,6 @@ from synapse.replication.tcp.streams import (
     ReceiptsStream,
     TagAccountDataStream,
     ToDeviceStream,
-    TypingStream,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events
@@ -111,6 +110,7 @@ from synapse.rest.client.v1.room import (
     RoomSendEventRestServlet,
     RoomStateEventRestServlet,
     RoomStateRestServlet,
+    RoomTypingRestServlet,
 )
 from synapse.rest.client.v1.voip import VoipRestServlet
 from synapse.rest.client.v2_alpha import groups, sync, user_directory
@@ -123,17 +123,18 @@ from synapse.rest.client.v2_alpha.account_data import (
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
+from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.server import HomeServer
-from synapse.storage.data_stores.main.censor_events import CensorEventsStore
-from synapse.storage.data_stores.main.media_repository import MediaRepositoryStore
-from synapse.storage.data_stores.main.monthly_active_users import (
+from synapse.storage.databases.main.censor_events import CensorEventsStore
+from synapse.storage.databases.main.media_repository import MediaRepositoryStore
+from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
-from synapse.storage.data_stores.main.presence import UserPresenceState
-from synapse.storage.data_stores.main.search import SearchWorkerStore
-from synapse.storage.data_stores.main.ui_auth import UIAuthWorkerStore
-from synapse.storage.data_stores.main.user_directory import UserDirectoryStore
+from synapse.storage.databases.main.presence import UserPresenceState
+from synapse.storage.databases.main.search import SearchWorkerStore
+from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
+from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
@@ -374,9 +375,8 @@ class GenericWorkerPresence(BasePresenceHandler):
 
         return _user_syncing()
 
-    @defer.inlineCallbacks
-    def notify_from_replication(self, states, stream_id):
-        parties = yield get_interested_parties(self.store, states)
+    async def notify_from_replication(self, states, stream_id):
+        parties = await get_interested_parties(self.store, states)
         room_ids_to_states, users_to_states = parties
 
         self.notifier.on_new_event(
@@ -386,8 +386,7 @@ class GenericWorkerPresence(BasePresenceHandler):
             users=users_to_states.keys(),
         )
 
-    @defer.inlineCallbacks
-    def process_replication_rows(self, token, rows):
+    async def process_replication_rows(self, token, rows):
         states = [
             UserPresenceState(
                 row.user_id,
@@ -405,7 +404,7 @@ class GenericWorkerPresence(BasePresenceHandler):
             self.user_to_current_state[state.user_id] = state
 
         stream_id = token
-        yield self.notify_from_replication(states, stream_id)
+        await self.notify_from_replication(states, stream_id)
 
     def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
         return [
@@ -449,37 +448,6 @@ class GenericWorkerPresence(BasePresenceHandler):
         # Proxy request to master
         user_id = user.to_string()
         await self._bump_active_client(user_id=user_id)
-
-
-class GenericWorkerTyping(object):
-    def __init__(self, hs):
-        self._latest_room_serial = 0
-        self._reset()
-
-    def _reset(self):
-        """
-        Reset the typing handler's data caches.
-        """
-        # map room IDs to serial numbers
-        self._room_serials = {}
-        # map room IDs to sets of users currently typing
-        self._room_typing = {}
-
-    def process_replication_rows(self, token, rows):
-        if self._latest_room_serial > token:
-            # The master has gone backwards. To prevent inconsistent data, just
-            # clear everything.
-            self._reset()
-
-        # Set the latest serial token to whatever the server gave us.
-        self._latest_room_serial = token
-
-        for row in rows:
-            self._room_serials[row.room_id] = token
-            self._room_typing[row.room_id] = row.user_ids
-
-    def get_current_token(self) -> int:
-        return self._latest_room_serial
 
 
 class GenericWorkerSlavedStore(
@@ -526,7 +494,10 @@ class GenericWorkerServer(HomeServer):
         site_tag = listener_config.http_options.tag
         if site_tag is None:
             site_tag = port
-        resources = {}
+
+        # We always include a health resource.
+        resources = {"/health": HealthResource()}
+
         for res in listener_config.http_options.resources:
             for name in res.names:
                 if name == "metrics":
@@ -558,6 +529,7 @@ class GenericWorkerServer(HomeServer):
                     KeyUploadServlet(self).register(resource)
                     AccountDataServlet(self).register(resource)
                     RoomAccountDataServlet(self).register(resource)
+                    RoomTypingRestServlet(self).register(resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
@@ -660,7 +632,7 @@ class GenericWorkerServer(HomeServer):
 
         self.get_tcp_replication().start_replication(self)
 
-    def remove_pusher(self, app_id, push_key, user_id):
+    async def remove_pusher(self, app_id, push_key, user_id):
         self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
 
     def build_replication_data_handler(self):
@@ -669,16 +641,12 @@ class GenericWorkerServer(HomeServer):
     def build_presence_handler(self):
         return GenericWorkerPresence(self)
 
-    def build_typing_handler(self):
-        return GenericWorkerTyping(self)
-
 
 class GenericWorkerReplicationHandler(ReplicationDataHandler):
     def __init__(self, hs):
         super(GenericWorkerReplicationHandler, self).__init__(hs)
 
         self.store = hs.get_datastore()
-        self.typing_handler = hs.get_typing_handler()
         self.presence_handler = hs.get_presence_handler()  # type: GenericWorkerPresence
         self.notifier = hs.get_notifier()
 
@@ -714,11 +682,6 @@ class GenericWorkerReplicationHandler(ReplicationDataHandler):
                 )
                 await self.pusher_pool.on_new_receipts(
                     token, token, {row.room_id for row in rows}
-                )
-            elif stream_name == TypingStream.NAME:
-                self.typing_handler.process_replication_rows(token, rows)
-                self.notifier.on_new_event(
-                    "typing_key", token, rooms=[row.room_id for row in rows]
                 )
             elif stream_name == ToDeviceStream.NAME:
                 entities = [row.entity for row in rows if row.entity.startswith("@")]
@@ -981,7 +944,7 @@ def start(config_options):
         config.server.update_user_directory = False
 
     if config.worker_app == "synapse.app.federation_sender":
-        if config.federation.send_federation:
+        if config.worker.send_federation:
             sys.stderr.write(
                 "\nThe send_federation must be disabled in the main synapse process"
                 "\nbefore they can be run in a separate worker."
@@ -991,10 +954,10 @@ def start(config_options):
             sys.exit(1)
 
         # Force the pushers to start since they will be disabled in the main config
-        config.federation.send_federation = True
+        config.worker.send_federation = True
     else:
         # For other worker types we force this to off.
-        config.federation.send_federation = False
+        config.worker.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

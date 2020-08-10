@@ -23,7 +23,7 @@ from canonicaljson import json
 
 from synapse.storage.database import LoggingTransaction  # noqa: F401
 from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 from synapse.types import Collection, get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -37,11 +37,11 @@ class SQLBaseStore(metaclass=ABCMeta):
     per data store (and not one per physical database).
     """
 
-    def __init__(self, database: Database, db_conn, hs):
+    def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
-        self.db = database
+        self.db_pool = database
         self.rand = random.SystemRandom()
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
@@ -100,8 +100,8 @@ def db_to_json(db_content):
     if isinstance(db_content, memoryview):
         db_content = db_content.tobytes()
 
-    # Decode it to a Unicode string before feeding it to json.loads, so we
-    # consistenty get a Unicode-containing object out.
+    # Decode it to a Unicode string before feeding it to json.loads, since
+    # Python 3.5 does not support deserializing bytes.
     if isinstance(db_content, (bytes, bytearray)):
         db_content = db_content.decode("utf8")
 

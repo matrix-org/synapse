@@ -38,6 +38,11 @@ the reverse proxy and the homeserver.
 server {
     listen 443 ssl;
     listen [::]:443 ssl;
+
+    # For the federation port
+    listen 8448 ssl default_server;
+    listen [::]:8448 ssl default_server;
+
     server_name matrix.example.com;
 
     location /_matrix {
@@ -46,17 +51,6 @@ server {
         # Nginx by default only allows file uploads up to 1M in size
         # Increase client_max_body_size to match max_upload_size defined in homeserver.yaml
         client_max_body_size 10M;
-    }
-}
-
-server {
-    listen 8448 ssl default_server;
-    listen [::]:8448 ssl default_server;
-    server_name example.com;
-
-    location / {
-        proxy_pass http://localhost:8008;
-        proxy_set_header X-Forwarded-For $remote_addr;
     }
 }
 ```
@@ -145,3 +139,10 @@ client IP addresses are recorded correctly.
 Having done so, you can then use `https://matrix.example.com` (instead
 of `https://matrix.example.com:8448`) as the "Custom server" when
 connecting to Synapse from a client.
+
+
+## Health check endpoint
+
+Synapse exposes a health check endpoint for use by reverse proxies.
+Each configured HTTP listener has a `/health` endpoint which always returns
+200 OK (and doesn't get logged).

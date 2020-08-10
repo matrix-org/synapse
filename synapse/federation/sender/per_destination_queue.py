@@ -75,10 +75,10 @@ class PerDestinationQueue(object):
         self._store = hs.get_datastore()
         self._transaction_manager = transaction_manager
         self._instance_name = hs.get_instance_name()
-        self._federation_shard_config = hs.config.federation.federation_shard_config
+        self._federation_shard_config = hs.config.worker.federation_shard_config
 
         self._should_send_on_this_instance = True
-        if not self._federation_shard_config.should_send_to(
+        if not self._federation_shard_config.should_handle(
             self._instance_name, destination
         ):
             # We don't raise an exception here to avoid taking out any other

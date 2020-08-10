@@ -88,7 +88,7 @@ class BackgroundUpdater(object):
 
     def __init__(self, hs, database):
         self._clock = hs.get_clock()
-        self.db = database
+        self.db_pool = database
 
         # if a background update is currently running, its name.
         self._current_background_update = None  # type: Optional[str]
@@ -139,7 +139,7 @@ class BackgroundUpdater(object):
         # otherwise, check if there are updates to be run. This is important,
         # as we may be running on a worker which doesn't perform the bg updates
         # itself, but still wants to wait for them to happen.
-        updates = await self.db.simple_select_onecol(
+        updates = await self.db_pool.simple_select_onecol(
             "background_updates",
             keyvalues=None,
             retcol="1",
@@ -160,7 +160,7 @@ class BackgroundUpdater(object):
         if update_name == self._current_background_update:
             return False
 
-        update_exists = await self.db.simple_select_one_onecol(
+        update_exists = await self.db_pool.simple_select_one_onecol(
             "background_updates",
             keyvalues={"update_name": update_name},
             retcol="1",
@@ -189,10 +189,10 @@ class BackgroundUpdater(object):
                 ORDER BY ordering, update_name
                 """
             )
-            return self.db.cursor_to_dict(txn)
+            return self.db_pool.cursor_to_dict(txn)
 
         if not self._current_background_update:
-            all_pending_updates = await self.db.runInteraction(
+            all_pending_updates = await self.db_pool.runInteraction(
                 "background_updates", get_background_updates_txn,
             )
             if not all_pending_updates:
@@ -243,13 +243,16 @@ class BackgroundUpdater(object):
         else:
             batch_size = self.DEFAULT_BACKGROUND_BATCH_SIZE
 
-        progress_json = await self.db.simple_select_one_onecol(
+        progress_json = await self.db_pool.simple_select_one_onecol(
             "background_updates",
             keyvalues={"update_name": update_name},
             retcol="progress_json",
         )
 
-        progress = json.loads(progress_json)
+        # Avoid a circular import.
+        from synapse.storage._base import db_to_json
+
+        progress = db_to_json(progress_json)
 
         time_start = self._clock.time_msec()
         items_updated = await update_handler(progress, batch_size)
@@ -399,7 +402,7 @@ class BackgroundUpdater(object):
             logger.debug("[SQL] %s", sql)
             c.execute(sql)
 
-        if isinstance(self.db.engine, engines.PostgresEngine):
+        if isinstance(self.db_pool.engine, engines.PostgresEngine):
             runner = create_index_psql
         elif psql_only:
             runner = None
@@ -410,7 +413,7 @@ class BackgroundUpdater(object):
         def updater(progress, batch_size):
             if runner is not None:
                 logger.info("Adding index %s to %s", index_name, table)
-                yield self.db.runWithConnection(runner)
+                yield self.db_pool.runWithConnection(runner)
             yield self._end_background_update(update_name)
             return 1
 
@@ -430,7 +433,7 @@ class BackgroundUpdater(object):
                 % update_name
             )
         self._current_background_update = None
-        return self.db.simple_delete_one(
+        return self.db_pool.simple_delete_one(
             "background_updates", keyvalues={"update_name": update_name}
         )
 
@@ -442,7 +445,7 @@ class BackgroundUpdater(object):
             progress: The progress of the update.
         """
 
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "background_update_progress",
             self._background_update_progress_txn,
             update_name,
@@ -460,7 +463,7 @@ class BackgroundUpdater(object):
 
         progress_json = json.dumps(progress)
 
-        self.db.simple_update_one_txn(
+        self.db_pool.simple_update_one_txn(
             txn,
             "background_updates",
             keyvalues={"update_name": update_name},

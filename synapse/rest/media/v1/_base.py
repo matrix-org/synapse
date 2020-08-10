@@ -17,8 +17,9 @@
 import logging
 import os
 import urllib
+from typing import Awaitable
 
-from twisted.internet import defer
+from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 
 from synapse.api.errors import Codes, SynapseError, cs_error
@@ -77,8 +78,9 @@ def respond_404(request):
     )
 
 
-@defer.inlineCallbacks
-def respond_with_file(request, media_type, file_path, file_size=None, upload_name=None):
+async def respond_with_file(
+    request, media_type, file_path, file_size=None, upload_name=None
+):
     logger.debug("Responding with %r", file_path)
 
     if os.path.isfile(file_path):
@@ -89,7 +91,7 @@ def respond_with_file(request, media_type, file_path, file_size=None, upload_nam
         add_file_headers(request, media_type, file_size, upload_name)
 
         with open(file_path, "rb") as f:
-            yield make_deferred_yieldable(FileSender().beginFileTransfer(f, request))
+            await make_deferred_yieldable(FileSender().beginFileTransfer(f, request))
 
         finish_request(request)
     else:
@@ -198,8 +200,9 @@ def _can_encode_filename_as_token(x):
     return True
 
 
-@defer.inlineCallbacks
-def respond_with_responder(request, responder, media_type, file_size, upload_name=None):
+async def respond_with_responder(
+    request, responder, media_type, file_size, upload_name=None
+):
     """Responds to the request with given responder. If responder is None then
     returns 404.
 
@@ -218,7 +221,7 @@ def respond_with_responder(request, responder, media_type, file_size, upload_nam
     add_file_headers(request, media_type, file_size, upload_name)
     try:
         with responder:
-            yield responder.write_to_consumer(request)
+            await responder.write_to_consumer(request)
     except Exception as e:
         # The majority of the time this will be due to the client having gone
         # away. Unfortunately, Twisted simply throws a generic exception at us
@@ -239,14 +242,14 @@ class Responder(object):
     held can be cleaned up.
     """
 
-    def write_to_consumer(self, consumer):
+    def write_to_consumer(self, consumer: IConsumer) -> Awaitable:
         """Stream response into consumer
 
         Args:
-            consumer (IConsumer)
+            consumer: The consumer to stream into.
 
         Returns:
-            Deferred: Resolves once the response has finished being written
+            Resolves once the response has finished being written
         """
         pass
 

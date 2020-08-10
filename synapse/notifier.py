@@ -320,7 +320,7 @@ class Notifier(object):
         """
         user_stream = self.user_to_user_stream.get(user_id)
         if user_stream is None:
-            current_token = await self.event_sources.get_current_token()
+            current_token = self.event_sources.get_current_token()
             if room_ids is None:
                 room_ids = await self.store.get_rooms_for_user(user_id)
             user_stream = _NotifierUserStream(
@@ -397,7 +397,7 @@ class Notifier(object):
         """
         from_token = pagination_config.from_token
         if not from_token:
-            from_token = await self.event_sources.get_current_token()
+            from_token = self.event_sources.get_current_token()
 
         limit = pagination_config.limit
 

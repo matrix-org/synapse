@@ -207,7 +207,7 @@ class ServerConfig(Config):
         # errors when attempting to search for messages.
         self.enable_search = config.get("enable_search", True)
 
-        self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
+        self.filter_timeline_limit = config.get("filter_timeline_limit", 100)
 
         # Whether we should block invites sent to users on this server
         # (other than those sent by local server admins)
@@ -439,6 +439,9 @@ class ServerConfig(Config):
                 validator=attr.validators.instance_of(str),
                 default=ROOM_COMPLEXITY_TOO_GREAT,
             )
+            admins_can_join = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
             **(config.get("limit_remote_rooms") or {})
@@ -526,6 +529,21 @@ class ServerConfig(Config):
         self.request_token_inhibit_3pid_errors = config.get(
             "request_token_inhibit_3pid_errors", False,
         )
+
+        # List of users trialing the new experimental default push rules. This setting is
+        # not included in the sample configuration file on purpose as it's a temporary
+        # hack, so that some users can trial the new defaults without impacting every
+        # user on the homeserver.
+        users_new_default_push_rules = (
+            config.get("users_new_default_push_rules") or []
+        )  # type: list
+        if not isinstance(users_new_default_push_rules, list):
+            raise ConfigError("'users_new_default_push_rules' must be a list")
+
+        # Turn the list into a set to improve lookup speed.
+        self.users_new_default_push_rules = set(
+            users_new_default_push_rules
+        )  # type: set
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
@@ -693,7 +711,9 @@ class ServerConfig(Config):
         #gc_thresholds: [700, 10, 10]
 
         # Set the limit on the returned events in the timeline in the get
-        # and sync operations. The default value is -1, means no upper limit.
+        # and sync operations. The default value is 100. -1 means no upper limit.
+        #
+        # Uncomment the following to increase the limit to 5000.
         #
         #filter_timeline_limit: 5000
 
@@ -737,7 +757,7 @@ class ServerConfig(Config):
         #       names: a list of names of HTTP resources. See below for a list of
         #           valid resource names.
         #
-        #       compress: set to true to enable HTTP comression for this resource.
+        #       compress: set to true to enable HTTP compression for this resource.
         #
         #   additional_resources: Only valid for an 'http' listener. A map of
         #        additional endpoints which should be loaded via dynamic modules.
@@ -890,6 +910,10 @@ class ServerConfig(Config):
           # override the error which is returned when the room is too complex.
           #
           #complexity_error: "This room is too complex."
+
+          # allow server admins to join complex rooms. Default is false.
+          #
+          #admins_can_join: true
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.

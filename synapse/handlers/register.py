@@ -28,7 +28,6 @@ from synapse.replication.http.register import (
 )
 from synapse.storage.state import StateFilter
 from synapse.types import RoomAlias, UserID, create_requester
-from synapse.util.async_helpers import Linearizer
 
 from ._base import BaseHandler
 
@@ -50,14 +49,7 @@ class RegistrationHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.identity_handler = self.hs.get_handlers().identity_handler
         self.ratelimiter = hs.get_registration_ratelimiter()
-
-        self._next_generated_user_id = None
-
         self.macaroon_gen = hs.get_macaroon_generator()
-
-        self._generate_user_id_linearizer = Linearizer(
-            name="_generate_user_id_linearizer"
-        )
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         if hs.config.worker_app:
@@ -219,7 +211,7 @@ class RegistrationHandler(BaseHandler):
                 if fail_count > 10:
                     raise SynapseError(500, "Unable to find a suitable guest user ID")
 
-                localpart = await self._generate_user_id()
+                localpart = await self.store.generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 self.check_user_id_not_appservice_exclusive(user_id)
@@ -510,18 +502,6 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE,
                 )
 
-    async def _generate_user_id(self):
-        if self._next_generated_user_id is None:
-            with await self._generate_user_id_linearizer.queue(()):
-                if self._next_generated_user_id is None:
-                    self._next_generated_user_id = (
-                        await self.store.find_next_generated_user_id_localpart()
-                    )
-
-        id = self._next_generated_user_id
-        self._next_generated_user_id += 1
-        return str(id)
-
     def check_registration_ratelimit(self, address):
         """A simple helper method to check whether the registration rate limit has been hit
         for a given IP address
@@ -568,7 +548,7 @@ class RegistrationHandler(BaseHandler):
             address (str|None): the IP address used to perform the registration.
 
         Returns:
-            Deferred
+            Awaitable
         """
         if self.hs.config.worker_app:
             return self._register_client(

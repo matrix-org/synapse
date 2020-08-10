@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
-from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+from canonicaljson import encode_canonical_json, encode_pretty_printed_json
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -46,6 +46,7 @@ from synapse.api.errors import (
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import preserve_fn
 from synapse.logging.opentracing import trace_servlet
+from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
@@ -242,10 +243,12 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         no appropriate method exists. Can be overriden in sub classes for
         different routing.
         """
+        # Treat HEAD requests as GET requests.
+        request_method = request.method.decode("ascii")
+        if request_method == "HEAD":
+            request_method = "GET"
 
-        method_handler = getattr(
-            self, "_async_render_%s" % (request.method.decode("ascii"),), None
-        )
+        method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
         if method_handler:
             raw_callback_return = method_handler(request)
 
@@ -362,11 +365,15 @@ class JsonResource(DirectServeJsonResource):
             A tuple of the callback to use, the name of the servlet, and the
             key word arguments to pass to the callback
         """
+        # Treat HEAD requests as GET requests.
         request_path = request.path.decode("ascii")
+        request_method = request.method
+        if request_method == b"HEAD":
+            request_method = b"GET"
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request.method, []):
+        for path_entry in self.path_regexs.get(request_method, []):
             m = path_entry.pattern.match(request_path)
             if m:
                 # We found a match!
@@ -442,21 +449,6 @@ class StaticResource(File):
         return super().render_GET(request)
 
 
-def _options_handler(request):
-    """Request handler for OPTIONS requests
-
-    This is a request handler suitable for return from
-    _get_handler_for_request. It returns a 200 and an empty body.
-
-    Args:
-        request (twisted.web.http.Request):
-
-    Returns:
-        Tuple[int, dict]: http code, response body.
-    """
-    return 200, {}
-
-
 def _unrecognised_request_handler(request):
     """Request handler for unrecognised requests
 
@@ -490,11 +482,12 @@ class OptionsResource(resource.Resource):
     """Responds to OPTION requests for itself and all children."""
 
     def render_OPTIONS(self, request):
-        code, response_json_object = _options_handler(request)
+        request.setResponseCode(204)
+        request.setHeader(b"Content-Length", b"0")
 
-        return respond_with_json(
-            request, code, response_json_object, send_cors=True, canonical_json=False,
-        )
+        set_cors_headers(request)
+
+        return b""
 
     def getChildWithDefault(self, path, request):
         if request.method == b"OPTIONS":
@@ -546,7 +539,7 @@ def respond_with_json(
             # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = json.dumps(json_object).encode("utf-8")
+            json_bytes = json_encoder.encode(json_object).encode("utf-8")
 
     return respond_with_json_bytes(request, code, json_bytes, send_cors=send_cors)
 
@@ -575,8 +568,8 @@ def respond_with_json_bytes(
     if send_cors:
         set_cors_headers(request)
 
-    # todo: we can almost certainly avoid this copy and encode the json straight into
-    # the bytesIO, but it would involve faffing around with string->bytes wrappers.
+    # note that this is zero-copy (the bytesio shares a copy-on-write buffer with
+    # the original `bytes`).
     bytes_io = BytesIO(json_bytes)
 
     producer = NoRangeStaticProducer(request, bytes_io)
@@ -593,7 +586,7 @@ def set_cors_headers(request: Request):
     """
     request.setHeader(b"Access-Control-Allow-Origin", b"*")
     request.setHeader(
-        b"Access-Control-Allow-Methods", b"GET, POST, PUT, DELETE, OPTIONS"
+        b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
     request.setHeader(
         b"Access-Control-Allow-Headers",

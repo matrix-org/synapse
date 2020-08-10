@@ -194,12 +194,16 @@ class ModuleApi(object):
             synapse.api.errors.AuthError: the access token is invalid
         """
         # see if the access token corresponds to a device
-        user_info = yield self._auth.get_user_by_access_token(access_token)
+        user_info = yield defer.ensureDeferred(
+            self._auth.get_user_by_access_token(access_token)
+        )
         device_id = user_info.get("device_id")
         user_id = user_info["user"].to_string()
         if device_id:
             # delete the device, which will also delete its access tokens
-            yield self._hs.get_device_handler().delete_device(user_id, device_id)
+            yield defer.ensureDeferred(
+                self._hs.get_device_handler().delete_device(user_id, device_id)
+            )
         else:
             # no associated device. Just delete the access token.
             yield defer.ensureDeferred(
@@ -219,7 +223,7 @@ class ModuleApi(object):
         Returns:
             Deferred[object]: result of func
         """
-        return self._store.db.runInteraction(desc, func, *args, **kwargs)
+        return self._store.db_pool.runInteraction(desc, func, *args, **kwargs)
 
     def complete_sso_login(
         self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str

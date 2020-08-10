@@ -239,6 +239,15 @@ class UserRestServletV2(RestServlet):
                     await self.deactivate_account_handler.deactivate_account(
                         target_user.to_string(), False
                     )
+                elif not deactivate and user["deactivated"]:
+                    if "password" not in body:
+                        raise SynapseError(
+                            400, "Must provide a password to re-activate an account."
+                        )
+
+                    await self.deactivate_account_handler.activate_account(
+                        target_user.to_string()
+                    )
 
             user = await self.admin_handler.get_user(target_user)
             return 200, user
@@ -254,7 +263,6 @@ class UserRestServletV2(RestServlet):
             admin = body.get("admin", None)
             user_type = body.get("user_type", None)
             displayname = body.get("displayname", None)
-            threepids = body.get("threepids", None)
 
             if user_type is not None and user_type not in UserTypes.ALL_USER_TYPES:
                 raise SynapseError(400, "Invalid user type")
