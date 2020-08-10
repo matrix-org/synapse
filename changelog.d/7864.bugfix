@@ -1,1 +1,1 @@
-Fix in-memory federation transmission queues building up indefinitely.
+Fix a memory leak by limiting the length of time that messages will be queued for a remote server that has been unreachable.
