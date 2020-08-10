@@ -49,7 +49,7 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
-from synapse.types import EventStreamToken, RoomStreamToken
+from synapse.types import EventStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
 if TYPE_CHECKING:
@@ -328,7 +328,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 - list of recent events in the room
                 - stream ordering key for the start of the chunk of events returned.
         """
-        from_id = RoomStreamToken.parse_stream_token(from_key.token).stream
+        from_id = from_key.stream
 
         room_ids = self._events_stream_cache.get_entities_changed(room_ids, from_id)
 
@@ -368,7 +368,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             room_ids
             from_key: The room_key portion of a StreamToken
         """
-        from_key = RoomStreamToken.parse_stream_token(from_key.token).stream
+
         return {
             room_id
             for room_id in room_ids
@@ -404,8 +404,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if from_key == to_key:
             return [], from_key
 
-        from_id = RoomStreamToken.parse_stream_token(from_key.token).stream
-        to_id = RoomStreamToken.parse_stream_token(to_key.token).stream
+        from_id = from_key.stream
+        to_id = to_key.stream
 
         has_changed = self._events_stream_cache.has_entity_changed(room_id, from_id)
 
@@ -437,7 +437,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             ret.reverse()
 
         if rows:
-            key = EventStreamToken("s%d" % min(r.stream_ordering for r in rows))
+            key = EventStreamToken(min(r.stream_ordering for r in rows))
         else:
             # Assume we didn't get anything because there was nothing to
             # get.
@@ -448,8 +448,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
     async def get_membership_changes_for_user(
         self, user_id: str, from_key: EventStreamToken, to_key: EventStreamToken
     ) -> List[EventBase]:
-        from_id = RoomStreamToken.parse_stream_token(from_key.token).stream
-        to_id = RoomStreamToken.parse_stream_token(to_key.token).stream
+        from_id = from_key.stream
+        to_id = to_key.stream
 
         if from_key == to_key:
             return []
@@ -581,7 +581,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         token.
         """
         token = self.get_room_max_stream_ordering()
-        return EventStreamToken("s%d" % (token,))
+        return EventStreamToken(token)
 
     async def get_stream_id_for_event(self, event_id: str) -> int:
         """The stream ID for an event
@@ -606,7 +606,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             A "s%d" stream token.
         """
         stream_id = await self.get_stream_id_for_event(event_id)
-        return EventStreamToken("s%d" % (stream_id,))
+        return EventStreamToken(stream_id)
 
     async def get_topological_token_for_event(self, event_id: str) -> str:
         """The stream token for an event
@@ -675,8 +675,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             else:
                 topo = None
             internal = event.internal_metadata
-            internal.before = str(RoomStreamToken(topo, stream - 1))
-            internal.after = str(RoomStreamToken(topo, stream))
+            internal.before = str(EventStreamToken(topological=topo, stream=stream - 1))
+            internal.after = str(EventStreamToken(topological=topo, stream=stream))
             internal.order = (int(topo) if topo else 0, int(stream))
 
     async def get_events_around(
@@ -748,12 +748,14 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         # Paginating backwards includes the event at the token, but paginating
         # forward doesn't.
-        before_token = RoomStreamToken(
-            results["topological_ordering"] - 1, results["stream_ordering"]
+        before_token = EventStreamToken(
+            topological=results["topological_ordering"] - 1,
+            stream=results["stream_ordering"],
         )
 
-        after_token = RoomStreamToken(
-            results["topological_ordering"], results["stream_ordering"]
+        after_token = EventStreamToken(
+            topological=results["topological_ordering"],
+            stream=results["stream_ordering"],
         )
 
         rows, start_token = self._paginate_room_events_txn(
@@ -963,8 +965,8 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         bounds = generate_pagination_where_clause(
             direction=direction,
             column_names=("topological_ordering", "stream_ordering"),
-            from_token=from_token,
-            to_token=to_token,
+            from_token=(from_token.topological, from_token.stream),
+            to_token=(to_token.topological, to_token.stream) if to_token else None,
             engine=self.database_engine,
         )
 
@@ -1023,12 +1025,12 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 # when we are going backwards so we subtract one from the
                 # stream part.
                 toke -= 1
-            next_token = RoomStreamToken(topo, toke)
+            next_token = EventStreamToken(topological=topo, stream=toke)
         else:
             # TODO (erikj): We should work out what to do here instead.
             next_token = to_token if to_token else from_token
 
-        return rows, EventStreamToken(str(next_token))
+        return rows, next_token
 
     async def paginate_room_events(
         self,
@@ -1057,9 +1059,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             and `to_key`).
         """
 
-        from_key = RoomStreamToken.parse(from_key)
+        from_key = EventStreamToken.parse(from_key)
         if to_key:
-            to_key = RoomStreamToken.parse(to_key)
+            to_key = EventStreamToken.parse(to_key)
 
         rows, token = await self.db_pool.runInteraction(
             "paginate_room_events",

@@ -19,7 +19,7 @@ from typing import Any, List, Set, Tuple
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
-from synapse.types import RoomStreamToken
+from synapse.types import EventStreamToken
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         )
 
     def _purge_history_txn(self, txn, room_id, token_str, delete_local_events):
-        token = RoomStreamToken.parse(token_str)
+        token = EventStreamToken.parse(token_str)
 
         # Tables that should be pruned:
         #     event_auth

@@ -25,7 +25,7 @@ from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import Requester, RoomStreamToken
+from synapse.types import EventStreamToken, Requester
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -338,8 +338,6 @@ class PaginationHandler(object):
             )
             room_token = pagin_config.from_token.room_key
 
-        room_token = RoomStreamToken.parse(room_token.token)
-
         pagin_config.from_token = pagin_config.from_token.copy_and_replace(
             "room_key", str(room_token)
         )
@@ -371,7 +369,7 @@ class PaginationHandler(object):
                     leave_token = await self.store.get_topological_token_for_event(
                         member_event_id
                     )
-                    leave_token = RoomStreamToken.parse(leave_token)
+                    leave_token = EventStreamToken.parse(leave_token)
                     if leave_token.topological < max_topo:
                         source_config.from_key = str(leave_token)
 

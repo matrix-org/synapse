@@ -33,7 +33,6 @@ from synapse.types import (
     EventStreamToken,
     JsonDict,
     MutableStateMap,
-    RoomStreamToken,
     StateMap,
     StreamToken,
     UserID,
@@ -1483,9 +1482,7 @@ class SyncHandler(object):
         if rooms_changed:
             return True
 
-        stream_id = RoomStreamToken.parse_stream_token(
-            since_token.room_key.token
-        ).stream
+        stream_id = since_token.room_key.stream
         for room_id in sync_result_builder.joined_room_ids:
             if self.store.has_room_changed_since(room_id, stream_id):
                 return True
@@ -1751,7 +1748,7 @@ class SyncHandler(object):
                             continue
 
                 leave_token = now_token.copy_and_replace(
-                    "room_key", EventStreamToken("s%d" % (event.stream_ordering,)),
+                    "room_key", EventStreamToken(event.stream_ordering),
                 )
                 room_entries.append(
                     RoomSyncResultBuilder(

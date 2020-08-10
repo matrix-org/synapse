@@ -18,7 +18,7 @@ from typing import List
 
 from synapse.api.constants import Membership
 from synapse.events import FrozenEvent
-from synapse.types import RoomStreamToken, StateMap
+from synapse.types import EventStreamToken, StateMap
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -125,8 +125,8 @@ class AdminHandler(BaseHandler):
             else:
                 stream_ordering = room.stream_ordering
 
-            from_key = str(RoomStreamToken(0, 0))
-            to_key = str(RoomStreamToken(None, stream_ordering))
+            from_key = str(EventStreamToken(stream=0, topological=0))
+            to_key = str(EventStreamToken(stream_ordering))
 
             written_events = set()  # Events that we've processed in this room
 

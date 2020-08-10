@@ -46,7 +46,6 @@ from synapse.types import (
     Requester,
     RoomAlias,
     RoomID,
-    RoomStreamToken,
     StateMap,
     StreamToken,
     UserID,
@@ -1104,10 +1103,9 @@ class RoomEventSource(object):
 
         to_key = self.get_current_key()
 
-        from_token = RoomStreamToken.parse(from_key.token)
-        if from_token.topological:
+        if from_key.topological:
             logger.warning("Stream has topological part!!!! %r", from_key)
-            from_key = EventStreamToken(from_token.stream)
+            from_key = EventStreamToken(from_key.stream)
 
         app_service = self.store.get_app_service_by_user_id(user.to_string())
         if app_service:
@@ -1136,14 +1134,14 @@ class RoomEventSource(object):
                 events[:] = events[:limit]
 
             if events:
-                end_key = EventStreamToken(events[-1].internal_metadata.after)
+                end_key = EventStreamToken.parse(events[-1].internal_metadata.after)
             else:
                 end_key = to_key
 
         return (events, end_key)
 
     def get_current_key(self) -> EventStreamToken:
-        return EventStreamToken("s%d" % (self.store.get_room_max_stream_ordering(),))
+        return EventStreamToken(self.store.get_room_max_stream_ordering(),)
 
 
 class RoomShutdownHandler(object):

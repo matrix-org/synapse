@@ -164,7 +164,7 @@ class InitialSyncHandler(BaseHandler):
                         self.state_handler.get_current_state, event.room_id
                     )
                 elif event.membership == Membership.LEAVE:
-                    room_end_token = EventStreamToken("s%d" % (event.stream_ordering,))
+                    room_end_token = EventStreamToken(event.stream_ordering)
                     deferred_room_state = run_in_background(
                         self.state_store.get_state_for_events, [event.event_id]
                     )

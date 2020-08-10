@@ -18,7 +18,7 @@ import re
 import string
 import sys
 from collections import namedtuple
-from typing import Any, Dict, Mapping, MutableMapping, Tuple, Type, TypeVar
+from typing import Any, Dict, Mapping, MutableMapping, Optional, Tuple, Type, TypeVar
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -388,7 +388,7 @@ class StreamToken(
             while len(keys) < len(cls._fields):
                 # i.e. old token from before receipt_key
                 keys.append("0")
-            return cls(EventStreamToken(keys[0]), *keys[1:])
+            return cls(EventStreamToken.parse(keys[0]), *keys[1:])
         except Exception:
             raise SynapseError(400, "Invalid Token")
 
@@ -399,10 +399,7 @@ class StreamToken(
     def room_stream_id(self):
         # TODO(markjh): Awful hack to work around hacks in the presence tests
         # which assume that the keys are integers.
-        if type(self.room_key.token) is int:
-            return self.room_key.token
-        else:
-            return int(self.room_key.token[1:].split("-")[-1])
+        return self.room_key.stream
 
     def is_after(self, other):
         """Does this token contain events that the other doesn't?"""
@@ -440,39 +437,13 @@ class StreamToken(
 
 @attr.s(eq=True, order=True, frozen=True, slots=True)
 class EventStreamToken:
-    token = attr.ib()
-
-    def __str__(self) -> str:
-        return str(self.token)
-
-
-StreamToken.START = StreamToken.from_string("s0_0")
-
-
-class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
-    """Tokens are positions between events. The token "s1" comes after event 1.
-
-            s0    s1
-            |     |
-        [0] V [1] V [2]
-
-    Tokens can either be a point in the live event stream or a cursor going
-    through historic events.
-
-    When traversing the live event stream events are ordered by when they
-    arrived at the homeserver.
-
-    When traversing historic events the events are ordered by their depth in
-    the event graph "topological_ordering" and then by when they arrived at the
-    homeserver "stream_ordering".
-
-    Live tokens start with an "s" followed by the "stream_ordering" id of the
-    event it comes after. Historic tokens start with a "t" followed by the
-    "topological_ordering" id of the event it comes after, followed by "-",
-    followed by the "stream_ordering" id of the event it comes after.
-    """
-
-    __slots__ = []  # type: list
+    stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
+    topological = attr.ib(
+        type=Optional[int],
+        kw_only=True,
+        default=None,
+        validator=attr.validators.optional(attr.validators.instance_of(int)),
+    )
 
     @classmethod
     def parse(cls, string):
@@ -500,6 +471,9 @@ class RoomStreamToken(namedtuple("_StreamToken", "topological stream")):
             return "t%d-%d" % (self.topological, self.stream)
         else:
             return "s%d" % (self.stream,)
+
+
+StreamToken.START = StreamToken.from_string("s0_0")
 
 
 class ThirdPartyInstanceID(
