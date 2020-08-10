@@ -768,6 +768,15 @@ class EventCreationHandler(object):
         else:
             prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
 
+        # we now ought to have some prev_events (unless it's a create event).
+        #
+        # do a quick sanity check here, rather than waiting until we've created the
+        # event and then try to auth it (which fails with a somewhat confusing "No
+        # create event in auth events")
+        assert (
+            builder.type == EventTypes.Create or len(prev_event_ids) > 0
+        ), "Attempting to create an event with no prev_events"
+
         event = await builder.build(prev_event_ids=prev_event_ids)
         context = await self.state.compute_event_context(event)
         if requester:

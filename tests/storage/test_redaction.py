@@ -251,6 +251,10 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             def room_id(self):
                 return self._base_builder.room_id
 
+            @property
+            def type(self):
+                return self._base_builder.type
+
         event_1, context_1 = self.get_success(
             self.event_creation_handler.create_new_client_event(
                 EventIdManglingBuilder(
