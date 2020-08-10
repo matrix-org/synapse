@@ -69,7 +69,16 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_user_by_id",
         )
 
-    async def is_shadow_banned(self, user_id):
+    async def is_shadow_banned(self, user_id: str) -> bool:
+        """Checks if a user is "shadow-banned", meaning that the user might
+        be told their request succeeded when it was actually ignored.
+
+        Args:
+            user_id: The user to check.
+
+        Returns:
+            True if the user is shadow-banned.
+        """
         return await self.db_pool.simple_select_one_onecol(
             table="users",
             keyvalues={"name": user_id},
