@@ -75,7 +75,7 @@ MAXINT = sys.maxsize
 _next_id = 1
 
 
-@attr.s
+@attr.s(frozen=True)
 class MatrixFederationRequest(object):
     method = attr.ib()
     """HTTP method
@@ -117,8 +117,10 @@ class MatrixFederationRequest(object):
 
     def __attrs_post_init__(self):
         global _next_id
-        self.txn_id = "%s-O-%s" % (self.method, _next_id)
+        txn_id = "%s-O-%s" % (self.method, _next_id)
         _next_id = (_next_id + 1) % (MAXINT - 1)
+
+        object.__setattr__(self, "txn_id", txn_id)
 
         destination_bytes = self.destination.encode("ascii")
         path_bytes = self.path.encode("ascii")
@@ -127,9 +129,11 @@ class MatrixFederationRequest(object):
         else:
             query_bytes = b""
 
-        self.uri = urllib.parse.urlunparse(
+        # The object is frozen so we can pre-compute this.
+        uri = urllib.parse.urlunparse(
             (b"matrix", destination_bytes, path_bytes, None, query_bytes, b"")
         )
+        object.__setattr__(self, "uri", uri)
 
     def get_json(self):
         if self.json_callback:
@@ -296,7 +300,9 @@ class MatrixFederationHttpClient(object):
             # 'M_UNRECOGNIZED' which some endpoints can return when omitting a
             # trailing slash on Synapse <= v0.99.3.
             logger.info("Retrying request with trailing slash")
-            request.path += "/"
+
+            # Request is frozen so we create a new instance
+            request = attr.evolve(request, path=request.path + "/")
 
             response = await self._send_request(request, **send_request_args)
 
