@@ -83,6 +83,8 @@ handlers:
         capacity: 10
         flushLevel: 30  # Flush for WARNING logs as well
 
+    # A handler that writes logs to stderr. Unused by default, but can be used
+    # instead of "buffer" and "file" in the logger handlers.
     console:
         class: logging.StreamHandler
         formatter: precise
@@ -97,11 +99,15 @@ loggers:
     twisted:
         # We send the twisted logging directly to the file handler,
         # to work around https://github.com/matrix-org/synapse/issues/3471
+        # when using "buffer" logger. Use "console" to log to stderr instead.
         handlers: [file]
         propagate: false
 
 root:
     level: INFO
+
+    # By default buffer logs in memory before logging to file. Replace "buffer"
+    # with "console" to log to stderr instead.
     handlers: [buffer]
 
 disable_existing_loggers: false
