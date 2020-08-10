@@ -149,13 +149,17 @@ class ShadowBanError(SynapseError):
     """An exception that returns a 200 OK with a fake body.
     """
 
-    def __init__(self, body=None):
+    def __init__(self, body: Optional[Dict] = None):
+        """
+        Args:
+            body: The fake body to return as a successful response.
+        """
+        super().__init__(200, "")
+
         if body is None:
             body = {}
 
         self.body = body
-
-        super().__init__(200, "")
 
     def error_dict(self):
         return self.body
