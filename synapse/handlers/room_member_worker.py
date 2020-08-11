@@ -23,7 +23,7 @@ from synapse.replication.http.membership import (
     ReplicationRemoteRejectInviteRestServlet as ReplRejectInvite,
     ReplicationUserJoinedLeftRoomRestServlet as ReplJoinedLeft,
 )
-from synapse.types import Requester, UserID
+from synapse.types import EventStreamToken, Requester, UserID
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             requester=requester,
             content=content,
         )
-        return ret["event_id"], ret["stream_id"]
+        return ret["event_id"], EventStreamToken(ret["stream_id"])
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_joined_room

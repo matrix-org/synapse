@@ -189,7 +189,7 @@ class Notifier(object):
         self.store = hs.get_datastore()
         self.pending_new_room_events = (
             []
-        )  # type: List[Tuple[int, EventBase, Collection[Union[str, UserID]]]]
+        )  # type: List[Tuple[EventStreamToken, EventBase, Collection[Union[str, UserID]]]]
 
         # Called when there are new things to stream over replication
         self.replication_callbacks = []  # type: List[Callable[[], None]]
@@ -247,8 +247,8 @@ class Notifier(object):
     def on_new_room_event(
         self,
         event: EventBase,
-        room_stream_id: int,
-        max_room_stream_id: int,
+        room_stream_id: EventStreamToken,
+        max_room_stream_id: EventStreamToken,
         extra_users: Collection[Union[str, UserID]] = [],
     ):
         """ Used by handlers to inform the notifier something has happened
@@ -267,7 +267,7 @@ class Notifier(object):
 
         self.notify_replication()
 
-    def _notify_pending_new_room_events(self, max_room_stream_id: int):
+    def _notify_pending_new_room_events(self, max_room_stream_token: EventStreamToken):
         """Notify for the room events that were queued waiting for a previous
         event to be persisted.
         Args:
@@ -276,37 +276,34 @@ class Notifier(object):
         """
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
-        for room_stream_id, event, extra_users in pending:
-            if room_stream_id > max_room_stream_id:
+        for room_stream_token, event, extra_users in pending:
+            if room_stream_token > max_room_stream_token:
                 self.pending_new_room_events.append(
-                    (room_stream_id, event, extra_users)
+                    (room_stream_token, event, extra_users)
                 )
             else:
-                self._on_new_room_event(event, room_stream_id, extra_users)
+                self._on_new_room_event(event, max_room_stream_token, extra_users)
 
     def _on_new_room_event(
         self,
         event: EventBase,
-        room_stream_id: int,
+        event_stream_token: EventStreamToken,
         extra_users: Collection[Union[str, UserID]] = [],
     ):
         """Notify any user streams that are interested in this room event"""
         # poke any interested application service.
         run_as_background_process(
-            "notify_app_services", self._notify_app_services, room_stream_id
+            "notify_app_services", self._notify_app_services, event_stream_token.stream
         )
 
         if self.federation_sender:
-            self.federation_sender.notify_new_events(room_stream_id)
+            self.federation_sender.notify_new_events(event_stream_token.stream)
 
         if event.type == EventTypes.Member and event.membership == Membership.JOIN:
             self._user_joined_room(event.state_key, event.room_id)
 
         self.on_new_event(
-            "room_key",
-            EventStreamToken(room_stream_id),
-            users=extra_users,
-            rooms=[event.room_id],
+            "room_key", event_stream_token, users=extra_users, rooms=[event.room_id],
         )
 
     async def _notify_app_services(self, room_stream_id: int):

@@ -49,7 +49,14 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
-from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
+from synapse.types import (
+    EventStreamToken,
+    Requester,
+    RoomAlias,
+    StreamToken,
+    UserID,
+    create_requester,
+)
 from synapse.util import json_decoder
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
@@ -644,7 +651,7 @@ class EventCreationHandler(object):
         context: EventContext,
         ratelimit: bool = True,
         ignore_shadow_ban: bool = False,
-    ) -> int:
+    ) -> EventStreamToken:
         """
         Persists and notifies local clients and federation of an event.
 
@@ -726,7 +733,7 @@ class EventCreationHandler(object):
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
-    ) -> Tuple[EventBase, int]:
+    ) -> Tuple[EventBase, EventStreamToken]:
         """
         Creates an event, then sends it.
 
@@ -764,14 +771,14 @@ class EventCreationHandler(object):
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
-            stream_id = await self.send_nonmember_event(
+            stream_token = await self.send_nonmember_event(
                 requester,
                 event,
                 context,
                 ratelimit=ratelimit,
                 ignore_shadow_ban=ignore_shadow_ban,
             )
-        return event, stream_id
+        return event, stream_token
 
     @measure_func("create_new_client_event")
     async def create_new_client_event(
@@ -845,7 +852,7 @@ class EventCreationHandler(object):
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
-    ) -> int:
+    ) -> EventStreamToken:
         """Processes a new event. This includes checking auth, persisting it,
         notifying users, sending to remote servers, etc.
 
@@ -917,13 +924,13 @@ class EventCreationHandler(object):
                 )
                 stream_id = result["stream_id"]
                 event.internal_metadata.stream_ordering = stream_id
-                return stream_id
+                return EventStreamToken(stream_id)
 
-            stream_id = await self.persist_and_notify_client_event(
+            stream_token = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
             )
 
-            return stream_id
+            return stream_token
         except Exception:
             # Ensure that we actually remove the entries in the push actions
             # staging area, if we calculated them.

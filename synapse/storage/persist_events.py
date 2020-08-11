@@ -31,7 +31,7 @@ from synapse.logging.context import PreserveLoggingContext, make_deferred_yielda
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
-from synapse.types import StateMap
+from synapse.types import EventStreamToken, StateMap
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.metrics import Measure
 
@@ -196,7 +196,7 @@ class EventsPersistenceStorage(object):
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ) -> int:
+    ) -> EventStreamToken:
         """
         Write events to the database
         Args:
@@ -226,11 +226,11 @@ class EventsPersistenceStorage(object):
             defer.gatherResults(deferreds, consumeErrors=True)
         )
 
-        return self.main_store.get_current_events_token()
+        return EventStreamToken(self.main_store.get_current_events_token())
 
     async def persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
-    ) -> Tuple[int, int]:
+    ) -> Tuple[EventStreamToken, EventStreamToken]:
         """
         Returns:
             The stream ordering of `event`, and the stream ordering of the
@@ -245,7 +245,10 @@ class EventsPersistenceStorage(object):
         await make_deferred_yieldable(deferred)
 
         max_persisted_id = self.main_store.get_current_events_token()
-        return (event.internal_metadata.stream_ordering, max_persisted_id)
+        return (
+            EventStreamToken(event.internal_metadata.stream_ordering),
+            EventStreamToken(max_persisted_id),
+        )
 
     def _maybe_start_persisting(self, room_id: str):
         async def persisting_queue(item):

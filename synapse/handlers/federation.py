@@ -73,6 +73,7 @@ from synapse.replication.http.membership import ReplicationUserJoinedLeftRoomRes
 from synapse.state import StateResolutionStore, resolve_events_with_store
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
+    EventStreamToken,
     JsonDict,
     MutableStateMap,
     StateMap,
@@ -1632,7 +1633,7 @@ class FederationHandler(BaseHandler):
 
     async def do_remotely_reject_invite(
         self, target_hosts: Iterable[str], room_id: str, user_id: str, content: JsonDict
-    ) -> Tuple[EventBase, int]:
+    ) -> Tuple[EventBase, EventStreamToken]:
         origin, event, room_version = await self._make_and_verify_event(
             target_hosts, room_id, user_id, "leave", content=content
         )
@@ -1653,11 +1654,11 @@ class FederationHandler(BaseHandler):
         await self.federation_client.send_leave(host_list, event)
 
         context = await self.state_handler.compute_event_context(event)
-        stream_id = await self.persist_events_and_notify(
+        stream_token = await self.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
 
-        return event, stream_id
+        return event, stream_token
 
     async def _make_and_verify_event(
         self,

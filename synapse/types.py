@@ -437,13 +437,13 @@ class StreamToken(
 
 @attr.s(eq=True, order=True, frozen=True, slots=True)
 class EventStreamToken:
-    stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
     topological = attr.ib(
         type=Optional[int],
         kw_only=True,
         default=None,
         validator=attr.validators.optional(attr.validators.instance_of(int)),
     )
+    stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     @classmethod
     def parse(cls, string):
