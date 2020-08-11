@@ -2048,3 +2048,17 @@ class ShadowBanTestCase(unittest.HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(room_id)
         )
         self.assertNotIn(event_id, latest_events)
+
+    def test_create_room(self):
+        """A shadow banned users should be able to create a room."""
+
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
+        # This creates a real room, so the other user should be able to join it.
+        self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
+
+        # Both users should be in the room.
+        users = self.get_success(self.store.get_users_in_room(room_id))
+        self.assertCountEqual(users, ["@banned:test", "@otheruser:test"])

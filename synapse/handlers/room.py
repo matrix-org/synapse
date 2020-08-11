@@ -813,6 +813,8 @@ class RoomCreationHandler(BaseHandler):
         async def send(etype, content, **kwargs) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
+            # Ignore whether the user is shadow-banned to allow the room
+            # creation to complete.
             (
                 _,
                 last_stream_id,
@@ -831,6 +833,8 @@ class RoomCreationHandler(BaseHandler):
         await send(etype=EventTypes.Create, content=creation_content)
 
         logger.debug("Sending %s in new room", EventTypes.Member)
+        # Shadow-banning won't interfere with the join, so this should complete
+        # fine.
         await self.room_member_handler.update_membership(
             creator,
             creator.user,
