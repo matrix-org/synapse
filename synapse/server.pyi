@@ -31,8 +31,10 @@ import synapse.server_notices.server_notices_sender
 import synapse.state
 import synapse.storage
 from synapse.events.builder import EventBuilderFactory
+from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.typing import FollowerTypingHandler
 from synapse.replication.tcp.streams import Stream
+from synapse.streams.events import EventSources
 
 class HomeServer(object):
     @property
@@ -153,3 +155,7 @@ class HomeServer(object):
         pass
     def get_typing_handler(self) -> FollowerTypingHandler:
         pass
+    def get_event_sources(self) -> EventSources:
+        pass
+    def get_application_service_handler(self):
+        return ApplicationServicesHandler(self)

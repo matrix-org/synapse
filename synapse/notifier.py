@@ -15,7 +15,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Callable, Iterable, List, TypeVar
+from typing import Callable, Dict, Iterable, List, Set, Tuple, TypeVar
 
 from prometheus_client import Counter
 
@@ -24,12 +24,13 @@ from twisted.internet import defer
 import synapse.server
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import AuthError
+from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import StreamToken
+from synapse.types import Collection, StreamToken
 from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
 from synapse.util.metrics import Measure
 from synapse.visibility import filter_events_for_client
@@ -159,14 +160,16 @@ class Notifier(object):
     UNUSED_STREAM_EXPIRY_MS = 10 * 60 * 1000
 
     def __init__(self, hs: "synapse.server.HomeServer"):
-        self.user_to_user_stream = {}
-        self.room_to_user_streams = {}
+        self.user_to_user_stream = {}  # type: Dict[str, _NotifierUserStream]
+        self.room_to_user_streams = {}  # type: Dict[str, Set[_NotifierUserStream]]
 
         self.hs = hs
         self.storage = hs.get_storage()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
-        self.pending_new_room_events = []
+        self.pending_new_room_events = (
+            []
+        )  # type: List[Tuple[int, EventBase, Collection[str]]]
 
         # Called when there are new things to stream over replication
         self.replication_callbacks = []  # type: List[Callable[[], None]]
@@ -178,10 +181,9 @@ class Notifier(object):
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
 
+        self.federation_sender = None
         if hs.should_send_federation():
             self.federation_sender = hs.get_federation_sender()
-        else:
-            self.federation_sender = None
 
         self.state_handler = hs.get_state_handler()
 
@@ -193,12 +195,12 @@ class Notifier(object):
         # when rendering the metrics page, which is likely once per minute at
         # most when scraping it.
         def count_listeners():
-            all_user_streams = set()
+            all_user_streams = set()  # type: Set[_NotifierUserStream]
 
-            for x in list(self.room_to_user_streams.values()):
-                all_user_streams |= x
-            for x in list(self.user_to_user_stream.values()):
-                all_user_streams.add(x)
+            for streams in list(self.room_to_user_streams.values()):
+                all_user_streams |= streams
+            for stream in list(self.user_to_user_stream.values()):
+                all_user_streams.add(stream)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
 
@@ -408,7 +410,7 @@ class Notifier(object):
             if not after_token.is_after(before_token):
                 return EventStreamResult([], (from_token, from_token))
 
-            events = []
+            events = []  # type: List[EventBase]
             end_token = from_token
 
             for name, source in self.event_sources.sources.items():
