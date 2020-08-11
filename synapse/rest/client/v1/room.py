@@ -255,7 +255,10 @@ class RoomSendEventRestServlet(TransactionRestServlet):
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
         try:
-            event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester, event_dict, txn_id=txn_id
             )
             event_id = event.event_id
@@ -801,7 +804,10 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         content = parse_json_object_from_request(request)
 
         try:
-            event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+            (
+                event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
                 requester,
                 {
                     "type": EventTypes.Redaction,
