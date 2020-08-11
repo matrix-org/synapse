@@ -163,6 +163,8 @@ def cache_in_self(builder: T) -> T:
 
         return dep
 
+    # We cast here as we need to tell mypy that `_get` has the same signature as
+    # `builder`.
     return cast(T, _get)
 
 
