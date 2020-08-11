@@ -286,6 +286,7 @@ class AuthTestCase(unittest.TestCase):
             return {
                 "name": USER_ID,
                 "is_guest": False,
+                "shadow_banned": False,
                 "token_id": 1234,
                 "device_id": "DEVICE",
             }

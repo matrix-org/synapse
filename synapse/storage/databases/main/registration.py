@@ -69,24 +69,6 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="get_user_by_id",
         )
 
-    async def is_shadow_banned(self, user_id: str) -> bool:
-        """Checks if a user is "shadow-banned", meaning that the user might
-        be told their request succeeded when it was actually ignored.
-
-        Args:
-            user_id: The user to check.
-
-        Returns:
-            True if the user is shadow-banned.
-        """
-        return await self.db_pool.simple_select_one_onecol(
-            table="users",
-            keyvalues={"name": user_id},
-            retcol="shadow_banned",
-            allow_none=True,
-            desc="is_shadow_banned",
-        )
-
     @defer.inlineCallbacks
     def is_trial_user(self, user_id):
         """Checks if user is in the "trial" period, i.e. within the first
@@ -336,7 +318,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
     def _query_for_auth(self, txn, token):
         sql = (
-            "SELECT users.name, users.is_guest, access_tokens.id as token_id,"
+            "SELECT users.name, users.is_guest, users.shadow_banned, access_tokens.id as token_id,"
             " access_tokens.device_id, access_tokens.valid_until_ms"
             " FROM users"
             " INNER JOIN access_tokens on users.name = access_tokens.user_id"

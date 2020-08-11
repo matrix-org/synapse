@@ -288,9 +288,7 @@ class RoomMemberHandler(object):
         content: Optional[dict] = None,
         require_consent: bool = True,
     ) -> Tuple[str, int]:
-        if action == Membership.INVITE and await self.store.is_shadow_banned(
-            requester.user.to_string()
-        ):
+        if action == Membership.INVITE and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester a bit.
             await self.clock.sleep(random.randint(1, 10))
             # We return a response that looks roughly legit.
@@ -791,7 +789,7 @@ class RoomMemberHandler(object):
                     403, "Invites have been disabled on this server", Codes.FORBIDDEN
                 )
 
-        if await self.store.is_shadow_banned(requester.user.to_string()):
+        if requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester a bit.
             await self.clock.sleep(random.randint(1, 10))
 
@@ -1060,7 +1058,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 return event_id, stream_id
 
             # The room is too large. Leave.
-            requester = types.create_requester(user, None, False, None)
+            requester = types.create_requester(user, None, False, False, None)
             await self.update_membership(
                 requester=requester, target=user, room_id=room_id, action="leave"
             )

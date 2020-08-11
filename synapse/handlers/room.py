@@ -624,9 +624,7 @@ class RoomCreationHandler(BaseHandler):
             except Exception:
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
-        if (invite_list or invite_3pid_list) and await self.store.is_shadow_banned(
-            user_id
-        ):
+        if (invite_list or invite_3pid_list) and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester a bit.
             await self.clock.sleep(random.randint(1, 10))
 

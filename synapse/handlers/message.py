@@ -721,9 +721,7 @@ class EventCreationHandler(object):
         See self.create_event and self.send_nonmember_event.
         """
 
-        if not ignore_shadow_ban and await self.store.is_shadow_banned(
-            requester.user.to_string()
-        ):
+        if not ignore_shadow_ban and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester a bit.
             await self.clock.sleep(random.randint(1, 10))
 
