@@ -60,10 +60,10 @@ class ShutdownRoomRestServlet(RestServlet):
 
         ret = await self.room_shutdown_handler.shutdown_room(
             room_id=room_id,
+            requester=requester,
             new_room_user_id=content["new_room_user_id"],
             new_room_name=content.get("room_name"),
             message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
             block=True,
         )
 
@@ -113,10 +113,10 @@ class DeleteRoomRestServlet(RestServlet):
 
         ret = await self.room_shutdown_handler.shutdown_room(
             room_id=room_id,
+            requester=requester,
             new_room_user_id=content.get("new_room_user_id"),
             new_room_name=content.get("room_name"),
             message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
             block=block,
         )
 

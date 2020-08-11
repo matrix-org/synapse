@@ -21,6 +21,7 @@ from synapse.api.errors import (
     Codes,
     InvalidClientCredentialsError,
     NotFoundError,
+    ShadowBanError,
     SynapseError,
 )
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -107,7 +108,11 @@ class ClientDirectoryServer(RestServlet):
 
         room_alias = RoomAlias.from_string(room_alias)
 
-        await dir_handler.delete_association(requester, room_alias)
+        try:
+            await dir_handler.delete_association(requester, room_alias)
+        except ShadowBanError:
+            # Pretend the request was successful.
+            pass
 
         logger.info(
             "User %s deleted alias %s", user.to_string(), room_alias.to_string()

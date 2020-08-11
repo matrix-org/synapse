@@ -14,12 +14,14 @@
 # limitations under the License.
 
 import logging
+import random
 
 from synapse.api.errors import (
     AuthError,
     Codes,
     HttpResponseException,
     RequestSendFailed,
+    ShadowBanError,
     StoreError,
     SynapseError,
 )
@@ -144,6 +146,9 @@ class BaseProfileHandler(BaseHandler):
             requester (Requester): The user attempting to make this change.
             new_displayname (str): The displayname to give this user.
             by_admin (bool): Whether this change was made by an administrator.
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
         """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -167,6 +172,13 @@ class BaseProfileHandler(BaseHandler):
 
         if new_displayname == "":
             new_displayname = None
+
+        # Since the requester can get overwritten below, check if the real
+        # requester is shadow-banned.
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester a bit.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         # If the admin changes the display name of a user, the requesting user cannot send
         # the join event to update the displayname in the rooms.
@@ -213,8 +225,17 @@ class BaseProfileHandler(BaseHandler):
     async def set_avatar_url(
         self, target_user, requester, new_avatar_url, by_admin=False
     ):
-        """target_user is the user whose avatar_url is to be changed;
-        auth_user is the user attempting to make this change."""
+        """Set a new avatar URL for a user.
+
+        Args:
+            target_user (UserID): the user whose displayname is to be changed.
+            requester (Requester): The user attempting to make this change.
+            new_displayname (str): The displayname to give this user.
+            by_admin (bool): Whether this change was made by an administrator.
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
+        """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
 
@@ -232,6 +253,13 @@ class BaseProfileHandler(BaseHandler):
             raise SynapseError(
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
+
+        # Since the requester can get overwritten below, check if the real
+        # requester is shadow-banned.
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester a bit.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         # Same like set_displayname
         if by_admin:

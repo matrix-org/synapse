@@ -145,24 +145,12 @@ class SynapseError(CodeMessageException):
         return cs_error(self.msg, self.errcode)
 
 
-class ShadowBanError(SynapseError):
-    """An exception that returns a 200 OK with a fake body.
+class ShadowBanError(Exception):
     """
+    Raised when a shadow-banned user attempts to perform an action.
 
-    def __init__(self, body: Optional[Dict] = None):
-        """
-        Args:
-            body: The fake body to return as a successful response.
-        """
-        super().__init__(200, "")
-
-        if body is None:
-            body = {}
-
-        self.body = body
-
-    def error_dict(self):
-        return self.body
+    This should be caught and a proper "fake" success response send to the user.
+    """
 
 
 class ProxiedRequestError(SynapseError):

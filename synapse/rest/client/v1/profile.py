@@ -15,7 +15,7 @@
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
 
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, ShadowBanError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import UserID
@@ -61,7 +61,13 @@ class ProfileDisplaynameRestServlet(RestServlet):
         except Exception:
             return 400, "Unable to parse name"
 
-        await self.profile_handler.set_displayname(user, requester, new_name, is_admin)
+        try:
+            await self.profile_handler.set_displayname(
+                user, requester, new_name, is_admin
+            )
+        except ShadowBanError:
+            # Pretend it was modified successfully.
+            pass
 
         return 200, {}
 
@@ -110,9 +116,13 @@ class ProfileAvatarURLRestServlet(RestServlet):
                 400, "Missing key 'avatar_url'", errcode=Codes.MISSING_PARAM
             )
 
-        await self.profile_handler.set_avatar_url(
-            user, requester, new_avatar_url, is_admin
-        )
+        try:
+            await self.profile_handler.set_avatar_url(
+                user, requester, new_avatar_url, is_admin
+            )
+        except ShadowBanError:
+            # Pretend it was modified successfully.
+            pass
 
         return 200, {}
 

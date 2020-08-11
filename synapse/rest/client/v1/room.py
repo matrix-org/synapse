@@ -29,6 +29,7 @@ from synapse.api.errors import (
     Codes,
     HttpResponseException,
     InvalidClientCredentialsError,
+    ShadowBanError,
     SynapseError,
 )
 from synapse.api.filtering import Filter
@@ -46,6 +47,7 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.util.stringutils import random_string
 
 MYPY = False
 if MYPY:
@@ -200,23 +202,26 @@ class RoomStateEventRestServlet(TransactionRestServlet):
         if state_key is not None:
             event_dict["state_key"] = state_key
 
-        if event_type == EventTypes.Member:
-            membership = content.get("membership", None)
-            event_id, _ = await self.room_member_handler.update_membership(
-                requester,
-                target=UserID.from_string(state_key),
-                room_id=room_id,
-                action=membership,
-                content=content,
-            )
-        else:
-            (
-                event,
-                _,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester, event_dict, txn_id=txn_id
-            )
-            event_id = event.event_id
+        try:
+            if event_type == EventTypes.Member:
+                membership = content.get("membership", None)
+                event_id, _ = await self.room_member_handler.update_membership(
+                    requester,
+                    target=UserID.from_string(state_key),
+                    room_id=room_id,
+                    action=membership,
+                    content=content,
+                )
+            else:
+                (
+                    event,
+                    _,
+                ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                    requester, event_dict, txn_id=txn_id
+                )
+                event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
         set_tag("event_id", event_id)
         ret = {"event_id": event_id}
@@ -249,12 +254,16 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         if b"ts" in request.args and requester.app_service:
             event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
-        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict, txn_id=txn_id
-        )
+        try:
+            event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester, event_dict, txn_id=txn_id
+            )
+            event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
-        set_tag("event_id", event.event_id)
-        return 200, {"event_id": event.event_id}
+        set_tag("event_id", event_id)
+        return 200, {"event_id": event_id}
 
     def on_GET(self, request, room_id, event_type, txn_id):
         return 200, "Not implemented"
@@ -716,16 +725,20 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            await self.room_member_handler.do_3pid_invite(
-                room_id,
-                requester.user,
-                content["medium"],
-                content["address"],
-                content["id_server"],
-                requester,
-                txn_id,
-                content.get("id_access_token"),
-            )
+            try:
+                await self.room_member_handler.do_3pid_invite(
+                    room_id,
+                    requester.user,
+                    content["medium"],
+                    content["address"],
+                    content["id_server"],
+                    requester,
+                    txn_id,
+                    content.get("id_access_token"),
+                )
+            except ShadowBanError:
+                # Pretend the request succeed.
+                pass
             return 200, {}
 
         target = requester.user
@@ -737,15 +750,19 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         if "reason" in content:
             event_content = {"reason": content["reason"]}
 
-        await self.room_member_handler.update_membership(
-            requester=requester,
-            target=target,
-            room_id=room_id,
-            action=membership_action,
-            txn_id=txn_id,
-            third_party_signed=content.get("third_party_signed", None),
-            content=event_content,
-        )
+        try:
+            await self.room_member_handler.update_membership(
+                requester=requester,
+                target=target,
+                room_id=room_id,
+                action=membership_action,
+                txn_id=txn_id,
+                third_party_signed=content.get("third_party_signed", None),
+                content=event_content,
+            )
+        except ShadowBanError:
+            # Pretend the request succeed.
+            pass
 
         return_value = {}
 
@@ -783,20 +800,24 @@ class RoomRedactEventRestServlet(TransactionRestServlet):
         requester = await self.auth.get_user_by_req(request)
         content = parse_json_object_from_request(request)
 
-        event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester,
-            {
-                "type": EventTypes.Redaction,
-                "content": content,
-                "room_id": room_id,
-                "sender": requester.user.to_string(),
-                "redacts": event_id,
-            },
-            txn_id=txn_id,
-        )
+        try:
+            event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+                requester,
+                {
+                    "type": EventTypes.Redaction,
+                    "content": content,
+                    "room_id": room_id,
+                    "sender": requester.user.to_string(),
+                    "redacts": event_id,
+                },
+                txn_id=txn_id,
+            )
+            event_id = event.event_id
+        except ShadowBanError:
+            event_id = "$" + random_string(43)
 
-        set_tag("event_id", event.event_id)
-        return 200, {"event_id": event.event_id}
+        set_tag("event_id", event_id)
+        return 200, {"event_id": event_id}
 
     def on_PUT(self, request, room_id, event_id, txn_id):
         set_tag("txn_id", txn_id)

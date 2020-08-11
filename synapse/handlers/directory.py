@@ -174,6 +174,8 @@ class DirectoryHandler(BaseHandler):
                 is neither the creator of the alias, nor a server admin.
 
             SynapseError: if the alias belongs to an AS
+
+            ShadowBanError: if the requester is shadow-banned.
         """
         user_id = requester.user.to_string()
 

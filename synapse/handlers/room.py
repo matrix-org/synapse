@@ -130,6 +130,9 @@ class RoomCreationHandler(BaseHandler):
 
         Returns:
             the new room id
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
         """
         await self.ratelimit(requester)
 
@@ -248,6 +251,9 @@ class RoomCreationHandler(BaseHandler):
             old_room_id: the id of the room to be replaced
             new_room_id: the id of the replacement room
             old_room_state: the state map for the old room
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
         """
         old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
 
@@ -1117,7 +1123,7 @@ class RoomShutdownHandler(object):
     async def shutdown_room(
         self,
         room_id: str,
-        requester_user_id: str,
+        requester: Requester,
         new_room_user_id: Optional[str] = None,
         new_room_name: Optional[str] = None,
         message: Optional[str] = None,
@@ -1138,7 +1144,7 @@ class RoomShutdownHandler(object):
 
         Args:
             room_id: The ID of the room to shut down.
-            requester_user_id:
+            requester:
                 User who requested the action and put the room on the
                 blocking list.
             new_room_user_id:
@@ -1180,8 +1186,25 @@ class RoomShutdownHandler(object):
         if not await self.store.get_room(room_id):
             raise NotFoundError("Unknown room id %s" % (room_id,))
 
+        # Check if the user is shadow-banned before any mutations occur.
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester a bit.
+            await self.clock.sleep(random.randint(1, 10))
+
+            # Since this usually returns the response sent to the client,
+            # assemble a fake response instead.
+            return {
+                "kicked_users": [],
+                "failed_to_kick_users": [],
+                "local_aliases": [],
+                "new_room_id": stringutils.random_string(18)
+                if new_room_user_id
+                else None,
+            }
+
         # This will work even if the room is already blocked, but that is
         # desirable in case the first attempt at blocking the room failed below.
+        requester_user_id = requester.user.to_string()
         if block:
             await self.store.block_room(room_id, requester_user_id)
 

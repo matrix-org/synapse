@@ -60,7 +60,6 @@ from synapse.types import (
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.metrics import measure_func
-from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -719,14 +718,15 @@ class EventCreationHandler(object):
         Creates an event, then sends it.
 
         See self.create_event and self.send_nonmember_event.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
 
         if not ignore_shadow_ban and requester.shadow_banned:
             # We randomly sleep a bit just to annoy the requester a bit.
             await self.clock.sleep(random.randint(1, 10))
-
-            # We return a response that looks roughly legit.
-            raise ShadowBanError({"event_id": "$" + random_string(43)})
+            raise ShadowBanError()
 
         # We limit the number of concurrent event sends in a room so that we
         # don't fork the DAG too much. If we don't limit then we can end up in
