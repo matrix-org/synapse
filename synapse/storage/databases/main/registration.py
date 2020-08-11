@@ -912,7 +912,11 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         hs.get_clock().looping_call(start_cull, THIRTY_MINUTES_IN_MS)
 
     async def add_access_token_to_user(
-        self, user_id: str, token: str, device_id: str, valid_until_ms: Optional[int]
+        self,
+        user_id: str,
+        token: str,
+        device_id: Optional[str],
+        valid_until_ms: Optional[int],
     ) -> None:
         """Adds an access token for the given user.
 
