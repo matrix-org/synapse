@@ -162,7 +162,7 @@ class AuthHandler(BaseHandler):
         request_body: Dict[str, Any],
         clientip: str,
         description: str,
-    ) -> dict:
+    ) -> Tuple[dict, str]:
         """
         Checks that the user is who they claim to be, via a UI auth.
 
@@ -183,8 +183,13 @@ class AuthHandler(BaseHandler):
                          describes the operation happening on their account.
 
         Returns:
-            The parameters for this request (which may
+            A tuple of (params, session_id).
+
+                'params' contains the parameters for this request (which may
                 have been given only in a previous call).
+
+                'session_id' is the ID of this session, either passed in by the
+                client or assigned by this call
 
         Raises:
             InteractiveAuthIncompleteError if the client has not yet completed
@@ -207,7 +212,7 @@ class AuthHandler(BaseHandler):
         flows = [[login_type] for login_type in self._supported_ui_auth_types]
 
         try:
-            result, params, _ = await self.check_auth(
+            result, params, session_id = await self.check_ui_auth(
                 flows, request, request_body, clientip, description
             )
         except LoginError:
@@ -230,7 +235,7 @@ class AuthHandler(BaseHandler):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Invalid auth")
 
-        return params
+        return params, session_id
 
     def get_enabled_auth_types(self):
         """Return the enabled user-interactive authentication types
@@ -240,7 +245,7 @@ class AuthHandler(BaseHandler):
         """
         return self.checkers.keys()
 
-    async def check_auth(
+    async def check_ui_auth(
         self,
         flows: List[List[str]],
         request: SynapseRequest,
@@ -363,7 +368,7 @@ class AuthHandler(BaseHandler):
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session.session_id)
+                session.session_id, self._auth_dict_for_flows(flows, session.session_id)
             )
 
         # check auth type currently being presented
@@ -410,7 +415,7 @@ class AuthHandler(BaseHandler):
         ret = self._auth_dict_for_flows(flows, session.session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
-        raise InteractiveAuthIncompleteError(ret)
+        raise InteractiveAuthIncompleteError(session.session_id, ret)
 
     async def add_oob_auth(
         self, stagetype: str, authdict: Dict[str, Any], clientip: str

@@ -23,8 +23,6 @@ from urllib import parse as urlparse
 
 from mock import Mock
 
-from twisted.internet import defer
-
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
@@ -51,8 +49,8 @@ class RoomBase(unittest.HomeserverTestCase):
 
         self.hs.get_federation_handler = Mock(return_value=Mock())
 
-        def _insert_client_ip(*args, **kwargs):
-            return defer.succeed(None)
+        async def _insert_client_ip(*args, **kwargs):
+            return None
 
         self.hs.get_datastore().insert_client_ip = _insert_client_ip
 

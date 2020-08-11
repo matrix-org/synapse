@@ -1,0 +1,1 @@
+Revert MSC2654 implementation because of perf issues. Please delete this line when processing the 1.19 changelog.

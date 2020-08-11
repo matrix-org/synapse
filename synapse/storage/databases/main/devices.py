@@ -17,8 +17,6 @@
 import logging
 from typing import List, Optional, Set, Tuple
 
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.errors import Codes, StoreError
@@ -36,6 +34,7 @@ from synapse.storage.database import (
     make_tuple_comparison_clause,
 )
 from synapse.types import Collection, get_verify_key_from_cross_signing_key
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import (
     Cache,
     cached,
@@ -137,7 +136,9 @@ class DeviceWorkerStore(SQLBaseStore):
         master_key_by_user = {}
         self_signing_key_by_user = {}
         for user in users:
-            cross_signing_key = yield self.get_e2e_cross_signing_key(user, "master")
+            cross_signing_key = yield defer.ensureDeferred(
+                self.get_e2e_cross_signing_key(user, "master")
+            )
             if cross_signing_key:
                 key_id, verify_key = get_verify_key_from_cross_signing_key(
                     cross_signing_key
@@ -150,8 +151,8 @@ class DeviceWorkerStore(SQLBaseStore):
                     "device_id": verify_key.version,
                 }
 
-            cross_signing_key = yield self.get_e2e_cross_signing_key(
-                user, "self_signing"
+            cross_signing_key = yield defer.ensureDeferred(
+                self.get_e2e_cross_signing_key(user, "self_signing")
             )
             if cross_signing_key:
                 key_id, verify_key = get_verify_key_from_cross_signing_key(
@@ -247,7 +248,7 @@ class DeviceWorkerStore(SQLBaseStore):
             destination (str): The host the device updates are intended for
             from_stream_id (int): The minimum stream_id to filter updates by, exclusive
             query_map (Dict[(str, str): (int, str|None)]): Dictionary mapping
-                user_id/device_id to update stream_id and the relevent json-encoded
+                user_id/device_id to update stream_id and the relevant json-encoded
                 opentracing context
 
         Returns:
@@ -397,7 +398,7 @@ class DeviceWorkerStore(SQLBaseStore):
             values={
                 "stream_id": stream_id,
                 "from_user_id": from_user_id,
-                "user_ids": json.dumps(user_ids),
+                "user_ids": json_encoder.encode(user_ids),
             },
         )
 
@@ -600,7 +601,7 @@ class DeviceWorkerStore(SQLBaseStore):
             between the requested tokens due to the limit.
 
             The token returned can be used in a subsequent call to this
-            function to get further updatees.
+            function to get further updates.
 
             The updates are a list of 2-tuples of stream ID and the row data
         """
@@ -1032,7 +1033,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 txn,
                 table="device_lists_remote_cache",
                 keyvalues={"user_id": user_id, "device_id": device_id},
-                values={"content": json.dumps(content)},
+                values={"content": json_encoder.encode(content)},
                 # we don't need to lock, because we assume we are the only thread
                 # updating this user's devices.
                 lock=False,
@@ -1088,7 +1089,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 {
                     "user_id": user_id,
                     "device_id": content["device_id"],
-                    "content": json.dumps(content),
+                    "content": json_encoder.encode(content),
                 }
                 for content in devices
             ],
@@ -1209,7 +1210,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                     "device_id": device_id,
                     "sent": False,
                     "ts": now,
-                    "opentracing_context": json.dumps(context)
+                    "opentracing_context": json_encoder.encode(context)
                     if whitelisted_homeserver(destination)
                     else "{}",
                 }
