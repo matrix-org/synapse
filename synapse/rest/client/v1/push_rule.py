@@ -25,7 +25,7 @@ from synapse.http.servlet import (
     parse_json_value_from_request,
     parse_string,
 )
-from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.baserules import BASE_RULE_IDS, NEW_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -44,6 +44,8 @@ class PushRuleRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None
+
+        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
 
     async def on_PUT(self, request, path):
         if self._is_worker:
@@ -179,7 +181,12 @@ class PushRuleRestServlet(RestServlet):
             rule_id = spec["rule_id"]
             is_default_rule = rule_id.startswith(".")
             if is_default_rule:
-                if namespaced_rule_id not in BASE_RULE_IDS:
+                if user_id in self._users_new_default_push_rules:
+                    rule_ids = NEW_RULE_IDS
+                else:
+                    rule_ids = BASE_RULE_IDS
+
+                if namespaced_rule_id not in rule_ids:
                     raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
             return self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule

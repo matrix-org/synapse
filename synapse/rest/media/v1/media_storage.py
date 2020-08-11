@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import contextlib
-import inspect
 import logging
 import os
 import shutil
@@ -30,7 +29,7 @@ from .filepath import MediaFilePaths
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-    from .storage_provider import StorageProvider
+    from .storage_provider import StorageProviderWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,7 @@ class MediaStorage(object):
         hs: "HomeServer",
         local_media_directory: str,
         filepaths: MediaFilePaths,
-        storage_providers: Sequence["StorageProvider"],
+        storage_providers: Sequence["StorageProviderWrapper"],
     ):
         self.hs = hs
         self.local_media_directory = local_media_directory
@@ -115,11 +114,7 @@ class MediaStorage(object):
 
         async def finish():
             for provider in self.storage_providers:
-                # store_file is supposed to return an Awaitable, but guard
-                # against improper implementations.
-                result = provider.store_file(path, file_info)
-                if inspect.isawaitable(result):
-                    await result
+                await provider.store_file(path, file_info)
 
             finished_called[0] = True
 
@@ -153,11 +148,7 @@ class MediaStorage(object):
             return FileResponder(open(local_path, "rb"))
 
         for provider in self.storage_providers:
-            res = provider.fetch(path, file_info)  # type: Any
-            # Fetch is supposed to return an Awaitable[Responder], but guard
-            # against improper implementations.
-            if inspect.isawaitable(res):
-                res = await res
+            res = await provider.fetch(path, file_info)  # type: Any
             if res:
                 logger.debug("Streaming %s from %s", path, provider)
                 return res
@@ -184,11 +175,7 @@ class MediaStorage(object):
             os.makedirs(dirname)
 
         for provider in self.storage_providers:
-            res = provider.fetch(path, file_info)  # type: Any
-            # Fetch is supposed to return an Awaitable[Responder], but guard
-            # against improper implementations.
-            if inspect.isawaitable(res):
-                res = await res
+            res = await provider.fetch(path, file_info)  # type: Any
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(
