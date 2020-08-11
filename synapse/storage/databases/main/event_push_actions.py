@@ -228,8 +228,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         )
 
         txn.execute(
-            sql % push_actions_column,
-            (user_id, room_id, stream_ordering),
+            sql % push_actions_column, (user_id, room_id, stream_ordering),
         )
         row = txn.fetchone()
         count = row[0] if row else 0
@@ -239,7 +238,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 """
                 SELECT %s FROM event_push_summary
                 WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
-            """ % push_summary_column,
+            """
+                % push_summary_column,
                 (room_id, user_id, stream_ordering),
             )
             rows = txn.fetchall()
@@ -980,7 +980,7 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
         txn.executemany(
             """
                 UPDATE event_push_summary
-                SET notif_count = ?, unread_count = ?, stream_ordering = ? 
+                SET notif_count = ?, unread_count = ?, stream_ordering = ?
                 WHERE user_id = ? AND room_id = ?
             """,
             (
