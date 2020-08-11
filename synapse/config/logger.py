@@ -106,8 +106,13 @@ loggers:
 root:
     level: INFO
 
-    # By default buffer logs in memory before logging to file. Replace "buffer"
-    # with "console" to log to stderr instead.
+    # Write logs to the `buffer` handler, which will buffer them together in memory,
+    # then write them to a file.
+    #
+    # Replace "buffer" with "console" to log to stderr instead. (Note that you'll
+    # also need to update the configuation for the `twisted` logger above, in
+    # this case.)
+    #
     handlers: [buffer]
 
 disable_existing_loggers: false
