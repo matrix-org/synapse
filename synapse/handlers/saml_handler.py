@@ -170,7 +170,12 @@ class SamlHandler:
                 saml2.BINDING_HTTP_POST,
                 outstanding=self._outstanding_requests_dict,
             )
-        except saml2.response.UnsolicitedResponse:
+        except saml2.response.UnsolicitedResponse as e:
+            # the pysaml2 library helpfully logs an ERROR here, but neglects to log
+            # the session ID. I don't really want to put the full text of the exception
+            # in the (user-visible) exception message, so let's log the exception here
+            # so we can track down the session IDs later.
+            logger.warning(str(e))
             raise SynapseError(400, "Unexpected SAML2 login.")
         except Exception as e:
             raise SynapseError(400, "Unable to parse SAML2 response: %s." % (e,))

@@ -36,6 +36,7 @@ def validate_config(json_schema: JsonDict, config: Any, config_path: List[str]) 
     try:
         jsonschema.validate(config, json_schema)
     except jsonschema.ValidationError as e:
+        # copy `config_path` before modifying it.
         path = list(config_path)
         for p in list(e.path):
             if isinstance(p, int):
