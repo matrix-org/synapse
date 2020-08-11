@@ -25,7 +25,7 @@ import abc
 import functools
 import logging
 import os
-from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
 
 import twisted
 from twisted.mail.smtp import sendmail
@@ -69,7 +69,6 @@ from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
-from synapse.handlers.oidc_handler import OidcHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import PresenceHandler
@@ -85,7 +84,6 @@ from synapse.handlers.room import (
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
-from synapse.handlers.saml_handler import SamlHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -119,6 +117,10 @@ from synapse.util.distributor import Distributor
 from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from synapse.handlers.oidc_handler import OidcHandler
+    from synapse.handlers.saml_handler import SamlHandler
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -603,12 +605,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         return CasHandler(self)
 
     @cache_in_self
-    def get_saml_handler(self) -> SamlHandler:
+    def get_saml_handler(self) -> "SamlHandler":
+        from synapse.handlers.saml_handler import SamlHandler
 
         return SamlHandler(self)
 
     @cache_in_self
-    def get_oidc_handler(self) -> OidcHandler:
+    def get_oidc_handler(self) -> "OidcHandler":
+        from synapse.handlers.oidc_handler import OidcHandler
 
         return OidcHandler(self)
 
