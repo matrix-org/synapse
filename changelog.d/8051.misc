@@ -1,1 +1,1 @@
-Remove the need to set `filters` in the logging config. This change is backwards compatible, as setting the filters explicitly still works.
+It is no longer necessary to explicitly define `filters` in the logging configuration. (Continuing to do so is redundant but harmless.)
