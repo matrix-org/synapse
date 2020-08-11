@@ -99,6 +99,25 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self._rotate_delay = 3
         self._rotate_count = 10000
 
+    def _stream_ordering_from_event_id_and_room_id_txn(
+        self, txn: LoggingTransaction, event_id: str, room_id: str,
+    ) -> int:
+        """Retrieve the stream ordering for the given event.
+
+        Args:
+            event_id: The ID of the event to retrieve the stream ordering of.
+            room_id: The room the event was sent into.
+
+        Returns:
+            The stream ordering for this event.
+        """
+        return self.db_pool.simple_select_one_onecol_txn(
+            txn=txn,
+            table="events",
+            keyvalues={"room_id": room_id, "event_id": event_id},
+            retcol="stream_ordering",
+        )
+
     @cachedInlineCallbacks(num_args=3, tree=True, max_entries=5000)
     def get_unread_event_push_actions_by_room_for_user(
         self, room_id, user_id, last_read_event_id
@@ -113,19 +132,19 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         return ret
 
     def _get_unread_counts_by_receipt_txn(
-        self, txn, room_id, user_id, last_read_event_id
+        self, txn, room_id, user_id, last_read_event_id,
     ):
-        sql = (
-            "SELECT stream_ordering"
-            " FROM events"
-            " WHERE room_id = ? AND event_id = ?"
-        )
-        txn.execute(sql, (room_id, last_read_event_id))
-        results = txn.fetchall()
-        if len(results) == 0:
-            return {"notify_count": 0, "highlight_count": 0}
+        if last_read_event_id is None:
+            stream_ordering = self.get_stream_ordering_for_local_membership_txn(
+                txn, user_id, room_id, Membership.JOIN,
+            )
+        else:
+            stream_ordering = self._stream_ordering_from_event_id_and_room_id_txn(
+                txn, last_read_event_id, room_id,
+            )
 
-        stream_ordering = results[0][0]
+        if stream_ordering is None:
+            return {"notify_count": 0, "unread_count": 0, "highlight_count": 0}
 
         return self._get_unread_counts_by_pos_txn(
             txn, room_id, user_id, stream_ordering
@@ -134,8 +153,70 @@ class EventPushActionsWorkerStore(SQLBaseStore):
     def _get_unread_counts_by_pos_txn(self, txn, room_id, user_id, stream_ordering):
 
         # First get number of notifications.
-        # We don't need to put a notif=1 clause as all rows always have
-        # notif=1
+        # We need to look specifically for events with notif = 1 because otherwise we'll
+        # count unread events (from MSC2654) that might not notify.
+        notify_count = self._get_count_from_push_actions_txn(
+            txn=txn,
+            user_id=user_id,
+            room_id=room_id,
+            stream_ordering=stream_ordering,
+            push_actions_column="notif",
+            push_summary_column="notif_count",
+        )
+
+        # Now get the number of highlights
+        highlight_count = self._get_count_from_push_actions_txn(
+            txn=txn,
+            user_id=user_id,
+            room_id=room_id,
+            stream_ordering=stream_ordering,
+            push_actions_column="highlight",
+            push_summary_column=None,
+        )
+
+        # Finally, get the number of unread messages
+        unread_count = self._get_count_from_push_actions_txn(
+            txn=txn,
+            user_id=user_id,
+            room_id=room_id,
+            stream_ordering=stream_ordering,
+            push_actions_column="unread",
+            push_summary_column="unread_count",
+        )
+
+        return {
+            "notify_count": notify_count,
+            "unread_count": unread_count,
+            "highlight_count": highlight_count,
+        }
+
+    def _get_count_from_push_actions_txn(
+        self,
+        txn: LoggingTransaction,
+        user_id: str,
+        room_id: str,
+        stream_ordering: int,
+        push_actions_column: str,
+        push_summary_column: Optional[str],
+    ) -> int:
+        """Counts the number of rows in event_push_actions with the given flag set to
+        true, and adds it up with its matching count in event_push_summary if any.
+
+        Args:
+            user_id: The user to calculate the count for.
+            room_id: The room to calculate the count for.
+            stream_ordering: The stream ordering to use in the conditional clause when
+                querying from event_push_actions.
+            push_actions_column: The column to filter by when querying from
+                event_push_actions. The filtering will be done on the condition
+                "[column] = 1".
+            push_summary_column: The count in event_push_summary to add the results from
+                the first query to. None if there is no count in the event_push_summary
+                table to add the results to.
+
+        Returns:
+            The desired count.
+        """
         sql = (
             "SELECT count(*)"
             " FROM event_push_actions ea"
@@ -143,39 +224,29 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             " user_id = ?"
             " AND room_id = ?"
             " AND stream_ordering > ?"
+            " AND %s = 1"
         )
-
-        txn.execute(sql, (user_id, room_id, stream_ordering))
-        row = txn.fetchone()
-        notify_count = row[0] if row else 0
 
         txn.execute(
-            """
-            SELECT notif_count FROM event_push_summary
-            WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
-        """,
-            (room_id, user_id, stream_ordering),
+            sql % push_actions_column,
+            (user_id, room_id, stream_ordering),
         )
-        rows = txn.fetchall()
-        if rows:
-            notify_count += rows[0][0]
-
-        # Now get the number of highlights
-        sql = (
-            "SELECT count(*)"
-            " FROM event_push_actions ea"
-            " WHERE"
-            " highlight = 1"
-            " AND user_id = ?"
-            " AND room_id = ?"
-            " AND stream_ordering > ?"
-        )
-
-        txn.execute(sql, (user_id, room_id, stream_ordering))
         row = txn.fetchone()
-        highlight_count = row[0] if row else 0
+        count = row[0] if row else 0
 
-        return {"notify_count": notify_count, "highlight_count": highlight_count}
+        if push_summary_column:
+            txn.execute(
+                """
+                SELECT %s FROM event_push_summary
+                WHERE room_id = ? AND user_id = ? AND stream_ordering > ?
+            """ % push_summary_column,
+                (room_id, user_id, stream_ordering),
+            )
+            rows = txn.fetchall()
+            if rows:
+                count += rows[0][0]
+
+        return count
 
     async def get_push_action_users_in_range(
         self, min_stream_ordering, max_stream_ordering
