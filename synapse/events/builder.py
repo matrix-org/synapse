@@ -17,6 +17,7 @@ from typing import Optional
 import attr
 from nacl.signing import SigningKey
 
+from synapse.api.auth import Auth
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
@@ -27,6 +28,8 @@ from synapse.api.room_versions import (
 )
 from synapse.crypto.event_signing import add_hashes_and_signatures
 from synapse.events import EventBase, _EventInternalMetadata, make_event_from_dict
+from synapse.state import StateHandler
+from synapse.storage.databases.main import DataStore
 from synapse.types import EventID, JsonDict
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
@@ -57,30 +60,31 @@ class EventBuilder(object):
         _signing_key: The signing key to use to sign the event as the server
     """
 
-    _state = attr.ib()
-    _auth = attr.ib()
-    _store = attr.ib()
-    _clock = attr.ib()
-    _hostname = attr.ib()
-    _signing_key = attr.ib()
+    _state = attr.ib(type=StateHandler)
+    _auth = attr.ib(type=Auth)
+    _store = attr.ib(type=DataStore)
+    _clock = attr.ib(type=Clock)
+    _hostname = attr.ib(type=str)
+    _signing_key = attr.ib(type=SigningKey)
 
     room_version = attr.ib(type=RoomVersion)
 
-    room_id = attr.ib()
-    type = attr.ib()
-    sender = attr.ib()
+    room_id = attr.ib(type=str)
+    type = attr.ib(type=str)
+    sender = attr.ib(type=str)
 
-    content = attr.ib(default=attr.Factory(dict))
-    unsigned = attr.ib(default=attr.Factory(dict))
+    content = attr.ib(default=attr.Factory(dict), type=JsonDict)
+    unsigned = attr.ib(default=attr.Factory(dict), type=JsonDict)
 
     # These only exist on a subset of events, so they raise AttributeError if
     # someone tries to get them when they don't exist.
-    _state_key = attr.ib(default=None)
-    _redacts = attr.ib(default=None)
-    _origin_server_ts = attr.ib(default=None)
+    _state_key = attr.ib(default=None, type=Optional[str])
+    _redacts = attr.ib(default=None, type=Optional[str])
+    _origin_server_ts = attr.ib(default=None, type=Optional[int])
 
     internal_metadata = attr.ib(
-        default=attr.Factory(lambda: _EventInternalMetadata({}))
+        default=attr.Factory(lambda: _EventInternalMetadata({})),
+        type=_EventInternalMetadata,
     )
 
     @property
