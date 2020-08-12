@@ -14,10 +14,12 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
 import attr
 
 from synapse.api.constants import RelationTypes
+from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.databases.main.stream import generate_pagination_where_clause
 from synapse.storage.relations import (
@@ -25,7 +27,7 @@ from synapse.storage.relations import (
     PaginationChunk,
     RelationPaginationToken,
 )
-from synapse.util.caches.descriptors import cached, cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
@@ -227,18 +229,18 @@ class RelationsWorkerStore(SQLBaseStore):
             "get_aggregation_groups_for_event", _get_aggregation_groups_for_event_txn
         )
 
-    @cachedInlineCallbacks()
-    def get_applicable_edit(self, event_id):
+    @cached()
+    async def get_applicable_edit(self, event_id: str) -> Optional[EventBase]:
         """Get the most recent edit (if any) that has happened for the given
         event.
 
         Correctly handles checking whether edits were allowed to happen.
 
         Args:
-            event_id (str): The original event ID
+            event_id: The original event ID
 
         Returns:
-            Deferred[EventBase|None]: Returns the most recent edit, if any.
+            The most recent edit, if any.
         """
 
         # We only allow edits for `m.room.message` events that have the same sender
@@ -268,15 +270,14 @@ class RelationsWorkerStore(SQLBaseStore):
             if row:
                 return row[0]
 
-        edit_id = yield self.db_pool.runInteraction(
+        edit_id = await self.db_pool.runInteraction(
             "get_applicable_edit", _get_applicable_edit_txn
         )
 
         if not edit_id:
-            return
+            return None
 
-        edit_event = yield self.get_event(edit_id, allow_none=True)
-        return edit_event
+        return await self.get_event(edit_id, allow_none=True)
 
     def has_user_annotated_event(self, parent_id, event_type, aggregation_key, sender):
         """Check if a user has already annotated an event with the same key
