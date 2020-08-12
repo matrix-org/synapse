@@ -110,6 +110,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
         Returns:
             The stream ordering for this event.
+            We should always have a stream ordering to return, because the event ID
+            should come from a local read receipt.
         """
         return self.db_pool.simple_select_one_onecol_txn(
             txn=txn,
