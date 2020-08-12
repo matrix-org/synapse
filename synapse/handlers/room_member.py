@@ -16,7 +16,7 @@
 import abc
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from unpaddedbase64 import encode_base64
 
