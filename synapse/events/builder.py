@@ -45,18 +45,18 @@ class EventBuilder(object):
 
     Attributes:
         room_version: Version of the target room
-        room_id (str)
-        type (str)
-        sender (str)
-        content (dict)
-        unsigned (dict)
-        internal_metadata (_EventInternalMetadata)
+        room_id
+        type
+        sender
+        content
+        unsigned
+        internal_metadata
 
-        _state (StateHandler)
-        _auth (synapse.api.Auth)
-        _store (DataStore)
-        _clock (Clock)
-        _hostname (str): The hostname of the server creating the event
+        _state
+        _auth
+        _store
+        _clock
+        _hostname: The hostname of the server creating the event
         _signing_key: The signing key to use to sign the event as the server
     """
 
