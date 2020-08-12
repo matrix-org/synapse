@@ -15,7 +15,7 @@
 
 import logging
 from functools import wraps
-from typing import Any, Callable, TypeVar, cast
+from typing import Any, Callable, Optional, TypeVar, cast
 
 from prometheus_client import Counter
 
