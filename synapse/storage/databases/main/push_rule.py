@@ -137,9 +137,7 @@ class PushRulesWorkerStore(
 
         use_new_defaults = user_id in self._users_new_default_push_rules
 
-        rules = _load_rules(rows, enabled_map, use_new_defaults)
-
-        return rules
+        return _load_rules(rows, enabled_map, use_new_defaults)
 
     @cached(max_entries=5000)
     async def get_push_rules_enabled_for_user(self, user_id):
@@ -245,7 +243,7 @@ class PushRulesWorkerStore(
             user_id: ID of user to copy push rules for.
         """
         # Retrieve push rules for this user
-        user_push_rules = yield self.get_push_rules_for_user(user_id)
+        user_push_rules = await self.get_push_rules_for_user(user_id)
 
         # Get rules relating to the old room and copy them to the new room
         for rule in user_push_rules:
