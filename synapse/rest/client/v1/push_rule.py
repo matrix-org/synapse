@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Awaitable
 
 from synapse.api.errors import (
     NotFoundError,
@@ -163,7 +164,7 @@ class PushRuleRestServlet(RestServlet):
         stream_id, _ = self.store.get_push_rules_stream_token()
         self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
-    def set_rule_attr(self, user_id, spec, val):
+    def set_rule_attr(self, user_id, spec, val) -> Awaitable:
         if spec["attr"] == "enabled":
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
