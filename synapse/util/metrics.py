@@ -61,7 +61,7 @@ in_flight = InFlightGauge(
 T = TypeVar("T", bound=Callable[..., Any])
 
 
-def measure_func(name: str = None) -> Callable[[T], T]:
+def measure_func(name: Optional[str] = None) -> Callable[[T], T]:
     """
     Used to decorate an async function with a `Measure` context manager.
 
