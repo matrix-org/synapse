@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from canonicaljson import encode_canonical_json, json
 
@@ -644,7 +644,7 @@ class EventCreationHandler(object):
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-    ) -> int:
+    ) -> Union[int, EventBase]:
         """
         Persists and notifies local clients and federation of an event.
 
@@ -682,7 +682,7 @@ class EventCreationHandler(object):
 
     async def deduplicate_state_event(
         self, event: EventBase, context: EventContext
-    ) -> None:
+    ) -> Optional[EventBase]:
         """
         Checks whether event is in the latest resolved state in context.
 
@@ -692,17 +692,17 @@ class EventCreationHandler(object):
         prev_state_ids = await context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
-            return
+            return None
         prev_event = await self.store.get_event(prev_event_id, allow_none=True)
         if not prev_event:
-            return
+            return None
 
         if prev_event and event.user_id == prev_event.user_id:
             prev_content = encode_canonical_json(prev_event.content)
             next_content = encode_canonical_json(event.content)
             if prev_content == next_content:
                 return prev_event
-        return
+        return None
 
     async def create_and_send_nonmember_event(
         self,
@@ -710,7 +710,7 @@ class EventCreationHandler(object):
         event_dict: dict,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
-    ) -> Tuple[EventBase, int]:
+    ) -> Tuple[EventBase, Union[int, EventBase]]:
         """
         Creates an event, then sends it.
 
@@ -957,7 +957,7 @@ class EventCreationHandler(object):
                     allow_none=True,
                 )
 
-                is_admin_redaction = (
+                is_admin_redaction = bool(
                     original_event and event.sender != original_event.sender
                 )
 
@@ -1077,8 +1077,8 @@ class EventCreationHandler(object):
             auth_events_ids = self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
-            auth_events = await self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
+            auth_events_map = await self.store.get_events(auth_events_ids)
+            auth_events = {(e.type, e.state_key): e for e in auth_events_map.values()}
 
             room_version = await self.store.get_room_version_id(event.room_id)
             room_version_obj = KNOWN_ROOM_VERSIONS[room_version]

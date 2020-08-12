@@ -22,6 +22,7 @@ from twisted.internet.defer import Deferred
 from twisted.internet.protocol import ReconnectingClientFactory
 
 from synapse.api.constants import EventTypes
+from synapse.events import EventBase
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
 from synapse.replication.tcp.streams import TypingStream
@@ -145,7 +146,7 @@ class ReplicationDataHandler:
 
                 event = await self.store.get_event(
                     row.data.event_id, allow_rejected=True
-                )
+                )  # type: EventBase  # type: ignore
                 if event.rejected_reason:
                     continue
 

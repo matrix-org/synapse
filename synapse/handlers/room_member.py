@@ -224,13 +224,17 @@ class RoomMemberHandler(object):
             # info.
             newly_joined = True
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(prev_member_event_id)
+                prev_member_event = await self.store.get_event(
+                    prev_member_event_id
+                )  # type: EventBase  # type: ignore
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 await self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(prev_member_event_id)
+                prev_member_event = await self.store.get_event(
+                    prev_member_event_id
+                )  # type: EventBase  # type: ignore
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target, room_id)
 
@@ -694,13 +698,17 @@ class RoomMemberHandler(object):
             # info.
             newly_joined = True
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(prev_member_event_id)
+                prev_member_event = await self.store.get_event(
+                    prev_member_event_id
+                )  # type: EventBase  # type: ignore
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 await self._user_joined_room(target_user, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(prev_member_event_id)
+                prev_member_event = await self.store.get_event(
+                    prev_member_event_id
+                )  # type: EventBase  # type: ignore
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target_user, room_id)
 
@@ -714,9 +722,11 @@ class RoomMemberHandler(object):
         if not guest_access_id:
             return False
 
-        guest_access = await self.store.get_event(guest_access_id)
+        guest_access = await self.store.get_event(
+            guest_access_id
+        )  # type: EventBase  # type: ignore
 
-        return (
+        return bool(
             guest_access
             and guest_access.content
             and "guest_access" in guest_access.content
@@ -772,7 +782,7 @@ class RoomMemberHandler(object):
         requester: Requester,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> int:
+    ) -> Union[int, EventBase]:
         if self.config.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
@@ -806,7 +816,7 @@ class RoomMemberHandler(object):
         if invitee:
             _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
-            )
+            )  # type: Tuple[Any, Union[int, EventBase]]  # type: ignore
         else:
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
@@ -831,7 +841,7 @@ class RoomMemberHandler(object):
         user: UserID,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> int:
+    ) -> Union[int, EventBase]:
         room_state = await self.state_handler.get_current_state(room_id)
 
         inviter_display_name = ""
@@ -1066,7 +1076,9 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         Implements RoomMemberHandler.remote_reject_invite
         """
-        invite_event = await self.store.get_event(invite_event_id)
+        invite_event = await self.store.get_event(
+            invite_event_id
+        )  # type: EventBase  # type: ignore
         room_id = invite_event.room_id
         target_user = invite_event.state_key
 
