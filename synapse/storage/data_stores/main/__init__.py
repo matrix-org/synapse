@@ -496,7 +496,7 @@ class DataStore(
         )
 
     def get_users_paginate(
-        self, start, limit, name=None, guests=True, deactivated=False
+        self, start, limit, name=None, guests=True, deactivated=False, appservice=False
     ):
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -525,6 +525,11 @@ class DataStore(
 
             if not deactivated:
                 filters.append("deactivated = 0")
+
+            if not appservice == False:
+                filters.append("appservice_id = ?")
+                args.append(appservice)
+
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
