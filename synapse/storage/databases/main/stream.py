@@ -361,11 +361,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             if self._events_stream_cache.has_entity_changed(room_id, from_key)
         }
 
-    @defer.inlineCallbacks
-    def get_room_events_stream_for_room(
+    async def get_room_events_stream_for_room(
         self, room_id, from_key, to_key, limit=0, order="DESC"
     ):
-
         """Get new room events in stream ordering since `from_key`.
 
         Args:
@@ -380,7 +378,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
                 oldest `limit` events.
 
         Returns:
-            Deferred[tuple[list[FrozenEvent], str]]: Returns the list of
+            tuple[list[FrozenEvent], str]: Returns the list of
             events (in ascending order) and the token from the start of
             the chunk of events returned.
         """
@@ -390,9 +388,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
         to_id = RoomStreamToken.parse_stream_token(to_key).stream
 
-        has_changed = yield self._events_stream_cache.has_entity_changed(
-            room_id, from_id
-        )
+        has_changed = self._events_stream_cache.has_entity_changed(room_id, from_id)
 
         if not has_changed:
             return [], from_key
@@ -410,9 +406,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             rows = [_EventDictReturn(row[0], None, row[1]) for row in txn]
             return rows
 
-        rows = yield self.db_pool.runInteraction("get_room_events_stream_for_room", f)
+        rows = await self.db_pool.runInteraction("get_room_events_stream_for_room", f)
 
-        ret = yield self.get_events_as_list(
+        ret = await self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
 
@@ -430,8 +426,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return ret, key
 
-    @defer.inlineCallbacks
-    def get_membership_changes_for_user(self, user_id, from_key, to_key):
+    async def get_membership_changes_for_user(self, user_id, from_key, to_key):
         from_id = RoomStreamToken.parse_stream_token(from_key).stream
         to_id = RoomStreamToken.parse_stream_token(to_key).stream
 
@@ -460,9 +455,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return rows
 
-        rows = yield self.db_pool.runInteraction("get_membership_changes_for_user", f)
+        rows = await self.db_pool.runInteraction("get_membership_changes_for_user", f)
 
-        ret = yield self.get_events_as_list(
+        ret = await self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
 
@@ -470,8 +465,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return ret
 
-    @defer.inlineCallbacks
-    def get_recent_events_for_room(self, room_id, limit, end_token):
+    async def get_recent_events_for_room(self, room_id, limit, end_token):
         """Get the most recent events in the room in topological ordering.
 
         Args:
@@ -486,11 +480,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             The events returned are in ascending order.
         """
 
-        rows, token = yield self.get_recent_event_ids_for_room(
+        rows, token = await self.get_recent_event_ids_for_room(
             room_id, limit, end_token
         )
 
-        events = yield self.get_events_as_list(
+        events = await self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
 
@@ -656,8 +650,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             internal.after = str(RoomStreamToken(topo, stream))
             internal.order = (int(topo) if topo else 0, int(stream))
 
-    @defer.inlineCallbacks
-    def get_events_around(
+    async def get_events_around(
         self, room_id, event_id, before_limit, after_limit, event_filter=None
     ):
         """Retrieve events and pagination tokens around a given event in a
@@ -674,7 +667,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             dict
         """
 
-        results = yield self.db_pool.runInteraction(
+        results = await self.db_pool.runInteraction(
             "get_events_around",
             self._get_events_around_txn,
             room_id,
@@ -684,11 +677,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             event_filter,
         )
 
-        events_before = yield self.get_events_as_list(
+        events_before = await self.get_events_as_list(
             list(results["before"]["event_ids"]), get_prev_content=True
         )
 
-        events_after = yield self.get_events_as_list(
+        events_after = await self.get_events_as_list(
             list(results["after"]["event_ids"]), get_prev_content=True
         )
 
@@ -758,8 +751,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             "after": {"event_ids": events_after, "token": end_token},
         }
 
-    @defer.inlineCallbacks
-    def get_all_new_events_stream(self, from_id, current_id, limit):
+    async def get_all_new_events_stream(self, from_id, current_id, limit):
         """Get all new events
 
          Returns all events with from_id < stream_ordering <= current_id.
@@ -770,7 +762,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
              limit (int): the maximum number of events to return
 
          Returns:
-             Deferred[Tuple[int, list[FrozenEvent]]]: A tuple of (next_id, events), where
+             Tuple[int, list[FrozenEvent]]: A tuple of (next_id, events), where
              `next_id` is the next value to pass as `from_id` (it will either be the
              stream_ordering of the last returned event, or, if fewer than `limit` events
              were found, `current_id`.
@@ -795,11 +787,11 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
             return upper_bound, [row[1] for row in rows]
 
-        upper_bound, event_ids = yield self.db_pool.runInteraction(
+        upper_bound, event_ids = await self.db_pool.runInteraction(
             "get_all_new_events_stream", get_all_new_events_stream_txn
         )
 
-        events = yield self.get_events_as_list(event_ids)
+        events = await self.get_events_as_list(event_ids)
 
         return upper_bound, events
 
@@ -1008,8 +1000,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return rows, str(next_token)
 
-    @defer.inlineCallbacks
-    def paginate_room_events(
+    async def paginate_room_events(
         self, room_id, from_key, to_key=None, direction="b", limit=-1, event_filter=None
     ):
         """Returns list of events before or after a given token.
@@ -1036,7 +1027,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
         if to_key:
             to_key = RoomStreamToken.parse(to_key)
 
-        rows, token = yield self.db_pool.runInteraction(
+        rows, token = await self.db_pool.runInteraction(
             "paginate_room_events",
             self._paginate_room_events_txn,
             room_id,
@@ -1047,7 +1038,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             event_filter,
         )
 
-        events = yield self.get_events_as_list(
+        events = await self.get_events_as_list(
             [r.event_id for r in rows], get_prev_content=True
         )
 

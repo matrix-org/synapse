@@ -104,7 +104,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
         self._rlsn._store.get_events = Mock(
-            return_value=defer.succeed({"123": mock_event})
+            return_value=make_awaitable({"123": mock_event})
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
         # Would be better to check the content, but once == remove blocking event
@@ -122,7 +122,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
         self._rlsn._store.get_events = Mock(
-            return_value=defer.succeed({"123": mock_event})
+            return_value=make_awaitable({"123": mock_event})
         )
 
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
@@ -217,7 +217,7 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
             type=EventTypes.Message, content={"msgtype": ServerNoticeMsgType}
         )
         self._rlsn._store.get_events = Mock(
-            return_value=defer.succeed({"123": mock_event})
+            return_value=make_awaitable({"123": mock_event})
         )
         self.get_success(self._rlsn.maybe_send_server_notice_to_user(self.user_id))
 

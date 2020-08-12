@@ -641,7 +641,7 @@ class StateResolutionStore(object):
             allow_rejected (bool): If True return rejected events.
 
         Returns:
-            Deferred[dict[str, FrozenEvent]]: Dict from event_id to event.
+            Awaitable[dict[str, FrozenEvent]]: Dict from event_id to event.
         """
 
         return self.store.get_events(
