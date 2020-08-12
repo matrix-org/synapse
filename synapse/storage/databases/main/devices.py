@@ -17,8 +17,6 @@
 import logging
 from typing import List, Optional, Set, Tuple
 
-from twisted.internet import defer
-
 from synapse.api.errors import Codes, StoreError
 from synapse.logging.opentracing import (
     get_active_span_text_map,
@@ -35,12 +33,7 @@ from synapse.storage.database import (
 )
 from synapse.types import Collection, get_verify_key_from_cross_signing_key
 from synapse.util import json_encoder
-from synapse.util.caches.descriptors import (
-    Cache,
-    cached,
-    cachedInlineCallbacks,
-    cachedList,
-)
+from synapse.util.caches.descriptors import Cache, cached, cachedList
 from synapse.util.iterutils import batch_iter
 from synapse.util.stringutils import shortstr
 
@@ -73,19 +66,17 @@ class DeviceWorkerStore(SQLBaseStore):
             desc="get_device",
         )
 
-    @defer.inlineCallbacks
-    def get_devices_by_user(self, user_id):
+    async def get_devices_by_user(self, user_id):
         """Retrieve all of a user's registered devices. Only returns devices
         that are not marked as hidden.
 
         Args:
             user_id (str):
         Returns:
-            defer.Deferred: resolves to a dict from device_id to a dict
-            containing "device_id", "user_id" and "display_name" for each
-            device.
+            A dict from device_id to a dict containing "device_id", "user_id"
+            and "display_name" for each device.
         """
-        devices = yield self.db_pool.simple_select_list(
+        devices = await self.db_pool.simple_select_list(
             table="devices",
             keyvalues={"user_id": user_id, "hidden": False},
             retcols=("user_id", "device_id", "display_name"),
@@ -95,8 +86,7 @@ class DeviceWorkerStore(SQLBaseStore):
         return {d["device_id"]: d for d in devices}
 
     @trace
-    @defer.inlineCallbacks
-    def get_device_updates_by_remote(self, destination, from_stream_id, limit):
+    async def get_device_updates_by_remote(self, destination, from_stream_id, limit):
         """Get a stream of device updates to send to the given remote server.
 
         Args:
@@ -104,7 +94,7 @@ class DeviceWorkerStore(SQLBaseStore):
             from_stream_id (int): The minimum stream_id to filter updates by, exclusive
             limit (int): Maximum number of device updates to return
         Returns:
-            Deferred[tuple[int, list[tuple[string,dict]]]]:
+            tuple[int, list[tuple[string,dict]]]:
                 current stream id (ie, the stream id of the last update included in the
                 response), and the list of updates, where each update is a pair of EDU
                 type and EDU contents
@@ -117,7 +107,7 @@ class DeviceWorkerStore(SQLBaseStore):
         if not has_changed:
             return now_stream_id, []
 
-        updates = yield self.db_pool.runInteraction(
+        updates = await self.db_pool.runInteraction(
             "get_device_updates_by_remote",
             self._get_device_updates_by_remote_txn,
             destination,
@@ -136,9 +126,7 @@ class DeviceWorkerStore(SQLBaseStore):
         master_key_by_user = {}
         self_signing_key_by_user = {}
         for user in users:
-            cross_signing_key = yield defer.ensureDeferred(
-                self.get_e2e_cross_signing_key(user, "master")
-            )
+            cross_signing_key = await self.get_e2e_cross_signing_key(user, "master")
             if cross_signing_key:
                 key_id, verify_key = get_verify_key_from_cross_signing_key(
                     cross_signing_key
@@ -151,8 +139,8 @@ class DeviceWorkerStore(SQLBaseStore):
                     "device_id": verify_key.version,
                 }
 
-            cross_signing_key = yield defer.ensureDeferred(
-                self.get_e2e_cross_signing_key(user, "self_signing")
+            cross_signing_key = await self.get_e2e_cross_signing_key(
+                user, "self_signing"
             )
             if cross_signing_key:
                 key_id, verify_key = get_verify_key_from_cross_signing_key(
@@ -202,7 +190,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 if update_stream_id > previous_update_stream_id:
                     query_map[key] = (update_stream_id, update_context)
 
-        results = yield self._get_device_update_edus_by_remote(
+        results = await self._get_device_update_edus_by_remote(
             destination, from_stream_id, query_map
         )
 
@@ -240,8 +228,9 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return list(txn)
 
-    @defer.inlineCallbacks
-    def _get_device_update_edus_by_remote(self, destination, from_stream_id, query_map):
+    async def _get_device_update_edus_by_remote(
+        self, destination, from_stream_id, query_map
+    ):
         """Returns a list of device update EDUs as well as E2EE keys
 
         Args:
@@ -256,7 +245,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         """
         devices = (
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "_get_e2e_device_keys_txn",
                 self._get_e2e_device_keys_txn,
                 query_map.keys(),
@@ -271,7 +260,7 @@ class DeviceWorkerStore(SQLBaseStore):
         for user_id, user_devices in devices.items():
             # The prev_id for the first row is always the last row before
             # `from_stream_id`
-            prev_id = yield self._get_last_device_update_for_remote_user(
+            prev_id = await self._get_last_device_update_for_remote_user(
                 destination, user_id, from_stream_id
             )
 
@@ -367,8 +356,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         txn.execute(sql, (destination, stream_id))
 
-    @defer.inlineCallbacks
-    def add_user_signature_change_to_streams(self, from_user_id, user_ids):
+    async def add_user_signature_change_to_streams(self, from_user_id, user_ids):
         """Persist that a user has made new signatures
 
         Args:
@@ -377,7 +365,7 @@ class DeviceWorkerStore(SQLBaseStore):
         """
 
         with self._device_list_id_gen.get_next() as stream_id:
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "add_user_sig_change_to_streams",
                 self._add_user_signature_change_txn,
                 from_user_id,
@@ -406,8 +394,7 @@ class DeviceWorkerStore(SQLBaseStore):
         return self._device_list_id_gen.get_current_token()
 
     @trace
-    @defer.inlineCallbacks
-    def get_user_devices_from_cache(self, query_list):
+    async def get_user_devices_from_cache(self, query_list):
         """Get the devices (and keys if any) for remote users from the cache.
 
         Args:
@@ -420,11 +407,11 @@ class DeviceWorkerStore(SQLBaseStore):
             user_id -> device_id -> device_info
         """
         user_ids = {user_id for user_id, _ in query_list}
-        user_map = yield self.get_device_list_last_stream_id_for_remotes(list(user_ids))
+        user_map = await self.get_device_list_last_stream_id_for_remotes(list(user_ids))
 
         # We go and check if any of the users need to have their device lists
         # resynced. If they do then we remove them from the cached list.
-        users_needing_resync = yield self.get_user_ids_requiring_device_list_resync(
+        users_needing_resync = await self.get_user_ids_requiring_device_list_resync(
             user_ids
         )
         user_ids_in_cache = {
@@ -438,19 +425,19 @@ class DeviceWorkerStore(SQLBaseStore):
                 continue
 
             if device_id:
-                device = yield self._get_cached_user_device(user_id, device_id)
+                device = await self._get_cached_user_device(user_id, device_id)
                 results.setdefault(user_id, {})[device_id] = device
             else:
-                results[user_id] = yield self.get_cached_devices_for_user(user_id)
+                results[user_id] = await self.get_cached_devices_for_user(user_id)
 
         set_tag("in_cache", results)
         set_tag("not_in_cache", user_ids_not_in_cache)
 
         return user_ids_not_in_cache, results
 
-    @cachedInlineCallbacks(num_args=2, tree=True)
-    def _get_cached_user_device(self, user_id, device_id):
-        content = yield self.db_pool.simple_select_one_onecol(
+    @cached(num_args=2, tree=True)
+    async def _get_cached_user_device(self, user_id, device_id):
+        content = await self.db_pool.simple_select_one_onecol(
             table="device_lists_remote_cache",
             keyvalues={"user_id": user_id, "device_id": device_id},
             retcol="content",
@@ -458,9 +445,9 @@ class DeviceWorkerStore(SQLBaseStore):
         )
         return db_to_json(content)
 
-    @cachedInlineCallbacks()
-    def get_cached_devices_for_user(self, user_id):
-        devices = yield self.db_pool.simple_select_list(
+    @cached()
+    async def get_cached_devices_for_user(self, user_id):
+        devices = await self.db_pool.simple_select_list(
             table="device_lists_remote_cache",
             keyvalues={"user_id": user_id},
             retcols=("device_id", "content"),
@@ -515,7 +502,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return now_stream_id, []
 
-    def get_users_whose_devices_changed(self, from_key, user_ids):
+    async def get_users_whose_devices_changed(self, from_key, user_ids):
         """Get set of users whose devices have changed since `from_key` that
         are in the given list of user_ids.
 
@@ -524,8 +511,7 @@ class DeviceWorkerStore(SQLBaseStore):
             user_ids (Iterable[str])
 
         Returns:
-            Deferred[set[str]]: The set of user_ids whose devices have changed
-            since `from_key`
+            set[str]: The set of user_ids whose devices have changed since `from_key`
         """
         from_key = int(from_key)
 
@@ -536,7 +522,7 @@ class DeviceWorkerStore(SQLBaseStore):
         )
 
         if not to_check:
-            return defer.succeed(set())
+            return set()
 
         def _get_users_whose_devices_changed_txn(txn):
             changes = set()
@@ -556,12 +542,11 @@ class DeviceWorkerStore(SQLBaseStore):
 
             return changes
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_users_whose_devices_changed", _get_users_whose_devices_changed_txn
         )
 
-    @defer.inlineCallbacks
-    def get_users_whose_signatures_changed(self, user_id, from_key):
+    async def get_users_whose_signatures_changed(self, user_id, from_key):
         """Get the users who have new cross-signing signatures made by `user_id` since
         `from_key`.
 
@@ -575,7 +560,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 SELECT DISTINCT user_ids FROM user_signature_stream
                 WHERE from_user_id = ? AND stream_id > ?
             """
-            rows = yield self.db_pool.execute(
+            rows = await self.db_pool.execute(
                 "get_users_whose_signatures_changed", None, sql, user_id, from_key
             )
             return {user for row in rows for user in db_to_json(row[0])}
@@ -669,8 +654,7 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return results
 
-    @defer.inlineCallbacks
-    def get_user_ids_requiring_device_list_resync(
+    async def get_user_ids_requiring_device_list_resync(
         self, user_ids: Optional[Collection[str]] = None,
     ) -> Set[str]:
         """Given a list of remote users return the list of users that we
@@ -681,7 +665,7 @@ class DeviceWorkerStore(SQLBaseStore):
             The IDs of users whose device lists need resync.
         """
         if user_ids:
-            rows = yield self.db_pool.simple_select_many_batch(
+            rows = await self.db_pool.simple_select_many_batch(
                 table="device_lists_remote_resync",
                 column="user_id",
                 iterable=user_ids,
@@ -689,7 +673,7 @@ class DeviceWorkerStore(SQLBaseStore):
                 desc="get_user_ids_requiring_device_list_resync_with_iterable",
             )
         else:
-            rows = yield self.db_pool.simple_select_list(
+            rows = await self.db_pool.simple_select_list(
                 table="device_lists_remote_resync",
                 keyvalues=None,
                 retcols=("user_id",),
@@ -779,16 +763,15 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             "drop_device_lists_outbound_last_success_non_unique_idx",
         )
 
-    @defer.inlineCallbacks
-    def _drop_device_list_streams_non_unique_indexes(self, progress, batch_size):
+    async def _drop_device_list_streams_non_unique_indexes(self, progress, batch_size):
         def f(conn):
             txn = conn.cursor()
             txn.execute("DROP INDEX IF EXISTS device_lists_remote_cache_id")
             txn.execute("DROP INDEX IF EXISTS device_lists_remote_extremeties_id")
             txn.close()
 
-        yield self.db_pool.runWithConnection(f)
-        yield self.db_pool.updates._end_background_update(
+        await self.db_pool.runWithConnection(f)
+        await self.db_pool.updates._end_background_update(
             DROP_DEVICE_LIST_STREAMS_NON_UNIQUE_INDEXES
         )
         return 1
@@ -868,8 +851,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         self._clock.looping_call(self._prune_old_outbound_device_pokes, 60 * 60 * 1000)
 
-    @defer.inlineCallbacks
-    def store_device(self, user_id, device_id, initial_device_display_name):
+    async def store_device(self, user_id, device_id, initial_device_display_name):
         """Ensure the given device is known; add it to the store if not
 
         Args:
@@ -878,7 +860,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             initial_device_display_name (str): initial displayname of the
                device. Ignored if device exists.
         Returns:
-            defer.Deferred: boolean whether the device was inserted or an
+            boolean whether the device was inserted or an
                 existing device existed with that ID.
         Raises:
             StoreError: if the device is already in use
@@ -888,7 +870,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             return False
 
         try:
-            inserted = yield self.db_pool.simple_insert(
+            inserted = await self.db_pool.simple_insert(
                 "devices",
                 values={
                     "user_id": user_id,
@@ -902,7 +884,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             if not inserted:
                 # if the device already exists, check if it's a real device, or
                 # if the device ID is reserved by something else
-                hidden = yield self.db_pool.simple_select_one_onecol(
+                hidden = await self.db_pool.simple_select_one_onecol(
                     "devices",
                     keyvalues={"user_id": user_id, "device_id": device_id},
                     retcol="hidden",
@@ -927,17 +909,14 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             )
             raise StoreError(500, "Problem storing device.")
 
-    @defer.inlineCallbacks
-    def delete_device(self, user_id, device_id):
+    async def delete_device(self, user_id, device_id):
         """Delete a device.
 
         Args:
             user_id (str): The ID of the user which owns the device
             device_id (str): The ID of the device to delete
-        Returns:
-            defer.Deferred
         """
-        yield self.db_pool.simple_delete_one(
+        await self.db_pool.simple_delete_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             desc="delete_device",
@@ -945,17 +924,14 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
 
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
-    @defer.inlineCallbacks
-    def delete_devices(self, user_id, device_ids):
+    async def delete_devices(self, user_id, device_ids):
         """Deletes several devices.
 
         Args:
             user_id (str): The ID of the user which owns the devices
             device_ids (list): The IDs of the devices to delete
-        Returns:
-            defer.Deferred
         """
-        yield self.db_pool.simple_delete_many(
+        await self.db_pool.simple_delete_many(
             table="devices",
             column="device_id",
             iterable=device_ids,
@@ -965,7 +941,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
-    def update_device(self, user_id, device_id, new_display_name=None):
+    async def update_device(self, user_id, device_id, new_display_name=None):
         """Update a device. Only updates the device if it is not marked as
         hidden.
 
@@ -976,15 +952,13 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                to leave unchanged
         Raises:
             StoreError: if the device is not found
-        Returns:
-            defer.Deferred
         """
         updates = {}
         if new_display_name is not None:
             updates["display_name"] = new_display_name
         if not updates:
-            return defer.succeed(None)
-        return self.db_pool.simple_update_one(
+            return None
+        return await self.db_pool.simple_update_one(
             table="devices",
             keyvalues={"user_id": user_id, "device_id": device_id, "hidden": False},
             updatevalues=updates,
@@ -1118,8 +1092,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             txn, table="device_lists_remote_resync", keyvalues={"user_id": user_id},
         )
 
-    @defer.inlineCallbacks
-    def add_device_change_to_streams(self, user_id, device_ids, hosts):
+    async def add_device_change_to_streams(self, user_id, device_ids, hosts):
         """Persist that a user's devices have been updated, and which hosts
         (if any) should be poked.
         """
@@ -1127,7 +1100,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             return
 
         with self._device_list_id_gen.get_next_mult(len(device_ids)) as stream_ids:
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "add_device_change_to_stream",
                 self._add_device_change_to_stream_txn,
                 user_id,
@@ -1142,7 +1115,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         with self._device_list_id_gen.get_next_mult(
             len(hosts) * len(device_ids)
         ) as stream_ids:
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "add_device_outbound_poke_to_stream",
                 self._add_device_outbound_poke_to_stream_txn,
                 user_id,
