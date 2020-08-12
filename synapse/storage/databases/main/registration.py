@@ -1323,6 +1323,14 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
             if not row:
                 if self._ignore_unknown_session_error:
+                    # If we need to inhibit the error caused by an incorrect session,
+                    # use None as placeholder values for the client secret and the
+                    # validation timestamp if the session ID doesn't exist.
+                    # It shouldn't be an issue because they're both only checked after
+                    # the token check, which should fail. And if it doesn't for some
+                    # reason, the next check is on the client secret, which is NOT NULL,
+                    # so we don't have to worry about the client secret matching by
+                    # accident.
                     row = {"client_secret": None, "validated_at": None}
                 else:
                     raise ThreepidValidationError(400, "Unknown session_id")
