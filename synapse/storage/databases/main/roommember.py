@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import Awaitable, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Awaitable, Iterable, List, Optional, Set
 
 from twisted.internet import defer
 
@@ -24,7 +24,6 @@ from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.state import _StateCacheEntry
 from synapse.storage._base import (
     LoggingTransaction,
     SQLBaseStore,
@@ -45,6 +44,9 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.caches import intern_string
 from synapse.util.caches.descriptors import _CacheContext, cached, cachedList
 from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.state import _StateCacheEntry
 
 logger = logging.getLogger(__name__)
 
@@ -1017,7 +1019,7 @@ class _JoinedHostsCache(object):
 
         self._len = 0
 
-    async def get_destinations(self, state_entry: _StateCacheEntry) -> Set[str]:
+    async def get_destinations(self, state_entry: "_StateCacheEntry") -> Set[str]:
         """Get set of destinations for a state entry
 
         Args:
