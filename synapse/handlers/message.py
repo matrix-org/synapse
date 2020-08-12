@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
@@ -93,11 +93,11 @@ class MessageHandler(object):
 
     async def get_room_data(
         self,
-        user_id: str = None,
-        room_id: str = None,
-        event_type: Optional[str] = None,
-        state_key: str = "",
-        is_guest: bool = False,
+        user_id: str,
+        room_id: str,
+        event_type: str,
+        state_key: str,
+        is_guest: bool,
     ) -> dict:
         """ Get data from a room.
 
@@ -407,7 +407,7 @@ class EventCreationHandler(object):
         #
         # map from room id to time-of-last-attempt.
         #
-        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: dict[str, int]
+        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: Dict[str, int]
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
         # config options, but *only* if we have a configuration for which we are
@@ -707,7 +707,7 @@ class EventCreationHandler(object):
     async def create_and_send_nonmember_event(
         self,
         requester: Requester,
-        event_dict: EventBase,
+        event_dict: dict,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
     ) -> Tuple[EventBase, int]:
@@ -971,7 +971,7 @@ class EventCreationHandler(object):
             # Validate a newly added alias or newly added alt_aliases.
 
             original_alias = None
-            original_alt_aliases = set()
+            original_alt_aliases = []  # type: List[str]
 
             original_event_id = event.unsigned.get("replaces_state")
             if original_event_id:
@@ -1018,6 +1018,10 @@ class EventCreationHandler(object):
                     return e.type == EventTypes.Member and e.sender == event.sender
 
                 current_state_ids = await context.get_current_state_ids()
+
+                # We know this event is not an outlier, so this must be
+                # non-None.
+                assert current_state_ids is not None
 
                 state_to_include_ids = [
                     e_id
