@@ -17,12 +17,12 @@ from canonicaljson import encode_canonical_json
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.util.caches.descriptors import cachedInlineCallbacks
+from synapse.util.caches.descriptors import cached
 
 
 class FilteringStore(SQLBaseStore):
-    @cachedInlineCallbacks(num_args=2)
-    def get_user_filter(self, user_localpart, filter_id):
+    @cached(num_args=2)
+    async def get_user_filter(self, user_localpart, filter_id):
         # filter_id is BIGINT UNSIGNED, so if it isn't a number, fail
         # with a coherent error message rather than 500 M_UNKNOWN.
         try:
@@ -30,7 +30,7 @@ class FilteringStore(SQLBaseStore):
         except ValueError:
             raise SynapseError(400, "Invalid filter ID", Codes.INVALID_PARAM)
 
-        def_json = yield self.db_pool.simple_select_one_onecol(
+        def_json = await self.db_pool.simple_select_one_onecol(
             table="user_filters",
             keyvalues={"user_id": user_localpart, "filter_id": filter_id},
             retcol="filter_json",

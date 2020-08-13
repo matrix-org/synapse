@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
@@ -198,8 +196,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
             columns=["room_id"],
         )
 
-    @defer.inlineCallbacks
-    def _background_deduplicate_state(self, progress, batch_size):
+    async def _background_deduplicate_state(self, progress, batch_size):
         """This background update will slowly deduplicate state by reencoding
         them as deltas.
         """
@@ -212,7 +209,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
         batch_size = max(1, int(batch_size / BATCH_SIZE_SCALE_FACTOR))
 
         if max_group is None:
-            rows = yield self.db_pool.execute(
+            rows = await self.db_pool.execute(
                 "_background_deduplicate_state",
                 None,
                 "SELECT coalesce(max(id), 0) FROM state_groups",
@@ -330,19 +327,18 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
 
             return False, batch_size
 
-        finished, result = yield self.db_pool.runInteraction(
+        finished, result = await self.db_pool.runInteraction(
             self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME, reindex_txn
         )
 
         if finished:
-            yield self.db_pool.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 self.STATE_GROUP_DEDUPLICATION_UPDATE_NAME
             )
 
         return result * BATCH_SIZE_SCALE_FACTOR
 
-    @defer.inlineCallbacks
-    def _background_index_state(self, progress, batch_size):
+    async def _background_index_state(self, progress, batch_size):
         def reindex_txn(conn):
             conn.rollback()
             if isinstance(self.database_engine, PostgresEngine):
@@ -365,9 +361,9 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                 )
                 txn.execute("DROP INDEX IF EXISTS state_groups_state_id")
 
-        yield self.db_pool.runWithConnection(reindex_txn)
+        await self.db_pool.runWithConnection(reindex_txn)
 
-        yield self.db_pool.updates._end_background_update(
+        await self.db_pool.updates._end_background_update(
             self.STATE_GROUP_INDEX_UPDATE_NAME
         )
 

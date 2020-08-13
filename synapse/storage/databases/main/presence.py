@@ -15,8 +15,6 @@
 
 from typing import List, Tuple
 
-from twisted.internet import defer
-
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.presence import UserPresenceState
 from synapse.util.caches.descriptors import cached, cachedList
@@ -24,14 +22,13 @@ from synapse.util.iterutils import batch_iter
 
 
 class PresenceStore(SQLBaseStore):
-    @defer.inlineCallbacks
-    def update_presence(self, presence_states):
+    async def update_presence(self, presence_states):
         stream_ordering_manager = self._presence_id_gen.get_next_mult(
             len(presence_states)
         )
 
         with stream_ordering_manager as stream_orderings:
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "update_presence",
                 self._update_presence_txn,
                 stream_orderings,

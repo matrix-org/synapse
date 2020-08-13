@@ -27,6 +27,7 @@ from synapse.server_notices.resource_limits_server_notices import (
 )
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 from tests.unittest import override_config
 from tests.utils import default_config
 
@@ -79,7 +80,9 @@ class TestResourceLimitsServerNotices(unittest.HomeserverTestCase):
             return_value=defer.succeed("!something:localhost")
         )
         self._rlsn._store.add_tag_to_room = Mock(return_value=defer.succeed(None))
-        self._rlsn._store.get_tags_for_room = Mock(return_value=defer.succeed({}))
+        self._rlsn._store.get_tags_for_room = Mock(
+            side_effect=lambda user_id, room_id: make_awaitable({})
+        )
 
     @override_config({"hs_disabled": True})
     def test_maybe_send_server_notice_disabled_hs(self):
