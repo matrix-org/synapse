@@ -1,1 +1,0 @@
-We no longer publish Docker images with the `-py3` tag suffix, as announced at https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#upgrading-to-v1180.

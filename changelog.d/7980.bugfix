@@ -1,1 +1,0 @@
-Fix "no create event in auth events" when trying to reject invitation after inviter leaves. Bug introduced in Synapse v1.10.0.
