@@ -52,7 +52,6 @@ Internal Changes
 - Improve the performance of the register endpoint. ([\#8009](https://github.com/matrix-org/synapse/issues/8009))
 - Reduce less useful output in the newsfragment CI step. Add a link to the changelog section of the contributing guide on error. ([\#8024](https://github.com/matrix-org/synapse/issues/8024))
 - Rename storage layer objects to be more sensible. ([\#8033](https://github.com/matrix-org/synapse/issues/8033))
-- Revert MSC2654 implementation because of perf issues. Please delete this line when processing the 1.19 changelog. ([\#8039](https://github.com/matrix-org/synapse/issues/8039))
 - Change the default log config to reduce disk I/O and storage for new servers. ([\#8040](https://github.com/matrix-org/synapse/issues/8040))
 - Add an assertion on prev_events in create_new_client_event. ([\#8041](https://github.com/matrix-org/synapse/issues/8041))
 - Add a comment to `ServerContextFactory` about the use of `SSLv23_METHOD`. ([\#8043](https://github.com/matrix-org/synapse/issues/8043))
