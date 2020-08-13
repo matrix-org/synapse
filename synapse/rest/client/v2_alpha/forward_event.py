@@ -105,7 +105,7 @@ class RoomEventForwardServlet(RestServlet):
                 # TODO add sender profile info here
             }
 
-        forwarded_event_dict = {
+        forward_event_dict = {
             "type": event_type,
             "content": content,
             "room_id": target_room_id,
@@ -114,13 +114,13 @@ class RoomEventForwardServlet(RestServlet):
         }
 
         if b"ts" in request.args and requester.app_service:
-            forwarded_event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
+            forward_event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
         (
             forwarded_event,
             _,
         ) = await self.event_creation_handler.create_and_send_nonmember_event(
-            requester, forwarded_event_dict, txn_id=txn_id
+            requester, forward_event_dict, txn_id=txn_id
         )
 
         set_tag("event_id", forwarded_event.event_id)
