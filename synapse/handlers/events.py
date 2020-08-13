@@ -57,13 +57,10 @@ class EventStreamHandler(BaseHandler):
         timeout=0,
         as_client_event=True,
         affect_presence=True,
-        only_keys=None,
         room_id=None,
         is_guest=False,
     ):
         """Fetches the events stream for a given user.
-
-        If `only_keys` is not None, events from keys will be sent down.
         """
 
         if room_id:
@@ -93,7 +90,6 @@ class EventStreamHandler(BaseHandler):
                 auth_user,
                 pagin_config,
                 timeout,
-                only_keys=only_keys,
                 is_guest=is_guest,
                 explicit_room_id=room_id,
             )

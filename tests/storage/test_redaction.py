@@ -251,6 +251,10 @@ class RedactionTestCase(unittest.HomeserverTestCase):
             def room_id(self):
                 return self._base_builder.room_id
 
+            @property
+            def type(self):
+                return self._base_builder.type
+
         event_1, context_1 = self.get_success(
             self.event_creation_handler.create_new_client_event(
                 EventIdManglingBuilder(
@@ -343,7 +347,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
         event_json = self.get_success(
-            self.store.db.simple_select_one_onecol(
+            self.store.db_pool.simple_select_one_onecol(
                 table="event_json",
                 keyvalues={"event_id": msg_event.event_id},
                 retcol="json",
@@ -361,7 +365,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(60 * 60 * 2)
 
         event_json = self.get_success(
-            self.store.db.simple_select_one_onecol(
+            self.store.db_pool.simple_select_one_onecol(
                 table="event_json",
                 keyvalues={"event_id": msg_event.event_id},
                 retcol="json",

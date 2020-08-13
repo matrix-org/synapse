@@ -144,7 +144,9 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # Get the create event to, later, check that we can still access it.
         message_handler = self.hs.get_message_handler()
         create_event = self.get_success(
-            message_handler.get_room_data(self.user_id, room_id, EventTypes.Create)
+            message_handler.get_room_data(
+                self.user_id, room_id, EventTypes.Create, state_key="", is_guest=False
+            )
         )
 
         # Send a first event to the room. This is the event we'll want to be purged at the

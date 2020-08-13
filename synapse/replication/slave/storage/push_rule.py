@@ -15,7 +15,7 @@
 # limitations under the License.
 
 from synapse.replication.tcp.streams import PushRulesStream
-from synapse.storage.data_stores.main.push_rule import PushRulesWorkerStore
+from synapse.storage.databases.main.push_rule import PushRulesWorkerStore
 
 from .events import SlavedEventStore
 

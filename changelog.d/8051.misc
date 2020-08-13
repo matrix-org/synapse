@@ -1,0 +1,1 @@
+It is no longer necessary to explicitly define `filters` in the logging configuration. (Continuing to do so is redundant but harmless.)

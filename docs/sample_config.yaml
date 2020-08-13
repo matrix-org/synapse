@@ -746,6 +746,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for ratelimiting redactions by room admins. If this is not explicitly
 #     set then it uses the same ratelimiting as per rc_message. This is useful
 #     to allow room admins to deal with abuse quickly.
+#   - two for ratelimiting number of rooms a user can join, "local" for when
+#     users are joining rooms the server is already in (this is cheap) vs
+#     "remote" for when users are trying to join rooms not on the server (which
+#     can be more expensive)
 #
 # The defaults are as shown below.
 #
@@ -771,6 +775,14 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_admin_redaction:
 #  per_second: 1
 #  burst_count: 50
+#
+#rc_joins:
+#  local:
+#    per_second: 0.1
+#    burst_count: 3
+#  remote:
+#    per_second: 0.01
+#    burst_count: 3
 
 
 # Ratelimiting settings for incoming federation
@@ -1564,6 +1576,17 @@ saml2_config:
   # The default is 'uid'.
   #
   #grandfathered_mxid_source_attribute: upn
+
+  # It is possible to configure Synapse to only allow logins if SAML attributes
+  # match particular values. The requirements can be listed under
+  # `attribute_requirements` as shown below. All of the listed attributes must
+  # match for the login to be permitted.
+  #
+  #attribute_requirements:
+  #  - attribute: userGroup
+  #    value: "staff"
+  #  - attribute: department
+  #    value: "sales"
 
   # Directory in which Synapse will try to find the template files below.
   # If not set, default templates from within the Synapse package will be used.
