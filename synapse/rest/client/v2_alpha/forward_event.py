@@ -110,12 +110,7 @@ class RoomEventForwardServlet(RestServlet):
             "content": content,
             "room_id": target_room_id,
             "sender": requester.user.to_string(),
-            "unsigned": {
-                self._data_key: {
-                    "valid": True,
-                    "event_id": event_id,
-                }
-            },
+            "unsigned": {self._data_key: {"valid": True, "event_id": event_id}},
         }
 
         if b"ts" in request.args and requester.app_service:

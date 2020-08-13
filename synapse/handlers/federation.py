@@ -741,10 +741,10 @@ class FederationHandler(BaseHandler, FederationBase):
             and not event.redacts
             and self._forwarded_key in event.content
         ):
-            valid, event_id = await self._validate_forwarded_event(event)
+            valid, forwarded_event_id = await self._validate_forwarded_event(event)
             event.unsigned[self._forwarded_key] = {
                 "valid": valid,
-                "event_id": event_id,
+                "event_id": forwarded_event_id,
             }
 
         try:
