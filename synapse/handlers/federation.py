@@ -683,7 +683,7 @@ class FederationHandler(BaseHandler, FederationBase):
     async def _validate_forwarded_event(self, event: EventBase) -> Tuple[bool, Optional[str]]:
         try:
             source_evt_dict = {**event.content[self._forwarded_key]}
-            room_version = source_evt_dict["unsigned"]["room_version"]
+            room_version_identifier = source_evt_dict["unsigned"]["room_version"]
             source_evt_dict["type"] = event.type
             source_evt_dict["content"] = {**event.content}
             del source_evt_dict["unsigned"]
@@ -691,11 +691,18 @@ class FederationHandler(BaseHandler, FederationBase):
         except (KeyError, TypeError):
             logger.exception("Failed to read forward data")
             return False, None
+
+        room_version = KNOWN_ROOM_VERSIONS.get(room_version_identifier)
+        if not room_version:
+            # We don't support the source room version, so we can't verify the event :(
+            return False, None
+
         try:
             source_evt = event_from_pdu_json(source_evt_dict, room_version)
         except SynapseError:
             logger.exception("Failed to parse forward data")
             return False, None
+
         try:
             checked_evt = await self._check_sigs_and_hash(room_version, source_evt)
             # _check_sigs_and_hash returns a redacted event if hash validation failed and

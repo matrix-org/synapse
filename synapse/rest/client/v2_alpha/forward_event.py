@@ -85,8 +85,9 @@ class RoomEventForwardServlet(RestServlet):
                                errcode=self._err_not_forwardable)
         elif not has_forward_meta:
             content[self._data_key] = event_dict
+            room_version = await self.store.get_room_version(event.room_id)
             content[self._data_key]["unsigned"] = {
-                "room_version": await self.store.get_room_version(event.room_id),
+                "room_version": room_version.identifier,
                 # TODO add sender profile info here
             }
 
