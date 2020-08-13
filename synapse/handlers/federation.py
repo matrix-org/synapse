@@ -50,6 +50,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
+from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
@@ -99,7 +100,7 @@ class _NewEventInfo:
     auth_events = attr.ib(type=Optional[StateMap[EventBase]], default=None)
 
 
-class FederationHandler(BaseHandler):
+class FederationHandler(BaseHandler, FederationBase):
     """Handles events that originated from federation.
         Responsible for:
         a) handling received Pdus before handing them on as Events to the rest
@@ -677,6 +678,35 @@ class FederationHandler(BaseHandler):
 
         return fetched_events
 
+    _forwarded_key = "net.maunium.msc2730.forwarded"
+
+    async def _validate_forwarded_event(self, event: EventBase) -> Tuple[bool, Optional[str]]:
+        try:
+            source_evt_dict = {**event.content[self._forwarded_key]}
+            room_version = source_evt_dict["unsigned"]["room_version"]
+            source_evt_dict["type"] = event.type
+            source_evt_dict["content"] = {**event.content}
+            del source_evt_dict["unsigned"]
+            del source_evt_dict["content"][self._forwarded_key]
+        except (KeyError, TypeError):
+            logger.exception("Failed to read forward data")
+            return False, None
+        try:
+            source_evt = event_from_pdu_json(source_evt_dict, room_version)
+        except SynapseError:
+            logger.exception("Failed to parse forward data")
+            return False, None
+        try:
+            checked_evt = await self._check_sigs_and_hash(room_version, source_evt)
+            # _check_sigs_and_hash returns a redacted event if hash validation failed and
+            # a SynapseError if signature validation failed. In both those cases, we want to
+            # mark the forward as invalid.
+            valid = not checked_evt.internal_metadata.is_redacted()
+        except SynapseError:
+            logger.exception("Failed to validate forward signature")
+            valid = False
+        return valid, source_evt.event_id
+
     async def _process_received_pdu(
         self, origin: str, event: EventBase, state: Optional[Iterable[EventBase]],
     ):
@@ -696,6 +726,13 @@ class FederationHandler(BaseHandler):
         event_id = event.event_id
 
         logger.debug("[%s %s] Processing event: %s", room_id, event_id, event)
+
+        if not event.is_state() and not event.redacts and self._forwarded_key in event.content:
+            valid, event_id = await self._validate_forwarded_event(event)
+            event.unsigned[self._forwarded_key] = {
+                "valid": valid,
+                "event_id": event_id,
+            }
 
         try:
             context = await self._handle_new_event(origin, event, state=state)
