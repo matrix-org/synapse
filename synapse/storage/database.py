@@ -516,14 +516,16 @@ class DatabasePool(object):
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
-            result = yield self.runWithConnection(
-                self.new_transaction,
-                desc,
-                after_callbacks,
-                exception_callbacks,
-                func,
-                *args,
-                **kwargs
+            result = yield defer.ensureDeferred(
+                self.runWithConnection(
+                    self.new_transaction,
+                    desc,
+                    after_callbacks,
+                    exception_callbacks,
+                    func,
+                    *args,
+                    **kwargs
+                )
             )
 
             for after_callback, after_args, after_kwargs in after_callbacks:
@@ -535,8 +537,7 @@ class DatabasePool(object):
 
         return result
 
-    @defer.inlineCallbacks
-    def runWithConnection(self, func: Callable, *args: Any, **kwargs: Any):
+    async def runWithConnection(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """Wraps the .runWithConnection() method on the underlying db_pool.
 
         Arguments:
@@ -547,7 +548,7 @@ class DatabasePool(object):
             kwargs: named args to pass to `func`
 
         Returns:
-            Deferred: The result of func
+            The result of func
         """
         parent_context = current_context()  # type: Optional[LoggingContextOrSentinel]
         if not parent_context:
@@ -570,11 +571,9 @@ class DatabasePool(object):
 
                 return func(conn, *args, **kwargs)
 
-        result = yield make_deferred_yieldable(
+        return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
         )
-
-        return result
 
     @staticmethod
     def cursor_to_dict(cursor):
