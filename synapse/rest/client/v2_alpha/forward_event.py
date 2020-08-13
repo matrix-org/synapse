@@ -16,7 +16,7 @@
 
 import logging
 
-from synapse.api.errors import Codes, SynapseError, AuthError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer
 from synapse.logging.opentracing import set_tag
 
@@ -31,8 +31,10 @@ class RoomEventForwardServlet(RestServlet):
     """
 
     PATTERNS = client_patterns(
-        ("/net.maunium.msc2730/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)"
-         "/forward/(?P<target_room_id>[^/]*)/(?P<txn_id>.*)"),
+        (
+            "/net.maunium.msc2730/rooms/(?P<room_id>[^/]*)/event/(?P<event_id>[^/]*)"
+            "/forward/(?P<target_room_id>[^/]*)/(?P<txn_id>.*)"
+        ),
         releases=(),  # This is an unstable feature
     )
 
@@ -59,14 +61,23 @@ class RoomEventForwardServlet(RestServlet):
             raise SynapseError(404, "Event not found.", errcode=Codes.NOT_FOUND)
 
         if event.is_state():
-            raise SynapseError(401, "State events cannot be forwarded.",
-                               errcode=self._err_not_forwardable)
+            raise SynapseError(
+                401,
+                "State events cannot be forwarded.",
+                errcode=self._err_not_forwardable,
+            )
         elif event.redacts:
-            raise SynapseError(401, "Redaction events cannot be forwarded.",
-                               errcode=self._err_not_forwardable)
+            raise SynapseError(
+                401,
+                "Redaction events cannot be forwarded.",
+                errcode=self._err_not_forwardable,
+            )
         elif event.internal_metadata.is_redacted():
-            raise SynapseError(401, "Redacted events cannot be forwarded.",
-                               errcode=self._err_not_forwardable)
+            raise SynapseError(
+                401,
+                "Redacted events cannot be forwarded.",
+                errcode=self._err_not_forwardable,
+            )
 
         event_id = event.event_id
         event_dict = event.get_dict()
@@ -81,8 +92,11 @@ class RoomEventForwardServlet(RestServlet):
             is_valid_forward = False
 
         if has_forward_meta and not is_valid_forward:
-            raise SynapseError(401, "Event contains invalid forward metadata.",
-                               errcode=self._err_not_forwardable)
+            raise SynapseError(
+                401,
+                "Event contains invalid forward metadata.",
+                errcode=self._err_not_forwardable,
+            )
         elif not has_forward_meta:
             content[self._data_key] = event_dict
             room_version = await self.store.get_room_version(event.room_id)
@@ -101,13 +115,16 @@ class RoomEventForwardServlet(RestServlet):
                     "valid": True,
                     "event_id": event_id,
                 }
-            }
+            },
         }
 
         if b"ts" in request.args and requester.app_service:
             forwarded_event_dict["origin_server_ts"] = parse_integer(request, "ts", 0)
 
-        forwarded_event, _ = await self.event_creation_handler.create_and_send_nonmember_event(
+        (
+            forwarded_event,
+            _,
+        ) = await self.event_creation_handler.create_and_send_nonmember_event(
             requester, forwarded_event_dict, txn_id=txn_id
         )
 

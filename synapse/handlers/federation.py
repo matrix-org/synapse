@@ -50,11 +50,11 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
-from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
+from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.handlers._base import BaseHandler
 from synapse.logging.context import (
     make_deferred_yieldable,
@@ -680,7 +680,9 @@ class FederationHandler(BaseHandler, FederationBase):
 
     _forwarded_key = "net.maunium.msc2730.forwarded"
 
-    async def _validate_forwarded_event(self, event: EventBase) -> Tuple[bool, Optional[str]]:
+    async def _validate_forwarded_event(
+        self, event: EventBase
+    ) -> Tuple[bool, Optional[str]]:
         try:
             source_evt_dict = {**event.content[self._forwarded_key]}
             room_version_identifier = source_evt_dict["unsigned"]["room_version"]
@@ -734,7 +736,11 @@ class FederationHandler(BaseHandler, FederationBase):
 
         logger.debug("[%s %s] Processing event: %s", room_id, event_id, event)
 
-        if not event.is_state() and not event.redacts and self._forwarded_key in event.content:
+        if (
+            not event.is_state()
+            and not event.redacts
+            and self._forwarded_key in event.content
+        ):
             valid, event_id = await self._validate_forwarded_event(event)
             event.unsigned[self._forwarded_key] = {
                 "valid": valid,
