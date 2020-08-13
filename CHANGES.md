@@ -1,6 +1,12 @@
 Synapse 1.19.0rc1 (2020-08-13)
 ==============================
 
+Removal warning
+---------------
+
+As outlined in the [previous release](https://github.com/matrix-org/synapse/releases/tag/v1.18.0), we are no longer publishing Docker images with the `-py3` tag suffix. On top of that, we have also removed the `latest-py3` tag. Please see [the announcement in the upgrade notes for 1.18.0](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#upgrading-to-v1180).
+
+
 Features
 --------
 
@@ -25,7 +31,7 @@ Bugfixes
 Updates to the Docker image
 ---------------------------
 
-- We no longer publish Docker images with the `-py3` tag suffix, as announced at https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#upgrading-to-v1180. ([\#8056](https://github.com/matrix-org/synapse/issues/8056))
+- We no longer publish Docker images with the `-py3` tag suffix, as [announced in the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#upgrading-to-v1180). ([\#8056](https://github.com/matrix-org/synapse/issues/8056))
 
 
 Improved Documentation
@@ -58,9 +64,7 @@ Internal Changes
 - Log `OPTIONS` requests at `DEBUG` rather than `INFO` level to reduce amount logged at `INFO`. ([\#8049](https://github.com/matrix-org/synapse/issues/8049))
 - Reduce amount of outbound request logging at INFO level. ([\#8050](https://github.com/matrix-org/synapse/issues/8050))
 - It is no longer necessary to explicitly define `filters` in the logging configuration. (Continuing to do so is redundant but harmless.) ([\#8051](https://github.com/matrix-org/synapse/issues/8051))
-- Add type hints to `Notifier`. ([\#8058](https://github.com/matrix-org/synapse/issues/8058), [\#8064](https://github.com/matrix-org/synapse/issues/8064))
-- Improve typing information on `HomeServer` object. ([\#8060](https://github.com/matrix-org/synapse/issues/8060))
-- Add type hints to `synapse.handlers.message` and `synapse.events.builder`. ([\#8067](https://github.com/matrix-org/synapse/issues/8067))
+- Add and improve type hints. ([\#8058](https://github.com/matrix-org/synapse/issues/8058), [\#8064](https://github.com/matrix-org/synapse/issues/8064), [\#8060](https://github.com/matrix-org/synapse/issues/8060), [\#8067](https://github.com/matrix-org/synapse/issues/8067))
 
 
 Synapse 1.18.0 (2020-07-30)
