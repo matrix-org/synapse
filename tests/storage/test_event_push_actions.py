@@ -142,20 +142,22 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
     @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):
-            return self.store.db_pool.simple_insert(
-                "events",
-                {
-                    "stream_ordering": so,
-                    "received_ts": ts,
-                    "event_id": "event%i" % so,
-                    "type": "",
-                    "room_id": "",
-                    "content": "",
-                    "processed": True,
-                    "outlier": False,
-                    "topological_ordering": 0,
-                    "depth": 0,
-                },
+            return defer.ensureDeferred(
+                self.store.db_pool.simple_insert(
+                    "events",
+                    {
+                        "stream_ordering": so,
+                        "received_ts": ts,
+                        "event_id": "event%i" % so,
+                        "type": "",
+                        "room_id": "",
+                        "content": "",
+                        "processed": True,
+                        "outlier": False,
+                        "topological_ordering": 0,
+                        "depth": 0,
+                    },
+                )
             )
 
         # start with the base case where there are no events in the table

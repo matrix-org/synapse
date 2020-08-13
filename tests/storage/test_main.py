@@ -35,7 +35,7 @@ class DataStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_get_users_paginate(self):
         yield self.store.register_user(self.user.to_string(), "pass")
-        yield self.store.create_profile(self.user.localpart)
+        yield defer.ensureDeferred(self.store.create_profile(self.user.localpart))
         yield self.store.set_profile_displayname(self.user.localpart, self.displayname)
 
         users, total = yield self.store.get_users_paginate(

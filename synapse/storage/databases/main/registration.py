@@ -17,9 +17,7 @@
 
 import logging
 import re
-from typing import Dict, List, Optional
-
-from twisted.internet.defer import Deferred
+from typing import Awaitable, Dict, List, Optional
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
@@ -1084,7 +1082,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
     def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
-    ) -> Deferred:
+    ) -> Awaitable:
         """Record a mapping from an external user id to a mxid
 
         Args:
