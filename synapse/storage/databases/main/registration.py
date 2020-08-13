@@ -561,7 +561,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             id_server (str)
 
         Returns:
-            Deferred
+            Awaitable
         """
         # We need to use an upsert, in case they user had already bound the
         # threepid
