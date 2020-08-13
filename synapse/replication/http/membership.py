@@ -86,7 +86,7 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
             remote_room_hosts, room_id, user_id, event_content
         )
 
-        return 200, {"event_id": event_id, "stream_id": stream_id}
+        return 200, {"event_id": event_id, "stream_id": str(stream_id)}
 
 
 class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
@@ -150,7 +150,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
             invite_event_id, txn_id, requester, event_content,
         )
 
-        return 200, {"event_id": event_id, "stream_id": stream_token.stream}
+        return 200, {"event_id": event_id, "stream_id": str(stream_token)}
 
 
 class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):

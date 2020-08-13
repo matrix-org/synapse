@@ -559,7 +559,7 @@ class RoomCreationHandler(BaseHandler):
         config: JsonDict,
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
-    ) -> Tuple[dict, int]:
+    ) -> Tuple[dict, EventStreamToken]:
         """ Creates a new room.
 
         Args:
@@ -806,7 +806,7 @@ class RoomCreationHandler(BaseHandler):
         await self._replication.wait_for_stream_position(
             self.hs.config.worker.events_shard_config.get_instance(room_id),
             "events",
-            last_stream_id,
+            last_stream_id.stream,
         )
 
         return result, last_stream_id
@@ -822,7 +822,7 @@ class RoomCreationHandler(BaseHandler):
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
-    ) -> int:
+    ) -> EventStreamToken:
         """Sends the initial events into a new room.
 
         `power_level_content_override` doesn't apply when initial state has
@@ -844,7 +844,7 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        async def send(etype: str, content: JsonDict, **kwargs) -> int:
+        async def send(etype: str, content: JsonDict, **kwargs) -> EventStreamToken:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             # Allow these events to be sent even if the user is shadow-banned to
@@ -1240,7 +1240,7 @@ class RoomShutdownHandler(object):
 
             room_creator_requester = create_requester(new_room_user_id)
 
-            info, stream_id = await self._room_creation_handler.create_room(
+            info, stream_token = await self._room_creation_handler.create_room(
                 room_creator_requester,
                 config={
                     "preset": RoomCreationPreset.PUBLIC_CHAT,
@@ -1261,7 +1261,7 @@ class RoomShutdownHandler(object):
             await self._replication.wait_for_stream_position(
                 self.hs.config.worker.events_shard_config.get_instance(new_room_id),
                 "events",
-                stream_id,
+                stream_token.stream,
             )
         else:
             new_room_id = None
@@ -1279,7 +1279,7 @@ class RoomShutdownHandler(object):
             try:
                 # Kick users from room
                 target_requester = create_requester(user_id)
-                _, stream_id = await self.room_member_handler.update_membership(
+                _, stream_token = await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,
                     room_id=room_id,
@@ -1293,7 +1293,7 @@ class RoomShutdownHandler(object):
                 await self._replication.wait_for_stream_position(
                     self.hs.config.worker.events_shard_config.get_instance(room_id),
                     "events",
-                    stream_id,
+                    stream_token.stream,
                 )
 
                 await self.room_member_handler.forget(target_requester.user, room_id)

@@ -125,11 +125,11 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
 
         logger.info("Got %d events from federation", len(event_and_contexts))
 
-        max_stream_id = await self.federation_handler.persist_events_and_notify(
+        max_stream_token = await self.federation_handler.persist_events_and_notify(
             room_id, event_and_contexts, backfilled
         )
 
-        return 200, {"max_stream_id": max_stream_id}
+        return 200, {"max_stream_id": str(max_stream_token)}
 
 
 class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):

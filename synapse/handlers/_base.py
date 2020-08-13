@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 import synapse.state
 import synapse.storage
@@ -21,6 +22,9 @@ import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.types import UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +34,7 @@ class BaseHandler(object):
     Common base class for the event handlers.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         """
         Args:
             hs (synapse.server.HomeServer):

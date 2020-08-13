@@ -43,7 +43,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         room_id: str,
         user: UserID,
         content: dict,
-    ) -> Tuple[str, int]:
+    ) -> Tuple[str, EventStreamToken]:
         """Implements RoomMemberHandler._remote_join
         """
         if len(remote_room_hosts) == 0:
@@ -59,7 +59,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
 
         await self._user_joined_room(user, room_id)
 
-        return ret["event_id"], ret["stream_id"]
+        return ret["event_id"], EventStreamToken.parse(ret["stream_id"])
 
     async def remote_reject_invite(
         self,
@@ -67,7 +67,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         txn_id: Optional[str],
         requester: Requester,
         content: dict,
-    ) -> Tuple[str, int]:
+    ) -> Tuple[str, EventStreamToken]:
         """
         Rejects an out-of-band invite received from a remote user
 
@@ -79,7 +79,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
             requester=requester,
             content=content,
         )
-        return ret["event_id"], EventStreamToken(ret["stream_id"])
+        return ret["event_id"], EventStreamToken.parse(ret["stream_id"])
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_joined_room

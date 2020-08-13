@@ -114,7 +114,7 @@ class RoomMemberHandler(object):
         room_id: str,
         user: UserID,
         content: dict,
-    ) -> Tuple[str, int]:
+    ) -> Tuple[str, EventStreamToken]:
         """Try and join a room that this server is not in
 
         Args:
@@ -532,11 +532,11 @@ class RoomMemberHandler(object):
                 if requester.is_guest:
                     content["kind"] = "guest"
 
-                remote_join_response = await self._remote_join(
+                event_id, stream_token = await self._remote_join(
                     requester, remote_room_hosts, room_id, target, content
                 )
 
-                return remote_join_response
+                return event_id, stream_token
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
@@ -809,7 +809,7 @@ class RoomMemberHandler(object):
         requester: Requester,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> int:
+    ) -> EventStreamToken:
         """Invite a 3PID to a room.
 
         Args:
@@ -867,11 +867,11 @@ class RoomMemberHandler(object):
         if invitee:
             # Note that update_membership with an action of "invite" can raise
             # a ShadowBanError, but this was done above already.
-            _, stream_id = await self.update_membership(
+            _, stream_token = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
         else:
-            stream_id = await self._make_and_store_3pid_invite(
+            stream_token = await self._make_and_store_3pid_invite(
                 requester,
                 id_server,
                 medium,
@@ -882,7 +882,7 @@ class RoomMemberHandler(object):
                 id_access_token=id_access_token,
             )
 
-        return stream_id
+        return stream_token
 
     async def _make_and_store_3pid_invite(
         self,
@@ -894,7 +894,7 @@ class RoomMemberHandler(object):
         user: UserID,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> int:
+    ) -> EventStreamToken:
         room_state = await self.state_handler.get_current_state(room_id)
 
         inviter_display_name = ""
@@ -1050,7 +1050,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         room_id: str,
         user: UserID,
         content: dict,
-    ) -> Tuple[str, int]:
+    ) -> Tuple[str, EventStreamToken]:
         """Implements RoomMemberHandler._remote_join
         """
         # filter ourselves out of remote_room_hosts: do_invite_join ignores it
@@ -1158,7 +1158,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         txn_id: Optional[str],
         requester: Requester,
         content: JsonDict,
-    ) -> Tuple[str, int]:
+    ) -> Tuple[str, EventStreamToken]:
         """Generate a local invite rejection
 
         This is called after we fail to reject an invite via a remote server. It
@@ -1224,10 +1224,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         context = await self.state_handler.compute_event_context(event)
         context.app_service = requester.app_service
-        stream_id = await self.event_creation_handler.handle_new_client_event(
+        stream_token = await self.event_creation_handler.handle_new_client_event(
             requester, event, context, extra_users=[UserID.from_string(target_user)],
         )
-        return event.event_id, stream_id
+        return event.event_id, stream_token
 
     async def _user_joined_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_joined_room

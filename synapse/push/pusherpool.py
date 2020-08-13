@@ -178,7 +178,7 @@ class PusherPool:
                 )
                 await self.remove_pusher(p["app_id"], p["pushkey"], p["user_name"])
 
-    async def on_new_notifications(self, min_stream_id, max_stream_id):
+    async def on_new_notifications(self, min_stream_id: int, max_stream_id: int):
         if not self.pushers:
             # nothing to do here.
             return

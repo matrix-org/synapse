@@ -1276,7 +1276,7 @@ class FederationHandler(BaseHandler):
 
     async def do_invite_join(
         self, target_hosts: Iterable[str], room_id: str, joinee: str, content: JsonDict
-    ) -> Tuple[str, int]:
+    ) -> Tuple[str, EventStreamToken]:
         """ Attempts to join the `joinee` to the room `room_id` via the
         servers contained in `target_hosts`.
 
@@ -1373,7 +1373,7 @@ class FederationHandler(BaseHandler):
             await self._replication.wait_for_stream_position(
                 self.config.worker.events_shard_config.get_instance(room_id),
                 "events",
-                max_stream_id,
+                max_stream_id.stream,
             )
 
             # Check whether this room is the result of an upgrade of a room we already know
@@ -1965,7 +1965,7 @@ class FederationHandler(BaseHandler):
         state: List[EventBase],
         event: EventBase,
         room_version: RoomVersion,
-    ) -> int:
+    ) -> EventStreamToken:
         """Checks the auth chain is valid (and passes auth checks) for the
         state and event. Then persists the auth chain and state atomically.
         Persists the event separately. Notifies about the persisted events
@@ -2917,7 +2917,7 @@ class FederationHandler(BaseHandler):
         room_id: str,
         event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
-    ) -> int:
+    ) -> EventStreamToken:
         """Persists events and tells the notifier/pushers about them, if
         necessary.
 
@@ -2938,9 +2938,9 @@ class FederationHandler(BaseHandler):
                 event_and_contexts=event_and_contexts,
                 backfilled=backfilled,
             )
-            return result["max_stream_id"]
+            return EventStreamToken.parse(result["max_stream_id"])
         else:
-            max_stream_id = await self.storage.persistence.persist_events(
+            max_stream_token = await self.storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 
@@ -2951,12 +2951,12 @@ class FederationHandler(BaseHandler):
 
             if not backfilled:  # Never notify for backfilled events
                 for event, _ in event_and_contexts:
-                    await self._notify_persisted_event(event, max_stream_id)
+                    await self._notify_persisted_event(event, max_stream_token)
 
-            return max_stream_id
+            return max_stream_token
 
     async def _notify_persisted_event(
-        self, event: EventBase, max_stream_id: int
+        self, event: EventBase, max_stream_token: EventStreamToken,
     ) -> None:
         """Checks to see if notifier/pushers should be notified about the
         event or not.
@@ -2982,12 +2982,14 @@ class FederationHandler(BaseHandler):
         elif event.internal_metadata.is_outlier():
             return
 
-        event_stream_id = event.internal_metadata.stream_ordering
+        event_stream_token = EventStreamToken(event.internal_metadata.stream_ordering)
         self.notifier.on_new_room_event(
-            event, event_stream_id, max_stream_id, extra_users=extra_users
+            event, event_stream_token, max_stream_token, extra_users=extra_users
         )
 
-        await self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
+        await self.pusher_pool.on_new_notifications(
+            event_stream_token.stream, max_stream_token.stream
+        )
 
     async def _clean_room_for_join(self, room_id: str) -> None:
         """Called to clean up any data in DB for a given room, ready for the

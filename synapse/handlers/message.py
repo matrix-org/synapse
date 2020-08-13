@@ -922,9 +922,9 @@ class EventCreationHandler(object):
                     ratelimit=ratelimit,
                     extra_users=extra_users,
                 )
-                stream_id = result["stream_id"]
-                event.internal_metadata.stream_ordering = stream_id
-                return EventStreamToken(stream_id)
+                stream_token = EventStreamToken.parse(result["stream_token"])
+                event.internal_metadata.stream_ordering = stream_token.stream
+                return stream_token
 
             stream_token = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
@@ -975,7 +975,7 @@ class EventCreationHandler(object):
         context: EventContext,
         ratelimit: bool = True,
         extra_users: List[UserID] = [],
-    ) -> int:
+    ) -> EventStreamToken:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
 
@@ -1146,20 +1146,23 @@ class EventCreationHandler(object):
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
-        event_stream_id, max_stream_id = await self.storage.persistence.persist_event(
-            event, context=context
-        )
+        (
+            event_stream_token,
+            max_stream_token,
+        ) = await self.storage.persistence.persist_event(event, context=context)
 
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
             self._message_handler.maybe_schedule_expiry(event)
 
-        await self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
+        await self.pusher_pool.on_new_notifications(
+            event_stream_token.stream, max_stream_token.stream
+        )
 
         def _notify():
             try:
                 self.notifier.on_new_room_event(
-                    event, event_stream_id, max_stream_id, extra_users=extra_users
+                    event, event_stream_token, max_stream_token, extra_users=extra_users
                 )
             except Exception:
                 logger.exception("Error notifying about new room event")
@@ -1171,7 +1174,7 @@ class EventCreationHandler(object):
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
 
-        return event_stream_id
+        return event_stream_token
 
     async def _bump_active_time(self, user: UserID) -> None:
         try:

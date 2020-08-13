@@ -446,7 +446,7 @@ class EventStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     @classmethod
-    def parse(cls, string):
+    def parse(cls, string: str) -> "EventStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
@@ -458,7 +458,7 @@ class EventStreamToken:
         raise SynapseError(400, "Invalid token %r" % (string,))
 
     @classmethod
-    def parse_stream_token(cls, string):
+    def parse_stream_token(cls, string: str) -> "EventStreamToken":
         try:
             if string[0] == "s":
                 return cls(topological=None, stream=int(string[1:]))
@@ -466,7 +466,7 @@ class EventStreamToken:
             pass
         raise SynapseError(400, "Invalid token %r" % (string,))
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.topological is not None:
             return "t%d-%d" % (self.topological, self.stream)
         else:
