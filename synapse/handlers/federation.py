@@ -691,7 +691,6 @@ class FederationHandler(BaseHandler, FederationBase):
             del source_evt_dict["unsigned"]
             del source_evt_dict["content"][self._forwarded_key]
         except (KeyError, TypeError):
-            logger.exception("Failed to read forward data")
             return False, None
 
         room_version = KNOWN_ROOM_VERSIONS.get(room_version_identifier)
@@ -702,7 +701,6 @@ class FederationHandler(BaseHandler, FederationBase):
         try:
             source_evt = event_from_pdu_json(source_evt_dict, room_version)
         except SynapseError:
-            logger.exception("Failed to parse forward data")
             return False, None
 
         try:
@@ -712,7 +710,6 @@ class FederationHandler(BaseHandler, FederationBase):
             # mark the forward as invalid.
             valid = not checked_evt.internal_metadata.is_redacted()
         except SynapseError:
-            logger.exception("Failed to validate forward signature")
             valid = False
         return valid, source_evt.event_id
 
