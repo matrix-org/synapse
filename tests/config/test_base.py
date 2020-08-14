@@ -21,7 +21,7 @@ from synapse.util.stringutils import random_string
 from tests import unittest
 
 
-class EmailConfigTestCase(unittest.HomeserverTestCase):
+class BaseConfigTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.hs = hs
 

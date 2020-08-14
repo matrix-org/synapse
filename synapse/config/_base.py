@@ -21,9 +21,11 @@ import os
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
-from typing import Any, List, MutableMapping, Optional
+from typing import Any, Callable, Dict, List, MutableMapping, Optional
 
 import attr
+import jinja2
+import pkg_resources
 import yaml
 
 
@@ -99,6 +101,11 @@ class Config(object):
 
     def __init__(self, root_config=None):
         self.root = root_config
+
+        # Get the path to the default Synapse template directory
+        self.default_template_dir = pkg_resources.resource_filename(
+            "synapse", "res/templates"
+        )
 
     def __getattr__(self, item: str) -> Any:
         """
@@ -183,6 +190,57 @@ class Config(object):
         cls.check_file(file_path, config_name)
         with open(file_path) as file_stream:
             return file_stream.read()
+
+    def read_templates(
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
+        filters: Dict[str, Callable] = {},
+    ) -> List[jinja2.Template]:
+        """Load a list of template files from disk using the given variables and filters.
+
+        This function will attempt to load the given templates from the default Synapse
+        template directory. If `custom_template_directory` is supplied, that directory
+        is tried first.
+
+        Files read are treated as Jinja templates. These templates are not rendered yet.
+
+        Args:
+            filenames: A list of template filenames to read.
+
+            custom_template_directory: A directory to try to look for the templates
+                before using the default Synapse template directory instead.
+
+            filters: Custom functions which can modify the given template variables upon
+                render, if the template file specifies them.
+
+        Raises:
+            ConfigError: if the file's path is incorrect or otherwise cannot be read.
+
+        Returns:
+            A list of jinja2 templates.
+        """
+        templates = []
+        search_directories = [self.default_template_dir]
+
+        # The loader will first look in the custom template directory (if specified) for the
+        # given filename. If it doesn't find it, it will use the default template dir instead
+        if custom_template_directory:
+            # Search the custom template directory as well
+            search_directories.insert(0, custom_template_directory)
+
+        loader = jinja2.FileSystemLoader(search_directories)
+        env = jinja2.Environment(loader=loader, autoescape=True)
+
+        # Update the environment with any custom filters
+        env.filters.update(filters)
+
+        for filename in filenames:
+            # Load the template
+            template = env.get_template(filename)
+            templates.append(template)
+
+        return templates
 
 
 class RootConfig(object):
