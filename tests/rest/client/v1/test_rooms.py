@@ -1974,3 +1974,66 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         """An alias which does not point to the room raises a SynapseError."""
         self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
         self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
+
+
+class ShadowBannedTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.banned_user_id = self.register_user("banned", "test")
+        self.banned_access_token = self.login("banned", "test")
+
+        self.store = self.hs.get_datastore()
+
+        self.get_success(
+            self.store.db_pool.simple_update(
+                table="users",
+                keyvalues={"name": self.banned_user_id},
+                updatevalues={"shadow_banned": True},
+                desc="shadow_ban",
+            )
+        )
+
+        self.other_user_id = self.register_user("otheruser", "pass")
+        self.other_access_token = self.login("otheruser", "pass")
+
+    def test_invite(self):
+        """Invites from shadow-banned users don't actually get sent."""
+
+        # The create works fine.
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
+        # Inviting the user completes successfully.
+        self.helper.invite(
+            room=room_id,
+            src=self.banned_user_id,
+            tok=self.banned_access_token,
+            targ=self.other_user_id,
+        )
+
+        # But the user wasn't actually invited.
+        invited_rooms = self.get_success(
+            self.store.get_invited_rooms_for_local_user(self.other_user_id)
+        )
+        self.assertEqual(invited_rooms, [])
+
+    def test_create_room(self):
+        """A shadow-banned users should be able to create a room."""
+
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
+        # This creates a real room, so the other user should be able to join it.
+        self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
+
+        # Both users should be in the room.
+        users = self.get_success(self.store.get_users_in_room(room_id))
+        self.assertCountEqual(users, ["@banned:test", "@otheruser:test"])
