@@ -22,7 +22,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from typing import Awaitable, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -53,6 +53,9 @@ from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
@@ -61,7 +64,7 @@ FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
 class RoomCreationHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super(RoomCreationHandler, self).__init__(hs)
 
         self.spam_checker = hs.get_spam_checker()
@@ -92,7 +95,7 @@ class RoomCreationHandler(BaseHandler):
                 "guest_can_join": False,
                 "power_level_content_override": {},
             },
-        }
+        }  # type: Dict[str, Dict[str, Any]]
 
         # Modify presets to selectively enable encryption by default per homeserver config
         for preset_name, preset_config in self._presets_dict.items():
@@ -214,6 +217,9 @@ class RoomCreationHandler(BaseHandler):
         )
 
         old_room_state = await tombstone_context.get_current_state_ids()
+
+        # We know the tombstone event isn't an outlier so it has current state.
+        assert old_room_state is not None
 
         # update any aliases
         await self._move_aliases_to_new_room(
@@ -601,6 +607,7 @@ class RoomCreationHandler(BaseHandler):
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
+        room_alias = None
         if "room_alias_name" in config:
             for wchar in string.whitespace:
                 if wchar in config["room_alias_name"]:
@@ -611,8 +618,6 @@ class RoomCreationHandler(BaseHandler):
 
             if mapping:
                 raise SynapseError(400, "Room alias already taken", Codes.ROOM_IN_USE)
-        else:
-            room_alias = None
 
         invite_list = config.get("invite", [])
         for i in invite_list:
@@ -787,6 +792,10 @@ class RoomCreationHandler(BaseHandler):
             The stream_id of the last event persisted.
         """
 
+        creator_id = creator.user.to_string()
+
+        event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
+
         def create(etype, content, **kwargs):
             e = {"type": etype, "content": content}
 
@@ -807,10 +816,6 @@ class RoomCreationHandler(BaseHandler):
             return last_stream_id
 
         config = self._presets_dict[preset_config]
-
-        creator_id = creator.user.to_string()
-
-        event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
@@ -852,7 +857,7 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50,
                 "invite": 50,
-            }
+            }  # type: Dict[str, Any]
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
@@ -906,7 +911,7 @@ class RoomCreationHandler(BaseHandler):
         return last_sent_stream_id
 
     async def _generate_room_id(
-        self, creator_id: str, is_public: str, room_version: RoomVersion,
+        self, creator_id: str, is_public: bool, room_version: RoomVersion,
     ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
