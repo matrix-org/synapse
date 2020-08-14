@@ -25,10 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Iterator, List, Tuple, Union
 
 import jinja2
-from canonicaljson import (
-    iterencode_canonical_json,
-    iterencode_pretty_printed_json,
-)
+from canonicaljson import iterencode_canonical_json, iterencode_pretty_printed_json
 from zope.interface import implementer
 
 from twisted.internet import defer, interfaces
