@@ -82,6 +82,9 @@ class PaginationHandler(object):
 
         self._retention_default_max_lifetime = hs.config.retention_default_max_lifetime
 
+        self._retention_allowed_lifetime_min = hs.config.retention_allowed_lifetime_min
+        self._retention_allowed_lifetime_max = hs.config.retention_allowed_lifetime_max
+
         if hs.config.retention_enabled:
             # Run the purge jobs described in the configuration file.
             for job in hs.config.retention_purge_jobs:
@@ -152,13 +155,30 @@ class PaginationHandler(object):
                 )
                 continue
 
-            max_lifetime = retention_policy["max_lifetime"]
+            # If max_lifetime is None, it means that the room has no retention policy.
+            # Given we only retrieve such rooms when there's a default retention policy
+            # defined in the server's configuration, we can safely assume that's the
+            # case and use it for this room.
+            max_lifetime = (
+                retention_policy["max_lifetime"] or self._retention_default_max_lifetime
+            )
 
-            if max_lifetime is None:
-                # If max_lifetime is None, it means that include_null equals True,
-                # therefore we can safely assume that there is a default policy defined
-                # in the server's configuration.
-                max_lifetime = self._retention_default_max_lifetime
+            # Cap the effective max_lifetime to be within the range allowed in the
+            # config.
+            # We do this in two steps:
+            #   1. Make sure it's higher or equal to the minimum allowed value, and if
+            #      it's not replace it with that value. This is because the server
+            #      operator can be required to not delete information before a given
+            #      time, e.g. to comply with freedom of information laws.
+            #   2. Make sure the resulting value is lower or equal to the maximum allowed
+            #      value, and if it's not replace it with that value. This is because the
+            #      server operator can be required to delete any data after a specific
+            #      amount of time.
+            if self._retention_allowed_lifetime_min is not None:
+                max_lifetime = max(self._retention_allowed_lifetime_min, max_lifetime)
+
+            if self._retention_allowed_lifetime_max is not None:
+                max_lifetime = min(max_lifetime, self._retention_allowed_lifetime_max)
 
             # Figure out what token we should start purging at.
             ts = self.clock.time_msec() - max_lifetime
