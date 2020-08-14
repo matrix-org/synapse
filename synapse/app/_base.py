@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import gc
 import logging
 import os
@@ -22,7 +21,6 @@ import sys
 import traceback
 from typing import Iterable
 
-from daemonize import Daemonize
 from typing_extensions import NoReturn
 
 from twisted.internet import defer, error, reactor
@@ -34,6 +32,7 @@ from synapse.config.server import ListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
+from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 
@@ -129,17 +128,8 @@ def start_reactor(
             if print_pidfile:
                 print(pid_file)
 
-            daemon = Daemonize(
-                app=appname,
-                pid=pid_file,
-                action=run,
-                auto_close_fds=False,
-                verbose=True,
-                logger=logger,
-            )
-            daemon.start()
-        else:
-            run()
+            daemonize_process(pid_file, logger)
+        run()
 
 
 def quit_with_error(error_string: str) -> NoReturn:
@@ -278,7 +268,7 @@ def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
 
         # It is now safe to start your Synapse.
         hs.start_listening(listeners)
-        hs.get_datastore().db.start_profiling()
+        hs.get_datastore().db_pool.start_profiling()
         hs.get_pusherpool().start()
 
         setup_sentry(hs)

@@ -43,7 +43,7 @@ REQUIREMENTS = [
     "jsonschema>=2.5.1",
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
-    "canonicaljson>=1.1.3",
+    "canonicaljson>=1.2.0",
     # we use the type definitions added in signedjson 1.1.
     "signedjson>=1.1.0",
     "pynacl>=1.2.1",
@@ -59,7 +59,6 @@ REQUIREMENTS = [
     "pyyaml>=3.11",
     "pyasn1>=0.1.9",
     "pyasn1-modules>=0.0.7",
-    "daemonize>=2.3.1",
     "bcrypt>=3.1.0",
     "pillow>=4.3.0",
     "sortedcontainers>=1.4.4",

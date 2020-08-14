@@ -49,10 +49,10 @@ from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3E
 from synapse.storage.types import Connection, Cursor
 from synapse.types import Collection
 
-logger = logging.getLogger(__name__)
-
 # python 3 does not have a maximum int value
 MAX_TXN_ID = 2 ** 63 - 1
+
+logger = logging.getLogger(__name__)
 
 sql_logger = logging.getLogger("synapse.storage.SQL")
 transaction_logger = logging.getLogger("synapse.storage.txn")
@@ -233,7 +233,7 @@ class LoggingTransaction:
         try:
             return func(sql, *args)
         except Exception as e:
-            logger.debug("[SQL FAIL] {%s} %s", self.name, e)
+            sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
         finally:
             secs = time.time() - start
@@ -279,7 +279,7 @@ class PerformanceCounters(object):
         return top_n_counters
 
 
-class Database(object):
+class DatabasePool(object):
     """Wraps a single physical database and connection pool.
 
     A single database may be used by multiple data stores.
@@ -419,7 +419,7 @@ class Database(object):
                 except self.engine.module.OperationalError as e:
                     # This can happen if the database disappears mid
                     # transaction.
-                    logger.warning(
+                    transaction_logger.warning(
                         "[TXN OPERROR] {%s} %s %d/%d", name, e, i, N,
                     )
                     if i < N:
@@ -427,18 +427,20 @@ class Database(object):
                         try:
                             conn.rollback()
                         except self.engine.module.Error as e1:
-                            logger.warning("[TXN EROLL] {%s} %s", name, e1)
+                            transaction_logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
                     raise
                 except self.engine.module.DatabaseError as e:
                     if self.engine.is_deadlock(e):
-                        logger.warning("[TXN DEADLOCK] {%s} %d/%d", name, i, N)
+                        transaction_logger.warning(
+                            "[TXN DEADLOCK] {%s} %d/%d", name, i, N
+                        )
                         if i < N:
                             i += 1
                             try:
                                 conn.rollback()
                             except self.engine.module.Error as e1:
-                                logger.warning(
+                                transaction_logger.warning(
                                     "[TXN EROLL] {%s} %s", name, e1,
                                 )
                             continue
@@ -478,7 +480,7 @@ class Database(object):
                     # [2]: https://github.com/python/cpython/blob/v3.8.0/Modules/_sqlite/cursor.c#L236
                     cursor.close()
         except Exception as e:
-            logger.debug("[TXN FAIL] {%s} %s", name, e)
+            transaction_logger.debug("[TXN FAIL] {%s} %s", name, e)
             raise
         finally:
             end = monotonic_time()

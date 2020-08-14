@@ -75,7 +75,7 @@ class PerDestinationQueue(object):
         self._store = hs.get_datastore()
         self._transaction_manager = transaction_manager
         self._instance_name = hs.get_instance_name()
-        self._federation_shard_config = hs.config.federation.federation_shard_config
+        self._federation_shard_config = hs.config.worker.federation_shard_config
 
         self._should_send_on_this_instance = True
         if not self._federation_shard_config.should_handle(
@@ -377,7 +377,36 @@ class PerDestinationQueue(object):
                 ),
             )
 
+            # XXX REVIEW needs scrutiny
+            #  to note: up to 50 pdus can be lost from the
+            #  main queue by a transaction that triggers a backoff — do we
+            #  clear the main queue now? I can see arguments for and against.
+
+            if e.retry_interval > 60 * 60 * 1000:
+                # we won't retry for another hour!
+                # (this suggests a significant outage)
+                # We drop pending PDUs and EDUs because otherwise they will
+                # rack up indefinitely.
+                # Note that:
+                # - the EDUs that are being dropped here are those that we can
+                #   afford to drop (specifically, only typing notifications,
+                #   read receipts and presence updates are being dropped here)
+                # - Other EDUs such as to_device messages are queued with a
+                #   different mechanism
+                # - this is all volatile state that would be lost if the
+                #   federation sender restarted anyway
+
+                # dropping read receipts is a bit sad but should be solved
+                # through another mechanism, because this is all volatile!
+                self._pending_pdus = []
+                self._pending_edus = []
+                self._pending_edus_keyed = {}
+                self._pending_presence = {}
+                self._pending_rrs = {}
+
             self._catching_up = True
+            # reset max catch up since we have dropped PDUs here
+            self._catch_up_max_stream_order = None
         except FederationDeniedError as e:
             logger.info(e)
         except HttpResponseException as e:

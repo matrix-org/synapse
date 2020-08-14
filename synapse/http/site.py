@@ -146,10 +146,9 @@ class SynapseRequest(Request):
 
         Returns a context manager; the correct way to use this is:
 
-        @defer.inlineCallbacks
-        def handle_request(request):
+        async def handle_request(request):
             with request.processing("FooServlet"):
-                yield really_handle_the_request()
+                await really_handle_the_request()
 
         Once the context manager is closed, the completion of the request will be logged,
         and the various metrics will be updated.
@@ -215,9 +214,7 @@ class SynapseRequest(Request):
         # It's useful to log it here so that we can get an idea of when
         # the client disconnects.
         with PreserveLoggingContext(self.logcontext):
-            logger.warning(
-                "Error processing request %r: %s %s", self, reason.type, reason.value
-            )
+            logger.info("Connection from client lost before response was sent")
 
             if not self._is_processing:
                 self._finished_processing()
@@ -289,7 +286,9 @@ class SynapseRequest(Request):
             # the connection dropped)
             code += "!"
 
-        self.site.access_logger.info(
+        log_level = logging.INFO if self._should_log_request() else logging.DEBUG
+        self.site.access_logger.log(
+            log_level,
             "%s - %s - {%s}"
             " Processed request: %.3fsec/%.3fsec (%.3fsec, %.3fsec) (%.3fsec/%.3fsec/%d)"
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
@@ -316,6 +315,17 @@ class SynapseRequest(Request):
             self.request_metrics.stop(self.finish_time, self.code, self.sentLength)
         except Exception as e:
             logger.warning("Failed to stop metrics: %r", e)
+
+    def _should_log_request(self) -> bool:
+        """Whether we should log at INFO that we processed the request.
+        """
+        if self.path == b"/health":
+            return False
+
+        if self.method == b"OPTIONS":
+            return False
+
+        return True
 
 
 class XForwardedForRequest(SynapseRequest):

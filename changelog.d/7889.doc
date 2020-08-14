@@ -1,1 +1,0 @@
-Change the sample config postgres user section to use `synapse_user` instead of `synapse` to align with the documentation.

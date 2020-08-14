@@ -18,7 +18,12 @@ import logging
 from http import HTTPStatus
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, SynapseError, ThreepidValidationError
+from synapse.api.errors import (
+    Codes,
+    InteractiveAuthIncompleteError,
+    SynapseError,
+    ThreepidValidationError,
+)
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
@@ -239,17 +244,11 @@ class PasswordRestServlet(RestServlet):
 
         # we do basic sanity checks here because the auth layer will store these
         # in sessions. Pull out the new password provided to us.
-        if "new_password" in body:
-            new_password = body.pop("new_password")
+        new_password = body.pop("new_password", None)
+        if new_password is not None:
             if not isinstance(new_password, str) or len(new_password) > 512:
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(new_password)
-
-            # If the password is valid, hash it and store it back on the body.
-            # This ensures that only the hashed password is handled everywhere.
-            if "new_password_hash" in body:
-                raise SynapseError(400, "Unexpected property: new_password_hash")
-            body["new_password_hash"] = await self.auth_handler.hash(new_password)
 
         # there are two possibilities here. Either the user does not have an
         # access token, and needs to do a password reset; or they have one and
@@ -263,23 +262,49 @@ class PasswordRestServlet(RestServlet):
 
         if self.auth.has_access_token(request):
             requester = await self.auth.get_user_by_req(request)
-            params = await self.auth_handler.validate_user_via_ui_auth(
-                requester,
-                request,
-                body,
-                self.hs.get_ip_from_request(request),
-                "modify your account password",
-            )
+            try:
+                params, session_id = await self.auth_handler.validate_user_via_ui_auth(
+                    requester,
+                    request,
+                    body,
+                    self.hs.get_ip_from_request(request),
+                    "modify your account password",
+                )
+            except InteractiveAuthIncompleteError as e:
+                # The user needs to provide more steps to complete auth, but
+                # they're not required to provide the password again.
+                #
+                # If a password is available now, hash the provided password and
+                # store it for later.
+                if new_password:
+                    password_hash = await self.auth_handler.hash(new_password)
+                    await self.auth_handler.set_session_data(
+                        e.session_id, "password_hash", password_hash
+                    )
+                raise
             user_id = requester.user.to_string()
         else:
             requester = None
-            result, params, _ = await self.auth_handler.check_auth(
-                [[LoginType.EMAIL_IDENTITY]],
-                request,
-                body,
-                self.hs.get_ip_from_request(request),
-                "modify your account password",
-            )
+            try:
+                result, params, session_id = await self.auth_handler.check_ui_auth(
+                    [[LoginType.EMAIL_IDENTITY]],
+                    request,
+                    body,
+                    self.hs.get_ip_from_request(request),
+                    "modify your account password",
+                )
+            except InteractiveAuthIncompleteError as e:
+                # The user needs to provide more steps to complete auth, but
+                # they're not required to provide the password again.
+                #
+                # If a password is available now, hash the provided password and
+                # store it for later.
+                if new_password:
+                    password_hash = await self.auth_handler.hash(new_password)
+                    await self.auth_handler.set_session_data(
+                        e.session_id, "password_hash", password_hash
+                    )
+                raise
 
             if LoginType.EMAIL_IDENTITY in result:
                 threepid = result[LoginType.EMAIL_IDENTITY]
@@ -304,12 +329,21 @@ class PasswordRestServlet(RestServlet):
                 logger.error("Auth succeeded but no known type! %r", result.keys())
                 raise SynapseError(500, "", Codes.UNKNOWN)
 
-        assert_params_in_dict(params, ["new_password_hash"])
-        new_password_hash = params["new_password_hash"]
+        # If we have a password in this request, prefer it. Otherwise, there
+        # must be a password hash from an earlier request.
+        if new_password:
+            password_hash = await self.auth_handler.hash(new_password)
+        else:
+            password_hash = await self.auth_handler.get_session_data(
+                session_id, "password_hash", None
+            )
+        if not password_hash:
+            raise SynapseError(400, "Missing params: password", Codes.MISSING_PARAM)
+
         logout_devices = params.get("logout_devices", True)
 
         await self._set_password_handler.set_password(
-            user_id, new_password_hash, logout_devices, requester
+            user_id, password_hash, logout_devices, requester
         )
 
         return 200, {}

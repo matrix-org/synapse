@@ -15,6 +15,7 @@
 
 import logging
 import urllib
+from typing import List
 
 from netaddr import AddrFormatError, IPAddress
 from zope.interface import implementer
@@ -236,22 +237,21 @@ class MatrixHostnameEndpoint(object):
 
         return run_in_background(self._do_connect, protocol_factory)
 
-    @defer.inlineCallbacks
-    def _do_connect(self, protocol_factory):
+    async def _do_connect(self, protocol_factory):
         first_exception = None
 
-        server_list = yield self._resolve_server()
+        server_list = await self._resolve_server()
 
         for server in server_list:
             host = server.host
             port = server.port
 
             try:
-                logger.info("Connecting to %s:%i", host.decode("ascii"), port)
+                logger.debug("Connecting to %s:%i", host.decode("ascii"), port)
                 endpoint = HostnameEndpoint(self._reactor, host, port)
                 if self._tls_options:
                     endpoint = wrapClientTLS(self._tls_options, endpoint)
-                result = yield make_deferred_yieldable(
+                result = await make_deferred_yieldable(
                     endpoint.connect(protocol_factory)
                 )
 
@@ -271,13 +271,9 @@ class MatrixHostnameEndpoint(object):
         # to try and if that doesn't work then we'll have an exception.
         raise Exception("Failed to resolve server %r" % (self._parsed_uri.netloc,))
 
-    @defer.inlineCallbacks
-    def _resolve_server(self):
+    async def _resolve_server(self) -> List[Server]:
         """Resolves the server name to a list of hosts and ports to attempt to
         connect to.
-
-        Returns:
-            Deferred[list[Server]]
         """
 
         if self._parsed_uri.scheme != b"matrix":
@@ -298,7 +294,7 @@ class MatrixHostnameEndpoint(object):
         if port or _is_ip_literal(host):
             return [Server(host, port or 8448)]
 
-        server_list = yield self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
+        server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
 
         if server_list:
             return server_list
