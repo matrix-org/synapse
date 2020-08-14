@@ -226,6 +226,13 @@ class Config(object):
         # The loader will first look in the custom template directory (if specified) for the
         # given filename. If it doesn't find it, it will use the default template dir instead
         if custom_template_directory:
+            # Check that the given template directory exists
+            if not self.path_exists(custom_template_directory):
+                raise ConfigError(
+                    "Configured template directory does not exist: %s"
+                    % (custom_template_directory,)
+                )
+
             # Search the custom template directory as well
             search_directories.insert(0, custom_template_directory)
 
