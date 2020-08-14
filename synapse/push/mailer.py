@@ -17,10 +17,10 @@ import email.mime.multipart
 import email.utils
 import logging
 import time
-import urllib
+import urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Iterable, List, TypeVar
+from typing import Callable, Iterable, List, TypeVar
 
 import bleach
 import jinja2
@@ -646,21 +646,27 @@ def format_ts_filter(value, format):
     return time.strftime(format, time.localtime(value / 1000))
 
 
-def create_mxc_to_http_filter(public_baseurl):
+def create_mxc_to_http_filter(public_baseurl: str) -> Callable:
+    """Create and return a jinja2 filter that converts MXC urls to HTTP
+
+    Args:
+        public_baseurl: The public, accessible base URL of the homeserver
+    """
+
     def mxc_to_http_filter(value, width, height, resize_method="crop"):
         if value[0:6] != "mxc://":
             return ""
 
-        serverAndMediaId = value[6:]
+        server_and_media_id = value[6:]
         fragment = None
-        if "#" in serverAndMediaId:
-            (serverAndMediaId, fragment) = serverAndMediaId.split("#", 1)
+        if "#" in server_and_media_id:
+            server_and_media_id, fragment = server_and_media_id.split("#", 1)
             fragment = "#" + fragment
 
         params = {"width": width, "height": height, "method": resize_method}
         return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
             public_baseurl,
-            serverAndMediaId,
+            server_and_media_id,
             urllib.parse.urlencode(params),
             fragment or "",
         )
