@@ -508,22 +508,20 @@ class EmailConfig(Config):
             A list of jinja2 templates.
         """
         templates = []
+        search_directories = [self.default_template_dir]
+
+        # The loader will first look in the custom template directory (if specified) for the
+        # given filename. If it doesn't find it, it will use the default template dir instead
+        if custom_template_directory:
+            # Search the custom template directory as well
+            search_directories.insert(0, custom_template_directory)
+
+        loader = jinja2.FileSystemLoader(search_directories)
+        env = jinja2.Environment(loader=loader, autoescape=autoescape)
+
         for filename in filenames:
-            template_directory = self.default_template_dir
-
-            # Check whether the template exists in the user-configured template directory
-            if custom_template_directory:
-                filepath = os.path.join(template_directory, filename)
-                if self.path_exists(filepath):
-                    # Use the custom template directory instead
-                    template_directory = custom_template_directory
-
-            # Set up jinja with the template directory
-            loader = jinja2.FileSystemLoader(template_directory)
-            env = jinja2.Environment(loader=loader, autoescape=autoescape)
-
-            # Apply any custom filters
-            env.filters.update(filters)
+            # Update the environment with the default filters plus any custom ones
+            env.filters = jinja2.filters.FILTERS.copy().update(filters)
 
             # Load the template
             template = env.get_template(filename)
