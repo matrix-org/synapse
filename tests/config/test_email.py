@@ -30,7 +30,7 @@ class EmailConfigTestCase(unittest.HomeserverTestCase):
         tmp_dir = tempfile.gettempdir()
 
         # Attempt to load an HTML template from our custom template directory
-        template = self.hs.config.read_templates(["sso_error.html"], tmp_dir,)[0]
+        template = self.hs.config.read_templates(["sso_error.html"], tmp_dir)[0]
 
         # If no errors, we should've gotten the default template instead
 
