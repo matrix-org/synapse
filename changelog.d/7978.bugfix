@@ -1,1 +1,0 @@
-Fix a long standing bug: 'Duplicate key value violates unique constraint "event_relations_id"' when message retention is configured.
