@@ -138,7 +138,7 @@ def generate_pagination_where_clause(
 
 def _make_generic_sql_bound(
     bound: str, column_names: Tuple[str, str], values: Tuple[Optional[int], int], engine
-):
+) -> str:
     """Create an SQL expression that bounds the given column names by the
     values, e.g. create the equivalent of `(1, 2) < (col1, col2)`.
 
