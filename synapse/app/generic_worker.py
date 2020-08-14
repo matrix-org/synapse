@@ -123,8 +123,9 @@ from synapse.rest.client.v2_alpha.account_data import (
 from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
+from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
-from synapse.server import HomeServer
+from synapse.server import HomeServer, cache_in_self
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.monthly_active_users import (
@@ -493,7 +494,10 @@ class GenericWorkerServer(HomeServer):
         site_tag = listener_config.http_options.tag
         if site_tag is None:
             site_tag = port
-        resources = {}
+
+        # We always include a health resource.
+        resources = {"/health": HealthResource()}
+
         for res in listener_config.http_options.resources:
             for name in res.names:
                 if name == "metrics":
@@ -631,10 +635,12 @@ class GenericWorkerServer(HomeServer):
     async def remove_pusher(self, app_id, push_key, user_id):
         self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
 
-    def build_replication_data_handler(self):
+    @cache_in_self
+    def get_replication_data_handler(self):
         return GenericWorkerReplicationHandler(self)
 
-    def build_presence_handler(self):
+    @cache_in_self
+    def get_presence_handler(self):
         return GenericWorkerPresence(self)
 
 

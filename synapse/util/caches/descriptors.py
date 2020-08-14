@@ -192,7 +192,7 @@ class Cache(object):
         callbacks = [callback] if callback else []
         self.check_thread()
         observable = ObservableDeferred(value, consumeErrors=True)
-        observer = defer.maybeDeferred(observable.observe)
+        observer = observable.observe()
         entry = CacheEntry(deferred=observable, callbacks=callbacks)
 
         existing_entry = self._pending_deferred_cache.pop(key, None)

@@ -58,7 +58,6 @@ class SQLBaseStore(metaclass=ABCMeta):
         """
         for host in {get_domain_from_id(u) for u in members_changed}:
             self._attempt_to_invalidate_cache("is_host_joined", (room_id, host))
-            self._attempt_to_invalidate_cache("was_host_joined", (room_id, host))
 
         self._attempt_to_invalidate_cache("get_users_in_room", (room_id,))
         self._attempt_to_invalidate_cache("get_room_summary", (room_id,))

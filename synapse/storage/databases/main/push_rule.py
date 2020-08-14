@@ -38,7 +38,7 @@ from synapse.util.caches.stream_change_cache import StreamChangeCache
 logger = logging.getLogger(__name__)
 
 
-def _load_rules(rawrules, enabled_map):
+def _load_rules(rawrules, enabled_map, use_new_defaults=False):
     ruleslist = []
     for rawrule in rawrules:
         rule = dict(rawrule)
@@ -48,7 +48,7 @@ def _load_rules(rawrules, enabled_map):
         ruleslist.append(rule)
 
     # We're going to be mutating this a lot, so do a deep copy
-    rules = list(list_with_base_rules(ruleslist))
+    rules = list(list_with_base_rules(ruleslist, use_new_defaults))
 
     for i, rule in enumerate(rules):
         rule_id = rule["rule_id"]
@@ -104,6 +104,8 @@ class PushRulesWorkerStore(
             prefilled_cache=push_rules_prefill,
         )
 
+        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
+
     @abc.abstractmethod
     def get_max_push_rules_stream_id(self):
         """Get the position of the push rules stream.
@@ -133,7 +135,9 @@ class PushRulesWorkerStore(
 
         enabled_map = yield self.get_push_rules_enabled_for_user(user_id)
 
-        rules = _load_rules(rows, enabled_map)
+        use_new_defaults = user_id in self._users_new_default_push_rules
+
+        rules = _load_rules(rows, enabled_map, use_new_defaults)
 
         return rules
 
@@ -166,18 +170,15 @@ class PushRulesWorkerStore(
             )
 
     @cachedList(
-        cached_method_name="get_push_rules_for_user",
-        list_name="user_ids",
-        num_args=1,
-        inlineCallbacks=True,
+        cached_method_name="get_push_rules_for_user", list_name="user_ids", num_args=1,
     )
-    def bulk_get_push_rules(self, user_ids):
+    async def bulk_get_push_rules(self, user_ids):
         if not user_ids:
             return {}
 
         results = {user_id: [] for user_id in user_ids}
 
-        rows = yield self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="push_rules",
             column="user_name",
             iterable=user_ids,
@@ -190,10 +191,14 @@ class PushRulesWorkerStore(
         for row in rows:
             results.setdefault(row["user_name"], []).append(row)
 
-        enabled_map_by_user = yield self.bulk_get_push_rules_enabled(user_ids)
+        enabled_map_by_user = await self.bulk_get_push_rules_enabled(user_ids)
 
         for user_id, rules in results.items():
-            results[user_id] = _load_rules(rules, enabled_map_by_user.get(user_id, {}))
+            use_new_defaults = user_id in self._users_new_default_push_rules
+
+            results[user_id] = _load_rules(
+                rules, enabled_map_by_user.get(user_id, {}), use_new_defaults,
+            )
 
         return results
 
@@ -248,94 +253,18 @@ class PushRulesWorkerStore(
             ):
                 yield self.copy_push_rule_from_room_to_room(new_room_id, user_id, rule)
 
-    @defer.inlineCallbacks
-    def bulk_get_push_rules_for_room(self, event, context):
-        state_group = context.state_group
-        if not state_group:
-            # If state_group is None it means it has yet to be assigned a
-            # state group, i.e. we need to make sure that calls with a state_group
-            # of None don't hit previous cached calls with a None state_group.
-            # To do this we set the state_group to a new object as object() != object()
-            state_group = object()
-
-        current_state_ids = yield defer.ensureDeferred(context.get_current_state_ids())
-        result = yield self._bulk_get_push_rules_for_room(
-            event.room_id, state_group, current_state_ids, event=event
-        )
-        return result
-
-    @cachedInlineCallbacks(num_args=2, cache_context=True)
-    def _bulk_get_push_rules_for_room(
-        self, room_id, state_group, current_state_ids, cache_context, event=None
-    ):
-        # We don't use `state_group`, its there so that we can cache based
-        # on it. However, its important that its never None, since two current_state's
-        # with a state_group of None are likely to be different.
-        # See bulk_get_push_rules_for_room for how we work around this.
-        assert state_group is not None
-
-        # We also will want to generate notifs for other people in the room so
-        # their unread countss are correct in the event stream, but to avoid
-        # generating them for bot / AS users etc, we only do so for people who've
-        # sent a read receipt into the room.
-
-        users_in_room = yield self._get_joined_users_from_context(
-            room_id,
-            state_group,
-            current_state_ids,
-            on_invalidate=cache_context.invalidate,
-            event=event,
-        )
-
-        # We ignore app service users for now. This is so that we don't fill
-        # up the `get_if_users_have_pushers` cache with AS entries that we
-        # know don't have pushers, nor even read receipts.
-        local_users_in_room = {
-            u
-            for u in users_in_room
-            if self.hs.is_mine_id(u)
-            and not self.get_if_app_services_interested_in_user(u)
-        }
-
-        # users in the room who have pushers need to get push rules run because
-        # that's how their pushers work
-        if_users_with_pushers = yield self.get_if_users_have_pushers(
-            local_users_in_room, on_invalidate=cache_context.invalidate
-        )
-        user_ids = {
-            uid for uid, have_pusher in if_users_with_pushers.items() if have_pusher
-        }
-
-        users_with_receipts = yield self.get_users_with_read_receipts_in_room(
-            room_id, on_invalidate=cache_context.invalidate
-        )
-
-        # any users with pushers must be ours: they have pushers
-        for uid in users_with_receipts:
-            if uid in local_users_in_room:
-                user_ids.add(uid)
-
-        rules_by_user = yield self.bulk_get_push_rules(
-            user_ids, on_invalidate=cache_context.invalidate
-        )
-
-        rules_by_user = {k: v for k, v in rules_by_user.items() if v is not None}
-
-        return rules_by_user
-
     @cachedList(
         cached_method_name="get_push_rules_enabled_for_user",
         list_name="user_ids",
         num_args=1,
-        inlineCallbacks=True,
     )
-    def bulk_get_push_rules_enabled(self, user_ids):
+    async def bulk_get_push_rules_enabled(self, user_ids):
         if not user_ids:
             return {}
 
         results = {user_id: {} for user_id in user_ids}
 
-        rows = yield self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="push_rules_enable",
             column="user_name",
             iterable=user_ids,

@@ -15,8 +15,6 @@
 
 from typing import List, Tuple
 
-from twisted.internet import defer
-
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
 from synapse.storage.presence import UserPresenceState
 from synapse.util.caches.descriptors import cached, cachedList
@@ -24,14 +22,13 @@ from synapse.util.iterutils import batch_iter
 
 
 class PresenceStore(SQLBaseStore):
-    @defer.inlineCallbacks
-    def update_presence(self, presence_states):
+    async def update_presence(self, presence_states):
         stream_ordering_manager = self._presence_id_gen.get_next_mult(
             len(presence_states)
         )
 
         with stream_ordering_manager as stream_orderings:
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "update_presence",
                 self._update_presence_txn,
                 stream_orderings,
@@ -133,13 +130,10 @@ class PresenceStore(SQLBaseStore):
         raise NotImplementedError()
 
     @cachedList(
-        cached_method_name="_get_presence_for_user",
-        list_name="user_ids",
-        num_args=1,
-        inlineCallbacks=True,
+        cached_method_name="_get_presence_for_user", list_name="user_ids", num_args=1,
     )
-    def get_presence_for_users(self, user_ids):
-        rows = yield self.db_pool.simple_select_many_batch(
+    async def get_presence_for_users(self, user_ids):
+        rows = await self.db_pool.simple_select_many_batch(
             table="presence_stream",
             column="user_id",
             iterable=user_ids,
