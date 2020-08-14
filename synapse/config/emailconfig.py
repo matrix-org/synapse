@@ -521,7 +521,8 @@ class EmailConfig(Config):
 
         for filename in filenames:
             # Update the environment with the default filters plus any custom ones
-            env.filters = jinja2.filters.FILTERS.copy().update(filters)
+            env.filters = jinja2.filters.FILTERS.copy()
+            env.filters.update(filters)
 
             # Load the template
             template = env.get_template(filename)
