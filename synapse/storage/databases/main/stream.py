@@ -49,7 +49,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine
 from synapse.types import RoomStreamToken
 from synapse.util.caches.stream_change_cache import StreamChangeCache
 
@@ -74,7 +74,7 @@ def generate_pagination_where_clause(
     column_names: Tuple[str, str],
     from_token: Optional[Tuple[int, int]],
     to_token: Optional[Tuple[int, int]],
-    engine,
+    engine: BaseDatabaseEngine,
 ) -> str:
     """Creates an SQL expression to bound the columns by the pagination
     tokens.
@@ -137,7 +137,10 @@ def generate_pagination_where_clause(
 
 
 def _make_generic_sql_bound(
-    bound: str, column_names: Tuple[str, str], values: Tuple[Optional[int], int], engine
+    bound: str,
+    column_names: Tuple[str, str],
+    values: Tuple[Optional[int], int],
+    engine: BaseDatabaseEngine,
 ) -> str:
     """Create an SQL expression that bounds the given column names by the
     values, e.g. create the equivalent of `(1, 2) < (col1, col2)`.
