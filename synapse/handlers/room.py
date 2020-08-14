@@ -266,7 +266,9 @@ class RoomCreationHandler(BaseHandler):
             )
             return
 
-        old_room_pl_state = await self.store.get_event(old_room_pl_event_id)
+        old_room_pl_state = await self.store.get_event(
+            old_room_pl_event_id
+        )  # type: EventBase  # type: ignore
 
         # we try to stop regular users from speaking by setting the PL required
         # to send regular events and invites to 'Moderator' level. That's normally
