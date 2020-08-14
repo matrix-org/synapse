@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os.path
 import tempfile
 
 from synapse.util.stringutils import random_string
@@ -36,6 +37,35 @@ class EmailConfigTestCase(unittest.HomeserverTestCase):
         # Render the template
         a_random_string = random_string(5)
         html_content = template.render({"error_description": a_random_string})
+
+        # Check that our string exists in the template
+        self.assertIn(
+            a_random_string,
+            html_content,
+            "Template file did not contain our test string",
+        )
+
+    def test_loading_custom_templates(self):
+        # Use a temporary directory that exists on the system
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Create a temporary bogus template file
+            with tempfile.NamedTemporaryFile(dir=tmp_dir) as tmp_template:
+                # Get temporary file's filename
+                template_filename = os.path.basename(tmp_template.name)
+
+                # Write a custom HTML template
+                contents = b"{{ test_variable }}"
+                tmp_template.write(contents)
+                tmp_template.flush()
+
+                # Attempt to load the template from our custom template directory
+                template = (
+                    self.hs.config.read_templates([template_filename], tmp_dir)
+                )[0]
+
+        # Render the template
+        a_random_string = random_string(5)
+        html_content = template.render({"test_variable": a_random_string})
 
         # Check that our string exists in the template
         self.assertIn(
