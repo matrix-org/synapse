@@ -16,6 +16,7 @@
 import os.path
 import tempfile
 
+from synapse.config import ConfigError
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -73,3 +74,9 @@ class BaseConfigTestCase(unittest.HomeserverTestCase):
             html_content,
             "Template file did not contain our test string",
         )
+
+    def test_loading_template_from_nonexistent_custom_directory(self):
+        with self.assertRaises(ConfigError):
+            self.hs.config.read_templates(
+                ["some_filename.html"], "a_nonexistent_directory"
+            )
