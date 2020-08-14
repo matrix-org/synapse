@@ -257,11 +257,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # Return all events where not all sets can reach them.
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
-    def get_oldest_events_in_room(self, room_id):
-        return self.db_pool.runInteraction(
-            "get_oldest_events_in_room", self._get_oldest_events_in_room_txn, room_id
-        )
-
     def get_oldest_events_with_depth_in_room(self, room_id):
         return self.db_pool.runInteraction(
             "get_oldest_events_with_depth_in_room",
@@ -302,14 +297,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             return 0
         else:
             return max(row["depth"] for row in rows)
-
-    def _get_oldest_events_in_room_txn(self, txn, room_id):
-        return self.db_pool.simple_select_onecol_txn(
-            txn,
-            table="event_backward_extremities",
-            keyvalues={"room_id": room_id},
-            retcol="event_id",
-        )
 
     def get_prev_events_for_room(self, room_id: str):
         """
