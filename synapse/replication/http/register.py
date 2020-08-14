@@ -44,6 +44,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         admin,
         user_type,
         address,
+        shadow_banned,
     ):
         """
         Args:
@@ -60,6 +61,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
             address (str|None): the IP address used to perform the regitration.
+            shadow_banned (bool): Whether to shadow-ban the user
         """
         return {
             "password_hash": password_hash,
@@ -70,6 +72,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             "admin": admin,
             "user_type": user_type,
             "address": address,
+            "shadow_banned": shadow_banned,
         }
 
     async def _handle_request(self, request, user_id):
@@ -87,6 +90,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             admin=content["admin"],
             user_type=content["user_type"],
             address=content["address"],
+            shadow_banned=content["shadow_banned"],
         )
 
         return 200, {}
