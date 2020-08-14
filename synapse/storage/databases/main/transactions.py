@@ -273,7 +273,7 @@ class TransactionStore(SQLBaseStore):
         Args:
             destination: the destination we have successfully sent to
         """
-        return self.db.simple_select_one_onecol(
+        return self.db_pool.simple_select_one_onecol(
             "destinations",
             {"destination": destination},
             "last_successful_stream_ordering",
@@ -293,7 +293,7 @@ class TransactionStore(SQLBaseStore):
             last_successful_stream_ordering: the stream_ordering of the most
                 recent successfully-sent PDU
         """
-        return self.db.simple_upsert(
+        return self.db_pool.simple_upsert(
             "destinations",
             keyvalues={"destination": destination},
             values={"last_successful_stream_ordering": last_successful_stream_ordering},
@@ -321,7 +321,7 @@ class TransactionStore(SQLBaseStore):
         Returns:
             event_ids
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_catch_up_room_event_ids",
             self._get_catch_up_room_event_ids_txn,
             destination,
@@ -354,7 +354,7 @@ class TransactionStore(SQLBaseStore):
         Returns the largest stream_ordering from the destination_rooms table
         that corresponds to this destination.
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "get_largest_destination_rooms_stream_order",
             self._get_largest_destination_rooms_stream_order_txn,
             destination,
@@ -389,9 +389,9 @@ class TransactionStore(SQLBaseStore):
             event_id: the ID of the event
             stream_ordering: the stream_ordering of the event
         """
-        return self.db.runInteraction(
+        return self.db_pool.runInteraction(
             "store_destination_rooms_entries",
-            self.db.simple_upsert_many_txn,
+            self.db_pool.simple_upsert_many_txn,
             "destination_rooms",
             ["destination", "room_id"],
             [(d, room_id) for d in destinations],

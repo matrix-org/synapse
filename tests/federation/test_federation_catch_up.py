@@ -58,7 +58,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
             Dictionary of { event_id: str, stream_ordering: int }
         """
         return self.get_success(
-            self.hs.get_datastore().db.simple_select_one(
+            self.hs.get_datastore().db_pool.simple_select_one(
                 table="destination_rooms",
                 keyvalues={"destination": destination, "room_id": room},
                 retcols=["event_id", "stream_ordering"],
@@ -114,8 +114,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         room_2 = self.helper.create_room_as("u1", tok=u1_token)
 
         # also critical (2) to federate
-        event_injection.inject_member_event(self.hs, room_1, "@user:host2", "join")
-        event_injection.inject_member_event(self.hs, room_2, "@user:host2", "join")
+        self.get_success(event_injection.inject_member_event(self.hs, room_1, "@user:host2", "join"))
+        self.get_success(event_injection.inject_member_event(self.hs, room_2, "@user:host2", "join"))
 
         self.helper.send_state(
             room_1, event_type="m.room.topic", body={"topic": "wombat"}, tok=u1_token
@@ -174,7 +174,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         u1_token = self.login("u1", "you the one")
         room = self.helper.create_room_as("u1", tok=u1_token)
 
-        event_injection.inject_member_event(self.hs, room, "@user:host2", "join")
+        self.get_success(event_injection.inject_member_event(self.hs, room, "@user:host2", "join"))
 
         event_id_1 = self.helper.send(room, "wombats!", tok=u1_token)["event_id"]
 
@@ -201,7 +201,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # take the remote offline
         self.is_online = False
 
-        event_injection.inject_member_event(self.hs, room, "@user:host2", "join")
+        self.get_success(event_injection.inject_member_event(self.hs, room, "@user:host2", "join"))
 
         self.helper.send(room, "wombats!", tok=u1_token)["event_id"]
 
@@ -257,9 +257,9 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         room_1 = self.helper.create_room_as("u1", tok=u1_token)
         room_2 = self.helper.create_room_as("u1", tok=u1_token)
         room_3 = self.helper.create_room_as("u1", tok=u1_token)
-        event_injection.inject_member_event(self.hs, room_1, "@user:host2", "join")
-        event_injection.inject_member_event(self.hs, room_2, "@user:host2", "join")
-        event_injection.inject_member_event(self.hs, room_3, "@user:host2", "join")
+        self.get_success(event_injection.inject_member_event(self.hs, room_1, "@user:host2", "join"))
+        self.get_success(event_injection.inject_member_event(self.hs, room_2, "@user:host2", "join"))
+        self.get_success(event_injection.inject_member_event(self.hs, room_3, "@user:host2", "join"))
 
         # create some events to play with
 
@@ -305,9 +305,9 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         room_1 = self.helper.create_room_as("u1", tok=u1_token)
         room_2 = self.helper.create_room_as("u1", tok=u1_token)
         room_3 = self.helper.create_room_as("u1", tok=u1_token)
-        event_injection.inject_member_event(self.hs, room_1, "@user:host2", "join")
-        event_injection.inject_member_event(self.hs, room_2, "@user:host2", "join")
-        event_injection.inject_member_event(self.hs, room_3, "@user:host2", "join")
+        self.get_success(event_injection.inject_member_event(self.hs, room_1, "@user:host2", "join"))
+        self.get_success(event_injection.inject_member_event(self.hs, room_2, "@user:host2", "join"))
+        self.get_success(event_injection.inject_member_event(self.hs, room_3, "@user:host2", "join"))
 
         # create some events to play with
 
