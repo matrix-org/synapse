@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 from collections import namedtuple
-from typing import List, Optional
+from typing import Collection, List, Optional
 
 from canonicaljson import encode_canonical_json
 
@@ -361,7 +361,9 @@ class TransactionStore(SQLBaseStore):
         )
 
     @staticmethod
-    def _get_largest_destination_rooms_stream_order_txn(txn, destination: str) -> Optional[int]:
+    def _get_largest_destination_rooms_stream_order_txn(
+        txn, destination: str
+    ) -> Optional[int]:
         txn.execute(
             """
             SELECT stream_ordering
@@ -379,7 +381,11 @@ class TransactionStore(SQLBaseStore):
             return None
 
     def store_destination_rooms_entries(
-        self, destinations: List[str], room_id: str, event_id: str, stream_ordering: int
+        self,
+        destinations: Collection[str],
+        room_id: str,
+        event_id: str,
+        stream_ordering: int,
     ):
         """
         Updates or creates `destination_rooms` entries in batch for a single event.

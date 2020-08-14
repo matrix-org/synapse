@@ -15,7 +15,7 @@
 # limitations under the License.
 import datetime
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple, cast
 
 from prometheus_client import Counter
 
@@ -494,7 +494,7 @@ class PerDestinationQueue(object):
                     "No event IDs found for catch-up: "
                     "last successful = %d, max catch up = %d",
                     self._last_successful_stream_order,
-                    self._catch_up_max_stream_order
+                    self._catch_up_max_stream_order,
                 )
                 self._catching_up = False
                 break
@@ -518,8 +518,8 @@ class PerDestinationQueue(object):
             if success:
                 sent_transactions_counter.inc()
                 final_pdu, _ = catch_up_pdus[-1]
-                self._last_successful_stream_order = (
-                    final_pdu.internal_metadata.stream_ordering
+                self._last_successful_stream_order = cast(
+                    int, final_pdu.internal_metadata.stream_ordering
                 )
                 await self._store.set_last_successful_stream_ordering(
                     self._destination, self._last_successful_stream_order
