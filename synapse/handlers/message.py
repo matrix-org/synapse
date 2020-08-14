@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
@@ -644,7 +644,7 @@ class EventCreationHandler(object):
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-    ) -> Union[int, EventBase]:
+    ) -> int:
         """
         Persists and notifies local clients and federation of an event.
 
@@ -715,7 +715,7 @@ class EventCreationHandler(object):
         event_dict: dict,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
-    ) -> Tuple[EventBase, Union[int, EventBase]]:
+    ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
 
