@@ -790,12 +790,13 @@ class RoomCreationHandler(BaseHandler):
         initial_state: StateMap,
         creation_content: JsonDict,
         room_alias: Optional[RoomAlias] = None,
-        power_level_content_override: Optional[
-            JsonDict
-        ] = None,  # Doesn't apply when initial state has power level state event content
+        power_level_content_override: Optional[JsonDict] = None,  #
         creator_join_profile: Optional[JsonDict] = None,
     ) -> int:
         """Sends the initial events into a new room.
+
+        `power_level_content_override` doesn't apply when initial state has
+        power level state event content.
 
         Returns:
             The stream_id of the last event persisted.
@@ -866,7 +867,7 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50,
                 "invite": 50,
-            }  # type: Dict[str, Any]
+            }  # type: JsonDict
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
