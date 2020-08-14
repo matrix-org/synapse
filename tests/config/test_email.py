@@ -27,10 +27,9 @@ class EmailConfigTestCase(unittest.HomeserverTestCase):
     def test_loading_missing_templates(self):
         # Use a temporary directory that exists on the system, but that isn't likely to
         # contain template files
-        tmp_dir = tempfile.gettempdir()
-
-        # Attempt to load an HTML template from our custom template directory
-        template = self.hs.config.read_templates(["sso_error.html"], tmp_dir)[0]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Attempt to load an HTML template from our custom template directory
+            template = self.hs.config.read_templates(["sso_error.html"], tmp_dir)[0]
 
         # If no errors, we should've gotten the default template instead
 
