@@ -478,7 +478,6 @@ class EmailConfig(Config):
         self,
         filenames: List[str],
         custom_template_directory: Optional[str] = None,
-        autoescape: bool = True,
         filters: Dict[str, Callable] = {},
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables and filters.
@@ -494,9 +493,6 @@ class EmailConfig(Config):
 
             custom_template_directory: A directory to try to look for the templates
                 before using the default Synapse template directory instead.
-
-            autoescape: Whether to automatically escape template variables when the templates
-                are rendered.
 
             filters: Custom functions which can modify the given template variables upon
                 render, if the template file specifies them.
@@ -517,7 +513,7 @@ class EmailConfig(Config):
             search_directories.insert(0, custom_template_directory)
 
         loader = jinja2.FileSystemLoader(search_directories)
-        env = jinja2.Environment(loader=loader, autoescape=autoescape)
+        env = jinja2.Environment(loader=loader, autoescape=True)
 
         for filename in filenames:
             # Update the environment with the default filters plus any custom ones
