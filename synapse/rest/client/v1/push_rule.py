@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Awaitable
-
 from synapse.api.errors import (
     NotFoundError,
     StoreError,
@@ -174,7 +172,9 @@ class PushRuleRestServlet(RestServlet):
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            return await self.store.set_push_rule_enabled(user_id, namespaced_rule_id, val)
+            return await self.store.set_push_rule_enabled(
+                user_id, namespaced_rule_id, val
+            )
         elif spec["attr"] == "actions":
             actions = val.get("actions")
             _check_actions(actions)
