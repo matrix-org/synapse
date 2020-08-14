@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json, json
 
@@ -45,7 +45,7 @@ from synapse.events.validator import EventValidator
 from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
-from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import (
     Collection,
@@ -93,11 +93,11 @@ class MessageHandler(object):
 
     async def get_room_data(
         self,
-        user_id: str = None,
-        room_id: str = None,
-        event_type: Optional[str] = None,
-        state_key: str = "",
-        is_guest: bool = False,
+        user_id: str,
+        room_id: str,
+        event_type: str,
+        state_key: str,
+        is_guest: bool,
     ) -> dict:
         """ Get data from a room.
 
@@ -407,7 +407,7 @@ class EventCreationHandler(object):
         #
         # map from room id to time-of-last-attempt.
         #
-        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: dict[str, int]
+        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: Dict[str, int]
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
         # config options, but *only* if we have a configuration for which we are
@@ -707,7 +707,7 @@ class EventCreationHandler(object):
     async def create_and_send_nonmember_event(
         self,
         requester: Requester,
-        event_dict: EventBase,
+        event_dict: dict,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
     ) -> Tuple[EventBase, int]:
@@ -767,6 +767,15 @@ class EventCreationHandler(object):
             )
         else:
             prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
+
+        # we now ought to have some prev_events (unless it's a create event).
+        #
+        # do a quick sanity check here, rather than waiting until we've created the
+        # event and then try to auth it (which fails with a somewhat confusing "No
+        # create event in auth events")
+        assert (
+            builder.type == EventTypes.Create or len(prev_event_ids) > 0
+        ), "Attempting to create an event with no prev_events"
 
         event = await builder.build(prev_event_ids=prev_event_ids)
         context = await self.state.compute_event_context(event)
@@ -882,9 +891,7 @@ class EventCreationHandler(object):
         except Exception:
             # Ensure that we actually remove the entries in the push actions
             # staging area, if we calculated them.
-            run_in_background(
-                self.store.remove_push_actions_from_staging, event.event_id
-            )
+            await self.store.remove_push_actions_from_staging(event.event_id)
             raise
 
     async def _validate_canonical_alias(
@@ -962,7 +969,7 @@ class EventCreationHandler(object):
             # Validate a newly added alias or newly added alt_aliases.
 
             original_alias = None
-            original_alt_aliases = set()
+            original_alt_aliases = []  # type: List[str]
 
             original_event_id = event.unsigned.get("replaces_state")
             if original_event_id:
@@ -1009,6 +1016,10 @@ class EventCreationHandler(object):
                     return e.type == EventTypes.Member and e.sender == event.sender
 
                 current_state_ids = await context.get_current_state_ids()
+
+                # We know this event is not an outlier, so this must be
+                # non-None.
+                assert current_state_ids is not None
 
                 state_to_include_ids = [
                     e_id
@@ -1061,7 +1072,7 @@ class EventCreationHandler(object):
                     raise SynapseError(400, "Cannot redact event from a different room")
 
             prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = await self.auth.compute_auth_events(
+            auth_events_ids = self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
             auth_events = await self.store.get_events(auth_events_ids)

@@ -68,6 +68,7 @@ from synapse.replication.http import REPLICATION_PREFIX, ReplicationRestResource
 from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
 from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
+from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
@@ -98,7 +99,9 @@ class SynapseHomeServer(HomeServer):
         if site_tag is None:
             site_tag = port
 
-        resources = {}
+        # We always include a health resource.
+        resources = {"/health": HealthResource()}
+
         for res in listener_config.http_options.resources:
             for name in res.names:
                 if name == "openid" and "federation" in res.names:
@@ -441,7 +444,7 @@ def setup(config_options):
 
             _base.start(hs, config.listeners)
 
-            hs.get_datastore().db.updates.start_doing_background_updates()
+            hs.get_datastore().db_pool.updates.start_doing_background_updates()
         except Exception:
             # Print the exception and bail out.
             print("Error during startup:", file=sys.stderr)
@@ -551,8 +554,8 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     #
 
     # This only reports info about the *main* database.
-    stats["database_engine"] = hs.get_datastore().db.engine.module.__name__
-    stats["database_server_version"] = hs.get_datastore().db.engine.server_version
+    stats["database_engine"] = hs.get_datastore().db_pool.engine.module.__name__
+    stats["database_server_version"] = hs.get_datastore().db_pool.engine.server_version
 
     logger.info("Reporting stats to %s: %s" % (hs.config.report_stats_endpoint, stats))
     try:

@@ -23,7 +23,7 @@ The processes communicate with each other via a Synapse-specific protocol called
 feeds streams of newly written data between processes so they can be kept in
 sync with the database state.
 
-When configured to do so, Synapse uses a 
+When configured to do so, Synapse uses a
 [Redis pub/sub channel](https://redis.io/topics/pubsub) to send the replication
 stream between all configured Synapse processes. Additionally, processes may
 make HTTP requests to each other, primarily for operations which need to wait
@@ -66,23 +66,31 @@ https://hub.docker.com/r/matrixdotorg/synapse/.
 
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
-the correct worker, or to the main synapse instance. See 
+the correct worker, or to the main synapse instance. See
 [reverse_proxy.md](reverse_proxy.md) for information on setting up a reverse
 proxy.
 
-To enable workers you should create a configuration file for each worker
-process. Each worker configuration file inherits the configuration of the shared
-homeserver configuration file.  You can then override configuration specific to
-that worker, e.g. the HTTP listener that it provides (if any); logging
-configuration; etc.  You should minimise the number of overrides though to
-maintain a usable config.
+When using workers, each worker process has its own configuration file which
+contains settings specific to that worker, such as the HTTP listener that it
+provides (if any), logging configuration, etc.
+
+Normally, the worker processes are configured to read from a shared
+configuration file as well as the worker-specific configuration files. This
+makes it easier to keep common configuration settings synchronised across all
+the processes.
+
+The main process is somewhat special in this respect: it does not normally
+need its own configuration file and can take all of its configuration from the
+shared configuration file.
 
 
-### Shared Configuration
+### Shared configuration
 
-Next you need to add both a HTTP replication listener, used for HTTP requests
-between processes, and redis config to the shared Synapse configuration file
-(`homeserver.yaml`). For example:
+Normally, only a couple of changes are needed to make an existing configuration
+file suitable for use with workers. First, you need to enable an "HTTP replication
+listener" for the main process; and secondly, you need to enable redis-based
+replication. For example:
+
 
 ```yaml
 # extend the existing `listeners` section. This defines the ports that the
@@ -105,7 +113,7 @@ Under **no circumstances** should the replication listener be exposed to the
 public internet; it has no authentication and is unencrypted.
 
 
-### Worker Configuration
+### Worker configuration
 
 In the config file for each worker, you must specify the type of worker
 application (`worker_app`), and you should specify a unqiue name for the worker
@@ -144,6 +152,9 @@ plain HTTP endpoint on port 8083 separately serving various endpoints, e.g.
 
 Obviously you should configure your reverse-proxy to route the relevant
 endpoints to the worker (`localhost:8083` in the above example).
+
+
+### Running Synapse with workers
 
 Finally, you need to start your worker processes. This can be done with either
 `synctl` or your distribution's preferred service manager such as `systemd`. We
@@ -405,6 +416,23 @@ are ones that do specific processing unrelated to requests, e.g. the `pusher`
 that handles sending out push notifications for new events. The intention is for
 all these to be folded into the `generic_worker` app and to use config to define
 which processes handle the various proccessing such as push notifications.
+
+
+## Migration from old config
+
+There are two main independent changes that have been made: introducing Redis
+support and merging apps into `synapse.app.generic_worker`. Both these changes
+are backwards compatible and so no changes to the config are required, however
+server admins are encouraged to plan to migrate to Redis as the old style direct
+TCP replication config is deprecated.
+
+To migrate to Redis add the `redis` config as above, and optionally remove the
+TCP `replication` listener from master and `worker_replication_port` from worker
+config.
+
+To migrate apps to use `synapse.app.generic_worker` simply update the
+`worker_app` option in the worker configs, and where worker are started (e.g.
+in systemd service files, but not required for synctl).
 
 
 ## Architectural diagram

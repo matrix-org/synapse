@@ -16,7 +16,7 @@
 import abc
 import logging
 from http import HTTPStatus
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from unpaddedbase64 import encode_base64
 
@@ -37,6 +37,10 @@ from synapse.util.distributor import user_joined_room, user_left_room
 
 from ._base import BaseHandler
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -48,7 +52,7 @@ class RoomMemberHandler(object):
 
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -207,7 +211,7 @@ class RoomMemberHandler(object):
             return duplicate.event_id, stream_id
 
         stream_id = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[target], ratelimit=ratelimit
+            requester, event, context, extra_users=[target], ratelimit=ratelimit,
         )
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -1000,7 +1004,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         check_complexity = self.hs.config.limit_remote_rooms.enabled
         if check_complexity and self.hs.config.limit_remote_rooms.admins_can_join:
-            check_complexity = not await self.hs.auth.is_server_admin(user)
+            check_complexity = not await self.auth.is_server_admin(user)
 
         if check_complexity:
             # Fetch the room complexity

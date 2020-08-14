@@ -13,11 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import re
 import string
 import sys
 from collections import namedtuple
-from typing import Any, Dict, Tuple, TypeVar
+from typing import Any, Dict, Tuple, Type, TypeVar
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -33,7 +34,7 @@ else:
 
     T_co = TypeVar("T_co", covariant=True)
 
-    class Collection(Iterable[T_co], Container[T_co], Sized):
+    class Collection(Iterable[T_co], Container[T_co], Sized):  # type: ignore
         __slots__ = ()
 
 
@@ -141,6 +142,9 @@ def get_localpart_from_id(string):
     return string[1:idx]
 
 
+DS = TypeVar("DS", bound="DomainSpecificString")
+
+
 class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "domain"))):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
@@ -150,6 +154,10 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         'localpart' : The local part of the name (without the leading sigil)
         'domain' : The domain part of the name
     """
+
+    __metaclass__ = abc.ABCMeta
+
+    SIGIL = abc.abstractproperty()  # type: str  # type: ignore
 
     # Deny iteration because it will bite you if you try to create a singleton
     # set by:
@@ -166,7 +174,7 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         return self
 
     @classmethod
-    def from_string(cls, s: str):
+    def from_string(cls: Type[DS], s: str) -> DS:
         """Parse the string given by 's' into a structure object."""
         if len(s) < 1 or s[0:1] != cls.SIGIL:
             raise SynapseError(
@@ -190,12 +198,12 @@ class DomainSpecificString(namedtuple("DomainSpecificString", ("localpart", "dom
         # names on one HS
         return cls(localpart=parts[0], domain=domain)
 
-    def to_string(self):
+    def to_string(self) -> str:
         """Return a string encoding the fields of the structure object."""
         return "%s%s:%s" % (self.SIGIL, self.localpart, self.domain)
 
     @classmethod
-    def is_valid(cls, s):
+    def is_valid(cls: Type[DS], s: str) -> bool:
         try:
             cls.from_string(s)
             return True
@@ -235,8 +243,9 @@ class GroupID(DomainSpecificString):
     SIGIL = "+"
 
     @classmethod
-    def from_string(cls, s):
-        group_id = super(GroupID, cls).from_string(s)
+    def from_string(cls: Type[DS], s: str) -> DS:
+        group_id = super().from_string(s)  # type: DS # type: ignore
+
         if not group_id.localpart:
             raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
 
