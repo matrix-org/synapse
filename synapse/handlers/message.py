@@ -667,14 +667,14 @@ class EventCreationHandler(object):
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if event.is_state():
-            prev_state = await self.deduplicate_state_event(event, context)
-            if prev_state is not None:
+            prev_event = await self.deduplicate_state_event(event, context)
+            if prev_event is not None:
                 logger.info(
                     "Not bothering to persist state event %s duplicated by %s",
                     event.event_id,
-                    prev_state.event_id,
+                    prev_event.event_id,
                 )
-                return prev_state
+                return await self.store.get_stream_token_for_event(prev_event.event_id)
 
         return await self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
@@ -686,8 +686,13 @@ class EventCreationHandler(object):
         """
         Checks whether event is in the latest resolved state in context.
 
-        If so, returns the version of the event in context.
-        Otherwise, returns None.
+        Args:
+            event: The event to check for duplication.
+            context: The event context.
+
+        Returns:
+            The previous verion of the event is returned, if it is found in the
+            event context. Otherwise, None is returned.
         """
         prev_state_ids = await context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
