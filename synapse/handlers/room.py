@@ -790,7 +790,7 @@ class RoomCreationHandler(BaseHandler):
         initial_state: StateMap,
         creation_content: JsonDict,
         room_alias: Optional[RoomAlias] = None,
-        power_level_content_override: Optional[JsonDict] = None,  #
+        power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
     ) -> int:
         """Sends the initial events into a new room.
