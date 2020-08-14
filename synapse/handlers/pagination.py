@@ -180,6 +180,8 @@ class PaginationHandler(object):
             if self._retention_allowed_lifetime_max is not None:
                 max_lifetime = min(max_lifetime, self._retention_allowed_lifetime_max)
 
+            logger.debug("[purge] max_lifetime for room %s: %s", room_id, max_lifetime)
+
             # Figure out what token we should start purging at.
             ts = self.clock.time_msec() - max_lifetime
 
