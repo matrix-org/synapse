@@ -91,12 +91,15 @@ class RoomEventForwardServlet(RestServlet):
         except (KeyError, TypeError):
             is_valid_forward = False
 
-        if has_forward_meta and not is_valid_forward:
-            raise SynapseError(
-                401,
-                "Event contains invalid forward metadata.",
-                errcode=self._err_not_forwardable,
-            )
+        if has_forward_meta:
+            if not is_valid_forward:
+                raise SynapseError(
+                    401,
+                    "Event contains invalid forward metadata.",
+                    errcode=self._err_not_forwardable,
+                )
+            # Pass through the old event ID to the new unsigned data
+            event_id = unsigned[self._data_key]["event_id"]
         elif not has_forward_meta:
             content[self._data_key] = event_dict
             room_version = await self.store.get_room_version(event.room_id)
