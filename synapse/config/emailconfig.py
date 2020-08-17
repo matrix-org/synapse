@@ -24,7 +24,7 @@ from typing import Optional
 
 import attr
 
-from ._base import Config, ConfigError
+from ._base import Config, ConfigError, create_mxc_to_http_filter, format_ts_filter
 
 MISSING_PASSWORD_RESET_CONFIG_ERROR = """\
 Password reset emails are enabled on this homeserver due to a partial
@@ -109,9 +109,6 @@ class EmailConfig(Config):
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
-        account_validity_config = config.get("account_validity") or {}
-        account_validity_renewal_enabled = account_validity_config.get("renew_at")
-
         self.threepid_behaviour_email = (
             # Have Synapse handle the email sending if account_threepid_delegates.email
             # is not defined
@@ -182,60 +179,84 @@ class EmailConfig(Config):
 
             # These email templates have placeholders in them, and thus must be
             # parsed using a templating engine during a request
-            self.email_password_reset_template_html = email_config.get(
+            password_reset_template_html = email_config.get(
                 "password_reset_template_html", "password_reset.html"
             )
-            self.email_password_reset_template_text = email_config.get(
+            password_reset_template_text = email_config.get(
                 "password_reset_template_text", "password_reset.txt"
             )
-            self.email_registration_template_html = email_config.get(
+            registration_template_html = email_config.get(
                 "registration_template_html", "registration.html"
             )
-            self.email_registration_template_text = email_config.get(
+            registration_template_text = email_config.get(
                 "registration_template_text", "registration.txt"
             )
-            self.email_add_threepid_template_html = email_config.get(
+            add_threepid_template_html = email_config.get(
                 "add_threepid_template_html", "add_threepid.html"
             )
-            self.email_add_threepid_template_text = email_config.get(
+            add_threepid_template_text = email_config.get(
                 "add_threepid_template_text", "add_threepid.txt"
             )
-            self.email_password_reset_template_failure_html = email_config.get(
+
+            password_reset_template_failure_html = email_config.get(
                 "password_reset_template_failure_html", "password_reset_failure.html"
             )
-            self.email_registration_template_failure_html = email_config.get(
+            registration_template_failure_html = email_config.get(
                 "registration_template_failure_html", "registration_failure.html"
             )
-            self.email_add_threepid_template_failure_html = email_config.get(
+            add_threepid_template_failure_html = email_config.get(
                 "add_threepid_template_failure_html", "add_threepid_failure.html"
             )
 
             # These templates do not support any placeholder variables, so we
             # will read them from disk once during setup
-            email_password_reset_template_success_html = email_config.get(
+            password_reset_template_success_html = email_config.get(
                 "password_reset_template_success_html", "password_reset_success.html"
             )
-            email_registration_template_success_html = email_config.get(
+            registration_template_success_html = email_config.get(
                 "registration_template_success_html", "registration_success.html"
             )
-            email_add_threepid_template_success_html = email_config.get(
+            add_threepid_template_success_html = email_config.get(
                 "add_threepid_template_success_html", "add_threepid_success.html"
             )
 
-            # Read and render web templates
+            # Read all templates from disk
             (
+                self.email_password_reset_template_html,
+                self.email_password_reset_template_text,
+                self.email_registration_template_html,
+                self.email_registration_template_text,
+                self.email_add_threepid_template_html,
+                self.email_add_threepid_template_text,
+                self.email_password_reset_template_failure_html,
+                self.email_registration_template_failure_html,
+                self.email_add_threepid_template_failure_html,
                 password_reset_template_success_html_template,
                 registration_template_success_html_template,
                 add_threepid_template_success_html_template,
             ) = self.read_templates(
                 [
-                    email_password_reset_template_success_html,
-                    email_registration_template_success_html,
-                    email_add_threepid_template_success_html,
+                    password_reset_template_html,
+                    password_reset_template_text,
+                    registration_template_html,
+                    registration_template_text,
+                    add_threepid_template_html,
+                    add_threepid_template_text,
+                    password_reset_template_failure_html,
+                    registration_template_failure_html,
+                    add_threepid_template_failure_html,
+                    password_reset_template_success_html,
+                    registration_template_success_html,
+                    add_threepid_template_success_html,
                 ],
                 self.email_template_dir,
+                filters={
+                    "format_ts": format_ts_filter,
+                    "mxc_to_http": create_mxc_to_http_filter(self.public_baseurl),
+                },
             )
 
+            # Render templates that do not contain any placeholders
             self.email_password_reset_template_success_html_content = (
                 password_reset_template_success_html_template.render()
             )
@@ -260,11 +281,23 @@ class EmailConfig(Config):
                     % (", ".join(missing),)
                 )
 
-            self.email_notif_template_html = email_config.get(
+            notif_template_html = email_config.get(
                 "notif_template_html", "notif_mail.html"
             )
-            self.email_notif_template_text = email_config.get(
+            notif_template_text = email_config.get(
                 "notif_template_text", "notif_mail.txt"
+            )
+
+            (
+                self.email_notif_template_html,
+                self.email_notif_template_text,
+            ) = self.read_templates(
+                [notif_template_html, notif_template_text],
+                self.email_template_dir,
+                filters={
+                    "format_ts": format_ts_filter,
+                    "mxc_to_http": create_mxc_to_http_filter(self.public_baseurl),
+                },
             )
 
             self.email_notif_for_new_users = email_config.get(
@@ -274,12 +307,24 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if account_validity_renewal_enabled:
-            self.email_expiry_template_html = email_config.get(
+        if self.account_validity.renew_by_email_enabled:
+            expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
-            self.email_expiry_template_text = email_config.get(
+            expiry_template_text = email_config.get(
                 "expiry_template_text", "notice_expiry.txt"
+            )
+
+            (
+                self.account_validity_template_html,
+                self.account_validity_template_text,
+            ) = self.read_templates(
+                [expiry_template_html, expiry_template_text],
+                self.email_template_dir,
+                filters={
+                    "format_ts": format_ts_filter,
+                    "mxc_to_http": create_mxc_to_http_filter(self.public_baseurl),
+                },
             )
 
         subjects_config = email_config.get("subjects", {})

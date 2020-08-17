@@ -32,7 +32,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import Mailer, create_mxc_to_http_filter, format_ts_filter
+from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import canonicalise_email, check_3pid_allowed
@@ -53,22 +53,11 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         self.identity_handler = hs.get_handlers().identity_handler
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            template_html, template_text = hs.config.read_templates(
-                [
-                    self.config.email_password_reset_template_html,
-                    self.config.email_password_reset_template_text,
-                ],
-                self.config.email_template_dir,
-                filters={
-                    "format_ts": format_ts_filter,
-                    "mxc_to_http": create_mxc_to_http_filter(hs.config.public_baseurl),
-                },
-            )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=template_html,
-                template_text=template_text,
+                template_html=hs.config.email_password_reset_template_html,
+                template_text=hs.config.email_password_reset_template_text,
             )
 
     async def on_POST(self, request):
@@ -412,18 +401,11 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
         self.store = self.hs.get_datastore()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            template_html, template_text = hs.config.read_templates(
-                [
-                    self.config.email_add_threepid_template_html,
-                    self.config.email_add_threepid_template_text,
-                ],
-                self.config.email_template_dir,
-            )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=template_html,
-                template_text=template_text,
+                template_html=hs.config.email_add_threepid_template_html,
+                template_text=hs.config.email_add_threepid_template_text,
             )
 
     async def on_POST(self, request):

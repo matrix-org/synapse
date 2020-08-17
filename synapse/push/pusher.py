@@ -16,7 +16,7 @@
 import logging
 
 from synapse.push.emailpusher import EmailPusher
-from synapse.push.mailer import Mailer, create_mxc_to_http_filter, format_ts_filter
+from synapse.push.mailer import Mailer
 
 from .httppusher import HttpPusher
 
@@ -34,20 +34,8 @@ class PusherFactory(object):
         if hs.config.email_enable_notifs:
             self.mailers = {}  # app_name -> Mailer
 
-            (
-                self.notif_template_html,
-                self.notif_template_text,
-            ) = hs.config.read_templates(
-                [
-                    self.config.email_notif_template_html,
-                    self.config.email_notif_template_text,
-                ],
-                self.config.email_template_dir,
-                filters={
-                    "format_ts": format_ts_filter,
-                    "mxc_to_http": create_mxc_to_http_filter(hs.config.public_baseurl),
-                },
-            )
+            self._notif_template_html = hs.config.email_notif_template_html
+            self._notif_template_text = hs.config.email_notif_template_text
 
             self.pusher_types["email"] = self._create_email_pusher
 
@@ -68,8 +56,8 @@ class PusherFactory(object):
             mailer = Mailer(
                 hs=self.hs,
                 app_name=app_name,
-                template_html=self.notif_template_html,
-                template_text=self.notif_template_text,
+                template_html=self._notif_template_html,
+                template_text=self._notif_template_text,
             )
             self.mailers[app_name] = mailer
         return EmailPusher(self.hs, pusherdict, mailer)
