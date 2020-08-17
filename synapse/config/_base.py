@@ -238,8 +238,8 @@ class Config(object):
         # Update the environment with our custom filters
         env.filters.update(
             {
-                "format_ts": format_ts_filter,
-                "mxc_to_http": create_mxc_to_http_filter(self.public_baseurl),
+                "format_ts": _format_ts_filter,
+                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
             }
         )
 
@@ -251,11 +251,11 @@ class Config(object):
         return templates
 
 
-def format_ts_filter(value: int, format: str):
+def _format_ts_filter(value: int, format: str):
     return time.strftime(format, time.localtime(value / 1000))
 
 
-def create_mxc_to_http_filter(public_baseurl: str) -> Callable:
+def _create_mxc_to_http_filter(public_baseurl: str) -> Callable:
     """Create and return a jinja2 filter that converts MXC urls to HTTP
 
     Args:
