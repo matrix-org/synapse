@@ -12,10 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 from typing import Any, Dict
-
-import pkg_resources
 
 from ._base import Config
 
@@ -29,21 +26,14 @@ class SSOConfig(Config):
     def read_config(self, config, **kwargs):
         sso_config = config.get("sso") or {}  # type: Dict[str, Any]
 
-        # Pick a template directory in order of:
-        # * The sso-specific template_dir
-        # * /path/to/synapse/install/res/templates
+        # The sso-specific template_dir
         template_dir = sso_config.get("template_dir")
-        if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
 
-        self.sso_template_dir = template_dir
-        self.sso_account_deactivated_template = self.read_file(
-            os.path.join(self.sso_template_dir, "sso_account_deactivated.html"),
-            "sso_account_deactivated_template",
-        )
-        self.sso_auth_success_template = self.read_file(
-            os.path.join(self.sso_template_dir, "sso_auth_success.html"),
-            "sso_auth_success_template",
+        (
+            self.sso_account_deactivated_template,
+            self.sso_auth_success_template,
+        ) = self.read_templates(
+            ["sso_account_deactivated.html", "sso_auth_success.html"], template_dir,
         )
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
