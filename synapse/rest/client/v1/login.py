@@ -341,12 +341,14 @@ class LoginRestServlet(RestServlet):
             user_id = canonical_uid
 
         if login_submission.get("org.matrix.msc2697.restore_device"):
+            # user requested to rehydrate a device, so check if there they have
+            # a dehydrated device, and if so, allow them to try to rehydrate it
             (
                 device_id,
                 dehydrated_device,
             ) = await self.device_handler.get_dehydrated_device(user_id)
             if dehydrated_device:
-                token = await self.device_handler.get_dehydration_token(
+                token = await self.device_handler.create_dehydration_token(
                     user_id, device_id, login_submission
                 )
                 result = {
@@ -424,33 +426,75 @@ class LoginRestServlet(RestServlet):
 
 
 class RestoreDeviceServlet(RestServlet):
+    """Complete a rehydration request, either by letting the client use the
+    dehydrated device, or by creating a new device for the user.
+
+    POST /org.matrix.msc2697/restore_device
+    Content-Type: application/json
+
+    {
+      "rehydrate": true,
+      "dehydration_token": "an_opaque_token"
+    }
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    { // same format as the result from a /login request
+      "user_id": "@alice:example.org",
+      "device_id": "dehydrated_device",
+      "access_token": "another_opaque_token"
+    }
+
+    """
+
     PATTERNS = client_patterns("/org.matrix.msc2697/restore_device")
 
     def __init__(self, hs):
         super(RestoreDeviceServlet, self).__init__()
         self.hs = hs
         self.device_handler = hs.get_device_handler()
+        self._well_known_builder = WellKnownBuilder(hs)
 
     async def on_POST(self, request: SynapseRequest):
         submission = parse_json_object_from_request(request)
 
         if submission.get("rehydrate"):
-            return (
-                200,
-                await self.device_handler.rehydrate_device(
-                    submission.get("dehydration_token")
-                ),
+            result = await self.device_handler.rehydrate_device(
+                submission["dehydration_token"]
             )
         else:
-            return (
-                200,
-                await self.device_handler.cancel_rehydrate(
-                    submission.get("dehydration_token")
-                ),
+            result = await self.device_handler.cancel_rehydrate(
+                submission["dehydration_token"]
             )
+        well_known_data = self._well_known_builder.get_well_known()
+        if well_known_data:
+            result["well_known"] = well_known_data
+        return (200, result)
 
 
 class StoreDeviceServlet(RestServlet):
+    """Store a dehydrated device.
+
+    POST /org.matrix.msc2697/device/dehydrate
+    Content-Type: application/json
+
+    {
+      "device_data": {
+        "algorithm": "m.dehydration.v1.olm",
+        "account": "dehydrated_device"
+      }
+    }
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {
+      "device_id": "dehydrated_device_id"
+    }
+
+    """
+
     PATTERNS = client_patterns("/org.matrix.msc2697/device/dehydrate")
 
     def __init__(self, hs):
@@ -464,7 +508,9 @@ class StoreDeviceServlet(RestServlet):
         requester = await self.auth.get_user_by_req(request)
 
         device_id = await self.device_handler.store_dehydrated_device(
-            requester.user.to_string(), submission.get("device_data")
+            requester.user.to_string(),
+            submission["device_data"],
+            submission.get("initial_device_display_name", None)
         )
         return 200, {"device_id": device_id}
 

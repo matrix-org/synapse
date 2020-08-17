@@ -35,7 +35,7 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_tuple_comparison_clause,
 )
-from synapse.types import Collection, get_verify_key_from_cross_signing_key
+from synapse.types import Collection, JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util.caches.descriptors import (
     Cache,
     cached,
@@ -728,7 +728,15 @@ class DeviceWorkerStore(SQLBaseStore):
             _mark_remote_user_device_list_as_unsubscribed_txn,
         )
 
-    async def get_dehydrated_device(self, user_id: str) -> Tuple[str, str]:
+    async def get_dehydrated_device(self, user_id: str) -> Tuple[str, JsonDict]:
+        """Retrieve the information for a dehydrated device.
+
+        Args:
+            user_id: the user whose dehydrated device we are looking for
+        Returns:
+            a tuple whose first item is the device ID, and the second item is
+            the dehydrated device information
+        """
         # FIXME: make sure device ID still exists in devices table
         row = await self.db_pool.simple_select_one(
             table="dehydrated_devices",
@@ -736,7 +744,7 @@ class DeviceWorkerStore(SQLBaseStore):
             retcols=["device_id", "device_data"],
             allow_none=True,
         )
-        return (row["device_id"], row["device_data"]) if row else (None, None)
+        return (row["device_id"], json.loads(row["device_data"])) if row else (None, None)
 
     def _store_dehydrated_device_txn(
         self, txn, user_id: str, device_id: str, device_data: str
@@ -768,19 +776,39 @@ class DeviceWorkerStore(SQLBaseStore):
         return old_device_id
 
     async def store_dehydrated_device(
-        self, user_id: str, device_id: str, device_data: str
+        self, user_id: str, device_id: str, device_data: JsonDict
     ) -> Optional[str]:
+        """Store a dehydrated device for a user.
+
+        Args:
+            user_id: the user that we are storing the device for
+            device_data: the dehydrated device information
+            initial_device_display_name: The display name to use for the device
+        Returns:
+            device id of the user's previous dehydrated device, if any
+        """
         return await self.db_pool.runInteraction(
             "store_dehydrated_device_txn",
             self._store_dehydrated_device_txn,
             user_id,
             device_id,
-            device_data,
+            json.dumps(device_data),
         )
 
     async def create_dehydration_token(
-        self, user_id: str, device_id: str, login_submission: str
+        self, user_id: str, device_id: str, login_submission: JsonDict
     ) -> str:
+        """Create a token for a client to fulfill a dehydration request.
+
+        Args:
+            user_id: the user that we are creating the token for
+            device_id: the device ID for the dehydrated device.  This is to
+                ensure that the device still exists when the user tells us
+                they want to use the dehydrated device.
+            login_submission: the contents of the login request.
+        Returns:
+            the dehydration token
+        """
         # FIXME: expire any old tokens
 
         attempts = 0
@@ -794,7 +822,7 @@ class DeviceWorkerStore(SQLBaseStore):
                         "token": token,
                         "user_id": user_id,
                         "device_id": device_id,
-                        "login_submission": login_submission,
+                        "login_submission": json.dumps(login_submission),
                         "creation_time": self.hs.get_clock().time_msec(),
                     },
                     desc="create_dehydration_token",
@@ -814,16 +842,18 @@ class DeviceWorkerStore(SQLBaseStore):
         self.db_pool.simple_delete_one_txn(
             txn, "dehydration_token", {"token": token},
         )
+        token_info["login_submission"] = json.loads(token_info["login_submission"])
 
         if dehydrate:
-            device = self.db_pool.simple_select_one_txn(
+            device_id = self.db_pool.simple_select_one_onecol_txn(
                 txn,
                 "dehydrated_devices",
-                {"user_id": token_info["user_id"]},
-                ["device_id", "device_data"],
+                keyvalues={"user_id": token_info["user_id"]},
+                retcol="device_id",
                 allow_none=True,
             )
-            if device and device["device_id"] == token_info["device_id"]:
+            token_info["dehydrated"] = False
+            if device_id == token_info["device_id"]:
                 count = self.db_pool.simple_delete_txn(
                     txn,
                     "dehydrated_devices",
@@ -838,6 +868,21 @@ class DeviceWorkerStore(SQLBaseStore):
         return token_info
 
     async def clear_dehydration_token(self, token: str, dehydrate: bool) -> dict:
+        """Use a dehydration token.  If the client wishes to use the dehydrated
+        device, it will also remove the dehydrated device.
+
+        Args:
+            token: the dehydration token
+            dehydrate: whether the client wishes to use the dehydrated device
+        Returns:
+            A dict giving the information related to the token.  It will have
+            the following properties:
+            - user_id: the user associated from the token
+            - device_id: the ID of the dehydrated device
+            - login_submission: the original submission to /login
+            - dehydrated: (only present if the "dehydrate" parameter is True).
+              Whether the dehydrated device can be used by the client.
+        """
         return await self.db_pool.runInteraction(
             "get_users_whose_devices_changed",
             self._clear_dehydration_token_txn,

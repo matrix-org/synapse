@@ -1,1 +1,1 @@
-Add support for device dehydration.
+Add support for device dehydration. (MSC2697)
