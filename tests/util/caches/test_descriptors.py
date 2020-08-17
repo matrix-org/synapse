@@ -366,11 +366,11 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1, arg2):
                 pass
 
-            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
-            def list_fn(self, args1, arg2):
+            @descriptors.cachedList("fn", "args1")
+            async def list_fn(self, args1, arg2):
                 assert current_context().request == "c1"
                 # we want this to behave like an asynchronous function
-                yield run_on_reactor()
+                await run_on_reactor()
                 assert current_context().request == "c1"
                 return self.mock(args1, arg2)
 
@@ -416,10 +416,10 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             def fn(self, arg1, arg2):
                 pass
 
-            @descriptors.cachedList("fn", "args1", inlineCallbacks=True)
-            def list_fn(self, args1, arg2):
+            @descriptors.cachedList("fn", "args1")
+            async def list_fn(self, args1, arg2):
                 # we want this to behave like an asynchronous function
-                yield run_on_reactor()
+                await run_on_reactor()
                 return self.mock(args1, arg2)
 
         obj = Cls()

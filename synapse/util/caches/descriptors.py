@@ -507,7 +507,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
     """
 
     def __init__(
-        self, orig, cached_method_name, list_name, num_args=None, inlineCallbacks=False
+        self, orig, cached_method_name, list_name, num_args=None
     ):
         """
         Args:
@@ -517,12 +517,8 @@ class CacheListDescriptor(_CacheDescriptorBase):
             num_args (int): number of positional arguments (excluding ``self``,
                 but including list_name) to use as cache keys. Defaults to all
                 named args of the function.
-            inlineCallbacks (bool): Whether orig is a generator that should
-                be wrapped by defer.inlineCallbacks
         """
-        super(CacheListDescriptor, self).__init__(
-            orig, num_args=num_args, inlineCallbacks=inlineCallbacks
-        )
+        super().__init__(orig, num_args=num_args, inlineCallbacks=False)
 
         self.list_name = list_name
 
@@ -691,7 +687,7 @@ def cached(
     )
 
 
-def cachedList(cached_method_name, list_name, num_args=None, inlineCallbacks=False):
+def cachedList(cached_method_name, list_name, num_args=None):
     """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
 
     Used to do batch lookups for an already created cache. A single argument
@@ -707,8 +703,6 @@ def cachedList(cached_method_name, list_name, num_args=None, inlineCallbacks=Fal
             do batch lookups in the cache.
         num_args (int): Number of arguments to use as the key in the cache
             (including list_name). Defaults to all named parameters.
-        inlineCallbacks (bool): Should the function be wrapped in an
-            `defer.inlineCallbacks`?
 
     Example:
 
@@ -726,5 +720,4 @@ def cachedList(cached_method_name, list_name, num_args=None, inlineCallbacks=Fal
         cached_method_name=cached_method_name,
         list_name=list_name,
         num_args=num_args,
-        inlineCallbacks=inlineCallbacks,
     )
