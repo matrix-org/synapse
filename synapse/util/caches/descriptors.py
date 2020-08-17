@@ -364,7 +364,7 @@ class CacheDescriptor(_CacheDescriptorBase):
     invalidated) by adding a special "cache_context" argument to the function
     and passing that as a kwarg to all caches called. For example::
 
-        @cachedInlineCallbacks(cache_context=True)
+        @cached(cache_context=True)
         def foo(self, key, cache_context):
             r1 = yield self.bar1(key, on_invalidate=cache_context.invalidate)
             r2 = yield self.bar2(key, on_invalidate=cache_context.invalidate)
@@ -382,16 +382,12 @@ class CacheDescriptor(_CacheDescriptorBase):
         max_entries=1000,
         num_args=None,
         tree=False,
-        inlineCallbacks=False,
         cache_context=False,
         iterable=False,
     ):
 
-        super(CacheDescriptor, self).__init__(
-            orig,
-            num_args=num_args,
-            inlineCallbacks=inlineCallbacks,
-            cache_context=cache_context,
+        super().__init__(
+            orig, num_args=num_args, inlineCallbacks=False, cache_context=cache_context,
         )
 
         self.max_entries = max_entries
@@ -690,20 +686,6 @@ def cached(
         max_entries=max_entries,
         num_args=num_args,
         tree=tree,
-        cache_context=cache_context,
-        iterable=iterable,
-    )
-
-
-def cachedInlineCallbacks(
-    max_entries=1000, num_args=None, tree=False, cache_context=False, iterable=False
-):
-    return lambda orig: CacheDescriptor(
-        orig,
-        max_entries=max_entries,
-        num_args=num_args,
-        tree=tree,
-        inlineCallbacks=True,
         cache_context=cache_context,
         iterable=iterable,
     )
