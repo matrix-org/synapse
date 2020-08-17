@@ -29,22 +29,29 @@ class SSOConfig(Config):
         # The sso-specific template_dir
         template_dir = sso_config.get("template_dir")
 
+        # Read templates from disk
         (
-            self.sso_account_deactivated_template,
-            self.sso_auth_success_template,
             self.sso_redirect_confirm_template,
             self.sso_auth_confirm_template,
             self.sso_error_template,
+            sso_account_deactivated_template,
+            sso_auth_success_template,
         ) = self.read_templates(
             [
-                "sso_account_deactivated.html",
-                "sso_auth_success.html",
                 "sso_redirect_confirm.html",
                 "sso_auth_confirm.html",
                 "sso_error.html",
+                "sso_account_deactivated.html",
+                "sso_auth_success.html",
             ],
             template_dir,
         )
+
+        # These templates have no placeholders, so render them here
+        self.sso_account_deactivated_template = (
+            sso_account_deactivated_template.render()
+        )
+        self.sso_auth_success_template = sso_auth_success_template.render()
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
 
