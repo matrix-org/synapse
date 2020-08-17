@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
 from synapse.config import (
     api,
@@ -115,6 +115,9 @@ class RootConfig:
     def generate_missing_files(
         self, config_dict: dict, config_dir_path: str
     ) -> None: ...
+
+def format_ts_filter(value: int, format: str): ...
+def create_mxc_to_http_filter(public_baseurl: str) -> Callable: ...
 
 class Config:
     root: RootConfig

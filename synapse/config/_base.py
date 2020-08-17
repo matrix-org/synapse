@@ -252,7 +252,7 @@ class Config(object):
         return templates
 
 
-def format_ts_filter(value, format):
+def format_ts_filter(value: int, format: str):
     return time.strftime(format, time.localtime(value / 1000))
 
 
