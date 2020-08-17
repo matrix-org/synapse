@@ -44,8 +44,8 @@ class AccountValidityHandler(object):
             and self._account_validity.renew_by_email_enabled
         ):
             # Don't do email-specific configuration if renewal by email is disabled.
-            self._template_html = self.hs.config.account_validity_template_html
-            self._template_text = self.hs.config.account_validity_template_text
+            self._template_html = self.config.account_validity_template_html
+            self._template_text = self.config.account_validity_template_text
 
             try:
                 app_name = self.hs.config.email_app_name

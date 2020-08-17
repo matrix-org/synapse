@@ -84,8 +84,8 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=hs.config.email_registration_template_html,
-                template_text=hs.config.email_registration_template_text,
+                template_html=self.config.email_registration_template_html,
+                template_text=self.config.email_registration_template_text,
             )
 
     async def on_POST(self, request):
@@ -251,7 +251,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._failure_email_template = (
-                hs.config.email_registration_template_failure_html
+                self.config.email_registration_template_failure_html
             )
 
     async def on_GET(self, request, medium):

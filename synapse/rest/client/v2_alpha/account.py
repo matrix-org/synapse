@@ -56,8 +56,8 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=hs.config.email_password_reset_template_html,
-                template_text=hs.config.email_password_reset_template_text,
+                template_html=self.config.email_password_reset_template_html,
+                template_text=self.config.email_password_reset_template_text,
             )
 
     async def on_POST(self, request):
@@ -403,8 +403,8 @@ class EmailThreepidRequestTokenRestServlet(RestServlet):
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=hs.config.email_add_threepid_template_html,
-                template_text=hs.config.email_add_threepid_template_text,
+                template_html=self.config.email_add_threepid_template_html,
+                template_text=self.config.email_add_threepid_template_text,
             )
 
     async def on_POST(self, request):
