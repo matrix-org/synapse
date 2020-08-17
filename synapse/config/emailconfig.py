@@ -102,8 +102,6 @@ class EmailConfig(Config):
         if isinstance(template_dir, str):
             # We need an absolute path, because we change directory after starting (and
             # we don't yet know what auxiliary templates like mail.css we will need).
-            # (Note that loading as package_resources with jinja.PackageLoader doesn't
-            # work for the same reason.)
             template_dir = os.path.abspath(template_dir)
         elif template_dir is not None:
             # If template_dir is something other than a str or None, warn the user
