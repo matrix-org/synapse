@@ -573,21 +573,6 @@ class PerDestinationQueue(object):
 
         return (edus, now_stream_id)
 
-    def reset_catch_up_state(self) -> None:
-        """
-        Resets the catch-up state of this destination.
-        This does the following:
-         - marks catch-up mode
-         - unsets the catch-up limit (max. stream order)
-             so that it is reset to the highest catch-up next time we have a
-             chance to catch up
-         - empties the main PDU queue as any PDUs in it will now be handled
-             by catch-up (because the max stream order limit was unset).
-        """
-        self._pending_pdus = []
-        self._catching_up = True
-        self._catch_up_max_stream_order = None
-
     async def _get_to_device_message_edus(self, limit: int) -> Tuple[List[Edu], int]:
         last_device_stream_id = self._last_device_stream_id
         to_device_stream_id = self._store.get_to_device_stream_token()
