@@ -160,7 +160,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._failure_email_template = (
-                hs.config.email_password_reset_template_failure_html
+                self.config.email_password_reset_template_failure_html
             )
 
     async def on_GET(self, request, medium):
@@ -560,7 +560,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._failure_email_template = (
-                hs.config.email_add_threepid_template_failure_html
+                self.config.email_add_threepid_template_failure_html
             )
 
     async def on_GET(self, request):
