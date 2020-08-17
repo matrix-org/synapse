@@ -76,6 +76,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 "get_destination_retry_timings",
                 "get_devices_by_remote",
                 "maybe_store_room_on_invite",
+                "get_last_successful_stream_ordering",
                 # Bits that user_directory needs
                 "get_user_directory_stream_pos",
                 "get_current_state_deltas",
@@ -157,6 +158,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         )
         self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: None
         self.datastore.set_received_txn_response = lambda *args, **kwargs: defer.succeed(
+            None
+        )
+
+        self.datastore.get_last_successful_stream_ordering = lambda *args, **kwargs: defer.succeed(
             None
         )
 
