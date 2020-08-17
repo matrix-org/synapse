@@ -97,15 +97,17 @@ class EmailConfig(Config):
             if parsed[1] == "":
                 raise RuntimeError("Invalid notif_from address")
 
-        # A user-configurable template directory. Templates will first be looked for here,
-        # and if not found, will be taken from the default template directory instead.
-        template_dir = email_config.get("template_dir") or self.default_template_dir
-
-        # We need an absolute path, because we change directory after starting (and
-        # we don't yet know what auxiliary templates like mail.css we will need).
-        # (Note that loading as package_resources with jinja.PackageLoader doesn't
-        # work for the same reason.)
-        self.email_template_dir = os.path.abspath(template_dir)
+        # A user-configurable template directory
+        template_dir = email_config.get("template_dir")
+        if isinstance(template_dir, str):
+            # We need an absolute path, because we change directory after starting (and
+            # we don't yet know what auxiliary templates like mail.css we will need).
+            # (Note that loading as package_resources with jinja.PackageLoader doesn't
+            # work for the same reason.)
+            template_dir = os.path.abspath(template_dir)
+        elif template_dir is not None:
+            # If template_dir is something other than a str or None, warn the user
+            raise ConfigError("Config option email.template_dir must be type str")
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
 
@@ -249,7 +251,7 @@ class EmailConfig(Config):
                     registration_template_success_html,
                     add_threepid_template_success_html,
                 ],
-                self.email_template_dir,
+                template_dir,
             )
 
             # Render templates that do not contain any placeholders
@@ -288,7 +290,7 @@ class EmailConfig(Config):
                 self.email_notif_template_html,
                 self.email_notif_template_text,
             ) = self.read_templates(
-                [notif_template_html, notif_template_text], self.email_template_dir,
+                [notif_template_html, notif_template_text], template_dir,
             )
 
             self.email_notif_for_new_users = email_config.get(
@@ -310,7 +312,7 @@ class EmailConfig(Config):
                 self.account_validity_template_html,
                 self.account_validity_template_text,
             ) = self.read_templates(
-                [expiry_template_html, expiry_template_text], self.email_template_dir,
+                [expiry_template_html, expiry_template_text], template_dir,
             )
 
         subjects_config = email_config.get("subjects", {})
