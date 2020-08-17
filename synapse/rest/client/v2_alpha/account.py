@@ -159,9 +159,8 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = hs.config.read_templates(
-                [self.config.email_password_reset_template_failure_html],
-                self.config.email_template_dir,
+            self._failure_email_template = (
+                hs.config.email_password_reset_template_failure_html
             )
 
     async def on_GET(self, request, medium):
@@ -211,7 +210,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
-            html = self.failure_email_template.render(**template_vars)
+            html = self._failure_email_template.render(**template_vars)
 
         respond_with_html(request, status_code, html)
 
@@ -560,9 +559,8 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = hs.config.read_templates(
-                [self.config.email_add_threepid_template_failure_html],
-                self.config.email_template_dir,
+            self._failure_email_template = (
+                hs.config.email_add_threepid_template_failure_html
             )
 
     async def on_GET(self, request):
@@ -613,7 +611,7 @@ class AddThreepidEmailSubmitTokenServlet(RestServlet):
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
-            html = self.failure_email_template.render(**template_vars)
+            html = self._failure_email_template.render(**template_vars)
 
         respond_with_html(request, status_code, html)
 
