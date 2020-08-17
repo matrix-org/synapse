@@ -4,13 +4,12 @@ For the next release
 Removal warning
 ---------------
 
-Some older clients added `:` to the `client_secret` parameter of various endpoints, however the
-Client-Server API specification
-[disallows this](https://matrix.org/docs/spec/client_server/unstable#post-matrix-client-r0-register-email-requesttoken).
-Adding `:` in a `client_secret` string has been allowed for some time to allow that client to update,
-and we are now removing it, as most users have updated. Further context can be found at [\#6766](https://github.com/matrix-org/synapse/issues/6766).
-
-We are not currently aware of any other clients that send incorrect `client_secret` values.
+Some older clients used a
+[disallowed character](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken)
+(`:`) in the `client_secret` parameter of various endpoints. The incorrect
+behaviour was allowed for backwards compatibility, but is now being removed
+from Synapse as most users have updated their client. Further context can be
+found at [\#6766](https://github.com/matrix-org/synapse/issues/6766).
 
 
 Synapse 1.19.0 (2020-08-17)
