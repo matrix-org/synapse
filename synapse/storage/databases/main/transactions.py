@@ -14,13 +14,14 @@
 # limitations under the License.
 import logging
 from collections import namedtuple
-from typing import Collection, List, Optional
+from typing import List, Optional
 
 from canonicaljson import encode_canonical_json
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
+from synapse.types import Collection
 from synapse.util.caches.expiringcache import ExpiringCache
 
 db_binary_type = memoryview
