@@ -949,11 +949,10 @@ class ServerConfig(Config):
           #  min_lifetime: 1d
           #  max_lifetime: 1y
 
-          # Retention policy limits. If set, a user won't be able to send a
-          # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
-          # that's not within this range. This is especially useful in closed federations,
-          # in which server admins can make sure every federating server applies the same
-          # rules.
+          # Retention policy limits. If set, and the state of a room contains a
+          # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
+          # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
+          # to these limits when running purge jobs.
           #
           #allowed_lifetime_min: 1d
           #allowed_lifetime_max: 1y

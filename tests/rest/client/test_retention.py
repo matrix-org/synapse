@@ -89,7 +89,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         # Check that the event is purged after waiting for the maximum allowed duration
         # instead of the one specified in the room's policy.
-        self._test_retention_event_purged(room_id, one_day_ms * 3)
+        self._test_retention_event_purged(room_id, one_day_ms * 1.5)
 
         # Set a max_lifetime lower than the minimum allowed value.
         self.helper.send_state(
@@ -99,12 +99,9 @@ class RetentionTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
 
-        # Check that the event hasn't been purged yet.
-        self._test_retention_event_purged(room_id, one_hour_ms, expect_purged=False)
-
         # Check that the event is purged after waiting for the minimum allowed duration
         # instead of the one specified in the room's policy.
-        self._test_retention_event_purged(room_id, one_day_ms)
+        self._test_retention_event_purged(room_id, one_day_ms * 0.5)
 
     def test_retention_event_purged_without_state_event(self):
         """Tests that expired events are correctly purged when the room's retention policy
@@ -156,7 +153,31 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # That event should be the second, not outdated event.
         self.assertEqual(filtered_events[0].event_id, valid_event_id, filtered_events)
 
-    def _test_retention_event_purged(self, room_id, increment, expect_purged=True):
+    def _test_retention_event_purged(self, room_id: str, increment: float):
+        """Run the following test scenario to test the message retention policy support:
+
+        1. Send event 1
+        2. Increment time by `increment`
+        3. Send event 2
+        4. Increment time by `increment`
+        5. Check that event 1 has been purged
+        6. Check that event 2 has not been purged
+        7. Check that state events that were sent before event 1 aren't purged.
+
+
+        The main reason for sending a second event is because currently Synapse won't
+        purge the latest message in a room because it would otherwise result in a lack of
+        forward extremities for this room. It's also a good thing to have (and with the
+        current ordering and checks) because if we eventually fix that, it acts as a
+        check that the purge jobs aren't too greedy and purge messages they shouldn't
+        purge.
+
+        Args:
+            room_id: The ID of the room to test retention in.
+            increment: The number of milliseconds to advance the clock each time. Must be
+                defined so that events in the room aren't purged if they are `increment`
+                old but are purged if they are `increment * 2` old.
+        """
         # Get the create event to, later, check that we can still access it.
         message_handler = self.hs.get_message_handler()
         create_event = self.get_success(
@@ -188,10 +209,11 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # one should still be kept.
         self.reactor.advance(increment / 1000)
 
-        # Check that the event has been purged from the database.
-        self.get_event(expired_event_id, expect_none=expect_purged)
+        # Check that the first event has been purged from the database, i.e. that we
+        # can't retrieve it anymore, because it has expired.
+        self.get_event(expired_event_id, expect_none=True)
 
-        # Check that the event that hasn't been purged can still be retrieved.
+        # Check that the event that hasn't expired can still be retrieved.
         valid_event = self.get_event(valid_event_id)
         self.assertEqual(valid_event.get("content", {}).get("body"), "2", valid_event)
 
