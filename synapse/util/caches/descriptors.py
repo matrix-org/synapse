@@ -285,15 +285,8 @@ class Cache(object):
 
 
 class _CacheDescriptorBase(object):
-    def __init__(
-        self, orig: _CachedFunction, num_args, inlineCallbacks, cache_context=False
-    ):
+    def __init__(self, orig: _CachedFunction, num_args, cache_context=False):
         self.orig = orig
-
-        if inlineCallbacks:
-            self.function_to_call = defer.inlineCallbacks(orig)
-        else:
-            self.function_to_call = orig
 
         arg_spec = inspect.getfullargspec(orig)
         all_args = arg_spec.args
@@ -386,9 +379,7 @@ class CacheDescriptor(_CacheDescriptorBase):
         iterable=False,
     ):
 
-        super().__init__(
-            orig, num_args=num_args, inlineCallbacks=False, cache_context=cache_context,
-        )
+        super().__init__(orig, num_args=num_args, cache_context=cache_context)
 
         self.max_entries = max_entries
         self.tree = tree
@@ -461,9 +452,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                     observer = defer.succeed(cached_result_d)
 
             except KeyError:
-                ret = defer.maybeDeferred(
-                    preserve_fn(self.function_to_call), obj, *args, **kwargs
-                )
+                ret = defer.maybeDeferred(preserve_fn(self.orig), obj, *args, **kwargs)
 
                 def onErr(f):
                     cache.invalidate(cache_key)
@@ -506,9 +495,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
     of results.
     """
 
-    def __init__(
-        self, orig, cached_method_name, list_name, num_args=None
-    ):
+    def __init__(self, orig, cached_method_name, list_name, num_args=None):
         """
         Args:
             orig (function)
@@ -518,7 +505,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
                 but including list_name) to use as cache keys. Defaults to all
                 named args of the function.
         """
-        super().__init__(orig, num_args=num_args, inlineCallbacks=False)
+        super().__init__(orig, num_args=num_args)
 
         self.list_name = list_name
 
@@ -623,7 +610,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
 
                 cached_defers.append(
                     defer.maybeDeferred(
-                        preserve_fn(self.function_to_call), **args_to_call
+                        preserve_fn(self.orig), **args_to_call
                     ).addCallbacks(complete_all, errback)
                 )
 
