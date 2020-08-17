@@ -28,7 +28,7 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
 from synapse.app import check_bind_error
-from synapse.config.server import ListenerConfig
+from synapse.config.server import ListenerConfig, TcpListenerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
 from synapse.util.async_helpers import Linearizer
@@ -142,24 +142,38 @@ def quit_with_error(error_string: str) -> NoReturn:
     sys.exit(1)
 
 
-def listen_metrics(bind_addresses, port):
+def listen_metrics(socket_options):
     """
     Start Prometheus metrics server.
     """
+    if not isinstance(socket_options, TcpListenerConfig):
+        logger.warning(
+            "Metrics listener only supports TCP, use an HTTP listener instead"
+        )
+        return
+
     from synapse.metrics import RegistryProxy, start_http_server
 
-    for host in bind_addresses:
+    if socket_options.tls:
+        logger.warning("Ignoring 'tls' option for metrics listener")
+
+    port = socket_options.port
+    for host in socket_options.bind_addresses:
         logger.info("Starting metrics listener on %s:%d", host, port)
         start_http_server(port, addr=host, registry=RegistryProxy)
 
 
-def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
+def listen_tcp(socket_options, factory, reactor=reactor, backlog=50):
     """
     Create a TCP socket for a port and several addresses
 
     Returns:
         list[twisted.internet.tcp.Port]: listening for TCP connections
     """
+    assert not socket_options.tls
+    bind_addresses = socket_options.bind_addresses
+    port = socket_options.port
+
     r = []
     for address in bind_addresses:
         try:
@@ -170,15 +184,17 @@ def listen_tcp(bind_addresses, port, factory, reactor=reactor, backlog=50):
     return r
 
 
-def listen_ssl(
-    bind_addresses, port, factory, context_factory, reactor=reactor, backlog=50
-):
+def listen_ssl(socket_options, factory, context_factory, reactor=reactor, backlog=50):
     """
     Create an TLS-over-TCP socket for a port and several addresses
 
     Returns:
         list of twisted.internet.tcp.Port listening for TLS connections
     """
+    assert socket_options.tls
+    bind_addresses = socket_options.bind_addresses
+    port = socket_options.port
+
     r = []
     for address in bind_addresses:
         try:

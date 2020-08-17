@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 import attr
 import yaml
@@ -101,13 +101,27 @@ class HttpListenerConfig:
 
 
 @attr.s(frozen=True)
-class ListenerConfig:
-    """Object describing the configuration of a single listener."""
+class TcpListenerConfig:
+    """Object describing the TCP-specific parts of the config of a listener."""
 
     port = attr.ib(type=int, validator=attr.validators.instance_of(int))
     bind_addresses = attr.ib(type=List[str])
-    type = attr.ib(type=str, validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
     tls = attr.ib(type=bool, default=False)
+
+
+@attr.s(frozen=True)
+class UnixListenerConfig:
+    """Object describing parts of a listener config for a UNIX named socket."""
+
+    path = attr.ib(type=str)
+
+
+@attr.s(frozen=True)
+class ListenerConfig:
+    """Object describing the configuration of a single listener."""
+
+    type = attr.ib(type=str, validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
+    socket_options = attr.ib(type=Union[TcpListenerConfig, UnixListenerConfig])
 
     # http_options is only populated if type=http
     http_options = attr.ib(type=Optional[HttpListenerConfig], default=None)
@@ -409,10 +423,11 @@ class ServerConfig(Config):
         if config.get("no_tls", False):
             l2 = []
             for listener in self.listeners:
-                if listener.tls:
+                socket_options = listener.socket_options
+                if isinstance(socket_options, TcpListenerConfig) and socket_options.tls:
                     logger.info(
                         "Ignoring TLS-enabled listener on port %i due to no_tls",
-                        listener.port,
+                        socket_options.port,
                     )
                 else:
                     l2.append(listener)
@@ -464,9 +479,9 @@ class ServerConfig(Config):
 
             self.listeners.append(
                 ListenerConfig(
-                    port=bind_port,
-                    bind_addresses=[bind_host],
-                    tls=True,
+                    socket_options=TcpListenerConfig(
+                        port=bind_port, bind_addresses=[bind_host], tls=True,
+                    ),
                     type="http",
                     http_options=http_options,
                 )
@@ -476,9 +491,9 @@ class ServerConfig(Config):
             if unsecure_port:
                 self.listeners.append(
                     ListenerConfig(
-                        port=unsecure_port,
-                        bind_addresses=[bind_host],
-                        tls=False,
+                        socket_options=TcpListenerConfig(
+                            port=unsecure_port, bind_addresses=[bind_host], tls=False,
+                        ),
                         type="http",
                         http_options=http_options,
                     )
@@ -488,7 +503,10 @@ class ServerConfig(Config):
         if manhole:
             self.listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    socket_options=TcpListenerConfig(
+                        port=manhole, bind_addresses=["127.0.0.1"]
+                    ),
+                    type="manhole",
                 )
             )
 
@@ -498,8 +516,10 @@ class ServerConfig(Config):
 
             self.listeners.append(
                 ListenerConfig(
-                    port=metrics_port,
-                    bind_addresses=[config.get("metrics_bind_host", "127.0.0.1")],
+                    socket_options=TcpListenerConfig(
+                        port=metrics_port,
+                        bind_addresses=[config.get("metrics_bind_host", "127.0.0.1")],
+                    ),
                     type="http",
                     http_options=HttpListenerConfig(
                         resources=[HttpResourceConfig(names=["metrics"])]
@@ -543,7 +563,10 @@ class ServerConfig(Config):
         )  # type: set
 
     def has_tls_listener(self) -> bool:
-        return any(listener.tls for listener in self.listeners)
+        return any(
+            getattr(listener.socket_options, "tls", False)
+            for listener in self.listeners
+        )
 
     def generate_config_section(
         self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
@@ -1080,26 +1103,6 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
     """parse a listener config from the config file"""
     listener_type = listener["type"]
 
-    port = listener.get("port")
-    if not isinstance(port, int):
-        raise ConfigError("Listener configuration is lacking a valid 'port' option")
-
-    tls = listener.get("tls", False)
-
-    bind_addresses = listener.get("bind_addresses", [])
-    bind_address = listener.get("bind_address")
-    # if bind_address was specified, add it to the list of addresses
-    if bind_address:
-        bind_addresses.append(bind_address)
-
-    # if we still have an empty list of addresses, use the default list
-    if not bind_addresses:
-        if listener_type == "metrics":
-            # the metrics listener doesn't support IPv6
-            bind_addresses.append("0.0.0.0")
-        else:
-            bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
-
     http_config = None
     if listener_type == "http":
         http_config = HttpListenerConfig(
@@ -1111,7 +1114,48 @@ def parse_listener_def(listener: Any) -> ListenerConfig:
             tag=listener.get("tag"),
         )
 
-    return ListenerConfig(port, bind_addresses, listener_type, tls, http_config)
+    port = listener.get("port")
+    path = listener.get("path")
+    if port is not None:
+        # TCP listener
+        if not isinstance(port, int):
+            raise ConfigError("Non-integer specified for 'port' in listener config")
+        if path is not None:
+            raise ConfigError("Both 'path' and 'port' in listener configuration")
+
+        tls = listener.get("tls", False)
+
+        bind_addresses = listener.get("bind_addresses", [])
+        bind_address = listener.get("bind_address")
+        # if bind_address was specified, add it to the list of addresses
+        if bind_address:
+            bind_addresses.append(bind_address)
+
+        # if we still have an empty list of addresses, use the default list
+        if not bind_addresses:
+            if listener_type == "metrics":
+                # the metrics listener doesn't support IPv6
+                bind_addresses.append("0.0.0.0")
+            else:
+                bind_addresses.extend(DEFAULT_BIND_ADDRESSES)
+
+        socket_options = TcpListenerConfig(
+            port, bind_addresses, tls
+        )  # type: Union[TcpListenerConfig, UnixListenerConfig]
+
+    elif path:
+        # UNIX socket listener
+        for key in ("tls", "bind_addresses", "bind_address"):
+            if key in listener:
+                raise ConfigError(
+                    "UNIX listener configuration contains '%s' option" % key
+                )
+        socket_options = UnixListenerConfig(path)
+
+    else:
+        raise ConfigError("Listener configuration is lacking a 'port' or 'path' option")
+
+    return ListenerConfig(listener_type, socket_options, http_config)
 
 
 NO_MORE_WEB_CLIENT_WARNING = """

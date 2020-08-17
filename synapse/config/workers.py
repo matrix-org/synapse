@@ -16,7 +16,7 @@
 import attr
 
 from ._base import Config, ConfigError, ShardedWorkerHandlingConfig
-from .server import ListenerConfig, parse_listener_def
+from .server import ListenerConfig, TcpListenerConfig, parse_listener_def
 
 
 @attr.s
@@ -81,7 +81,10 @@ class WorkerConfig(Config):
         if manhole:
             self.worker_listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    socket_options=TcpListenerConfig(
+                        port=manhole, bind_addresses=["127.0.0.1"]
+                    ),
+                    type="manhole",
                 )
             )
 

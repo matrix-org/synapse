@@ -49,7 +49,7 @@ from synapse.app import _base
 from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
-from synapse.config.server import ListenerConfig
+from synapse.config.server import ListenerConfig, TcpListenerConfig, UnixListenerConfig
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.http.additional_resource import AdditionalResource
 from synapse.http.server import (
@@ -92,12 +92,7 @@ class SynapseHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
 
     def _listener_http(self, config: HomeServerConfig, listener_config: ListenerConfig):
-        port = listener_config.port
-        bind_addresses = listener_config.bind_addresses
-        tls = listener_config.tls
-        site_tag = listener_config.http_options.tag
-        if site_tag is None:
-            site_tag = port
+        assert listener_config.http_options is not None
 
         # We always include a health resource.
         resources = {"/health": HealthResource()}
@@ -137,36 +132,46 @@ class SynapseHomeServer(HomeServer):
 
         root_resource = create_resource_tree(resources, root_resource)
 
-        if tls:
-            ports = listen_ssl(
-                bind_addresses,
-                port,
-                SynapseSite(
-                    "synapse.access.https.%s" % (site_tag,),
-                    site_tag,
-                    listener_config,
-                    root_resource,
-                    self.version_string,
-                ),
-                self.tls_server_context_factory,
-                reactor=self.get_reactor(),
-            )
-            logger.info("Synapse now listening on TCP port %d (TLS)", port)
+        socket_options = listener_config.socket_options
+        site_tag = listener_config.http_options.tag
+
+        if isinstance(socket_options, TcpListenerConfig):
+            port = socket_options.port
+            if site_tag is None:
+                site_tag = port
+            site_type = "https" if socket_options.tls else "http"
+        else:
+            assert isinstance(socket_options, UnixListenerConfig)
+            port = None
+            if site_tag is None:
+                site_tag = os.path.basename(socket_options.path)
+            site_type = "unix"
+
+        site = SynapseSite(
+            "synapse.access.%s.%s" % (site_type, site_tag),
+            site_tag,
+            listener_config,
+            root_resource,
+            self.version_string,
+        )
+
+        if port is not None:
+            if socket_options.tls:
+                ports = listen_ssl(
+                    socket_options,
+                    site,
+                    self.tls_server_context_factory,
+                    reactor=self.get_reactor(),
+                )
+                logger.info("Synapse now listening on TCP port %d (TLS)", port)
+
+            else:
+                ports = listen_tcp(socket_options, site, reactor=self.get_reactor())
+                logger.info("Synapse now listening on TCP port %d", port)
 
         else:
-            ports = listen_tcp(
-                bind_addresses,
-                port,
-                SynapseSite(
-                    "synapse.access.http.%s" % (site_tag,),
-                    site_tag,
-                    listener_config,
-                    root_resource,
-                    self.version_string,
-                ),
-                reactor=self.get_reactor(),
-            )
-            logger.info("Synapse now listening on TCP port %d", port)
+            ports = [self.get_reactor().listenUNIX(socket_options.path, site)]
+            logger.info("Synapse now listening on UNIX socket %s", socket_options.path)
 
         return ports
 
@@ -295,31 +300,37 @@ class SynapseHomeServer(HomeServer):
             if listener.type == "http":
                 self._listening_services.extend(self._listener_http(config, listener))
             elif listener.type == "manhole":
-                listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
-                )
+                if not isinstance(listener.socket_options, TcpListenerConfig):
+                    logger.warning("Manhole listener currently only supports TCP")
+                else:
+                    listen_tcp(
+                        listener.socket_options,
+                        manhole(
+                            username="matrix",
+                            password="rabbithole",
+                            globals={"hs": self},
+                        ),
+                    )
             elif listener.type == "replication":
+                if not isinstance(listener.socket_options, TcpListenerConfig):
+                    logger.error(
+                        "Replication configured to listen on a UNIX socket,"
+                        " but only TCP is supported"
+                    )
+                    # XXX: should we straight up bail here?
+                    continue
                 services = listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    ReplicationStreamProtocolFactory(self),
+                    listener.socket_options, ReplicationStreamProtocolFactory(self),
                 )
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener.type == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warning(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
+                        "Metrics listener configured, but enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(listener.bind_addresses, listener.port)
+                    _base.listen_metrics(listener.socket_options)
             else:
                 # this shouldn't happen, as the listener type should have been checked
                 # during parsing

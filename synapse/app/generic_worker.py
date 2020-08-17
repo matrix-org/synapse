@@ -16,6 +16,7 @@
 # limitations under the License.
 import contextlib
 import logging
+import os
 import sys
 from typing import Dict, Iterable, Optional, Set
 
@@ -37,7 +38,7 @@ from synapse.app import _base
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
-from synapse.config.server import ListenerConfig
+from synapse.config.server import ListenerConfig, TcpListenerConfig, UnixListenerConfig
 from synapse.federation import send_queue
 from synapse.federation.transport.server import TransportLayerServer
 from synapse.handlers.presence import (
@@ -486,14 +487,7 @@ class GenericWorkerServer(HomeServer):
     DATASTORE_CLASS = GenericWorkerSlavedStore
 
     def _listen_http(self, listener_config: ListenerConfig):
-        port = listener_config.port
-        bind_addresses = listener_config.bind_addresses
-
         assert listener_config.http_options is not None
-
-        site_tag = listener_config.http_options.tag
-        if site_tag is None:
-            site_tag = port
 
         # We always include a health resource.
         resources = {"/health": HealthResource()}
@@ -590,43 +584,60 @@ class GenericWorkerServer(HomeServer):
 
         root_resource = create_resource_tree(resources, OptionsResource())
 
-        _base.listen_tcp(
-            bind_addresses,
-            port,
-            SynapseSite(
-                "synapse.access.http.%s" % (site_tag,),
-                site_tag,
-                listener_config,
-                root_resource,
-                self.version_string,
-            ),
-            reactor=self.get_reactor(),
+        socket_options = listener_config.socket_options
+        site_tag = listener_config.http_options.tag
+
+        if isinstance(socket_options, TcpListenerConfig):
+            port = socket_options.port
+            if site_tag is None:
+                site_tag = port
+            site_type = "http"
+        else:
+            assert isinstance(socket_options, UnixListenerConfig)
+            port = None
+            socket_path = socket_options.path
+            if site_tag is None:
+                site_tag = os.path.basename(socket_path)
+            site_type = "unix"
+
+        site = SynapseSite(
+            "synapse.access.%s.%s" % (site_type, site_tag),
+            site_tag,
+            listener_config,
+            root_resource,
+            self.version_string,
         )
 
-        logger.info("Synapse worker now listening on port %d", port)
+        if port is not None:
+            _base.listen_tcp(socket_options, site, reactor=self.get_reactor())
+            logger.info("Synapse worker now listening on port %d", port)
+        else:
+            self.get_reactor().listenUNIX(socket_path, site)
+            logger.info("Synapse worker now listening on socket %s", socket_path)
 
     def start_listening(self, listeners: Iterable[ListenerConfig]):
         for listener in listeners:
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
-                _base.listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
-                )
+                if not isinstance(listener.socket_options, TcpListenerConfig):
+                    logger.warning("Manhole listener currently only supports TCP")
+                else:
+                    _base.listen_tcp(
+                        listener.socket_options,
+                        manhole(
+                            username="matrix",
+                            password="rabbithole",
+                            globals={"hs": self},
+                        ),
+                    )
             elif listener.type == "metrics":
                 if not self.get_config().enable_metrics:
                     logger.warning(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
+                        "Metrics listener configured, but enable_metrics is not True!"
                     )
                 else:
-                    _base.listen_metrics(listener.bind_addresses, listener.port)
+                    _base.listen_metrics(listener.socket_options)
             else:
                 logger.warning("Unsupported listener type: %s", listener.type)
 
