@@ -23,7 +23,7 @@ import urllib.parse
 from collections import OrderedDict
 from hashlib import sha256
 from textwrap import dedent
-from typing import Any, Callable, Dict, List, MutableMapping, Optional
+from typing import Any, Callable, List, MutableMapping, Optional
 
 import attr
 import jinja2
@@ -194,12 +194,9 @@ class Config(object):
             return file_stream.read()
 
     def read_templates(
-        self,
-        filenames: List[str],
-        custom_template_directory: Optional[str] = None,
-        filters: Dict[str, Callable] = {},
+        self, filenames: List[str], custom_template_directory: Optional[str] = None,
     ) -> List[jinja2.Template]:
-        """Load a list of template files from disk using the given variables and filters.
+        """Load a list of template files from disk using the given variables.
 
         This function will attempt to load the given templates from the default Synapse
         template directory. If `custom_template_directory` is supplied, that directory
@@ -212,9 +209,6 @@ class Config(object):
 
             custom_template_directory: A directory to try to look for the templates
                 before using the default Synapse template directory instead.
-
-            filters: Custom functions which can modify the given template variables upon
-                render, if the template file specifies them.
 
         Raises:
             ConfigError: if the file's path is incorrect or otherwise cannot be read.
@@ -241,8 +235,13 @@ class Config(object):
         loader = jinja2.FileSystemLoader(search_directories)
         env = jinja2.Environment(loader=loader, autoescape=True)
 
-        # Update the environment with any custom filters
-        env.filters.update(filters)
+        # Update the environment with our custom filters
+        env.filters.update(
+            {
+                "format_ts": format_ts_filter,
+                "mxc_to_http": create_mxc_to_http_filter(self.public_baseurl),
+            }
+        )
 
         for filename in filenames:
             # Load the template
