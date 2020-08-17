@@ -15,7 +15,7 @@
 import logging
 from typing import Dict, Set
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes, SynapseError

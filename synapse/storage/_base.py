@@ -19,8 +19,6 @@ import random
 from abc import ABCMeta
 from typing import Any, Optional
 
-from canonicaljson import json
-
 from synapse.storage.database import LoggingTransaction  # noqa: F401
 from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
 from synapse.storage.database import DatabasePool
