@@ -46,7 +46,7 @@ class UserSharedRoomsServlet(RestServlet):
                 errcode=Codes.FORBIDDEN,
             )
 
-        rooms = await self.store.get_rooms_in_common_for_users(
+        rooms = await self.store.get_shared_rooms_for_users(
             requester.user.to_string(), user_id
         )
 
