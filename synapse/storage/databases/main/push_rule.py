@@ -638,7 +638,7 @@ class PushRuleStore(PushRulesWorkerStore):
                 FOR KEY SHARE
             """
             txn.execute(sql, (user_id, rule_id))
-            if txn.rowcount() < 1:
+            if txn.fetchone():
                 # needed to set NOT_FOUND code.
                 raise NotFoundError("Push rule does not exist.")
 
