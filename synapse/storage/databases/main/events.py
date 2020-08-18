@@ -34,6 +34,7 @@ from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
 from synapse.storage.util.id_generators import StreamIdGenerator
 from synapse.types import StateMap, get_domain_from_id
+from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.iterutils import batch_iter
 
@@ -97,6 +98,7 @@ class PersistEventsStore:
         self.store = main_data_store
         self.database_engine = db.engine
         self._clock = hs.get_clock()
+        self._instance_name = hs.get_instance_name()
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
         self.is_mine_id = hs.is_mine_id
@@ -157,8 +159,8 @@ class PersistEventsStore:
                 len(events_and_contexts)
             )
         else:
-            stream_ordering_manager = self._stream_id_gen.get_next_mult(
-                len(events_and_contexts)
+            stream_ordering_manager = await maybe_awaitable(
+                self._stream_id_gen.get_next_mult(len(events_and_contexts))
             )
 
         with stream_ordering_manager as stream_orderings:
@@ -800,6 +802,7 @@ class PersistEventsStore:
             table="events",
             values=[
                 {
+                    "instance_name": self._instance_name,
                     "stream_ordering": event.internal_metadata.stream_ordering,
                     "topological_ordering": event.depth,
                     "depth": event.depth,
