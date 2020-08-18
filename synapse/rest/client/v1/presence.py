@@ -49,9 +49,7 @@ class PresenceStatusRestServlet(RestServlet):
                 raise AuthError(403, "You are not allowed to see their presence.")
 
         state = await self.presence_handler.get_state(target_user=user)
-        state = format_user_presence_state(
-            state, self.clock.time_msec(), include_user_id=False
-        )
+        state = format_user_presence_state(state, self.clock.time_msec())
 
         return 200, state
 
