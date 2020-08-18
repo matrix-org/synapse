@@ -43,7 +43,7 @@ class UserSharedRoomsServlet(RestServlet):
             raise SynapseError(
                 code=400,
                 msg="'user_id' must not be the authenticated user",
-                errcode=Codes.BAD_JSON,
+                errcode=Codes.FORBIDDEN,
             )
 
         rooms = await self.store.get_rooms_in_common_for_users(
