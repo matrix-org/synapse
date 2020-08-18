@@ -126,7 +126,7 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         events.append(self.get_success(store.get_event(valid_event_id)))
 
-        # Advance the time by anothe 2 days. After this, the first event should be
+        # Advance the time by another 2 days. After this, the first event should be
         # outdated but not the second one.
         self.reactor.advance(one_day_ms * 2 / 1000)
 
@@ -144,7 +144,9 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         # Get the create event to, later, check that we can still access it.
         message_handler = self.hs.get_message_handler()
         create_event = self.get_success(
-            message_handler.get_room_data(self.user_id, room_id, EventTypes.Create)
+            message_handler.get_room_data(
+                self.user_id, room_id, EventTypes.Create, state_key="", is_guest=False
+            )
         )
 
         # Send a first event to the room. This is the event we'll want to be purged at the

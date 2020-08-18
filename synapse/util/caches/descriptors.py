@@ -192,7 +192,7 @@ class Cache(object):
         callbacks = [callback] if callback else []
         self.check_thread()
         observable = ObservableDeferred(value, consumeErrors=True)
-        observer = defer.maybeDeferred(observable.observe)
+        observer = observable.observe()
         entry = CacheEntry(deferred=observable, callbacks=callbacks)
 
         existing_entry = self._pending_deferred_cache.pop(key, None)
@@ -516,7 +516,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
         """
         Args:
             orig (function)
-            cached_method_name (str): The name of the chached method.
+            cached_method_name (str): The name of the cached method.
             list_name (str): Name of the argument which is the bulk lookup list
             num_args (int): number of positional arguments (excluding ``self``,
                 but including list_name) to use as cache keys. Defaults to all

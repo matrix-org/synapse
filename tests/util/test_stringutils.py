@@ -28,9 +28,6 @@ class StringUtilsTestCase(unittest.TestCase):
             "_--something==_",
             "...--==-18913",
             "8Dj2odd-e9asd.cd==_--ddas-secret-",
-            # We temporarily allow : characters: https://github.com/matrix-org/synapse/issues/6766
-            # To be removed in a future release
-            "SECRET:1234567890",
         ]
 
         bad = [

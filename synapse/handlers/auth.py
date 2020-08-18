@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import logging
 import time
 import unicodedata
@@ -41,7 +42,6 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
-from synapse.push.mailer import load_jinja2_templates
 from synapse.types import Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.threepids import canonicalise_email
@@ -131,18 +131,17 @@ class AuthHandler(BaseHandler):
         # after the SSO completes and before redirecting them back to their client.
         # It notifies the user they are about to give access to their matrix account
         # to the client.
-        self._sso_redirect_confirm_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["sso_redirect_confirm.html"],
-        )[0]
+        self._sso_redirect_confirm_template = hs.config.sso_redirect_confirm_template
+
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
-        self._sso_auth_confirm_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["sso_auth_confirm.html"],
-        )[0]
+        self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
+
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
         self._sso_auth_success_template = hs.config.sso_auth_success_template
+
         # The following template is shown during the SSO authentication process if
         # the account is deactivated.
         self._sso_account_deactivated_template = (
@@ -161,7 +160,7 @@ class AuthHandler(BaseHandler):
         request_body: Dict[str, Any],
         clientip: str,
         description: str,
-    ) -> dict:
+    ) -> Tuple[dict, str]:
         """
         Checks that the user is who they claim to be, via a UI auth.
 
@@ -182,8 +181,13 @@ class AuthHandler(BaseHandler):
                          describes the operation happening on their account.
 
         Returns:
-            The parameters for this request (which may
+            A tuple of (params, session_id).
+
+                'params' contains the parameters for this request (which may
                 have been given only in a previous call).
+
+                'session_id' is the ID of this session, either passed in by the
+                client or assigned by this call
 
         Raises:
             InteractiveAuthIncompleteError if the client has not yet completed
@@ -206,7 +210,7 @@ class AuthHandler(BaseHandler):
         flows = [[login_type] for login_type in self._supported_ui_auth_types]
 
         try:
-            result, params, _ = await self.check_auth(
+            result, params, session_id = await self.check_ui_auth(
                 flows, request, request_body, clientip, description
             )
         except LoginError:
@@ -229,7 +233,7 @@ class AuthHandler(BaseHandler):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Invalid auth")
 
-        return params
+        return params, session_id
 
     def get_enabled_auth_types(self):
         """Return the enabled user-interactive authentication types
@@ -239,7 +243,7 @@ class AuthHandler(BaseHandler):
         """
         return self.checkers.keys()
 
-    async def check_auth(
+    async def check_ui_auth(
         self,
         flows: List[List[str]],
         request: SynapseRequest,
@@ -362,7 +366,7 @@ class AuthHandler(BaseHandler):
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session.session_id)
+                session.session_id, self._auth_dict_for_flows(flows, session.session_id)
             )
 
         # check auth type currently being presented
@@ -409,7 +413,7 @@ class AuthHandler(BaseHandler):
         ret = self._auth_dict_for_flows(flows, session.session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
-        raise InteractiveAuthIncompleteError(ret)
+        raise InteractiveAuthIncompleteError(session.session_id, ret)
 
     async def add_oob_auth(
         self, stagetype: str, authdict: Dict[str, Any], clientip: str
@@ -863,11 +867,15 @@ class AuthHandler(BaseHandler):
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
             if hasattr(provider, "on_logged_out"):
-                await provider.on_logged_out(
+                # This might return an awaitable, if it does block the log out
+                # until it completes.
+                result = provider.on_logged_out(
                     user_id=str(user_info["user"]),
                     device_id=user_info["device_id"],
                     access_token=access_token,
                 )
+                if inspect.isawaitable(result):
+                    await result
 
         # delete pushers associated with this access token
         if user_info["token_id"] is not None:

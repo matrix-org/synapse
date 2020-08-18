@@ -1,10 +1,12 @@
 - [Choosing your server name](#choosing-your-server-name)
+- [Picking a database engine](#picking-a-database-engine)
 - [Installing Synapse](#installing-synapse)
   - [Installing from source](#installing-from-source)
     - [Platform-Specific Instructions](#platform-specific-instructions)
   - [Prebuilt packages](#prebuilt-packages)
 - [Setting up Synapse](#setting-up-synapse)
   - [TLS certificates](#tls-certificates)
+  - [Client Well-Known URI](#client-well-known-uri)
   - [Email](#email)
   - [Registering a user](#registering-a-user)
   - [Setting up a TURN server](#setting-up-a-turn-server)
@@ -26,6 +28,25 @@ production-ready setup, you will probably want to specify your domain
 that your email address is probably `user@example.com` rather than
 `user@email.example.com`) - but doing so may require more advanced setup: see
 [Setting up Federation](docs/federate.md).
+
+# Picking a database engine
+
+Synapse offers two database engines:
+ * [PostgreSQL](https://www.postgresql.org)
+ * [SQLite](https://sqlite.org/)
+
+Almost all installations should opt to use PostgreSQL. Advantages include:
+
+* significant performance improvements due to the superior threading and
+  caching model, smarter query optimiser
+* allowing the DB to be run on separate hardware
+
+For information on how to install and use PostgreSQL, please see
+[docs/postgres.md](docs/postgres.md)
+
+By default Synapse uses SQLite and in doing so trades performance for convenience.
+SQLite is only recommended in Synapse for testing purposes or for servers with
+light workloads.
 
 # Installing Synapse
 
@@ -234,9 +255,9 @@ for a number of platforms.
 
 There is an offical synapse image available at
 https://hub.docker.com/r/matrixdotorg/synapse which can be used with
-the docker-compose file available at [contrib/docker](contrib/docker). Further information on
-this including configuration options is available in the README on
-hub.docker.com.
+the docker-compose file available at [contrib/docker](contrib/docker). Further
+information on this including configuration options is available in the README
+on hub.docker.com.
 
 Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
@@ -244,7 +265,8 @@ https://hub.docker.com/r/avhost/docker-matrix/tags/
 
 Slavi Pantaleev has created an Ansible playbook,
 which installs the offical Docker image of Matrix Synapse
-along with many other Matrix-related services (Postgres database, riot-web, coturn, mxisd, SSL support, etc.).
+along with many other Matrix-related services (Postgres database, Element, coturn,
+ma1sd, SSL support, etc.).
 For more details, see
 https://github.com/spantaleev/matrix-docker-ansible-deploy
 
@@ -277,22 +299,27 @@ The fingerprint of the repository signing key (as shown by `gpg
 /usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
 `AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058`.
 
-#### Downstream Debian/Ubuntu packages
+#### Downstream Debian packages
 
-For `buster` and `sid`, Synapse is available in the Debian repositories and
-it should be possible to install it with simply:
+We do not recommend using the packages from the default Debian `buster`
+repository at this time, as they are old and suffer from known security
+vulnerabilities. You can install the latest version of Synapse from
+[our repository](#matrixorg-packages) or from `buster-backports`. Please
+see the [Debian documentation](https://backports.debian.org/Instructions/)
+for information on how to use backports.
+
+If you are using Debian `sid` or testing, Synapse is available in the default
+repositories and it should be possible to install it simply with:
 
 ```
 sudo apt install matrix-synapse
 ```
 
-There is also a version of `matrix-synapse` in `stretch-backports`. Please see
-the [Debian documentation on
-backports](https://backports.debian.org/Instructions/) for information on how
-to use them.
+#### Downstream Ubuntu packages
 
-We do not recommend using the packages in downstream Ubuntu at this time, as
-they are old and suffer from known security vulnerabilities.
+We do not recommend using the packages in the default Ubuntu repository
+at this time, as they are old and suffer from known security vulnerabilities.
+The latest version of Synapse can be installed from [our repository](#matrixorg-packages).
 
 ### Fedora
 
@@ -405,13 +432,11 @@ so, you will need to edit `homeserver.yaml`, as follows:
   ```
 
 * You will also need to uncomment the `tls_certificate_path` and
-  `tls_private_key_path` lines under the `TLS` section. You can either
-  point these settings at an existing certificate and key, or you can
-  enable Synapse's built-in ACME (Let's Encrypt) support. Instructions
-  for having Synapse automatically provision and renew federation
-  certificates through ACME can be found at [ACME.md](docs/ACME.md).
-  Note that, as pointed out in that document, this feature will not
-  work with installs set up after November 2019.
+  `tls_private_key_path` lines under the `TLS` section. You will need to manage
+  provisioning of these certificates yourself — Synapse had built-in ACME
+  support, but the ACMEv1 protocol Synapse implements is deprecated, not
+  allowed by LetsEncrypt for new sites, and will break for existing sites in
+  late 2020. See [ACME.md](docs/ACME.md).
 
   If you are using your own certificate, be sure to use a `.pem` file that
   includes the full certificate chain including any intermediate certificates
@@ -421,6 +446,60 @@ so, you will need to edit `homeserver.yaml`, as follows:
 For a more detailed guide to configuring your server for federation, see
 [federate.md](docs/federate.md).
 
+## Client Well-Known URI
+
+Setting up the client Well-Known URI is optional but if you set it up, it will
+allow users to enter their full username (e.g. `@user:<server_name>`) into clients
+which support well-known lookup to automatically configure the homeserver and
+identity server URLs. This is useful so that users don't have to memorize or think
+about the actual homeserver URL you are using.
+
+The URL `https://<server_name>/.well-known/matrix/client` should return JSON in
+the following format.
+
+```
+{
+  "m.homeserver": {
+    "base_url": "https://<matrix.example.com>"
+  }
+}
+```
+
+It can optionally contain identity server information as well.
+
+```
+{
+  "m.homeserver": {
+    "base_url": "https://<matrix.example.com>"
+  },
+  "m.identity_server": {
+    "base_url": "https://<identity.example.com>"
+  }
+}
+```
+
+To work in browser based clients, the file must be served with the appropriate
+Cross-Origin Resource Sharing (CORS) headers. A recommended value would be
+`Access-Control-Allow-Origin: *` which would allow all browser based clients to
+view it.
+
+In nginx this would be something like:
+```
+location /.well-known/matrix/client {
+    return 200 '{"m.homeserver": {"base_url": "https://<matrix.example.com>"}}';
+    add_header Content-Type application/json;
+    add_header Access-Control-Allow-Origin *;
+}
+```
+
+You should also ensure the `public_baseurl` option in `homeserver.yaml` is set
+correctly. `public_baseurl` should be set to the URL that clients will use to
+connect to your server. This is the same URL you put for the `m.homeserver`
+`base_url` above.
+
+```
+public_baseurl: "https://<matrix.example.com>"
+```
 
 ## Email
 
@@ -439,7 +518,7 @@ email will be disabled.
 
 ## Registering a user
 
-The easiest way to create a new user is to do so from a client like [Riot](https://riot.im).
+The easiest way to create a new user is to do so from a client like [Element](https://element.io/).
 
 Alternatively you can do so from the command line if you have installed via pip.
 

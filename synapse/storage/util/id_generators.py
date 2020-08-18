@@ -20,7 +20,8 @@ from typing import Dict, Set, Tuple
 
 from typing_extensions import Deque
 
-from synapse.storage.database import Database, LoggingTransaction
+from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.util.sequence import PostgresSequenceGenerator
 
 
 class IdGenerator(object):
@@ -238,7 +239,7 @@ class MultiWriterIdGenerator:
     def __init__(
         self,
         db_conn,
-        db: Database,
+        db: DatabasePool,
         instance_name: str,
         table: str,
         instance_column: str,
@@ -247,7 +248,6 @@ class MultiWriterIdGenerator:
     ):
         self._db = db
         self._instance_name = instance_name
-        self._sequence_name = sequence_name
 
         # We lock as some functions may be called from DB threads.
         self._lock = threading.Lock()
@@ -259,6 +259,8 @@ class MultiWriterIdGenerator:
         # Set of local IDs that we're still processing. The current position
         # should be less than the minimum of this set (if not empty).
         self._unfinished_ids = set()  # type: Set[int]
+
+        self._sequence_gen = PostgresSequenceGenerator(sequence_name)
 
     def _load_current_ids(
         self, db_conn, table: str, instance_column: str, id_column: str
@@ -283,9 +285,7 @@ class MultiWriterIdGenerator:
         return current_positions
 
     def _load_next_id_txn(self, txn):
-        txn.execute("SELECT nextval(?)", (self._sequence_name,))
-        (next_id,) = txn.fetchone()
-        return next_id
+        return self._sequence_gen.get_next_id_txn(txn)
 
     async def get_next(self):
         """

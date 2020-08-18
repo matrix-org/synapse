@@ -109,7 +109,7 @@ class InitialSyncHandler(BaseHandler):
 
         rooms_ret = []
 
-        now_token = await self.hs.get_event_sources().get_current_token()
+        now_token = self.hs.get_event_sources().get_current_token()
 
         presence_stream = self.hs.get_event_sources().sources["presence"]
         pagination_config = PaginationConfig(from_token=now_token)
@@ -360,7 +360,7 @@ class InitialSyncHandler(BaseHandler):
             current_state.values(), time_now
         )
 
-        now_token = await self.hs.get_event_sources().get_current_token()
+        now_token = self.hs.get_event_sources().get_current_token()
 
         limit = pagin_config.limit if pagin_config else None
         if limit is None:

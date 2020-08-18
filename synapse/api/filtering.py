@@ -21,11 +21,9 @@ import jsonschema
 from canonicaljson import json
 from jsonschema import FormatChecker
 
-from twisted.internet import defer
-
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
-from synapse.storage.presence import UserPresenceState
+from synapse.api.presence import UserPresenceState
 from synapse.types import RoomID, UserID
 
 FILTER_SCHEMA = {
@@ -137,9 +135,8 @@ class Filtering(object):
         super(Filtering, self).__init__()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def get_user_filter(self, user_localpart, filter_id):
-        result = yield self.store.get_user_filter(user_localpart, filter_id)
+    async def get_user_filter(self, user_localpart, filter_id):
+        result = await self.store.get_user_filter(user_localpart, filter_id)
         return FilterCollection(result)
 
     def add_user_filter(self, user_localpart, user_filter):

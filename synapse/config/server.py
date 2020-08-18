@@ -23,11 +23,9 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import attr
 import yaml
-from netaddr import IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
-from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -136,11 +134,6 @@ class ServerConfig(Config):
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
         self.public_baseurl = config.get("public_baseurl")
 
-        # Whether to send federation traffic out in this process. This only
-        # applies to some federation traffic, and so shouldn't be used to
-        # "disable" federation
-        self.send_federation = config.get("send_federation", True)
-
         # Whether to enable user presence.
         self.use_presence = config.get("use_presence", True)
 
@@ -213,7 +206,7 @@ class ServerConfig(Config):
         # errors when attempting to search for messages.
         self.enable_search = config.get("enable_search", True)
 
-        self.filter_timeline_limit = config.get("filter_timeline_limit", -1)
+        self.filter_timeline_limit = config.get("filter_timeline_limit", 100)
 
         # Whether we should block invites sent to users on this server
         # (other than those sent by local server admins)
@@ -262,34 +255,6 @@ class ServerConfig(Config):
         # Admin uri to direct users at should their instance become blocked
         # due to resource constraints
         self.admin_contact = config.get("admin_contact", None)
-
-        # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None  # type: Optional[dict]
-        federation_domain_whitelist = config.get("federation_domain_whitelist", None)
-
-        if federation_domain_whitelist is not None:
-            # turn the whitelist into a hash for speed of lookup
-            self.federation_domain_whitelist = {}
-
-            for domain in federation_domain_whitelist:
-                self.federation_domain_whitelist[domain] = True
-
-        self.federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", []
-        )
-
-        # Attempt to create an IPSet from the given ranges
-        try:
-            self.federation_ip_range_blacklist = IPSet(
-                self.federation_ip_range_blacklist
-            )
-
-            # Always blacklist 0.0.0.0, ::
-            self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
-        except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
-            )
 
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != "/":
@@ -473,6 +438,9 @@ class ServerConfig(Config):
                 validator=attr.validators.instance_of(str),
                 default=ROOM_COMPLEXITY_TOO_GREAT,
             )
+            admins_can_join = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
             **(config.get("limit_remote_rooms") or {})
@@ -539,8 +507,6 @@ class ServerConfig(Config):
                 )
             )
 
-        _check_resource_config(self.listeners)
-
         self.cleanup_extremities_with_dummy_events = config.get(
             "cleanup_extremities_with_dummy_events", True
         )
@@ -560,6 +526,21 @@ class ServerConfig(Config):
         self.request_token_inhibit_3pid_errors = config.get(
             "request_token_inhibit_3pid_errors", False,
         )
+
+        # List of users trialing the new experimental default push rules. This setting is
+        # not included in the sample configuration file on purpose as it's a temporary
+        # hack, so that some users can trial the new defaults without impacting every
+        # user on the homeserver.
+        users_new_default_push_rules = (
+            config.get("users_new_default_push_rules") or []
+        )  # type: list
+        if not isinstance(users_new_default_push_rules, list):
+            raise ConfigError("'users_new_default_push_rules' must be a list")
+
+        # Turn the list into a set to improve lookup speed.
+        self.users_new_default_push_rules = set(
+            users_new_default_push_rules
+        )  # type: set
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
@@ -727,7 +708,9 @@ class ServerConfig(Config):
         #gc_thresholds: [700, 10, 10]
 
         # Set the limit on the returned events in the timeline in the get
-        # and sync operations. The default value is -1, means no upper limit.
+        # and sync operations. The default value is 100. -1 means no upper limit.
+        #
+        # Uncomment the following to increase the limit to 5000.
         #
         #filter_timeline_limit: 5000
 
@@ -742,38 +725,6 @@ class ServerConfig(Config):
         # will receive errors when searching for messages. Defaults to enabled.
         #
         #enable_search: false
-
-        # Restrict federation to the following whitelist of domains.
-        # N.B. we recommend also firewalling your federation listener to limit
-        # inbound federation traffic as early as possible, rather than relying
-        # purely on this application-layer restriction.  If not specified, the
-        # default is to whitelist everything.
-        #
-        #federation_domain_whitelist:
-        #  - lon.example.com
-        #  - nyc.example.com
-        #  - syd.example.com
-
-        # Prevent federation requests from being sent to the following
-        # blacklist IP address CIDR ranges. If this option is not specified, or
-        # specified with an empty list, no ip range blacklist will be enforced.
-        #
-        # As of Synapse v1.4.0 this option also affects any outbound requests to identity
-        # servers provided by user input.
-        #
-        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-        # listed here, since they correspond to unroutable addresses.)
-        #
-        federation_ip_range_blacklist:
-          - '127.0.0.0/8'
-          - '10.0.0.0/8'
-          - '172.16.0.0/12'
-          - '192.168.0.0/16'
-          - '100.64.0.0/10'
-          - '169.254.0.0/16'
-          - '::1/128'
-          - 'fe80::/64'
-          - 'fc00::/7'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
@@ -803,7 +754,7 @@ class ServerConfig(Config):
         #       names: a list of names of HTTP resources. See below for a list of
         #           valid resource names.
         #
-        #       compress: set to true to enable HTTP comression for this resource.
+        #       compress: set to true to enable HTTP compression for this resource.
         #
         #   additional_resources: Only valid for an 'http' listener. A map of
         #        additional endpoints which should be loaded via dynamic modules.
@@ -956,6 +907,10 @@ class ServerConfig(Config):
           # override the error which is returned when the room is too complex.
           #
           #complexity_error: "This room is too complex."
+
+          # allow server admins to join complex rooms. Default is false.
+          #
+          #admins_can_join: true
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.
@@ -1175,20 +1130,3 @@ def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
                 if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
-
-
-def _check_resource_config(listeners: Iterable[ListenerConfig]) -> None:
-    resource_names = {
-        res_name
-        for listener in listeners
-        if listener.http_options
-        for res in listener.http_options.resources
-        for res_name in res.names
-    }
-
-    for resource in resource_names:
-        if resource == "consent":
-            try:
-                check_requirements("resources.consent")
-            except DependencyException as e:
-                raise ConfigError(e.message)

@@ -15,8 +15,6 @@
 
 import logging
 
-from twisted.internet import defer
-
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -54,16 +52,15 @@ class BaseProfileHandler(BaseHandler):
 
         self.user_directory_handler = hs.get_user_directory_handler()
 
-    @defer.inlineCallbacks
-    def get_profile(self, user_id):
+    async def get_profile(self, user_id):
         target_user = UserID.from_string(user_id)
 
         if self.hs.is_mine(target_user):
             try:
-                displayname = yield self.store.get_profile_displayname(
+                displayname = await self.store.get_profile_displayname(
                     target_user.localpart
                 )
-                avatar_url = yield self.store.get_profile_avatar_url(
+                avatar_url = await self.store.get_profile_avatar_url(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -74,7 +71,7 @@ class BaseProfileHandler(BaseHandler):
             return {"displayname": displayname, "avatar_url": avatar_url}
         else:
             try:
-                result = yield self.federation.make_query(
+                result = await self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": user_id},
@@ -86,8 +83,7 @@ class BaseProfileHandler(BaseHandler):
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-    @defer.inlineCallbacks
-    def get_profile_from_cache(self, user_id):
+    async def get_profile_from_cache(self, user_id):
         """Get the profile information from our local cache. If the user is
         ours then the profile information will always be corect. Otherwise,
         it may be out of date/missing.
@@ -95,10 +91,10 @@ class BaseProfileHandler(BaseHandler):
         target_user = UserID.from_string(user_id)
         if self.hs.is_mine(target_user):
             try:
-                displayname = yield self.store.get_profile_displayname(
+                displayname = await self.store.get_profile_displayname(
                     target_user.localpart
                 )
-                avatar_url = yield self.store.get_profile_avatar_url(
+                avatar_url = await self.store.get_profile_avatar_url(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -108,14 +104,13 @@ class BaseProfileHandler(BaseHandler):
 
             return {"displayname": displayname, "avatar_url": avatar_url}
         else:
-            profile = yield self.store.get_from_remote_profile_cache(user_id)
+            profile = await self.store.get_from_remote_profile_cache(user_id)
             return profile or {}
 
-    @defer.inlineCallbacks
-    def get_displayname(self, target_user):
+    async def get_displayname(self, target_user):
         if self.hs.is_mine(target_user):
             try:
-                displayname = yield self.store.get_profile_displayname(
+                displayname = await self.store.get_profile_displayname(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -126,7 +121,7 @@ class BaseProfileHandler(BaseHandler):
             return displayname
         else:
             try:
-                result = yield self.federation.make_query(
+                result = await self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": target_user.to_string(), "field": "displayname"},
@@ -189,11 +184,10 @@ class BaseProfileHandler(BaseHandler):
 
         await self._update_join_states(requester, target_user)
 
-    @defer.inlineCallbacks
-    def get_avatar_url(self, target_user):
+    async def get_avatar_url(self, target_user):
         if self.hs.is_mine(target_user):
             try:
-                avatar_url = yield self.store.get_profile_avatar_url(
+                avatar_url = await self.store.get_profile_avatar_url(
                     target_user.localpart
                 )
             except StoreError as e:
@@ -203,7 +197,7 @@ class BaseProfileHandler(BaseHandler):
             return avatar_url
         else:
             try:
-                result = yield self.federation.make_query(
+                result = await self.federation.make_query(
                     destination=target_user.domain,
                     query_type="profile",
                     args={"user_id": target_user.to_string(), "field": "avatar_url"},
@@ -253,8 +247,7 @@ class BaseProfileHandler(BaseHandler):
 
         await self._update_join_states(requester, target_user)
 
-    @defer.inlineCallbacks
-    def on_profile_query(self, args):
+    async def on_profile_query(self, args):
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this homeserver")
@@ -264,12 +257,12 @@ class BaseProfileHandler(BaseHandler):
         response = {}
         try:
             if just_field is None or just_field == "displayname":
-                response["displayname"] = yield self.store.get_profile_displayname(
+                response["displayname"] = await self.store.get_profile_displayname(
                     user.localpart
                 )
 
             if just_field is None or just_field == "avatar_url":
-                response["avatar_url"] = yield self.store.get_profile_avatar_url(
+                response["avatar_url"] = await self.store.get_profile_avatar_url(
                     user.localpart
                 )
         except StoreError as e:
@@ -304,8 +297,7 @@ class BaseProfileHandler(BaseHandler):
                     "Failed to update join event for room %s - %s", room_id, str(e)
                 )
 
-    @defer.inlineCallbacks
-    def check_profile_query_allowed(self, target_user, requester=None):
+    async def check_profile_query_allowed(self, target_user, requester=None):
         """Checks whether a profile query is allowed. If the
         'require_auth_for_profile_requests' config flag is set to True and a
         'requester' is provided, the query is only allowed if the two users
@@ -337,8 +329,8 @@ class BaseProfileHandler(BaseHandler):
             return
 
         try:
-            requester_rooms = yield self.store.get_rooms_for_user(requester.to_string())
-            target_user_rooms = yield self.store.get_rooms_for_user(
+            requester_rooms = await self.store.get_rooms_for_user(requester.to_string())
+            target_user_rooms = await self.store.get_rooms_for_user(
                 target_user.to_string()
             )
 
@@ -371,25 +363,24 @@ class MasterProfileHandler(BaseProfileHandler):
             "Update remote profile", self._update_remote_profile_cache
         )
 
-    @defer.inlineCallbacks
-    def _update_remote_profile_cache(self):
+    async def _update_remote_profile_cache(self):
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
         """
-        entries = yield self.store.get_remote_profile_cache_entries_that_expire(
+        entries = await self.store.get_remote_profile_cache_entries_that_expire(
             last_checked=self.clock.time_msec() - self.PROFILE_UPDATE_EVERY_MS
         )
 
         for user_id, displayname, avatar_url in entries:
-            is_subscribed = yield self.store.is_subscribed_remote_profile_for_user(
+            is_subscribed = await self.store.is_subscribed_remote_profile_for_user(
                 user_id
             )
             if not is_subscribed:
-                yield self.store.maybe_delete_remote_profile_cache(user_id)
+                await self.store.maybe_delete_remote_profile_cache(user_id)
                 continue
 
             try:
-                profile = yield self.federation.make_query(
+                profile = await self.federation.make_query(
                     destination=get_domain_from_id(user_id),
                     query_type="profile",
                     args={"user_id": user_id},
@@ -398,7 +389,7 @@ class MasterProfileHandler(BaseProfileHandler):
             except Exception:
                 logger.exception("Failed to get avatar_url")
 
-                yield self.store.update_remote_profile_cache(
+                await self.store.update_remote_profile_cache(
                     user_id, displayname, avatar_url
                 )
                 continue
@@ -407,4 +398,4 @@ class MasterProfileHandler(BaseProfileHandler):
             new_avatar = profile.get("avatar_url")
 
             # We always hit update to update the last_check timestamp
-            yield self.store.update_remote_profile_cache(user_id, new_name, new_avatar)
+            await self.store.update_remote_profile_cache(user_id, new_name, new_avatar)

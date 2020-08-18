@@ -72,7 +72,7 @@ class AdminHandler(BaseHandler):
             writer (ExfiltrationWriter)
 
         Returns:
-            defer.Deferred: Resolves when all data for a user has been written.
+            Resolves when all data for a user has been written.
             The returned value is that returned by `writer.finished()`.
         """
         # Get all rooms the user is in or has been in

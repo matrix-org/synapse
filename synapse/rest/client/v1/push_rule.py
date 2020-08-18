@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from synapse.api.errors import (
     NotFoundError,
     StoreError,
@@ -23,7 +24,7 @@ from synapse.http.servlet import (
     parse_json_value_from_request,
     parse_string,
 )
-from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.baserules import BASE_RULE_IDS, NEW_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -42,6 +43,8 @@ class PushRuleRestServlet(RestServlet):
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None
+
+        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
 
     async def on_PUT(self, request, path):
         if self._is_worker:
@@ -159,7 +162,7 @@ class PushRuleRestServlet(RestServlet):
         stream_id, _ = self.store.get_push_rules_stream_token()
         self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
-    def set_rule_attr(self, user_id, spec, val):
+    async def set_rule_attr(self, user_id, spec, val):
         if spec["attr"] not in ("enabled", "actions"):
             # for the sake of potential future expansion, shouldn't report
             # 404 in the case of an unknown request so check it corresponds to
@@ -172,7 +175,6 @@ class PushRuleRestServlet(RestServlet):
         if is_default_rule:
             if namespaced_rule_id not in BASE_RULE_IDS:
                 raise NotFoundError("Unknown rule %s" % (namespaced_rule_id,))
-
         if spec["attr"] == "enabled":
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
@@ -181,13 +183,24 @@ class PushRuleRestServlet(RestServlet):
                 # This should *actually* take a dict, but many clients pass
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
-            return self.store.set_push_rule_enabled(
+            return await self.store.set_push_rule_enabled(
                 user_id, namespaced_rule_id, val, is_default_rule
             )
         elif spec["attr"] == "actions":
             actions = val.get("actions")
             _check_actions(actions)
-            return self.store.set_push_rule_actions(
+            namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
+            rule_id = spec["rule_id"]
+            is_default_rule = rule_id.startswith(".")
+            if is_default_rule:
+                if user_id in self._users_new_default_push_rules:
+                    rule_ids = NEW_RULE_IDS
+                else:
+                    rule_ids = BASE_RULE_IDS
+
+                if namespaced_rule_id not in rule_ids:
+                    raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
+            return await self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:
