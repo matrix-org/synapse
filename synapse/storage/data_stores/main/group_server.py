@@ -1011,6 +1011,14 @@ class GroupServerStore(GroupServerWorkerStore):
             "remove_user_from_group", _remove_user_from_group_txn
         )
 
+    def change_user_admin_in_group(self, group_id, user_id, is_admin):
+        return self.db_pool.simple_update(
+            table="group_users",
+            keyvalues={"group_id": group_id, "user_id": user_id},
+            updatevalues={"is_admin": is_admin},
+            desc="change_user_admin_in_group"
+        )
+
     def add_room_to_group(self, group_id, room_id, is_public):
         return self.db.simple_insert(
             table="group_rooms",

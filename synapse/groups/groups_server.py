@@ -721,6 +721,27 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         raise NotImplementedError()
 
+    async def change_user_admin_in_group(
+        self, group_id, user_id, want_admin, requester_user_id, content
+    ):
+        """Promotes or demotes a user in a group.
+        """
+
+        await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
+
+        if requester_user_id == user_id:
+            raise SynapseError(400, "User cannot target themselves")
+
+        is_admin = await self.store.is_user_admin_in_group(
+            group_id, requester_user_id
+        )
+        if not is_admin:
+            raise SynapseError(403, "User is not admin in group")
+
+        await self.store.change_user_admin_in_group(group_id, user_id, want_admin)
+
+        return {}
+
     async def remove_user_from_group(
         self, group_id, user_id, requester_user_id, content
     ):

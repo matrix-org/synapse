@@ -470,6 +470,25 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
 
         return {"state": "invite", "user_profile": user_profile}
 
+    async def change_user_admin_in_group(
+        self, group_id, user_id, want_admin, requester_user_id, content
+    ):
+        """Promotes or demotes a user in a group.
+        """
+
+        if not self.is_mine_id(user_id):
+            raise SynapseError(400, "User not on this server")
+
+        # TODO: We should probably support federation, but this is fine for now
+        if not self.is_mine_id(group_id):
+            raise SynapseError(400, "Group not on this server")
+
+        res = await self.groups_server_handler.change_user_admin_in_group(
+            group_id, user_id, want_admin, requester_user_id, content
+        )
+
+        return res
+
     async def remove_user_from_group(
         self, group_id, user_id, requester_user_id, content
     ):
