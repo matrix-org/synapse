@@ -16,7 +16,7 @@
 import abc
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
 from unpaddedbase64 import encode_base64
 
@@ -782,7 +782,7 @@ class RoomMemberHandler(object):
         requester: Requester,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> Union[int, EventBase]:
+    ) -> int:
         if self.config.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
@@ -816,7 +816,7 @@ class RoomMemberHandler(object):
         if invitee:
             _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
-            )  # type: Tuple[Any, Union[int, EventBase]]  # type: ignore
+            )
         else:
             stream_id = await self._make_and_store_3pid_invite(
                 requester,
@@ -841,7 +841,7 @@ class RoomMemberHandler(object):
         user: UserID,
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
-    ) -> Union[int, EventBase]:
+    ) -> int:
         room_state = await self.state_handler.get_current_state(room_id)
 
         inviter_display_name = ""
