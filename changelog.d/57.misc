@@ -1,0 +1,1 @@
+Add user_id back to presence in worker too https://github.com/matrix-org/synapse/commit/0bbbd10513008d30c17eb1d1e7ba1d091fb44ec7 .

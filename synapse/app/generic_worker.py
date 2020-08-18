@@ -156,7 +156,7 @@ class PresenceStatusStubServlet(RestServlet):
 
     async def on_GET(self, request, user_id):
         await self.auth.get_user_by_req(request)
-        return 200, {"presence": "offline"}
+        return 200, {"presence": "offline", "user_id": user_id}
 
     async def on_PUT(self, request, user_id):
         await self.auth.get_user_by_req(request)
