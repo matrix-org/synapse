@@ -548,6 +548,31 @@ class GroupAdminUsersKickServlet(RestServlet):
 
         return 200, result
 
+class GroupAdminChangeAdminServlet(RestServlet):
+    """Promote or demote a user in the group
+    """
+
+    PATTERNS = client_patterns(
+        "/groups/(?P<group_id>[^/]*)/admin/users/admins/(?P<user_id>[^/]*)$"
+    )
+
+    def __init__(self, hs):
+        super(GroupAdminChangeAdminServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.groups_handler = hs.get_groups_local_handler()
+
+    async def on_POST(self, request, group_id, user_id):
+        requester = await self.auth.get_user_by_req(request)
+        requester_user_id = requester.user.to_string()
+
+        content = parse_json_object_from_request(request)
+        want_admin = content["is_admin"]
+        result = await self.groups_handler.change_user_admin_in_group(
+            group_id, user_id, want_admin, requester_user_id, content
+        )
+
+        return 200, result
 
 class GroupSelfLeaveServlet(RestServlet):
     """Leave a joined group
@@ -722,6 +747,7 @@ def register_servlets(hs, http_server):
     GroupAdminRoomsConfigServlet(hs).register(http_server)
     GroupAdminUsersInviteServlet(hs).register(http_server)
     GroupAdminUsersKickServlet(hs).register(http_server)
+    GroupAdminChangeAdminServlet(hs).register(http_server)
     GroupSelfLeaveServlet(hs).register(http_server)
     GroupSelfJoinServlet(hs).register(http_server)
     GroupSelfAcceptInviteServlet(hs).register(http_server)
