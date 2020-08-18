@@ -1,3 +1,17 @@
+For the next release
+====================
+
+Removal warning
+---------------
+
+Some older clients used a
+[disallowed character](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken)
+(`:`) in the `client_secret` parameter of various endpoints. The incorrect
+behaviour was allowed for backwards compatibility, but is now being removed
+from Synapse as most users have updated their client. Further context can be
+found at [\#6766](https://github.com/matrix-org/synapse/issues/6766).
+
+
 Synapse 1.19.0 (2020-08-17)
 ===========================
 
