@@ -19,7 +19,7 @@ import itertools
 import logging
 import threading
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Tuple, overload
+from typing import Collection, Dict, Iterable, List, Optional, Tuple, overload
 
 from constantly import NamedConstant, Names
 from typing_extensions import Literal
@@ -258,11 +258,11 @@ class EventsWorkerStore(SQLBaseStore):
 
     async def get_events_as_list(
         self,
-        event_ids: Iterable[str],
+        event_ids: Collection[str],
         redact_behaviour: EventRedactBehaviour = EventRedactBehaviour.REDACT,
         get_prev_content: bool = False,
         allow_rejected: bool = False,
-    ):
+    ) -> List[EventBase]:
         """Get events from the database and return in a list in the same order
         as given by `event_ids` arg.
 
@@ -283,8 +283,8 @@ class EventsWorkerStore(SQLBaseStore):
                 omits rejected events from the response.
 
         Returns:
-            list[EventBase]: List of events fetched from the database. The
-            events are in the same order as `event_ids` arg.
+            List of events fetched from the database. The events are in the same
+            order as `event_ids` arg.
 
             Note that the returned list may be smaller than the list of event
             IDs if not all events could be fetched.
