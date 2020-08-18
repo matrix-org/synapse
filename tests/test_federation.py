@@ -42,7 +42,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         )
 
         user_id = UserID("us", "test")
-        our_user = Requester(user_id, None, False, None, None)
+        our_user = Requester(user_id, None, False, False, None, None)
         room_creator = self.homeserver.get_room_creation_handler()
         room_deferred = ensureDeferred(
             room_creator.create_room(

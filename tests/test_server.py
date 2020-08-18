@@ -178,7 +178,6 @@ class JsonResourceTests(unittest.TestCase):
 
         self.assertEqual(channel.result["code"], b"200")
         self.assertNotIn("body", channel.result)
-        self.assertEqual(channel.headers.getRawHeaders(b"Content-Length"), [b"15"])
 
 
 class OptionsResourceTests(unittest.TestCase):

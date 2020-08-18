@@ -250,7 +250,11 @@ class HomeserverTestCase(TestCase):
 
                 async def get_user_by_req(request, allow_guest=False, rights="access"):
                     return create_requester(
-                        UserID.from_string(self.helper.auth_user_id), 1, False, None
+                        UserID.from_string(self.helper.auth_user_id),
+                        1,
+                        False,
+                        False,
+                        None,
                     )
 
                 self.hs.get_auth().get_user_by_req = get_user_by_req
@@ -540,7 +544,7 @@ class HomeserverTestCase(TestCase):
         """
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, False, None, None)
 
         event, context = self.get_success(
             event_creator.create_event(

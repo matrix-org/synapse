@@ -1,11 +1,30 @@
-Synapse 1.19.0rc1 (2020-08-13)
-==============================
+For the next release
+====================
+
+Removal warning
+---------------
+
+Some older clients used a
+[disallowed character](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-register-email-requesttoken)
+(`:`) in the `client_secret` parameter of various endpoints. The incorrect
+behaviour was allowed for backwards compatibility, but is now being removed
+from Synapse as most users have updated their client. Further context can be
+found at [\#6766](https://github.com/matrix-org/synapse/issues/6766).
+
+
+Synapse 1.19.0 (2020-08-17)
+===========================
+
+No significant changes since 1.19.0rc1.
 
 Removal warning
 ---------------
 
 As outlined in the [previous release](https://github.com/matrix-org/synapse/releases/tag/v1.18.0), we are no longer publishing Docker images with the `-py3` tag suffix. On top of that, we have also removed the `latest-py3` tag. Please see [the announcement in the upgrade notes for 1.18.0](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#upgrading-to-v1180).
 
+
+Synapse 1.19.0rc1 (2020-08-13)
+==============================
 
 Features
 --------
