@@ -614,6 +614,16 @@ class PushRuleStore(PushRulesWorkerStore):
                 },
             )
 
+        # ensure we have a push_rules_enable row
+        # enabledness defaults to true
+        sql = """
+            INSERT INTO push_rules_enable (id, user_name, rule_id, enabled)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT DO NOTHING
+        """
+        new_enable_id = self._push_rules_enable_id_gen.get_next()
+        txn.execute(sql, (new_enable_id, user_id, rule_id, True))
+
     @defer.inlineCallbacks
     def delete_push_rule(self, user_id, rule_id):
         """
