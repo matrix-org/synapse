@@ -695,7 +695,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             user_id,
             other_user_id,
             user_id,
-            other_user_id
+            other_user_id,
         )
         return list({row[0] for row in rows})
 
