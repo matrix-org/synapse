@@ -14,20 +14,18 @@
 # limitations under the License.
 
 import contextlib
+import inspect
 import logging
 import os
 import shutil
-import sys
+from typing import Optional
 
-import six
-
-from twisted.internet import defer
 from twisted.protocols.basic import FileSender
 
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
 from synapse.util.file_consumer import BackgroundFileConsumer
 
-from ._base import Responder
+from ._base import FileInfo, Responder
 
 logger = logging.getLogger(__name__)
 
@@ -49,25 +47,24 @@ class MediaStorage(object):
         self.filepaths = filepaths
         self.storage_providers = storage_providers
 
-    @defer.inlineCallbacks
-    def store_file(self, source, file_info):
+    async def store_file(self, source, file_info: FileInfo) -> str:
         """Write `source` to the on disk media store, and also any other
         configured storage providers
 
         Args:
             source: A file like object that should be written
-            file_info (FileInfo): Info about the file to store
+            file_info: Info about the file to store
 
         Returns:
-            Deferred[str]: the file path written to in the primary media store
+            the file path written to in the primary media store
         """
 
         with self.store_into_file(file_info) as (f, fname, finish_cb):
             # Write to the main repository
-            yield defer_to_thread(
+            await defer_to_thread(
                 self.hs.get_reactor(), _write_file_synchronously, source, f
             )
-            yield finish_cb()
+            await finish_cb()
 
         return fname
 
@@ -78,7 +75,7 @@ class MediaStorage(object):
 
         Actually yields a 3-tuple (file, fname, finish_cb), where file is a file
         like object that can be written to, fname is the absolute path of file
-        on disk, and finish_cb is a function that returns a Deferred.
+        on disk, and finish_cb is a function that returns an awaitable.
 
         fname can be used to read the contents from after upload, e.g. to
         generate thumbnails.
@@ -94,7 +91,7 @@ class MediaStorage(object):
 
             with media_storage.store_into_file(info) as (f, fname, finish_cb):
                 # .. write into f ...
-                yield finish_cb()
+                await finish_cb()
         """
 
         path = self._file_info_to_path(file_info)
@@ -106,10 +103,13 @@ class MediaStorage(object):
 
         finished_called = [False]
 
-        @defer.inlineCallbacks
-        def finish():
+        async def finish():
             for provider in self.storage_providers:
-                yield provider.store_file(path, file_info)
+                # store_file is supposed to return an Awaitable, but guard
+                # against improper implementations.
+                result = provider.store_file(path, file_info)
+                if inspect.isawaitable(result):
+                    await result
 
             finished_called[0] = True
 
@@ -117,27 +117,24 @@ class MediaStorage(object):
             with open(fname, "wb") as f:
                 yield f, fname, finish
         except Exception:
-            t, v, tb = sys.exc_info()
             try:
                 os.remove(fname)
             except Exception:
                 pass
-            six.reraise(t, v, tb)
+            raise
 
         if not finished_called:
             raise Exception("Finished callback not called")
 
-    @defer.inlineCallbacks
-    def fetch_media(self, file_info):
+    async def fetch_media(self, file_info: FileInfo) -> Optional[Responder]:
         """Attempts to fetch media described by file_info from the local cache
         and configured storage providers.
 
         Args:
-            file_info (FileInfo)
+            file_info
 
         Returns:
-            Deferred[Responder|None]: Returns a Responder if the file was found,
-                otherwise None.
+            Returns a Responder if the file was found, otherwise None.
         """
 
         path = self._file_info_to_path(file_info)
@@ -146,23 +143,26 @@ class MediaStorage(object):
             return FileResponder(open(local_path, "rb"))
 
         for provider in self.storage_providers:
-            res = yield provider.fetch(path, file_info)
+            res = provider.fetch(path, file_info)
+            # Fetch is supposed to return an Awaitable, but guard against
+            # improper implementations.
+            if inspect.isawaitable(res):
+                res = await res
             if res:
                 logger.debug("Streaming %s from %s", path, provider)
                 return res
 
         return None
 
-    @defer.inlineCallbacks
-    def ensure_media_is_in_local_cache(self, file_info):
+    async def ensure_media_is_in_local_cache(self, file_info: FileInfo) -> str:
         """Ensures that the given file is in the local cache. Attempts to
         download it from storage providers if it isn't.
 
         Args:
-            file_info (FileInfo)
+            file_info
 
         Returns:
-            Deferred[str]: Full path to local file
+            Full path to local file
         """
         path = self._file_info_to_path(file_info)
         local_path = os.path.join(self.local_media_directory, path)
@@ -174,14 +174,18 @@ class MediaStorage(object):
             os.makedirs(dirname)
 
         for provider in self.storage_providers:
-            res = yield provider.fetch(path, file_info)
+            res = provider.fetch(path, file_info)
+            # Fetch is supposed to return an Awaitable, but guard against
+            # improper implementations.
+            if inspect.isawaitable(res):
+                res = await res
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(
                         open(local_path, "wb"), self.hs.get_reactor()
                     )
-                    yield res.write_to_consumer(consumer)
-                    yield consumer.wait()
+                    await res.write_to_consumer(consumer)
+                    await consumer.wait()
                 return local_path
 
         raise Exception("file could not be found")

@@ -17,14 +17,10 @@ import logging
 import re
 from collections import namedtuple
 
-from six import string_types
-
-from canonicaljson import json
-
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.data_stores.main.events_worker import EventRedactBehaviour
 from synapse.storage.database import Database
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
@@ -159,7 +155,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                     stream_ordering = row["stream_ordering"]
                     origin_server_ts = row["origin_server_ts"]
                     try:
-                        event_json = json.loads(row["json"])
+                        event_json = db_to_json(row["json"])
                         content = event_json["content"]
                     except Exception:
                         continue
@@ -180,7 +176,7 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                     # skip over it.
                     continue
 
-                if not isinstance(value, string_types):
+                if not isinstance(value, str):
                     # If the event body, name or topic isn't a string
                     # then skip over it
                     continue

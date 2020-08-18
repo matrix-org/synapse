@@ -150,3 +150,8 @@ class EventContentFields(object):
     # Timestamp to delete the event after
     # cf https://github.com/matrix-org/matrix-doc/pull/2228
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
+
+
+class RoomEncryptionAlgorithms(object):
+    MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
+    DEFAULT = MEGOLM_V1_AES_SHA2

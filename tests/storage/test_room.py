@@ -56,6 +56,10 @@ class RoomStoreTestCase(unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_get_room_unknown_room(self):
+        self.assertIsNone((yield self.store.get_room("!uknown:test")),)
+
+    @defer.inlineCallbacks
     def test_get_room_with_stats(self):
         self.assertDictContainsSubset(
             {
@@ -65,6 +69,10 @@ class RoomStoreTestCase(unittest.TestCase):
             },
             (yield self.store.get_room_with_stats(self.room.to_string())),
         )
+
+    @defer.inlineCallbacks
+    def test_get_room_with_stats_unknown_room(self):
+        self.assertIsNone((yield self.store.get_room_with_stats("!uknown:test")),)
 
 
 class RoomEventsStoreTestCase(unittest.TestCase):
@@ -101,7 +109,9 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             etype=EventTypes.Name, name=name, content={"name": name}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = yield defer.ensureDeferred(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(
@@ -117,7 +127,9 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             etype=EventTypes.Topic, topic=topic, content={"topic": topic}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = yield defer.ensureDeferred(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(

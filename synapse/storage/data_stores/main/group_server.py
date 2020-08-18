@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import List, Tuple
+
 from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage._base import SQLBaseStore, db_to_json
 
 # The category ID for the "default" category. We don't store as null in the
 # database to avoid the fun of null != null
@@ -195,7 +197,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             categories = {
                 row[0]: {
                     "is_public": row[1],
-                    "profile": json.loads(row[2]),
+                    "profile": db_to_json(row[2]),
                     "order": row[3],
                 }
                 for row in txn
@@ -219,7 +221,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return {
             row["category_id"]: {
                 "is_public": row["is_public"],
-                "profile": json.loads(row["profile"]),
+                "profile": db_to_json(row["profile"]),
             }
             for row in rows
         }
@@ -233,7 +235,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group_category",
         )
 
-        category["profile"] = json.loads(category["profile"])
+        category["profile"] = db_to_json(category["profile"])
 
         return category
 
@@ -249,7 +251,7 @@ class GroupServerWorkerStore(SQLBaseStore):
         return {
             row["role_id"]: {
                 "is_public": row["is_public"],
-                "profile": json.loads(row["profile"]),
+                "profile": db_to_json(row["profile"]),
             }
             for row in rows
         }
@@ -263,7 +265,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group_role",
         )
 
-        role["profile"] = json.loads(role["profile"])
+        role["profile"] = db_to_json(role["profile"])
 
         return role
 
@@ -331,7 +333,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             roles = {
                 row[0]: {
                     "is_public": row[1],
-                    "profile": json.loads(row[2]),
+                    "profile": db_to_json(row[2]),
                     "order": row[3],
                 }
                 for row in txn
@@ -460,7 +462,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         now = int(self._clock.time_msec())
         if row and now < row["valid_until_ms"]:
-            return json.loads(row["attestation_json"])
+            return db_to_json(row["attestation_json"])
 
         return None
 
@@ -487,7 +489,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     "group_id": row[0],
                     "type": row[1],
                     "membership": row[2],
-                    "content": json.loads(row[3]),
+                    "content": db_to_json(row[3]),
                 }
                 for row in txn
             ]
@@ -517,7 +519,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                     "group_id": group_id,
                     "membership": membership,
                     "type": gtype,
-                    "content": json.loads(content_json),
+                    "content": db_to_json(content_json),
                 }
                 for group_id, membership, gtype, content_json in txn
             ]
@@ -526,13 +528,35 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_groups_changes_for_user", _get_groups_changes_for_user_txn
         )
 
-    def get_all_groups_changes(self, from_token, to_token, limit):
-        from_token = int(from_token)
-        has_changed = self._group_updates_stream_cache.has_any_entity_changed(
-            from_token
-        )
+    async def get_all_groups_changes(
+        self, instance_name: str, last_id: int, current_id: int, limit: int
+    ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
+        """Get updates for groups replication stream.
+
+        Args:
+            instance_name: The writer we want to fetch updates from. Unused
+                here since there is only ever one writer.
+            last_id: The token to fetch updates from. Exclusive.
+            current_id: The token to fetch updates up to. Inclusive.
+            limit: The requested limit for the number of rows to return. The
+                function may return more or fewer rows.
+
+        Returns:
+            A tuple consisting of: the updates, a token to use to fetch
+            subsequent updates, and whether we returned fewer rows than exists
+            between the requested tokens due to the limit.
+
+            The token returned can be used in a subsequent call to this
+            function to get further updatees.
+
+            The updates are a list of 2-tuples of stream ID and the row data
+        """
+
+        last_id = int(last_id)
+        has_changed = self._group_updates_stream_cache.has_any_entity_changed(last_id)
+
         if not has_changed:
-            return defer.succeed([])
+            return [], current_id, False
 
         def _get_all_groups_changes_txn(txn):
             sql = """
@@ -541,13 +565,21 @@ class GroupServerWorkerStore(SQLBaseStore):
                 WHERE ? < stream_id AND stream_id <= ?
                 LIMIT ?
             """
-            txn.execute(sql, (from_token, to_token, limit))
-            return [
-                (stream_id, group_id, user_id, gtype, json.loads(content_json))
+            txn.execute(sql, (last_id, current_id, limit))
+            updates = [
+                (stream_id, (group_id, user_id, gtype, db_to_json(content_json)))
                 for stream_id, group_id, user_id, gtype, content_json in txn
             ]
 
-        return self.db.runInteraction(
+            limited = False
+            upto_token = current_id
+            if len(updates) >= limit:
+                upto_token = updates[-1][0]
+                limited = True
+
+            return updates, upto_token, limited
+
+        return await self.db.runInteraction(
             "get_all_groups_changes", _get_all_groups_changes_txn
         )
 

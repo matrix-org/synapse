@@ -35,7 +35,7 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 
 from synapse.config import ConfigError
-from synapse.http.server import finish_request
+from synapse.http.server import respond_with_html
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.push.mailer import load_jinja2_templates
@@ -144,15 +144,10 @@ class OidcHandler:
                 access_denied.
             error_description: A human-readable description of the error.
         """
-        html_bytes = self._error_template.render(
+        html = self._error_template.render(
             error=error, error_description=error_description
-        ).encode("utf-8")
-
-        request.setResponseCode(400)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%i" % len(html_bytes))
-        request.write(html_bytes)
-        finish_request(request)
+        )
+        respond_with_html(request, 400, html)
 
     def _validate_metadata(self):
         """Verifies the provider metadata.

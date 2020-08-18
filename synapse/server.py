@@ -44,7 +44,6 @@ from synapse.federation.federation_client import FederationClient
 from synapse.federation.federation_server import (
     FederationHandlerRegistry,
     FederationServer,
-    ReplicationFederationHandlerRegistry,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
 from synapse.federation.sender import FederationSender
@@ -73,14 +72,18 @@ from synapse.handlers.profile import BaseProfileHandler, MasterProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
 from synapse.handlers.register import RegistrationHandler
-from synapse.handlers.room import RoomContextHandler, RoomCreationHandler
+from synapse.handlers.room import (
+    RoomContextHandler,
+    RoomCreationHandler,
+    RoomShutdownHandler,
+)
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
-from synapse.handlers.typing import TypingHandler
+from synapse.handlers.typing import FollowerTypingHandler, TypingWriterHandler
 from synapse.handlers.user_directory import UserDirectoryHandler
 from synapse.http.client import InsecureInterceptableContextFactory, SimpleHttpClient
 from synapse.http.matrixfederationclient import MatrixFederationHttpClient
@@ -102,7 +105,7 @@ from synapse.server_notices.worker_server_notices_sender import (
     WorkerServerNoticesSender,
 )
 from synapse.state import StateHandler, StateResolutionHandler
-from synapse.storage import DataStores, Storage
+from synapse.storage import DataStore, DataStores, Storage
 from synapse.streams.events import EventSources
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
@@ -144,6 +147,7 @@ class HomeServer(object):
         "handlers",
         "auth",
         "room_creation_handler",
+        "room_shutdown_handler",
         "state_handler",
         "state_resolution_handler",
         "presence_handler",
@@ -234,6 +238,8 @@ class HomeServer(object):
 
         self._reactor = reactor
         self.hostname = hostname
+        # the key we use to sign events and requests
+        self.signing_key = config.key.signing_key[0]
         self.config = config
         self._building = {}
         self._listening_services = []
@@ -307,7 +313,7 @@ class HomeServer(object):
     def get_clock(self):
         return self.clock
 
-    def get_datastore(self):
+    def get_datastore(self) -> DataStore:
         return self.datastores.main
 
     def get_datastores(self):
@@ -357,6 +363,9 @@ class HomeServer(object):
     def build_room_creation_handler(self):
         return RoomCreationHandler(self)
 
+    def build_room_shutdown_handler(self):
+        return RoomShutdownHandler(self)
+
     def build_sendmail(self):
         return sendmail
 
@@ -370,7 +379,10 @@ class HomeServer(object):
         return PresenceHandler(self)
 
     def build_typing_handler(self):
-        return TypingHandler(self)
+        if self.config.worker.writers.typing == self.get_instance_name():
+            return TypingWriterHandler(self)
+        else:
+            return FollowerTypingHandler(self)
 
     def build_sync_handler(self):
         return SyncHandler(self)
@@ -526,10 +538,7 @@ class HomeServer(object):
         return RoomMemberMasterHandler(self)
 
     def build_federation_registry(self):
-        if self.config.worker_app:
-            return ReplicationFederationHandlerRegistry(self)
-        else:
-            return FederationHandlerRegistry()
+        return FederationHandlerRegistry(self)
 
     def build_server_notices_manager(self):
         if self.config.worker_app:

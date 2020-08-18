@@ -106,8 +106,8 @@ class EventBuilder(object):
             Deferred[FrozenEvent]
         """
 
-        state_ids = yield self._state.get_current_state_ids(
-            self.room_id, prev_event_ids
+        state_ids = yield defer.ensureDeferred(
+            self._state.get_current_state_ids(self.room_id, prev_event_ids)
         )
         auth_ids = yield self._auth.compute_auth_events(self, state_ids)
 
@@ -162,7 +162,7 @@ class EventBuilderFactory(object):
     def __init__(self, hs):
         self.clock = hs.get_clock()
         self.hostname = hs.hostname
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()

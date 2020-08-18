@@ -19,12 +19,12 @@ import argparse
 import errno
 import os
 from collections import OrderedDict
+from hashlib import sha256
 from io import open as io_open
 from textwrap import dedent
-from typing import Any, MutableMapping, Optional
+from typing import Any, List, MutableMapping, Optional
 
-from six import integer_types
-
+import attr
 import yaml
 
 
@@ -118,7 +118,7 @@ class Config(object):
 
     @staticmethod
     def parse_size(value):
-        if isinstance(value, integer_types):
+        if isinstance(value, int):
             return value
         sizes = {"K": 1024, "M": 1024 * 1024}
         size = 1
@@ -130,7 +130,7 @@ class Config(object):
 
     @staticmethod
     def parse_duration(value):
-        if isinstance(value, integer_types):
+        if isinstance(value, int):
             return value
         second = 1000
         minute = 60 * second
@@ -720,4 +720,36 @@ def find_config_files(search_paths):
     return config_files
 
 
-__all__ = ["Config", "RootConfig"]
+@attr.s
+class ShardedWorkerHandlingConfig:
+    """Algorithm for choosing which instance is responsible for handling some
+    sharded work.
+
+    For example, the federation senders use this to determine which instances
+    handles sending stuff to a given destination (which is used as the `key`
+    below).
+    """
+
+    instances = attr.ib(type=List[str])
+
+    def should_handle(self, instance_name: str, key: str) -> bool:
+        """Whether this instance is responsible for handling the given key.
+        """
+
+        # If multiple instances are not defined we always return true.
+        if not self.instances or len(self.instances) == 1:
+            return True
+
+        # We shard by taking the hash, modulo it by the number of instances and
+        # then checking whether this instance matches the instance at that
+        # index.
+        #
+        # (Technically this introduces some bias and is not entirely uniform,
+        # but since the hash is so large the bias is ridiculously small).
+        dest_hash = sha256(key.encode("utf8")).digest()
+        dest_int = int.from_bytes(dest_hash, byteorder="little")
+        remainder = dest_int % (len(self.instances))
+        return self.instances[remainder] == instance_name
+
+
+__all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]

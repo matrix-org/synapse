@@ -20,8 +20,6 @@ import logging
 import re
 from typing import List, Union
 
-from six import string_types
-
 import synapse
 import synapse.api.auth
 import synapse.types
@@ -40,7 +38,7 @@ from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.handlers.auth import AuthHandler
-from synapse.http.server import finish_request
+from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -51,7 +49,7 @@ from synapse.push.mailer import load_jinja2_templates
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
-from synapse.util.threepids import check_3pid_allowed
+from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -120,7 +118,14 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         client_secret = body["client_secret"]
         assert_valid_client_secret(client_secret)
 
-        email = body["email"]
+        # For emails, canonicalise the address.
+        # We store all email addresses canonicalised in the DB.
+        # (See on_POST in EmailThreepidRequestTokenRestServlet
+        # in synapse/rest/client/v2_alpha/account.py)
+        try:
+            email = canonicalise_email(body["email"])
+        except ValueError as e:
+            raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
         next_link = body.get("next_link")  # Optional param
 
@@ -132,7 +137,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
             )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
-            "email", body["email"]
+            "email", email
         )
 
         if existing_user_id is not None:
@@ -310,17 +315,15 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
             # Otherwise show the success template
             html = self.config.email_registration_template_success_html_content
-
-            request.setResponseCode(200)
+            status_code = 200
         except ThreepidValidationError as e:
-            request.setResponseCode(e.code)
+            status_code = e.code
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
             html = self.failure_email_template.render(**template_vars)
 
-        request.write(html.encode("utf-8"))
-        finish_request(request)
+        respond_with_html(request, status_code, html)
 
 
 class UsernameAvailabilityRestServlet(RestServlet):
@@ -412,7 +415,7 @@ class RegisterRestServlet(RestServlet):
         desired_password_hash = None
         if "password" in body:
             password = body.pop("password")
-            if not isinstance(password, string_types) or len(password) > 512:
+            if not isinstance(password, str) or len(password) > 512:
                 raise SynapseError(400, "Invalid password")
             self.password_policy_handler.validate_password(password)
 
@@ -456,7 +459,7 @@ class RegisterRestServlet(RestServlet):
 
             access_token = self.auth.get_access_token_from_request(request)
 
-            if isinstance(desired_username, string_types):
+            if isinstance(desired_username, str):
                 result = await self._do_appservice_registration(
                     desired_username,
                     desired_password_hash,
@@ -629,6 +632,15 @@ class RegisterRestServlet(RestServlet):
                     if login_type in auth_result:
                         medium = auth_result[login_type]["medium"]
                         address = auth_result[login_type]["address"]
+                        # For emails, canonicalise the address.
+                        # We store all email addresses canonicalised in the DB.
+                        # (See on_POST in EmailThreepidRequestTokenRestServlet
+                        # in synapse/rest/client/v2_alpha/account.py)
+                        if medium == "email":
+                            try:
+                                address = canonicalise_email(address)
+                            except ValueError as e:
+                                raise SynapseError(400, str(e))
 
                         existing_user_id = await self.store.get_user_id_by_threepid(
                             medium, address

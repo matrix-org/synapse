@@ -16,6 +16,7 @@ from synapse.config._base import ConfigError
 
 if __name__ == "__main__":
     import sys
+
     from synapse.config.homeserver import HomeServerConfig
 
     action = sys.argv[1]

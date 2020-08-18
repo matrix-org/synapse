@@ -12,11 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 from typing import Optional
-
-from six import itervalues
 
 import pymacaroons
 from netaddr import IPAddress
@@ -24,7 +21,6 @@ from netaddr import IPAddress
 from twisted.internet import defer
 from twisted.web.server import Request
 
-import synapse.logging.opentracing as opentracing
 import synapse.types
 from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
@@ -37,6 +33,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
+from synapse.logging import opentracing as opentracing
 from synapse.types import StateMap, UserID
 from synapse.util.caches import register_cache
 from synapse.util.caches.lrucache import LruCache
@@ -90,7 +87,7 @@ class Auth(object):
             event, prev_state_ids, for_verification=True
         )
         auth_events = yield self.store.get_events(auth_events_ids)
-        auth_events = {(e.type, e.state_key): e for e in itervalues(auth_events)}
+        auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
 
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
         event_auth.check(
@@ -130,8 +127,10 @@ class Auth(object):
         if current_state:
             member = current_state.get((EventTypes.Member, user_id), None)
         else:
-            member = yield self.state.get_current_state(
-                room_id=room_id, event_type=EventTypes.Member, state_key=user_id
+            member = yield defer.ensureDeferred(
+                self.state.get_current_state(
+                    room_id=room_id, event_type=EventTypes.Member, state_key=user_id
+                )
             )
         membership = member.membership if member else None
 
@@ -545,7 +544,7 @@ class Auth(object):
         # Currently we ignore the `for_verification` flag even though there are
         # some situations where we can drop particular auth events when adding
         # to the event's `auth_events` (e.g. joins pointing to previous joins
-        # when room is publically joinable). Dropping event IDs has the
+        # when room is publicly joinable). Dropping event IDs has the
         # advantage that the auth chain for the room grows slower, but we use
         # the auth chain in state resolution v2 to order events, which means
         # care must be taken if dropping events to ensure that it doesn't
@@ -673,8 +672,10 @@ class Auth(object):
             )
             return member_event.membership, member_event.event_id
         except AuthError:
-            visibility = yield self.state.get_current_state(
-                room_id, EventTypes.RoomHistoryVisibility, ""
+            visibility = yield defer.ensureDeferred(
+                self.state.get_current_state(
+                    room_id, EventTypes.RoomHistoryVisibility, ""
+                )
             )
             if (
                 visibility

@@ -229,7 +229,7 @@ class HomeserverTestCase(TestCase):
         self.site = SynapseSite(
             logger_name="synapse.access.http.fake",
             site_tag="test",
-            config={},
+            config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
         )
@@ -603,7 +603,9 @@ class HomeserverTestCase(TestCase):
             user: MXID of the user to inject the membership for.
             membership: The membership type.
         """
-        event_injection.inject_member_event(self.hs, room, user, membership)
+        self.get_success(
+            event_injection.inject_member_event(self.hs, room, user, membership)
+        )
 
 
 class FederatingHomeserverTestCase(HomeserverTestCase):

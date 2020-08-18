@@ -23,6 +23,7 @@ such as [Github][github-idp].
 [auth0]: https://auth0.com/
 [okta]: https://www.okta.com/
 [dex-idp]: https://github.com/dexidp/dex
+[keycloak-idp]: https://www.keycloak.org/docs/latest/server_admin/#sso-protocols
 [hydra]: https://www.ory.sh/docs/hydra/
 [github-idp]: https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps
 
@@ -89,7 +90,50 @@ oidc_config:
        localpart_template: "{{ user.name }}"
        display_name_template: "{{ user.name|capitalize }}"
 ```
+### [Keycloak][keycloak-idp]
 
+[Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat. 
+
+Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to install Keycloak and set up a realm.
+
+1. Click `Clients` in the sidebar and click `Create`
+
+2. Fill in the fields as below:
+
+| Field | Value |
+|-----------|-----------|
+| Client ID | `synapse` |
+| Client Protocol | `openid-connect` |
+
+3. Click `Save`
+4. Fill in the fields as below:
+
+| Field | Value |
+|-----------|-----------|
+| Client ID | `synapse` |
+| Enabled | `On` |
+| Client Protocol | `openid-connect` |
+| Access Type | `confidential` |
+| Valid Redirect URIs | `[synapse public baseurl]/_synapse/oidc/callback` |
+
+5. Click `Save`
+6. On the Credentials tab, update the fields:
+
+| Field | Value |
+|-------|-------|
+| Client Authenticator | `Client ID and Secret` |
+
+7. Click `Regenerate Secret`
+8. Copy Secret
+
+```yaml
+oidc_config:
+   enabled: true
+   issuer: "https://127.0.0.1:8443/auth/realms/{realm_name}"
+   client_id: "synapse"
+   client_secret: "copy secret generated from above"
+   scopes: ["openid", "profile"]
+```
 ### [Auth0][auth0]
 
 1. Create a regular web application for Synapse

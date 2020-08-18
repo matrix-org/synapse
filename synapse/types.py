@@ -19,10 +19,9 @@ import sys
 from collections import namedtuple
 from typing import Any, Dict, Tuple, TypeVar
 
-from six.moves import filter
-
 import attr
 from signedjson.key import decode_verify_key_bytes
+from six.moves import filter
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError
@@ -31,7 +30,7 @@ from synapse.api.errors import Codes, SynapseError
 if sys.version_info[:3] >= (3, 6, 0):
     from typing import Collection
 else:
-    from typing import Sized, Iterable, Container
+    from typing import Container, Iterable, Sized
 
     T_co = TypeVar("T_co", covariant=True)
 

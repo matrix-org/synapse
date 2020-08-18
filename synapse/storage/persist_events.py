@@ -20,9 +20,6 @@ import logging
 from collections import deque, namedtuple
 from typing import Iterable, List, Optional, Set, Tuple
 
-from six import iteritems
-from six.moves import range
-
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -32,7 +29,6 @@ from synapse.events import FrozenEvent
 from synapse.events.snapshot import EventContext
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.state import StateResolutionStore
 from synapse.storage.data_stores import DataStores
 from synapse.storage.data_stores.main.events import DeltaState
 from synapse.types import StateMap
@@ -218,7 +214,7 @@ class EventsPersistenceStorage(object):
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
         deferreds = []
-        for room_id, evs_ctxs in iteritems(partitioned):
+        for room_id, evs_ctxs in partitioned.items():
             d = self._event_persist_queue.add_to_queue(
                 room_id, evs_ctxs, backfilled=backfilled
             )
@@ -319,7 +315,7 @@ class EventsPersistenceStorage(object):
                             (event, context)
                         )
 
-                    for room_id, ev_ctx_rm in iteritems(events_by_room):
+                    for room_id, ev_ctx_rm in events_by_room.items():
                         latest_event_ids = await self.main_store.get_latest_event_ids_in_room(
                             room_id
                         )
@@ -651,6 +647,10 @@ class EventsPersistenceStorage(object):
             room_version = await self.main_store.get_room_version_id(room_id)
 
         logger.debug("calling resolve_state_groups from preserve_events")
+
+        # Avoid a circular import.
+        from synapse.state import StateResolutionStore
+
         res = await self._state_resolution_handler.resolve_state_groups(
             room_id,
             room_version,
@@ -674,7 +674,7 @@ class EventsPersistenceStorage(object):
 
         to_insert = {
             key: ev_id
-            for key, ev_id in iteritems(current_state)
+            for key, ev_id in current_state.items()
             if ev_id != existing_state.get(key)
         }
 
@@ -786,9 +786,3 @@ class EventsPersistenceStorage(object):
 
         for user_id in left_users:
             await self.main_store.mark_remote_user_device_list_as_unsubscribed(user_id)
-
-    async def locally_reject_invite(self, user_id: str, room_id: str) -> int:
-        """Mark the invite has having been rejected even though we failed to
-        create a leave event for it.
-        """
-        return await self.persist_events_store.locally_reject_invite(user_id, room_id)

@@ -249,7 +249,10 @@ class BackgroundUpdater(object):
             retcol="progress_json",
         )
 
-        progress = json.loads(progress_json)
+        # Avoid a circular import.
+        from synapse.storage._base import db_to_json
+
+        progress = db_to_json(progress_json)
 
         time_start = self._clock.time_msec()
         items_updated = await update_handler(progress, batch_size)

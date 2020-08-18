@@ -1,0 +1,1 @@
+Merge mainline Synapse v1.18.0 into the `dinsic` branch.

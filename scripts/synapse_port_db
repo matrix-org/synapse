@@ -23,8 +23,6 @@ import sys
 import time
 import traceback
 
-from six import string_types
-
 import yaml
 
 from twisted.internet import defer, reactor
@@ -51,6 +49,7 @@ from synapse.storage.data_stores.main.media_repository import (
 from synapse.storage.data_stores.main.profile import ProfileStore
 from synapse.storage.data_stores.main.registration import (
     RegistrationBackgroundUpdateStore,
+    find_max_generated_user_id_localpart,
 )
 from synapse.storage.data_stores.main.room import RoomBackgroundUpdateStore
 from synapse.storage.data_stores.main.roommember import RoomMemberBackgroundUpdateStore
@@ -92,6 +91,7 @@ BOOLEAN_COLUMNS = {
     "account_validity": ["email_sent"],
     "redactions": ["have_censored"],
     "room_stats_state": ["is_federatable"],
+    "local_media_repository": ["safe_from_quarantine"],
 }
 
 
@@ -128,6 +128,26 @@ APPEND_ONLY_TABLES = [
     "state_group_edges",
     "stream_ordering_to_exterm",
 ]
+
+
+IGNORED_TABLES = {
+    # We don't port these tables, as they're a faff and we can regenerate
+    # them anyway.
+    "user_directory",
+    "user_directory_search",
+    "user_directory_search_content",
+    "user_directory_search_docsize",
+    "user_directory_search_segdir",
+    "user_directory_search_segments",
+    "user_directory_search_stat",
+    "user_directory_search_pos",
+    "users_who_share_private_rooms",
+    "users_in_public_room",
+    # UI auth sessions have foreign keys so additional care needs to be taken,
+    # the sessions are transient anyway, so ignore them.
+    "ui_auth_sessions",
+    "ui_auth_sessions_credentials",
+}
 
 
 # Error returned by the run function. Used at the top-level part of the script to
@@ -293,14 +313,7 @@ class Porter(object):
             )
             return
 
-        if table in (
-            "user_directory",
-            "user_directory_search",
-            "users_who_share_rooms",
-            "users_in_pubic_room",
-        ):
-            # We don't port these tables, as they're a faff and we can regenreate
-            # them anyway.
+        if table in IGNORED_TABLES:
             self.progress.update(table, table_size)  # Mark table as done
             return
 
@@ -612,8 +625,10 @@ class Porter(object):
                 )
             )
 
-            # Step 5. Do final post-processing
+            # Step 5. Set up sequences
+            self.progress.set_state("Setting up sequence generators")
             await self._setup_state_group_id_seq()
+            await self._setup_user_id_seq()
 
             self.progress.done()
         except Exception as e:
@@ -637,7 +652,7 @@ class Porter(object):
                 return bool(col)
             if isinstance(col, bytes):
                 return bytearray(col)
-            elif isinstance(col, string_types) and "\0" in col:
+            elif isinstance(col, str) and "\0" in col:
                 logger.warning(
                     "DROPPING ROW: NUL value in table %s col %s: %r",
                     table,
@@ -782,6 +797,13 @@ class Porter(object):
             txn.execute("ALTER SEQUENCE state_group_id_seq RESTART WITH %s", (next_id,))
 
         return self.postgres_store.db.runInteraction("setup_state_group_id_seq", r)
+
+    def _setup_user_id_seq(self):
+        def r(txn):
+            next_id = find_max_generated_user_id_localpart(txn) + 1
+            txn.execute("ALTER SEQUENCE user_id_seq RESTART WITH %s", (next_id,))
+
+        return self.postgres_store.db.runInteraction("setup_user_id_seq", r)
 
 
 ##############################################

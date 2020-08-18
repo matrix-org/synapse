@@ -89,7 +89,7 @@ class OIDCConfig(Config):
         # use an OpenID Connect Provider for authentication, instead of its internal
         # password database.
         #
-        # See https://github.com/matrix-org/synapse/blob/master/openid.md.
+        # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md.
         #
         oidc_config:
           # Uncomment the following to enable authorization against an OpenID Connect

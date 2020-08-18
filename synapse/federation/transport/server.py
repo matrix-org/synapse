@@ -20,8 +20,6 @@ import logging
 import re
 from typing import Optional, Tuple, Type
 
-from twisted.internet.defer import maybeDeferred
-
 import synapse
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
@@ -110,7 +108,7 @@ class Authenticator(object):
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
-        self.notifer = hs.get_notifier()
+        self.notifier = hs.get_notifier()
 
         self.replication_client = None
         if hs.config.worker.worker_app:
@@ -176,7 +174,7 @@ class Authenticator(object):
             await self.store.set_destination_retry_timings(origin, None, 0, 0)
 
             # Inform the relevant places that the remote server is back up.
-            self.notifer.notify_remote_server_up(origin)
+            self.notifier.notify_remote_server_up(origin)
             if self.replication_client:
                 # If we're on a worker we try and inform master about this. The
                 # replication client doesn't hook into the notifier to avoid
@@ -341,6 +339,12 @@ class BaseFederationServlet(object):
                 if origin:
                     with ratelimiter.ratelimit(origin) as d:
                         await d
+                        if request._disconnected:
+                            logger.warning(
+                                "client disconnected before we started processing "
+                                "request"
+                            )
+                            return -1, None
                         response = await func(
                             origin, content, request.args, *args, **kwargs
                         )
@@ -362,11 +366,7 @@ class BaseFederationServlet(object):
                 continue
 
             server.register_paths(
-                method,
-                (pattern,),
-                self._wrap(code),
-                self.__class__.__name__,
-                trace=False,
+                method, (pattern,), self._wrap(code), self.__class__.__name__,
             )
 
 
@@ -800,12 +800,8 @@ class PublicRoomList(BaseFederationServlet):
             # zero is a special value which corresponds to no limit.
             limit = None
 
-        data = await maybeDeferred(
-            self.handler.get_local_public_room_list,
-            limit,
-            since_token,
-            network_tuple=network_tuple,
-            from_federation=True,
+        data = await self.handler.get_local_public_room_list(
+            limit, since_token, network_tuple=network_tuple, from_federation=True
         )
         return 200, data
 

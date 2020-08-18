@@ -17,9 +17,6 @@ import logging
 from collections import namedtuple
 from typing import Dict, Iterable, List, Set, Tuple
 
-from six import iteritems
-from six.moves import range
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
@@ -27,6 +24,8 @@ from synapse.storage._base import SQLBaseStore
 from synapse.storage.data_stores.state.bg_updates import StateBackgroundUpdateStore
 from synapse.storage.database import Database
 from synapse.storage.state import StateFilter
+from synapse.storage.types import Cursor
+from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import StateMap
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.dictionary_cache import DictionaryCache
@@ -93,6 +92,14 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         )
         self._state_group_members_cache = DictionaryCache(
             "*stateGroupMembersCache*", 500000,
+        )
+
+        def get_max_state_group_txn(txn: Cursor):
+            txn.execute("SELECT COALESCE(max(id), 0) FROM state_groups")
+            return txn.fetchone()[0]
+
+        self._state_group_seq_gen = build_sequence_generator(
+            self.database_engine, get_max_state_group_txn, "state_group_id_seq"
         )
 
     @cached(max_entries=10000, iterable=True)
@@ -263,7 +270,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         # And finally update the result dict, by filtering out any extra
         # stuff we pulled out of the database.
-        for group, group_state_dict in iteritems(group_to_state_dict):
+        for group, group_state_dict in group_to_state_dict.items():
             # We just replace any existing entries, as we will have loaded
             # everything we need from the database anyway.
             state[group] = state_filter.filter_state(group_state_dict)
@@ -341,11 +348,11 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         else:
             non_member_types = non_member_filter.concrete_types()
 
-        for group, group_state_dict in iteritems(group_to_state_dict):
+        for group, group_state_dict in group_to_state_dict.items():
             state_dict_members = {}
             state_dict_non_members = {}
 
-            for k, v in iteritems(group_state_dict):
+            for k, v in group_state_dict.items():
                 if k[0] == EventTypes.Member:
                     state_dict_members[k] = v
                 else:
@@ -389,7 +396,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 # AFAIK, this can never happen
                 raise Exception("current_state_ids cannot be None")
 
-            state_group = self.database_engine.get_next_state_group_id(txn)
+            state_group = self._state_group_seq_gen.get_next_id_txn(txn)
 
             self.db.simple_insert_txn(
                 txn,
@@ -432,7 +439,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                             "state_key": key[1],
                             "event_id": state_id,
                         }
-                        for key, state_id in iteritems(delta_ids)
+                        for key, state_id in delta_ids.items()
                     ],
                 )
             else:
@@ -447,7 +454,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                             "state_key": key[1],
                             "event_id": state_id,
                         }
-                        for key, state_id in iteritems(current_state_ids)
+                        for key, state_id in current_state_ids.items()
                     ],
                 )
 
@@ -458,7 +465,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
             current_member_state_ids = {
                 s: ev
-                for (s, ev) in iteritems(current_state_ids)
+                for (s, ev) in current_state_ids.items()
                 if s[0] == EventTypes.Member
             }
             txn.call_after(
@@ -470,7 +477,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
             current_non_member_state_ids = {
                 s: ev
-                for (s, ev) in iteritems(current_state_ids)
+                for (s, ev) in current_state_ids.items()
                 if s[0] != EventTypes.Member
             }
             txn.call_after(
@@ -555,7 +562,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                         "state_key": key[1],
                         "event_id": state_id,
                     }
-                    for key, state_id in iteritems(curr_state)
+                    for key, state_id in curr_state.items()
                 ],
             )
 

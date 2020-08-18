@@ -16,8 +16,6 @@
 
 import logging
 
-from six import iteritems
-
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.types import get_domain_from_id
 
@@ -72,7 +70,7 @@ class GroupsLocalWorkerHandler(object):
         self.clock = hs.get_clock()
         self.keyring = hs.get_keyring()
         self.is_mine_id = hs.is_mine_id
-        self.signing_key = hs.config.signing_key[0]
+        self.signing_key = hs.signing_key
         self.server_name = hs.hostname
         self.notifier = hs.get_notifier()
         self.attestations = hs.get_groups_attestation_signing()
@@ -227,7 +225,7 @@ class GroupsLocalWorkerHandler(object):
 
         results = {}
         failed_results = []
-        for destination, dest_user_ids in iteritems(destinations):
+        for destination, dest_user_ids in destinations.items():
             try:
                 r = await self.transport_client.bulk_get_publicised_groups(
                     destination, list(dest_user_ids)

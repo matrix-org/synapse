@@ -16,9 +16,6 @@
 import logging
 import operator
 
-from six import iteritems, itervalues
-from six.moves import map
-
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, Membership
@@ -298,7 +295,7 @@ def filter_events_for_server(
                 # membership states for the requesting server to determine
                 # if the server is either in the room or has been invited
                 # into the room.
-                for ev in itervalues(state):
+                for ev in state.values():
                     if ev.type != EventTypes.Member:
                         continue
                     try:
@@ -322,7 +319,7 @@ def filter_events_for_server(
         return True
 
     # Lets check to see if all the events have a history visibility
-    # of "shared" or "world_readable". If thats the case then we don't
+    # of "shared" or "world_readable". If that's the case then we don't
     # need to check membership (as we know the server is in the room).
     event_to_state_ids = yield storage.state.get_state_ids_for_events(
         frozenset(e.event_id for e in events),
@@ -332,20 +329,20 @@ def filter_events_for_server(
     )
 
     visibility_ids = set()
-    for sids in itervalues(event_to_state_ids):
+    for sids in event_to_state_ids.values():
         hist = sids.get((EventTypes.RoomHistoryVisibility, ""))
         if hist:
             visibility_ids.add(hist)
 
     # If we failed to find any history visibility events then the default
-    # is "shared" visiblity.
+    # is "shared" visibility.
     if not visibility_ids:
         all_open = True
     else:
         event_map = yield storage.main.get_events(visibility_ids)
         all_open = all(
             e.content.get("history_visibility") in (None, "shared", "world_readable")
-            for e in itervalues(event_map)
+            for e in event_map.values()
         )
 
     if not check_history_visibility_only:
@@ -394,8 +391,8 @@ def filter_events_for_server(
     #
     event_id_to_state_key = {
         event_id: key
-        for key_to_eid in itervalues(event_to_state_ids)
-        for key, event_id in iteritems(key_to_eid)
+        for key_to_eid in event_to_state_ids.values()
+        for key, event_id in key_to_eid.items()
     }
 
     def include(typ, state_key):
@@ -409,20 +406,16 @@ def filter_events_for_server(
         return state_key[idx + 1 :] == server_name
 
     event_map = yield storage.main.get_events(
-        [
-            e_id
-            for e_id, key in iteritems(event_id_to_state_key)
-            if include(key[0], key[1])
-        ]
+        [e_id for e_id, key in event_id_to_state_key.items() if include(key[0], key[1])]
     )
 
     event_to_state = {
         e_id: {
             key: event_map[inner_e_id]
-            for key, inner_e_id in iteritems(key_to_eid)
+            for key, inner_e_id in key_to_eid.items()
             if inner_e_id in event_map
         }
-        for e_id, key_to_eid in iteritems(event_to_state_ids)
+        for e_id, key_to_eid in event_to_state_ids.items()
     }
 
     to_return = []

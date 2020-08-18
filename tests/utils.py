@@ -21,9 +21,9 @@ import time
 import uuid
 import warnings
 from inspect import getcallargs
+from urllib import parse as urlparse
 
 from mock import Mock, patch
-from six.moves.urllib import parse as urlparse
 
 from twisted.internet import defer, reactor
 
@@ -168,6 +168,9 @@ def default_config(name, parse=False):
         # background, which upsets the test runner.
         "update_user_directory": False,
         "caches": {"global_factor": 1},
+        "listeners": [{"port": 0, "type": "http"}],
+        # Enable encryption by default in private rooms
+        "encryption_enabled_by_default_for_room_type": "invite",
     }
 
     if parse:
@@ -670,6 +673,8 @@ def create_room(hs, room_id, creator_id):
         },
     )
 
-    event, context = yield event_creation_handler.create_new_client_event(builder)
+    event, context = yield defer.ensureDeferred(
+        event_creation_handler.create_new_client_event(builder)
+    )
 
     yield persistence_store.persist_event(event, context)
