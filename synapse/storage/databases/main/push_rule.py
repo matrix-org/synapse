@@ -631,17 +631,16 @@ class PushRuleStore(PushRulesWorkerStore):
         new_id = self._push_rules_enable_id_gen.get_next()
 
         if not is_default_rule:
-            try:
-                # first check it exists XXX need SELECT FOR KEY SHARE
-                self.db.simple_select_one_onecol_txn(
-                    txn, "push_rules", {"user_name": user_id, "rule_id": rule_id}, "id"
-                )
-            except StoreError as serr:
-                if serr.code == 404:
-                    # needed to set NOT_FOUND code.
-                    raise NotFoundError("Push rule does not exist.")
-                else:
-                    raise
+            # first check it exists — need FOR KEY SHARE
+            sql = """
+                SELECT 1 FROM push_rules
+                WHERE user_name = ? AND rule_id = ?
+                FOR KEY SHARE
+            """
+            txn.execute(sql, (user_id, rule_id))
+            if txn.rowcount() < 1:
+                # needed to set NOT_FOUND code.
+                raise NotFoundError("Push rule does not exist.")
 
         self.db_pool.simple_upsert_txn(
             txn,
