@@ -566,7 +566,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",
@@ -667,7 +667,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
             "state_groups_state",
         ):
             count = self.get_success(
-                self.store.db.simple_select_one_onecol(
+                self.store.db_pool.simple_select_one_onecol(
                     table=table,
                     keyvalues={"room_id": room_id},
                     retcol="COUNT(*)",

@@ -26,7 +26,6 @@ import yaml
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.endpoint import parse_and_validate_server_name
-from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
 
@@ -508,8 +507,6 @@ class ServerConfig(Config):
                 )
             )
 
-        _check_resource_config(self.listeners)
-
         self.cleanup_extremities_with_dummy_events = config.get(
             "cleanup_extremities_with_dummy_events", True
         )
@@ -529,6 +526,21 @@ class ServerConfig(Config):
         self.request_token_inhibit_3pid_errors = config.get(
             "request_token_inhibit_3pid_errors", False,
         )
+
+        # List of users trialing the new experimental default push rules. This setting is
+        # not included in the sample configuration file on purpose as it's a temporary
+        # hack, so that some users can trial the new defaults without impacting every
+        # user on the homeserver.
+        users_new_default_push_rules = (
+            config.get("users_new_default_push_rules") or []
+        )  # type: list
+        if not isinstance(users_new_default_push_rules, list):
+            raise ConfigError("'users_new_default_push_rules' must be a list")
+
+        # Turn the list into a set to improve lookup speed.
+        self.users_new_default_push_rules = set(
+            users_new_default_push_rules
+        )  # type: set
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
@@ -1118,20 +1130,3 @@ def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
                 if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
-
-
-def _check_resource_config(listeners: Iterable[ListenerConfig]) -> None:
-    resource_names = {
-        res_name
-        for listener in listeners
-        if listener.http_options
-        for res in listener.http_options.resources
-        for res_name in res.names
-    }
-
-    for resource in resource_names:
-        if resource == "consent":
-            try:
-                check_requirements("resources.consent")
-            except DependencyException as e:
-                raise ConfigError(e.message)

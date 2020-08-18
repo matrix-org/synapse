@@ -33,13 +33,13 @@ from typing_extensions import ContextManager
 import synapse.metrics
 from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.errors import SynapseError
+from synapse.api.presence import UserPresenceState
 from synapse.logging.context import run_in_background
 from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.state import StateHandler
-from synapse.storage.data_stores.main import DataStore
-from synapse.storage.presence import UserPresenceState
+from synapse.storage.databases.main import DataStore
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import cached
@@ -319,7 +319,7 @@ class PresenceHandler(BasePresenceHandler):
         is some spurious presence changes that will self-correct.
         """
         # If the DB pool has already terminated, don't try updating
-        if not self.store.db.is_running():
+        if not self.store.db_pool.is_running():
             return
 
         logger.info(

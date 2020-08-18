@@ -40,6 +40,7 @@ from synapse.logging.context import (
 from synapse.storage.keys import FetchKeyResult
 
 from tests import unittest
+from tests.test_utils import make_awaitable
 
 
 class MockPerspectiveServer(object):
@@ -201,7 +202,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         with a null `ts_valid_until_ms`
         """
         mock_fetcher = keyring.KeyFetcher()
-        mock_fetcher.get_keys = Mock(return_value=defer.succeed({}))
+        mock_fetcher.get_keys = Mock(return_value=make_awaitable({}))
 
         kr = keyring.Keyring(
             self.hs, key_fetchers=(StoreKeyFetcher(self.hs), mock_fetcher)
@@ -244,17 +245,15 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         """Two requests for the same key should be deduped."""
         key1 = signedjson.key.generate_signing_key(1)
 
-        def get_keys(keys_to_fetch):
+        async def get_keys(keys_to_fetch):
             # there should only be one request object (with the max validity)
             self.assertEqual(keys_to_fetch, {"server1": {get_key_id(key1): 1500}})
 
-            return defer.succeed(
-                {
-                    "server1": {
-                        get_key_id(key1): FetchKeyResult(get_verify_key(key1), 1200)
-                    }
+            return {
+                "server1": {
+                    get_key_id(key1): FetchKeyResult(get_verify_key(key1), 1200)
                 }
-            )
+            }
 
         mock_fetcher = keyring.KeyFetcher()
         mock_fetcher.get_keys = Mock(side_effect=get_keys)
@@ -281,25 +280,19 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         """If the first fetcher cannot provide a recent enough key, we fall back"""
         key1 = signedjson.key.generate_signing_key(1)
 
-        def get_keys1(keys_to_fetch):
+        async def get_keys1(keys_to_fetch):
             self.assertEqual(keys_to_fetch, {"server1": {get_key_id(key1): 1500}})
-            return defer.succeed(
-                {
-                    "server1": {
-                        get_key_id(key1): FetchKeyResult(get_verify_key(key1), 800)
-                    }
-                }
-            )
+            return {
+                "server1": {get_key_id(key1): FetchKeyResult(get_verify_key(key1), 800)}
+            }
 
-        def get_keys2(keys_to_fetch):
+        async def get_keys2(keys_to_fetch):
             self.assertEqual(keys_to_fetch, {"server1": {get_key_id(key1): 1500}})
-            return defer.succeed(
-                {
-                    "server1": {
-                        get_key_id(key1): FetchKeyResult(get_verify_key(key1), 1200)
-                    }
+            return {
+                "server1": {
+                    get_key_id(key1): FetchKeyResult(get_verify_key(key1), 1200)
                 }
-            )
+            }
 
         mock_fetcher1 = keyring.KeyFetcher()
         mock_fetcher1.get_keys = Mock(side_effect=get_keys1)

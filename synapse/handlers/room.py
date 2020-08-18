@@ -22,7 +22,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -32,11 +32,14 @@ from synapse.api.constants import (
     RoomEncryptionAlgorithms,
 )
 from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
+    JsonDict,
     Requester,
     RoomAlias,
     RoomID,
@@ -53,6 +56,9 @@ from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
@@ -61,7 +67,7 @@ FIVE_MINUTES_IN_MS = 5 * 60 * 1000
 
 
 class RoomCreationHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super(RoomCreationHandler, self).__init__(hs)
 
         self.spam_checker = hs.get_spam_checker()
@@ -92,7 +98,7 @@ class RoomCreationHandler(BaseHandler):
                 "guest_can_join": False,
                 "power_level_content_override": {},
             },
-        }
+        }  # type: Dict[str, Dict[str, Any]]
 
         # Modify presets to selectively enable encryption by default per homeserver config
         for preset_name, preset_config in self._presets_dict.items():
@@ -214,6 +220,9 @@ class RoomCreationHandler(BaseHandler):
         )
 
         old_room_state = await tombstone_context.get_current_state_ids()
+
+        # We know the tombstone event isn't an outlier so it has current state.
+        assert old_room_state is not None
 
         # update any aliases
         await self._move_aliases_to_new_room(
@@ -528,17 +537,21 @@ class RoomCreationHandler(BaseHandler):
             logger.error("Unable to send updated alias events in new room: %s", e)
 
     async def create_room(
-        self, requester, config, ratelimit=True, creator_join_profile=None
+        self,
+        requester: Requester,
+        config: JsonDict,
+        ratelimit: bool = True,
+        creator_join_profile: Optional[JsonDict] = None,
     ) -> Tuple[dict, int]:
         """ Creates a new room.
 
         Args:
-            requester (synapse.types.Requester):
+            requester:
                 The user who requested the room creation.
-            config (dict) : A dict of configuration options.
-            ratelimit (bool): set to False to disable the rate limiter
+            config : A dict of configuration options.
+            ratelimit: set to False to disable the rate limiter
 
-            creator_join_profile (dict|None):
+            creator_join_profile:
                 Set to override the displayname and avatar for the creating
                 user in this room. If unset, displayname and avatar will be
                 derived from the user's profile. If set, should contain the
@@ -601,6 +614,7 @@ class RoomCreationHandler(BaseHandler):
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
+        room_alias = None
         if "room_alias_name" in config:
             for wchar in string.whitespace:
                 if wchar in config["room_alias_name"]:
@@ -611,8 +625,6 @@ class RoomCreationHandler(BaseHandler):
 
             if mapping:
                 raise SynapseError(400, "Room alias already taken", Codes.ROOM_IN_USE)
-        else:
-            room_alias = None
 
         invite_list = config.get("invite", [])
         for i in invite_list:
@@ -771,23 +783,30 @@ class RoomCreationHandler(BaseHandler):
 
     async def _send_events_for_new_room(
         self,
-        creator,  # A Requester object.
-        room_id,
-        preset_config,
-        invite_list,
-        initial_state,
-        creation_content,
-        room_alias=None,
-        power_level_content_override=None,  # Doesn't apply when initial state has power level state event content
-        creator_join_profile=None,
+        creator: Requester,
+        room_id: str,
+        preset_config: str,
+        invite_list: List[str],
+        initial_state: StateMap,
+        creation_content: JsonDict,
+        room_alias: Optional[RoomAlias] = None,
+        power_level_content_override: Optional[JsonDict] = None,
+        creator_join_profile: Optional[JsonDict] = None,
     ) -> int:
         """Sends the initial events into a new room.
+
+        `power_level_content_override` doesn't apply when initial state has
+        power level state event content.
 
         Returns:
             The stream_id of the last event persisted.
         """
 
-        def create(etype, content, **kwargs):
+        creator_id = creator.user.to_string()
+
+        event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
+
+        def create(etype: str, content: JsonDict, **kwargs) -> JsonDict:
             e = {"type": etype, "content": content}
 
             e.update(event_keys)
@@ -795,7 +814,7 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        async def send(etype, content, **kwargs) -> int:
+        async def send(etype: str, content: JsonDict, **kwargs) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             (
@@ -807,10 +826,6 @@ class RoomCreationHandler(BaseHandler):
             return last_stream_id
 
         config = self._presets_dict[preset_config]
-
-        creator_id = creator.user.to_string()
-
-        event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
@@ -852,7 +867,7 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50,
                 "invite": 50,
-            }
+            }  # type: JsonDict
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
@@ -906,7 +921,7 @@ class RoomCreationHandler(BaseHandler):
         return last_sent_stream_id
 
     async def _generate_room_id(
-        self, creator_id: str, is_public: str, room_version: RoomVersion,
+        self, creator_id: str, is_public: bool, room_version: RoomVersion,
     ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
@@ -930,23 +945,30 @@ class RoomCreationHandler(BaseHandler):
 
 
 class RoomContextHandler(object):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
-    async def get_event_context(self, user, room_id, event_id, limit, event_filter):
+    async def get_event_context(
+        self,
+        user: UserID,
+        room_id: str,
+        event_id: str,
+        limit: int,
+        event_filter: Optional[Filter],
+    ) -> Optional[JsonDict]:
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
         Args:
-            user (UserID)
-            room_id (str)
-            event_id (str)
-            limit (int): The maximum number of events to return in total
+            user
+            room_id
+            event_id
+            limit: The maximum number of events to return in total
                 (excluding state).
-            event_filter (Filter|None): the filter to apply to the events returned
+            event_filter: the filter to apply to the events returned
                 (excluding the target event_id)
 
         Returns:
@@ -1033,15 +1055,21 @@ class RoomContextHandler(object):
 
 
 class RoomEventSource(object):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
     async def get_new_events(
-        self, user, from_key, limit, room_ids, is_guest, explicit_room_id=None
-    ):
+        self,
+        user: UserID,
+        from_key: str,
+        limit: int,
+        room_ids: List[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
+    ) -> Tuple[List[EventBase], str]:
         # We just ignore the key for now.
 
-        to_key = await self.get_current_key()
+        to_key = self.get_current_key()
 
         from_token = RoomStreamToken.parse(from_key)
         if from_token.topological:
@@ -1081,10 +1109,10 @@ class RoomEventSource(object):
 
         return (events, end_key)
 
-    def get_current_key(self):
-        return self.store.get_room_events_max_id()
+    def get_current_key(self) -> str:
+        return "s%d" % (self.store.get_room_max_stream_ordering(),)
 
-    def get_current_key_for_room(self, room_id):
+    def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
         return self.store.get_room_events_max_id(room_id)
 
 
@@ -1096,7 +1124,7 @@ class RoomShutdownHandler(object):
     )
     DEFAULT_ROOM_NAME = "Content Violation Notification"
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.room_member_handler = hs.get_room_member_handler()
         self._room_creation_handler = hs.get_room_creation_handler()

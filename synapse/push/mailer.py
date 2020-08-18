@@ -16,8 +16,7 @@
 import email.mime.multipart
 import email.utils
 import logging
-import time
-import urllib
+import urllib.parse
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Iterable, List, TypeVar
@@ -640,72 +639,3 @@ def string_ordinal_total(s):
     for c in s:
         tot += ord(c)
     return tot
-
-
-def format_ts_filter(value, format):
-    return time.strftime(format, time.localtime(value / 1000))
-
-
-def load_jinja2_templates(
-    template_dir,
-    template_filenames,
-    apply_format_ts_filter=False,
-    apply_mxc_to_http_filter=False,
-    public_baseurl=None,
-):
-    """Loads and returns one or more jinja2 templates and applies optional filters
-
-    Args:
-        template_dir (str): The directory where templates are stored
-        template_filenames (list[str]): A list of template filenames
-        apply_format_ts_filter (bool): Whether to apply a template filter that formats
-            timestamps
-        apply_mxc_to_http_filter (bool): Whether to apply a template filter that converts
-            mxc urls to http urls
-        public_baseurl (str|None): The public baseurl of the server. Required for
-            apply_mxc_to_http_filter to be enabled
-
-    Returns:
-        A list of jinja2 templates corresponding to the given list of filenames,
-        with order preserved
-    """
-    logger.info(
-        "loading email templates %s from '%s'", template_filenames, template_dir
-    )
-    loader = jinja2.FileSystemLoader(template_dir)
-    env = jinja2.Environment(loader=loader)
-
-    if apply_format_ts_filter:
-        env.filters["format_ts"] = format_ts_filter
-
-    if apply_mxc_to_http_filter and public_baseurl:
-        env.filters["mxc_to_http"] = _create_mxc_to_http_filter(public_baseurl)
-
-    templates = []
-    for template_filename in template_filenames:
-        template = env.get_template(template_filename)
-        templates.append(template)
-
-    return templates
-
-
-def _create_mxc_to_http_filter(public_baseurl):
-    def mxc_to_http_filter(value, width, height, resize_method="crop"):
-        if value[0:6] != "mxc://":
-            return ""
-
-        serverAndMediaId = value[6:]
-        fragment = None
-        if "#" in serverAndMediaId:
-            (serverAndMediaId, fragment) = serverAndMediaId.split("#", 1)
-            fragment = "#" + fragment
-
-        params = {"width": width, "height": height, "method": resize_method}
-        return "%s_matrix/media/v1/thumbnail/%s?%s%s" % (
-            public_baseurl,
-            serverAndMediaId,
-            urllib.parse.urlencode(params),
-            fragment or "",
-        )
-
-    return mxc_to_http_filter

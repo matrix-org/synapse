@@ -17,12 +17,16 @@ import logging
 import re
 
 import attr
+from canonicaljson import json
 
 from twisted.internet import defer, task
 
 from synapse.logging import context
 
 logger = logging.getLogger(__name__)
+
+# Create a custom encoder to reduce the whitespace produced by JSON encoding.
+json_encoder = json.JSONEncoder(separators=(",", ":"))
 
 
 def unwrapFirstError(failure):

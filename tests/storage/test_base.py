@@ -21,7 +21,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 from synapse.storage.engines import create_engine
 
 from tests import unittest
@@ -57,7 +57,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         fake_engine = Mock(wraps=engine)
         fake_engine.can_native_upsert = False
 
-        db = Database(Mock(), Mock(config=sqlite_config), fake_engine)
+        db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool
 
         self.datastore = SQLBaseStore(db, None, hs)
@@ -66,8 +66,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_insert_1col(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db.simple_insert(
-            table="tablename", values={"columname": "Value"}
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert(
+                table="tablename", values={"columname": "Value"}
+            )
         )
 
         self.mock_txn.execute.assert_called_with(
@@ -78,10 +80,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_insert_3cols(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db.simple_insert(
-            table="tablename",
-            # Use OrderedDict() so we can assert on the SQL generated
-            values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)]),
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert(
+                table="tablename",
+                # Use OrderedDict() so we can assert on the SQL generated
+                values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)]),
+            )
         )
 
         self.mock_txn.execute.assert_called_with(
@@ -93,7 +97,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
         self.mock_txn.__iter__ = Mock(return_value=iter([("Value",)]))
 
-        value = yield self.datastore.db.simple_select_one_onecol(
+        value = yield self.datastore.db_pool.simple_select_one_onecol(
             table="tablename", keyvalues={"keycol": "TheKey"}, retcol="retcol"
         )
 
@@ -107,7 +111,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
         self.mock_txn.fetchone.return_value = (1, 2, 3)
 
-        ret = yield self.datastore.db.simple_select_one(
+        ret = yield self.datastore.db_pool.simple_select_one(
             table="tablename",
             keyvalues={"keycol": "TheKey"},
             retcols=["colA", "colB", "colC"],
@@ -123,7 +127,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 0
         self.mock_txn.fetchone.return_value = None
 
-        ret = yield self.datastore.db.simple_select_one(
+        ret = yield self.datastore.db_pool.simple_select_one(
             table="tablename",
             keyvalues={"keycol": "Not here"},
             retcols=["colA"],
@@ -138,7 +142,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.__iter__ = Mock(return_value=iter([(1,), (2,), (3,)]))
         self.mock_txn.description = (("colA", None, None, None, None, None, None),)
 
-        ret = yield self.datastore.db.simple_select_list(
+        ret = yield self.datastore.db_pool.simple_select_list(
             table="tablename", keyvalues={"keycol": "A set"}, retcols=["colA"]
         )
 
@@ -151,7 +155,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_update_one_1col(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db.simple_update_one(
+        yield self.datastore.db_pool.simple_update_one(
             table="tablename",
             keyvalues={"keycol": "TheKey"},
             updatevalues={"columnname": "New Value"},
@@ -166,7 +170,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_update_one_4cols(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db.simple_update_one(
+        yield self.datastore.db_pool.simple_update_one(
             table="tablename",
             keyvalues=OrderedDict([("colA", 1), ("colB", 2)]),
             updatevalues=OrderedDict([("colC", 3), ("colD", 4)]),
@@ -181,7 +185,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_delete_one(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db.simple_delete_one(
+        yield self.datastore.db_pool.simple_delete_one(
             table="tablename", keyvalues={"keycol": "Go away"}
         )
 
