@@ -528,12 +528,16 @@ class _ByteProducer:
         self._request.write(b"".join(data))
 
     def resumeProducing(self) -> None:
-        # We've stopped producing in the meantime.
+        # We've stopped producing in the meantime (note that this might be
+        # re-entrant after calling write).
         if not self._request:
             return
 
-        # Get the next chunk and write it to the request. Calling write will
-        # spin the reactor (and might be re-entrant).
+        # Get the next chunk and write it to the request.
+        #
+        # The output of the JSON encoder is coalesced until min_chunk_size is
+        # reached. (This is because JSON encoders produce a very small output
+        # per iteration.)
         #
         # Note that buffer stores a list of bytes (instead of appending to
         # bytes) to hopefully avoid many allocations.
@@ -545,8 +549,9 @@ class _ByteProducer:
                 buffer.append(data)
                 buffered_bytes += len(data)
             except StopIteration:
-                # Everything is serialized, write any data, then finalize the
-                # producer.
+                # The entire JSON object has been serialized, write any
+                # remaining data, finalize the producer and the request, and
+                # clean-up any references.
                 self._send_data(buffer)
                 self._request.unregisterProducer()
                 self._request.finish()
