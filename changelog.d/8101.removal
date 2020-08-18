@@ -1,1 +1,0 @@
-Disallow `:` characters from being included in `client_secret` parameters across all related endpoints. This is a breaking change.
