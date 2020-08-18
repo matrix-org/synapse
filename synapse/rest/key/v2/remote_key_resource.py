@@ -15,12 +15,12 @@
 import logging
 from typing import Dict, Set
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import json
 from signedjson.sign import sign_json
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
-from synapse.http.server import DirectServeJsonResource, respond_with_json_bytes
+from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
 
 logger = logging.getLogger(__name__)
@@ -223,4 +223,4 @@ class RemoteKey(DirectServeJsonResource):
 
             results = {"server_keys": signed_keys}
 
-            respond_with_json_bytes(request, 200, encode_canonical_json(results))
+            respond_with_json(request, 200, results, canonical_json=True)
