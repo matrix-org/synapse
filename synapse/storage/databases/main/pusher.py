@@ -19,10 +19,8 @@ from typing import Iterable, Iterator, List, Tuple
 
 from canonicaljson import encode_canonical_json
 
-from twisted.internet import defer
-
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.util.caches.descriptors import cachedInlineCallbacks, cachedList
+from synapse.util.caches.descriptors import cached, cachedList
 
 logger = logging.getLogger(__name__)
 
@@ -34,23 +32,22 @@ class PusherWorkerStore(SQLBaseStore):
         Drops any rows whose data cannot be decoded
         """
         for r in rows:
-            dataJson = r["data"]
+            data_json = r["data"]
             try:
-                r["data"] = db_to_json(dataJson)
+                r["data"] = db_to_json(data_json)
             except Exception as e:
                 logger.warning(
                     "Invalid JSON in data for pusher %d: %s, %s",
                     r["id"],
-                    dataJson,
+                    data_json,
                     e.args[0],
                 )
                 continue
 
             yield r
 
-    @defer.inlineCallbacks
-    def user_has_pusher(self, user_id):
-        ret = yield self.db_pool.simple_select_one_onecol(
+    async def user_has_pusher(self, user_id):
+        ret = await self.db_pool.simple_select_one_onecol(
             "pushers", {"user_name": user_id}, "id", allow_none=True
         )
         return ret is not None
@@ -61,9 +58,8 @@ class PusherWorkerStore(SQLBaseStore):
     def get_pushers_by_user_id(self, user_id):
         return self.get_pushers_by({"user_name": user_id})
 
-    @defer.inlineCallbacks
-    def get_pushers_by(self, keyvalues):
-        ret = yield self.db_pool.simple_select_list(
+    async def get_pushers_by(self, keyvalues):
+        ret = await self.db_pool.simple_select_list(
             "pushers",
             keyvalues,
             [
@@ -87,16 +83,14 @@ class PusherWorkerStore(SQLBaseStore):
         )
         return self._decode_pushers_rows(ret)
 
-    @defer.inlineCallbacks
-    def get_all_pushers(self):
+    async def get_all_pushers(self):
         def get_pushers(txn):
             txn.execute("SELECT * FROM pushers")
             rows = self.db_pool.cursor_to_dict(txn)
 
             return self._decode_pushers_rows(rows)
 
-        rows = yield self.db_pool.runInteraction("get_all_pushers", get_pushers)
-        return rows
+        return await self.db_pool.runInteraction("get_all_pushers", get_pushers)
 
     async def get_all_updated_pushers_rows(
         self, instance_name: str, last_id: int, current_id: int, limit: int
@@ -164,19 +158,16 @@ class PusherWorkerStore(SQLBaseStore):
             "get_all_updated_pushers_rows", get_all_updated_pushers_rows_txn
         )
 
-    @cachedInlineCallbacks(num_args=1, max_entries=15000)
-    def get_if_user_has_pusher(self, user_id):
+    @cached(num_args=1, max_entries=15000)
+    async def get_if_user_has_pusher(self, user_id):
         # This only exists for the cachedList decorator
         raise NotImplementedError()
 
     @cachedList(
-        cached_method_name="get_if_user_has_pusher",
-        list_name="user_ids",
-        num_args=1,
-        inlineCallbacks=True,
+        cached_method_name="get_if_user_has_pusher", list_name="user_ids", num_args=1,
     )
-    def get_if_users_have_pushers(self, user_ids):
-        rows = yield self.db_pool.simple_select_many_batch(
+    async def get_if_users_have_pushers(self, user_ids):
+        rows = await self.db_pool.simple_select_many_batch(
             table="pushers",
             column="user_name",
             iterable=user_ids,
@@ -189,34 +180,38 @@ class PusherWorkerStore(SQLBaseStore):
 
         return result
 
-    @defer.inlineCallbacks
-    def update_pusher_last_stream_ordering(
+    async def update_pusher_last_stream_ordering(
         self, app_id, pushkey, user_id, last_stream_ordering
-    ):
-        yield self.db_pool.simple_update_one(
+    ) -> None:
+        await self.db_pool.simple_update_one(
             "pushers",
             {"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             {"last_stream_ordering": last_stream_ordering},
             desc="update_pusher_last_stream_ordering",
         )
 
-    @defer.inlineCallbacks
-    def update_pusher_last_stream_ordering_and_success(
-        self, app_id, pushkey, user_id, last_stream_ordering, last_success
-    ):
+    async def update_pusher_last_stream_ordering_and_success(
+        self,
+        app_id: str,
+        pushkey: str,
+        user_id: str,
+        last_stream_ordering: int,
+        last_success: int,
+    ) -> bool:
         """Update the last stream ordering position we've processed up to for
         the given pusher.
 
         Args:
-            app_id (str)
-            pushkey (str)
-            last_stream_ordering (int)
-            last_success (int)
+            app_id
+            pushkey
+            user_id
+            last_stream_ordering
+            last_success
 
         Returns:
-            Deferred[bool]: True if the pusher still exists; False if it has been deleted.
+            True if the pusher still exists; False if it has been deleted.
         """
-        updated = yield self.db_pool.simple_update(
+        updated = await self.db_pool.simple_update(
             table="pushers",
             keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             updatevalues={
@@ -228,18 +223,18 @@ class PusherWorkerStore(SQLBaseStore):
 
         return bool(updated)
 
-    @defer.inlineCallbacks
-    def update_pusher_failing_since(self, app_id, pushkey, user_id, failing_since):
-        yield self.db_pool.simple_update(
+    async def update_pusher_failing_since(
+        self, app_id, pushkey, user_id, failing_since
+    ) -> None:
+        await self.db_pool.simple_update(
             table="pushers",
             keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
             updatevalues={"failing_since": failing_since},
             desc="update_pusher_failing_since",
         )
 
-    @defer.inlineCallbacks
-    def get_throttle_params_by_room(self, pusher_id):
-        res = yield self.db_pool.simple_select_list(
+    async def get_throttle_params_by_room(self, pusher_id):
+        res = await self.db_pool.simple_select_list(
             "pusher_throttle",
             {"pusher": pusher_id},
             ["room_id", "last_sent_ts", "throttle_ms"],
@@ -255,11 +250,10 @@ class PusherWorkerStore(SQLBaseStore):
 
         return params_by_room
 
-    @defer.inlineCallbacks
-    def set_throttle_params(self, pusher_id, room_id, params):
+    async def set_throttle_params(self, pusher_id, room_id, params) -> None:
         # no need to lock because `pusher_throttle` has a primary key on
         # (pusher, room_id) so simple_upsert will retry
-        yield self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             "pusher_throttle",
             {"pusher": pusher_id, "room_id": room_id},
             params,
@@ -272,8 +266,7 @@ class PusherStore(PusherWorkerStore):
     def get_pushers_stream_token(self):
         return self._pushers_id_gen.get_current_token()
 
-    @defer.inlineCallbacks
-    def add_pusher(
+    async def add_pusher(
         self,
         user_id,
         access_token,
@@ -287,11 +280,11 @@ class PusherStore(PusherWorkerStore):
         data,
         last_stream_ordering,
         profile_tag="",
-    ):
+    ) -> None:
         with self._pushers_id_gen.get_next() as stream_id:
             # no need to lock because `pushers` has a unique key on
             # (app_id, pushkey, user_name) so simple_upsert will retry
-            yield self.db_pool.simple_upsert(
+            await self.db_pool.simple_upsert(
                 table="pushers",
                 keyvalues={"app_id": app_id, "pushkey": pushkey, "user_name": user_id},
                 values={
@@ -316,15 +309,16 @@ class PusherStore(PusherWorkerStore):
 
             if user_has_pusher is not True:
                 # invalidate, since we the user might not have had a pusher before
-                yield self.db_pool.runInteraction(
+                await self.db_pool.runInteraction(
                     "add_pusher",
                     self._invalidate_cache_and_stream,
                     self.get_if_user_has_pusher,
                     (user_id,),
                 )
 
-    @defer.inlineCallbacks
-    def delete_pusher_by_app_id_pushkey_user_id(self, app_id, pushkey, user_id):
+    async def delete_pusher_by_app_id_pushkey_user_id(
+        self, app_id, pushkey, user_id
+    ) -> None:
         def delete_pusher_txn(txn, stream_id):
             self._invalidate_cache_and_stream(
                 txn, self.get_if_user_has_pusher, (user_id,)
@@ -351,6 +345,6 @@ class PusherStore(PusherWorkerStore):
             )
 
         with self._pushers_id_gen.get_next() as stream_id:
-            yield self.db_pool.runInteraction(
+            await self.db_pool.runInteraction(
                 "delete_pusher", delete_pusher_txn, stream_id
             )
