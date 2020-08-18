@@ -1260,7 +1260,7 @@ class FederationHandler(BaseHandler):
         return pdu
 
     async def on_event_auth(self, event_id: str) -> List[EventBase]:
-        event = await self.store.get_event(event_id)  # type: EventBase  # type: ignore
+        event = await self.store.get_event(event_id)
         auth = await self.store.get_auth_chain(
             list(event.auth_event_ids()), include_given=True
         )
@@ -1777,9 +1777,7 @@ class FederationHandler(BaseHandler):
         """Returns the state at the event. i.e. not including said event.
         """
 
-        event = await self.store.get_event(
-            event_id, check_room_id=room_id
-        )  # type: EventBase  # type: ignore
+        event = await self.store.get_event(event_id, check_room_id=room_id)
 
         state_groups = await self.state_store.get_state_groups(room_id, [event_id])
 
@@ -1805,9 +1803,7 @@ class FederationHandler(BaseHandler):
     async def get_state_ids_for_pdu(self, room_id: str, event_id: str) -> List[str]:
         """Returns the state at the event. i.e. not including said event.
         """
-        event = await self.store.get_event(
-            event_id, check_room_id=room_id
-        )  # type: EventBase  # type: ignore
+        event = await self.store.get_event(event_id, check_room_id=room_id)
 
         state_groups = await self.state_store.get_state_groups_ids(room_id, [event_id])
 
@@ -2173,9 +2169,7 @@ class FederationHandler(BaseHandler):
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
-        event = await self.store.get_event(
-            event_id, check_room_id=room_id
-        )  # type: EventBase  # type: ignore
+        event = await self.store.get_event(event_id, check_room_id=room_id)
 
         # Just go through and process each event in `remote_auth_chain`. We
         # don't want to fall into the trap of `missing` being wrong.

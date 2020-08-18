@@ -225,16 +225,16 @@ class RoomMemberHandler(object):
             newly_joined = True
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(
-                    prev_member_event_id
-                )  # type: EventBase  # type: ignore
+                    prev_member_event_id, allow_none=False
+                )
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 await self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(
-                    prev_member_event_id
-                )  # type: EventBase  # type: ignore
+                    prev_member_event_id, allow_none=False
+                )
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target, room_id)
 
@@ -698,17 +698,13 @@ class RoomMemberHandler(object):
             # info.
             newly_joined = True
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(
-                    prev_member_event_id
-                )  # type: EventBase  # type: ignore
+                prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 await self._user_joined_room(target_user, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(
-                    prev_member_event_id
-                )  # type: EventBase  # type: ignore
+                prev_member_event = await self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target_user, room_id)
 
@@ -722,9 +718,7 @@ class RoomMemberHandler(object):
         if not guest_access_id:
             return False
 
-        guest_access = await self.store.get_event(
-            guest_access_id
-        )  # type: EventBase  # type: ignore
+        guest_access = await self.store.get_event(guest_access_id)
 
         return bool(
             guest_access
@@ -1076,9 +1070,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         Implements RoomMemberHandler.remote_reject_invite
         """
-        invite_event = await self.store.get_event(
-            invite_event_id
-        )  # type: EventBase  # type: ignore
+        invite_event = await self.store.get_event(invite_event_id)
         room_id = invite_event.room_id
         target_user = invite_event.state_key
 
