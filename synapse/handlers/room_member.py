@@ -224,17 +224,13 @@ class RoomMemberHandler(object):
             # info.
             newly_joined = True
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(
-                    prev_member_event_id, allow_none=False
-                )
+                prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
             if newly_joined:
                 await self._user_joined_room(target, room_id)
         elif event.membership == Membership.LEAVE:
             if prev_member_event_id:
-                prev_member_event = await self.store.get_event(
-                    prev_member_event_id, allow_none=False
-                )
+                prev_member_event = await self.store.get_event(prev_member_event_id)
                 if prev_member_event.membership == Membership.JOIN:
                     await self._user_left_room(target, room_id)
 
