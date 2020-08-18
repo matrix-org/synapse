@@ -31,8 +31,9 @@ def _reject_invalid_json(val):
     raise json.JSONDecodeError("Invalid JSON value: '%s'" % val)
 
 
-# Create a custom encoder to reduce the whitespace produced by JSON encoding.
-json_encoder = json.JSONEncoder(separators=(",", ":"))
+# Create a custom encoder to reduce the whitespace produced by JSON encoding and
+# ensure that valid JSON is produced.
+json_encoder = json.JSONEncoder(allow_nan=False, separators=(",", ":"))
 
 # Create a custom decoder to reject Python extensions to JSON.
 json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
