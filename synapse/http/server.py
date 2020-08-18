@@ -534,6 +534,9 @@ class _ByteProducer:
 
         # Get the next chunk and write it to the request. Calling write will
         # spin the reactor (and might be re-entrant).
+        #
+        # Note that buffer stores a list of bytes (instead of appending to
+        # bytes) to hopefully avoid many allocations.
         buffer = []
         buffered_bytes = 0
         while buffered_bytes < self.min_chunk_size:
@@ -553,7 +556,6 @@ class _ByteProducer:
         self._send_data(buffer)
 
     def stopProducing(self) -> None:
-        self._generator = None  # type: ignore
         self._request = None
 
 
