@@ -516,7 +516,7 @@ class _ByteProducer:
         self._request = request
         self._iterator = iterator
 
-    def start(self):
+    def start(self) -> None:
         self._request.registerProducer(self, False)
 
     def _send_data(self, data: List[bytes]) -> None:
@@ -527,7 +527,7 @@ class _ByteProducer:
             return
         self._request.write(b"".join(data))
 
-    def resumeProducing(self):
+    def resumeProducing(self) -> None:
         # We've stopped producing in the meantime.
         if not self._request:
             return
@@ -552,7 +552,7 @@ class _ByteProducer:
 
         self._send_data(buffer)
 
-    def stopProducing(self):
+    def stopProducing(self) -> None:
         self._generator = None  # type: ignore
         self._request = None
 
