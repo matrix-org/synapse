@@ -596,8 +596,20 @@ class EventsWorkerStore(SQLBaseStore):
             if not allow_rejected and rejected_reason:
                 continue
 
-            d = db_to_json(row["json"])
-            internal_metadata = db_to_json(row["internal_metadata"])
+            # If the event or metadata cannot be parsed, log the error and act
+            # as if the event is unknown.
+            try:
+                d = db_to_json(row["json"])
+            except ValueError:
+                logger.error("Unable to parse json from event: %s", event_id)
+                continue
+            try:
+                internal_metadata = db_to_json(row["internal_metadata"])
+            except ValueError:
+                logger.error(
+                    "Unable to parse internal_metadata from event: %s", event_id
+                )
+                continue
 
             format_version = row["format_version"]
             if format_version is None:
