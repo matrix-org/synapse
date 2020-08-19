@@ -544,9 +544,11 @@ class _ByteProducer:
         while not self._paused:
             # Get the next chunk and write it to the request.
             #
-            # The output of the JSON encoder is coalesced until min_chunk_size is
-            # reached. (This is because JSON encoders produce a very small output
-            # per iteration.)
+            # The output of the JSON encoder is buffered and coalesced until
+            # min_chunk_size is reached. This is because JSON encoders produce
+            # very small output per iteration and the Request object converts
+            # each call to write() to a separate chunk. Without this there would
+            # be an explosion in bytes written (e.g. b"{" becoming "1\r\n{\r\n").
             #
             # Note that buffer stores a list of bytes (instead of appending to
             # bytes) to hopefully avoid many allocations.
