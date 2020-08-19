@@ -29,7 +29,7 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
-from synapse.storage.engines import PostgresEngine
+from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.storage.util.id_generators import ChainedIdGenerator
 from synapse.util import json_encoder
@@ -542,11 +542,20 @@ class PushRuleStore(PushRulesWorkerStore):
 
         # ensure we have a push_rules_enable row
         # enabledness defaults to true
-        sql = """
-            INSERT INTO push_rules_enable (id, user_name, rule_id, enabled)
-            VALUES (?, ?, ?, ?)
-            ON CONFLICT DO NOTHING
-        """
+        if isinstance(self.database_engine, PostgresEngine):
+            sql = """
+                INSERT INTO push_rules_enable (id, user_name, rule_id, enabled)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+            """
+        elif isinstance(self.database_engine, Sqlite3Engine):
+            sql = """
+                INSERT OR IGNORE INTO push_rules_enable (id, user_name, rule_id, enabled)
+                VALUES (?, ?, ?, ?)
+            """
+        else:
+            raise RuntimeError("Unknown database engine")
+
         new_enable_id = self._push_rules_enable_id_gen.get_next()
         txn.execute(sql, (new_enable_id, user_id, rule_id, 1))
 
