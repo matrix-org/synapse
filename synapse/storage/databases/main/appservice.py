@@ -169,7 +169,7 @@ class ApplicationServiceTransactionWorkerStore(
             service(ApplicationService): The service whose state to set.
             state(ApplicationServiceState): The connectivity state to apply.
         Returns:
-            A Deferred which resolves when the state was set successfully.
+            An Awaitable which resolves when the state was set successfully.
         """
         return self.db_pool.simple_upsert(
             "application_services_state", {"as_id": service.id}, {"state": state}

@@ -64,7 +64,7 @@ class ProfileTestCase(unittest.TestCase):
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        yield self.store.create_profile(self.frank.localpart)
+        yield defer.ensureDeferred(self.store.create_profile(self.frank.localpart))
 
         self.handler = hs.get_profile_handler()
         self.hs = hs
@@ -157,7 +157,7 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield self.store.create_profile("caroline")
+        yield defer.ensureDeferred(self.store.create_profile("caroline"))
         yield self.store.set_profile_displayname("caroline", "Caroline")
 
         response = yield defer.ensureDeferred(

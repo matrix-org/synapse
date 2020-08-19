@@ -767,13 +767,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         return set(room_ids)
 
-    def get_membership_from_event_ids(
+    async def get_membership_from_event_ids(
         self, member_event_ids: Iterable[str]
     ) -> List[dict]:
         """Get user_id and membership of a set of event IDs.
         """
 
-        return self.db_pool.simple_select_many_batch(
+        return await self.db_pool.simple_select_many_batch(
             table="room_memberships",
             column="event_id",
             iterable=member_event_ids,
