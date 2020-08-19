@@ -2024,6 +2024,31 @@ class ShadowBannedTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(invited_rooms, [])
 
+    def test_invite_3pid(self):
+        """Ensure that a 3PID invite does not attempt to contact the identity server."""
+        identity_handler = self.hs.get_handlers().identity_handler
+        identity_handler.lookup_3pid = Mock(
+            side_effect=AssertionError("This should not get called")
+        )
+
+        # The create works fine.
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
+        # Inviting the user completes successfully.
+        request, channel = self.make_request(
+            "POST",
+            "/rooms/%s/invite" % (room_id,),
+            {"id_server": "test", "medium": "email", "address": "test@test.test"},
+            access_token=self.banned_access_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+        # This should have raised an error earlier, but double check this wasn't called.
+        identity_handler.lookup_3pid.assert_not_called()
+
     def test_create_room(self):
         """A shadow-banned user should be able to create a room."""
 
