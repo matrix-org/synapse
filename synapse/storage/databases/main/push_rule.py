@@ -29,6 +29,7 @@ from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.receipts import ReceiptsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
+from synapse.storage.engines import PostgresEngine
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
 from synapse.storage.util.id_generators import ChainedIdGenerator
 from synapse.util import json_encoder
@@ -632,13 +633,20 @@ class PushRuleStore(PushRulesWorkerStore):
 
         if not is_default_rule:
             # first check it exists — need FOR KEY SHARE
-            sql = """
+            for_key_share = "FOR KEY SHARE"
+            if not isinstance(self.database_engine, PostgresEngine):
+                # For key share is not applicable/available on SQLite
+                for_key_share = ""
+            sql = (
+                """
                 SELECT 1 FROM push_rules
                 WHERE user_name = ? AND rule_id = ?
-                FOR KEY SHARE
+                %s
             """
+                % for_key_share
+            )
             txn.execute(sql, (user_id, rule_id))
-            if txn.fetchone():
+            if txn.fetchone() is None:
                 # needed to set NOT_FOUND code.
                 raise NotFoundError("Push rule does not exist.")
 
