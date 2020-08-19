@@ -547,7 +547,7 @@ class PushRuleStore(PushRulesWorkerStore):
             ON CONFLICT DO NOTHING
         """
         new_enable_id = self._push_rules_enable_id_gen.get_next()
-        txn.execute(sql, (new_enable_id, user_id, rule_id, True))
+        txn.execute(sql, (new_enable_id, user_id, rule_id, 1))
 
     async def delete_push_rule(self, user_id: str, rule_id: str) -> None:
         """
