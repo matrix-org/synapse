@@ -675,7 +675,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             list: user_id
         """
         SQL = """
-            SELECT p1.room_id 
+            SELECT p1.room_id
             FROM users_in_public_rooms as p1
             INNER JOIN users_in_public_rooms as p2
                 ON p1.room_id = p2.room_id
