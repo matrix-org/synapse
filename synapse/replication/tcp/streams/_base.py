@@ -352,7 +352,7 @@ class PushRulesStream(Stream):
         )
 
     def _current_token(self, instance_name: str) -> int:
-        push_rules_token, _ = self.store.get_push_rules_stream_token()
+        push_rules_token = self.store.get_max_push_rules_stream_id()
         return push_rules_token
 
 
