@@ -248,7 +248,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
 
     def test_enabled_404_when_put_non_existent_rule(self):
         """
-        Tests that `enabled` gives 404 when the server-default rule doesn't exist.
+        Tests that `enabled` gives 404 when we put to a rule that doesn't exist.
         """
         self.register_user("user", "pass")
         token = self.login("user", "pass")
@@ -266,7 +266,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
 
     def test_enabled_404_when_put_non_existent_server_rule(self):
         """
-        Tests that `enabled` gives 404 when the server-default rule doesn't exist.
+        Tests that `enabled` gives 404 when we put to a server-default rule that doesn't exist.
         """
         self.register_user("user", "pass")
         token = self.login("user", "pass")
@@ -413,7 +413,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
 
     def test_actions_404_when_put_non_existent_rule(self):
         """
-        Tests that `actions` gives 404 when the default rule doesn't exist.
+        Tests that `actions` gives 404 when putting to a rule that doesn't exist.
         """
         self.register_user("user", "pass")
         token = self.login("user", "pass")
@@ -431,7 +431,7 @@ class PushRuleAttributesTestCase(HomeserverTestCase):
 
     def test_actions_404_when_put_non_existent_server_rule(self):
         """
-        Tests that `enabled` gives 404 when the server-default rule doesn't exist.
+        Tests that `actions` gives 404 when putting to a server-default rule that doesn't exist.
         """
         self.register_user("user", "pass")
         token = self.login("user", "pass")
