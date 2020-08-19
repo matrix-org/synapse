@@ -610,5 +610,5 @@ class ShadowBanError(Exception):
     """
     Raised when a shadow-banned user attempts to perform an action.
 
-    This should be caught and a proper "fake" success response send to the user.
+    This should be caught and a proper "fake" success response sent to the user.
     """

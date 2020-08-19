@@ -637,7 +637,7 @@ class RoomCreationHandler(BaseHandler):
                 raise SynapseError(400, "Invalid user_id: %s" % (i,))
 
         if (invite_list or invite_3pid_list) and requester.shadow_banned:
-            # We randomly sleep a bit just to annoy the requester a bit.
+            # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
 
             # Allow the request to go through, but remove any associated invites.

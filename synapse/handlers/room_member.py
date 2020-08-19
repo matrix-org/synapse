@@ -313,7 +313,7 @@ class RoomMemberHandler(object):
             ShadowBanError if a shadow-banned requester attempts to send an invite.
         """
         if action == Membership.INVITE and requester.shadow_banned:
-            # We randomly sleep a bit just to annoy the requester a bit.
+            # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
             raise ShadowBanError()
 
@@ -832,7 +832,7 @@ class RoomMemberHandler(object):
                 )
 
         if requester.shadow_banned:
-            # We randomly sleep a bit just to annoy the requester a bit.
+            # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
             raise ShadowBanError()
 

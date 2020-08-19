@@ -318,7 +318,7 @@ class JoinRoomAliasServlet(RestServlet):
             if not (join_rules_event.content.get("join_rule") == JoinRules.PUBLIC):
                 # update_membership with an action of "invite" can raise a
                 # ShadowBanError. This is not handled since it is assumed that
-                # an admin isn't going to call this API with shadow-banned user.
+                # an admin isn't going to call this API with a shadow-banned user.
                 await self.room_member_handler.update_membership(
                     requester=requester,
                     target=fake_requester.user,

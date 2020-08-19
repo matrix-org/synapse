@@ -733,7 +733,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                     content.get("id_access_token"),
                 )
             except ShadowBanError:
-                # Pretend the request succeed.
+                # Pretend the request succeeded.
                 pass
             return 200, {}
 
@@ -757,7 +757,7 @@ class RoomMembershipRestServlet(TransactionRestServlet):
                 content=event_content,
             )
         except ShadowBanError:
-            # Pretend the request succeed.
+            # Pretend the request succeeded.
             pass
 
         return_value = {}

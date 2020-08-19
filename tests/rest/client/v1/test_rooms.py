@@ -2025,7 +2025,7 @@ class ShadowBannedTestCase(unittest.HomeserverTestCase):
         self.assertEqual(invited_rooms, [])
 
     def test_create_room(self):
-        """A shadow-banned users should be able to create a room."""
+        """A shadow-banned user should be able to create a room."""
 
         room_id = self.helper.create_room_as(
             self.banned_user_id, tok=self.banned_access_token
