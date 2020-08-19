@@ -19,6 +19,7 @@ from canonicaljson import json
 
 from synapse.api.errors import StoreError
 from synapse.storage._base import SQLBaseStore, db_to_json
+from synapse.storage.database import LoggingTransaction
 from synapse.types import JsonDict
 from synapse.util import stringutils as stringutils
 
@@ -214,14 +215,16 @@ class UIAuthWorkerStore(SQLBaseStore):
             value,
         )
 
-    def _set_ui_auth_session_data_txn(self, txn, session_id: str, key: str, value: Any):
+    def _set_ui_auth_session_data_txn(
+        self, txn: LoggingTransaction, session_id: str, key: str, value: Any
+    ):
         # Get the current value.
         result = self.db_pool.simple_select_one_txn(
             txn,
             table="ui_auth_sessions",
             keyvalues={"session_id": session_id},
             retcols=("serverdict",),
-        )
+        )  # type: Dict[str, Any]  # type: ignore
 
         # Update it and add it back to the database.
         serverdict = db_to_json(result["serverdict"])
@@ -275,7 +278,9 @@ class UIAuthStore(UIAuthWorkerStore):
             expiration_time,
         )
 
-    def _delete_old_ui_auth_sessions_txn(self, txn, expiration_time: int):
+    def _delete_old_ui_auth_sessions_txn(
+        self, txn: LoggingTransaction, expiration_time: int
+    ):
         # Get the expired sessions.
         sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
         txn.execute(sql, [expiration_time])
