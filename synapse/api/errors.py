@@ -21,9 +21,9 @@ import typing
 from http import HTTPStatus
 from typing import Dict, List, Optional, Union
 
-from canonicaljson import json
-
 from twisted.web import http
+
+from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
     from synapse.types import JsonDict
@@ -593,7 +593,7 @@ class HttpResponseException(CodeMessageException):
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
         try:
-            j = json.loads(self.response.decode("utf-8"))
+            j = json_decoder.decode(self.response.decode("utf-8"))
         except ValueError:
             j = {}
 

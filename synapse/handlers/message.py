@@ -17,7 +17,7 @@
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from canonicaljson import encode_canonical_json, json
+from canonicaljson import encode_canonical_json
 
 from twisted.internet.interfaces import IDelayedCall
 
@@ -55,6 +55,7 @@ from synapse.types import (
     UserID,
     create_requester,
 )
+from synapse.util import json_decoder
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
 from synapse.util.metrics import measure_func
@@ -667,14 +668,14 @@ class EventCreationHandler(object):
         assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
 
         if event.is_state():
-            prev_state = await self.deduplicate_state_event(event, context)
-            if prev_state is not None:
+            prev_event = await self.deduplicate_state_event(event, context)
+            if prev_event is not None:
                 logger.info(
                     "Not bothering to persist state event %s duplicated by %s",
                     event.event_id,
-                    prev_state.event_id,
+                    prev_event.event_id,
                 )
-                return prev_state
+                return await self.store.get_stream_id_for_event(prev_event.event_id)
 
         return await self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
@@ -682,27 +683,32 @@ class EventCreationHandler(object):
 
     async def deduplicate_state_event(
         self, event: EventBase, context: EventContext
-    ) -> None:
+    ) -> Optional[EventBase]:
         """
         Checks whether event is in the latest resolved state in context.
 
-        If so, returns the version of the event in context.
-        Otherwise, returns None.
+        Args:
+            event: The event to check for duplication.
+            context: The event context.
+
+        Returns:
+            The previous verion of the event is returned, if it is found in the
+            event context. Otherwise, None is returned.
         """
         prev_state_ids = await context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
         if not prev_event_id:
-            return
+            return None
         prev_event = await self.store.get_event(prev_event_id, allow_none=True)
         if not prev_event:
-            return
+            return None
 
         if prev_event and event.user_id == prev_event.user_id:
             prev_content = encode_canonical_json(prev_event.content)
             next_content = encode_canonical_json(event.content)
             if prev_content == next_content:
                 return prev_event
-        return
+        return None
 
     async def create_and_send_nonmember_event(
         self,
@@ -859,7 +865,7 @@ class EventCreationHandler(object):
         # Ensure that we can round trip before trying to persist in db
         try:
             dump = frozendict_json_encoder.encode(event.content)
-            json.loads(dump)
+            json_decoder.decode(dump)
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
             raise
@@ -955,7 +961,7 @@ class EventCreationHandler(object):
                     allow_none=True,
                 )
 
-                is_admin_redaction = (
+                is_admin_redaction = bool(
                     original_event and event.sender != original_event.sender
                 )
 
@@ -1075,8 +1081,8 @@ class EventCreationHandler(object):
             auth_events_ids = self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
-            auth_events = await self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
+            auth_events_map = await self.store.get_events(auth_events_ids)
+            auth_events = {(e.type, e.state_key): e for e in auth_events_map.values()}
 
             room_version = await self.store.get_room_version_id(event.room_id)
             room_version_obj = KNOWN_ROOM_VERSIONS[room_version]

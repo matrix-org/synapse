@@ -23,7 +23,7 @@ from jsonschema import FormatChecker
 
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
-from synapse.storage.presence import UserPresenceState
+from synapse.api.presence import UserPresenceState
 from synapse.types import RoomID, UserID
 
 FILTER_SCHEMA = {

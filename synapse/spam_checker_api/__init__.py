@@ -62,5 +62,5 @@ class SpamCheckerApi(object):
         state_ids = yield self._store.get_filtered_current_state_ids(
             room_id=room_id, state_filter=StateFilter.from_types(types)
         )
-        state = yield self._store.get_events(state_ids.values())
+        state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()

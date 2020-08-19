@@ -159,7 +159,7 @@ class PushRuleRestServlet(RestServlet):
         return 200, {}
 
     def notify_user(self, user_id):
-        stream_id, _ = self.store.get_push_rules_stream_token()
+        stream_id = self.store.get_max_push_rules_stream_id()
         self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
     async def set_rule_attr(self, user_id, spec, val):

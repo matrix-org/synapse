@@ -1,12 +1,12 @@
-matrix-synapse-py3 (1.xx.0) stable; urgency=medium
+matrix-synapse-py3 (1.19.0) stable; urgency=medium
 
   [ Synapse Packaging team ]
-  * New synapse release 1.xx.0.
+  * New synapse release 1.19.0.
 
   [ Aaron Raimist ]
   * Fix outdated documentation for SYNAPSE_CACHE_FACTOR
 
- -- Synapse Packaging team <packages@matrix.org>  XXXXX
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 17 Aug 2020 14:06:42 +0100
 
 matrix-synapse-py3 (1.18.0) stable; urgency=medium
 

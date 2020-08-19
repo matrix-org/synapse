@@ -42,7 +42,6 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
-from synapse.push.mailer import load_jinja2_templates
 from synapse.types import Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.threepids import canonicalise_email
@@ -132,18 +131,17 @@ class AuthHandler(BaseHandler):
         # after the SSO completes and before redirecting them back to their client.
         # It notifies the user they are about to give access to their matrix account
         # to the client.
-        self._sso_redirect_confirm_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["sso_redirect_confirm.html"],
-        )[0]
+        self._sso_redirect_confirm_template = hs.config.sso_redirect_confirm_template
+
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
-        self._sso_auth_confirm_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["sso_auth_confirm.html"],
-        )[0]
+        self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
+
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
         self._sso_auth_success_template = hs.config.sso_auth_success_template
+
         # The following template is shown during the SSO authentication process if
         # the account is deactivated.
         self._sso_account_deactivated_template = (

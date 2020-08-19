@@ -44,7 +44,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
 )
-from synapse.push.mailer import load_jinja2_templates
+from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -81,23 +81,11 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         self.config = hs.config
 
         if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            from synapse.push.mailer import Mailer, load_jinja2_templates
-
-            template_html, template_text = load_jinja2_templates(
-                self.config.email_template_dir,
-                [
-                    self.config.email_registration_template_html,
-                    self.config.email_registration_template_text,
-                ],
-                apply_format_ts_filter=True,
-                apply_mxc_to_http_filter=True,
-                public_baseurl=self.config.public_baseurl,
-            )
             self.mailer = Mailer(
                 hs=self.hs,
                 app_name=self.config.email_app_name,
-                template_html=template_html,
-                template_text=template_text,
+                template_html=self.config.email_registration_template_html,
+                template_text=self.config.email_registration_template_text,
             )
 
     async def on_POST(self, request):
@@ -262,15 +250,8 @@ class RegistrationSubmitTokenServlet(RestServlet):
         self.store = hs.get_datastore()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_registration_template_failure_html],
-            )
-
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            (self.failure_email_template,) = load_jinja2_templates(
-                self.config.email_template_dir,
-                [self.config.email_registration_template_failure_html],
+            self._failure_email_template = (
+                self.config.email_registration_template_failure_html
             )
 
     async def on_GET(self, request, medium):
@@ -318,7 +299,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
             # Show a failure page with a reason
             template_vars = {"failure_reason": e.msg}
-            html = self.failure_email_template.render(**template_vars)
+            html = self._failure_email_template.render(**template_vars)
 
         respond_with_html(request, status_code, html)
 
