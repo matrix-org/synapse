@@ -2050,13 +2050,25 @@ class ShadowBannedTestCase(unittest.HomeserverTestCase):
         identity_handler.lookup_3pid.assert_not_called()
 
     def test_create_room(self):
-        """A shadow-banned user should be able to create a room."""
-
-        room_id = self.helper.create_room_as(
-            self.banned_user_id, tok=self.banned_access_token
+        """Invitations during a room creation should be discarded, but the room still gets created."""
+        # The room creation is successful.
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/createRoom",
+            {"visibility": "public", "invite": [self.other_user_id]},
+            access_token=self.banned_access_token,
         )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        room_id = channel.json_body["room_id"]
 
-        # This creates a real room, so the other user should be able to join it.
+        # But the user wasn't actually invited.
+        invited_rooms = self.get_success(
+            self.store.get_invited_rooms_for_local_user(self.other_user_id)
+        )
+        self.assertEqual(invited_rooms, [])
+
+        # Since a real room was created, the other user should be able to join it.
         self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
 
         # Both users should be in the room.
