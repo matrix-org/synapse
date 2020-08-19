@@ -19,12 +19,11 @@ import random
 from abc import ABCMeta
 from typing import Any, Optional
 
-from canonicaljson import json
-
 from synapse.storage.database import LoggingTransaction  # noqa: F401
 from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
 from synapse.storage.database import DatabasePool
 from synapse.types import Collection, get_domain_from_id
+from synapse.util import json_decoder
 
 logger = logging.getLogger(__name__)
 
@@ -99,13 +98,13 @@ def db_to_json(db_content):
     if isinstance(db_content, memoryview):
         db_content = db_content.tobytes()
 
-    # Decode it to a Unicode string before feeding it to json.loads, since
+    # Decode it to a Unicode string before feeding it to the JSON decoder, since
     # Python 3.5 does not support deserializing bytes.
     if isinstance(db_content, (bytes, bytearray)):
         db_content = db_content.decode("utf8")
 
     try:
-        return json.loads(db_content)
+        return json_decoder.decode(db_content)
     except Exception:
         logging.warning("Tried to decode '%r' as JSON and failed", db_content)
         raise
