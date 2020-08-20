@@ -591,12 +591,17 @@ class RegisterRestServlet(RestServlet):
                                 Codes.THREEPID_IN_USE,
                             )
 
+            entries = await self.store.get_user_agents_ips_to_ui_auth_session(
+                session_id
+            )
+
             registered_user_id = await self.registration_handler.register_user(
                 localpart=desired_username,
                 password_hash=password_hash,
                 guest_access_token=guest_access_token,
                 threepid=threepid,
                 address=client_addr,
+                user_agent_ips=entries,
             )
             # Necessary due to auth checks prior to the threepid being
             # written to the db

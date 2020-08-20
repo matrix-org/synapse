@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import attr
 
@@ -260,6 +260,34 @@ class UIAuthWorkerStore(SQLBaseStore):
 
         return serverdict.get(key, default)
 
+    async def add_user_agent_ip_to_ui_auth_session(
+        self, session_id: str, user_agent: str, ip: str,
+    ):
+        """Add the given user agent / IP to the tracking table
+        """
+        await self.db_pool.simple_upsert(
+            table="ui_auth_sessions_ips",
+            keyvalues={"session_id": session_id, "user_agent": user_agent, "ip": ip},
+            values={},
+            desc="add_user_agent_ip_to_ui_auth_session",
+        )
+
+    async def get_user_agents_ips_to_ui_auth_session(
+        self, session_id: str,
+    ) -> List[Tuple[str, str]]:
+        """Get the given user agents / IPs used during the ui auth process
+
+        Returns:
+            List of user_agent/ip pairs
+        """
+        rows = await self.db_pool.simple_select_list(
+            table="ui_auth_sessions_ips",
+            keyvalues={"session_id": session_id},
+            retcols=("user_agent", "ip"),
+            desc="get_user_agents_ips_to_ui_auth_session",
+        )
+        return [(row["user_agent"], row["ip"]) for row in rows]
+
 
 class UIAuthStore(UIAuthWorkerStore):
     def delete_old_ui_auth_sessions(self, expiration_time: int):
@@ -284,6 +312,15 @@ class UIAuthStore(UIAuthWorkerStore):
         sql = "SELECT session_id FROM ui_auth_sessions WHERE creation_time <= ?"
         txn.execute(sql, [expiration_time])
         session_ids = [r[0] for r in txn.fetchall()]
+
+        # Delete the corresponding IP/user agents.
+        self.db_pool.simple_delete_many_txn(
+            txn,
+            table="ui_auth_sessions_ips",
+            column="session_id",
+            iterable=session_ids,
+            keyvalues={},
+        )
 
         # Delete the corresponding completed credentials.
         self.db_pool.simple_delete_many_txn(
