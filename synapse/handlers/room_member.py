@@ -459,8 +459,8 @@ class RoomMemberHandler(object):
 
             if is_host_in_room:
                 time_now_s = self.clock.time()
-                allowed, time_allowed = self._join_rate_limiter_local.can_do_action(
-                    requester.user.to_string(),
+                allowed, time_allowed = self._join_rate_limiter_local.can_requester_do_action(
+                    requester,
                 )
 
                 if not allowed:
@@ -470,8 +470,8 @@ class RoomMemberHandler(object):
 
             else:
                 time_now_s = self.clock.time()
-                allowed, time_allowed = self._join_rate_limiter_remote.can_do_action(
-                    requester.user.to_string(),
+                allowed, time_allowed = self._join_rate_limiter_remote.can_requester_do_action(
+                    requester,
                 )
 
                 if not allowed:
