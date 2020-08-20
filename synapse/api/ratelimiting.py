@@ -58,11 +58,7 @@ class Ratelimiter(object):
             return True, -1.0
 
         return self.can_do_action(
-            requester.user.to_string(),
-            rate_hz,
-            burst_count,
-            update,
-            _time_now_s
+            requester.user.to_string(), rate_hz, burst_count, update, _time_now_s
         )
 
     def can_do_action(
