@@ -48,8 +48,10 @@ class SpamCheckerApi(object):
             twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
                 The filtered state events in the room.
         """
-        state_ids = yield self._store.get_filtered_current_state_ids(
-            room_id=room_id, state_filter=StateFilter.from_types(types)
+        state_ids = yield defer.ensureDeferred(
+            self._store.get_filtered_current_state_ids(
+                room_id=room_id, state_filter=StateFilter.from_types(types)
+            )
         )
         state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()
