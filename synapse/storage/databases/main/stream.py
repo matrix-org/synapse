@@ -595,7 +595,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             A stream ID.
         """
         return await self.db_pool.runInteraction(
-            "get_stream_id_for_event", self.get_stream_id_for_event_txn,
+            "get_stream_id_for_event", self.get_stream_id_for_event_txn, event_id,
         )
 
     def get_stream_id_for_event_txn(
