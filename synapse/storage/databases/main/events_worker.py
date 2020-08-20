@@ -79,7 +79,7 @@ class EventsWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(EventsWorkerStore, self).__init__(database, db_conn, hs)
 
-        if hs.config.worker.writers.events == hs.get_instance_name():
+        if hs.get_instance_name() in hs.config.worker.writers.events:
             # We are the process in charge of generating stream ids for events,
             # so instantiate ID generators based on the database
             if isinstance(database.engine, PostgresEngine):
