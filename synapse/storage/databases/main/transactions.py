@@ -14,14 +14,13 @@
 # limitations under the License.
 import logging
 from collections import namedtuple
-from typing import List, Optional, Iterable
+from typing import Iterable, List, Optional
 
 from canonicaljson import encode_canonical_json
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
-from synapse.types import Collection
 from synapse.util.caches.expiringcache import ExpiringCache
 
 db_binary_type = memoryview
@@ -266,7 +265,9 @@ class TransactionStore(SQLBaseStore):
             "_cleanup_transactions", _cleanup_transactions_txn
         )
 
-    async def get_last_successful_stream_ordering(self, destination: str) -> Optional[int]:
+    async def get_last_successful_stream_ordering(
+        self, destination: str
+    ) -> Optional[int]:
         """
         Gets the stream ordering of the PDU most-recently successfully sent
         to the specified destination.
@@ -350,7 +351,9 @@ class TransactionStore(SQLBaseStore):
         event_ids = [row[0] for row in txn]
         return event_ids
 
-    async def get_largest_destination_rooms_stream_order(self, destination: str) -> Optional[int]:
+    async def get_largest_destination_rooms_stream_order(
+        self, destination: str
+    ) -> Optional[int]:
         """
         Returns the largest stream_ordering from the destination_rooms table
         that corresponds to this destination.

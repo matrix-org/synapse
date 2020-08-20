@@ -1,4 +1,3 @@
-from asyncio.futures import Future
 from typing import List, Tuple
 
 from mock import Mock
@@ -32,7 +31,9 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         state_handler = hs.get_state_handler()
 
         # This mock is crucial for destination_rooms to be populated.
-        state_handler.get_current_hosts_in_room = Mock(return_value=make_awaitable(["test", "host2"]))
+        state_handler.get_current_hosts_in_room = Mock(
+            return_value=make_awaitable(["test", "host2"])
+        )
 
         # whenever send_transaction is called, record the pdu data
         self.pdus = []

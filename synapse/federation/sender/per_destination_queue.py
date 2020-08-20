@@ -504,9 +504,7 @@ class PerDestinationQueue(object):
             #   of redacted events to the destination.
             # - don't need to worry about rejected events as we do not actively
             #   forward received events over federation.
-            events = await self._store.get_events_as_list(
-                event_ids
-            )
+            events = await self._store.get_events_as_list(event_ids)
 
             # zip them together with their stream orderings
             catch_up_pdus = [
