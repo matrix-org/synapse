@@ -1,0 +1,1 @@
+Appservices which are exempt from ratelimiting are no longer ratelimited when joining rooms.
