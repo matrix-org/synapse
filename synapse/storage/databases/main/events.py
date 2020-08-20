@@ -155,8 +155,8 @@ class PersistEventsStore:
         # Note: Multiple instances of this function cannot be in flight at
         # the same time for the same room.
         if backfilled:
-            stream_ordering_manager = self._backfill_id_gen.get_next_mult(
-                len(events_and_contexts)
+            stream_ordering_manager = await maybe_awaitable(
+                self._backfill_id_gen.get_next_mult(len(events_and_contexts))
             )
         else:
             stream_ordering_manager = await maybe_awaitable(
@@ -164,6 +164,9 @@ class PersistEventsStore:
             )
 
         with stream_ordering_manager as stream_orderings:
+            if backfilled:
+                stream_orderings = [-s for s in stream_orderings]
+
             for (event, context), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 

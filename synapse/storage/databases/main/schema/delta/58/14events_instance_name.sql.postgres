@@ -18,3 +18,9 @@ CREATE SEQUENCE IF NOT EXISTS events_stream_seq;
 SELECT setval('events_stream_seq', (
     SELECT COALESCE(MAX(stream_ordering), 1) FROM events
 ));
+
+CREATE SEQUENCE IF NOT EXISTS events_backfill_stream_seq;
+
+SELECT setval('events_backfill_stream_seq', (
+    SELECT COALESCE(-MIN(stream_ordering), 1) FROM events
+));

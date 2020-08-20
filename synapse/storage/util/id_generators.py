@@ -202,6 +202,7 @@ class MultiWriterIdGenerator:
     ):
         self._db = db
         self._instance_name = instance_name
+        self._sequence_name = sequence_name
 
         # We lock as some functions may be called from DB threads.
         self._lock = threading.Lock()
@@ -219,7 +220,7 @@ class MultiWriterIdGenerator:
         # and b) noting that if we have seen a run of persisted positions
         # without gaps (e.g. 5, 6, 7) then we can skip forward (e.g. to 7).
         self._persisted_upto_position = (
-            min(self._current_positions.values()) if self._current_positions else 0
+            min(self._current_positions.values()) if self._current_positions else 1
         )
         self._known_persisted_positions = []  # type: List[int]
 
@@ -415,7 +416,8 @@ class MultiWriterIdGenerator:
                 break
 
         logger.info(
-            "Got new_id: %s, setting persited pos to %s",
+            "Got new_id %s: %s, setting persited pos to %s",
+            self._sequence_name,
             new_id,
             self._persisted_upto_position,
         )

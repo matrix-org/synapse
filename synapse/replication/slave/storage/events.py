@@ -80,4 +80,4 @@ class SlavedEventStore(
         return self._stream_id_gen.get_current_token()
 
     def get_room_min_stream_ordering(self):
-        return self._backfill_id_gen.get_current_token()
+        return -self._backfill_id_gen.get_current_token()
