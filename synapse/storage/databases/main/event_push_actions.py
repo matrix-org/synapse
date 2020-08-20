@@ -122,8 +122,22 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
     @cachedInlineCallbacks(num_args=3, tree=True, max_entries=5000)
     def get_unread_event_push_actions_by_room_for_user(
-        self, room_id, user_id, last_read_event_id
-    ):
+        self, room_id: str, user_id: str, last_read_event_id: Optional[str],
+    ) -> Dict[str, int]:
+        """Get the notification count, the highlight count and the unread message count
+        for a given user in a given room after the given read receipt.
+
+        Args:
+            room_id: The room to retrieve the counts in.
+            user_id: The user to retrieve the counts for.
+            last_read_event_id: The event associated with the latest read receipt for
+                this user in this room. None if no receipt for this user in this room.
+
+        Returns
+            A dict containing the counts mentioned earlier in this docstring,
+            respectively under the keys "notify_count", "highlight_count" and
+            "unread_count".
+        """
         ret = yield self.db_pool.runInteraction(
             "get_unread_event_push_actions_by_room",
             self._get_unread_counts_by_receipt_txn,
@@ -212,9 +226,8 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             push_actions_column: The column to filter by when querying from
                 event_push_actions. The filtering will be done on the condition
                 "[column] = 1".
-            push_summary_column: The count in event_push_summary to add the results from
-                the first query to. None if there is no count in the event_push_summary
-                table to add the results to.
+            push_summary_column: The count in event_push_summary to retrieve and add to
+                the results from the first query. None if there's no such count.
 
         Returns:
             The desired count.
@@ -504,7 +517,9 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             _get_if_maybe_push_in_range_for_user_txn,
         )
 
-    async def add_push_actions_to_staging(self, event_id, user_id_actions):
+    async def add_push_actions_to_staging(
+        self, event_id, user_id_actions, count_as_unread=False,
+    ):
         """Add the push actions for the event to the push action staging area.
 
         Args:
@@ -512,10 +527,14 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             user_id_actions (dict[str, list[dict|str])]): A dictionary mapping
                 user_id to list of push actions, where an action can either be
                 a string or dict.
+            count_as_unread (bool): Whether this event should increment the
+                unread counts.
 
         Returns:
             Deferred
         """
+
+        print(count_as_unread)
 
         if not user_id_actions:
             return
@@ -525,7 +544,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         def _gen_entry(user_id, actions):
             is_highlight = 1 if _action_has_highlight(actions) else 0
             notif = 1 if "notify" in actions else 0
-            unread = 1 if "mark_unread" in actions else 0
+            unread = int(count_as_unread)
             return (
                 event_id,  # event_id column
                 user_id,  # user_id column
@@ -922,14 +941,17 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
             LEFT JOIN event_push_summary AS old USING (user_id, room_id)
         """
 
+        # First get the count of unread messages.
         txn.execute(
             sql % ("unread_count", "unread"),
             (old_rotate_stream_ordering, rotate_to_stream_ordering),
         )
 
-        # We need to merge both lists into a single object because we might not have the
-        # same amount of rows in each of them. In this case we use a dict indexed on the
-        # user ID and room ID to make it easier to populate.
+        # We need to merge results from the two requests (the one that retrieves the
+        # unread count and the one that retrieves the notifications count) into a single
+        # object because we might not have the same amount of rows in each of them. To do
+        # this, we use a dict indexed on the user ID and room ID to make it easier to
+        # populate.
         summaries = {}  # type: Dict[Tuple[str, str], EventPushSummary]
         for row in txn:
             summaries[(row[0], row[1])] = EventPushSummary(
@@ -950,7 +972,9 @@ class EventPushActionsStore(EventPushActionsWorkerStore):
                 summaries[(row[0], row[1])].notif_count = row[2]
             else:
                 # Because the rules on notifying are different than the rules on marking
-                # a message unread, we might end up with messages that notify and
+                # a message unread, we might end up with messages that notify but aren't
+                # marked unread, so we might not have a summary for this (user, room)
+                # tuple to complete.
                 summaries[(row[0], row[1])] = EventPushSummary(
                     unread_count=0,
                     stream_ordering=row[3],

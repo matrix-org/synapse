@@ -177,9 +177,12 @@ class BulkPushRuleEvaluator(object):
         return pl_event.content if pl_event else {}, sender_level
 
     async def action_for_event_by_user(self, event, context) -> None:
-        """Given an event and context, evaluate the push rules and insert the
-        results into the event_push_actions_staging table.
+        """Given an event and context, evaluate the push rules, check if the message
+        should increment the unread count, and insert the results into the
+        event_push_actions_staging table.
         """
+        count_as_unread = _should_count_as_unread(event, context)
+
         rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user = {}
 
@@ -230,23 +233,12 @@ class BulkPushRuleEvaluator(object):
                         actions_by_user[uid] = actions
                     break
 
-            # If the event should be counted as unread, add mark_unread to its actions.
-            # mark_unread is an internal action we use to tell add_push_actions_to_staging
-            # that we want this event to have the unread bit set to 1 in the push action
-            # tables.
-            # The push rules endpoint on the CS API checks the actions on new push rules
-            # and limit them to spec'd ones, so we shouldn't have to worry about users
-            # changing their push rules to include this action.
-            if _should_count_as_unread(event, context):
-                if uid in actions_by_user:
-                    actions_by_user[uid].append("mark_unread")
-                else:
-                    actions_by_user[uid] = ["mark_unread"]
-
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist
         # the event)
-        await self.store.add_push_actions_to_staging(event.event_id, actions_by_user)
+        await self.store.add_push_actions_to_staging(
+            event.event_id, actions_by_user, count_as_unread,
+        )
 
 
 def _condition_checker(evaluator, conditions, uid, display_name, cache):
@@ -426,8 +418,8 @@ class RulesForRoom(object):
         Args:
             ret_rules_by_user (dict): Partiallly filled dict of push rules. Gets
                 updated with any new rules.
-            member_event_ids (dict): List of event ids for membership events that
-                have happened since the last time we filled rules_by_user
+            member_event_ids (dict): Dict of user id to event id for membership events
+                that have happened since the last time we filled rules_by_user
             state_group: The state group we are currently computing push rules
                 for. Used when updating the cache.
         """
@@ -455,7 +447,7 @@ class RulesForRoom(object):
 
         logger.debug("Joined: %r", user_ids)
 
-        # Previously we only considered users with pushers and read receipts in that
+        # Previously we only considered users with pushers or read receipts in that
         # room. We can't do this anymore because we use push actions to calculate unread
         # counts, which don't rely on the user having pushers or sent a read receipt into
         # the room. Therefore we just need to filter for local users here.

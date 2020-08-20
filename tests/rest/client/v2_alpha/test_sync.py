@@ -378,7 +378,6 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
             tok=self.tok,
         )
 
-    # @unittest.DEBUG
     def test_unread_counts(self):
         """Tests that /sync returns the right value for the unread count (MSC2654)."""
 
