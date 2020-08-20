@@ -102,7 +102,7 @@ class EventsWorkerStore(SQLBaseStore):
         else:
             # We shouldn't be running in worker mode with SQLite, but its useful
             # to support if for unit tests.
-            if hs.config.worker.writers.events == hs.get_instance_name():
+            if hs.get_instance_name() in hs.config.worker.writers.events:
                 self._stream_id_gen = StreamIdGenerator(
                     db_conn, "events", "stream_ordering",
                 )
