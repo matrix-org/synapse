@@ -124,7 +124,9 @@ class RegistrationHandler(BaseHandler):
             try:
                 int(localpart)
                 raise SynapseError(
-                    400, "Numeric user IDs are reserved for guest users."
+                    400,
+                    "Numeric user IDs are reserved for guest users.",
+                    errcode=Codes.INVALID_USERNAME,
                 )
             except ValueError:
                 pass
