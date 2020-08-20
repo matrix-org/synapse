@@ -117,7 +117,7 @@ def make_conn(
 #
 # Python 3.5.2 doesn't support Callable with an ellipsis, so we wrap it in quotes so
 # that mypy sees the type but the runtime python doesn't.
-_CallbackListEntry = Tuple["Callable[..., None]", Iterable[Any], Dict[str, Any]]
+_CallbackListEntry = Tuple[Callable[..., None], Iterable[Any], Dict[str, Any]]
 
 
 class LoggingTransaction:
@@ -161,7 +161,7 @@ class LoggingTransaction:
         self.after_callbacks = after_callbacks
         self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback: "Callable[..., None]", *args: Any, **kwargs: Any):
+    def call_after(self, callback: Callable[..., None], *args: Any, **kwargs: Any):
         """Call the given callback on the main twisted thread after the
         transaction has finished. Used to invalidate the caches on the
         correct thread.
@@ -173,7 +173,7 @@ class LoggingTransaction:
         self.after_callbacks.append((callback, args, kwargs))
 
     def call_on_exception(
-        self, callback: "Callable[..., None]", *args: Any, **kwargs: Any
+        self, callback: Callable[..., None], *args: Any, **kwargs: Any
     ):
         # if self.exception_callbacks is None, that means that whatever constructed the
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
@@ -280,6 +280,9 @@ class PerformanceCounters(object):
         )
 
         return top_n_counters
+
+
+R = TypeVar("R")
 
 
 class DatabasePool(object):
@@ -395,10 +398,10 @@ class DatabasePool(object):
         desc: str,
         after_callbacks: List[_CallbackListEntry],
         exception_callbacks: List[_CallbackListEntry],
-        func: Callable,
+        func: Callable[..., R],
         *args: Any,
         **kwargs: Any
-    ) -> Any:
+    ) -> R:
         start = monotonic_time()
         txn_id = self._TXN_ID
 
@@ -547,7 +550,9 @@ class DatabasePool(object):
 
         return result
 
-    async def runWithConnection(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+    async def runWithConnection(
+        self, func: Callable[..., R], *args: Any, **kwargs: Any
+    ) -> R:
         """Wraps the .runWithConnection() method on the underlying db_pool.
 
         Arguments:
