@@ -22,7 +22,7 @@ import logging
 import math
 import string
 from collections import OrderedDict
-from typing import Optional, Tuple
+from typing import Awaitable, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -1041,7 +1041,7 @@ class RoomEventSource(object):
     ):
         # We just ignore the key for now.
 
-        to_key = await self.get_current_key()
+        to_key = self.get_current_key()
 
         from_token = RoomStreamToken.parse(from_key)
         if from_token.topological:
@@ -1081,10 +1081,10 @@ class RoomEventSource(object):
 
         return (events, end_key)
 
-    def get_current_key(self):
-        return self.store.get_room_events_max_id()
+    def get_current_key(self) -> str:
+        return "s%d" % (self.store.get_room_max_stream_ordering(),)
 
-    def get_current_key_for_room(self, room_id):
+    def get_current_key_for_room(self, room_id: str) -> Awaitable[str]:
         return self.store.get_room_events_max_id(room_id)
 
 

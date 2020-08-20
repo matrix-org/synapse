@@ -34,7 +34,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(
+    async def _serialize_payload(
         user_id,
         password_hash,
         was_guest,
@@ -105,7 +105,7 @@ class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(user_id, auth_result, access_token):
+    async def _serialize_payload(user_id, auth_result, access_token):
         """
         Args:
             user_id (str): The user ID that consented

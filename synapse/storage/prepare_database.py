@@ -47,8 +47,8 @@ class UpgradeDatabaseException(PrepareDatabaseException):
     pass
 
 
-def prepare_database(db_conn, database_engine, config, data_stores=["main", "state"]):
-    """Prepares a database for usage. Will either create all necessary tables
+def prepare_database(db_conn, database_engine, config, databases=["main", "state"]):
+    """Prepares a physical database for usage. Will either create all necessary tables
     or upgrade from an older schema version.
 
     If `config` is None then prepare_database will assert that no upgrade is
@@ -60,8 +60,8 @@ def prepare_database(db_conn, database_engine, config, data_stores=["main", "sta
         config (synapse.config.homeserver.HomeServerConfig|None):
             application config, or None if we are connecting to an existing
             database which we expect to be configured already
-        data_stores (list[str]): The name of the data stores that will be used
-            with this database. Defaults to all data stores.
+        databases (list[str]): The name of the databases that will be used
+            with this physical database. Defaults to all databases.
     """
 
     try:
@@ -87,10 +87,10 @@ def prepare_database(db_conn, database_engine, config, data_stores=["main", "sta
                     upgraded,
                     database_engine,
                     config,
-                    data_stores=data_stores,
+                    databases=databases,
                 )
         else:
-            _setup_new_database(cur, database_engine, data_stores=data_stores)
+            _setup_new_database(cur, database_engine, databases=databases)
 
         # check if any of our configured dynamic modules want a database
         if config is not None:
@@ -103,9 +103,9 @@ def prepare_database(db_conn, database_engine, config, data_stores=["main", "sta
         raise
 
 
-def _setup_new_database(cur, database_engine, data_stores):
-    """Sets up the database by finding a base set of "full schemas" and then
-    applying any necessary deltas, including schemas from the given data
+def _setup_new_database(cur, database_engine, databases):
+    """Sets up the physical database by finding a base set of "full schemas" and
+    then applying any necessary deltas, including schemas from the given data
     stores.
 
     The "full_schemas" directory has subdirectories named after versions. This
@@ -138,8 +138,8 @@ def _setup_new_database(cur, database_engine, data_stores):
     Args:
         cur (Cursor): a database cursor
         database_engine (DatabaseEngine)
-        data_stores (list[str]): The names of the data stores to instantiate
-            on the given database.
+        databases (list[str]): The names of the databases to instantiate
+            on the given physical database.
     """
 
     # We're about to set up a brand new database so we check that its
@@ -176,13 +176,13 @@ def _setup_new_database(cur, database_engine, data_stores):
     directories.extend(
         os.path.join(
             dir_path,
-            "data_stores",
-            data_store,
+            "databases",
+            database,
             "schema",
             "full_schemas",
             str(max_current_ver),
         )
-        for data_store in data_stores
+        for database in databases
     )
 
     directory_entries = []
@@ -219,7 +219,7 @@ def _setup_new_database(cur, database_engine, data_stores):
         upgraded=False,
         database_engine=database_engine,
         config=None,
-        data_stores=data_stores,
+        databases=databases,
         is_empty=True,
     )
 
@@ -231,10 +231,10 @@ def _upgrade_existing_database(
     upgraded,
     database_engine,
     config,
-    data_stores,
+    databases,
     is_empty=False,
 ):
-    """Upgrades an existing database.
+    """Upgrades an existing physical database.
 
     Delta files can either be SQL stored in *.sql files, or python modules
     in *.py.
@@ -285,8 +285,8 @@ def _upgrade_existing_database(
         config (synapse.config.homeserver.HomeServerConfig|None):
             None if we are initialising a blank database, otherwise the application
             config
-        data_stores (list[str]): The names of the data stores to instantiate
-            on the given database.
+        databases (list[str]): The names of the databases to instantiate
+            on the given physical database.
         is_empty (bool): Is this a blank database? I.e. do we need to run the
             upgrade portions of the delta scripts.
     """
@@ -303,8 +303,8 @@ def _upgrade_existing_database(
 
     # some of the deltas assume that config.server_name is set correctly, so now
     # is a good time to run the sanity check.
-    if not is_empty and "main" in data_stores:
-        from synapse.storage.data_stores.main import check_database_before_upgrade
+    if not is_empty and "main" in databases:
+        from synapse.storage.databases.main import check_database_before_upgrade
 
         check_database_before_upgrade(cur, database_engine, config)
 
@@ -330,11 +330,9 @@ def _upgrade_existing_database(
         # First we find the directories to search in
         delta_dir = os.path.join(dir_path, "schema", "delta", str(v))
         directories = [delta_dir]
-        for data_store in data_stores:
+        for database in databases:
             directories.append(
-                os.path.join(
-                    dir_path, "data_stores", data_store, "schema", "delta", str(v)
-                )
+                os.path.join(dir_path, "databases", database, "schema", "delta", str(v))
             )
 
         # Used to check if we have any duplicate file names

@@ -609,13 +609,15 @@ class SynapseCmd(cmd.Cmd):
 
     @defer.inlineCallbacks
     def _do_event_stream(self, timeout):
-        res = yield self.http_client.get_json(
-            self._url() + "/events",
-            {
-                "access_token": self._tok(),
-                "timeout": str(timeout),
-                "from": self.event_stream_token,
-            },
+        res = yield defer.ensureDeferred(
+            self.http_client.get_json(
+                self._url() + "/events",
+                {
+                    "access_token": self._tok(),
+                    "timeout": str(timeout),
+                    "from": self.event_stream_token,
+                },
+            )
         )
         print(json.dumps(res, indent=4))
 
