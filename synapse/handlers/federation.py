@@ -17,6 +17,7 @@
 
 """Contains handlers for federation events."""
 
+import collections
 import itertools
 import logging
 from collections.abc import Container
@@ -1368,11 +1369,25 @@ class FederationHandler(BaseHandler):
                 self.config.worker.writers.events, "events", max_stream_id
             )
 
-            # Check whether this room is the result of an upgrade of a room we already know
-            # about. If so, migrate over user information
-            predecessor = await self.store.get_room_predecessor(room_id)
+            # Check whether this room is the result of an upgrade of a room we
+            # already know about. If so, migrate over user information
+            #
+            # Note: we do this manually rather than asking the DB to avoid a
+            # race where the current state hasn't yet updated.
+            predecessor = None
+            for s in state:
+                if s.type == EventTypes.Create:
+                    predecessor = s.content.get("predecessor", None)
+
+                    # Ensure the key is a dictionary
+                    if not isinstance(predecessor, collections.abc.Mapping):
+                        predecessor = None
+
+                    break
+
             if not predecessor or not isinstance(predecessor.get("room_id"), str):
                 return event.event_id, max_stream_id
+
             old_room_id = predecessor["room_id"]
             logger.debug(
                 "Found predecessor for %s during remote join: %s", room_id, old_room_id
