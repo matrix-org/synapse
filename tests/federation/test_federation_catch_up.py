@@ -11,7 +11,7 @@ from synapse.federation.units import Edu
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 
-from tests.test_utils import event_injection
+from tests.test_utils import event_injection, make_awaitable
 from tests.unittest import FederatingHomeserverTestCase, override_config
 
 
@@ -31,12 +31,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # stub out get_current_hosts_in_room
         state_handler = hs.get_state_handler()
 
-        # need to do these Future shenanigans because someone awaits on this
-        # result
         # This mock is crucial for destination_rooms to be populated.
-        fut = Future()
-        fut.set_result(["test", "host2"])
-        state_handler.get_current_hosts_in_room = Mock(return_value=fut)
+        state_handler.get_current_hosts_in_room = Mock(return_value=make_awaitable(["test", "host2"]))
 
         # whenever send_transaction is called, record the pdu data
         self.pdus = []
@@ -160,8 +156,8 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         # now we need to initiate a federation transaction somehow…
         # to do that, let's send another event (because it's simple to do)
         # (do it to another room otherwise the catch-up logic decides it doesn't
-        #  need to catch up room_1 — something I overlooked when first writing
-        #  this test)
+        # need to catch up room_1 — something I overlooked when first writing
+        # this test)
         self.helper.send(room_2, "wombats!", tok=u1_token)
 
         # we should now have received both PDUs

@@ -98,7 +98,7 @@ class PerDestinationQueue(object):
         # _catching_up is flipped to False.
         self._catching_up = True
         # the maximum stream order to catch up to (PDUs after this are expected
-        #  to be in the main transmission queue), inclusive
+        # to be in the main transmission queue), inclusive
         self._catch_up_max_stream_order = None  # type: Optional[int]
         # Cache of the last successfully-transmitted stream ordering for this
         # destination (we are the only updater so this is safe)
@@ -478,7 +478,7 @@ class PerDestinationQueue(object):
                     self._catching_up = False
                     return
 
-        # get 50 catchup room/PDUs
+        # get at most 50 catchup room/PDUs
         while self._last_successful_stream_order < self._catch_up_max_stream_order:
             event_ids = await self._store.get_catch_up_room_event_ids(
                 self._destination,
@@ -491,7 +491,7 @@ class PerDestinationQueue(object):
                 # tinkering with the database, but I also have limited foresight,
                 # so let's handle this properly
                 logger.warning(
-                    "No event IDs found for catch-up: "
+                    "Unexpectedly, no event IDs were found for catch-up: "
                     "last successful = %d, max catch up = %d",
                     self._last_successful_stream_order,
                     self._catch_up_max_stream_order,
@@ -500,9 +500,13 @@ class PerDestinationQueue(object):
                 break
 
             # fetch the relevant events from the event store
+            # - redacted behaviour of REDACT is fine, since we only send metadata
+            #   of redacted events to the destination.
+            # - don't need to worry about rejected events as we do not actively
+            #   forward received events over federation.
             events = await self._store.get_events_as_list(
                 event_ids
-            )  # XXX REVIEW: redact behaviour and allow_rejected ???
+            )
 
             # zip them together with their stream orderings
             catch_up_pdus = [
