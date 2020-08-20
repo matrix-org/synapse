@@ -507,9 +507,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             _get_if_maybe_push_in_range_for_user_txn,
         )
 
-    async def add_push_actions_to_staging(
-        self, event_id, user_id_actions, count_as_unread=False,
-    ):
+    async def add_push_actions_to_staging(self, event_id, user_id_actions):
         """Add the push actions for the event to the push action staging area.
 
         Args:
@@ -517,8 +515,6 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             user_id_actions (dict[str, list[dict|str])]): A dictionary mapping
                 user_id to list of push actions, where an action can either be
                 a string or dict.
-            count_as_unread (bool): Whether this event should increment the
-                unread counts.
 
         Returns:
             Deferred
@@ -531,7 +527,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         def _gen_entry(user_id, actions):
             is_highlight = 1 if _action_has_highlight(actions) else 0
             notif = 1 if "notify" in actions else 0
-            unread = int(count_as_unread)
+            unread = 1 if "mark_unread" in actions else 0
             return (
                 event_id,  # event_id column
                 user_id,  # user_id column
