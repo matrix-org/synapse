@@ -15,6 +15,7 @@
 
 import abc
 import logging
+import random
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
 
@@ -22,7 +23,13 @@ from unpaddedbase64 import encode_base64
 
 from synapse import types
 from synapse.api.constants import MAX_DEPTH, EventTypes, Membership
-from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    ShadowBanError,
+    SynapseError,
+)
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import EventFormatVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
@@ -285,6 +292,31 @@ class RoomMemberHandler(object):
         content: Optional[dict] = None,
         require_consent: bool = True,
     ) -> Tuple[str, int]:
+        """Update a user's membership in a room.
+
+        Params:
+            requester: The user who is performing the update.
+            target: The user whose membership is being updated.
+            room_id: The room ID whose membership is being updated.
+            action: The membership change, see synapse.api.constants.Membership.
+            txn_id: The transaction ID, if given.
+            remote_room_hosts: Remote servers to send the update to.
+            third_party_signed: Information from a 3PID invite.
+            ratelimit: Whether to rate limit the request.
+            content: The content of the created event.
+            require_consent: Whether consent is required.
+
+        Returns:
+            A tuple of the new event ID and stream ID.
+
+        Raises:
+            ShadowBanError if a shadow-banned requester attempts to send an invite.
+        """
+        if action == Membership.INVITE and requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
+
         key = (room_id,)
 
         with (await self.member_linearizer.queue(key)):
@@ -773,12 +805,36 @@ class RoomMemberHandler(object):
         txn_id: Optional[str],
         id_access_token: Optional[str] = None,
     ) -> int:
+        """Invite a 3PID to a room.
+
+        Args:
+            room_id: The room to invite the 3PID to.
+            inviter: The user sending the invite.
+            medium: The 3PID's medium.
+            address: The 3PID's address.
+            id_server: The identity server to use.
+            requester: The user making the request.
+            txn_id: The transaction ID this is part of, or None if this is not
+                part of a transaction.
+            id_access_token: The optional identity server access token.
+
+        Returns:
+             The new stream ID.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
+        """
         if self.config.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
                 raise SynapseError(
                     403, "Invites have been disabled on this server", Codes.FORBIDDEN
                 )
+
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         # We need to rate limit *before* we send out any 3PID invites, so we
         # can't just rely on the standard ratelimiting of events.
@@ -804,6 +860,8 @@ class RoomMemberHandler(object):
         )
 
         if invitee:
+            # Note that update_membership with an action of "invite" can raise
+            # a ShadowBanError, but this was done above already.
             _, stream_id = await self.update_membership(
                 requester, UserID.from_string(invitee), room_id, "invite", txn_id=txn_id
             )
@@ -1042,7 +1100,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 return event_id, stream_id
 
             # The room is too large. Leave.
-            requester = types.create_requester(user, None, False, None)
+            requester = types.create_requester(user, None, False, False, None)
             await self.update_membership(
                 requester=requester, target=user, room_id=room_id, action="leave"
             )
