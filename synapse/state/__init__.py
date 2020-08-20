@@ -16,17 +16,7 @@
 
 import logging
 from collections import namedtuple
-from typing import (
-    Awaitable,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Set,
-    Union,
-    overload,
-)
+from typing import Awaitable, Dict, Iterable, List, Optional, Set, Union, overload
 
 import attr
 from frozendict import frozendict
@@ -41,7 +31,7 @@ from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import StateMap
+from synapse.types import Collection, StateMap
 from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
