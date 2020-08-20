@@ -1,1 +1,1 @@
-Appservices which are exempt from ratelimiting are no longer ratelimited when joining rooms.
+Appservices which are exempt from ratelimiting are no longer ratelimited when joining rooms. This fixes a bug which was introduced in v1.19.0. 
