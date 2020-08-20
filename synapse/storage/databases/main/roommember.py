@@ -814,40 +814,6 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             _is_local_host_in_room_ignoring_users_txn,
         )
 
-    def get_stream_ordering_for_local_membership_txn(
-        self,
-        txn: LoggingTransaction,
-        user_id: str,
-        room_id: str,
-        membership: Membership,
-    ) -> Optional[int]:
-        """Get the stream ordering for a given local room membership.
-
-        Args:
-            user_id: The user ID to retrieve the membership for.
-            room_id: The room ID to retrieve the membership for.
-            membership: The membership to retrieve the stream ordering for.
-
-        Returns:
-            The stream ordering, or None if the membership wasn't found.
-        """
-        txn.execute(
-            """
-            SELECT stream_ordering FROM local_current_membership
-            LEFT JOIN events USING (event_id, room_id)
-            WHERE membership = ?
-                AND user_id = ?
-                AND room_id = ?
-            """,
-            (membership, user_id, room_id),
-        )
-        row = txn.fetchone()
-
-        if row is None:
-            return None
-
-        return row[0]
-
 
 class RoomMemberBackgroundUpdateStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):

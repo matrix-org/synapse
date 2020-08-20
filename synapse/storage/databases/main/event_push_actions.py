@@ -19,7 +19,6 @@ from typing import Dict, List, Optional, Tuple
 
 import attr
 
-from synapse.api.constants import Membership
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import LoggingTransaction, SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
@@ -99,33 +98,16 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self._rotate_delay = 3
         self._rotate_count = 10000
 
-    def _stream_ordering_from_event_id_and_room_id_txn(
-        self, txn: LoggingTransaction, event_id: str, room_id: str,
-    ) -> int:
-        """Retrieve the stream ordering for the given event.
-
-        Args:
-            event_id: The ID of the event to retrieve the stream ordering of.
-            room_id: The room the event was sent into.
-
-        Returns:
-            The stream ordering for this event.
-            We should always have a stream ordering to return, because the event ID
-            should come from a local read receipt.
-        """
-        return self.db_pool.simple_select_one_onecol_txn(
-            txn=txn,
-            table="events",
-            keyvalues={"room_id": room_id, "event_id": event_id},
-            retcol="stream_ordering",
-        )
-
     @cached(num_args=3, tree=True, max_entries=5000)
     async def get_unread_event_push_actions_by_room_for_user(
         self, room_id: str, user_id: str, last_read_event_id: Optional[str],
     ) -> Dict[str, int]:
         """Get the notification count, the highlight count and the unread message count
         for a given user in a given room after the given read receipt.
+
+        Note that this function assumes the user to be a current member of the room,
+        since it's either call by the sync handler to handle joined room entries, or by
+        the HTTP pusher to calculate the badge of unread joined rooms.
 
         Args:
             room_id: The room to retrieve the counts in.
@@ -149,17 +131,26 @@ class EventPushActionsWorkerStore(SQLBaseStore):
     def _get_unread_counts_by_receipt_txn(
         self, txn, room_id, user_id, last_read_event_id,
     ):
-        if last_read_event_id is None:
-            stream_ordering = self.get_stream_ordering_for_local_membership_txn(
-                txn, user_id, room_id, Membership.JOIN,
-            )
-        else:
-            stream_ordering = self._stream_ordering_from_event_id_and_room_id_txn(
-                txn, last_read_event_id, room_id,
+        stream_ordering = None
+
+        if last_read_event_id is not None:
+            stream_ordering = self.get_stream_id_for_event_txn(
+                txn, last_read_event_id, allow_none=True,
             )
 
         if stream_ordering is None:
-            return {"notify_count": 0, "unread_count": 0, "highlight_count": 0}
+            # Either last_read_event_id is None, or it's an event we don't have (e.g.
+            # because it's been purged), in which case retrieve the stream ordering for
+            # the latest membership event from this user in this room (which we assume is
+            # a join).
+            event_id = self.db_pool.simple_select_one_onecol_txn(
+                txn=txn,
+                table="local_current_membership",
+                keyvalues={"room_id": room_id, "user_id": user_id},
+                retcol="event_id",
+            )
+
+            stream_ordering = self.get_stream_id_for_event_txn(txn, event_id)
 
         return self._get_unread_counts_by_pos_txn(
             txn, room_id, user_id, stream_ordering
@@ -532,9 +523,6 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         Returns:
             Deferred
         """
-
-        print(count_as_unread)
-
         if not user_id_actions:
             return
 
