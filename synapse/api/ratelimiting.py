@@ -55,7 +55,7 @@ class Ratelimiter(object):
         # Disable rate limiting of users belonging to any AS that is configured
         # not to be rate limited in its registration file (rate_limited: true|false).
         if requester.app_service and not requester.app_service.is_rate_limited():
-            return [True, -1]
+            return True, -1.0
 
         return self.can_do_action(
             requester.user.to_string(),
