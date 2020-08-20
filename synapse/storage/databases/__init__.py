@@ -87,12 +87,21 @@ class Databases(object):
 
                 logger.info("Database %r prepared", db_name)
 
+            # Closing the context manager doesn't close the connection.
+            # psycopg will close the connection when the object gets GCed, but *only*
+            # if the PID is the same as when the connection was opened [1], and
+            # it may not be if we fork in the meantime.
+            #
+            # [1]: https://github.com/psycopg/psycopg2/blob/2_8_5/psycopg/connection_type.c#L1378
+
+            db_conn.close()
+
         # Sanity check that we have actually configured all the required stores.
         if not main:
             raise Exception("No 'main' data store configured")
 
         if not state:
-            raise Exception("No 'main' data store configured")
+            raise Exception("No 'state' data store configured")
 
         # We use local variables here to ensure that the databases do not have
         # optional types.

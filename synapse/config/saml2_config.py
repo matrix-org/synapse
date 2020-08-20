@@ -18,8 +18,6 @@ import logging
 from typing import Any, List
 
 import attr
-import jinja2
-import pkg_resources
 
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module, load_python_module
@@ -171,15 +169,9 @@ class SAML2Config(Config):
             saml2_config.get("saml_session_lifetime", "15m")
         )
 
-        template_dir = saml2_config.get("template_dir")
-        if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates",)
-
-        loader = jinja2.FileSystemLoader(template_dir)
-        # enable auto-escape here, to having to remember to escape manually in the
-        # template
-        env = jinja2.Environment(loader=loader, autoescape=True)
-        self.saml2_error_html_template = env.get_template("saml_error.html")
+        self.saml2_error_html_template = self.read_templates(
+            ["saml_error.html"], saml2_config.get("template_dir")
+        )
 
     def _default_saml_config_dict(
         self, required_attributes: set, optional_attributes: set

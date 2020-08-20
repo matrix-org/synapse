@@ -23,7 +23,6 @@ from enum import Enum
 from typing import Optional
 
 import attr
-import pkg_resources
 
 from ._base import Config, ConfigError
 
@@ -98,20 +97,17 @@ class EmailConfig(Config):
             if parsed[1] == "":
                 raise RuntimeError("Invalid notif_from address")
 
+        # A user-configurable template directory
         template_dir = email_config.get("template_dir")
-        # we need an absolute path, because we change directory after starting (and
-        # we don't yet know what auxiliary templates like mail.css we will need).
-        # (Note that loading as package_resources with jinja.PackageLoader doesn't
-        # work for the same reason.)
-        if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
-
-        self.email_template_dir = os.path.abspath(template_dir)
+        if isinstance(template_dir, str):
+            # We need an absolute path, because we change directory after starting (and
+            # we don't yet know what auxiliary templates like mail.css we will need).
+            template_dir = os.path.abspath(template_dir)
+        elif template_dir is not None:
+            # If template_dir is something other than a str or None, warn the user
+            raise ConfigError("Config option email.template_dir must be type str")
 
         self.email_enable_notifs = email_config.get("enable_notifs", False)
-
-        account_validity_config = config.get("account_validity") or {}
-        account_validity_renewal_enabled = account_validity_config.get("renew_at")
 
         self.threepid_behaviour_email = (
             # Have Synapse handle the email sending if account_threepid_delegates.email
@@ -166,19 +162,6 @@ class EmailConfig(Config):
             email_config.get("validation_token_lifetime", "1h")
         )
 
-        if (
-            self.email_enable_notifs
-            or account_validity_renewal_enabled
-            or self.threepid_behaviour_email == ThreepidBehaviour.LOCAL
-        ):
-            # make sure we can import the required deps
-            import bleach
-            import jinja2
-
-            # prevent unused warnings
-            jinja2
-            bleach
-
         if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             missing = []
             if not self.email_notif_from:
@@ -196,49 +179,49 @@ class EmailConfig(Config):
 
             # These email templates have placeholders in them, and thus must be
             # parsed using a templating engine during a request
-            self.email_password_reset_template_html = email_config.get(
+            password_reset_template_html = email_config.get(
                 "password_reset_template_html", "password_reset.html"
             )
-            self.email_password_reset_template_text = email_config.get(
+            password_reset_template_text = email_config.get(
                 "password_reset_template_text", "password_reset.txt"
             )
-            self.email_registration_template_html = email_config.get(
+            registration_template_html = email_config.get(
                 "registration_template_html", "registration.html"
             )
-            self.email_registration_template_text = email_config.get(
+            registration_template_text = email_config.get(
                 "registration_template_text", "registration.txt"
             )
-            self.email_add_threepid_template_html = email_config.get(
+            add_threepid_template_html = email_config.get(
                 "add_threepid_template_html", "add_threepid.html"
             )
-            self.email_add_threepid_template_text = email_config.get(
+            add_threepid_template_text = email_config.get(
                 "add_threepid_template_text", "add_threepid.txt"
             )
 
-            self.email_password_reset_template_failure_html = email_config.get(
+            password_reset_template_failure_html = email_config.get(
                 "password_reset_template_failure_html", "password_reset_failure.html"
             )
-            self.email_registration_template_failure_html = email_config.get(
+            registration_template_failure_html = email_config.get(
                 "registration_template_failure_html", "registration_failure.html"
             )
-            self.email_add_threepid_template_failure_html = email_config.get(
+            add_threepid_template_failure_html = email_config.get(
                 "add_threepid_template_failure_html", "add_threepid_failure.html"
             )
 
             # These templates do not support any placeholder variables, so we
             # will read them from disk once during setup
-            email_password_reset_template_success_html = email_config.get(
+            password_reset_template_success_html = email_config.get(
                 "password_reset_template_success_html", "password_reset_success.html"
             )
-            email_registration_template_success_html = email_config.get(
+            registration_template_success_html = email_config.get(
                 "registration_template_success_html", "registration_success.html"
             )
-            email_add_threepid_template_success_html = email_config.get(
+            add_threepid_template_success_html = email_config.get(
                 "add_threepid_template_success_html", "add_threepid_success.html"
             )
 
-            # Check templates exist
-            for f in [
+            # Read all templates from disk
+            (
                 self.email_password_reset_template_html,
                 self.email_password_reset_template_text,
                 self.email_registration_template_html,
@@ -248,32 +231,36 @@ class EmailConfig(Config):
                 self.email_password_reset_template_failure_html,
                 self.email_registration_template_failure_html,
                 self.email_add_threepid_template_failure_html,
-                email_password_reset_template_success_html,
-                email_registration_template_success_html,
-                email_add_threepid_template_success_html,
-            ]:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find template file %s" % (p,))
+                password_reset_template_success_html_template,
+                registration_template_success_html_template,
+                add_threepid_template_success_html_template,
+            ) = self.read_templates(
+                [
+                    password_reset_template_html,
+                    password_reset_template_text,
+                    registration_template_html,
+                    registration_template_text,
+                    add_threepid_template_html,
+                    add_threepid_template_text,
+                    password_reset_template_failure_html,
+                    registration_template_failure_html,
+                    add_threepid_template_failure_html,
+                    password_reset_template_success_html,
+                    registration_template_success_html,
+                    add_threepid_template_success_html,
+                ],
+                template_dir,
+            )
 
-            # Retrieve content of web templates
-            filepath = os.path.join(
-                self.email_template_dir, email_password_reset_template_success_html
+            # Render templates that do not contain any placeholders
+            self.email_password_reset_template_success_html_content = (
+                password_reset_template_success_html_template.render()
             )
-            self.email_password_reset_template_success_html = self.read_file(
-                filepath, "email.password_reset_template_success_html"
+            self.email_registration_template_success_html_content = (
+                registration_template_success_html_template.render()
             )
-            filepath = os.path.join(
-                self.email_template_dir, email_registration_template_success_html
-            )
-            self.email_registration_template_success_html_content = self.read_file(
-                filepath, "email.registration_template_success_html"
-            )
-            filepath = os.path.join(
-                self.email_template_dir, email_add_threepid_template_success_html
-            )
-            self.email_add_threepid_template_success_html_content = self.read_file(
-                filepath, "email.add_threepid_template_success_html"
+            self.email_add_threepid_template_success_html_content = (
+                add_threepid_template_success_html_template.render()
             )
 
         if self.email_enable_notifs:
@@ -290,17 +277,19 @@ class EmailConfig(Config):
                     % (", ".join(missing),)
                 )
 
-            self.email_notif_template_html = email_config.get(
+            notif_template_html = email_config.get(
                 "notif_template_html", "notif_mail.html"
             )
-            self.email_notif_template_text = email_config.get(
+            notif_template_text = email_config.get(
                 "notif_template_text", "notif_mail.txt"
             )
 
-            for f in self.email_notif_template_text, self.email_notif_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
+            (
+                self.email_notif_template_html,
+                self.email_notif_template_text,
+            ) = self.read_templates(
+                [notif_template_html, notif_template_text], template_dir,
+            )
 
             self.email_notif_for_new_users = email_config.get(
                 "notif_for_new_users", True
@@ -309,18 +298,20 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if account_validity_renewal_enabled:
-            self.email_expiry_template_html = email_config.get(
+        if self.account_validity.renew_by_email_enabled:
+            expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
-            self.email_expiry_template_text = email_config.get(
+            expiry_template_text = email_config.get(
                 "expiry_template_text", "notice_expiry.txt"
             )
 
-            for f in self.email_expiry_template_text, self.email_expiry_template_html:
-                p = os.path.join(self.email_template_dir, f)
-                if not os.path.isfile(p):
-                    raise ConfigError("Unable to find email template file %s" % (p,))
+            (
+                self.account_validity_template_html,
+                self.account_validity_template_text,
+            ) = self.read_templates(
+                [expiry_template_html, expiry_template_text], template_dir,
+            )
 
         subjects_config = email_config.get("subjects", {})
         subjects = {}
@@ -400,9 +391,7 @@ class EmailConfig(Config):
           # Directory in which Synapse will try to find the template files below.
           # If not set, default templates from within the Synapse package will be used.
           #
-          # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-          # If you *do* uncomment it, you will need to make sure that all the templates
-          # below are in the directory.
+          # Do not uncomment this setting unless you want to customise the templates.
           #
           # Synapse will look for the following templates in this directory:
           #

@@ -17,11 +17,10 @@
 import logging
 from typing import Dict, List, Tuple
 
-from canonicaljson import json
-
 from synapse.storage._base import db_to_json
 from synapse.storage.databases.main.account_data import AccountDataWorkerStore
 from synapse.types import JsonDict
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -98,7 +97,7 @@ class TagsWorkerStore(AccountDataWorkerStore):
                 txn.execute(sql, (user_id, room_id))
                 tags = []
                 for tag, content in txn:
-                    tags.append(json.dumps(tag) + ":" + content)
+                    tags.append(json_encoder.encode(tag) + ":" + content)
                 tag_json = "{" + ",".join(tags) + "}"
                 results.append((stream_id, (user_id, room_id, tag_json)))
 
@@ -200,7 +199,7 @@ class TagsStore(TagsWorkerStore):
         Returns:
             The next account data ID.
         """
-        content_json = json.dumps(content)
+        content_json = json_encoder.encode(content)
 
         def add_tag_txn(txn, next_id):
             self.db_pool.simple_upsert_txn(
