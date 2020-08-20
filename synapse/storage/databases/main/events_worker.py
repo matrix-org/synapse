@@ -620,19 +620,38 @@ class EventsWorkerStore(SQLBaseStore):
             room_version_id = row["room_version_id"]
 
             if not room_version_id:
-                # this should only happen for out-of-band membership events
-                if not internal_metadata.get("out_of_band_membership"):
-                    logger.warning(
-                        "Room %s for event %s is unknown", d["room_id"], event_id
+                # this should only happen for out-of-band membership events which
+                # arrived before #6983 landed. For all other events, we should have
+                # an entry in the 'rooms' table.
+                #
+                # However, the 'out_of_band_membership' flag is unreliable for older
+                # invites, so just accept it for all membership events.
+                #
+                if d["type"] != EventTypes.Member:
+                    raise Exception(
+                        "Room %s for event %s is unknown" % (d["room_id"], event_id)
                     )
-                    continue
 
-                # take a wild stab at the room version based on the event format
+                # so, assuming this is an out-of-band-invite that arrived before #6983
+                # landed, we know that the room version must be v5 or earlier (because
+                # v6 hadn't been invented at that point, so invites from such rooms
+                # would have been rejected.)
+                #
+                # The main reason we need to know the room version here (other than
+                # choosing the right python Event class) is in case the event later has
+                # to be redacted - and all the room versions up to v5 used the same
+                # redaction algorithm.
+                #
+                # So, the following approximations should be adequate.
+
                 if format_version == EventFormatVersions.V1:
+                    # if it's event format v1 then it must be room v1 or v2
                     room_version = RoomVersions.V1
                 elif format_version == EventFormatVersions.V2:
+                    # if it's event format v2 then it must be room v3
                     room_version = RoomVersions.V3
                 else:
+                    # if it's event format v3 then it must be room v4 or v5
                     room_version = RoomVersions.V5
             else:
                 room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
