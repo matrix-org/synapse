@@ -600,7 +600,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     def get_stream_id_for_event_txn(
         self, txn: LoggingTransaction, event_id: str, allow_none=False,
-    ) -> str:
+    ) -> int:
         return self.db_pool.simple_select_one_onecol_txn(
             txn=txn,
             table="events",
