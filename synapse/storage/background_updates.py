@@ -16,9 +16,8 @@
 import logging
 from typing import Optional
 
-from canonicaljson import json
-
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.util import json_encoder
 
 from . import engines
 
@@ -457,7 +456,7 @@ class BackgroundUpdater(object):
             progress(dict): The progress of the update.
         """
 
-        progress_json = json.dumps(progress)
+        progress_json = json_encoder.encode(progress)
 
         self.db_pool.simple_update_one_txn(
             txn,
