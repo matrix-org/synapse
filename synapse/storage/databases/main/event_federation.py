@@ -44,15 +44,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         Returns:
             list of events
         """
-        # get_events_as_list requires a list, so convert to a list here
-        event_ids = list(
-            await self.get_auth_chain_ids(event_ids, include_given=include_given)
+        event_ids = await self.get_auth_chain_ids(
+            event_ids, include_given=include_given
         )
         return await self.get_events_as_list(event_ids)
 
     async def get_auth_chain_ids(
         self, event_ids: Collection[str], include_given: bool = False,
-    ) -> Set[str]:
+    ) -> List[str]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
@@ -60,7 +59,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             include_given: include the given events in result
 
         Returns:
-            set of event_ids
+            list of event_ids
         """
         return await self.db_pool.runInteraction(
             "get_auth_chain_ids",
@@ -71,7 +70,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
     def _get_auth_chain_ids_txn(
         self, txn: LoggingTransaction, event_ids: Collection[str], include_given: bool
-    ) -> Set[str]:
+    ) -> List[str]:
         if include_given:
             results = set(event_ids)
         else:
@@ -94,7 +93,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             front = new_front
             results.update(front)
 
-        return results
+        return list(results)
 
     def get_auth_chain_difference(self, state_sets: List[Set[str]]):
         """Given sets of state events figure out the auth chain difference (as
