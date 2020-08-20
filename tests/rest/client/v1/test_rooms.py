@@ -2074,3 +2074,28 @@ class ShadowBannedTestCase(unittest.HomeserverTestCase):
         # Both users should be in the room.
         users = self.get_success(self.store.get_users_in_room(room_id))
         self.assertCountEqual(users, ["@banned:test", "@otheruser:test"])
+
+    def test_message(self):
+        """Messages from shadow-banned users don't actually get sent."""
+
+        room_id = self.helper.create_room_as(
+            self.other_user_id, tok=self.other_access_token
+        )
+
+        # The user should be in the room.
+        self.helper.join(room_id, self.banned_user_id, tok=self.banned_access_token)
+
+        # Sending a message should complete successfully.
+        result = self.helper.send_event(
+            room_id=room_id,
+            type=EventTypes.Message,
+            content={"msgtype": "m.text", "body": "with right label"},
+            tok=self.banned_access_token,
+        )
+        self.assertIn("event_id", result)
+        event_id = result["event_id"]
+
+        latest_events = self.get_success(
+            self.store.get_latest_event_ids_in_room(room_id)
+        )
+        self.assertNotIn(event_id, latest_events)
