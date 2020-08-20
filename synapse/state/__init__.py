@@ -16,11 +16,12 @@
 
 import logging
 from collections import namedtuple
-from typing import Awaitable, Dict, Iterable, List, Optional, Set
+from typing import Awaitable, Dict, Iterable, List, Optional, Set, Union, overload
 
 import attr
 from frozendict import frozendict
 from prometheus_client import Histogram
+from typing_extensions import Literal
 
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, StateResolutionVersions
@@ -107,21 +108,45 @@ class StateHandler(object):
         self.hs = hs
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
+    @overload
     async def get_current_state(
-        self, room_id, event_type=None, state_key="", latest_event_ids=None
-    ):
-        """ Retrieves the current state for the room. This is done by
+        self,
+        room_id: str,
+        event_type: Literal[None] = None,
+        state_key: str = "",
+        latest_event_ids: Optional[List[str]] = None,
+    ) -> StateMap[EventBase]:
+        ...
+
+    @overload
+    async def get_current_state(
+        self,
+        room_id: str,
+        event_type: str,
+        state_key: str = "",
+        latest_event_ids: Optional[List[str]] = None,
+    ) -> Optional[EventBase]:
+        ...
+
+    async def get_current_state(
+        self,
+        room_id: str,
+        event_type: Optional[str] = None,
+        state_key: str = "",
+        latest_event_ids: Optional[List[str]] = None,
+    ) -> Union[Optional[EventBase], StateMap[EventBase]]:
+        """Retrieves the current state for the room. This is done by
         calling `get_latest_events_in_room` to get the leading edges of the
         event graph and then resolving any of the state conflicts.
 
         This is equivalent to getting the state of an event that were to send
         next before receiving any new events.
 
-        If `event_type` is specified, then the method returns only the one
-        event (or None) with that `event_type` and `state_key`.
-
         Returns:
-            map from (type, state_key) to event
+            If `event_type` is specified, then the method returns only the one
+            event (or None) with that `event_type` and `state_key`.
+
+            Otherwise, a map from (type, state_key) to event.
         """
         if not latest_event_ids:
             latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
@@ -157,7 +182,7 @@ class StateHandler(object):
                 database (via a cache)
 
         Returns:
-            Deferred[dict[(str, str), str)]]: the state dict, mapping from
+            dict[(str, str), str)]: the state dict, mapping from
                 (event_type, state_key) -> event_id
         """
         if not latest_event_ids:
@@ -200,7 +225,7 @@ class StateHandler(object):
             event_ids (list[str]):
 
         Returns:
-            Deferred[list[str]]: the hosts in the room at the given events
+            list[str]: the hosts in the room at the given events
         """
         entry = await self.resolve_state_groups_for_events(room_id, event_ids)
         joined_hosts = await self.store.get_joined_hosts(room_id, entry)
@@ -358,7 +383,7 @@ class StateHandler(object):
                 checks the database for room version.
 
         Returns:
-            Deferred[_StateCacheEntry]: resolved state
+            _StateCacheEntry: resolved state
         """
         logger.debug("resolve_state_groups event_ids %s", event_ids)
 
@@ -633,15 +658,17 @@ class StateResolutionStore(object):
 
     store = attr.ib()
 
-    def get_events(self, event_ids, allow_rejected=False):
+    def get_events(
+        self, event_ids: Iterable[str], allow_rejected: bool = False
+    ) -> Awaitable[Dict[str, EventBase]]:
         """Get events from the database
 
         Args:
-            event_ids (list): The event_ids of the events to fetch
-            allow_rejected (bool): If True return rejected events.
+            event_ids: The event_ids of the events to fetch
+            allow_rejected: If True return rejected events.
 
         Returns:
-            Awaitable[dict[str, FrozenEvent]]: Dict from event_id to event.
+            An awaitable which resolves to a dict from event_id to event.
         """
 
         return self.store.get_events(
