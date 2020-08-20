@@ -675,7 +675,7 @@ class EventCreationHandler(object):
                     event.event_id,
                     prev_event.event_id,
                 )
-                return await self.store.get_stream_token_for_event(prev_event.event_id)
+                return await self.store.get_stream_id_for_event(prev_event.event_id)
 
         return await self.handle_new_client_event(
             requester=requester, event=event, context=context, ratelimit=ratelimit
