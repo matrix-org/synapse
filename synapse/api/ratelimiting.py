@@ -17,6 +17,7 @@ from collections import OrderedDict
 from typing import Any, Optional, Tuple
 
 from synapse.api.errors import LimitExceededError
+from synapse.types import Requester
 from synapse.util import Clock
 
 
@@ -42,6 +43,27 @@ class Ratelimiter(object):
         #   * The point in time
         #   * The rate_hz of this particular entry. This can vary per request
         self.actions = OrderedDict()  # type: OrderedDict[Any, Tuple[float, int, float]]
+
+    def can_requester_do_action(
+        self,
+        requester: Requester,
+        rate_hz: Optional[float] = None,
+        burst_count: Optional[int] = None,
+        update: bool = True,
+        _time_now_s: Optional[int] = None,
+    ) -> Tuple[bool, float]:
+        # Disable rate limiting of users belonging to any AS that is configured
+        # not to be rate limited in its registration file (rate_limited: true|false).
+        if requester.app_service and not requester.app_service.is_rate_limited():
+            return [True, -1]
+
+        return self.can_do_action(
+            requester.user.to_string(),
+            rate_hz,
+            burst_count,
+            update,
+            _time_now_s
+        )
 
     def can_do_action(
         self,
