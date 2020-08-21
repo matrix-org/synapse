@@ -602,9 +602,6 @@ class PushRuleStore(PushRulesWorkerStore):
         """
         Sets the `enabled` state of a push rule.
 
-        Will throw NotFoundError if the rule does not exist; the Code for this
-        is NOT_FOUND.
-
         Args:
             user_id: the user ID of the user who wishes to enable/disable the rule
                 e.g. '@tina:example.org'
@@ -616,6 +613,9 @@ class PushRuleStore(PushRulesWorkerStore):
             is_default_rule: True if and only if this is a server-default rule.
                 This skips the check for existence (as only user-created rules
                 are always stored in the database `push_rules` table).
+
+        Raises:
+            NotFoundError if the rule does not exist.
         """
         with self._push_rules_stream_id_gen.get_next() as stream_id:
             event_stream_ordering = self._stream_id_gen.get_current_token()
@@ -643,7 +643,14 @@ class PushRuleStore(PushRulesWorkerStore):
         new_id = self._push_rules_enable_id_gen.get_next()
 
         if not is_default_rule:
-            # first check it exists — need FOR KEY SHARE
+            # first check it exists; we need to lock for key share so that a
+            # transaction that deletes the push rule will conflict with this one.
+            # We also need a push_rule_enable row to exist for every push_rules
+            # row, otherwise it is possible to simultaneously delete a push rule
+            # (that has no _enable row) and enable it, resulting in a dangling
+            # _enable row. To solve this: we either need to use SERIALISABLE or
+            # ensure we always have a push_rule_enable row for every push_rule
+            # row. We chose the latter.
             for_key_share = "FOR KEY SHARE"
             if not isinstance(self.database_engine, PostgresEngine):
                 # For key share is not applicable/available on SQLite
@@ -660,6 +667,7 @@ class PushRuleStore(PushRulesWorkerStore):
             if txn.fetchone() is None:
                 # needed to set NOT_FOUND code.
                 raise NotFoundError("Push rule does not exist.")
+
 
         self.db_pool.simple_upsert_txn(
             txn,
