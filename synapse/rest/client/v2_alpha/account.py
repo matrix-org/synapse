@@ -214,6 +214,7 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
             hs: server
         """
         super(PasswordResetConfirmationSubmitTokenServlet, self).__init__()
+        self.hs = hs
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -226,6 +227,15 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
             )
 
     async def on_POST(self, request):
+        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
+                logger.warning(
+                    "Password reset emails have been disabled due to lack of an email config"
+                )
+            raise SynapseError(
+                400, "Email-based password resets are disabled on this server"
+            )
+
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
         client_secret = parse_string(request, "client_secret", required=True)
