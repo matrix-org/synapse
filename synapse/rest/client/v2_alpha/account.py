@@ -153,11 +153,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             hs (synapse.server.HomeServer): server
         """
         super(PasswordResetSubmitTokenServlet, self).__init__()
-        self.hs = hs
-        self.auth = hs.get_auth()
         self.config = hs.config
-        self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
 
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._confirmation_email_template = (
