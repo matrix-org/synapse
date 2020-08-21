@@ -250,7 +250,20 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Remove the host
         path = link.replace("https://example.com", "")
 
+        # Load the password reset confirmation page
         request, channel = self.make_request("GET", path, shorthand=False)
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+
+        # Replace the path with the confirmation path
+        path = re.sub(
+            "^/_matrix.*submit_token",
+            "/_matrix/client/unstable/password_reset/email/submit_token_confirm",
+            path,
+        )
+
+        # Confirm the password reset
+        request, channel = self.make_request("POST", path, shorthand=False)
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
