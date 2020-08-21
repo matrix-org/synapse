@@ -16,6 +16,7 @@
 # limitations under the License.
 import logging
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -36,6 +37,9 @@ from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import canonicalise_email, check_3pid_allowed
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -204,10 +208,10 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
         "/password_reset/email/submit_token_confirm$", releases=(), unstable=True,
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         """
         Args:
-            hs (synapse.server.HomeServer): server
+            hs: server
         """
         super(PasswordResetConfirmationSubmitTokenServlet, self).__init__()
         self.auth = hs.get_auth()
