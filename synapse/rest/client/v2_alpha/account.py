@@ -158,9 +158,10 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         self.config = hs.config
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
+
         if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self._failure_email_template = (
-                self.config.email_password_reset_template_failure_html
+            self._confirmation_email_template = (
+                self.config.email_password_reset_template_confirmation_html
             )
 
     async def on_GET(self, request, medium):
@@ -183,6 +184,52 @@ class PasswordResetSubmitTokenServlet(RestServlet):
         client_secret = parse_string(request, "client_secret", required=True)
         assert_valid_client_secret(client_secret)
 
+        # Show a confirmation page, just in case someone accidentally clicked this link when
+        # they didn't mean to
+        template_vars = {
+            "sid": sid,
+            "token": token,
+            "client_secret": client_secret,
+            "medium": medium,
+        }
+        respond_with_html(
+            request, 200, self._confirmation_email_template.render(**template_vars)
+        )
+
+
+class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
+    """Handles confirmation of 3PID validation token submission.
+
+    A user will land on PasswordResetSubmitTokenServlet, confirm the password reset, then
+    submit the same parameters to this servlet.
+    """
+
+    PATTERNS = client_patterns(
+        "/password_reset/email/submit_token_confirm$", releases=(), unstable=True,
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super(PasswordResetConfirmationSubmitTokenServlet, self).__init__()
+        self.auth = hs.get_auth()
+        self.clock = hs.get_clock()
+        self.store = hs.get_datastore()
+        if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            self._failure_email_template = (
+                hs.config.email_password_reset_template_failure_html
+            )
+            self._email_password_reset_template_success_html = (
+                hs.config.email_password_reset_template_success_html_content
+            )
+
+    async def on_POST(self, request):
+        sid = parse_string(request, "sid", required=True)
+        token = parse_string(request, "token", required=True)
+        client_secret = parse_string(request, "client_secret", required=True)
+
         # Attempt to validate a 3PID session
         try:
             # Mark the session as valid
@@ -203,7 +250,7 @@ class PasswordResetSubmitTokenServlet(RestServlet):
                     return None
 
             # Otherwise show the success template
-            html = self.config.email_password_reset_template_success_html_content
+            html = self._email_password_reset_template_success_html
             status_code = 200
         except ThreepidValidationError as e:
             status_code = e.code
@@ -881,6 +928,7 @@ class WhoamiRestServlet(RestServlet):
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
     PasswordResetSubmitTokenServlet(hs).register(http_server)
+    PasswordResetConfirmationSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
