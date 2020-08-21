@@ -60,9 +60,10 @@ FROM docker.io/python:${PYTHON_VERSION}-slim
 
 RUN apt-get update && apt-get install -y \
     curl \
+    gosu \
+    libjpeg62-turbo \
     libpq5 \
     xmlsec1 \
-    gosu \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
