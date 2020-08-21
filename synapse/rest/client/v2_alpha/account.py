@@ -215,7 +215,6 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
         """
         super(PasswordResetConfirmationSubmitTokenServlet, self).__init__()
         self.hs = hs
-        self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
