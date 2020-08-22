@@ -56,6 +56,7 @@ commands:
       - run: mkdir -vp ~/.docker/cli-plugins/ ~/dockercache
       - run: curl --silent -L "https://github.com/docker/buildx/releases/download/<< parameters.buildx_version >>/buildx-<< parameters.buildx_version >>.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
       - run: chmod a+x ~/.docker/cli-plugins/docker-buildx
+      # install qemu links in /proc/sys/fs/binfmt_misc on the docker instance running the circleci job
       - run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       - run: docker context create builder
       - run: docker buildx create builder --use
@@ -73,4 +74,3 @@ commands:
         type: string
     steps:
       - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> << parameters.label >> << parameters.tag >> --progress=plain .
-
