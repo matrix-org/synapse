@@ -410,14 +410,16 @@ retention:
   # If any purge job is configured, it is strongly recommended to have at least
   # a single job with neither 'shortest_max_lifetime' nor 'longest_max_lifetime'
   # set, or one job without 'shortest_max_lifetime' and one job without
-  # 'longest_max_lifetime' set.
+  # 'longest_max_lifetime' set. Otherwise some rooms might be ignored, even if
+  # 'allowed_lifetime_min' and 'allowed_lifetime_max' are set, because capping a
+  # room's policy to these values is done after the policies are retrieved from
+  # Synapse's database (which is done using the range specified in a purge job's
+  # configuration).
   #
   #purge_jobs:
-  #  - shortest_max_lifetime: 1d
-  #    longest_max_lifetime: 3d
+  #  - longest_max_lifetime: 3d
   #    interval: 12h
   #  - shortest_max_lifetime: 3d
-  #    longest_max_lifetime: 1y
   #    interval: 1d
 
 # Inhibits the /requestToken endpoints from returning an error that might leak

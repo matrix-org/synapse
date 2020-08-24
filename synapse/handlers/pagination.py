@@ -114,7 +114,7 @@ class PaginationHandler(object):
                 the range to handle (inclusive). If None, it means that the range has no
                 upper limit.
         """
-        # We want the storage layer to to include rooms with no retention policy in its
+        # We want the storage layer to include rooms with no retention policy in its
         # return value only if a default retention policy is defined in the server's
         # configuration and that policy's 'max_lifetime' is either lower (or equal) than
         # max_ms or higher than min_ms (or both).
