@@ -181,9 +181,12 @@ If you wish to point the healthcheck at a different port with docker command, ad
 
 ## Setting the healthcheck in docker-compose file
 
-You can add the following to set a custom healthcheck in a docker compose file. 
+You can add the following to set a custom healthcheck in a docker compose file. You'll need version >2.1 for this to work. 
 
 ```
 healthcheck:
   test: ["CMD", "curl", "-fSs", "http://localhost:8008/health"]
+  interval: 1m
+  timeout: 10s
+  retries: 3
 ```
