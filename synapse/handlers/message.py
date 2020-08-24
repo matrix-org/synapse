@@ -15,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
@@ -34,6 +35,7 @@ from synapse.api.errors import (
     Codes,
     ConsentNotGivenError,
     NotFoundError,
+    ShadowBanError,
     SynapseError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
@@ -716,12 +718,20 @@ class EventCreationHandler(object):
         event_dict: dict,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
+        ignore_shadow_ban: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
 
         See self.create_event and self.send_nonmember_event.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
+        if not ignore_shadow_ban and requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         # We limit the number of concurrent event sends in a room so that we
         # don't fork the DAG too much. If we don't limit then we can end up in

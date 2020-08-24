@@ -136,6 +136,9 @@ class RoomCreationHandler(BaseHandler):
 
         Returns:
             the new room id
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
         """
         await self.ratelimit(requester)
 
@@ -171,6 +174,15 @@ class RoomCreationHandler(BaseHandler):
     async def _upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
     ):
+        """
+        Args:
+            requester: the user requesting the upgrade
+            old_room_id: the id of the room to be replaced
+            new_versions: the version to upgrade the room to
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
+        """
         user_id = requester.user.to_string()
 
         # start by allocating a new room id
@@ -257,6 +269,9 @@ class RoomCreationHandler(BaseHandler):
             old_room_id: the id of the room to be replaced
             new_room_id: the id of the replacement room
             old_room_state: the state map for the old room
+
+        Raises:
+            ShadowBanError if the requester is shadow-banned.
         """
         old_room_pl_event_id = old_room_state.get((EventTypes.PowerLevels, ""))
 
@@ -829,11 +844,13 @@ class RoomCreationHandler(BaseHandler):
         async def send(etype: str, content: JsonDict, **kwargs) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
+            # Allow these events to be sent even if the user is shadow-banned to
+            # allow the room creation to complete.
             (
                 _,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                creator, event, ratelimit=False
+                creator, event, ratelimit=False, ignore_shadow_ban=True,
             )
             return last_stream_id
 
