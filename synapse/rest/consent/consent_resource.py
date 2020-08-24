@@ -22,8 +22,6 @@ from os import path
 import jinja2
 from jinja2 import TemplateNotFound
 
-from twisted.internet import defer
-
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
 from synapse.http.server import DirectServeHtmlResource, respond_with_html
@@ -135,7 +133,7 @@ class ConsentResource(DirectServeHtmlResource):
             else:
                 qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
-            u = await defer.maybeDeferred(self.store.get_user_by_id, qualified_user_id)
+            u = await self.store.get_user_by_id(qualified_user_id)
             if u is None:
                 raise NotFoundError("Unknown user")
 

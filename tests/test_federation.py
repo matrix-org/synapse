@@ -1,3 +1,18 @@
+# -*- coding: utf-8 -*-
+# Copyright 2020 The Matrix.org Foundation C.I.C.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from mock import Mock
 
 from twisted.internet.defer import ensureDeferred, maybeDeferred, succeed
@@ -10,6 +25,7 @@ from synapse.util.retryutils import NotRetryingDestination
 
 from tests import unittest
 from tests.server import ThreadedMemoryReactorClock, setup_test_homeserver
+from tests.test_utils import make_awaitable
 
 
 class MessageAcceptTests(unittest.HomeserverTestCase):
@@ -95,7 +111,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         prev_events that said event references.
         """
 
-        def post_json(destination, path, data, headers=None, timeout=0):
+        async def post_json(destination, path, data, headers=None, timeout=0):
             # If it asks us for new missing events, give them NOTHING
             if path.startswith("/_matrix/federation/v1/get_missing_events/"):
                 return {"events": []}
@@ -173,7 +189,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         # Register a mock on the store so that the incoming update doesn't fail because
         # we don't share a room with the user.
         store = self.homeserver.get_datastore()
-        store.get_rooms_for_user = Mock(return_value=succeed(["!someroom:test"]))
+        store.get_rooms_for_user = Mock(return_value=make_awaitable(["!someroom:test"]))
 
         # Manually inject a fake device list update. We need this update to include at
         # least one prev_id so that the user's device list will need to be retried.

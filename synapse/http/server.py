@@ -25,7 +25,7 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Tuple, Union
 
 import jinja2
-from canonicaljson import encode_canonical_json, encode_pretty_printed_json, json
+from canonicaljson import encode_canonical_json, encode_pretty_printed_json
 
 from twisted.internet import defer
 from twisted.python import failure
@@ -46,6 +46,7 @@ from synapse.api.errors import (
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import preserve_fn
 from synapse.logging.opentracing import trace_servlet
+from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
 
 logger = logging.getLogger(__name__)
@@ -242,10 +243,12 @@ class _AsyncResource(resource.Resource, metaclass=abc.ABCMeta):
         no appropriate method exists. Can be overriden in sub classes for
         different routing.
         """
+        # Treat HEAD requests as GET requests.
+        request_method = request.method.decode("ascii")
+        if request_method == "HEAD":
+            request_method = "GET"
 
-        method_handler = getattr(
-            self, "_async_render_%s" % (request.method.decode("ascii"),), None
-        )
+        method_handler = getattr(self, "_async_render_%s" % (request_method,), None)
         if method_handler:
             raw_callback_return = method_handler(request)
 
@@ -362,11 +365,15 @@ class JsonResource(DirectServeJsonResource):
             A tuple of the callback to use, the name of the servlet, and the
             key word arguments to pass to the callback
         """
+        # Treat HEAD requests as GET requests.
         request_path = request.path.decode("ascii")
+        request_method = request.method
+        if request_method == b"HEAD":
+            request_method = b"GET"
 
         # Loop through all the registered callbacks to check if the method
         # and path regex match
-        for path_entry in self.path_regexs.get(request.method, []):
+        for path_entry in self.path_regexs.get(request_method, []):
             m = path_entry.pattern.match(request_path)
             if m:
                 # We found a match!
@@ -532,7 +539,7 @@ def respond_with_json(
             # canonicaljson already encodes to bytes
             json_bytes = encode_canonical_json(json_object)
         else:
-            json_bytes = json.dumps(json_object).encode("utf-8")
+            json_bytes = json_encoder.encode(json_object).encode("utf-8")
 
     return respond_with_json_bytes(request, code, json_bytes, send_cors=send_cors)
 
@@ -579,7 +586,7 @@ def set_cors_headers(request: Request):
     """
     request.setHeader(b"Access-Control-Allow-Origin", b"*")
     request.setHeader(
-        b"Access-Control-Allow-Methods", b"GET, POST, PUT, DELETE, OPTIONS"
+        b"Access-Control-Allow-Methods", b"GET, HEAD, POST, PUT, DELETE, OPTIONS"
     )
     request.setHeader(
         b"Access-Control-Allow-Headers",

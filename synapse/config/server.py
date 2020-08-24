@@ -439,6 +439,9 @@ class ServerConfig(Config):
                 validator=attr.validators.instance_of(str),
                 default=ROOM_COMPLEXITY_TOO_GREAT,
             )
+            admins_can_join = attr.ib(
+                validator=attr.validators.instance_of(bool), default=False
+            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
             **(config.get("limit_remote_rooms") or {})
@@ -526,6 +529,21 @@ class ServerConfig(Config):
         self.request_token_inhibit_3pid_errors = config.get(
             "request_token_inhibit_3pid_errors", False,
         )
+
+        # List of users trialing the new experimental default push rules. This setting is
+        # not included in the sample configuration file on purpose as it's a temporary
+        # hack, so that some users can trial the new defaults without impacting every
+        # user on the homeserver.
+        users_new_default_push_rules = (
+            config.get("users_new_default_push_rules") or []
+        )  # type: list
+        if not isinstance(users_new_default_push_rules, list):
+            raise ConfigError("'users_new_default_push_rules' must be a list")
+
+        # Turn the list into a set to improve lookup speed.
+        self.users_new_default_push_rules = set(
+            users_new_default_push_rules
+        )  # type: set
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
@@ -892,6 +910,10 @@ class ServerConfig(Config):
           # override the error which is returned when the room is too complex.
           #
           #complexity_error: "This room is too complex."
+
+          # allow server admins to join complex rooms. Default is false.
+          #
+          #admins_can_join: true
 
         # Whether to require a user to be in the room to add an alias to it.
         # Defaults to 'true'.

@@ -15,8 +15,6 @@
 import logging
 import random
 
-from twisted.internet import defer
-
 import synapse.logging.context
 from synapse.api.errors import CodeMessageException
 
@@ -54,8 +52,7 @@ class NotRetryingDestination(Exception):
         self.destination = destination
 
 
-@defer.inlineCallbacks
-def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs):
+async def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs):
     """For a given destination check if we have previously failed to
     send a request there and are waiting before retrying the destination.
     If we are not ready to retry the destination, this will raise a
@@ -73,9 +70,9 @@ def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs)
     Example usage:
 
         try:
-            limiter = yield get_retry_limiter(destination, clock, store)
+            limiter = await get_retry_limiter(destination, clock, store)
             with limiter:
-                response = yield do_request()
+                response = await do_request()
         except NotRetryingDestination:
             # We aren't ready to retry that destination.
             raise
@@ -83,7 +80,7 @@ def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs)
     failure_ts = None
     retry_last_ts, retry_interval = (0, 0)
 
-    retry_timings = yield store.get_destination_retry_timings(destination)
+    retry_timings = await store.get_destination_retry_timings(destination)
 
     if retry_timings:
         failure_ts = retry_timings["failure_ts"]
@@ -222,10 +219,9 @@ class RetryDestinationLimiter(object):
             if self.failure_ts is None:
                 self.failure_ts = retry_last_ts
 
-        @defer.inlineCallbacks
-        def store_retry_timings():
+        async def store_retry_timings():
             try:
-                yield self.store.set_destination_retry_timings(
+                await self.store.set_destination_retry_timings(
                     self.destination,
                     self.failure_ts,
                     retry_last_ts,

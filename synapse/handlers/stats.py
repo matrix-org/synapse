@@ -232,7 +232,7 @@ class StatsHandler:
 
                 if membership == prev_membership:
                     pass  # noop
-                if membership == Membership.JOIN:
+                elif membership == Membership.JOIN:
                     room_stats_delta["joined_members"] += 1
                 elif membership == Membership.INVITE:
                     room_stats_delta["invited_members"] += 1

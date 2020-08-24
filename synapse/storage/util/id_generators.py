@@ -20,7 +20,7 @@ from typing import Dict, Set, Tuple
 
 from typing_extensions import Deque
 
-from synapse.storage.database import Database, LoggingTransaction
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
 
@@ -239,7 +239,7 @@ class MultiWriterIdGenerator:
     def __init__(
         self,
         db_conn,
-        db: Database,
+        db: DatabasePool,
         instance_name: str,
         table: str,
         instance_column: str,
