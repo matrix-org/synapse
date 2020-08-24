@@ -498,7 +498,7 @@ class DataStore(
         )
 
     def get_users_paginate(
-        self, start, limit, name=None, guests=True, deactivated=False
+        self, start, limit, user_id=None, name=None, guests=True, deactivated=False
     ):
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -507,7 +507,8 @@ class DataStore(
         Args:
             start (int): start number to begin the query from
             limit (int): number of rows to retrieve
-            name (string): search for user_id or display name
+            user_id (string): search for user_id
+            name (string): search for local part of user_id or display name
             guests (bool): whether to in include guest users
             deactivated (bool): whether to include deactivated users
         Returns:
@@ -521,6 +522,9 @@ class DataStore(
             if name:
                 filters.append("(name LIKE ? OR displayname LIKE ?)")
                 args.extend(["%" + name + "%:%", "%" + name + "%"])
+            elif user_id:
+                filters.append("name LIKE ?")
+                args.extend(["%" + user_id + "%"])
 
             if not guests:
                 filters.append("is_guest = 0")
