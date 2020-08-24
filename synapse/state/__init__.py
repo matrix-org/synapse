@@ -714,7 +714,7 @@ class StateResolutionStore(object):
         chain.
 
         Returns:
-            Set of event IDs.
+            An awaitable that resolves to a set of event IDs.
         """
 
         return self.store.get_auth_chain_difference(state_sets)
