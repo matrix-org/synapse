@@ -675,13 +675,27 @@ class RoomMemberStateTestCase(RoomBase):
         self.assertEquals(json.loads(content), channel.json_body)
 
 
-class RoomMembershipUpdateTestCase(RoomBase):
+class RoomJoinRatelimitTestCase(RoomBase):
     user_id = "@sid1:red"
 
     servlets = [
         profile.register_servlets,
         room.register_servlets,
     ]
+
+    @unittest.override_config(
+        {
+            "rc_joins": {
+                "local": {"per_second": 3, "burst_count": 3},
+            }
+        }
+    )
+    def test_join_local_ratelimit(self):
+        """Tests that local joins are actually rate-limited."""
+        for i in range(5):
+            self.helper.create_room_as(self.user_id)
+
+        self.helper.create_room_as(self.user_id, expect_code=429)
 
     @unittest.override_config(
         {
