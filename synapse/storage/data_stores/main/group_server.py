@@ -1012,7 +1012,7 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def change_user_admin_in_group(self, group_id, user_id, is_admin):
-        return self.db_pool.simple_update(
+        return self.db.simple_update(
             table="group_users",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={"is_admin": is_admin},
