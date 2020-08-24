@@ -27,7 +27,7 @@ import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest.client.v1 import directory, login, profile, room
-from synapse.rest.client.v2_alpha import account
+from synapse.rest.client.v2_alpha import account, room_upgrade_rest_servlet
 from synapse.types import JsonDict, RoomAlias
 from synapse.util.stringutils import random_string
 
@@ -1982,6 +1982,7 @@ class ShadowBannedTestCase(unittest.HomeserverTestCase):
         directory.register_servlets,
         login.register_servlets,
         room.register_servlets,
+        room_upgrade_rest_servlet.register_servlets,
     ]
 
     def prepare(self, reactor, clock, homeserver):
@@ -2099,3 +2100,30 @@ class ShadowBannedTestCase(unittest.HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(room_id)
         )
         self.assertNotIn(event_id, latest_events)
+
+    def test_upgrade(self):
+        """A room upgrade should fail, but look like it succeeded."""
+
+        # The create works fine.
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
+        request, channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/rooms/%s/upgrade" % (room_id,),
+            {"new_version": "6"},
+            access_token=self.banned_access_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        # A new room_id should be returned.
+        self.assertIn("replacement_room", channel.json_body)
+
+        new_room_id = channel.json_body["replacement_room"]
+
+        # It doesn't really matter what API we use here, we just want to assert
+        # that the room doesn't exist.
+        summary = self.get_success(self.store.get_room_summary(new_room_id))
+        # The summary should be empty since the room doesn't exist.
+        self.assertEqual(summary, {})

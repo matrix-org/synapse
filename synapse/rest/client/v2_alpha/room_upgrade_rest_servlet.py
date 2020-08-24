@@ -63,7 +63,6 @@ class RoomUpgradeRestServlet(RestServlet):
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("new_version",))
-        new_version = content["new_version"]
 
         new_version = KNOWN_ROOM_VERSIONS.get(content["new_version"])
         if new_version is None:
