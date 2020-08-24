@@ -40,11 +40,7 @@ class RestHelper(object):
     auth_user_id = attr.ib()
 
     def create_room_as(
-        self,
-        room_creator=None,
-        is_public=True,
-        tok=None,
-        expect_code=200,
+        self, room_creator=None, is_public=True, tok=None, expect_code=200,
     ):
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator

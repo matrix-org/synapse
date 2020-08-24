@@ -684,11 +684,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
     ]
 
     @unittest.override_config(
-        {
-            "rc_joins": {
-                "local": {"per_second": 3, "burst_count": 3},
-            }
-        }
+        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
     )
     def test_join_local_ratelimit(self):
         """Tests that local joins are actually rate-limited."""
@@ -698,11 +694,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
         self.helper.create_room_as(self.user_id, expect_code=429)
 
     @unittest.override_config(
-        {
-            "rc_joins": {
-                "local": {"per_second": 3, "burst_count": 3},
-            }
-        }
+        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
     )
     def test_join_local_ratelimit_profile_change(self):
         """Tests that sending a profile update into all of the user's joined rooms isn't
@@ -734,7 +726,8 @@ class RoomJoinRatelimitTestCase(RoomBase):
         # Check that all the rooms have been sent a profile update into.
         for room_id in room_ids:
             path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (
-                room_id, self.user_id,
+                room_id,
+                self.user_id,
             )
 
             request, channel = self.make_request("GET", path)
@@ -745,11 +738,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
             self.assertEquals(channel.json_body["displayname"], "John Doe")
 
     @unittest.override_config(
-        {
-            "rc_joins": {
-                "local": {"per_second": 3, "burst_count": 3},
-            }
-        }
+        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
     )
     def test_join_local_ratelimit_idempotent(self):
         """Tests that the room join endpoints remain idempotent despite rate-limiting
