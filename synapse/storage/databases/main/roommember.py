@@ -221,10 +221,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                     GROUP BY m.membership
                 """
 
-            txn.execute(sql, (room_id,))
+            # rei tmp
+            #txn.execute(sql, (room_id,))
+            #res = {}
+            #for count, membership in txn:
+            #    summary = res.setdefault(membership, MemberSummary([], count))
+
             res = {}
-            for count, membership in txn:
-                summary = res.setdefault(membership, MemberSummary([], count))
+            summary = res.setdefault("join", MemberSummary([], 42))
 
             # we order by membership and then fairly arbitrarily by event_id so
             # heroes are consistent
