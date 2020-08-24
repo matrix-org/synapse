@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.19.0 that would cause non-join operations (e.g. calling `/join` on a room the user has already joined, or sending a profile update) to be rate-limited.
