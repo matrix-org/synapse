@@ -759,7 +759,11 @@ class EventCreationHandler(object):
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
             stream_id = await self.send_nonmember_event(
-                requester, event, context, ratelimit=ratelimit
+                requester,
+                event,
+                context,
+                ratelimit=ratelimit,
+                ignore_shadow_ban=ignore_shadow_ban,
             )
         return event, stream_id
 
