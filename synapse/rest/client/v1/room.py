@@ -21,14 +21,13 @@ import re
 from typing import List, Optional
 from urllib import parse as urlparse
 
-from canonicaljson import json
-
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
     HttpResponseException,
     InvalidClientCredentialsError,
+    ShadowBanError,
     SynapseError,
 )
 from synapse.api.filtering import Filter
@@ -46,6 +45,8 @@ from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import RoomAlias, RoomID, StreamToken, ThirdPartyInstanceID, UserID
+from synapse.util import json_decoder
+from synapse.util.stringutils import random_string
 
 MYPY = False
 if MYPY:
@@ -201,14 +202,17 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             event_dict["state_key"] = state_key
 
         if event_type == EventTypes.Member:
-            membership = content.get("membership", None)
-            event_id, _ = await self.room_member_handler.update_membership(
-                requester,
-                target=UserID.from_string(state_key),
-                room_id=room_id,
-                action=membership,
-                content=content,
-            )
+            try:
+                membership = content.get("membership", None)
+                event_id, _ = await self.room_member_handler.update_membership(
+                    requester,
+                    target=UserID.from_string(state_key),
+                    room_id=room_id,
+                    action=membership,
+                    content=content,
+                )
+            except ShadowBanError:
+                event_id = "$" + random_string(43)
         else:
             (
                 event,
@@ -519,7 +523,9 @@ class RoomMessageListRestServlet(RestServlet):
         filter_str = parse_string(request, b"filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(
+                json_decoder.decode(filter_json)
+            )  # type: Optional[Filter]
             if (
                 event_filter
                 and event_filter.filter_json.get("event_format", "client")
@@ -631,7 +637,9 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, b"filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(json.loads(filter_json))  # type: Optional[Filter]
+            event_filter = Filter(
+                json_decoder.decode(filter_json)
+            )  # type: Optional[Filter]
         else:
             event_filter = None
 
@@ -716,16 +724,20 @@ class RoomMembershipRestServlet(TransactionRestServlet):
             content = {}
 
         if membership_action == "invite" and self._has_3pid_invite_keys(content):
-            await self.room_member_handler.do_3pid_invite(
-                room_id,
-                requester.user,
-                content["medium"],
-                content["address"],
-                content["id_server"],
-                requester,
-                txn_id,
-                content.get("id_access_token"),
-            )
+            try:
+                await self.room_member_handler.do_3pid_invite(
+                    room_id,
+                    requester.user,
+                    content["medium"],
+                    content["address"],
+                    content["id_server"],
+                    requester,
+                    txn_id,
+                    content.get("id_access_token"),
+                )
+            except ShadowBanError:
+                # Pretend the request succeeded.
+                pass
             return 200, {}
 
         target = requester.user
@@ -737,15 +749,19 @@ class RoomMembershipRestServlet(TransactionRestServlet):
         if "reason" in content:
             event_content = {"reason": content["reason"]}
 
-        await self.room_member_handler.update_membership(
-            requester=requester,
-            target=target,
-            room_id=room_id,
-            action=membership_action,
-            txn_id=txn_id,
-            third_party_signed=content.get("third_party_signed", None),
-            content=event_content,
-        )
+        try:
+            await self.room_member_handler.update_membership(
+                requester=requester,
+                target=target,
+                room_id=room_id,
+                action=membership_action,
+                txn_id=txn_id,
+                third_party_signed=content.get("third_party_signed", None),
+                content=event_content,
+            )
+        except ShadowBanError:
+            # Pretend the request succeeded.
+            pass
 
         return_value = {}
 

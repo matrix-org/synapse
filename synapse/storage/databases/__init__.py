@@ -38,9 +38,9 @@ class Databases(object):
         # store.
 
         self.databases = []
-        self.main = None
-        self.state = None
-        self.persist_events = None
+        main = None
+        state = None
+        persist_events = None
 
         for database_config in hs.config.database.databases:
             db_name = database_config.name
@@ -61,27 +61,25 @@ class Databases(object):
 
                     # Sanity check we don't try and configure the main store on
                     # multiple databases.
-                    if self.main:
+                    if main:
                         raise Exception("'main' data store already configured")
 
-                    self.main = main_store_class(database, db_conn, hs)
+                    main = main_store_class(database, db_conn, hs)
 
                     # If we're on a process that can persist events also
                     # instantiate a `PersistEventsStore`
                     if hs.config.worker.writers.events == hs.get_instance_name():
-                        self.persist_events = PersistEventsStore(
-                            hs, database, self.main
-                        )
+                        persist_events = PersistEventsStore(hs, database, main)
 
                 if "state" in database_config.databases:
                     logger.info("Starting 'state' data store")
 
                     # Sanity check we don't try and configure the state store on
                     # multiple databases.
-                    if self.state:
+                    if state:
                         raise Exception("'state' data store already configured")
 
-                    self.state = StateGroupDataStore(database, db_conn, hs)
+                    state = StateGroupDataStore(database, db_conn, hs)
 
                 db_conn.commit()
 
@@ -89,9 +87,24 @@ class Databases(object):
 
                 logger.info("Database %r prepared", db_name)
 
+            # Closing the context manager doesn't close the connection.
+            # psycopg will close the connection when the object gets GCed, but *only*
+            # if the PID is the same as when the connection was opened [1], and
+            # it may not be if we fork in the meantime.
+            #
+            # [1]: https://github.com/psycopg/psycopg2/blob/2_8_5/psycopg/connection_type.c#L1378
+
+            db_conn.close()
+
         # Sanity check that we have actually configured all the required stores.
-        if not self.main:
+        if not main:
             raise Exception("No 'main' data store configured")
 
-        if not self.state:
-            raise Exception("No 'main' data store configured")
+        if not state:
+            raise Exception("No 'state' data store configured")
+
+        # We use local variables here to ensure that the databases do not have
+        # optional types.
+        self.main = main
+        self.state = state
+        self.persist_events = persist_events

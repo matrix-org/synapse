@@ -19,6 +19,7 @@ from mock import Mock, call
 from signedjson.key import generate_signing_key
 
 from synapse.api.constants import EventTypes, Membership, PresenceState
+from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events.builder import EventBuilder
 from synapse.handlers.presence import (
@@ -32,7 +33,6 @@ from synapse.handlers.presence import (
     handle_update,
 )
 from synapse.rest.client.v1 import room
-from synapse.storage.presence import UserPresenceState
 from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest

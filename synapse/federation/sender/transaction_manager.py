@@ -13,9 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List
-
-from canonicaljson import json
+from typing import TYPE_CHECKING, List, Tuple
 
 from synapse.api.errors import HttpResponseException
 from synapse.events import EventBase
@@ -28,6 +26,7 @@ from synapse.logging.opentracing import (
     tags,
     whitelisted_homeserver,
 )
+from synapse.util import json_decoder
 from synapse.util.metrics import measure_func
 
 if TYPE_CHECKING:
@@ -54,7 +53,10 @@ class TransactionManager(object):
 
     @measure_func("_send_new_transaction")
     async def send_new_transaction(
-        self, destination: str, pending_pdus: List[EventBase], pending_edus: List[Edu]
+        self,
+        destination: str,
+        pending_pdus: List[Tuple[EventBase, int]],
+        pending_edus: List[Edu],
     ):
 
         # Make a transaction-sending opentracing span. This span follows on from
@@ -68,7 +70,7 @@ class TransactionManager(object):
         for edu in pending_edus:
             context = edu.get_context()
             if context:
-                span_contexts.append(extract_text_map(json.loads(context)))
+                span_contexts.append(extract_text_map(json_decoder.decode(context)))
             if keep_destination:
                 edu.strip_context()
 

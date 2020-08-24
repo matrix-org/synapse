@@ -1,1 +1,0 @@
-Move some database-related log lines from the default logger to the database/transaction loggers.

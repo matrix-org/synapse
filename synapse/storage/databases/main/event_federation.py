@@ -15,16 +15,16 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Dict, List, Optional, Set, Tuple
-
-from twisted.internet import defer
+from typing import Dict, Iterable, List, Set, Tuple
 
 from synapse.api.errors import StoreError
+from synapse.events import EventBase
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
+from synapse.types import Collection
 from synapse.util.caches.descriptors import cached
 from synapse.util.iterutils import batch_iter
 
@@ -32,57 +32,51 @@ logger = logging.getLogger(__name__)
 
 
 class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBaseStore):
-    def get_auth_chain(self, event_ids, include_given=False):
-        """Get auth events for given event_ids. The events *must* be state events.
-
-        Args:
-            event_ids (list): state events
-            include_given (bool): include the given events in result
-
-        Returns:
-            list of events
-        """
-        return self.get_auth_chain_ids(
-            event_ids, include_given=include_given
-        ).addCallback(self.get_events_as_list)
-
-    def get_auth_chain_ids(
-        self,
-        event_ids: List[str],
-        include_given: bool = False,
-        ignore_events: Optional[Set[str]] = None,
-    ):
+    async def get_auth_chain(
+        self, event_ids: Collection[str], include_given: bool = False
+    ) -> List[EventBase]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
             event_ids: state events
             include_given: include the given events in result
-            ignore_events: Set of events to exclude from the returned auth
-                chain. This is useful if the caller will just discard the
-                given events anyway, and saves us from figuring out their auth
-                chains if not required.
+
+        Returns:
+            list of events
+        """
+        event_ids = await self.get_auth_chain_ids(
+            event_ids, include_given=include_given
+        )
+        return await self.get_events_as_list(event_ids)
+
+    async def get_auth_chain_ids(
+        self, event_ids: Collection[str], include_given: bool = False,
+    ) -> List[str]:
+        """Get auth events for given event_ids. The events *must* be state events.
+
+        Args:
+            event_ids: state events
+            include_given: include the given events in result
 
         Returns:
             list of event_ids
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_auth_chain_ids",
             self._get_auth_chain_ids_txn,
             event_ids,
             include_given,
-            ignore_events,
         )
 
-    def _get_auth_chain_ids_txn(self, txn, event_ids, include_given, ignore_events):
-        if ignore_events is None:
-            ignore_events = set()
-
+    def _get_auth_chain_ids_txn(
+        self, txn: LoggingTransaction, event_ids: Collection[str], include_given: bool
+    ) -> List[str]:
         if include_given:
             results = set(event_ids)
         else:
             results = set()
 
-        base_sql = "SELECT auth_id FROM event_auth WHERE "
+        base_sql = "SELECT DISTINCT auth_id FROM event_auth WHERE "
 
         front = set(event_ids)
         while front:
@@ -94,7 +88,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 txn.execute(base_sql + clause, args)
                 new_front.update(r[0] for r in txn)
 
-            new_front -= ignore_events
             new_front -= results
 
             front = new_front
@@ -259,11 +252,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # Return all events where not all sets can reach them.
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
-    def get_oldest_events_in_room(self, room_id):
-        return self.db_pool.runInteraction(
-            "get_oldest_events_in_room", self._get_oldest_events_in_room_txn, room_id
-        )
-
     def get_oldest_events_with_depth_in_room(self, room_id):
         return self.db_pool.runInteraction(
             "get_oldest_events_with_depth_in_room",
@@ -286,17 +274,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         return dict(txn)
 
-    @defer.inlineCallbacks
-    def get_max_depth_of(self, event_ids):
+    async def get_max_depth_of(self, event_ids: List[str]) -> int:
         """Returns the max depth of a set of event IDs
 
         Args:
-            event_ids (list[str])
-
-        Returns
-            Deferred[int]
+            event_ids: The event IDs to calculate the max depth of.
         """
-        rows = yield self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="events",
             column="event_id",
             iterable=event_ids,
@@ -308,14 +292,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             return 0
         else:
             return max(row["depth"] for row in rows)
-
-    def _get_oldest_events_in_room_txn(self, txn, room_id):
-        return self.db_pool.simple_select_onecol_txn(
-            txn,
-            table="event_backward_extremities",
-            keyvalues={"room_id": room_id},
-            retcol="event_id",
-        )
 
     def get_prev_events_for_room(self, room_id: str):
         """
@@ -478,7 +454,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             "get_forward_extremeties_for_room", get_forward_extremeties_for_room_txn
         )
 
-    def get_backfill_events(self, room_id, event_list, limit):
+    async def get_backfill_events(self, room_id, event_list, limit):
         """Get a list of Events for a given topic that occurred before (and
         including) the events in event_list. Return a list of max size `limit`
 
@@ -488,17 +464,15 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             event_list (list)
             limit (int)
         """
-        return (
-            self.db_pool.runInteraction(
-                "get_backfill_events",
-                self._get_backfill_events,
-                room_id,
-                event_list,
-                limit,
-            )
-            .addCallback(self.get_events_as_list)
-            .addCallback(lambda l: sorted(l, key=lambda e: -e.depth))
+        event_ids = await self.db_pool.runInteraction(
+            "get_backfill_events",
+            self._get_backfill_events,
+            room_id,
+            event_list,
+            limit,
         )
+        events = await self.get_events_as_list(event_ids)
+        return sorted(events, key=lambda e: -e.depth)
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
         logger.debug("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
@@ -550,9 +524,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         return event_results
 
-    @defer.inlineCallbacks
-    def get_missing_events(self, room_id, earliest_events, latest_events, limit):
-        ids = yield self.db_pool.runInteraction(
+    async def get_missing_events(self, room_id, earliest_events, latest_events, limit):
+        ids = await self.db_pool.runInteraction(
             "get_missing_events",
             self._get_missing_events,
             room_id,
@@ -560,8 +533,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             latest_events,
             limit,
         )
-        events = yield self.get_events_as_list(ids)
-        return events
+        return await self.get_events_as_list(ids)
 
     def _get_missing_events(self, txn, room_id, earliest_events, latest_events, limit):
 
@@ -595,17 +567,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         event_results.reverse()
         return event_results
 
-    @defer.inlineCallbacks
-    def get_successor_events(self, event_ids):
+    async def get_successor_events(self, event_ids: Iterable[str]) -> List[str]:
         """Fetch all events that have the given events as a prev event
 
         Args:
-            event_ids (iterable[str])
-
-        Returns:
-            Deferred[list[str]]
+            event_ids: The events to use as the previous events.
         """
-        rows = yield self.db_pool.simple_select_many_batch(
+        rows = await self.db_pool.simple_select_many_batch(
             table="event_edges",
             column="prev_event_id",
             iterable=event_ids,
@@ -674,8 +642,7 @@ class EventFederationStore(EventFederationWorkerStore):
         txn.execute(query, (room_id,))
         txn.call_after(self.get_latest_event_ids_in_room.invalidate, (room_id,))
 
-    @defer.inlineCallbacks
-    def _background_delete_non_state_event_auth(self, progress, batch_size):
+    async def _background_delete_non_state_event_auth(self, progress, batch_size):
         def delete_event_auth(txn):
             target_min_stream_id = progress.get("target_min_stream_id_inclusive")
             max_stream_id = progress.get("max_stream_id_exclusive")
@@ -714,12 +681,12 @@ class EventFederationStore(EventFederationWorkerStore):
 
             return min_stream_id >= target_min_stream_id
 
-        result = yield self.db_pool.runInteraction(
+        result = await self.db_pool.runInteraction(
             self.EVENT_AUTH_STATE_ONLY, delete_event_auth
         )
 
         if not result:
-            yield self.db_pool.updates._end_background_update(
+            await self.db_pool.updates._end_background_update(
                 self.EVENT_AUTH_STATE_ONLY
             )
 

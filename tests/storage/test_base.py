@@ -66,8 +66,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_insert_1col(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_insert(
-            table="tablename", values={"columname": "Value"}
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert(
+                table="tablename", values={"columname": "Value"}
+            )
         )
 
         self.mock_txn.execute.assert_called_with(
@@ -78,10 +80,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_insert_3cols(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_insert(
-            table="tablename",
-            # Use OrderedDict() so we can assert on the SQL generated
-            values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)]),
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert(
+                table="tablename",
+                # Use OrderedDict() so we can assert on the SQL generated
+                values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)]),
+            )
         )
 
         self.mock_txn.execute.assert_called_with(

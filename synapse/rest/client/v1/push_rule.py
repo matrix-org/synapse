@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 from synapse.api.errors import (
     NotFoundError,
     StoreError,
@@ -160,10 +159,10 @@ class PushRuleRestServlet(RestServlet):
         return 200, {}
 
     def notify_user(self, user_id):
-        stream_id, _ = self.store.get_push_rules_stream_token()
+        stream_id = self.store.get_max_push_rules_stream_id()
         self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
-    def set_rule_attr(self, user_id, spec, val):
+    async def set_rule_attr(self, user_id, spec, val):
         if spec["attr"] == "enabled":
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
@@ -173,7 +172,9 @@ class PushRuleRestServlet(RestServlet):
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            return self.store.set_push_rule_enabled(user_id, namespaced_rule_id, val)
+            return await self.store.set_push_rule_enabled(
+                user_id, namespaced_rule_id, val
+            )
         elif spec["attr"] == "actions":
             actions = val.get("actions")
             _check_actions(actions)
@@ -188,7 +189,7 @@ class PushRuleRestServlet(RestServlet):
 
                 if namespaced_rule_id not in rule_ids:
                     raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
-            return self.store.set_push_rule_actions(
+            return await self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:

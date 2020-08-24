@@ -1577,6 +1577,17 @@ saml2_config:
   #
   #grandfathered_mxid_source_attribute: upn
 
+  # It is possible to configure Synapse to only allow logins if SAML attributes
+  # match particular values. The requirements can be listed under
+  # `attribute_requirements` as shown below. All of the listed attributes must
+  # match for the login to be permitted.
+  #
+  #attribute_requirements:
+  #  - attribute: userGroup
+  #    value: "staff"
+  #  - attribute: department
+  #    value: "sales"
+
   # Directory in which Synapse will try to find the template files below.
   # If not set, default templates from within the Synapse package will be used.
   #
@@ -1991,9 +2002,7 @@ email:
   # Directory in which Synapse will try to find the template files below.
   # If not set, default templates from within the Synapse package will be used.
   #
-  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-  # If you *do* uncomment it, you will need to make sure that all the templates
-  # below are in the directory.
+  # Do not uncomment this setting unless you want to customise the templates.
   #
   # Synapse will look for the following templates in this directory:
   #

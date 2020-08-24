@@ -43,7 +43,7 @@ REQUIREMENTS = [
     "jsonschema>=2.5.1",
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
-    "canonicaljson>=1.2.0",
+    "canonicaljson>=1.3.0",
     # we use the type definitions added in signedjson 1.1.
     "signedjson>=1.1.0",
     "pynacl>=1.2.1",
@@ -78,8 +78,6 @@ CONDITIONAL_REQUIREMENTS = {
     "matrix-synapse-ldap3": ["matrix-synapse-ldap3>=0.1"],
     # we use execute_batch, which arrived in psycopg 2.7.
     "postgres": ["psycopg2>=2.7"],
-    # ConsentResource uses select_autoescape, which arrived in jinja 2.9
-    "resources.consent": ["Jinja2>=2.9"],
     # ACME support is required to provision TLS certificates from authorities
     # that use the protocol, such as Let's Encrypt.
     "acme": [

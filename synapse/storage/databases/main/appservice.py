@@ -16,15 +16,12 @@
 import logging
 import re
 
-from canonicaljson import json
-
-from twisted.internet import defer
-
 from synapse.appservice import AppServiceTransaction
 from synapse.config.appservice import load_appservices
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.util import json_encoder
 
 logger = logging.getLogger(__name__)
 
@@ -124,17 +121,15 @@ class ApplicationServiceStore(ApplicationServiceWorkerStore):
 class ApplicationServiceTransactionWorkerStore(
     ApplicationServiceWorkerStore, EventsWorkerStore
 ):
-    @defer.inlineCallbacks
-    def get_appservices_by_state(self, state):
+    async def get_appservices_by_state(self, state):
         """Get a list of application services based on their state.
 
         Args:
             state(ApplicationServiceState): The state to filter on.
         Returns:
-            A Deferred which resolves to a list of ApplicationServices, which
-            may be empty.
+            A list of ApplicationServices, which may be empty.
         """
-        results = yield self.db_pool.simple_select_list(
+        results = await self.db_pool.simple_select_list(
             "application_services_state", {"state": state}, ["as_id"]
         )
         # NB: This assumes this class is linked with ApplicationServiceStore
@@ -147,16 +142,15 @@ class ApplicationServiceTransactionWorkerStore(
                     services.append(service)
         return services
 
-    @defer.inlineCallbacks
-    def get_appservice_state(self, service):
+    async def get_appservice_state(self, service):
         """Get the application service state.
 
         Args:
             service(ApplicationService): The service whose state to set.
         Returns:
-            A Deferred which resolves to ApplicationServiceState.
+            An ApplicationServiceState.
         """
-        result = yield self.db_pool.simple_select_one(
+        result = await self.db_pool.simple_select_one(
             "application_services_state",
             {"as_id": service.id},
             ["state"],
@@ -174,7 +168,7 @@ class ApplicationServiceTransactionWorkerStore(
             service(ApplicationService): The service whose state to set.
             state(ApplicationServiceState): The connectivity state to apply.
         Returns:
-            A Deferred which resolves when the state was set successfully.
+            An Awaitable which resolves when the state was set successfully.
         """
         return self.db_pool.simple_upsert(
             "application_services_state", {"as_id": service.id}, {"state": state}
@@ -209,7 +203,7 @@ class ApplicationServiceTransactionWorkerStore(
             new_txn_id = max(highest_txn_id, last_txn_id) + 1
 
             # Insert new txn into txn table
-            event_ids = json.dumps([e.event_id for e in events])
+            event_ids = json_encoder.encode([e.event_id for e in events])
             txn.execute(
                 "INSERT INTO application_services_txns(as_id, txn_id, event_ids) "
                 "VALUES(?,?,?)",
@@ -270,16 +264,14 @@ class ApplicationServiceTransactionWorkerStore(
             "complete_appservice_txn", _complete_appservice_txn
         )
 
-    @defer.inlineCallbacks
-    def get_oldest_unsent_txn(self, service):
+    async def get_oldest_unsent_txn(self, service):
         """Get the oldest transaction which has not been sent for this
         service.
 
         Args:
             service(ApplicationService): The app service to get the oldest txn.
         Returns:
-            A Deferred which resolves to an AppServiceTransaction or
-            None.
+            An AppServiceTransaction or None.
         """
 
         def _get_oldest_unsent_txn(txn):
@@ -298,7 +290,7 @@ class ApplicationServiceTransactionWorkerStore(
 
             return entry
 
-        entry = yield self.db_pool.runInteraction(
+        entry = await self.db_pool.runInteraction(
             "get_oldest_unsent_appservice_txn", _get_oldest_unsent_txn
         )
 
@@ -307,7 +299,7 @@ class ApplicationServiceTransactionWorkerStore(
 
         event_ids = db_to_json(entry["event_ids"])
 
-        events = yield self.get_events_as_list(event_ids)
+        events = await self.get_events_as_list(event_ids)
 
         return AppServiceTransaction(service=service, id=entry["txn_id"], events=events)
 
@@ -332,8 +324,7 @@ class ApplicationServiceTransactionWorkerStore(
             "set_appservice_last_pos", set_appservice_last_pos_txn
         )
 
-    @defer.inlineCallbacks
-    def get_new_events_for_appservice(self, current_id, limit):
+    async def get_new_events_for_appservice(self, current_id, limit):
         """Get all new evnets"""
 
         def get_new_events_for_appservice_txn(txn):
@@ -357,11 +348,11 @@ class ApplicationServiceTransactionWorkerStore(
 
             return upper_bound, [row[1] for row in rows]
 
-        upper_bound, event_ids = yield self.db_pool.runInteraction(
+        upper_bound, event_ids = await self.db_pool.runInteraction(
             "get_new_events_for_appservice", get_new_events_for_appservice_txn
         )
 
-        events = yield self.get_events_as_list(event_ids)
+        events = await self.get_events_as_list(event_ids)
 
         return upper_bound, events
 
