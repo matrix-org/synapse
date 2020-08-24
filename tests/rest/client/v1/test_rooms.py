@@ -21,7 +21,7 @@
 import json
 from urllib import parse as urlparse
 
-from mock import Mock
+from mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
@@ -1976,6 +1976,8 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
 
 
+# To avoid the tests timing out don't add a delay to "annoy the requester".
+@patch("random.randint", new=lambda a, b: 0)
 class ShadowBannedTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets_for_client_rest_resource,
