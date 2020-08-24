@@ -179,6 +179,54 @@ class RoomTestCase(_ShadowBannedBase):
         # The summary should be empty since the room doesn't exist.
         self.assertEqual(summary, {})
 
+    def test_typing(self):
+        """Typing notifications should not be propagated into the room."""
+        # The create works fine.
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/typing/%s" % (room_id, self.banned_user_id),
+            {"typing": True, "timeout": 30000},
+            access_token=self.banned_access_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code)
+
+        # There should be no typing events.
+        event_source = self.hs.get_event_sources().sources["typing"]
+        self.assertEquals(event_source.get_current_key(), 0)
+
+        # The other user can join and sending typing events.
+        self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
+
+        request, channel = self.make_request(
+            "PUT",
+            "/rooms/%s/typing/%s" % (room_id, self.other_user_id),
+            {"typing": True, "timeout": 30000},
+            access_token=self.other_access_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code)
+
+        # These appear in the room.
+        self.assertEquals(event_source.get_current_key(), 1)
+        events = self.get_success(
+            event_source.get_new_events(from_key=0, room_ids=[room_id])
+        )
+        self.assertEquals(
+            events[0],
+            [
+                {
+                    "type": "m.typing",
+                    "room_id": room_id,
+                    "content": {"user_ids": [self.other_user_id]},
+                }
+            ],
+        )
+
 
 # To avoid the tests timing out don't add a delay to "annoy the requester".
 @patch("random.randint", new=lambda a, b: 0)

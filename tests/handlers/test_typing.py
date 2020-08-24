@@ -21,7 +21,7 @@ from mock import ANY, Mock, call
 from twisted.internet import defer
 
 from synapse.api.errors import AuthError
-from synapse.types import UserID
+from synapse.types import UserID, create_requester
 
 from tests import unittest
 from tests.test_utils import make_awaitable
@@ -167,7 +167,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=20000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=20000,
             )
         )
 
@@ -194,7 +197,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=20000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=20000,
             )
         )
 
@@ -269,7 +275,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.stopped_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
             )
         )
 
@@ -309,7 +317,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=10000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=10000,
             )
         )
 
@@ -348,7 +359,10 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.started_typing(
-                target_user=U_APPLE, auth_user=U_APPLE, room_id=ROOM_ID, timeout=10000
+                target_user=U_APPLE,
+                requester=create_requester(U_APPLE),
+                room_id=ROOM_ID,
+                timeout=10000,
             )
         )
 
