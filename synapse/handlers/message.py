@@ -729,7 +729,7 @@ class EventCreationHandler(object):
             ShadowBanError if the requester has been shadow-banned.
         """
         if not ignore_shadow_ban and requester.shadow_banned:
-            # We randomly sleep a bit just to annoy the requester a bit.
+            # We randomly sleep a bit just to annoy the requester.
             await self.clock.sleep(random.randint(1, 10))
             raise ShadowBanError()
 
