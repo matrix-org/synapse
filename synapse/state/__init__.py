@@ -205,8 +205,7 @@ class StateHandler(object):
 
         logger.debug("calling resolve_state_groups from get_current_state_ids")
         ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
-        # mypy doesn't like that this returns a frozendict instead of a dict.
-        return ret.state  # type: ignore
+        return dict(ret.state)
 
     async def get_current_users_in_room(
         self, room_id: str, latest_event_ids: Optional[List[str]] = None
@@ -316,8 +315,7 @@ class StateHandler(object):
                 event.room_id, event.prev_event_ids()
             )
 
-            # mypy doesn't like that this is a frozendict, not a dict.
-            state_ids_before_event = entry.state  # type: ignore
+            state_ids_before_event = dict(entry.state)
             state_group_before_event = entry.state_group
             state_group_before_event_prev_group = entry.prev_group
             deltas_to_state_group_before_event = entry.delta_ids
