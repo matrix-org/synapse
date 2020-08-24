@@ -16,7 +16,17 @@
 
 import logging
 from collections import namedtuple
-from typing import Awaitable, Dict, Iterable, List, Optional, Set, Union, overload
+from typing import (
+    Awaitable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Union,
+    overload,
+)
 
 import attr
 from frozendict import frozendict
@@ -625,7 +635,7 @@ def resolve_events_with_store(
     clock: Clock,
     room_id: str,
     room_version: str,
-    state_sets: List[StateMap[str]],
+    state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_res_store: "StateResolutionStore",
 ) -> Awaitable[StateMap[str]]:

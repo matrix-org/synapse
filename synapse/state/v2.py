@@ -24,6 +24,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
     overload,
@@ -53,7 +54,7 @@ async def resolve_events_with_store(
     clock: Clock,
     room_id: str,
     room_version: str,
-    state_sets: List[StateMap[str]],
+    state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_res_store: "synapse.state.StateResolutionStore",
 ) -> StateMap[str]:
@@ -235,7 +236,7 @@ async def _get_power_level_for_sender(
 
 
 async def _get_auth_chain_difference(
-    state_sets: List[StateMap[str]],
+    state_sets: Sequence[StateMap[str]],
     event_map: Dict[str, EventBase],
     state_res_store: "synapse.state.StateResolutionStore",
 ) -> Set[str]:

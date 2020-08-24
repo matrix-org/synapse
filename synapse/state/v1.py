@@ -15,7 +15,17 @@
 
 import hashlib
 import logging
-from typing import Awaitable, Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import (
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+)
 
 from synapse import event_auth
 from synapse.api.constants import EventTypes
@@ -32,7 +42,7 @@ POWER_KEY = (EventTypes.PowerLevels, "")
 
 async def resolve_events_with_store(
     room_id: str,
-    state_sets: List[StateMap[str]],
+    state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_map_factory: Callable[[Iterable[str]], Awaitable[Dict[str, EventBase]]],
 ) -> StateMap[str]:
