@@ -166,7 +166,7 @@ point to another Dockerfile.
 ## Disabling the healthcheck
 
 If you are using a non-standard port or tls inside docker you can disable the healthcheck
-whilst running the above docker run commands. 
+whilst running the above `docker run` commands. 
 
 ```
    --no-healthcheck
