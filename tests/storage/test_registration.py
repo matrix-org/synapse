@@ -133,8 +133,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
         # Check that, with the config setting set to false (the default value), a
         # validation error is caused by the unknown session ID.
         try:
-            yield self.store.validate_threepid_session(
-                "fake_sid", "fake_client_secret", "fake_token", 0,
+            yield defer.ensureDeferred(
+                self.store.validate_threepid_session(
+                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                )
             )
         except ThreepidValidationError as e:
             self.assertEquals(e.msg, "Unknown session_id", e)
@@ -144,8 +146,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
         # Check that now the validation error is caused by the token not matching.
         try:
-            yield self.store.validate_threepid_session(
-                "fake_sid", "fake_client_secret", "fake_token", 0,
+            yield defer.ensureDeferred(
+                self.store.validate_threepid_session(
+                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                )
             )
         except ThreepidValidationError as e:
             self.assertEquals(e.msg, "Validation token not found or has expired", e)
