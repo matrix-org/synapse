@@ -16,23 +16,13 @@ from mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.rest.client.v1 import directory, login, room
+from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import room_upgrade_rest_servlet
 
 from tests import unittest
 
 
-# To avoid the tests timing out don't add a delay to "annoy the requester".
-@patch("random.randint", new=lambda a, b: 0)
-class RoomTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        directory.register_servlets,
-        login.register_servlets,
-        room.register_servlets,
-        room_upgrade_rest_servlet.register_servlets,
-    ]
-
+class _ShadowBannedBase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
         # Create two users, one of which is shadow-banned.
         self.banned_user_id = self.register_user("banned", "test")
@@ -51,6 +41,18 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         self.other_user_id = self.register_user("otheruser", "pass")
         self.other_access_token = self.login("otheruser", "pass")
+
+
+# To avoid the tests timing out don't add a delay to "annoy the requester".
+@patch("random.randint", new=lambda a, b: 0)
+class RoomTestCase(_ShadowBannedBase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        directory.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        room_upgrade_rest_servlet.register_servlets,
+    ]
 
     def test_invite(self):
         """Invites from shadow-banned users don't actually get sent."""
@@ -176,3 +178,34 @@ class RoomTestCase(unittest.HomeserverTestCase):
         summary = self.get_success(self.store.get_room_summary(new_room_id))
         # The summary should be empty since the room doesn't exist.
         self.assertEqual(summary, {})
+
+
+# To avoid the tests timing out don't add a delay to "annoy the requester".
+@patch("random.randint", new=lambda a, b: 0)
+class ProfileTestCase(_ShadowBannedBase):
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        profile.register_servlets,
+    ]
+
+    def test_displayname(self):
+        """Profile changes should succeed, but don't end up in a room."""
+        # The update should succeed.
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/profile/%s/displayname" % (self.banned_user_id,),
+            {"displayname": "new display name"},
+            access_token=self.banned_access_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertEqual(channel.json_body, {})
+
+        # The user's display name should be updated.
+        request, channel = self.make_request(
+            "GET", "/profile/%s/displayname" % (self.banned_user_id,)
+        )
+        self.render(request)
+        self.assertEqual(channel.code, 200, channel.result)
+        self.assertEqual(channel.json_body["displayname"], "new display name")
