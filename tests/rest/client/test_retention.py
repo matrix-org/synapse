@@ -167,10 +167,8 @@ class RetentionTestCase(unittest.HomeserverTestCase):
 
         The main reason for sending a second event is because currently Synapse won't
         purge the latest message in a room because it would otherwise result in a lack of
-        forward extremities for this room. It's also a good thing to have (and with the
-        current ordering and checks) because if we eventually fix that, it acts as a
-        check that the purge jobs aren't too greedy and purge messages they shouldn't
-        purge.
+        forward extremities for this room. It's also a good thing to ensure the purge jobs
+        aren't too greedy and purge messages they shouldn't.
 
         Args:
             room_id: The ID of the room to test retention in.
