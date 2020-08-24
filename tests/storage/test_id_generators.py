@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from synapse.storage.database import Database
+from synapse.storage.database import DatabasePool
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
 
 from tests.unittest import HomeserverTestCase
@@ -27,9 +27,9 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.db = self.store.db  # type: Database
+        self.db_pool = self.store.db_pool  # type: DatabasePool
 
-        self.get_success(self.db.runInteraction("_setup_db", self._setup_db))
+        self.get_success(self.db_pool.runInteraction("_setup_db", self._setup_db))
 
     def _setup_db(self, txn):
         txn.execute("CREATE SEQUENCE foobar_seq")
@@ -47,7 +47,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         def _create(conn):
             return MultiWriterIdGenerator(
                 conn,
-                self.db,
+                self.db_pool,
                 instance_name=instance_name,
                 table="foobar",
                 instance_column="instance_name",
@@ -55,7 +55,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 sequence_name="foobar_seq",
             )
 
-        return self.get_success(self.db.runWithConnection(_create))
+        return self.get_success(self.db_pool.runWithConnection(_create))
 
     def _insert_rows(self, instance_name: str, number: int):
         def _insert(txn):
@@ -65,7 +65,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                     (instance_name,),
                 )
 
-        self.get_success(self.db.runInteraction("test_single_instance", _insert))
+        self.get_success(self.db_pool.runInteraction("test_single_instance", _insert))
 
     def test_empty(self):
         """Test an ID generator against an empty database gives sensible
@@ -88,7 +88,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         id_gen = self._create_id_generator()
 
         self.assertEqual(id_gen.get_positions(), {"master": 7})
-        self.assertEqual(id_gen.get_current_token("master"), 7)
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
 
         # Try allocating a new ID gen and check that we only see position
         # advanced after we leave the context manager.
@@ -98,12 +98,12 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 self.assertEqual(stream_id, 8)
 
                 self.assertEqual(id_gen.get_positions(), {"master": 7})
-                self.assertEqual(id_gen.get_current_token("master"), 7)
+                self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
 
         self.get_success(_get_next_async())
 
         self.assertEqual(id_gen.get_positions(), {"master": 8})
-        self.assertEqual(id_gen.get_current_token("master"), 8)
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 8)
 
     def test_multi_instance(self):
         """Test that reads and writes from multiple processes are handled
@@ -116,8 +116,8 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         second_id_gen = self._create_id_generator("second")
 
         self.assertEqual(first_id_gen.get_positions(), {"first": 3, "second": 7})
-        self.assertEqual(first_id_gen.get_current_token("first"), 3)
-        self.assertEqual(first_id_gen.get_current_token("second"), 7)
+        self.assertEqual(first_id_gen.get_current_token_for_writer("first"), 3)
+        self.assertEqual(first_id_gen.get_current_token_for_writer("second"), 7)
 
         # Try allocating a new ID gen and check that we only see position
         # advanced after we leave the context manager.
@@ -166,7 +166,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         id_gen = self._create_id_generator()
 
         self.assertEqual(id_gen.get_positions(), {"master": 7})
-        self.assertEqual(id_gen.get_current_token("master"), 7)
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
 
         # Try allocating a new ID gen and check that we only see position
         # advanced after we leave the context manager.
@@ -176,9 +176,9 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
             self.assertEqual(stream_id, 8)
 
             self.assertEqual(id_gen.get_positions(), {"master": 7})
-            self.assertEqual(id_gen.get_current_token("master"), 7)
+            self.assertEqual(id_gen.get_current_token_for_writer("master"), 7)
 
-        self.get_success(self.db.runInteraction("test", _get_next_txn))
+        self.get_success(self.db_pool.runInteraction("test", _get_next_txn))
 
         self.assertEqual(id_gen.get_positions(), {"master": 8})
-        self.assertEqual(id_gen.get_current_token("master"), 8)
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), 8)

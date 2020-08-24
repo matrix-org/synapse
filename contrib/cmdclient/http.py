@@ -14,14 +14,14 @@
 # limitations under the License.
 
 from __future__ import print_function
-from twisted.web.client import Agent, readBody
-from twisted.web.http_headers import Headers
-from twisted.internet import defer, reactor
-
-from pprint import pformat
 
 import json
 import urllib
+from pprint import pformat
+
+from twisted.internet import defer, reactor
+from twisted.web.client import Agent, readBody
+from twisted.web.http_headers import Headers
 
 
 class HttpClient(object):

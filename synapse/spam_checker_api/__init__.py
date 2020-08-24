@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from enum import Enum
 
 from twisted.internet import defer
 
@@ -23,6 +24,16 @@ if MYPY:
     import synapse.server
 
 logger = logging.getLogger(__name__)
+
+
+class RegistrationBehaviour(Enum):
+    """
+    Enum to define whether a registration request should allowed, denied, or shadow-banned.
+    """
+
+    ALLOW = "allow"
+    SHADOW_BAN = "shadow_ban"
+    DENY = "deny"
 
 
 class SpamCheckerApi(object):
@@ -48,8 +59,10 @@ class SpamCheckerApi(object):
             twisted.internet.defer.Deferred[list(synapse.events.FrozenEvent)]:
                 The filtered state events in the room.
         """
-        state_ids = yield self._store.get_filtered_current_state_ids(
-            room_id=room_id, state_filter=StateFilter.from_types(types)
+        state_ids = yield defer.ensureDeferred(
+            self._store.get_filtered_current_state_ids(
+                room_id=room_id, state_filter=StateFilter.from_types(types)
+            )
         )
-        state = yield self._store.get_events(state_ids.values())
+        state = yield defer.ensureDeferred(self._store.get_events(state_ids.values()))
         return state.values()

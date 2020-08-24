@@ -12,15 +12,15 @@ npm install jquery jsdom
 """
 from __future__ import print_function
 
-import gevent
-import grequests
-from BeautifulSoup import BeautifulSoup
 import json
-import urllib
 import subprocess
 import time
 
-# ACCESS_TOKEN="" #
+import gevent
+import grequests
+from BeautifulSoup import BeautifulSoup
+
+ACCESS_TOKEN = ""
 
 MATRIXBASE = "https://matrix.org/_matrix/client/api/v1/"
 MYUSERNAME = "@davetest:matrix.org"

@@ -16,22 +16,15 @@
 import hmac
 import logging
 from hashlib import sha256
+from http import HTTPStatus
 from os import path
-
-from six.moves import http_client
 
 import jinja2
 from jinja2 import TemplateNotFound
 
-from twisted.internet import defer
-
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import (
-    DirectServeResource,
-    finish_request,
-    wrap_html_request_handler,
-)
+from synapse.http.server import DirectServeHtmlResource, respond_with_html
 from synapse.http.servlet import parse_string
 from synapse.types import UserID
 
@@ -49,7 +42,7 @@ else:
         return a == b
 
 
-class ConsentResource(DirectServeResource):
+class ConsentResource(DirectServeHtmlResource):
     """A twisted Resource to display a privacy policy and gather consent to it
 
     When accessed via GET, returns the privacy policy via a template.
@@ -120,7 +113,6 @@ class ConsentResource(DirectServeResource):
 
         self._hmac_secret = hs.config.form_secret.encode("utf-8")
 
-    @wrap_html_request_handler
     async def _async_render_GET(self, request):
         """
         Args:
@@ -141,7 +133,7 @@ class ConsentResource(DirectServeResource):
             else:
                 qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
-            u = await defer.maybeDeferred(self.store.get_user_by_id, qualified_user_id)
+            u = await self.store.get_user_by_id(qualified_user_id)
             if u is None:
                 raise NotFoundError("Unknown user")
 
@@ -161,7 +153,6 @@ class ConsentResource(DirectServeResource):
         except TemplateNotFound:
             raise NotFoundError("Unknown policy version")
 
-    @wrap_html_request_handler
     async def _async_render_POST(self, request):
         """
         Args:
@@ -197,12 +188,8 @@ class ConsentResource(DirectServeResource):
         template_html = self._jinja_env.get_template(
             path.join(TEMPLATE_LANGUAGE, template_name)
         )
-        html_bytes = template_html.render(**template_args).encode("utf8")
-
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%i" % len(html_bytes))
-        request.write(html_bytes)
-        finish_request(request)
+        html = template_html.render(**template_args)
+        respond_with_html(request, 200, html)
 
     def _check_hash(self, userid, userhmac):
         """
@@ -223,4 +210,4 @@ class ConsentResource(DirectServeResource):
         )
 
         if not compare_digest(want_mac, userhmac):
-            raise SynapseError(http_client.FORBIDDEN, "HMAC incorrect")
+            raise SynapseError(HTTPStatus.FORBIDDEN, "HMAC incorrect")

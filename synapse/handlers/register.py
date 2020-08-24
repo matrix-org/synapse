@@ -17,7 +17,7 @@
 import logging
 
 from synapse import types
-from synapse.api.constants import MAX_USERID_LENGTH, LoginType
+from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.config.server import is_threepid_reserved
 from synapse.http.servlet import assert_params_in_dict
@@ -26,8 +26,9 @@ from synapse.replication.http.register import (
     ReplicationPostRegisterActionsServlet,
     ReplicationRegisterServlet,
 )
-from synapse.types import RoomAlias, RoomID, UserID, create_requester
-from synapse.util.async_helpers import Linearizer
+from synapse.spam_checker_api import RegistrationBehaviour
+from synapse.storage.state import StateFilter
+from synapse.types import RoomAlias, UserID, create_requester
 
 from ._base import BaseHandler
 
@@ -49,15 +50,10 @@ class RegistrationHandler(BaseHandler):
         self.user_directory_handler = hs.get_user_directory_handler()
         self.identity_handler = self.hs.get_handlers().identity_handler
         self.ratelimiter = hs.get_registration_ratelimiter()
-
-        self._next_generated_user_id = None
-
         self.macaroon_gen = hs.get_macaroon_generator()
-
-        self._generate_user_id_linearizer = Linearizer(
-            name="_generate_user_id_linearizer"
-        )
         self._server_notices_mxid = hs.config.server_notices_mxid
+
+        self.spam_checker = hs.get_spam_checker()
 
         if hs.config.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
@@ -131,7 +127,9 @@ class RegistrationHandler(BaseHandler):
             try:
                 int(localpart)
                 raise SynapseError(
-                    400, "Numeric user IDs are reserved for guest users."
+                    400,
+                    "Numeric user IDs are reserved for guest users.",
+                    errcode=Codes.INVALID_USERNAME,
                 )
             except ValueError:
                 pass
@@ -149,6 +147,7 @@ class RegistrationHandler(BaseHandler):
         address=None,
         bind_emails=[],
         by_admin=False,
+        user_agent_ips=None,
     ):
         """Registers a new client on the server.
 
@@ -166,12 +165,32 @@ class RegistrationHandler(BaseHandler):
             bind_emails (List[str]): list of emails to bind to this account.
             by_admin (bool): True if this registration is being made via the
               admin api, otherwise False.
+            user_agent_ips (List[(str, str)]): Tuples of IP addresses and user-agents used
+                during the registration process.
         Returns:
             str: user_id
         Raises:
             SynapseError if there was a problem registering.
         """
         self.check_registration_ratelimit(address)
+
+        result = self.spam_checker.check_registration_for_spam(
+            threepid, localpart, user_agent_ips or [],
+        )
+
+        if result == RegistrationBehaviour.DENY:
+            logger.info(
+                "Blocked registration of %r", localpart,
+            )
+            # We return a 429 to make it not obvious that they've been
+            # denied.
+            raise SynapseError(429, "Rate limited")
+
+        shadow_banned = result == RegistrationBehaviour.SHADOW_BAN
+        if shadow_banned:
+            logger.info(
+                "Shadow banning registration of %r", localpart,
+            )
 
         # do not check_auth_blocking if the call is coming through the Admin API
         if not by_admin:
@@ -201,6 +220,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                shadow_banned=shadow_banned,
             )
 
             if self.hs.config.user_directory_search_all_users:
@@ -218,7 +238,7 @@ class RegistrationHandler(BaseHandler):
                 if fail_count > 10:
                     raise SynapseError(500, "Unable to find a suitable guest user ID")
 
-                localpart = await self._generate_user_id()
+                localpart = await self.store.generate_user_id()
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 self.check_user_id_not_appservice_exclusive(user_id)
@@ -231,6 +251,7 @@ class RegistrationHandler(BaseHandler):
                         make_guest=make_guest,
                         create_profile_with_displayname=default_display_name,
                         address=address,
+                        shadow_banned=shadow_banned,
                     )
 
                     # Successfully registered
@@ -270,57 +291,186 @@ class RegistrationHandler(BaseHandler):
 
         return user_id
 
-    async def _auto_join_rooms(self, user_id):
-        """Automatically joins users to auto join rooms - creating the room in the first place
-        if the user is the first to be created.
+    async def _create_and_join_rooms(self, user_id: str):
+        """
+        Create the auto-join rooms and join or invite the user to them.
+
+        This should only be called when the first "real" user registers.
 
         Args:
-            user_id(str): The user to join
+            user_id: The user to join
         """
-        # auto-join the user to any rooms we're supposed to dump them into
-        fake_requester = create_requester(user_id)
+        # Getting the handlers during init gives a dependency loop.
+        room_creation_handler = self.hs.get_room_creation_handler()
+        room_member_handler = self.hs.get_room_member_handler()
 
-        # try to create the room if we're the first real user on the server. Note
-        # that an auto-generated support or bot user is not a real user and will never be
-        # the user to create the room
-        should_auto_create_rooms = False
-        is_real_user = await self.store.is_real_user(user_id)
-        if self.hs.config.autocreate_auto_join_rooms and is_real_user:
-            count = await self.store.count_real_users()
-            should_auto_create_rooms = count == 1
-        for r in self.hs.config.auto_join_rooms:
+        # Generate a stub for how the rooms will be configured.
+        stub_config = {
+            "preset": self.hs.config.registration.autocreate_auto_join_room_preset,
+        }
+
+        # If the configuration providers a user ID to create rooms with, use
+        # that instead of the first user registered.
+        requires_join = False
+        if self.hs.config.registration.auto_join_user_id:
+            fake_requester = create_requester(
+                self.hs.config.registration.auto_join_user_id
+            )
+
+            # If the room requires an invite, add the user to the list of invites.
+            if self.hs.config.registration.auto_join_room_requires_invite:
+                stub_config["invite"] = [user_id]
+
+            # If the room is being created by a different user, the first user
+            # registered needs to join it. Note that in the case of an invitation
+            # being necessary this will occur after the invite was sent.
+            requires_join = True
+        else:
+            fake_requester = create_requester(user_id)
+
+        # Choose whether to federate the new room.
+        if not self.hs.config.registration.autocreate_auto_join_rooms_federated:
+            stub_config["creation_content"] = {"m.federate": False}
+
+        for r in self.hs.config.registration.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)
-            try:
-                if should_auto_create_rooms:
-                    room_alias = RoomAlias.from_string(r)
-                    if self.hs.hostname != room_alias.domain:
-                        logger.warning(
-                            "Cannot create room alias %s, "
-                            "it does not match server domain",
-                            r,
-                        )
-                    else:
-                        # create room expects the localpart of the room alias
-                        room_alias_localpart = room_alias.localpart
 
-                        # getting the RoomCreationHandler during init gives a dependency
-                        # loop
-                        await self.hs.get_room_creation_handler().create_room(
-                            fake_requester,
-                            config={
-                                "preset": "public_chat",
-                                "room_alias_name": room_alias_localpart,
-                            },
+            try:
+                room_alias = RoomAlias.from_string(r)
+
+                if self.hs.hostname != room_alias.domain:
+                    logger.warning(
+                        "Cannot create room alias %s, "
+                        "it does not match server domain",
+                        r,
+                    )
+                else:
+                    # A shallow copy is OK here since the only key that is
+                    # modified is room_alias_name.
+                    config = stub_config.copy()
+                    # create room expects the localpart of the room alias
+                    config["room_alias_name"] = room_alias.localpart
+
+                    info, _ = await room_creation_handler.create_room(
+                        fake_requester, config=config, ratelimit=False,
+                    )
+
+                    # If the room does not require an invite, but another user
+                    # created it, then ensure the first user joins it.
+                    if requires_join:
+                        await room_member_handler.update_membership(
+                            requester=create_requester(user_id),
+                            target=UserID.from_string(user_id),
+                            room_id=info["room_id"],
+                            # Since it was just created, there are no remote hosts.
+                            remote_room_hosts=[],
+                            action="join",
                             ratelimit=False,
                         )
-                else:
-                    await self._join_user_to_room(fake_requester, r)
+
             except ConsentNotGivenError as e:
                 # Technically not necessary to pull out this error though
                 # moving away from bare excepts is a good thing to do.
                 logger.error("Failed to join new user to %r: %r", r, e)
             except Exception as e:
                 logger.error("Failed to join new user to %r: %r", r, e)
+
+    async def _join_rooms(self, user_id: str):
+        """
+        Join or invite the user to the auto-join rooms.
+
+        Args:
+            user_id: The user to join
+        """
+        room_member_handler = self.hs.get_room_member_handler()
+
+        for r in self.hs.config.registration.auto_join_rooms:
+            logger.info("Auto-joining %s to %s", user_id, r)
+
+            try:
+                room_alias = RoomAlias.from_string(r)
+
+                if RoomAlias.is_valid(r):
+                    (
+                        room_id,
+                        remote_room_hosts,
+                    ) = await room_member_handler.lookup_room_alias(room_alias)
+                    room_id = room_id.to_string()
+                else:
+                    raise SynapseError(
+                        400, "%s was not legal room ID or room alias" % (r,)
+                    )
+
+                # Calculate whether the room requires an invite or can be
+                # joined directly. Note that unless a join rule of public exists,
+                # it is treated as requiring an invite.
+                requires_invite = True
+
+                state = await self.store.get_filtered_current_state_ids(
+                    room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
+                )
+
+                event_id = state.get((EventTypes.JoinRules, ""))
+                if event_id:
+                    join_rules_event = await self.store.get_event(
+                        event_id, allow_none=True
+                    )
+                    if join_rules_event:
+                        join_rule = join_rules_event.content.get("join_rule", None)
+                        requires_invite = join_rule and join_rule != JoinRules.PUBLIC
+
+                # Send the invite, if necessary.
+                if requires_invite:
+                    await room_member_handler.update_membership(
+                        requester=create_requester(
+                            self.hs.config.registration.auto_join_user_id
+                        ),
+                        target=UserID.from_string(user_id),
+                        room_id=room_id,
+                        remote_room_hosts=remote_room_hosts,
+                        action="invite",
+                        ratelimit=False,
+                    )
+
+                # Send the join.
+                await room_member_handler.update_membership(
+                    requester=create_requester(user_id),
+                    target=UserID.from_string(user_id),
+                    room_id=room_id,
+                    remote_room_hosts=remote_room_hosts,
+                    action="join",
+                    ratelimit=False,
+                )
+
+            except ConsentNotGivenError as e:
+                # Technically not necessary to pull out this error though
+                # moving away from bare excepts is a good thing to do.
+                logger.error("Failed to join new user to %r: %r", r, e)
+            except Exception as e:
+                logger.error("Failed to join new user to %r: %r", r, e)
+
+    async def _auto_join_rooms(self, user_id: str):
+        """Automatically joins users to auto join rooms - creating the room in the first place
+        if the user is the first to be created.
+
+        Args:
+            user_id: The user to join
+        """
+        # auto-join the user to any rooms we're supposed to dump them into
+
+        # try to create the room if we're the first real user on the server. Note
+        # that an auto-generated support or bot user is not a real user and will never be
+        # the user to create the room
+        should_auto_create_rooms = False
+        is_real_user = await self.store.is_real_user(user_id)
+        if self.hs.config.registration.autocreate_auto_join_rooms and is_real_user:
+            count = await self.store.count_real_users()
+            should_auto_create_rooms = count == 1
+
+        if should_auto_create_rooms:
+            await self._create_and_join_rooms(user_id)
+        else:
+            await self._join_rooms(user_id)
 
     async def post_consent_actions(self, user_id):
         """A series of registration actions that can only be carried out once consent
@@ -380,42 +530,6 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE,
                 )
 
-    async def _generate_user_id(self):
-        if self._next_generated_user_id is None:
-            with await self._generate_user_id_linearizer.queue(()):
-                if self._next_generated_user_id is None:
-                    self._next_generated_user_id = (
-                        await self.store.find_next_generated_user_id_localpart()
-                    )
-
-        id = self._next_generated_user_id
-        self._next_generated_user_id += 1
-        return str(id)
-
-    async def _join_user_to_room(self, requester, room_identifier):
-        room_member_handler = self.hs.get_room_member_handler()
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-        elif RoomAlias.is_valid(room_identifier):
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = await room_member_handler.lookup_room_alias(
-                room_alias
-            )
-            room_id = room_id.to_string()
-        else:
-            raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
-            )
-
-        await room_member_handler.update_membership(
-            requester=requester,
-            target=requester.user,
-            room_id=room_id,
-            remote_room_hosts=remote_room_hosts,
-            action="join",
-            ratelimit=False,
-        )
-
     def check_registration_ratelimit(self, address):
         """A simple helper method to check whether the registration rate limit has been hit
         for a given IP address
@@ -443,6 +557,7 @@ class RegistrationHandler(BaseHandler):
         admin=False,
         user_type=None,
         address=None,
+        shadow_banned=False,
     ):
         """Register user in the datastore.
 
@@ -460,9 +575,10 @@ class RegistrationHandler(BaseHandler):
             user_type (str|None): type of user. One of the values from
                 api.constants.UserTypes, or None for a normal user.
             address (str|None): the IP address used to perform the registration.
+            shadow_banned (bool): Whether to shadow-ban the user
 
         Returns:
-            Deferred
+            Awaitable
         """
         if self.hs.config.worker_app:
             return self._register_client(
@@ -475,6 +591,7 @@ class RegistrationHandler(BaseHandler):
                 admin=admin,
                 user_type=user_type,
                 address=address,
+                shadow_banned=shadow_banned,
             )
         else:
             return self.store.register_user(
@@ -486,6 +603,7 @@ class RegistrationHandler(BaseHandler):
                 create_profile_with_displayname=create_profile_with_displayname,
                 admin=admin,
                 user_type=user_type,
+                shadow_banned=shadow_banned,
             )
 
     async def register_device(

@@ -24,7 +24,6 @@ DISTS = (
     "debian:sid",
     "ubuntu:xenial",
     "ubuntu:bionic",
-    "ubuntu:eoan",
     "ubuntu:focal",
 )
 

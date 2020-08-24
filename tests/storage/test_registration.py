@@ -17,6 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
+from synapse.api.errors import ThreepidValidationError
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
@@ -58,8 +59,10 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_add_tokens(self):
         yield self.store.register_user(self.user_id, self.pwhash)
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+            )
         )
 
         result = yield self.store.get_user_by_access_token(self.tokens[1])
@@ -74,11 +77,15 @@ class RegistrationStoreTestCase(unittest.TestCase):
     def test_user_delete_access_tokens(self):
         # add some tokens
         yield self.store.register_user(self.user_id, self.pwhash)
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
+            )
         )
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+            )
         )
 
         # now delete some
@@ -116,3 +123,33 @@ class RegistrationStoreTestCase(unittest.TestCase):
         )
         res = yield self.store.is_support_user(SUPPORT_USER)
         self.assertTrue(res)
+
+    @defer.inlineCallbacks
+    def test_3pid_inhibit_invalid_validation_session_error(self):
+        """Tests that enabling the configuration option to inhibit 3PID errors on
+        /requestToken also inhibits validation errors caused by an unknown session ID.
+        """
+
+        # Check that, with the config setting set to false (the default value), a
+        # validation error is caused by the unknown session ID.
+        try:
+            yield defer.ensureDeferred(
+                self.store.validate_threepid_session(
+                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                )
+            )
+        except ThreepidValidationError as e:
+            self.assertEquals(e.msg, "Unknown session_id", e)
+
+        # Set the config setting to true.
+        self.store._ignore_unknown_session_error = True
+
+        # Check that now the validation error is caused by the token not matching.
+        try:
+            yield defer.ensureDeferred(
+                self.store.validate_threepid_session(
+                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                )
+            )
+        except ThreepidValidationError as e:
+            self.assertEquals(e.msg, "Validation token not found or has expired", e)
