@@ -163,8 +163,6 @@ class RetentionTestCase(unittest.HomeserverTestCase):
         5. Check that event 1 has been purged
         6. Check that event 2 has not been purged
         7. Check that state events that were sent before event 1 aren't purged.
-
-
         The main reason for sending a second event is because currently Synapse won't
         purge the latest message in a room because it would otherwise result in a lack of
         forward extremities for this room. It's also a good thing to ensure the purge jobs
