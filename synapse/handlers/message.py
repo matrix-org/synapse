@@ -647,6 +647,7 @@ class EventCreationHandler(object):
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
+        ignore_shadow_ban: bool = False,
     ) -> int:
         """
         Persists and notifies local clients and federation of an event.
@@ -659,11 +660,19 @@ class EventCreationHandler(object):
 
         Return:
             The stream_id of the persisted event.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
         if event.type == EventTypes.Member:
             raise SynapseError(
                 500, "Tried to send member event through non-member codepath"
             )
+
+        if not ignore_shadow_ban and requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         user = UserID.from_string(event.sender)
 
@@ -1190,8 +1199,14 @@ class EventCreationHandler(object):
 
                     event.internal_metadata.proactively_send = False
 
+                    # Since this is a dummy-event it is OK if it is sent by a
+                    # shadow-banned user.
                     await self.send_nonmember_event(
-                        requester, event, context, ratelimit=False
+                        requester,
+                        event,
+                        context,
+                        ratelimit=False,
+                        ignore_shadow_ban=True,
                     )
                     dummy_event_sent = True
                     break
