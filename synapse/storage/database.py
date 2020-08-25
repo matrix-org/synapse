@@ -1438,15 +1438,15 @@ class DatabasePool(object):
         txn.execute(sql, list(keyvalues.values()))
         return txn.rowcount
 
-    def simple_delete_many(
+    async def simple_delete_many(
         self,
         table: str,
         column: str,
         iterable: Iterable[Any],
         keyvalues: Dict[str, Any],
         desc: str,
-    ) -> defer.Deferred:
-        return self.runInteraction(
+    ) -> int:
+        return await self.runInteraction(
             desc, self.simple_delete_many_txn, table, column, iterable, keyvalues
         )
 
