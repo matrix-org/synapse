@@ -35,7 +35,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Check that the new user exists with all provided attributes
         self.assertEqual(user_id, "@bob:test")
         self.assertTrue(access_token)
-        self.assertTrue(self.store.get_user_by_id(user_id))
+        self.assertTrue(self.get_success(self.store.get_user_by_id(user_id)))
 
         # Check that the email was assigned
         emails = self.get_success(self.store.user_get_threepids(user_id))

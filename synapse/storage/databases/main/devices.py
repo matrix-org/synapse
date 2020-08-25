@@ -55,7 +55,7 @@ class DeviceWorkerStore(SQLBaseStore):
             user_id: The ID of the user which owns the device
             device_id: The ID of the device to retrieve
         Returns:
-            defer.Deferred for a dict containing the device information
+            Awaitable for a dict containing the device information
         Raises:
             StoreError: if the device is not found
         """
