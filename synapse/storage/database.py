@@ -1512,7 +1512,7 @@ class DatabasePool(object):
 
         return cache, min_val
 
-    def simple_select_list_paginate(
+    async def simple_select_list_paginate(
         self,
         table: str,
         orderby: str,
@@ -1523,7 +1523,7 @@ class DatabasePool(object):
         keyvalues: Optional[Dict[str, Any]] = None,
         order_direction: str = "ASC",
         desc: str = "simple_select_list_paginate",
-    ) -> defer.Deferred:
+    ) -> List[Dict[str, Any]]:
         """
         Executes a SELECT query on the named table with start and limit,
         of row numbers, which may return zero or number of rows from start to limit,
@@ -1542,10 +1542,11 @@ class DatabasePool(object):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             order_direction: Whether the results should be ordered "ASC" or "DESC".
+
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            A list of dictionaries.
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc,
             self.simple_select_list_paginate_txn,
             table,
