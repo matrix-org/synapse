@@ -16,7 +16,7 @@
 import contextlib
 import threading
 from collections import deque
-from typing import Dict, Set
+from typing import Dict, List, Set
 
 from typing_extensions import Deque
 
@@ -234,8 +234,11 @@ class MultiWriterIdGenerator:
 
         return current_positions
 
-    def _load_next_id_txn(self, txn):
+    def _load_next_id_txn(self, txn) -> int:
         return self._sequence_gen.get_next_id_txn(txn)
+
+    def _load_next_mult_id_txn(self, txn, n: int) -> List[int]:
+        return self._sequence_gen.get_next_mult_txn(txn, n)
 
     async def get_next(self):
         """
@@ -259,6 +262,34 @@ class MultiWriterIdGenerator:
                 yield next_id
             finally:
                 self._mark_id_as_finished(next_id)
+
+        return manager()
+
+    async def get_next_mult(self, n: int):
+        """
+        Usage:
+            with await stream_id_gen.get_next_mult(5) as stream_ids:
+                # ... persist event ...
+        """
+        next_ids = await self._db.runInteraction(
+            "_load_next_mult_id", self._load_next_mult_id_txn, n
+        )
+
+        # Assert the fetched ID is actually greater than any ID we've already
+        # seen. If not, then the sequence and table have got out of sync
+        # somehow.
+        assert max(self.get_positions().values(), default=0) < min(next_ids)
+
+        with self._lock:
+            self._unfinished_ids.update(next_ids)
+
+        @contextlib.contextmanager
+        def manager():
+            try:
+                yield next_ids
+            finally:
+                for i in next_ids:
+                    self._mark_id_as_finished(i)
 
         return manager()
 
