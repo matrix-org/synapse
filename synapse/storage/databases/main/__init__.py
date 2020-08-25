@@ -521,7 +521,7 @@ class DataStore(
 
             if name:
                 filters.append("(name LIKE ? OR displayname LIKE ?)")
-                args.extend(["%" + name + "%:%", "%" + name + "%"])
+                args.extend(["%@" + name + "%:%", "%" + name + "%"])
             elif user_id:
                 filters.append("name LIKE ?")
                 args.extend(["%" + user_id + "%"])
