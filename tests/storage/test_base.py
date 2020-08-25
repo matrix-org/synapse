@@ -97,8 +97,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
         self.mock_txn.__iter__ = Mock(return_value=iter([("Value",)]))
 
-        value = yield self.datastore.db_pool.simple_select_one_onecol(
-            table="tablename", keyvalues={"keycol": "TheKey"}, retcol="retcol"
+        value = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_select_one_onecol(
+                table="tablename", keyvalues={"keycol": "TheKey"}, retcol="retcol"
+            )
         )
 
         self.assertEquals("Value", value)
