@@ -56,9 +56,10 @@ class TransactionActions(object):
     ) -> None:
         """ Persist how we responded to a transaction.
         """
-        if not transaction.transaction_id:
+        transaction_id = transaction.transaction_id  # type: ignore
+        if not transaction_id:
             raise RuntimeError("Cannot persist a transaction with no transaction_id")
 
         await self.store.set_received_txn_response(
-            transaction.transaction_id, origin, code, response
+            transaction_id, origin, code, response
         )

@@ -17,7 +17,7 @@
 
 import logging
 import re
-from typing import Awaitable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
