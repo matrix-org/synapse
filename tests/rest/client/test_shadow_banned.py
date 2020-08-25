@@ -233,3 +233,40 @@ class ProfileTestCase(_ShadowBannedBase):
         self.assertEqual(
             event.content, {"membership": "join", "displayname": original_display_name}
         )
+
+    def test_room_displayname(self):
+        """Changes to state events for a room should be processed, but not end up in the room."""
+        original_display_name = "banned"
+        new_display_name = "new name"
+
+        # Join a room.
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
+        # The update should succeed.
+        request, channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/state/m.room.member/%s"
+            % (room_id, self.banned_user_id),
+            {"membership": "join", "displayname": new_display_name},
+            access_token=self.banned_access_token,
+        )
+        self.render(request)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertIn("event_id", channel.json_body)
+
+        # The display name in the room should not be.
+        message_handler = self.hs.get_message_handler()
+        event = self.get_success(
+            message_handler.get_room_data(
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
+                False,
+            )
+        )
+        self.assertEqual(
+            event.content, {"membership": "join", "displayname": original_display_name}
+        )

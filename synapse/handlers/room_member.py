@@ -356,7 +356,7 @@ class RoomMemberHandler(object):
             # later on.
             content = dict(content)
 
-        if not self.allow_per_room_profiles:
+        if not self.allow_per_room_profiles or requester.shadow_banned:
             # Strip profile data, knowing that new profile data will be added to the
             # event's content in event_creation_handler.create_event() using the target's
             # global profile.
