@@ -80,7 +80,7 @@ class StreamIdGenerator(object):
             upwards, -1 to grow downwards.
 
     Usage:
-        with stream_id_gen.get_next() as stream_id:
+        with await stream_id_gen.get_next() as stream_id:
             # ... persist event ...
     """
 
@@ -95,10 +95,10 @@ class StreamIdGenerator(object):
             )
         self._unfinished_ids = deque()  # type: Deque[int]
 
-    def get_next(self):
+    async def get_next(self):
         """
         Usage:
-            with stream_id_gen.get_next() as stream_id:
+            with await stream_id_gen.get_next() as stream_id:
                 # ... persist event ...
         """
         with self._lock:
@@ -117,10 +117,10 @@ class StreamIdGenerator(object):
 
         return manager()
 
-    def get_next_mult(self, n):
+    async def get_next_mult(self, n):
         """
         Usage:
-            with stream_id_gen.get_next(n) as stream_ids:
+            with await stream_id_gen.get_next(n) as stream_ids:
                 # ... persist events ...
         """
         with self._lock:
