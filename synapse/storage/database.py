@@ -1623,14 +1623,14 @@ class DatabasePool(object):
 
         return cls.cursor_to_dict(txn)
 
-    def simple_search_list(
+    async def simple_search_list(
         self,
         table: str,
         term: Optional[str],
         col: str,
         retcols: Iterable[str],
         desc="simple_search_list",
-    ):
+    ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1641,10 +1641,10 @@ class DatabasePool(object):
             retcols: the names of the columns to return
 
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]] or None
+            A list of dictionaries or None.
         """
 
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_search_list_txn, table, term, col, retcols
         )
 
