@@ -185,8 +185,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_delete_one(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_delete_one(
-            table="tablename", keyvalues={"keycol": "Go away"}
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_delete_one(
+                table="tablename", keyvalues={"keycol": "Go away"}
+            )
         )
 
         self.mock_txn.execute.assert_called_with(

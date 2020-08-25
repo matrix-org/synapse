@@ -1389,9 +1389,9 @@ class DatabasePool(object):
 
         return dict(zip(retcols, row))
 
-    def simple_delete_one(
+    async def simple_delete_one(
         self, table: str, keyvalues: Dict[str, Any], desc: str = "simple_delete_one"
-    ) -> defer.Deferred:
+    ) -> None:
         """Executes a DELETE query on the named table, expecting to delete a
         single row.
 
@@ -1399,7 +1399,7 @@ class DatabasePool(object):
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
         """
-        return self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
+        await self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
 
     @staticmethod
     def simple_delete_one_txn(
