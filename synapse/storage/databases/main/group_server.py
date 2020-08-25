@@ -586,14 +586,14 @@ class GroupServerWorkerStore(SQLBaseStore):
 
 
 class GroupServerStore(GroupServerWorkerStore):
-    def set_group_join_policy(self, group_id, join_policy):
+    async def set_group_join_policy(self, group_id: str, join_policy: str) -> None:
         """Set the join policy of a group.
 
         join_policy can be one of:
          * "invite"
          * "open"
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="groups",
             keyvalues={"group_id": group_id},
             updatevalues={"join_policy": join_policy},
@@ -1079,10 +1079,12 @@ class GroupServerStore(GroupServerWorkerStore):
             "remove_room_from_group", _remove_room_from_group_txn
         )
 
-    def update_group_publicity(self, group_id, user_id, publicise):
+    async def update_group_publicity(
+        self, group_id: str, user_id: str, publicise: bool
+    ) -> None:
         """Update whether the user is publicising their membership of the group
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="local_group_membership",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={"is_publicised": publicise},
@@ -1221,20 +1223,24 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_group_profile",
         )
 
-    def update_attestation_renewal(self, group_id, user_id, attestation):
+    async def update_attestation_renewal(
+        self, group_id: str, user_id: str, attestation: dict
+    ) -> None:
         """Update an attestation that we have renewed
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="group_attestations_renewals",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={"valid_until_ms": attestation["valid_until_ms"]},
             desc="update_attestation_renewal",
         )
 
-    def update_remote_attestion(self, group_id, user_id, attestation):
+    async def update_remote_attestion(
+        self, group_id: str, user_id: str, attestation: dict
+    ) -> None:
         """Update an attestation that a remote has renewed
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="group_attestations_remote",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={

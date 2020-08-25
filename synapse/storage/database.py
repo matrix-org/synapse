@@ -1333,13 +1333,13 @@ class DatabasePool(object):
 
         return txn.rowcount
 
-    def simple_update_one(
+    async def simple_update_one(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
         desc: str = "simple_update_one",
-    ) -> defer.Deferred:
+    ) -> None:
         """Executes an UPDATE query on the named table, setting new values for
         columns in a row matching the key values.
 
@@ -1348,7 +1348,7 @@ class DatabasePool(object):
             keyvalues: dict of column names and values to select the row with
             updatevalues: dict giving column names and values to update
         """
-        return self.runInteraction(
+        await self.runInteraction(
             desc, self.simple_update_one_txn, table, keyvalues, updatevalues
         )
 

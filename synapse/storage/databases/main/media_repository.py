@@ -84,9 +84,9 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_local_media",
         )
 
-    def mark_local_media_as_safe(self, media_id: str):
+    async def mark_local_media_as_safe(self, media_id: str) -> None:
         """Mark a local media as safe from quarantining."""
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="local_media_repository",
             keyvalues={"media_id": media_id},
             updatevalues={"safe_from_quarantine": True},

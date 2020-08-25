@@ -163,10 +163,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_update_one_1col(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_update_one(
-            table="tablename",
-            keyvalues={"keycol": "TheKey"},
-            updatevalues={"columnname": "New Value"},
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_update_one(
+                table="tablename",
+                keyvalues={"keycol": "TheKey"},
+                updatevalues={"columnname": "New Value"},
+            )
         )
 
         self.mock_txn.execute.assert_called_with(
@@ -178,10 +180,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_update_one_4cols(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_update_one(
-            table="tablename",
-            keyvalues=OrderedDict([("colA", 1), ("colB", 2)]),
-            updatevalues=OrderedDict([("colC", 3), ("colD", 4)]),
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_update_one(
+                table="tablename",
+                keyvalues=OrderedDict([("colA", 1), ("colB", 2)]),
+                updatevalues=OrderedDict([("colC", 3), ("colD", 4)]),
+            )
         )
 
         self.mock_txn.execute.assert_called_with(

@@ -71,16 +71,20 @@ class ProfileWorkerStore(SQLBaseStore):
             table="profiles", values={"user_id": user_localpart}, desc="create_profile"
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname):
-        return self.db_pool.simple_update_one(
+    async def set_profile_displayname(
+        self, user_localpart: str, new_displayname: str
+    ) -> None:
+        await self.db_pool.simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"displayname": new_displayname},
             desc="set_profile_displayname",
         )
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url):
-        return self.db_pool.simple_update_one(
+    async def set_profile_avatar_url(
+        self, user_localpart: str, new_avatar_url: str
+    ) -> None:
+        await self.db_pool.simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"avatar_url": new_avatar_url},
