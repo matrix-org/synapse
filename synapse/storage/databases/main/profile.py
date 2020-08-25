@@ -106,8 +106,10 @@ class ProfileStore(ProfileWorkerStore):
             desc="add_remote_profile_cache",
         )
 
-    def update_remote_profile_cache(self, user_id, displayname, avatar_url):
-        return self.db_pool.simple_update(
+    async def update_remote_profile_cache(
+        self, user_id: str, displayname: str, avatar_url: str
+    ) -> int:
+        return await self.db_pool.simple_update(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             updatevalues={

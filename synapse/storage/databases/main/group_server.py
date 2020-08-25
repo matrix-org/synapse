@@ -1051,8 +1051,10 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="add_room_to_group",
         )
 
-    def update_room_in_group_visibility(self, group_id, room_id, is_public):
-        return self.db_pool.simple_update(
+    async def update_room_in_group_visibility(
+        self, group_id: str, room_id: str, is_public: bool
+    ) -> int:
+        return await self.db_pool.simple_update(
             table="group_rooms",
             keyvalues={"group_id": group_id, "room_id": room_id},
             updatevalues={"is_public": is_public},
