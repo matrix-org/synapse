@@ -119,10 +119,10 @@ from a previous call.
 The parameter ``limit`` is optional but is used for pagination, denoting the
 maximum number of items to return in this call. Defaults to ``100``.
 
-The parameter ``user_id`` is optional and filters to only users with user IDs
+The parameter ``user_id`` is optional and filters to only return users with user IDs
 that contain this value. This parameter is ignored when using the ``name`` parameter.
 
-The parameter ``name`` is optional and filters to only users with user ID localparts
+The parameter ``name`` is optional and filters to only return users with user ID localparts
 **or** displaynames that contain this value.
 
 The parameter ``guests`` is optional and if ``false`` will **exclude** guest users.
