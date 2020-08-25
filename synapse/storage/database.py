@@ -671,15 +671,30 @@ class DatabasePool(object):
 
         txn.execute(sql, vals)
 
-    def simple_insert_many(
+    async def simple_insert_many(
         self, table: str, values: List[Dict[str, Any]], desc: str
-    ) -> defer.Deferred:
-        return self.runInteraction(desc, self.simple_insert_many_txn, table, values)
+    ) -> None:
+        """Executes an INSERT query on the named table.
+
+        Args:
+            table: string giving the table name
+            values: dict of new column names and values for them
+            desc: string giving a description of the transaction
+        """
+        await self.runInteraction(desc, self.simple_insert_many_txn, table, values)
 
     @staticmethod
     def simple_insert_many_txn(
         txn: LoggingTransaction, table: str, values: List[Dict[str, Any]]
     ) -> None:
+        """Executes an INSERT query on the named table.
+
+        Args:
+            txn: The transaction to use.
+            table: string giving the table name
+            values: dict of new column names and values for them
+            desc: string giving a description of the transaction
+        """
         if not values:
             return
 
