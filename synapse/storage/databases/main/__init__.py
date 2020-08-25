@@ -507,7 +507,7 @@ class DataStore(
         Args:
             start (int): start number to begin the query from
             limit (int): number of rows to retrieve
-            user_id (string): search for user_id
+            user_id (string): search for user_id. ignored if name is not None
             name (string): search for local part of user_id or display name
             guests (bool): whether to in include guest users
             deactivated (bool): whether to include deactivated users
