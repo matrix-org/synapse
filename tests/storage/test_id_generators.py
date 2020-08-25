@@ -213,7 +213,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         id_gen.advance("first", 8)
         self.assertEqual(id_gen.get_persisted_upto_position(), 9)
 
-        # Jmp forward with gaps. The minimum is 11, even though we haven't seen
+        # Jump forward with gaps. The minimum is 11, even though we haven't seen
         # 10 we know that everything before 11 must be persisted.
         id_gen.advance("first", 11)
         id_gen.advance("second", 15)

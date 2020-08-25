@@ -43,7 +43,7 @@ class PostgresSequenceGenerator(SequenceGenerator):
         txn.execute(
             "SELECT nextval(?) FROM generate_series(1, ?)", (self._sequence_name, n)
         )
-        return [i for i, in txn]
+        return [i for (i,) in txn]
 
 
 GetFirstCallbackType = Callable[[Cursor], int]

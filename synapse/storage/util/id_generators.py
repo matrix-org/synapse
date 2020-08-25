@@ -220,7 +220,9 @@ class MultiWriterIdGenerator:
         # will be gapless; gaps can form when e.g. a transaction was rolled
         # back. This means that sometimes we won't be able to skip forward the
         # position even though everything has been persisted. However, since
-        # gaps should be relatively rare it's still worth while doing this.
+        # gaps should be relatively rare it's still worth doing the book keeping
+        # that allows us to skip forwards when there are gapless runs of
+        # positions.
         self._persisted_upto_position = (
             min(self._current_positions.values()) if self._current_positions else 0
         )
@@ -285,7 +287,7 @@ class MultiWriterIdGenerator:
         """
         Usage:
             with await stream_id_gen.get_next_mult(5) as stream_ids:
-                # ... persist event ...
+                # ... persist events ...
         """
         next_ids = await self._db.runInteraction(
             "_load_next_mult_id", self._load_next_mult_id_txn, n
@@ -408,6 +410,9 @@ class MultiWriterIdGenerator:
         # We now iterate through the seen positions, discarding those that are
         # less than the current min positions, and incrementing the min position
         # if its exactly one greater.
+        #
+        # This is also where we discard items from `_known_persisted_positions`
+        # (to ensure the list doesn't infinitely grow).
         while self._known_persisted_positions:
             if self._known_persisted_positions[0] <= self._persisted_upto_position:
                 heapq.heappop(self._known_persisted_positions)
