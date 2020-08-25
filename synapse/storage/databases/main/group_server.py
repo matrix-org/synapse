@@ -945,10 +945,10 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_user_from_summary",
         )
 
-    def add_group_invite(self, group_id, user_id):
+    async def add_group_invite(self, group_id: str, user_id: str) -> None:
         """Record that the group server has invited a user
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="group_invites",
             values={"group_id": group_id, "user_id": user_id},
             desc="add_group_invite",
@@ -1051,8 +1051,10 @@ class GroupServerStore(GroupServerWorkerStore):
             "remove_user_from_group", _remove_user_from_group_txn
         )
 
-    def add_room_to_group(self, group_id, room_id, is_public):
-        return self.db_pool.simple_insert(
+    async def add_room_to_group(
+        self, group_id: str, room_id: str, is_public: bool
+    ) -> None:
+        await self.db_pool.simple_insert(
             table="group_rooms",
             values={"group_id": group_id, "room_id": room_id, "is_public": is_public},
             desc="add_room_to_group",

@@ -57,7 +57,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_local_media",
         )
 
-    def store_local_media(
+    async def store_local_media(
         self,
         media_id,
         media_type,
@@ -66,8 +66,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         media_length,
         user_id,
         url_cache=None,
-    ):
-        return self.db_pool.simple_insert(
+    ) -> None:
+        await self.db_pool.simple_insert(
             "local_media_repository",
             {
                 "media_id": media_id,
@@ -138,10 +138,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
         return self.db_pool.runInteraction("get_url_cache", get_url_cache_txn)
 
-    def store_url_cache(
+    async def store_url_cache(
         self, url, response_code, etag, expires_ts, og, media_id, download_ts
     ):
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             "local_media_repository_url_cache",
             {
                 "url": url,
@@ -169,7 +169,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_local_media_thumbnails",
         )
 
-    def store_local_thumbnail(
+    async def store_local_thumbnail(
         self,
         media_id,
         thumbnail_width,
@@ -178,7 +178,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             "local_media_repository_thumbnails",
             {
                 "media_id": media_id,
@@ -207,7 +207,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_cached_remote_media",
         )
 
-    def store_cached_remote_media(
+    async def store_cached_remote_media(
         self,
         origin,
         media_id,
@@ -217,7 +217,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         upload_name,
         filesystem_id,
     ):
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             "remote_media_cache",
             {
                 "media_origin": origin,
@@ -281,7 +281,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="get_remote_media_thumbnails",
         )
 
-    def store_remote_media_thumbnail(
+    async def store_remote_media_thumbnail(
         self,
         origin,
         media_id,
@@ -292,7 +292,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             "remote_media_cache_thumbnails",
             {
                 "media_origin": origin,

@@ -1080,9 +1080,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-    def record_user_external_id(
+    async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
-    ) -> Awaitable:
+    ) -> None:
         """Record a mapping from an external user id to a mxid
 
         Args:
@@ -1090,7 +1090,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
@@ -1234,12 +1234,12 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         return res if res else False
 
-    def add_user_pending_deactivation(self, user_id):
+    async def add_user_pending_deactivation(self, user_id: str) -> None:
         """
         Adds a user to the table of users who need to be parted from all the rooms they're
         in
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             "users_pending_deactivation",
             values={"user_id": user_id},
             desc="add_user_pending_deactivation",

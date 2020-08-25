@@ -21,9 +21,8 @@ from canonicaljson import encode_canonical_json
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
+from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
-
-db_binary_type = memoryview
 
 logger = logging.getLogger(__name__)
 
@@ -98,26 +97,27 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_received_txn_response(self, transaction_id, origin, code, response_dict):
-        """Persist the response we returened for an incoming transaction, and
+    async def set_received_txn_response(
+        self, transaction_id: str, origin: str, code: int, response_dict: JsonDict
+    ) -> None:
+        """Persist the response we returned for an incoming transaction, and
         should return for subsequent transactions with the same transaction_id
         and origin.
 
         Args:
-            txn
-            transaction_id (str)
-            origin (str)
-            code (int)
-            response_json (str)
+            transaction_id: The incoming transaction ID.
+            origin: The origin server.
+            code: The response code.
+            response_dict: The response, to be encoded into JSON.
         """
 
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="received_transactions",
             values={
                 "transaction_id": transaction_id,
                 "origin": origin,
                 "response_code": code,
-                "response_json": db_binary_type(encode_canonical_json(response_dict)),
+                "response_json": memoryview(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
             or_ignore=True,

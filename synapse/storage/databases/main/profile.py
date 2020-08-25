@@ -63,8 +63,8 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_from_remote_profile_cache",
         )
 
-    def create_profile(self, user_localpart):
-        return self.db_pool.simple_insert(
+    async def create_profile(self, user_localpart: str) -> None:
+        await self.db_pool.simple_insert(
             table="profiles", values={"user_id": user_localpart}, desc="create_profile"
         )
 
