@@ -1,3 +1,13 @@
+Synapse 1.19.1rc1 (2020-08-25)
+==============================
+
+Bugfixes
+--------
+
+- Fixes a bug where appservices with ratelimiting disabled would still be ratelimited when joining rooms. This bug was introduced in v1.19.0. ([\#8139](https://github.com/matrix-org/synapse/issues/8139))
+- Fix a bug introduced in v1.19.0 that would cause e.g. profile updates to fail due to incorrect application of rate limits on join requests. ([\#8153](https://github.com/matrix-org/synapse/issues/8153))
+
+
 Synapse 1.19.0 (2020-08-17)
 ===========================
 
