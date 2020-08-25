@@ -44,14 +44,16 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group",
         )
 
-    def get_users_in_group(self, group_id, include_private=False):
+    async def get_users_in_group(
+        self, group_id: str, include_private: bool = False
+    ) -> List[Dict[str, Any]]:
         # TODO: Pagination
 
         keyvalues = {"group_id": group_id}
         if not include_private:
             keyvalues["is_public"] = True
 
-        return self.db_pool.simple_select_list(
+        return await self.db_pool.simple_select_list(
             table="group_users",
             keyvalues=keyvalues,
             retcols=("user_id", "is_public", "is_admin"),

@@ -1154,13 +1154,13 @@ class DatabasePool(object):
             desc, self.simple_select_onecol_txn, table, keyvalues, retcol
         )
 
-    def simple_select_list(
+    async def simple_select_list(
         self,
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcols: Iterable[str],
         desc: str = "simple_select_list",
-    ) -> defer.Deferred:
+    ) -> List[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1170,10 +1170,11 @@ class DatabasePool(object):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            A list of dictionaries.
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_list_txn, table, keyvalues, retcols
         )
 

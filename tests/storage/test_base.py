@@ -148,8 +148,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.__iter__ = Mock(return_value=iter([(1,), (2,), (3,)]))
         self.mock_txn.description = (("colA", None, None, None, None, None, None),)
 
-        ret = yield self.datastore.db_pool.simple_select_list(
-            table="tablename", keyvalues={"keycol": "A set"}, retcols=["colA"]
+        ret = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_select_list(
+                table="tablename", keyvalues={"keycol": "A set"}, retcols=["colA"]
+            )
         )
 
         self.assertEquals([{"colA": 1}, {"colA": 2}, {"colA": 3}], ret)
