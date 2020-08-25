@@ -521,7 +521,7 @@ class ReceiptsStore(ReceiptsWorkerStore):
             )
 
         stream_id_manager = self._receipts_id_gen.get_next()
-        with stream_id_manager as stream_id:
+        with await stream_id_manager as stream_id:
             event_ts = await self.db_pool.runInteraction(
                 "insert_linearized_receipt",
                 self.insert_linearized_receipt_txn,
