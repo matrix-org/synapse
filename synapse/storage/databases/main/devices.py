@@ -714,11 +714,11 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return {row["user_id"] for row in rows}
 
-    def mark_remote_user_device_cache_as_stale(self, user_id: str):
+    async def mark_remote_user_device_cache_as_stale(self, user_id: str) -> None:
         """Records that the server has reason to believe the cache of the devices
         for the remote users is out of date.
         """
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="device_lists_remote_resync",
             keyvalues={"user_id": user_id},
             values={},

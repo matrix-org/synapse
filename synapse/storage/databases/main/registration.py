@@ -549,23 +549,22 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="user_delete_threepids",
         )
 
-    def add_user_bound_threepid(self, user_id, medium, address, id_server):
+    async def add_user_bound_threepid(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ):
         """The server proxied a bind request to the given identity server on
         behalf of the given user. We need to remember this in case the user
         asks us to unbind the threepid.
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
-            id_server (str)
-
-        Returns:
-            Awaitable
+            user_id
+            medium
+            address
+            id_server
         """
         # We need to use an upsert, in case they user had already bound the
         # threepid
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="user_threepid_id_server",
             keyvalues={
                 "user_id": user_id,

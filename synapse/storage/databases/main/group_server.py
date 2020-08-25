@@ -737,7 +737,13 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_room_from_summary",
         )
 
-    def upsert_group_category(self, group_id, category_id, profile, is_public):
+    async def upsert_group_category(
+        self,
+        group_id: str,
+        category_id: str,
+        profile: Optional[JsonDict],
+        is_public: Optional[bool],
+    ) -> None:
         """Add/update room category for group
         """
         insertion_values = {}
@@ -753,7 +759,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             values=update_values,
@@ -768,7 +774,13 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_group_category",
         )
 
-    def upsert_group_role(self, group_id, role_id, profile, is_public):
+    async def upsert_group_role(
+        self,
+        group_id: str,
+        role_id: str,
+        profile: Optional[JsonDict],
+        is_public: Optional[bool],
+    ) -> None:
         """Add/remove user role
         """
         insertion_values = {}
@@ -784,7 +796,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             values=update_values,
