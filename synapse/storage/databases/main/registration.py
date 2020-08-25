@@ -623,19 +623,21 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="remove_user_bound_threepid",
         )
 
-    def get_id_servers_user_bound(self, user_id, medium, address):
+    async def get_id_servers_user_bound(
+        self, user_id: str, medium: str, address: str
+    ) -> List[str]:
         """Get the list of identity servers that the server proxied bind
         requests to for given user and threepid
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
+            user_id: The user to query for identity servers.
+            medium: The medium to query for identity servers.
+            address: The address to query for identity servers.
 
         Returns:
-            Deferred[list[str]]: Resolves to a list of identity servers
+            A list of identity servers
         """
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
             retcol="id_server",

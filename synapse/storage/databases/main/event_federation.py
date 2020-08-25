@@ -368,8 +368,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     @cached(max_entries=5000, iterable=True)
-    def get_latest_event_ids_in_room(self, room_id):
-        return self.db_pool.simple_select_onecol(
+    async def get_latest_event_ids_in_room(self, room_id: str) -> List[str]:
+        return await self.db_pool.simple_select_onecol(
             table="event_forward_extremities",
             keyvalues={"room_id": room_id},
             retcol="event_id",

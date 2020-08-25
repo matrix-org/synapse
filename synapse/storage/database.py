@@ -1132,13 +1132,13 @@ class DatabasePool(object):
 
         return [r[0] for r in txn]
 
-    def simple_select_onecol(
+    async def simple_select_onecol(
         self,
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcol: str,
         desc: str = "simple_select_onecol",
-    ) -> defer.Deferred:
+    ) -> List[Any]:
         """Executes a SELECT query on the named table, which returns a list
         comprising of the values of the named column from the selected rows.
 
@@ -1148,9 +1148,9 @@ class DatabasePool(object):
             retcol: column whos value we wish to retrieve.
 
         Returns:
-            Deferred: Results in a list
+            Results in a list
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_onecol_txn, table, keyvalues, retcol
         )
 

@@ -125,8 +125,8 @@ class RoomWorkerStore(SQLBaseStore):
             "get_room_with_stats", get_room_with_stats_txn, room_id
         )
 
-    def get_public_room_ids(self):
-        return self.db_pool.simple_select_onecol(
+    async def get_public_room_ids(self) -> List[str]:
+        return await self.db_pool.simple_select_onecol(
             table="rooms",
             keyvalues={"is_public": True},
             retcol="room_id",

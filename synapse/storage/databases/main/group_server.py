@@ -58,10 +58,10 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_users_in_group",
         )
 
-    def get_invited_users_in_group(self, group_id):
+    async def get_invited_users_in_group(self, group_id: str) -> List[str]:
         # TODO: Pagination
 
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="group_invites",
             keyvalues={"group_id": group_id},
             retcol="user_id",
@@ -265,15 +265,14 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         return role
 
-    def get_local_groups_for_room(self, room_id):
+    async def get_local_groups_for_room(self, room_id: str) -> List[str]:
         """Get all of the local group that contain a given room
         Args:
-            room_id (str): The ID of a room
+            room_id: The ID of a room
         Returns:
-            Deferred[list[str]]: A twisted.Deferred containing a list of group ids
-                containing this room
+            A list of group ids containing this room
         """
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="group_rooms",
             keyvalues={"room_id": room_id},
             retcol="group_id",
@@ -422,10 +421,10 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_users_membership_info_in_group", _get_users_membership_in_group_txn
         )
 
-    def get_publicised_groups_for_user(self, user_id):
+    async def get_publicised_groups_for_user(self, user_id: str) -> List[str]:
         """Get all groups a user is publicising
         """
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="local_group_membership",
             keyvalues={"user_id": user_id, "membership": "join", "is_publicised": True},
             retcol="group_id",
@@ -466,8 +465,8 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         return None
 
-    def get_joined_groups(self, user_id):
-        return self.db_pool.simple_select_onecol(
+    async def get_joined_groups(self, user_id: str) -> List[str]:
+        return await self.db_pool.simple_select_onecol(
             table="local_group_membership",
             keyvalues={"user_id": user_id, "membership": "join"},
             retcol="group_id",
