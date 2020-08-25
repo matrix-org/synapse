@@ -187,15 +187,24 @@ class ProfileTestCase(_ShadowBannedBase):
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         login.register_servlets,
         profile.register_servlets,
+        room.register_servlets,
     ]
 
     def test_displayname(self):
         """Profile changes should succeed, but don't end up in a room."""
+        original_display_name = "banned"
+        new_display_name = "new name"
+
+        # Join a room.
+        room_id = self.helper.create_room_as(
+            self.banned_user_id, tok=self.banned_access_token
+        )
+
         # The update should succeed.
         request, channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/profile/%s/displayname" % (self.banned_user_id,),
-            {"displayname": "new display name"},
+            {"displayname": new_display_name},
             access_token=self.banned_access_token,
         )
         self.render(request)
@@ -208,4 +217,19 @@ class ProfileTestCase(_ShadowBannedBase):
         )
         self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
-        self.assertEqual(channel.json_body["displayname"], "new display name")
+        self.assertEqual(channel.json_body["displayname"], new_display_name)
+
+        # But the display name in the room should not be.
+        message_handler = self.hs.get_message_handler()
+        event = self.get_success(
+            message_handler.get_room_data(
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
+                False,
+            )
+        )
+        self.assertEqual(
+            event.content, {"membership": "join", "displayname": original_display_name}
+        )
