@@ -108,7 +108,7 @@ The api is::
 
     GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 
-To use it, you will need to authenticate by providing an `access_token` for a
+To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
 
 The parameter ``from`` is optional but used for pagination, denoting the
