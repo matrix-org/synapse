@@ -603,7 +603,9 @@ class DatabasePool(object):
         results = [dict(zip(col_headers, row)) for row in cursor]
         return results
 
-    def execute(self, desc: str, decoder: Callable, query: str, *args: Any):
+    async def execute(
+        self, desc: str, decoder: "Optional[Callable[..., R]]", query: str, *args: Any
+    ) -> R:
         """Runs a single query for a result set.
 
         Args:
@@ -612,7 +614,7 @@ class DatabasePool(object):
             query - The query string to execute
             *args - Query args.
         Returns:
-            Deferred which results to the result of decoder(results)
+            The result of decoder(results)
         """
 
         def interaction(txn):
@@ -622,7 +624,7 @@ class DatabasePool(object):
             else:
                 return txn.fetchall()
 
-        return self.runInteraction(desc, interaction)
+        return await self.runInteraction(desc, interaction)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
