@@ -653,10 +653,12 @@ class EventCreationHandler(object):
         Persists and notifies local clients and federation of an event.
 
         Args:
-            requester
-            event the event to send.
-            context: the context of the event.
+            requester: The requester sending the event.
+            event: The event to send.
+            context: The context of the event.
             ratelimit: Whether to rate limit this send.
+            ignore_shadow_ban: True if shadow-banned users should be allowed to
+                send this event.
 
         Return:
             The stream_id of the persisted event.
@@ -733,6 +735,14 @@ class EventCreationHandler(object):
         Creates an event, then sends it.
 
         See self.create_event and self.send_nonmember_event.
+
+        Args:
+            requester: The requester sending the event.
+            event_dict: An entire event.
+            ratelimit: Whether to rate limit this send.
+            txn_id: The transaction ID.
+            ignore_shadow_ban: True if shadow-banned users should be allowed to
+                send this event.
 
         Raises:
             ShadowBanError if the requester has been shadow-banned.
