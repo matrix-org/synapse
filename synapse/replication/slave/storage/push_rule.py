@@ -30,7 +30,7 @@ class SlavedPushRuleStore(SlavedEventStore, PushRulesWorkerStore):
         assert isinstance(self._push_rules_stream_id_gen, SlavedIdTracker)
 
         if stream_name == PushRulesStream.NAME:
-            self._push_rules_stream_id_gen.advance(token)
+            self._push_rules_stream_id_gen.advance(instance_name, token)
             for row in rows:
                 self.get_push_rules_for_user.invalidate((row.user_id,))
                 self.get_push_rules_enabled_for_user.invalidate((row.user_id,))
