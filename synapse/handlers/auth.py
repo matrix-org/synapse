@@ -92,28 +92,42 @@ def convert_client_dict_legacy_fields_to_identifier(
         )
 
 
-def login_id_thirdparty_from_phone(identifier):
+def login_id_phone_to_thirdparty(identifier: Dict[str, str]) -> Dict[str, str]:
     """
-    Convert a phone login identifier type to a generic threepid identifier
-    Args:
-        identifier(dict): Login identifier dict of type 'm.id.phone'
+    Convert a phone login identifier type to a generic threepid identifier.
 
-    Returns: Login identifier dict of type 'm.id.threepid'
+    Args:
+        identifier: Login identifier dict of type 'm.id.phone'
+
+    Returns:
+        An equivalent m.id.thirdparty identifier dict
     """
+    if "type" not in identifier:
+        raise SynapseError(
+            400, "Invalid phone-type identifier", errcode=Codes.MISSING_PARAM
+        )
+
     if "country" not in identifier or (
         # The specification requires a "phone" field, while Synapse used to require a "number"
         # field. Accept both for backwards compatibility.
         "phone" not in identifier
         and "number" not in identifier
     ):
-        raise SynapseError(400, "Invalid phone-type identifier")
+        raise SynapseError(
+            400, "Invalid phone-type identifier", errcode=Codes.INVALID_PARAM
+        )
 
     # Accept both "phone" and "number" as valid keys in m.id.phone
     phone_number = identifier.get("phone", identifier["number"])
 
+    # Convert user-provided phone number to a consistent representation
     msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
 
-    return {"type": "m.id.thirdparty", "medium": "msisdn", "address": msisdn}
+    return {
+        "type": "m.id.thirdparty",
+        "medium": "msisdn",
+        "address": msisdn,
+    }
 
 
 class AuthHandler(BaseHandler):

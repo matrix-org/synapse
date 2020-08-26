@@ -20,7 +20,7 @@ from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.auth import (
     convert_client_dict_legacy_fields_to_identifier,
-    login_id_thirdparty_from_phone,
+    login_id_phone_to_thirdparty,
 )
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -158,7 +158,7 @@ class LoginRestServlet(RestServlet):
 
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
-            identifier = login_id_thirdparty_from_phone(identifier)
+            identifier = login_id_phone_to_thirdparty(identifier)
 
         # convert threepid identifiers to user IDs
         if identifier["type"] == "m.id.thirdparty":
