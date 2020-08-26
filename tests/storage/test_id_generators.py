@@ -182,3 +182,39 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.assertEqual(id_gen.get_positions(), {"master": 8})
         self.assertEqual(id_gen.get_current_token_for_writer("master"), 8)
+
+    def test_get_persisted_upto_position(self):
+        """Test that `get_persisted_upto_position` correctly tracks updates to
+        positions.
+        """
+
+        self._insert_rows("first", 3)
+        self._insert_rows("second", 5)
+
+        id_gen = self._create_id_generator("first")
+
+        # Min is 3 and there is a gap between 5, so we expect it to be 3.
+        self.assertEqual(id_gen.get_persisted_upto_position(), 3)
+
+        # We advance "first" straight to 6. Min is now 5 but there is no gap so
+        # we expect it to be 6
+        id_gen.advance("first", 6)
+        self.assertEqual(id_gen.get_persisted_upto_position(), 6)
+
+        # No gap, so we expect 7.
+        id_gen.advance("second", 7)
+        self.assertEqual(id_gen.get_persisted_upto_position(), 7)
+
+        # We haven't seen 8 yet, so we expect 7 still.
+        id_gen.advance("second", 9)
+        self.assertEqual(id_gen.get_persisted_upto_position(), 7)
+
+        # Now that we've seen 7, 8 and 9 we can got straight to 9.
+        id_gen.advance("first", 8)
+        self.assertEqual(id_gen.get_persisted_upto_position(), 9)
+
+        # Jump forward with gaps. The minimum is 11, even though we haven't seen
+        # 10 we know that everything before 11 must be persisted.
+        id_gen.advance("first", 11)
+        id_gen.advance("second", 15)
+        self.assertEqual(id_gen.get_persisted_upto_position(), 11)

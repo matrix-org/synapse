@@ -53,7 +53,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "user_type": None,
                 "deactivated": 0,
             },
-            (yield self.store.get_user_by_id(self.user_id)),
+            (yield defer.ensureDeferred(self.store.get_user_by_id(self.user_id))),
         )
 
     @defer.inlineCallbacks
