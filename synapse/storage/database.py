@@ -29,9 +29,11 @@ from typing import (
     Tuple,
     TypeVar,
     Union,
+    overload,
 )
 
 from prometheus_client import Histogram
+from typing_extensions import Literal
 
 from twisted.enterprise import adbapi
 from twisted.internet import defer
@@ -1020,14 +1022,36 @@ class DatabasePool(object):
 
         return txn.execute_batch(sql, args)
 
-    def simple_select_one(
+    @overload
+    async def simple_select_one(
+        self,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcols: Iterable[str],
+        allow_none: Literal[False] = False,
+        desc: str = "simple_select_one",
+    ) -> Dict[str, Any]:
+        ...
+
+    @overload
+    async def simple_select_one(
+        self,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcols: Iterable[str],
+        allow_none: Literal[True] = True,
+        desc: str = "simple_select_one",
+    ) -> Optional[Dict[str, Any]]:
+        ...
+
+    async def simple_select_one(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
         allow_none: bool = False,
         desc: str = "simple_select_one",
-    ) -> defer.Deferred:
+    ) -> Optional[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning multiple columns from it.
 
@@ -1038,18 +1062,18 @@ class DatabasePool(object):
             allow_none: If true, return None instead of failing if the SELECT
                 statement returns no rows
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_one_txn, table, keyvalues, retcols, allow_none
         )
 
-    def simple_select_one_onecol(
+    async def simple_select_one_onecol(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         retcol: Iterable[str],
         allow_none: bool = False,
         desc: str = "simple_select_one_onecol",
-    ) -> defer.Deferred:
+    ) -> Optional[Any]:
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning a single column from it.
 
@@ -1061,7 +1085,7 @@ class DatabasePool(object):
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc,
             self.simple_select_one_onecol_txn,
             table,

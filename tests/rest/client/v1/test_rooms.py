@@ -28,7 +28,7 @@ from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import account
-from synapse.types import JsonDict, RoomAlias
+from synapse.types import JsonDict, RoomAlias, UserID
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -673,6 +673,92 @@ class RoomMemberStateTestCase(RoomBase):
         self.render(request)
         self.assertEquals(200, channel.code, msg=channel.result["body"])
         self.assertEquals(json.loads(content), channel.json_body)
+
+
+class RoomJoinRatelimitTestCase(RoomBase):
+    user_id = "@sid1:red"
+
+    servlets = [
+        profile.register_servlets,
+        room.register_servlets,
+    ]
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit(self):
+        """Tests that local joins are actually rate-limited."""
+        for i in range(3):
+            self.helper.create_room_as(self.user_id)
+
+        self.helper.create_room_as(self.user_id, expect_code=429)
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit_profile_change(self):
+        """Tests that sending a profile update into all of the user's joined rooms isn't
+        rate-limited by the rate-limiter on joins."""
+
+        # Create and join as many rooms as the rate-limiting config allows in a second.
+        room_ids = [
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+            self.helper.create_room_as(self.user_id),
+        ]
+        # Let some time for the rate-limiter to forget about our multi-join.
+        self.reactor.advance(2)
+        # Add one to make sure we're joined to more rooms than the config allows us to
+        # join in a second.
+        room_ids.append(self.helper.create_room_as(self.user_id))
+
+        # Create a profile for the user, since it hasn't been done on registration.
+        store = self.hs.get_datastore()
+        self.get_success(
+            store.create_profile(UserID.from_string(self.user_id).localpart)
+        )
+
+        # Update the display name for the user.
+        path = "/_matrix/client/r0/profile/%s/displayname" % self.user_id
+        request, channel = self.make_request("PUT", path, {"displayname": "John Doe"})
+        self.render(request)
+        self.assertEquals(channel.code, 200, channel.json_body)
+
+        # Check that all the rooms have been sent a profile update into.
+        for room_id in room_ids:
+            path = "/_matrix/client/r0/rooms/%s/state/m.room.member/%s" % (
+                room_id,
+                self.user_id,
+            )
+
+            request, channel = self.make_request("GET", path)
+            self.render(request)
+            self.assertEquals(channel.code, 200)
+
+            self.assertIn("displayname", channel.json_body)
+            self.assertEquals(channel.json_body["displayname"], "John Doe")
+
+    @unittest.override_config(
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
+    )
+    def test_join_local_ratelimit_idempotent(self):
+        """Tests that the room join endpoints remain idempotent despite rate-limiting
+        on room joins."""
+        room_id = self.helper.create_room_as(self.user_id)
+
+        # Let's test both paths to be sure.
+        paths_to_test = [
+            "/_matrix/client/r0/rooms/%s/join",
+            "/_matrix/client/r0/join/%s",
+        ]
+
+        for path in paths_to_test:
+            # Make sure we send more requests than the rate-limiting config would allow
+            # if all of these requests ended up joining the user to a room.
+            for i in range(4):
+                request, channel = self.make_request("POST", path % room_id, {})
+                self.render(request)
+                self.assertEquals(channel.code, 200)
 
 
 class RoomMessagesTestCase(RoomBase):
@@ -1974,103 +2060,3 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         """An alias which does not point to the room raises a SynapseError."""
         self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
         self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
-
-
-class ShadowBannedTestCase(unittest.HomeserverTestCase):
-    servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
-        directory.register_servlets,
-        login.register_servlets,
-        room.register_servlets,
-    ]
-
-    def prepare(self, reactor, clock, homeserver):
-        self.banned_user_id = self.register_user("banned", "test")
-        self.banned_access_token = self.login("banned", "test")
-
-        self.store = self.hs.get_datastore()
-
-        self.get_success(
-            self.store.db_pool.simple_update(
-                table="users",
-                keyvalues={"name": self.banned_user_id},
-                updatevalues={"shadow_banned": True},
-                desc="shadow_ban",
-            )
-        )
-
-        self.other_user_id = self.register_user("otheruser", "pass")
-        self.other_access_token = self.login("otheruser", "pass")
-
-    def test_invite(self):
-        """Invites from shadow-banned users don't actually get sent."""
-
-        # The create works fine.
-        room_id = self.helper.create_room_as(
-            self.banned_user_id, tok=self.banned_access_token
-        )
-
-        # Inviting the user completes successfully.
-        self.helper.invite(
-            room=room_id,
-            src=self.banned_user_id,
-            tok=self.banned_access_token,
-            targ=self.other_user_id,
-        )
-
-        # But the user wasn't actually invited.
-        invited_rooms = self.get_success(
-            self.store.get_invited_rooms_for_local_user(self.other_user_id)
-        )
-        self.assertEqual(invited_rooms, [])
-
-    def test_invite_3pid(self):
-        """Ensure that a 3PID invite does not attempt to contact the identity server."""
-        identity_handler = self.hs.get_handlers().identity_handler
-        identity_handler.lookup_3pid = Mock(
-            side_effect=AssertionError("This should not get called")
-        )
-
-        # The create works fine.
-        room_id = self.helper.create_room_as(
-            self.banned_user_id, tok=self.banned_access_token
-        )
-
-        # Inviting the user completes successfully.
-        request, channel = self.make_request(
-            "POST",
-            "/rooms/%s/invite" % (room_id,),
-            {"id_server": "test", "medium": "email", "address": "test@test.test"},
-            access_token=self.banned_access_token,
-        )
-        self.render(request)
-        self.assertEquals(200, channel.code, channel.result)
-
-        # This should have raised an error earlier, but double check this wasn't called.
-        identity_handler.lookup_3pid.assert_not_called()
-
-    def test_create_room(self):
-        """Invitations during a room creation should be discarded, but the room still gets created."""
-        # The room creation is successful.
-        request, channel = self.make_request(
-            "POST",
-            "/_matrix/client/r0/createRoom",
-            {"visibility": "public", "invite": [self.other_user_id]},
-            access_token=self.banned_access_token,
-        )
-        self.render(request)
-        self.assertEquals(200, channel.code, channel.result)
-        room_id = channel.json_body["room_id"]
-
-        # But the user wasn't actually invited.
-        invited_rooms = self.get_success(
-            self.store.get_invited_rooms_for_local_user(self.other_user_id)
-        )
-        self.assertEqual(invited_rooms, [])
-
-        # Since a real room was created, the other user should be able to join it.
-        self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
-
-        # Both users should be in the room.
-        users = self.get_success(self.store.get_users_in_room(room_id))
-        self.assertCountEqual(users, ["@banned:test", "@otheruser:test"])

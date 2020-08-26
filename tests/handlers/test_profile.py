@@ -71,7 +71,9 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        yield defer.ensureDeferred(
+            self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        )
 
         displayname = yield defer.ensureDeferred(
             self.handler.get_displayname(self.frank)
@@ -104,7 +106,12 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
+            "Frank",
         )
 
     @defer.inlineCallbacks
@@ -112,10 +119,17 @@ class ProfileTestCase(unittest.TestCase):
         self.hs.config.enable_set_displayname = False
 
         # Setting displayname for the first time is allowed
-        yield self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        yield defer.ensureDeferred(
+            self.store.set_profile_displayname(self.frank.localpart, "Frank")
+        )
 
         self.assertEquals(
-            (yield self.store.get_profile_displayname(self.frank.localpart)), "Frank",
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_displayname(self.frank.localpart)
+                )
+            ),
+            "Frank",
         )
 
         # Setting displayname a second time is forbidden
@@ -158,7 +172,9 @@ class ProfileTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_incoming_fed_query(self):
         yield defer.ensureDeferred(self.store.create_profile("caroline"))
-        yield self.store.set_profile_displayname("caroline", "Caroline")
+        yield defer.ensureDeferred(
+            self.store.set_profile_displayname("caroline", "Caroline")
+        )
 
         response = yield defer.ensureDeferred(
             self.query_handlers["profile"](
@@ -170,8 +186,10 @@ class ProfileTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_get_my_avatar(self):
-        yield self.store.set_profile_avatar_url(
-            self.frank.localpart, "http://my.server/me.png"
+        yield defer.ensureDeferred(
+            self.store.set_profile_avatar_url(
+                self.frank.localpart, "http://my.server/me.png"
+            )
         )
         avatar_url = yield defer.ensureDeferred(self.handler.get_avatar_url(self.frank))
 
@@ -188,7 +206,11 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.frank.localpart)
+                )
+            ),
             "http://my.server/pic.gif",
         )
 
@@ -202,7 +224,11 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.frank.localpart)
+                )
+            ),
             "http://my.server/me.png",
         )
 
@@ -211,12 +237,18 @@ class ProfileTestCase(unittest.TestCase):
         self.hs.config.enable_set_avatar_url = False
 
         # Setting displayname for the first time is allowed
-        yield self.store.set_profile_avatar_url(
-            self.frank.localpart, "http://my.server/me.png"
+        yield defer.ensureDeferred(
+            self.store.set_profile_avatar_url(
+                self.frank.localpart, "http://my.server/me.png"
+            )
         )
 
         self.assertEquals(
-            (yield self.store.get_profile_avatar_url(self.frank.localpart)),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_profile_avatar_url(self.frank.localpart)
+                )
+            ),
             "http://my.server/me.png",
         )
 
