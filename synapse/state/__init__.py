@@ -25,6 +25,7 @@ from typing import (
     Sequence,
     Set,
     Union,
+    cast,
     overload,
 )
 
@@ -554,16 +555,20 @@ class StateResolutionHandler(object):
             if conflicted_state:
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
-                    # mypy doesn't like that new_state was previously mutable,
-                    # and now isn't. We don't mutate past this point though, so
-                    # tell it to go away.
-                    new_state = await resolve_events_with_store(  # type: ignore
-                        self.clock,
-                        room_id,
-                        room_version,
-                        list(state_groups_ids.values()),
-                        event_map=event_map,
-                        state_res_store=state_res_store,
+                    # resolve_eevnts_with_store returns a StateMap, but we can
+                    # treat it as a MutableStateMap as it is above. It isn't
+                    # actually mutated anymore (and is frozen in
+                    # _make_state_cache_entry below).
+                    new_state = cast(
+                        MutableStateMap,
+                        await resolve_events_with_store(
+                            self.clock,
+                            room_id,
+                            room_version,
+                            list(state_groups_ids.values()),
+                            event_map=event_map,
+                            state_res_store=state_res_store,
+                        ),
                     )
 
             # if the new state matches any of the input state groups, we can
