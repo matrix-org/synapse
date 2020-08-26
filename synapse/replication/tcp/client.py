@@ -18,6 +18,8 @@ import heapq
 import logging
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
+import attr
+
 from twisted.internet.defer import Deferred
 from twisted.internet.protocol import ReconnectingClientFactory
 
@@ -109,9 +111,7 @@ class ReplicationDataHandler:
 
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
-        self._streams_to_waiters = (
-            {}
-        )  # type: Dict[str, List[Tuple[int, Deferred[None]]]]
+        self._streams_to_waiters = {}  # type: Dict[str, List[_WaitForPositionEntry]]
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list
@@ -169,11 +169,11 @@ class ReplicationDataHandler:
         # `len(list)` works for both cases.
         index_of_first_deferred_not_called = len(waiting_list)
 
-        for idx, (position, deferred) in enumerate(waiting_list):
-            if position <= token:
+        for idx, entry in enumerate(waiting_list):
+            if entry.position <= token:
                 try:
                     with PreserveLoggingContext():
-                        deferred.callback(None)
+                        entry.deferred.callback(None)
                 except Exception:
                     # The deferred has been cancelled or timed out.
                     pass
@@ -221,7 +221,7 @@ class ReplicationDataHandler:
 
         # We insert into the list using heapq as it is more efficient than
         # pushing then resorting each time.
-        heapq.heappush(waiting_list, (position, deferred))
+        heapq.heappush(waiting_list, _WaitForPositionEntry(position, deferred))
 
         # We measure here to get in flight counts and average waiting time.
         with Measure(self._clock, "repl.wait_for_stream_position"):
@@ -230,3 +230,15 @@ class ReplicationDataHandler:
             logger.info(
                 "Finished waiting for repl stream %r to reach %s", stream_name, position
             )
+
+
+@attr.s(
+    frozen=True, slots=True, order=True,
+)
+class _WaitForPositionEntry:
+    """Entry for type `_streams_to_waiters` that is comparable. A tuple can't
+    be used as `Deferred` is not comparable.
+    """
+
+    position = attr.ib(type=int)
+    deferred = attr.ib(type=Deferred, order=False)
