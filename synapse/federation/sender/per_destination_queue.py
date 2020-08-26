@@ -97,9 +97,11 @@ class PerDestinationQueue(object):
         # New events will only be sent once this is finished, at which point
         # _catching_up is flipped to False.
         self._catching_up = True
+
         # the maximum stream order to catch up to (PDUs after this are expected
         # to be in the main transmission queue), inclusive
         self._catch_up_max_stream_order = None  # type: Optional[int]
+
         # Cache of the last successfully-transmitted stream ordering for this
         # destination (we are the only updater so this is safe)
         self._last_successful_stream_order = None  # type: Optional[int]
@@ -152,7 +154,7 @@ class PerDestinationQueue(object):
             order: an arbitrary order for the PDU — NOT the stream ordering
         """
         if (
-            self._catch_up_max_stream_order
+            self._catch_up_max_stream_order is not None
             and pdu.internal_metadata.stream_ordering <= self._catch_up_max_stream_order
         ):
             # we are in catch-up mode and this PDU is already scheduled to be

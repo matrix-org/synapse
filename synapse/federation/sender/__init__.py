@@ -285,7 +285,7 @@ class FederationSender(object):
         sent_pdus_destination_dist_total.inc(len(destinations))
         sent_pdus_destination_dist_count.inc()
 
-        # track the fact that we are enqueuing this PDU for these destinations,
+        # track the fact that we have a PDU for these destinations,
         # to allow us to perform catch-up later on if the remote is unreachable
         # for a while.
         await self.store.store_destination_rooms_entries(
