@@ -199,7 +199,7 @@ class RoomTestCase(_ShadowBannedBase):
         event_source = self.hs.get_event_sources().sources["typing"]
         self.assertEquals(event_source.get_current_key(), 0)
 
-        # The other user can join and sending typing events.
+        # The other user can join and send typing events.
         self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
 
         request, channel = self.make_request(
