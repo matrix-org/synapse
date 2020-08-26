@@ -12,9 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import logging
-from typing import Dict, Generic, List, Optional, Tuple, TypeVar
+from typing import TYPE_CHECKING, Dict, Generic, List, Optional, Tuple, TypeVar
 from urllib.parse import urlencode
 
 import attr
@@ -35,11 +34,14 @@ from typing_extensions import TypedDict
 from twisted.web.client import readBody
 
 from synapse.config import ConfigError
-from synapse.http.server import finish_request
+from synapse.http.server import respond_with_html
 from synapse.http.site import SynapseRequest
-from synapse.push.mailer import load_jinja2_templates
-from synapse.server import HomeServer
+from synapse.logging.context import make_deferred_yieldable
 from synapse.types import UserID, map_username_to_mxid_localpart
+from synapse.util import json_decoder
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +92,8 @@ class OidcHandler:
     """Handles requests related to the OpenID Connect login flow.
     """
 
-    def __init__(self, hs: HomeServer):
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
         self._callback_url = hs.config.oidc_callback_url  # type: str
         self._scopes = hs.config.oidc_scopes  # type: List[str]
         self._uses_userinfo_config = hs.config.oidc_uses_userinfo  # type: bool
@@ -100,7 +103,6 @@ class OidcHandler:
             hs.config.oidc_client_auth_method,
         )  # type: ClientAuth
         self._client_auth_method = hs.config.oidc_client_auth_method  # type: str
-        self._subject_claim = hs.config.oidc_subject_claim
         self._provider_metadata = OpenIDProviderMetadata(
             issuer=hs.config.oidc_issuer,
             authorization_endpoint=hs.config.oidc_authorization_endpoint,
@@ -123,9 +125,7 @@ class OidcHandler:
         self._hostname = hs.hostname  # type: str
         self._server_name = hs.config.server_name  # type: str
         self._macaroon_secret_key = hs.config.macaroon_secret_key
-        self._error_template = load_jinja2_templates(
-            hs.config.sso_template_dir, ["sso_error.html"]
-        )[0]
+        self._error_template = hs.config.sso_error_template
 
         # identifier for the external_ids table
         self._auth_provider_id = "oidc"
@@ -146,15 +146,10 @@ class OidcHandler:
                 access_denied.
             error_description: A human-readable description of the error.
         """
-        html_bytes = self._error_template.render(
+        html = self._error_template.render(
             error=error, error_description=error_description
-        ).encode("utf-8")
-
-        request.setResponseCode(400)
-        request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-        request.setHeader(b"Content-Length", b"%i" % len(html_bytes))
-        request.write(html_bytes)
-        finish_request(request)
+        )
+        respond_with_html(request, 400, html)
 
     def _validate_metadata(self):
         """Verifies the provider metadata.
@@ -311,6 +306,10 @@ class OidcHandler:
         received in the callback to exchange it for a token. The call uses the
         ``ClientAuth`` to authenticate with the client with its ID and secret.
 
+        See:
+           https://tools.ietf.org/html/rfc6749#section-3.2
+           https://openid.net/specs/openid-connect-core-1_0.html#TokenEndpoint
+
         Args:
             code: The authorization code we got from the callback.
 
@@ -363,14 +362,14 @@ class OidcHandler:
             code=response.code, phrase=response.phrase.decode("utf-8")
         )
 
-        resp_body = await readBody(response)
+        resp_body = await make_deferred_yieldable(readBody(response))
 
         if response.code >= 500:
             # In case of a server error, we should first try to decode the body
             # and check for an error field. If not, we respond with a generic
             # error message.
             try:
-                resp = json.loads(resp_body.decode("utf-8"))
+                resp = json_decoder.decode(resp_body.decode("utf-8"))
                 error = resp["error"]
                 description = resp.get("error_description", error)
             except (ValueError, KeyError):
@@ -387,7 +386,7 @@ class OidcHandler:
 
         # Since it is a not a 5xx code, body should be a valid JSON. It will
         # raise if not.
-        resp = json.loads(resp_body.decode("utf-8"))
+        resp = json_decoder.decode(resp_body.decode("utf-8"))
 
         if "error" in resp:
             error = resp["error"]
@@ -485,6 +484,7 @@ class OidcHandler:
                 claims_params=claims_params,
             )
         except ValueError:
+            logger.info("Reloading JWKS after decode error")
             jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
             claims = jwt.decode(
                 token["id_token"],
@@ -593,6 +593,9 @@ class OidcHandler:
         # The provider might redirect with an error.
         # In that case, just display it as-is.
         if b"error" in request.args:
+            # error response from the auth server. see:
+            #  https://tools.ietf.org/html/rfc6749#section-4.1.2.1
+            #  https://openid.net/specs/openid-connect-core-1_0.html#AuthError
             error = request.args[b"error"][0].decode()
             description = request.args.get(b"error_description", [b""])[0].decode()
 
@@ -606,8 +609,11 @@ class OidcHandler:
             self._render_error(request, error, description)
             return
 
+        # otherwise, it is presumably a successful response. see:
+        #   https://tools.ietf.org/html/rfc6749#section-4.1.2
+
         # Fetch the session cookie
-        session = request.getCookie(SESSION_COOKIE_NAME)
+        session = request.getCookie(SESSION_COOKIE_NAME)  # type: Optional[bytes]
         if session is None:
             logger.info("No session cookie found")
             self._render_error(request, "missing_session", "No session cookie found")
@@ -655,7 +661,7 @@ class OidcHandler:
             self._render_error(request, "invalid_request", "Code parameter is missing")
             return
 
-        logger.info("Exchanging code")
+        logger.debug("Exchanging code")
         code = request.args[b"code"][0].decode()
         try:
             token = await self._exchange_code(code)
@@ -664,10 +670,12 @@ class OidcHandler:
             self._render_error(request, e.error, e.error_description)
             return
 
+        logger.debug("Successfully obtained OAuth2 access token")
+
         # Now that we have a token, get the userinfo, either by decoding the
         # `id_token` or by fetching the `userinfo_endpoint`.
         if self._uses_userinfo:
-            logger.info("Fetching userinfo")
+            logger.debug("Fetching userinfo")
             try:
                 userinfo = await self._fetch_userinfo(token)
             except Exception as e:
@@ -675,7 +683,7 @@ class OidcHandler:
                 self._render_error(request, "fetch_error", str(e))
                 return
         else:
-            logger.info("Extracting userinfo from id_token")
+            logger.debug("Extracting userinfo from id_token")
             try:
                 userinfo = await self._parse_id_token(token, nonce=nonce)
             except Exception as e:
@@ -683,9 +691,17 @@ class OidcHandler:
                 self._render_error(request, "invalid_token", str(e))
                 return
 
+        # Pull out the user-agent and IP from the request.
+        user_agent = request.requestHeaders.getRawHeaders(b"User-Agent", default=[b""])[
+            0
+        ].decode("ascii", "surrogateescape")
+        ip_address = self.hs.get_ip_from_request(request)
+
         # Call the mapper to register/login the user
         try:
-            user_id = await self._map_userinfo_to_user(userinfo, token)
+            user_id = await self._map_userinfo_to_user(
+                userinfo, token, user_agent, ip_address
+            )
         except MappingException as e:
             logger.exception("Could not map user")
             self._render_error(request, "mapping_error", str(e))
@@ -751,7 +767,7 @@ class OidcHandler:
         return macaroon.serialize()
 
     def _verify_oidc_session_token(
-        self, session: str, state: str
+        self, session: bytes, state: str
     ) -> Tuple[str, str, Optional[str]]:
         """Verifies and extract an OIDC session token.
 
@@ -822,7 +838,9 @@ class OidcHandler:
         now = self._clock.time_msec()
         return now < expiry
 
-    async def _map_userinfo_to_user(self, userinfo: UserInfo, token: Token) -> str:
+    async def _map_userinfo_to_user(
+        self, userinfo: UserInfo, token: Token, user_agent: str, ip_address: str
+    ) -> str:
         """Maps a UserInfo object to a mxid.
 
         UserInfo should have a claim that uniquely identifies users. This claim
@@ -837,6 +855,8 @@ class OidcHandler:
         Args:
             userinfo: an object representing the user
             token: a dict with the tokens obtained from the provider
+            user_agent: The user agent of the client making the request.
+            ip_address: The IP address of the client making the request.
 
         Raises:
             MappingException: if there was an error while mapping some properties
@@ -897,8 +917,8 @@ class OidcHandler:
             # not taken, register the user
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart, default_display_name=attributes["display_name"],
+		user_agent_ips=(user_agent, ip_address),
             )
-
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,
         )

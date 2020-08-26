@@ -15,11 +15,11 @@
 
 import logging
 
-from twisted.internet import defer
-
+import synapse.state
+import synapse.storage
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import LimitExceededError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.types import UserID
 
 logger = logging.getLogger(__name__)
@@ -28,10 +28,6 @@ logger = logging.getLogger(__name__)
 class BaseHandler(object):
     """
     Common base class for the event handlers.
-
-    Attributes:
-        store (synapse.storage.DataStore):
-        state_handler (synapse.state.StateHandler):
     """
 
     def __init__(self, hs):
@@ -39,22 +35,36 @@ class BaseHandler(object):
         Args:
             hs (synapse.server.HomeServer):
         """
-        self.store = hs.get_datastore()
+        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
-        self.state_handler = hs.get_state_handler()
+        self.state_handler = hs.get_state_handler()  # type: synapse.state.StateHandler
         self.distributor = hs.get_distributor()
-        self.ratelimiter = hs.get_ratelimiter()
-        self.admin_redaction_ratelimiter = hs.get_admin_redaction_ratelimiter()
         self.clock = hs.get_clock()
         self.hs = hs
+
+        # The rate_hz and burst_count are overridden on a per-user basis
+        self.request_ratelimiter = Ratelimiter(
+            clock=self.clock, rate_hz=0, burst_count=0
+        )
+        self._rc_message = self.hs.config.rc_message
+
+        # Check whether ratelimiting room admin message redaction is enabled
+        # by the presence of rate limits in the config
+        if self.hs.config.rc_admin_redaction:
+            self.admin_redaction_ratelimiter = Ratelimiter(
+                clock=self.clock,
+                rate_hz=self.hs.config.rc_admin_redaction.per_second,
+                burst_count=self.hs.config.rc_admin_redaction.burst_count,
+            )
+        else:
+            self.admin_redaction_ratelimiter = None
 
         self.server_name = hs.hostname
 
         self.event_builder_factory = hs.get_event_builder_factory()
 
-    @defer.inlineCallbacks
-    def ratelimit(self, requester, update=True, is_admin_redaction=False):
+    async def ratelimit(self, requester, update=True, is_admin_redaction=False):
         """Ratelimits requests.
 
         Args:
@@ -70,7 +80,6 @@ class BaseHandler(object):
         Raises:
             LimitExceededError if the request should be ratelimited
         """
-        time_now = self.clock.time()
         user_id = requester.user.to_string()
 
         # The AS user itself is never rate limited.
@@ -83,47 +92,31 @@ class BaseHandler(object):
         if requester.app_service and not requester.app_service.is_rate_limited():
             return
 
+        messages_per_second = self._rc_message.per_second
+        burst_count = self._rc_message.burst_count
+
         # Check if there is a per user override in the DB.
-        override = yield self.store.get_ratelimit_for_user(user_id)
+        override = await self.store.get_ratelimit_for_user(user_id)
         if override:
-            # If overriden with a null Hz then ratelimiting has been entirely
+            # If overridden with a null Hz then ratelimiting has been entirely
             # disabled for the user
             if not override.messages_per_second:
                 return
 
             messages_per_second = override.messages_per_second
             burst_count = override.burst_count
-        else:
-            # We default to different values if this is an admin redaction and
-            # the config is set
-            if is_admin_redaction and self.hs.config.rc_admin_redaction:
-                messages_per_second = self.hs.config.rc_admin_redaction.per_second
-                burst_count = self.hs.config.rc_admin_redaction.burst_count
-            else:
-                messages_per_second = self.hs.config.rc_message.per_second
-                burst_count = self.hs.config.rc_message.burst_count
 
-        if is_admin_redaction and self.hs.config.rc_admin_redaction:
-            # If we have separate config for admin redactions we use a separate
-            # ratelimiter
-            allowed, time_allowed = self.admin_redaction_ratelimiter.can_do_action(
-                user_id,
-                time_now,
-                rate_hz=messages_per_second,
-                burst_count=burst_count,
-                update=update,
-            )
+        if is_admin_redaction and self.admin_redaction_ratelimiter:
+            # If we have separate config for admin redactions, use a separate
+            # ratelimiter as to not have user_ids clash
+            self.admin_redaction_ratelimiter.ratelimit(user_id, update=update)
         else:
-            allowed, time_allowed = self.ratelimiter.can_do_action(
+            # Override rate and burst count per-user
+            self.request_ratelimiter.ratelimit(
                 user_id,
-                time_now,
                 rate_hz=messages_per_second,
                 burst_count=burst_count,
                 update=update,
-            )
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now))
             )
 
     async def maybe_kick_guest_users(self, event, context=None):

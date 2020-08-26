@@ -14,20 +14,19 @@
 # limitations under the License.
 import logging
 import re
-from typing import Callable, Dict, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Set, Tuple
 
 import attr
 import saml2
 import saml2.response
 from saml2.client import Saml2Client
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.config import ConfigError
-from synapse.http.server import finish_request
+from synapse.config.saml2_config import SamlAttributeRequirement
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
 from synapse.module_api import ModuleApi
-from synapse.module_api.errors import RedirectException
 from synapse.types import (
     UserID,
     map_username_to_mxid_localpart,
@@ -35,6 +34,9 @@ from synapse.types import (
 )
 from synapse.util.async_helpers import Linearizer
 from synapse.util.iterutils import chunk_seq
+
+if TYPE_CHECKING:
+    import synapse.server
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,8 @@ class Saml2SessionData:
 
 
 class SamlHandler:
-    def __init__(self, hs):
+    def __init__(self, hs: "synapse.server.HomeServer"):
+        self.hs = hs
         self._saml_client = Saml2Client(hs.config.saml2_sp_config)
         self._auth = hs.get_auth()
         self._auth_handler = hs.get_auth_handler()
@@ -64,6 +67,7 @@ class SamlHandler:
         self._grandfathered_mxid_source_attribute = (
             hs.config.saml2_grandfathered_mxid_source_attribute
         )
+        self._saml2_attribute_requirements = hs.config.saml2.attribute_requirements
 
         # plugin to do custom mapping from saml response to mxid
         self._user_mapping_provider = hs.config.saml2_user_mapping_provider_class(
@@ -75,12 +79,10 @@ class SamlHandler:
         self._auth_provider_id = "saml"
 
         # a map from saml session id to Saml2SessionData object
-        self._outstanding_requests_dict = {}
+        self._outstanding_requests_dict = {}  # type: Dict[str, Saml2SessionData]
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="saml_mapping", clock=self._clock)
-
-        self._error_html_content = hs.config.saml2_error_html_content
 
     def handle_redirect_request(
         self, client_redirect_url: bytes, ui_auth_session_id: Optional[str] = None
@@ -99,6 +101,9 @@ class SamlHandler:
         reqid, info = self._saml_client.prepare_for_authenticate(
             relay_state=client_redirect_url
         )
+
+        # Since SAML sessions timeout it is useful to log when they were created.
+        logger.info("Initiating a new SAML session: %s" % (reqid,))
 
         now = self._clock.time_msec()
         self._outstanding_requests_dict[reqid] = Saml2SessionData(
@@ -129,26 +134,15 @@ class SamlHandler:
         # the dict.
         self.expire_sessions()
 
-        try:
-            user_id, current_session = await self._map_saml_response_to_user(
-                resp_bytes, relay_state
-            )
-        except RedirectException:
-            # Raise the exception as per the wishes of the SAML module response
-            raise
-        except Exception as e:
-            # If decoding the response or mapping it to a user failed, then log the
-            # error and tell the user that something went wrong.
-            logger.error(e)
+        # Pull out the user-agent and IP from the request.
+        user_agent = request.requestHeaders.getRawHeaders(b"User-Agent", default=[b""])[
+            0
+        ].decode("ascii", "surrogateescape")
+        ip_address = self.hs.get_ip_from_request(request)
 
-            request.setResponseCode(400)
-            request.setHeader(b"Content-Type", b"text/html; charset=utf-8")
-            request.setHeader(
-                b"Content-Length", b"%d" % (len(self._error_html_content),)
-            )
-            request.write(self._error_html_content.encode("utf8"))
-            finish_request(request)
-            return
+        user_id, current_session = await self._map_saml_response_to_user(
+            resp_bytes, relay_state, user_agent, ip_address
+        )
 
         # Complete the interactive auth session or the login.
         if current_session and current_session.ui_auth_session_id:
@@ -160,7 +154,11 @@ class SamlHandler:
             await self._auth_handler.complete_sso_login(user_id, request, relay_state)
 
     async def _map_saml_response_to_user(
-        self, resp_bytes: str, client_redirect_url: str
+        self,
+        resp_bytes: str,
+        client_redirect_url: str,
+        user_agent: str,
+        ip_address: str,
     ) -> Tuple[str, Optional[Saml2SessionData]]:
         """
         Given a sample response, retrieve the cached session and user for it.
@@ -168,9 +166,16 @@ class SamlHandler:
         Args:
             resp_bytes: The SAML response.
             client_redirect_url: The redirect URL passed in by the client.
+            user_agent: The user agent of the client making the request.
+            ip_address: The IP address of the client making the request.
 
         Returns:
              Tuple of the user ID and SAML session associated with this response.
+
+        Raises:
+            SynapseError if there was a problem with the response.
+            RedirectException: some mapping providers may raise this if they need
+                to redirect to an interstitial page.
         """
         try:
             saml2_auth = self._saml_client.parse_authn_request_response(
@@ -178,13 +183,18 @@ class SamlHandler:
                 saml2.BINDING_HTTP_POST,
                 outstanding=self._outstanding_requests_dict,
             )
+        except saml2.response.UnsolicitedResponse as e:
+            # the pysaml2 library helpfully logs an ERROR here, but neglects to log
+            # the session ID. I don't really want to put the full text of the exception
+            # in the (user-visible) exception message, so let's log the exception here
+            # so we can track down the session IDs later.
+            logger.warning(str(e))
+            raise SynapseError(400, "Unexpected SAML2 login.")
         except Exception as e:
-            logger.warning("Exception parsing SAML2 response: %s", e)
-            raise SynapseError(400, "Unable to parse SAML2 response: %s" % (e,))
+            raise SynapseError(400, "Unable to parse SAML2 response: %s." % (e,))
 
         if saml2_auth.not_signed:
-            logger.warning("SAML2 response was not signed")
-            raise SynapseError(400, "SAML2 response was not signed")
+            raise SynapseError(400, "SAML2 response was not signed.")
 
         logger.debug("SAML2 response: %s", saml2_auth.origxml)
         for assertion in saml2_auth.assertions:
@@ -202,6 +212,9 @@ class SamlHandler:
         current_session = self._outstanding_requests_dict.pop(
             saml2_auth.in_response_to, None
         )
+
+        for requirement in self._saml2_attribute_requirements:
+            _check_attribute_requirement(saml2_auth.ava, requirement)
 
         remote_user_id = self._user_mapping_provider.get_remote_user_id(
             saml2_auth, client_redirect_url
@@ -264,13 +277,13 @@ class SamlHandler:
 
                 localpart = attribute_dict.get("mxid_localpart")
                 if not localpart:
-                    logger.error(
-                        "SAML mapping provider plugin did not return a "
-                        "mxid_localpart object"
+                    raise Exception(
+                        "Error parsing SAML2 response: SAML mapping provider plugin "
+                        "did not return a mxid_localpart value"
                     )
-                    raise SynapseError(500, "Error parsing SAML2 response")
 
                 displayname = attribute_dict.get("displayname")
+                emails = attribute_dict.get("emails", [])
 
                 # Check if this mxid already exists
                 if not await self._datastore.get_users_by_id_case_insensitive(
@@ -288,7 +301,10 @@ class SamlHandler:
             logger.info("Mapped SAML user to local part %s", localpart)
 
             registered_user_id = await self._registration_handler.register_user(
-                localpart=localpart, default_display_name=displayname
+                localpart=localpart,
+                default_display_name=displayname,
+                bind_emails=emails,
+                user_agent_ips=(user_agent, ip_address),
             )
 
             await self._datastore.record_user_external_id(
@@ -305,6 +321,21 @@ class SamlHandler:
         for reqid in to_expire:
             logger.debug("Expiring session id %s", reqid)
             del self._outstanding_requests_dict[reqid]
+
+
+def _check_attribute_requirement(ava: dict, req: SamlAttributeRequirement):
+    values = ava.get(req.attribute, [])
+    for v in values:
+        if v == req.value:
+            return
+
+    logger.info(
+        "SAML2 attribute %s did not match required value '%s' (was '%s')",
+        req.attribute,
+        req.value,
+        values,
+    )
+    raise AuthError(403, "You are not authorized to log in here.")
 
 
 DOT_REPLACE_PATTERN = re.compile(
@@ -381,6 +412,7 @@ class DefaultSamlMappingProvider(object):
             dict: A dict containing new user attributes. Possible keys:
                 * mxid_localpart (str): Required. The localpart of the user's mxid
                 * displayname (str): The displayname of the user
+                * emails (list[str]): Any emails for the user
         """
         try:
             mxid_source = saml_response.ava[self._mxid_source_attribute][0]
@@ -403,9 +435,13 @@ class DefaultSamlMappingProvider(object):
         # If displayname is None, the mxid_localpart will be used instead
         displayname = saml_response.ava.get("displayName", [None])[0]
 
+        # Retrieve any emails present in the saml response
+        emails = saml_response.ava.get("email", [])
+
         return {
             "mxid_localpart": localpart,
             "displayname": displayname,
+            "emails": emails,
         }
 
     @staticmethod
@@ -444,4 +480,4 @@ class DefaultSamlMappingProvider(object):
                 second set consists of those attributes which can be used if
                 available, but are not necessary
         """
-        return {"uid", config.mxid_source_attribute}, {"displayName"}
+        return {"uid", config.mxid_source_attribute}, {"displayName", "email"}

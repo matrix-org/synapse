@@ -27,7 +27,7 @@
     different thread to Synapse. This can make it more resilient to
     heavy load meaning metrics cannot be retrieved, and can be exposed
     to just internal networks easier. The served metrics are available
-    over HTTP only, and will be available at `/`.
+    over HTTP only, and will be available at `/_synapse/metrics`.
 
     Add a new listener to homeserver.yaml:
 

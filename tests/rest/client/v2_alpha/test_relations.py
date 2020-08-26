@@ -15,8 +15,7 @@
 
 import itertools
 import json
-
-import six
+import urllib
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
@@ -100,7 +99,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(400, channel.code, channel.json_body)
 
     def test_basic_paginate_relations(self):
-        """Tests that calling pagination API corectly the latest relations.
+        """Tests that calling pagination API correctly the latest relations.
         """
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
         self.assertEquals(200, channel.code, channel.json_body)
@@ -134,7 +133,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # Make sure next_batch has something in it that looks like it could be a
         # valid token.
         self.assertIsInstance(
-            channel.json_body.get("next_batch"), six.string_types, channel.json_body
+            channel.json_body.get("next_batch"), str, channel.json_body
         )
 
     def test_repeated_paginate_relations(self):
@@ -278,7 +277,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         prev_token = None
         found_event_ids = []
-        encoded_key = six.moves.urllib.parse.quote_plus("👍".encode("utf-8"))
+        encoded_key = urllib.parse.quote_plus("👍".encode("utf-8"))
         for _ in range(20):
             from_token = ""
             if prev_token:
@@ -670,7 +669,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         query = ""
         if key:
-            query = "?key=" + six.moves.urllib.parse.quote_plus(key.encode("utf-8"))
+            query = "?key=" + urllib.parse.quote_plus(key.encode("utf-8"))
 
         original_id = parent_id if parent_id else self.parent_id
 

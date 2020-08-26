@@ -56,7 +56,9 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             )
 
         for i in range(0, 20):
-            self.get_success(self.store.db.runInteraction("insert", insert_event, i))
+            self.get_success(
+                self.store.db_pool.runInteraction("insert", insert_event, i)
+            )
 
         # this should get the last ten
         r = self.get_success(self.store.get_prev_events_for_room(room_id))
@@ -81,13 +83,13 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
         for i in range(0, 20):
             self.get_success(
-                self.store.db.runInteraction("insert", insert_event, i, room1)
+                self.store.db_pool.runInteraction("insert", insert_event, i, room1)
             )
             self.get_success(
-                self.store.db.runInteraction("insert", insert_event, i, room2)
+                self.store.db_pool.runInteraction("insert", insert_event, i, room2)
             )
             self.get_success(
-                self.store.db.runInteraction("insert", insert_event, i, room3)
+                self.store.db_pool.runInteraction("insert", insert_event, i, room3)
             )
 
         # Test simple case
@@ -164,7 +166,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
 
             depth = depth_map[event_id]
 
-            self.store.db.simple_insert_txn(
+            self.store.db_pool.simple_insert_txn(
                 txn,
                 table="events",
                 values={
@@ -179,7 +181,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
                 },
             )
 
-            self.store.db.simple_insert_many_txn(
+            self.store.db_pool.simple_insert_many_txn(
                 txn,
                 table="event_auth",
                 values=[
@@ -192,7 +194,7 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
         for event_id in auth_graph:
             next_stream_ordering += 1
             self.get_success(
-                self.store.db.runInteraction(
+                self.store.db_pool.runInteraction(
                     "insert", insert_event, event_id, next_stream_ordering
                 )
             )
