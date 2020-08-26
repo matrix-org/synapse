@@ -1,1 +1,1 @@
-Remove unused `is_guest` parameter from `MessageHandler.get_room_data`.
+Remove unused `is_guest` parameter from, and add safeguard to, `MessageHandler.get_room_data`.
