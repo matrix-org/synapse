@@ -171,7 +171,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
-            is_guest=requester.is_guest,
         )
 
         if not data:
