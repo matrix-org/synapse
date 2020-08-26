@@ -917,7 +917,7 @@ class OidcHandler:
             # not taken, register the user
             registered_user_id = await self._registration_handler.register_user(
                 localpart=localpart, default_display_name=attributes["display_name"],
-		user_agent_ips=(user_agent, ip_address),
+                user_agent_ips=(user_agent, ip_address),
             )
         await self._datastore.record_user_external_id(
             self._auth_provider_id, remote_user_id, registered_user_id,

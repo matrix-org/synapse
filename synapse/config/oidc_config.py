@@ -169,7 +169,6 @@ class OIDCConfig(Config):
           #
           #merge_with_existing_users: false
 
-
           # An external module can be provided here as a custom solution to mapping
           # attributes returned from a OIDC provider onto a matrix user.
           #
@@ -185,7 +184,7 @@ class OIDCConfig(Config):
             # Custom configuration values for the module. This section will be passed as
             # a Python dictionary to the user mapping provider module's `parse_config`
             # method.
-
+            #
             # The examples below are intended for the default provider: they should be
             # changed if using a custom provider.
             #
