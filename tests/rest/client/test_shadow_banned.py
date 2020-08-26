@@ -264,7 +264,6 @@ class ProfileTestCase(_ShadowBannedBase):
                 room_id,
                 "m.room.member",
                 self.banned_user_id,
-                False,
             )
         )
         self.assertEqual(
