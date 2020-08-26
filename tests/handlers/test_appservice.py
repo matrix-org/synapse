@@ -19,6 +19,7 @@ from twisted.internet import defer
 
 from synapse.handlers.appservice import ApplicationServicesHandler
 
+from tests.test_utils import make_awaitable
 from tests.utils import MockClock
 
 from .. import unittest
@@ -117,9 +118,9 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             self._mkservice_alias(is_interested_in_alias=False),
         ]
 
-        self.mock_as_api.query_alias.return_value = defer.succeed(True)
+        self.mock_as_api.query_alias.return_value = make_awaitable(True)
         self.mock_store.get_app_services.return_value = services
-        self.mock_store.get_association_from_room_alias.return_value = defer.succeed(
+        self.mock_store.get_association_from_room_alias.return_value = make_awaitable(
             Mock(room_id=room_id, servers=servers)
         )
 
@@ -135,7 +136,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
 
     def _mkservice(self, is_interested):
         service = Mock()
-        service.is_interested.return_value = defer.succeed(is_interested)
+        service.is_interested.return_value = make_awaitable(is_interested)
         service.token = "mock_service_token"
         service.url = "mock_service_url"
         return service

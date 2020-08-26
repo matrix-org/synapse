@@ -120,7 +120,7 @@ class BulkPushRuleEvaluator(object):
             pl_event = await self.store.get_event(pl_event_id)
             auth_events = {POWER_KEY: pl_event}
         else:
-            auth_events_ids = await self.auth.compute_auth_events(
+            auth_events_ids = self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=False
             )
             auth_events = await self.store.get_events(auth_events_ids)

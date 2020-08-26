@@ -241,20 +241,20 @@ class HomeserverTestCase(TestCase):
         if hasattr(self, "user_id"):
             if self.hijack_auth:
 
-                def get_user_by_access_token(token=None, allow_guest=False):
-                    return succeed(
-                        {
-                            "user": UserID.from_string(self.helper.auth_user_id),
-                            "token_id": 1,
-                            "is_guest": False,
-                        }
-                    )
+                async def get_user_by_access_token(token=None, allow_guest=False):
+                    return {
+                        "user": UserID.from_string(self.helper.auth_user_id),
+                        "token_id": 1,
+                        "is_guest": False,
+                    }
 
-                def get_user_by_req(request, allow_guest=False, rights="access"):
-                    return succeed(
-                        create_requester(
-                            UserID.from_string(self.helper.auth_user_id), 1, False, None
-                        )
+                async def get_user_by_req(request, allow_guest=False, rights="access"):
+                    return create_requester(
+                        UserID.from_string(self.helper.auth_user_id),
+                        1,
+                        False,
+                        False,
+                        None,
                     )
 
                 self.hs.get_auth().get_user_by_req = get_user_by_req
@@ -422,8 +422,8 @@ class HomeserverTestCase(TestCase):
 
         async def run_bg_updates():
             with LoggingContext("run_bg_updates", request="run_bg_updates-1"):
-                while not await stor.db.updates.has_completed_background_updates():
-                    await stor.db.updates.do_next_background_update(1)
+                while not await stor.db_pool.updates.has_completed_background_updates():
+                    await stor.db_pool.updates.do_next_background_update(1)
 
         hs = setup_test_homeserver(self.addCleanup, *args, **kwargs)
         stor = hs.get_datastore()
@@ -544,7 +544,7 @@ class HomeserverTestCase(TestCase):
         """
         event_creator = self.hs.get_event_creation_handler()
         secrets = self.hs.get_secrets()
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, False, None, None)
 
         event, context = self.get_success(
             event_creator.create_event(
@@ -571,7 +571,7 @@ class HomeserverTestCase(TestCase):
         Add the given event as an extremity to the room.
         """
         self.get_success(
-            self.hs.get_datastore().db.simple_insert(
+            self.hs.get_datastore().db_pool.simple_insert(
                 table="event_forward_extremities",
                 values={"room_id": room_id, "event_id": event_id},
                 desc="test_add_extremity",

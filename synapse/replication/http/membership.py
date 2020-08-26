@@ -52,7 +52,9 @@ class ReplicationRemoteJoinRestServlet(ReplicationEndpoint):
         self.clock = hs.get_clock()
 
     @staticmethod
-    def _serialize_payload(requester, room_id, user_id, remote_room_hosts, content):
+    async def _serialize_payload(
+        requester, room_id, user_id, remote_room_hosts, content
+    ):
         """
         Args:
             requester(Requester)
@@ -112,7 +114,7 @@ class ReplicationRemoteRejectInviteRestServlet(ReplicationEndpoint):
         self.member_handler = hs.get_room_member_handler()
 
     @staticmethod
-    def _serialize_payload(  # type: ignore
+    async def _serialize_payload(  # type: ignore
         invite_event_id: str,
         txn_id: Optional[str],
         requester: Requester,
@@ -174,7 +176,7 @@ class ReplicationUserJoinedLeftRoomRestServlet(ReplicationEndpoint):
         self.distributor = hs.get_distributor()
 
     @staticmethod
-    def _serialize_payload(room_id, user_id, change):
+    async def _serialize_payload(room_id, user_id, change):
         """
         Args:
             room_id (str)

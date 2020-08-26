@@ -192,7 +192,7 @@ class Cache(object):
         callbacks = [callback] if callback else []
         self.check_thread()
         observable = ObservableDeferred(value, consumeErrors=True)
-        observer = defer.maybeDeferred(observable.observe)
+        observer = observable.observe()
         entry = CacheEntry(deferred=observable, callbacks=callbacks)
 
         existing_entry = self._pending_deferred_cache.pop(key, None)
@@ -285,15 +285,8 @@ class Cache(object):
 
 
 class _CacheDescriptorBase(object):
-    def __init__(
-        self, orig: _CachedFunction, num_args, inlineCallbacks, cache_context=False
-    ):
+    def __init__(self, orig: _CachedFunction, num_args, cache_context=False):
         self.orig = orig
-
-        if inlineCallbacks:
-            self.function_to_call = defer.inlineCallbacks(orig)
-        else:
-            self.function_to_call = orig
 
         arg_spec = inspect.getfullargspec(orig)
         all_args = arg_spec.args
@@ -364,7 +357,7 @@ class CacheDescriptor(_CacheDescriptorBase):
     invalidated) by adding a special "cache_context" argument to the function
     and passing that as a kwarg to all caches called. For example::
 
-        @cachedInlineCallbacks(cache_context=True)
+        @cached(cache_context=True)
         def foo(self, key, cache_context):
             r1 = yield self.bar1(key, on_invalidate=cache_context.invalidate)
             r2 = yield self.bar2(key, on_invalidate=cache_context.invalidate)
@@ -382,17 +375,11 @@ class CacheDescriptor(_CacheDescriptorBase):
         max_entries=1000,
         num_args=None,
         tree=False,
-        inlineCallbacks=False,
         cache_context=False,
         iterable=False,
     ):
 
-        super(CacheDescriptor, self).__init__(
-            orig,
-            num_args=num_args,
-            inlineCallbacks=inlineCallbacks,
-            cache_context=cache_context,
-        )
+        super().__init__(orig, num_args=num_args, cache_context=cache_context)
 
         self.max_entries = max_entries
         self.tree = tree
@@ -465,9 +452,7 @@ class CacheDescriptor(_CacheDescriptorBase):
                     observer = defer.succeed(cached_result_d)
 
             except KeyError:
-                ret = defer.maybeDeferred(
-                    preserve_fn(self.function_to_call), obj, *args, **kwargs
-                )
+                ret = defer.maybeDeferred(preserve_fn(self.orig), obj, *args, **kwargs)
 
                 def onErr(f):
                     cache.invalidate(cache_key)
@@ -510,9 +495,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
     of results.
     """
 
-    def __init__(
-        self, orig, cached_method_name, list_name, num_args=None, inlineCallbacks=False
-    ):
+    def __init__(self, orig, cached_method_name, list_name, num_args=None):
         """
         Args:
             orig (function)
@@ -521,12 +504,8 @@ class CacheListDescriptor(_CacheDescriptorBase):
             num_args (int): number of positional arguments (excluding ``self``,
                 but including list_name) to use as cache keys. Defaults to all
                 named args of the function.
-            inlineCallbacks (bool): Whether orig is a generator that should
-                be wrapped by defer.inlineCallbacks
         """
-        super(CacheListDescriptor, self).__init__(
-            orig, num_args=num_args, inlineCallbacks=inlineCallbacks
-        )
+        super().__init__(orig, num_args=num_args)
 
         self.list_name = list_name
 
@@ -631,7 +610,7 @@ class CacheListDescriptor(_CacheDescriptorBase):
 
                 cached_defers.append(
                     defer.maybeDeferred(
-                        preserve_fn(self.function_to_call), **args_to_call
+                        preserve_fn(self.orig), **args_to_call
                     ).addCallbacks(complete_all, errback)
                 )
 
@@ -695,21 +674,7 @@ def cached(
     )
 
 
-def cachedInlineCallbacks(
-    max_entries=1000, num_args=None, tree=False, cache_context=False, iterable=False
-):
-    return lambda orig: CacheDescriptor(
-        orig,
-        max_entries=max_entries,
-        num_args=num_args,
-        tree=tree,
-        inlineCallbacks=True,
-        cache_context=cache_context,
-        iterable=iterable,
-    )
-
-
-def cachedList(cached_method_name, list_name, num_args=None, inlineCallbacks=False):
+def cachedList(cached_method_name, list_name, num_args=None):
     """Creates a descriptor that wraps a function in a `CacheListDescriptor`.
 
     Used to do batch lookups for an already created cache. A single argument
@@ -725,8 +690,6 @@ def cachedList(cached_method_name, list_name, num_args=None, inlineCallbacks=Fal
             do batch lookups in the cache.
         num_args (int): Number of arguments to use as the key in the cache
             (including list_name). Defaults to all named parameters.
-        inlineCallbacks (bool): Should the function be wrapped in an
-            `defer.inlineCallbacks`?
 
     Example:
 
@@ -744,5 +707,4 @@ def cachedList(cached_method_name, list_name, num_args=None, inlineCallbacks=Fal
         cached_method_name=cached_method_name,
         list_name=list_name,
         num_args=num_args,
-        inlineCallbacks=inlineCallbacks,
     )

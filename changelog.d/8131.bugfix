@@ -1,0 +1,1 @@
+Fix a bug which could cause a leaked postgres connection if synapse was set to daemonize.

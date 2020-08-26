@@ -21,9 +21,9 @@ import typing
 from http import HTTPStatus
 from typing import Dict, List, Optional, Union
 
-from canonicaljson import json
-
 from twisted.web import http
+
+from synapse.util import json_decoder
 
 if typing.TYPE_CHECKING:
     from synapse.types import JsonDict
@@ -238,14 +238,16 @@ class InteractiveAuthIncompleteError(Exception):
     (This indicates we should return a 401 with 'result' as the body)
 
     Attributes:
+        session_id: The ID of the ongoing interactive auth session.
         result: the server response to the request, which should be
             passed back to the client
     """
 
-    def __init__(self, result: "JsonDict"):
+    def __init__(self, session_id: str, result: "JsonDict"):
         super(InteractiveAuthIncompleteError, self).__init__(
             "Interactive auth not yet complete"
         )
+        self.session_id = session_id
         self.result = result
 
 
@@ -591,7 +593,7 @@ class HttpResponseException(CodeMessageException):
         # try to parse the body as json, to get better errcode/msg, but
         # default to M_UNKNOWN with the HTTP status as the error text
         try:
-            j = json.loads(self.response.decode("utf-8"))
+            j = json_decoder.decode(self.response.decode("utf-8"))
         except ValueError:
             j = {}
 
@@ -602,3 +604,11 @@ class HttpResponseException(CodeMessageException):
         errmsg = j.pop("error", self.msg)
 
         return ProxiedRequestError(self.code, errmsg, errcode, j)
+
+
+class ShadowBanError(Exception):
+    """
+    Raised when a shadow-banned user attempts to perform an action.
+
+    This should be caught and a proper "fake" success response sent to the user.
+    """

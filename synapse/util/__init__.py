@@ -17,12 +17,26 @@ import logging
 import re
 
 import attr
+from canonicaljson import json
 
 from twisted.internet import defer, task
 
 from synapse.logging import context
 
 logger = logging.getLogger(__name__)
+
+
+def _reject_invalid_json(val):
+    """Do not allow Infinity, -Infinity, or NaN values in JSON."""
+    raise json.JSONDecodeError("Invalid JSON value: '%s'" % val)
+
+
+# Create a custom encoder to reduce the whitespace produced by JSON encoding and
+# ensure that valid JSON is produced.
+json_encoder = json.JSONEncoder(allow_nan=False, separators=(",", ":"))
+
+# Create a custom decoder to reject Python extensions to JSON.
+json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
 def unwrapFirstError(failure):

@@ -27,9 +27,7 @@ from typing import Dict, Optional
 from urllib import parse as urlparse
 
 import attr
-from canonicaljson import json
 
-from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 
 from synapse.api.errors import Codes, SynapseError
@@ -43,6 +41,7 @@ from synapse.http.servlet import parse_integer, parse_string
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
+from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.stringutils import random_string
@@ -228,7 +227,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         else:
             logger.info("Returning cached response")
 
-        og = await make_deferred_yieldable(defer.maybeDeferred(observable.observe))
+        og = await make_deferred_yieldable(observable.observe())
         respond_with_json_bytes(request, 200, og, send_cors=True)
 
     async def _do_preview(self, url: str, user: str, ts: int) -> bytes:
@@ -355,7 +354,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("Calculated OG for %s as %s", url, og)
 
-        jsonog = json.dumps(og)
+        jsonog = json_encoder.encode(og)
 
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
@@ -586,7 +585,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("Running url preview cache expiry")
 
-        if not (await self.store.db.updates.has_completed_background_updates()):
+        if not (await self.store.db_pool.updates.has_completed_background_updates()):
             logger.info("Still running DB updates; skipping expiry")
             return
 

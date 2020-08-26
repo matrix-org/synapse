@@ -1,0 +1,1 @@
+Clarify the error code if a user tries to register with a numeric ID. This bug was introduced in v1.15.0.

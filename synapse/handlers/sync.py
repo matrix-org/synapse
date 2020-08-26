@@ -960,7 +960,7 @@ class SyncHandler(object):
         # this is due to some of the underlying streams not supporting the ability
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
-        now_token = await self.event_sources.get_current_token()
+        now_token = self.event_sources.get_current_token()
 
         logger.debug(
             "Calculating sync response for %r between %s and %s",
