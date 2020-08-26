@@ -24,6 +24,8 @@ from synapse.storage.database import DatabasePool
 from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
 
+db_binary_type = memoryview
+
 logger = logging.getLogger(__name__)
 
 
@@ -117,7 +119,7 @@ class TransactionStore(SQLBaseStore):
                 "transaction_id": transaction_id,
                 "origin": origin,
                 "response_code": code,
-                "response_json": memoryview(encode_canonical_json(response_dict)),
+                "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
             or_ignore=True,
