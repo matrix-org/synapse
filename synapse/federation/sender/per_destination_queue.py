@@ -246,9 +246,8 @@ class PerDestinationQueue(object):
                 # this keeps the catching-up logic simple
                 await self._catch_up_transmission_loop()
                 if self._catching_up:
-                    # XXX if we aren't actually caught up still, shouldn't
-                    #  carry on to the main loop
-                    #  (but need to consider what we do in a failure...?)
+                    # if we aren't actually caught up yet, shouldn't carry on to
+                    # the main loop
                     return
 
             pending_pdus = []
