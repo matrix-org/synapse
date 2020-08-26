@@ -38,6 +38,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.ui_auth import INTERACTIVE_AUTH_CHECKERS
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
 from synapse.http.server import finish_request, respond_with_html
+from synapse.http.servlet import assert_params_in_dict
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -52,24 +53,43 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-def login_submission_legacy_convert(submission):
+def convert_client_dict_legacy_fields_to_identifier(
+    submission: Dict[str, Union[str, Dict]]
+):
     """
-    If the input login submission is an old style object
-    (ie. with top-level user / medium / address) convert it
-    to a typed object.
+    Convert a legacy-formatted login submission to an identifier dict.
+
+    Legacy login submissions (used in both login and user-interactive authentication)
+    provide user-identifying information at the top-level instead.
+
+    This is now deprecated and replaced with identifiers:
+    https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
+
+    Args:
+        submission: The client dict to convert. Passed by reference and modified
+
+    Raises:
+        SynapseError: If the format of the client dict is invalid
     """
     if "user" in submission:
-        submission["identifier"] = {"type": "m.id.user", "user": submission["user"]}
-        del submission["user"]
+        submission["identifier"] = {"type": "m.id.user", "user": submission.pop("user")}
 
     if "medium" in submission and "address" in submission:
         submission["identifier"] = {
             "type": "m.id.thirdparty",
-            "medium": submission["medium"],
-            "address": submission["address"],
+            "medium": submission.pop("medium"),
+            "address": submission.pop("address"),
         }
-        del submission["medium"]
-        del submission["address"]
+
+    # We've converted valid, legacy login submissions to an identifier. If the
+    # dict still doesn't have an identifier, it's invalid
+    assert_params_in_dict(submission, required=["identifier"])
+
+    # Ensure the identifier has a type
+    if "type" not in submission["identifier"]:
+        raise SynapseError(
+            400, "'identifier' dict has no key 'type'", errcode=Codes.MISSING_PARAM,
+        )
 
 
 def login_id_thirdparty_from_phone(identifier):

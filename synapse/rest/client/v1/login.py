@@ -19,8 +19,8 @@ from typing import Awaitable, Callable, Dict, Optional
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.handlers.auth import (
+    convert_client_dict_legacy_fields_to_identifier,
     login_id_thirdparty_from_phone,
-    login_submission_legacy_convert,
 )
 from synapse.http.server import finish_request
 from synapse.http.servlet import (
@@ -153,14 +153,8 @@ class LoginRestServlet(RestServlet):
             login_submission.get("address"),
             login_submission.get("user"),
         )
-        login_submission_legacy_convert(login_submission)
-
-        if "identifier" not in login_submission:
-            raise SynapseError(400, "Missing param: identifier")
-
+        convert_client_dict_legacy_fields_to_identifier(login_submission)
         identifier = login_submission["identifier"]
-        if "type" not in identifier:
-            raise SynapseError(400, "Login identifier has no type")
 
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
