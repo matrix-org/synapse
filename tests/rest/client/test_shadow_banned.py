@@ -256,7 +256,7 @@ class ProfileTestCase(_ShadowBannedBase):
         self.assertEquals(200, channel.code, channel.result)
         self.assertIn("event_id", channel.json_body)
 
-        # The display name in the room should not be.
+        # The display name in the room should not be changed.
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
