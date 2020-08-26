@@ -41,6 +41,7 @@ from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
+    MutableStateMap,
     Requester,
     RoomAlias,
     RoomID,
@@ -814,7 +815,7 @@ class RoomCreationHandler(BaseHandler):
         room_id: str,
         preset_config: str,
         invite_list: List[str],
-        initial_state: StateMap,
+        initial_state: MutableStateMap,
         creation_content: JsonDict,
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,

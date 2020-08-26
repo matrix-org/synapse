@@ -41,7 +41,7 @@ from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import Collection, StateMap
+from synapse.types import Collection, MutableStateMap, StateMap
 from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -205,7 +205,7 @@ class StateHandler(object):
 
         logger.debug("calling resolve_state_groups from get_current_state_ids")
         ret = await self.resolve_state_groups_for_events(room_id, latest_event_ids)
-        return dict(ret.state)
+        return ret.state
 
     async def get_current_users_in_room(
         self, room_id: str, latest_event_ids: Optional[List[str]] = None
@@ -302,7 +302,7 @@ class StateHandler(object):
             # if we're given the state before the event, then we use that
             state_ids_before_event = {
                 (s.type, s.state_key): s.event_id for s in old_state
-            }
+            }  # type: StateMap[str]
             state_group_before_event = None
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
@@ -315,7 +315,7 @@ class StateHandler(object):
                 event.room_id, event.prev_event_ids()
             )
 
-            state_ids_before_event = dict(entry.state)
+            state_ids_before_event = entry.state
             state_group_before_event = entry.state_group
             state_group_before_event_prev_group = entry.prev_group
             deltas_to_state_group_before_event = entry.delta_ids
@@ -540,7 +540,7 @@ class StateResolutionHandler(object):
             #
             # XXX: is this actually worthwhile, or should we just let
             # resolve_events_with_store do it?
-            new_state = {}
+            new_state = {}  # type: MutableStateMap[str]
             conflicted_state = False
             for st in state_groups_ids.values():
                 for key, e_id in st.items():
@@ -554,7 +554,10 @@ class StateResolutionHandler(object):
             if conflicted_state:
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
-                    new_state = await resolve_events_with_store(
+                    # mypy doesn't like that new_state was previously mutable,
+                    # and now isn't. We don't mutate past this point though, so
+                    # tell it to go away.
+                    new_state = await resolve_events_with_store(  # type: ignore
                         self.clock,
                         room_id,
                         room_version,

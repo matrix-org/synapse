@@ -38,7 +38,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
-from synapse.types import StateMap
+from synapse.types import MutableStateMap, StateMap
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
@@ -414,7 +414,7 @@ async def _iterative_auth_checks(
     base_state: StateMap[str],
     event_map: Dict[str, EventBase],
     state_res_store: "synapse.state.StateResolutionStore",
-) -> StateMap[str]:
+) -> MutableStateMap[str]:
     """Sequentially apply auth checks to each event in given list, updating the
     state as it goes along.
 
@@ -430,7 +430,7 @@ async def _iterative_auth_checks(
     Returns:
         Returns the final updated state
     """
-    resolved_state = base_state.copy()
+    resolved_state = dict(base_state)
     room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
     for idx, event_id in enumerate(event_ids, start=1):
