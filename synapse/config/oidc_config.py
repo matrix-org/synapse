@@ -57,7 +57,9 @@ class OIDCConfig(Config):
         self.oidc_userinfo_endpoint = oidc_config.get("userinfo_endpoint")
         self.oidc_jwks_uri = oidc_config.get("jwks_uri")
         self.oidc_skip_verification = oidc_config.get("skip_verification", False)
-        self.oidc_merge_with_existing_users = oidc_config.get("merge_with_existing_users", False)
+        self.oidc_merge_with_existing_users = oidc_config.get(
+            "merge_with_existing_users", False
+        )
 
         ump_config = oidc_config.get("user_mapping_provider", {})
         ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
@@ -137,7 +139,7 @@ class OIDCConfig(Config):
           # the oauth2 authorization endpoint. Required if provider discovery is disabled.
           #
           #authorization_endpoint: "https://accounts.example.com/oauth2/auth"
-          
+
           # always use userinfo endpoint. This is required for providers that don't include user
           # information in the token response, e.g. Gitlab.
           #
