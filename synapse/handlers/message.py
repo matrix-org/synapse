@@ -125,6 +125,14 @@ class MessageHandler(object):
             )
             data = room_state[membership_event_id].get(key)
         else:
+            # check_user_in_room_or_world_readable, if it doesn't raise an AuthError, should
+            # only ever return a Membership.JOIN/LEAVE object
+            #
+            # Safeguard in case it returned something else
+            logger.error(
+                "Attempted to retrieve data from a room for a user that has never been in it. "
+                "This should not have happened."
+            )
             raise SynapseError(403, "User not in room", errcode=Codes.FORBIDDEN)
 
         return data
