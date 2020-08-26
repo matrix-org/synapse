@@ -1,0 +1,1 @@
+Make `SlavedIdTracker.advance` have the same interface as `MultiWriterIDGenerator`.
