@@ -363,7 +363,7 @@ class PerDestinationQueue(object):
                         self._last_successful_stream_order = (
                             final_pdu.internal_metadata.stream_ordering
                         )
-                        await self._store.set_last_successful_stream_ordering(
+                        await self._store.set_destination_last_successful_stream_ordering(
                             self._destination, self._last_successful_stream_order
                         )
                 else:
@@ -441,7 +441,7 @@ class PerDestinationQueue(object):
     async def _catch_up_transmission_loop(self) -> None:
         if self._last_successful_stream_order is None:
             # first catch-up, so get from database
-            self._last_successful_stream_order = await self._store.get_last_successful_stream_ordering(
+            self._last_successful_stream_order = await self._store.get_destination_last_successful_stream_ordering(
                 self._destination
             )
 
@@ -529,7 +529,7 @@ class PerDestinationQueue(object):
             self._last_successful_stream_order = cast(
                 int, final_pdu.internal_metadata.stream_ordering
             )
-            await self._store.set_last_successful_stream_ordering(
+            await self._store.set_destination_last_successful_stream_ordering(
                 self._destination, self._last_successful_stream_order
             )
 

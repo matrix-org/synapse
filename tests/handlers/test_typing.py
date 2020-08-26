@@ -161,7 +161,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             None
         )
 
-        self.datastore.get_last_successful_stream_ordering = lambda *args, **kwargs: defer.succeed(
+        self.datastore.get_destination_last_successful_stream_ordering = lambda *args, **kwargs: defer.succeed(
             None
         )
 

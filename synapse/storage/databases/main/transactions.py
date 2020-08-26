@@ -265,7 +265,7 @@ class TransactionStore(SQLBaseStore):
             "_cleanup_transactions", _cleanup_transactions_txn
         )
 
-    async def get_last_successful_stream_ordering(
+    async def get_destination_last_successful_stream_ordering(
         self, destination: str
     ) -> Optional[int]:
         """
@@ -283,7 +283,7 @@ class TransactionStore(SQLBaseStore):
             desc="get_last_successful_stream_ordering",
         )
 
-    async def set_last_successful_stream_ordering(
+    async def set_destination_last_successful_stream_ordering(
         self, destination: str, last_successful_stream_ordering: int
     ) -> None:
         """

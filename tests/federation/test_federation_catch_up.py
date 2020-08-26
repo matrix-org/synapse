@@ -213,7 +213,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.pump()
 
         lsso_1 = self.get_success(
-            self.hs.get_datastore().get_last_successful_stream_ordering("host2")
+            self.hs.get_datastore().get_destination_last_successful_stream_ordering("host2")
         )
 
         self.assertIsNone(
@@ -227,7 +227,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         event_id_2 = self.helper.send(room, "rabbits!", tok=u1_token)["event_id"]
 
         lsso_2 = self.get_success(
-            self.hs.get_datastore().get_last_successful_stream_ordering("host2")
+            self.hs.get_datastore().get_destination_last_successful_stream_ordering("host2")
         )
         row_2 = self.get_destination_room(room)
 
@@ -286,7 +286,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         event_2 = self.get_success(self.hs.get_datastore().get_event(event_id_2))
 
         self.get_success(
-            self.hs.get_datastore().set_last_successful_stream_ordering(
+            self.hs.get_datastore().set_destination_last_successful_stream_ordering(
                 "host2", event_2.internal_metadata.stream_ordering
             )
         )
@@ -349,7 +349,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         event_2 = self.get_success(self.hs.get_datastore().get_event(event_id_2))
 
         self.get_success(
-            self.hs.get_datastore().set_last_successful_stream_ordering(
+            self.hs.get_datastore().set_destination_last_successful_stream_ordering(
                 "host2", event_2.internal_metadata.stream_ordering
             )
         )
