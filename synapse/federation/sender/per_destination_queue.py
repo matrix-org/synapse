@@ -506,14 +506,16 @@ class PerDestinationQueue(object):
             # - don't need to worry about rejected events as we do not actively
             #   forward received events over federation.
             events = await self._store.get_events_as_list(event_ids)
+            if not events:
+                raise AssertionError(
+                    "No events retrieved when we asked for %r. "
+                    "This should not happen." % event_ids
+                )
 
             # zip them together with their stream orderings
             catch_up_pdus = [
                 (event, event.internal_metadata.stream_ordering) for event in events
             ]
-
-            if not catch_up_pdus:
-                break
 
             success = await self._transaction_manager.send_new_transaction(
                 self._destination, catch_up_pdus, []
