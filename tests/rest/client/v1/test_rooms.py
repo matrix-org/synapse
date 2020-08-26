@@ -715,7 +715,9 @@ class RoomJoinRatelimitTestCase(RoomBase):
 
         # Create a profile for the user, since it hasn't been done on registration.
         store = self.hs.get_datastore()
-        self.get_success(store.create_profile(UserID.from_string(self.user_id).localpart))
+        self.get_success(
+            store.create_profile(UserID.from_string(self.user_id).localpart)
+        )
 
         # Update the display name for the user.
         path = "/_matrix/client/r0/profile/%s/displayname" % self.user_id
