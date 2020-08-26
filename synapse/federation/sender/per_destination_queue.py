@@ -518,17 +518,18 @@ class PerDestinationQueue(object):
             success = await self._transaction_manager.send_new_transaction(
                 self._destination, catch_up_pdus, []
             )
-            if success:
-                sent_transactions_counter.inc()
-                final_pdu, _ = catch_up_pdus[-1]
-                self._last_successful_stream_order = cast(
-                    int, final_pdu.internal_metadata.stream_ordering
-                )
-                await self._store.set_last_successful_stream_ordering(
-                    self._destination, self._last_successful_stream_order
-                )
-            else:
+
+            if not success:
                 return
+
+            sent_transactions_counter.inc()
+            final_pdu, _ = catch_up_pdus[-1]
+            self._last_successful_stream_order = cast(
+                int, final_pdu.internal_metadata.stream_ordering
+            )
+            await self._store.set_last_successful_stream_ordering(
+                self._destination, self._last_successful_stream_order
+            )
 
         # once we have reached this point, catch-up is done!
         self._catching_up = False
