@@ -41,8 +41,10 @@ class TestEventContext(unittest.HomeserverTestCase):
         serialize/deserialize.
         """
 
-        event, context = create_event(
-            self.hs, room_id=self.room_id, type="m.test", sender=self.user_id,
+        event, context = self.get_success(
+            create_event(
+                self.hs, room_id=self.room_id, type="m.test", sender=self.user_id,
+            )
         )
 
         self._check_serialize_deserialize(event, context)
@@ -51,12 +53,14 @@ class TestEventContext(unittest.HomeserverTestCase):
         """Test that an EventContext for a state event (with not previous entry)
         is the same after serialize/deserialize.
         """
-        event, context = create_event(
-            self.hs,
-            room_id=self.room_id,
-            type="m.test",
-            sender=self.user_id,
-            state_key="",
+        event, context = self.get_success(
+            create_event(
+                self.hs,
+                room_id=self.room_id,
+                type="m.test",
+                sender=self.user_id,
+                state_key="",
+            )
         )
 
         self._check_serialize_deserialize(event, context)
@@ -65,13 +69,15 @@ class TestEventContext(unittest.HomeserverTestCase):
         """Test that an EventContext for a state event (which replaces a
         previous entry) is the same after serialize/deserialize.
         """
-        event, context = create_event(
-            self.hs,
-            room_id=self.room_id,
-            type="m.room.member",
-            sender=self.user_id,
-            state_key=self.user_id,
-            content={"membership": "leave"},
+        event, context = self.get_success(
+            create_event(
+                self.hs,
+                room_id=self.room_id,
+                type="m.room.member",
+                sender=self.user_id,
+                state_key=self.user_id,
+                content={"membership": "leave"},
+            )
         )
 
         self._check_serialize_deserialize(event, context)

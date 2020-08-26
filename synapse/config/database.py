@@ -55,7 +55,7 @@ DEFAULT_CONFIG = """\
 #database:
 #  name: psycopg2
 #  args:
-#    user: synapse
+#    user: synapse_user
 #    password: secretpassword
 #    database: synapse
 #    host: localhost
@@ -100,7 +100,10 @@ class DatabaseConnectionConfig:
 
         self.name = name
         self.config = db_config
-        self.data_stores = data_stores
+
+        # The `data_stores` config is actually talking about `databases` (we
+        # changed the name).
+        self.databases = data_stores
 
 
 class DatabaseConfig(Config):

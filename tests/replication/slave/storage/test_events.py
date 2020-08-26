@@ -366,7 +366,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         state_handler = self.hs.get_state_handler()
         context = self.get_success(state_handler.compute_event_context(event))
 
-        self.master_store.add_push_actions_to_staging(
-            event.event_id, {user_id: actions for user_id, actions in push_actions}
+        self.get_success(
+            self.master_store.add_push_actions_to_staging(
+                event.event_id, {user_id: actions for user_id, actions in push_actions}
+            )
         )
         return event, context

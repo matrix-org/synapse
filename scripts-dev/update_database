@@ -40,7 +40,7 @@ class MockHomeserver(HomeServer):
             config.server_name, reactor=reactor, config=config, **kwargs
         )
 
-        self.version_string = "Synapse/"+get_version_string(synapse)
+        self.version_string = "Synapse/" + get_version_string(synapse)
 
 
 if __name__ == "__main__":
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     store = hs.get_datastore()
 
     async def run_background_updates():
-        await store.db.updates.run_background_updates(sleep=False)
+        await store.db_pool.updates.run_background_updates(sleep=False)
         # Stop the reactor to exit the script once every background update is run.
         reactor.stop()
 

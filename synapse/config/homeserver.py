@@ -23,6 +23,7 @@ from .cas import CasConfig
 from .consent_config import ConsentConfig
 from .database import DatabaseConfig
 from .emailconfig import EmailConfig
+from .federation import FederationConfig
 from .groups import GroupsConfig
 from .jwt_config import JWTConfig
 from .key import KeyConfig
@@ -57,6 +58,7 @@ class HomeServerConfig(RootConfig):
     config_classes = [
         ServerConfig,
         TlsConfig,
+        FederationConfig,
         CacheConfig,
         DatabaseConfig,
         LoggingConfig,
@@ -76,7 +78,6 @@ class HomeServerConfig(RootConfig):
         JWTConfig,
         PasswordConfig,
         EmailConfig,
-        WorkerConfig,
         PasswordAuthProviderConfig,
         PushConfig,
         SpamCheckerConfig,
@@ -89,5 +90,7 @@ class HomeServerConfig(RootConfig):
         RoomDirectoryConfig,
         ThirdPartyRulesConfig,
         TracerConfig,
+        WorkerConfig,
         RedisConfig,
+        FederationConfig,
     ]
