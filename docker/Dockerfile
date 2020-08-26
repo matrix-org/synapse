@@ -25,6 +25,7 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     libpq-dev \
     libssl-dev \
+    libwebp-dev \
     libxml++2.6-dev \
     libxslt1-dev \
     zlib1g-dev \
@@ -63,6 +64,7 @@ RUN apt-get update && apt-get install -y \
     gosu \
     libjpeg62-turbo \
     libpq5 \
+    libwebp6 \
     xmlsec1 \
  && rm -rf /var/lib/apt/lists/*
 
