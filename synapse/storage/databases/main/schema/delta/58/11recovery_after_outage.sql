@@ -18,7 +18,10 @@
 -- This stores, for each (destination, room) pair, the event_id and stream_ordering
 -- of the latest event for that destination.
 CREATE TABLE IF NOT EXISTS destination_rooms (
-  -- the destination in question
+  -- the destination in question.
+  --    Can not be a foreign key because rows in the `destinations` table will
+  --    only be created when we back off or when we successfully send a
+  --    transaction.
   destination TEXT NOT NULL,
   -- the ID of the room in question
   room_id TEXT NOT NULL,
@@ -26,7 +29,8 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   stream_ordering INTEGER,
   -- the event_id of the event
   event_id TEXT NOT NULL,
-  PRIMARY KEY (destination, room_id)
+  PRIMARY KEY (destination, room_id),
+  FOREIGN KEY (room_id) REFERENCES rooms (room_id)
 );
 
 -- this column tracks the stream_ordering of the event that was most recently
