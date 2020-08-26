@@ -498,7 +498,7 @@ class DataStore(
         )
 
     def get_users_paginate(
-        self, start, limit, name=None, guests=True, deactivated=False
+        self, start, limit, name=None, guests=True, deactivated=False, appservice=False
     ):
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -528,6 +528,12 @@ class DataStore(
             if not deactivated:
                 filters.append("deactivated = 0")
 
+            if appservice == 'null':
+                filters.append("appservice_id is null")
+            elif appservice:
+                filters.append("appservice_id = ?")
+                args.append(appservice)
+
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
             sql = "SELECT COUNT(*) as total_users FROM users %s" % (where_clause)
@@ -536,7 +542,7 @@ class DataStore(
 
             args = [self.hs.config.server_name] + args + [limit, start]
             sql = """
-                SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url
+                SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url, appservice_id
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
                 {}

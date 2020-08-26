@@ -91,9 +91,10 @@ class UsersRestServletV2(RestServlet):
         user_id = parse_string(request, "user_id", default=None)
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
+        appservice = parse_string(request, "appservice", default=False)
 
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, guests, deactivated
+            start, limit, user_id, guests, deactivated, appservice
         )
         ret = {"users": users, "total": total}
         if len(users) >= limit:
