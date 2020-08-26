@@ -159,7 +159,7 @@ class TransactionStore(SQLBaseStore):
             allow_none=True,
         )
 
-        if result and result["retry_last_ts"] and result["retry_last_ts"] > 0:
+        if result and result["retry_last_ts"]:
             return result
         else:
             return None

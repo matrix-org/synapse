@@ -16,7 +16,7 @@
 -- after there has been a connectivity problem for any reason.
 
 -- This stores, for each (destination, room) pair, the event_id and stream_ordering
--- of the latest event to be enqueued for transmission to that destination.
+-- of the latest event for that destination.
 CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the destination in question
   destination TEXT NOT NULL,
