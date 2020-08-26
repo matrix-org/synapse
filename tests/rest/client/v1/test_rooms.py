@@ -684,38 +684,39 @@ class RoomJoinRatelimitTestCase(RoomBase):
     ]
 
     @unittest.override_config(
-        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
     )
     def test_join_local_ratelimit(self):
         """Tests that local joins are actually rate-limited."""
-        for i in range(5):
+        for i in range(3):
             self.helper.create_room_as(self.user_id)
 
         self.helper.create_room_as(self.user_id, expect_code=429)
 
     @unittest.override_config(
-        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
     )
     def test_join_local_ratelimit_profile_change(self):
         """Tests that sending a profile update into all of the user's joined rooms isn't
         rate-limited by the rate-limiter on joins."""
 
-        # Create and join more rooms than the rate-limiting config allows in a second.
+        # Create and join as many rooms as the rate-limiting config allows in a second.
         room_ids = [
             self.helper.create_room_as(self.user_id),
             self.helper.create_room_as(self.user_id),
             self.helper.create_room_as(self.user_id),
         ]
-        self.reactor.advance(1)
-        room_ids = room_ids + [
-            self.helper.create_room_as(self.user_id),
-            self.helper.create_room_as(self.user_id),
-            self.helper.create_room_as(self.user_id),
-        ]
+        # Let some time for the rate-limiter to forget about our multi-join.
+        self.reactor.advance(2)
+        # Add one to make sure we're joined to more rooms than the config allows us to
+        # join in a second.
+        room_ids.append(self.helper.create_room_as(self.user_id))
 
         # Create a profile for the user, since it hasn't been done on registration.
         store = self.hs.get_datastore()
-        store.create_profile(UserID.from_string(self.user_id).localpart)
+        self.get_success(
+            store.create_profile(UserID.from_string(self.user_id).localpart)
+        )
 
         # Update the display name for the user.
         path = "/_matrix/client/r0/profile/%s/displayname" % self.user_id
@@ -738,7 +739,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
             self.assertEquals(channel.json_body["displayname"], "John Doe")
 
     @unittest.override_config(
-        {"rc_joins": {"local": {"per_second": 3, "burst_count": 3}}}
+        {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
     )
     def test_join_local_ratelimit_idempotent(self):
         """Tests that the room join endpoints remain idempotent despite rate-limiting
@@ -754,7 +755,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
         for path in paths_to_test:
             # Make sure we send more requests than the rate-limiting config would allow
             # if all of these requests ended up joining the user to a room.
-            for i in range(6):
+            for i in range(4):
                 request, channel = self.make_request("POST", path % room_id, {})
                 self.render(request)
                 self.assertEquals(channel.code, 200)
