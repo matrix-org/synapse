@@ -26,11 +26,14 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the ID of the room in question
   room_id TEXT NOT NULL,
   -- the stream_ordering of the event
-  stream_ordering INTEGER,
+  stream_ordering INTEGER NOT NULL,
   -- the event_id of the event
   event_id TEXT NOT NULL,
   PRIMARY KEY (destination, room_id),
   FOREIGN KEY (room_id) REFERENCES rooms (room_id)
+    ON DELETE CASCADE,
+  FOREIGN KEY (stream_ordering) REFERENCES events (stream_ordering)
+    ON DELETE CASCADE
 );
 
 -- this column tracks the stream_ordering of the event that was most recently
