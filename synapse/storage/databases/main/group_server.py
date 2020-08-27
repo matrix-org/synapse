@@ -70,7 +70,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_invited_users_in_group",
         )
 
-    def get_rooms_in_group(self, group_id: str, include_private: bool = False):
+    async def get_rooms_in_group(self, group_id: str, include_private: bool = False):
         """Retrieve the rooms that belong to a given group. Does not return rooms that
         lack members.
 
@@ -79,7 +79,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             include_private: Whether to return private rooms in results
 
         Returns:
-            Deferred[List[Dict[str, str|bool]]]: A list of dictionaries, each in the
+            List[Dict[str, str|bool]]: A list of dictionaries, each in the
             form of:
 
             {
@@ -117,11 +117,11 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for room_id, is_public in txn
             ]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_rooms_in_group", _get_rooms_in_group_txn
         )
 
-    def get_rooms_for_summary_by_category(
+    async def get_rooms_for_summary_by_category(
         self, group_id: str, include_private: bool = False,
     ):
         """Get the rooms and categories that should be included in a summary request
@@ -131,7 +131,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             include_private: Whether to return private rooms in results
 
         Returns:
-            Deferred[Tuple[List, Dict]]: A tuple containing:
+            Tuple[List, Dict]: A tuple containing:
 
                 * A list of dictionaries with the keys:
                     * "room_id": str, the room ID
@@ -207,7 +207,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return rooms, categories
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_rooms_for_summary", _get_rooms_for_summary_txn
         )
 
@@ -281,10 +281,11 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_local_groups_for_room",
         )
 
-    def get_users_for_summary_by_role(self, group_id, include_private=False):
+    async def get_users_for_summary_by_role(self, group_id, include_private=False):
         """Get the users and roles that should be included in a summary request
 
-        Returns ([users], [roles])
+        Returns:
+            ([users], [roles])
         """
 
         def _get_users_for_summary_txn(txn):
@@ -338,7 +339,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return users, roles
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_users_for_summary_by_role", _get_users_for_summary_txn
         )
 
@@ -376,7 +377,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
-    def get_users_membership_info_in_group(self, group_id, user_id):
+    async def get_users_membership_info_in_group(self, group_id, user_id):
         """Get a dict describing the membership of a user in a group.
 
         Example if joined:
@@ -387,7 +388,8 @@ class GroupServerWorkerStore(SQLBaseStore):
                 "is_privileged": False,
             }
 
-        Returns an empty dict if the user is not join/invite/etc
+        Returns:
+             An empty dict if the user is not join/invite/etc
         """
 
         def _get_users_membership_in_group_txn(txn):
@@ -419,7 +421,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return {}
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_users_membership_info_in_group", _get_users_membership_in_group_txn
         )
 
@@ -433,7 +435,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_publicised_groups_for_user",
         )
 
-    def get_attestations_need_renewals(self, valid_until_ms):
+    async def get_attestations_need_renewals(self, valid_until_ms):
         """Get all attestations that need to be renewed until givent time
         """
 
@@ -445,7 +447,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             txn.execute(sql, (valid_until_ms,))
             return self.db_pool.cursor_to_dict(txn)
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_attestations_need_renewals", _get_attestations_need_renewals_txn
         )
 
@@ -475,7 +477,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_joined_groups",
         )
 
-    def get_all_groups_for_user(self, user_id, now_token):
+    async def get_all_groups_for_user(self, user_id, now_token):
         def _get_all_groups_for_user_txn(txn):
             sql = """
                 SELECT group_id, type, membership, u.content
@@ -495,7 +497,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for row in txn
             ]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_groups_for_user", _get_all_groups_for_user_txn
         )
 
@@ -600,8 +602,10 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="set_group_join_policy",
         )
 
-    def add_room_to_summary(self, group_id, room_id, category_id, order, is_public):
-        return self.db_pool.runInteraction(
+    async def add_room_to_summary(
+        self, group_id, room_id, category_id, order, is_public
+    ) -> None:
+        await self.db_pool.runInteraction(
             "add_room_to_summary",
             self._add_room_to_summary_txn,
             group_id,
@@ -818,8 +822,10 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_group_role",
         )
 
-    def add_user_to_summary(self, group_id, user_id, role_id, order, is_public):
-        return self.db_pool.runInteraction(
+    async def add_user_to_summary(
+        self, group_id, user_id, role_id, order, is_public
+    ) -> None:
+        await self.db_pool.runInteraction(
             "add_user_to_summary",
             self._add_user_to_summary_txn,
             group_id,
@@ -963,7 +969,7 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="add_group_invite",
         )
 
-    def add_user_to_group(
+    async def add_user_to_group(
         self,
         group_id,
         user_id,
@@ -971,7 +977,7 @@ class GroupServerStore(GroupServerWorkerStore):
         is_public=True,
         local_attestation=None,
         remote_attestation=None,
-    ):
+    ) -> None:
         """Add a user to the group server.
 
         Args:
@@ -1026,9 +1032,9 @@ class GroupServerStore(GroupServerWorkerStore):
                     },
                 )
 
-        return self.db_pool.runInteraction("add_user_to_group", _add_user_to_group_txn)
+        await self.db_pool.runInteraction("add_user_to_group", _add_user_to_group_txn)
 
-    def remove_user_from_group(self, group_id, user_id):
+    async def remove_user_from_group(self, group_id, user_id):
         def _remove_user_from_group_txn(txn):
             self.db_pool.simple_delete_txn(
                 txn,
@@ -1056,7 +1062,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "remove_user_from_group", _remove_user_from_group_txn
         )
 
@@ -1079,7 +1085,7 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_room_in_group_visibility",
         )
 
-    def remove_room_from_group(self, group_id, room_id):
+    async def remove_room_from_group(self, group_id, room_id):
         def _remove_room_from_group_txn(txn):
             self.db_pool.simple_delete_txn(
                 txn,
@@ -1093,7 +1099,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 keyvalues={"group_id": group_id, "room_id": room_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "remove_room_from_group", _remove_room_from_group_txn
         )
 
@@ -1286,14 +1292,11 @@ class GroupServerStore(GroupServerWorkerStore):
     def get_group_stream_token(self):
         return self._group_updates_id_gen.get_current_token()
 
-    def delete_group(self, group_id):
+    async def delete_group(self, group_id: str) -> None:
         """Deletes a group fully from the database.
 
         Args:
-            group_id (str)
-
-        Returns:
-            Deferred
+            group_id: The group ID to delete.
         """
 
         def _delete_group_txn(txn):
@@ -1317,4 +1320,4 @@ class GroupServerStore(GroupServerWorkerStore):
                     txn, table=table, keyvalues={"group_id": group_id}
                 )
 
-        return self.db_pool.runInteraction("delete_group", _delete_group_txn)
+        await self.db_pool.runInteraction("delete_group", _delete_group_txn)
