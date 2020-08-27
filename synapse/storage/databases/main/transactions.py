@@ -56,7 +56,7 @@ class TransactionStore(SQLBaseStore):
             expiry_ms=5 * 60 * 1000,
         )
 
-    def get_received_txn_response(self, transaction_id, origin):
+    async def get_received_txn_response(self, transaction_id, origin):
         """For an incoming transaction from a given origin, check if we have
         already responded to it. If so, return the response code and response
         body (as a dict).
@@ -66,11 +66,11 @@ class TransactionStore(SQLBaseStore):
             origin(str)
 
         Returns:
-            tuple: None if we have not previously responded to
+            Tuple|None: None if we have not previously responded to
             this transaction or a 2-tuple of (int, dict)
         """
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_received_txn_response",
             self._get_received_txn_response,
             transaction_id,
@@ -166,7 +166,7 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_destination_retry_timings(
+    async def set_destination_retry_timings(
         self, destination, failure_ts, retry_last_ts, retry_interval
     ):
         """Sets the current retry timings for a given destination.
@@ -180,7 +180,7 @@ class TransactionStore(SQLBaseStore):
         """
 
         self._destination_retry_cache.pop(destination, None)
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
             destination,
@@ -256,13 +256,13 @@ class TransactionStore(SQLBaseStore):
             "cleanup_transactions", self._cleanup_transactions
         )
 
-    def _cleanup_transactions(self):
+    async def _cleanup_transactions(self) -> None:
         now = self._clock.time_msec()
         month_ago = now - 30 * 24 * 60 * 60 * 1000
 
         def _cleanup_transactions_txn(txn):
             txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "_cleanup_transactions", _cleanup_transactions_txn
         )
