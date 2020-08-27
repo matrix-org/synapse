@@ -153,8 +153,7 @@ class LoginRestServlet(RestServlet):
             login_submission.get("address"),
             login_submission.get("user"),
         )
-        convert_client_dict_legacy_fields_to_identifier(login_submission)
-        identifier = login_submission["identifier"]
+        identifier = convert_client_dict_legacy_fields_to_identifier(login_submission)
 
         # convert phone type identifiers to generic threepids
         if identifier["type"] == "m.id.phone":
