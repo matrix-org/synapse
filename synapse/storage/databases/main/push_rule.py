@@ -668,7 +668,6 @@ class PushRuleStore(PushRulesWorkerStore):
                 # needed to set NOT_FOUND code.
                 raise NotFoundError("Push rule does not exist.")
 
-
         self.db_pool.simple_upsert_txn(
             txn,
             "push_rules_enable",
