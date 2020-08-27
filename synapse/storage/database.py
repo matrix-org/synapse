@@ -1117,10 +1117,7 @@ class DatabasePool(object):
 
     @staticmethod
     def simple_select_onecol_txn(
-        txn: LoggingTransaction,
-        table: str,
-        keyvalues: Dict[str, Any],
-        retcol: str,
+        txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any], retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
