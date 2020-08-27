@@ -123,8 +123,10 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
         yield _inject_actions(6, PlAIN_NOTIF)
         yield _rotate(7)
 
-        yield self.store.db_pool.simple_delete(
-            table="event_push_actions", keyvalues={"1": 1}, desc=""
+        yield defer.ensureDeferred(
+            self.store.db_pool.simple_delete(
+                table="event_push_actions", keyvalues={"1": 1}, desc=""
+            )
         )
 
         yield _assert_counts(1, 0)
