@@ -65,13 +65,10 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
                     WHERE dr.destination = ? AND dr.room_id = ?
                 """,
                 destination,
-                room
+                room,
             )
         )[0]
-        return {
-            "event_id": event_id,
-            "stream_ordering": stream_ordering
-        }
+        return {"event_id": event_id, "stream_ordering": stream_ordering}
 
     def make_fake_destination_queue(
         self, destination: str = "host2"
