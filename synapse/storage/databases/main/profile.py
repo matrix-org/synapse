@@ -71,16 +71,20 @@ class ProfileWorkerStore(SQLBaseStore):
             table="profiles", values={"user_id": user_localpart}, desc="create_profile"
         )
 
-    def set_profile_displayname(self, user_localpart, new_displayname):
-        return self.db_pool.simple_update_one(
+    async def set_profile_displayname(
+        self, user_localpart: str, new_displayname: str
+    ) -> None:
+        await self.db_pool.simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"displayname": new_displayname},
             desc="set_profile_displayname",
         )
 
-    def set_profile_avatar_url(self, user_localpart, new_avatar_url):
-        return self.db_pool.simple_update_one(
+    async def set_profile_avatar_url(
+        self, user_localpart: str, new_avatar_url: str
+    ) -> None:
+        await self.db_pool.simple_update_one(
             table="profiles",
             keyvalues={"user_id": user_localpart},
             updatevalues={"avatar_url": new_avatar_url},
@@ -106,8 +110,10 @@ class ProfileStore(ProfileWorkerStore):
             desc="add_remote_profile_cache",
         )
 
-    def update_remote_profile_cache(self, user_id, displayname, avatar_url):
-        return self.db_pool.simple_update(
+    async def update_remote_profile_cache(
+        self, user_id: str, displayname: str, avatar_url: str
+    ) -> int:
+        return await self.db_pool.simple_update(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             updatevalues={

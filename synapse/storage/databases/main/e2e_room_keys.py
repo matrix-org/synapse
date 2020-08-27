@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 from synapse.api.errors import StoreError
 from synapse.logging.opentracing import log_kv, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -368,18 +370,22 @@ class EndToEndRoomKeyStore(SQLBaseStore):
         )
 
     @trace
-    def update_e2e_room_keys_version(
-        self, user_id, version, info=None, version_etag=None
-    ):
+    async def update_e2e_room_keys_version(
+        self,
+        user_id: str,
+        version: str,
+        info: Optional[dict] = None,
+        version_etag: Optional[int] = None,
+    ) -> None:
         """Update a given backup version
 
         Args:
-            user_id(str): the user whose backup version we're updating
-            version(str): the version ID of the backup version we're updating
-            info (dict): the new backup version info to store.  If None, then
-                the backup version info is not updated
-            version_etag (Optional[int]): etag of the keys in the backup.  If
-                None, then the etag is not updated
+            user_id: the user whose backup version we're updating
+            version: the version ID of the backup version we're updating
+            info: the new backup version info to store. If None, then the backup
+                version info is not updated.
+            version_etag: etag of the keys in the backup. If None, then the etag
+                is not updated.
         """
         updatevalues = {}
 
@@ -389,7 +395,7 @@ class EndToEndRoomKeyStore(SQLBaseStore):
             updatevalues["etag"] = version_etag
 
         if updatevalues:
-            return self.db_pool.simple_update(
+            await self.db_pool.simple_update(
                 table="e2e_room_keys_versions",
                 keyvalues={"user_id": user_id, "version": version},
                 updatevalues=updatevalues,

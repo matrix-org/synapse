@@ -44,7 +44,7 @@ class SlavedPresenceStore(BaseSlavedStore):
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == PresenceStream.NAME:
-            self._presence_id_gen.advance(token)
+            self._presence_id_gen.advance(instance_name, token)
             for row in rows:
                 self.presence_stream_cache.entity_has_changed(row.user_id, token)
                 self._get_presence_for_user.invalidate((row.user_id,))

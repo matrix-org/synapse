@@ -477,14 +477,13 @@ class DataStore(
             "generate_user_daily_visits", _generate_user_daily_visits
         )
 
-    def get_users(self):
+    async def get_users(self) -> List[Dict[str, Any]]:
         """Function to retrieve a list of users in users table.
 
-        Args:
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            A list of dictionaries representing users.
         """
-        return self.db_pool.simple_select_list(
+        return await self.db_pool.simple_select_list(
             table="users",
             keyvalues={},
             retcols=[

@@ -537,8 +537,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             desc="get_user_in_directory",
         )
 
-    def update_user_directory_stream_pos(self, stream_id):
-        return self.db_pool.simple_update_one(
+    async def update_user_directory_stream_pos(self, stream_id: str) -> None:
+        await self.db_pool.simple_update_one(
             table="user_directory_stream_pos",
             keyvalues={},
             updatevalues={"stream_id": stream_id},

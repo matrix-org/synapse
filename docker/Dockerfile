@@ -19,11 +19,16 @@ ARG PYTHON_VERSION=3.7
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
-
-
 RUN apt-get update && apt-get install -y \
     build-essential \
+    libffi-dev \
+    libjpeg-dev \
     libpq-dev \
+    libssl-dev \
+    libwebp-dev \
+    libxml++2.6-dev \
+    libxslt1-dev \
+    zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # Build dependencies that are not available as wheels, to speed up rebuilds
@@ -56,9 +61,11 @@ FROM docker.io/python:${PYTHON_VERSION}-slim
 
 RUN apt-get update && apt-get install -y \
     curl \
-    libpq5 \
-    xmlsec1 \
     gosu \
+    libjpeg62-turbo \
+    libpq5 \
+    libwebp6 \
+    xmlsec1 \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local

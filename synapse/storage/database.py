@@ -1153,13 +1153,13 @@ class DatabasePool(object):
 
         return [r[0] for r in txn]
 
-    def simple_select_onecol(
+    async def simple_select_onecol(
         self,
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcol: str,
         desc: str = "simple_select_onecol",
-    ) -> defer.Deferred:
+    ) -> List[Any]:
         """Executes a SELECT query on the named table, which returns a list
         comprising of the values of the named column from the selected rows.
 
@@ -1169,19 +1169,19 @@ class DatabasePool(object):
             retcol: column whos value we wish to retrieve.
 
         Returns:
-            Deferred: Results in a list
+            Results in a list
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_onecol_txn, table, keyvalues, retcol
         )
 
-    def simple_select_list(
+    async def simple_select_list(
         self,
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcols: Iterable[str],
         desc: str = "simple_select_list",
-    ) -> defer.Deferred:
+    ) -> List[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1191,10 +1191,11 @@ class DatabasePool(object):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            A list of dictionaries.
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_list_txn, table, keyvalues, retcols
         )
 
@@ -1320,14 +1321,14 @@ class DatabasePool(object):
         txn.execute(sql, values)
         return cls.cursor_to_dict(txn)
 
-    def simple_update(
+    async def simple_update(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
         desc: str,
-    ) -> defer.Deferred:
-        return self.runInteraction(
+    ) -> int:
+        return await self.runInteraction(
             desc, self.simple_update_txn, table, keyvalues, updatevalues
         )
 
@@ -1353,13 +1354,13 @@ class DatabasePool(object):
 
         return txn.rowcount
 
-    def simple_update_one(
+    async def simple_update_one(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
         desc: str = "simple_update_one",
-    ) -> defer.Deferred:
+    ) -> None:
         """Executes an UPDATE query on the named table, setting new values for
         columns in a row matching the key values.
 
@@ -1368,7 +1369,7 @@ class DatabasePool(object):
             keyvalues: dict of column names and values to select the row with
             updatevalues: dict giving column names and values to update
         """
-        return self.runInteraction(
+        await self.runInteraction(
             desc, self.simple_update_one_txn, table, keyvalues, updatevalues
         )
 
