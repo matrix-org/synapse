@@ -133,6 +133,8 @@ class _EventInternalMetadata(object):
         rejection. This is needed as those events are marked as outliers, but
         they still need to be processed as if they're new events (e.g. updating
         invite state in the database, relaying to clients, etc).
+
+        (Added in synapse 0.99.0, so may be unreliable for events received before that)
         """
         return self._dict.get("out_of_band_membership", False)
 

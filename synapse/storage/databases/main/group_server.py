@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -28,8 +28,8 @@ _DEFAULT_ROLE_ID = ""
 
 
 class GroupServerWorkerStore(SQLBaseStore):
-    def get_group(self, group_id):
-        return self.db_pool.simple_select_one(
+    async def get_group(self, group_id: str) -> Optional[Dict[str, Any]]:
+        return await self.db_pool.simple_select_one(
             table="groups",
             keyvalues={"group_id": group_id},
             retcols=(
@@ -44,24 +44,26 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_group",
         )
 
-    def get_users_in_group(self, group_id, include_private=False):
+    async def get_users_in_group(
+        self, group_id: str, include_private: bool = False
+    ) -> List[Dict[str, Any]]:
         # TODO: Pagination
 
         keyvalues = {"group_id": group_id}
         if not include_private:
             keyvalues["is_public"] = True
 
-        return self.db_pool.simple_select_list(
+        return await self.db_pool.simple_select_list(
             table="group_users",
             keyvalues=keyvalues,
             retcols=("user_id", "is_public", "is_admin"),
             desc="get_users_in_group",
         )
 
-    def get_invited_users_in_group(self, group_id):
+    async def get_invited_users_in_group(self, group_id: str) -> List[str]:
         # TODO: Pagination
 
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="group_invites",
             keyvalues={"group_id": group_id},
             retcol="user_id",
@@ -265,15 +267,14 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         return role
 
-    def get_local_groups_for_room(self, room_id):
+    async def get_local_groups_for_room(self, room_id: str) -> List[str]:
         """Get all of the local group that contain a given room
         Args:
-            room_id (str): The ID of a room
+            room_id: The ID of a room
         Returns:
-            Deferred[list[str]]: A twisted.Deferred containing a list of group ids
-                containing this room
+            A list of group ids containing this room
         """
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="group_rooms",
             keyvalues={"room_id": room_id},
             retcol="group_id",
@@ -341,17 +342,20 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_users_for_summary_by_role", _get_users_for_summary_txn
         )
 
-    def is_user_in_group(self, user_id, group_id):
-        return self.db_pool.simple_select_one_onecol(
+    async def is_user_in_group(self, user_id: str, group_id: str) -> bool:
+        result = await self.db_pool.simple_select_one_onecol(
             table="group_users",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcol="user_id",
             allow_none=True,
             desc="is_user_in_group",
-        ).addCallback(lambda r: bool(r))
+        )
+        return bool(result)
 
-    def is_user_admin_in_group(self, group_id, user_id):
-        return self.db_pool.simple_select_one_onecol(
+    async def is_user_admin_in_group(
+        self, group_id: str, user_id: str
+    ) -> Optional[bool]:
+        return await self.db_pool.simple_select_one_onecol(
             table="group_users",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcol="is_admin",
@@ -359,10 +363,12 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="is_user_admin_in_group",
         )
 
-    def is_user_invited_to_local_group(self, group_id, user_id):
+    async def is_user_invited_to_local_group(
+        self, group_id: str, user_id: str
+    ) -> Optional[bool]:
         """Has the group server invited a user?
         """
-        return self.db_pool.simple_select_one_onecol(
+        return await self.db_pool.simple_select_one_onecol(
             table="group_invites",
             keyvalues={"group_id": group_id, "user_id": user_id},
             retcol="user_id",
@@ -417,10 +423,10 @@ class GroupServerWorkerStore(SQLBaseStore):
             "get_users_membership_info_in_group", _get_users_membership_in_group_txn
         )
 
-    def get_publicised_groups_for_user(self, user_id):
+    async def get_publicised_groups_for_user(self, user_id: str) -> List[str]:
         """Get all groups a user is publicising
         """
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="local_group_membership",
             keyvalues={"user_id": user_id, "membership": "join", "is_publicised": True},
             retcol="group_id",
@@ -461,8 +467,8 @@ class GroupServerWorkerStore(SQLBaseStore):
 
         return None
 
-    def get_joined_groups(self, user_id):
-        return self.db_pool.simple_select_onecol(
+    async def get_joined_groups(self, user_id: str) -> List[str]:
+        return await self.db_pool.simple_select_onecol(
             table="local_group_membership",
             keyvalues={"user_id": user_id, "membership": "join"},
             retcol="group_id",
@@ -580,14 +586,14 @@ class GroupServerWorkerStore(SQLBaseStore):
 
 
 class GroupServerStore(GroupServerWorkerStore):
-    def set_group_join_policy(self, group_id, join_policy):
+    async def set_group_join_policy(self, group_id: str, join_policy: str) -> None:
         """Set the join policy of a group.
 
         join_policy can be one of:
          * "invite"
          * "open"
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="groups",
             keyvalues={"group_id": group_id},
             updatevalues={"join_policy": join_policy},
@@ -1045,8 +1051,10 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="add_room_to_group",
         )
 
-    def update_room_in_group_visibility(self, group_id, room_id, is_public):
-        return self.db_pool.simple_update(
+    async def update_room_in_group_visibility(
+        self, group_id: str, room_id: str, is_public: bool
+    ) -> int:
+        return await self.db_pool.simple_update(
             table="group_rooms",
             keyvalues={"group_id": group_id, "room_id": room_id},
             updatevalues={"is_public": is_public},
@@ -1071,10 +1079,12 @@ class GroupServerStore(GroupServerWorkerStore):
             "remove_room_from_group", _remove_room_from_group_txn
         )
 
-    def update_group_publicity(self, group_id, user_id, publicise):
+    async def update_group_publicity(
+        self, group_id: str, user_id: str, publicise: bool
+    ) -> None:
         """Update whether the user is publicising their membership of the group
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="local_group_membership",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={"is_publicised": publicise},
@@ -1181,7 +1191,7 @@ class GroupServerStore(GroupServerWorkerStore):
 
             return next_id
 
-        with self._group_updates_id_gen.get_next() as next_id:
+        with await self._group_updates_id_gen.get_next() as next_id:
             res = await self.db_pool.runInteraction(
                 "register_user_group_membership",
                 _register_user_group_membership_txn,
@@ -1213,20 +1223,24 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_group_profile",
         )
 
-    def update_attestation_renewal(self, group_id, user_id, attestation):
+    async def update_attestation_renewal(
+        self, group_id: str, user_id: str, attestation: dict
+    ) -> None:
         """Update an attestation that we have renewed
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="group_attestations_renewals",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={"valid_until_ms": attestation["valid_until_ms"]},
             desc="update_attestation_renewal",
         )
 
-    def update_remote_attestion(self, group_id, user_id, attestation):
+    async def update_remote_attestion(
+        self, group_id: str, user_id: str, attestation: dict
+    ) -> None:
         """Update an attestation that a remote has renewed
         """
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="group_attestations_remote",
             keyvalues={"group_id": group_id, "user_id": user_id},
             updatevalues={

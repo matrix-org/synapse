@@ -67,13 +67,12 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
 
         # second step: complete the update
         # we should now get run with a much bigger number of items to update
-        @defer.inlineCallbacks
-        def update(progress, count):
+        async def update(progress, count):
             self.assertEqual(progress, {"my_key": 2})
             self.assertAlmostEqual(
                 count, target_background_update_duration_ms / duration_ms, places=0,
             )
-            yield self.updates._end_background_update("test_update")
+            await self.updates._end_background_update("test_update")
             return count
 
         self.update_handler.side_effect = update

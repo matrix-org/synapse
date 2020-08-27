@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, Dict, List, Optional
+
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
 
@@ -37,12 +39,13 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(MediaRepositoryStore, self).__init__(database, db_conn, hs)
 
-    def get_local_media(self, media_id):
+    async def get_local_media(self, media_id: str) -> Optional[Dict[str, Any]]:
         """Get the metadata for a local piece of media
+
         Returns:
             None if the media_id doesn't exist.
         """
-        return self.db_pool.simple_select_one(
+        return await self.db_pool.simple_select_one(
             "local_media_repository",
             {"media_id": media_id},
             (
@@ -81,9 +84,9 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_local_media",
         )
 
-    def mark_local_media_as_safe(self, media_id: str):
+    async def mark_local_media_as_safe(self, media_id: str) -> None:
         """Mark a local media as safe from quarantining."""
-        return self.db_pool.simple_update_one(
+        await self.db_pool.simple_update_one(
             table="local_media_repository",
             keyvalues={"media_id": media_id},
             updatevalues={"safe_from_quarantine": True},
@@ -155,8 +158,8 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_url_cache",
         )
 
-    def get_local_media_thumbnails(self, media_id):
-        return self.db_pool.simple_select_list(
+    async def get_local_media_thumbnails(self, media_id: str) -> List[Dict[str, Any]]:
+        return await self.db_pool.simple_select_list(
             "local_media_repository_thumbnails",
             {"media_id": media_id},
             (
@@ -191,8 +194,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_local_thumbnail",
         )
 
-    def get_cached_remote_media(self, origin, media_id):
-        return self.db_pool.simple_select_one(
+    async def get_cached_remote_media(
+        self, origin, media_id: str
+    ) -> Optional[Dict[str, Any]]:
+        return await self.db_pool.simple_select_one(
             "remote_media_cache",
             {"media_origin": origin, "media_id": media_id},
             (
@@ -266,8 +271,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             "update_cached_last_access_time", update_cache_txn
         )
 
-    def get_remote_media_thumbnails(self, origin, media_id):
-        return self.db_pool.simple_select_list(
+    async def get_remote_media_thumbnails(
+        self, origin: str, media_id: str
+    ) -> List[Dict[str, Any]]:
+        return await self.db_pool.simple_select_list(
             "remote_media_cache_thumbnails",
             {"media_origin": origin, "media_id": media_id},
             (
@@ -307,14 +314,14 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_remote_media_thumbnail",
         )
 
-    def get_remote_media_before(self, before_ts):
+    async def get_remote_media_before(self, before_ts):
         sql = (
             "SELECT media_origin, media_id, filesystem_id"
             " FROM remote_media_cache"
             " WHERE last_access_ts < ?"
         )
 
-        return self.db_pool.execute(
+        return await self.db_pool.execute(
             "get_remote_media_before", self.db_pool.cursor_to_dict, sql, before_ts
         )
 
