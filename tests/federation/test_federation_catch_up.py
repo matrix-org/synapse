@@ -54,13 +54,24 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         Returns:
             Dictionary of { event_id: str, stream_ordering: int }
         """
-        return self.get_success(
-            self.hs.get_datastore().db_pool.simple_select_one(
-                table="destination_rooms",
-                keyvalues={"destination": destination, "room_id": room},
-                retcols=["event_id", "stream_ordering"],
+        event_id, stream_ordering = self.get_success(
+            self.hs.get_datastore().db_pool.execute(
+                "test:get_destination_rooms",
+                None,
+                """
+                SELECT event_id, stream_ordering
+                    FROM destination_rooms dr
+                    JOIN events USING (stream_ordering)
+                    WHERE dr.destination = ? AND dr.room_id = ?
+                """,
+                destination,
+                room
             )
-        )
+        )[0]
+        return {
+            "event_id": event_id,
+            "stream_ordering": stream_ordering
+        }
 
     def make_fake_destination_queue(
         self, destination: str = "host2"

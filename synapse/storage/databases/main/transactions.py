@@ -409,6 +409,6 @@ class TransactionStore(SQLBaseStore):
             "destination_rooms",
             ["destination", "room_id"],
             rows,
-            ["event_id", "stream_ordering"],
-            [(event_id, stream_ordering)] * len(rows),
+            ["stream_ordering"],
+            [(stream_ordering,)] * len(rows),
         )
