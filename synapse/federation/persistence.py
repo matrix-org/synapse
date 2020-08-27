@@ -21,7 +21,9 @@ These actions are mostly only used by the :py:mod:`.replication` module.
 
 import logging
 
+from synapse.federation.units import Transaction
 from synapse.logging.utils import log_function
+from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +51,15 @@ class TransactionActions(object):
         return self.store.get_received_txn_response(transaction.transaction_id, origin)
 
     @log_function
-    def set_response(self, origin, transaction, code, response):
+    async def set_response(
+        self, origin: str, transaction: Transaction, code: int, response: JsonDict
+    ) -> None:
         """ Persist how we responded to a transaction.
-
-        Returns:
-            Deferred
         """
-        if not transaction.transaction_id:
+        transaction_id = transaction.transaction_id  # type: ignore
+        if not transaction_id:
             raise RuntimeError("Cannot persist a transaction with no transaction_id")
 
-        return self.store.set_received_txn_response(
-            transaction.transaction_id, origin, code, response
+        await self.store.set_received_txn_response(
+            transaction_id, origin, code, response
         )

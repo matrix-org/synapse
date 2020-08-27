@@ -140,22 +140,28 @@ class KeyStore(SQLBaseStore):
         for i in invalidations:
             invalidate((i,))
 
-    def store_server_keys_json(
-        self, server_name, key_id, from_server, ts_now_ms, ts_expires_ms, key_json_bytes
-    ):
+    async def store_server_keys_json(
+        self,
+        server_name: str,
+        key_id: str,
+        from_server: str,
+        ts_now_ms: int,
+        ts_expires_ms: int,
+        key_json_bytes: bytes,
+    ) -> None:
         """Stores the JSON bytes for a set of keys from a server
         The JSON should be signed by the originating server, the intermediate
         server, and by this server. Updates the value for the
         (server_name, key_id, from_server) triplet if one already existed.
         Args:
-            server_name (str): The name of the server.
-            key_id (str): The identifer of the key this JSON is for.
-            from_server (str): The server this JSON was fetched from.
-            ts_now_ms (int): The time now in milliseconds.
-            ts_valid_until_ms (int): The time when this json stops being valid.
-            key_json (bytes): The encoded JSON.
+            server_name: The name of the server.
+            key_id: The identifer of the key this JSON is for.
+            from_server: The server this JSON was fetched from.
+            ts_now_ms: The time now in milliseconds.
+            ts_valid_until_ms: The time when this json stops being valid.
+            key_json_bytes: The encoded JSON.
         """
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="server_keys_json",
             keyvalues={
                 "server_name": server_name,
