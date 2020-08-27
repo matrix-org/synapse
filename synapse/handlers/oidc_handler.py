@@ -869,6 +869,9 @@ class OidcHandler:
             raise MappingException(
                 "Failed to extract subject from OIDC response: %s" % (e,)
             )
+        # Some OIDC providers use integer IDs, but Synapse expects them to be
+        # strings. Really make sure it is a string.
+        remote_user_id = str(remote_user_id)
 
         logger.info(
             "Looking for existing mapping for user %s:%s",
