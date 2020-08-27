@@ -378,11 +378,6 @@ class PerDestinationQueue(object):
                 ),
             )
 
-            # XXX REVIEW needs scrutiny
-            #  to note: up to 50 pdus can be lost from the
-            #  main queue by a transaction that triggers a backoff — do we
-            #  clear the main queue now? I can see arguments for and against.
-
             if e.retry_interval > 60 * 60 * 1000:
                 # we won't retry for another hour!
                 # (this suggests a significant outage)
