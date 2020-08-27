@@ -17,7 +17,7 @@
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
@@ -84,17 +84,17 @@ class RegistrationWorkerStore(SQLBaseStore):
         return is_trial
 
     @cached()
-    def get_user_by_access_token(self, token):
+    async def get_user_by_access_token(self, token: str) -> Optional[dict]:
         """Get a user from the given access token.
 
         Args:
-            token (str): The access token of a user.
+            token: The access token of a user.
         Returns:
-            defer.Deferred: None, if the token did not match, otherwise dict
-                including the keys `name`, `is_guest`, `device_id`, `token_id`,
-                `valid_until_ms`.
+            None, if the token did not match, otherwise dict
+            including the keys `name`, `is_guest`, `device_id`, `token_id`,
+            `valid_until_ms`.
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_user_by_access_token", self._query_for_auth, token
         )
 
@@ -281,13 +281,12 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         return bool(res) if res else False
 
-    def set_server_admin(self, user, admin):
+    async def set_server_admin(self, user: UserID, admin: bool) -> None:
         """Sets whether a user is an admin of this homeserver.
 
         Args:
-            user (UserID): user ID of the user to test
-            admin (bool): true iff the user is to be a server admin,
-                false otherwise.
+            user: user ID of the user to test
+            admin: true iff the user is to be a server admin, false otherwise.
         """
 
         def set_server_admin_txn(txn):
@@ -298,7 +297,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 txn, self.get_user_by_id, (user.to_string(),)
             )
 
-        return self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
+        await self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
 
     def _query_for_auth(self, txn, token):
         sql = (
@@ -364,9 +363,11 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
         return True if res == UserTypes.SUPPORT else False
 
-    def get_users_by_id_case_insensitive(self, user_id):
+    async def get_users_by_id_case_insensitive(self, user_id: str) -> Dict[str, str]:
         """Gets users that match user_id case insensitively.
-        Returns a mapping of user_id -> password_hash.
+
+        Returns:
+             A mapping of user_id -> password_hash.
         """
 
         def f(txn):
@@ -374,7 +375,7 @@ class RegistrationWorkerStore(SQLBaseStore):
             txn.execute(sql, (user_id,))
             return dict(txn)
 
-        return self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
+        return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
@@ -408,7 +409,7 @@ class RegistrationWorkerStore(SQLBaseStore):
 
         return await self.db_pool.runInteraction("count_users", _count_users)
 
-    def count_daily_user_type(self):
+    async def count_daily_user_type(self) -> Dict[str, int]:
         """
         Counts 1) native non guest users
                2) native guests users
@@ -437,7 +438,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 results[row[0]] = row[1]
             return results
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "count_daily_user_type", _count_daily_user_type
         )
 
@@ -609,6 +610,9 @@ class RegistrationWorkerStore(SQLBaseStore):
             medium
             address
             id_server
+
+        Returns:
+            Awaitable
         """
         await self.db_pool.simple_delete(
             table="user_threepid_id_server",
@@ -663,7 +667,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         # Convert the integer into a boolean.
         return res == 1
 
-    def get_threepid_validation_session(
+    async def get_threepid_validation_session(
         self, medium, client_secret, address=None, sid=None, validated=True
     ):
         """Gets a session_id and last_send_attempt (if available) for a
@@ -680,7 +684,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 perform no filtering
 
         Returns:
-            Deferred[dict|None]: A dict containing the following:
+            dict|None: A dict containing the following:
                 * address - address of the 3pid
                 * medium - medium of the 3pid
                 * client_secret - a secret provided by the client for this validation session
@@ -726,17 +730,17 @@ class RegistrationWorkerStore(SQLBaseStore):
 
             return rows[0]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_threepid_validation_session", get_threepid_validation_session_txn
         )
 
-    def delete_threepid_session(self, session_id):
+    async def delete_threepid_session(self, session_id: str) -> None:
         """Removes a threepid validation session from the database. This can
         be done after validation has been performed and whatever action was
         waiting on it has been carried out
 
         Args:
-            session_id (str): The ID of the session to delete
+            session_id: The ID of the session to delete
         """
 
         def delete_threepid_session_txn(txn):
@@ -751,7 +755,7 @@ class RegistrationWorkerStore(SQLBaseStore):
                 keyvalues={"session_id": session_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_threepid_session", delete_threepid_session_txn
         )
 
@@ -941,7 +945,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             desc="add_access_token_to_user",
         )
 
-    def register_user(
+    async def register_user(
         self,
         user_id,
         password_hash=None,
@@ -952,7 +956,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         admin=False,
         user_type=None,
         shadow_banned=False,
-    ):
+    ) -> None:
         """Attempts to register an account.
 
         Args:
@@ -973,11 +977,8 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         Raises:
             StoreError if the user_id could not be registered.
-
-        Returns:
-            Deferred
         """
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "register_user",
             self._register_user,
             user_id,
@@ -1101,7 +1102,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             desc="record_user_external_id",
         )
 
-    def user_set_password_hash(self, user_id, password_hash):
+    async def user_set_password_hash(self, user_id: str, password_hash: str) -> None:
         """
         NB. This does *not* evict any cache because the one use for this
             removes most of the entries subsequently anyway so it would be
@@ -1114,17 +1115,18 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "user_set_password_hash", user_set_password_hash_txn
         )
 
-    def user_set_consent_version(self, user_id, consent_version):
+    async def user_set_consent_version(
+        self, user_id: str, consent_version: str
+    ) -> None:
         """Updates the user table to record privacy policy consent
 
         Args:
-            user_id (str): full mxid of the user to update
-            consent_version (str): version of the policy the user has consented
-                to
+            user_id: full mxid of the user to update
+            consent_version: version of the policy the user has consented to
 
         Raises:
             StoreError(404) if user not found
@@ -1139,16 +1141,17 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db_pool.runInteraction("user_set_consent_version", f)
+        await self.db_pool.runInteraction("user_set_consent_version", f)
 
-    def user_set_consent_server_notice_sent(self, user_id, consent_version):
+    async def user_set_consent_server_notice_sent(
+        self, user_id: str, consent_version: str
+    ) -> None:
         """Updates the user table to record that we have sent the user a server
         notice about privacy policy consent
 
         Args:
-            user_id (str): full mxid of the user to update
-            consent_version (str): version of the policy we have notified the
-                user about
+            user_id: full mxid of the user to update
+            consent_version: version of the policy we have notified the user about
 
         Raises:
             StoreError(404) if user not found
@@ -1163,22 +1166,25 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             )
             self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-        return self.db_pool.runInteraction("user_set_consent_server_notice_sent", f)
+        await self.db_pool.runInteraction("user_set_consent_server_notice_sent", f)
 
-    def user_delete_access_tokens(self, user_id, except_token_id=None, device_id=None):
+    async def user_delete_access_tokens(
+        self,
+        user_id: str,
+        except_token_id: Optional[str] = None,
+        device_id: Optional[str] = None,
+    ) -> List[Tuple[str, int, Optional[str]]]:
         """
         Invalidate access tokens belonging to a user
 
         Args:
-            user_id (str):  ID of user the tokens belong to
-            except_token_id (str): list of access_tokens IDs which should
-                *not* be deleted
-            device_id (str|None):  ID of device the tokens are associated with.
+            user_id: ID of user the tokens belong to
+            except_token_id: access_tokens ID which should *not* be deleted
+            device_id: ID of device the tokens are associated with.
                 If None, tokens associated with any device (or no device) will
                 be deleted
         Returns:
-            defer.Deferred[list[str, int, str|None, int]]: a list of
-                (token, token id, device id) for each of the deleted tokens
+            A tuple of (token, token id, device id) for each of the deleted tokens
         """
 
         def f(txn):
@@ -1209,9 +1215,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
             return tokens_and_devices
 
-        return self.db_pool.runInteraction("user_delete_access_tokens", f)
+        return await self.db_pool.runInteraction("user_delete_access_tokens", f)
 
-    def delete_access_token(self, access_token):
+    async def delete_access_token(self, access_token: str) -> None:
         def f(txn):
             self.db_pool.simple_delete_one_txn(
                 txn, table="access_tokens", keyvalues={"token": access_token}
@@ -1221,7 +1227,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 txn, self.get_user_by_access_token, (access_token,)
             )
 
-        return self.db_pool.runInteraction("delete_access_token", f)
+        await self.db_pool.runInteraction("delete_access_token", f)
 
     @cached()
     async def is_guest(self, user_id: str) -> bool:
@@ -1272,7 +1278,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             desc="get_users_pending_deactivation",
         )
 
-    def validate_threepid_session(self, session_id, client_secret, token, current_ts):
+    async def validate_threepid_session(
+        self, session_id, client_secret, token, current_ts
+    ):
         """Attempt to validate a threepid session using a token
 
         Args:
@@ -1288,8 +1296,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 expired
 
         Returns:
-            deferred str|None: A str representing a link to redirect the user
-            to if there is one.
+            str|None: A str representing a link to redirect the user to if there is one.
         """
 
         # Insert everything into a transaction in order to run atomically
@@ -1359,11 +1366,11 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             return next_link
 
         # Return next_link if it exists
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "validate_threepid_session_txn", validate_threepid_session_txn
         )
 
-    def start_or_continue_validation_session(
+    async def start_or_continue_validation_session(
         self,
         medium,
         address,
@@ -1417,12 +1424,12 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
                 },
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "start_or_continue_validation_session",
             start_or_continue_validation_session_txn,
         )
 
-    def cull_expired_threepid_validation_tokens(self):
+    async def cull_expired_threepid_validation_tokens(self):
         """Remove threepid validation tokens with expiry dates that have passed"""
 
         def cull_expired_threepid_validation_tokens_txn(txn, ts):
@@ -1432,7 +1439,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             """
             return txn.execute(sql, (ts,))
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "cull_expired_threepid_validation_tokens",
             cull_expired_threepid_validation_tokens_txn,
             self.clock.time_msec(),
