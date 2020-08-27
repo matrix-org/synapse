@@ -555,7 +555,7 @@ class StateResolutionHandler(object):
             if conflicted_state:
                 logger.info("Resolving conflicted state for %r", room_id)
                 with Measure(self.clock, "state._resolve_events"):
-                    # resolve_eevnts_with_store returns a StateMap, but we can
+                    # resolve_events_with_store returns a StateMap, but we can
                     # treat it as a MutableStateMap as it is above. It isn't
                     # actually mutated anymore (and is frozen in
                     # _make_state_cache_entry below).
