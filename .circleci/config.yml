@@ -58,7 +58,9 @@ commands:
       - run: chmod a+x ~/.docker/cli-plugins/docker-buildx
       # install qemu links in /proc/sys/fs/binfmt_misc on the docker instance running the circleci job
       - run: docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+      # create a context named `builder` for the builds
       - run: docker context create builder
+      # create a buildx builder using the new context, and set it as the default
       - run: docker buildx create builder --use
 
   docker_build:
