@@ -67,10 +67,7 @@ commands:
       platforms:
         type: string
         default: linux/amd64
-      label:
-        type: string
-        default: --label gitsha1=${CIRCLE_SHA1}
       tag:
         type: string
     steps:
-      - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> << parameters.label >> << parameters.tag >> --progress=plain .
+      - run: docker buildx build -f docker/Dockerfile --push --platform << parameters.platforms >> --label gitsha1=${CIRCLE_SHA1} << parameters.tag >> --progress=plain .
