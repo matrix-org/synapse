@@ -15,8 +15,8 @@
 -- This schema delta alters the schema to enable 'catching up' remote homeservers
 -- after there has been a connectivity problem for any reason.
 
--- This stores, for each (destination, room) pair, the event_id and stream_ordering
--- of the latest event for that destination.
+-- This stores, for each (destination, room) pair and stream_ordering of the
+-- latest event for that destination.
 CREATE TABLE IF NOT EXISTS destination_rooms (
   -- the destination in question.
   --    Can not be a foreign key because rows in the `destinations` table will
@@ -27,8 +27,6 @@ CREATE TABLE IF NOT EXISTS destination_rooms (
   room_id TEXT NOT NULL,
   -- the stream_ordering of the event
   stream_ordering INTEGER NOT NULL,
-  -- the event_id of the event
-  event_id TEXT NOT NULL,
   PRIMARY KEY (destination, room_id),
   FOREIGN KEY (room_id) REFERENCES rooms (room_id)
     ON DELETE CASCADE,

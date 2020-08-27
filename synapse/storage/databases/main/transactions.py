@@ -340,6 +340,7 @@ class TransactionStore(SQLBaseStore):
     ) -> List[str]:
         q = """
             SELECT event_id FROM destination_rooms
+             JOIN events USING (stream_ordering)
             WHERE destination = ?
               AND stream_ordering > ? AND stream_ordering <= ?
             ORDER BY stream_ordering
