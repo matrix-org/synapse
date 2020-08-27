@@ -1553,53 +1553,6 @@ class DatabasePool(object):
 
         return cache, min_val
 
-    async def simple_select_list_paginate(
-        self,
-        table: str,
-        orderby: str,
-        start: int,
-        limit: int,
-        retcols: Iterable[str],
-        filters: Optional[Dict[str, Any]] = None,
-        keyvalues: Optional[Dict[str, Any]] = None,
-        order_direction: str = "ASC",
-        desc: str = "simple_select_list_paginate",
-    ) -> List[Dict[str, Any]]:
-        """
-        Executes a SELECT query on the named table with start and limit,
-        of row numbers, which may return zero or number of rows from start to limit,
-        returning the result as a list of dicts.
-
-        Args:
-            table: the table name
-            orderby: Column to order the results by.
-            start: Index to begin the query at.
-            limit: Number of results to return.
-            retcols: the names of the columns to return
-            filters:
-                column names and values to filter the rows with, or None to not
-                apply a WHERE ? LIKE ? clause.
-            keyvalues:
-                column names and values to select the rows with, or None to not
-                apply a WHERE clause.
-            order_direction: Whether the results should be ordered "ASC" or "DESC".
-
-        Returns:
-            A list of dictionaries.
-        """
-        return await self.runInteraction(
-            desc,
-            self.simple_select_list_paginate_txn,
-            table,
-            orderby,
-            start,
-            limit,
-            retcols,
-            filters=filters,
-            keyvalues=keyvalues,
-            order_direction=order_direction,
-        )
-
     @classmethod
     def simple_select_list_paginate_txn(
         cls,
