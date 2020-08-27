@@ -100,11 +100,6 @@ def login_id_phone_to_thirdparty(identifier: JsonDict) -> Dict[str, str]:
     Returns:
         An equivalent m.id.thirdparty identifier dict
     """
-    if "type" not in identifier:
-        raise SynapseError(
-            400, "Invalid phone-type identifier", errcode=Codes.MISSING_PARAM
-        )
-
     if "country" not in identifier or (
         # The specification requires a "phone" field, while Synapse used to require a "number"
         # field. Accept both for backwards compatibility.
