@@ -409,6 +409,7 @@ class PerDestinationQueue(object):
             # reset max catch up since we have dropped PDUs here
             self._catch_up_max_stream_order = None
         except FederationDeniedError as e:
+            # remote server is not in our federation whitelist
             logger.info(e)
         except HttpResponseException as e:
             logger.warning(
@@ -418,7 +419,9 @@ class PerDestinationQueue(object):
                 e,
             )
 
-            # XXX REVIEW should we be catching up?
+            self._catching_up = True
+            # reset max catch up since we have dropped PDUs here
+            self._catch_up_max_stream_order = None
         except RequestSendFailed as e:
             logger.warning(
                 "TX [%s] Failed to send transaction: %s", self._destination, e
@@ -428,12 +431,20 @@ class PerDestinationQueue(object):
                 logger.info(
                     "Failed to send event %s to %s", p.event_id, self._destination
                 )
+
+            self._catching_up = True
+            # reset max catch up since we have dropped PDUs here
+            self._catch_up_max_stream_order = None
         except Exception:
             logger.exception("TX [%s] Failed to send transaction", self._destination)
             for p, _ in pending_pdus:
                 logger.info(
                     "Failed to send event %s to %s", p.event_id, self._destination
                 )
+
+            self._catching_up = True
+            # reset max catch up since we have dropped PDUs here
+            self._catch_up_max_stream_order = None
         finally:
             # We want to be *very* sure we clear this after we stop processing
             self.transmission_loop_running = False
