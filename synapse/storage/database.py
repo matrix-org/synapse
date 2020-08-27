@@ -606,7 +606,11 @@ class DatabasePool(object):
         return results
 
     async def execute(
-        self, desc: str, decoder: "Optional[Callable[..., R]]", query: str, *args: Any
+        self,
+        desc: str,
+        decoder: Optional[Callable[[Cursor], R]],
+        query: str,
+        *args: Any
     ) -> R:
         """Runs a single query for a result set.
 

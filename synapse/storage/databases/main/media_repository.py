@@ -312,14 +312,14 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_remote_media_thumbnail",
         )
 
-    def get_remote_media_before(self, before_ts):
+    async def get_remote_media_before(self, before_ts):
         sql = (
             "SELECT media_origin, media_id, filesystem_id"
             " FROM remote_media_cache"
             " WHERE last_access_ts < ?"
         )
 
-        return self.db_pool.execute(
+        return await self.db_pool.execute(
             "get_remote_media_before", self.db_pool.cursor_to_dict, sql, before_ts
         )
 
