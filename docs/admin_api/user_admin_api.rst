@@ -108,7 +108,7 @@ The api is::
 
     GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 
-To use it, you will need to authenticate by providing an `access_token` for a
+To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
 
 The parameter ``from`` is optional but used for pagination, denoting the
@@ -119,8 +119,11 @@ from a previous call.
 The parameter ``limit`` is optional but is used for pagination, denoting the
 maximum number of items to return in this call. Defaults to ``100``.
 
-The parameter ``user_id`` is optional and filters to only users with user IDs
-that contain this value.
+The parameter ``user_id`` is optional and filters to only return users with user IDs
+that contain this value. This parameter is ignored when using the ``name`` parameter.
+
+The parameter ``name`` is optional and filters to only return users with user ID localparts
+**or** displaynames that contain this value.
 
 The parameter ``guests`` is optional and if ``false`` will **exclude** guest users.
 Defaults to ``true`` to include guest users.

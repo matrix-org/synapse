@@ -38,7 +38,7 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
             self.store.store_device("user_id", "device_id", "display_name")
         )
 
-        res = yield self.store.get_device("user_id", "device_id")
+        res = yield defer.ensureDeferred(self.store.get_device("user_id", "device_id"))
         self.assertDictContainsSubset(
             {
                 "user_id": "user_id",
@@ -111,12 +111,12 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
             self.store.store_device("user_id", "device_id", "display_name 1")
         )
 
-        res = yield self.store.get_device("user_id", "device_id")
+        res = yield defer.ensureDeferred(self.store.get_device("user_id", "device_id"))
         self.assertEqual("display_name 1", res["display_name"])
 
         # do a no-op first
         yield defer.ensureDeferred(self.store.update_device("user_id", "device_id"))
-        res = yield self.store.get_device("user_id", "device_id")
+        res = yield defer.ensureDeferred(self.store.get_device("user_id", "device_id"))
         self.assertEqual("display_name 1", res["display_name"])
 
         # do the update
@@ -127,7 +127,7 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         )
 
         # check it worked
-        res = yield self.store.get_device("user_id", "device_id")
+        res = yield defer.ensureDeferred(self.store.get_device("user_id", "device_id"))
         self.assertEqual("display_name 2", res["display_name"])
 
     @defer.inlineCallbacks

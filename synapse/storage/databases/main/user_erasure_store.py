@@ -13,30 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import operator
-
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
 
 
 class UserErasureWorkerStore(SQLBaseStore):
     @cached()
-    def is_user_erased(self, user_id):
+    async def is_user_erased(self, user_id: str) -> bool:
         """
         Check if the given user id has requested erasure
 
         Args:
-            user_id (str): full user id to check
+            user_id: full user id to check
 
         Returns:
-            Deferred[bool]: True if the user has requested erasure
+            True if the user has requested erasure
         """
-        return self.db_pool.simple_select_onecol(
+        result = await self.db_pool.simple_select_onecol(
             table="erased_users",
             keyvalues={"user_id": user_id},
             retcol="1",
             desc="is_user_erased",
-        ).addCallback(operator.truth)
+        )
+        return bool(result)
 
     @cachedList(cached_method_name="is_user_erased", list_name="user_ids")
     async def are_users_erased(self, user_ids):

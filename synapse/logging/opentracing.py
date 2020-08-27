@@ -172,12 +172,11 @@ from functools import wraps
 from typing import TYPE_CHECKING, Dict, Optional, Type
 
 import attr
-from canonicaljson import json
 
 from twisted.internet import defer
 
 from synapse.config import ConfigError
-from synapse.util import json_decoder
+from synapse.util import json_decoder, json_encoder
 
 if TYPE_CHECKING:
     from synapse.http.site import SynapseRequest
@@ -693,7 +692,7 @@ def active_span_context_as_string():
         opentracing.tracer.inject(
             opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
         )
-    return json.dumps(carrier)
+    return json_encoder.encode(carrier)
 
 
 @only_if_tracing
