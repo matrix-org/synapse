@@ -383,19 +383,20 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         # Now return the first `limit`
         return notifs[:limit]
 
-    def get_if_maybe_push_in_range_for_user(self, user_id, min_stream_ordering):
+    async def get_if_maybe_push_in_range_for_user(
+        self, user_id: str, min_stream_ordering: int
+    ) -> bool:
         """A fast check to see if there might be something to push for the
         user since the given stream ordering. May return false positives.
 
         Useful to know whether to bother starting a pusher on start up or not.
 
         Args:
-            user_id (str)
-            min_stream_ordering (int)
+            user_id
+            min_stream_ordering
 
         Returns:
-            Deferred[bool]: True if there may be push to process, False if
-            there definitely isn't.
+            True if there may be push to process, False if there definitely isn't.
         """
 
         def _get_if_maybe_push_in_range_for_user_txn(txn):
@@ -408,7 +409,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             txn.execute(sql, (user_id, min_stream_ordering))
             return bool(txn.fetchone())
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_if_maybe_push_in_range_for_user",
             _get_if_maybe_push_in_range_for_user_txn,
         )
@@ -423,7 +424,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                 a string or dict.
 
         Returns:
-            Deferred
+            Awaitable
         """
 
         if not user_id_actions:
@@ -507,7 +508,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             "Found stream ordering 1 day ago: it's %d", self.stream_ordering_day_ago
         )
 
-    def find_first_stream_ordering_after_ts(self, ts):
+    async def find_first_stream_ordering_after_ts(self, ts: int) -> int:
         """Gets the stream ordering corresponding to a given timestamp.
 
         Specifically, finds the stream_ordering of the first event that was
@@ -516,13 +517,12 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         relatively slow.
 
         Args:
-            ts (int): timestamp in millis
+            ts: timestamp in millis
 
         Returns:
-            Deferred[int]: stream ordering of the first event received on/after
-                the timestamp
+            stream ordering of the first event received on/after the timestamp
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "_find_first_stream_ordering_after_ts_txn",
             self._find_first_stream_ordering_after_ts_txn,
             ts,
