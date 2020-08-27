@@ -578,20 +578,20 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="add_user_bound_threepid",
         )
 
-    def user_get_bound_threepids(self, user_id):
+    async def user_get_bound_threepids(self, user_id: str) -> List[Dict[str, Any]]:
         """Get the threepids that a user has bound to an identity server through the homeserver
         The homeserver remembers where binds to an identity server occurred. Using this
         method can retrieve those threepids.
 
         Args:
-            user_id (str): The ID of the user to retrieve threepids for
+            user_id: The ID of the user to retrieve threepids for
 
         Returns:
-            Deferred[list[dict]]: List of dictionaries containing the following:
+            List of dictionaries containing the following keys:
                 medium (str): The medium of the threepid (e.g "email")
                 address (str): The address of the threepid (e.g "bob@example.com")
         """
-        return self.db_pool.simple_select_list(
+        return await self.db_pool.simple_select_list(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id},
             retcols=["medium", "address"],
@@ -623,19 +623,21 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="remove_user_bound_threepid",
         )
 
-    def get_id_servers_user_bound(self, user_id, medium, address):
+    async def get_id_servers_user_bound(
+        self, user_id: str, medium: str, address: str
+    ) -> List[str]:
         """Get the list of identity servers that the server proxied bind
         requests to for given user and threepid
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
+            user_id: The user to query for identity servers.
+            medium: The medium to query for identity servers.
+            address: The address to query for identity servers.
 
         Returns:
-            Deferred[list[str]]: Resolves to a list of identity servers
+            A list of identity servers
         """
-        return self.db_pool.simple_select_onecol(
+        return await self.db_pool.simple_select_onecol(
             table="user_threepid_id_server",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
             retcol="id_server",
