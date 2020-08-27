@@ -43,7 +43,7 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
-from synapse.types import Requester, UserID
+from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
@@ -53,9 +53,7 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-def convert_client_dict_legacy_fields_to_identifier(
-    submission: Dict[str, Union[str, Dict]]
-):
+def convert_client_dict_legacy_fields_to_identifier(submission: JsonDict):
     """
     Convert a legacy-formatted login submission to an identifier dict.
 
@@ -92,7 +90,7 @@ def convert_client_dict_legacy_fields_to_identifier(
         )
 
 
-def login_id_phone_to_thirdparty(identifier: Dict[str, str]) -> Dict[str, str]:
+def login_id_phone_to_thirdparty(identifier: JsonDict) -> Dict[str, str]:
     """
     Convert a phone login identifier type to a generic threepid identifier.
 
