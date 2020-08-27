@@ -214,9 +214,11 @@ Deactivate Account
 
 This API deactivates an account. It removes active access tokens, resets the
 password, and deletes third-party IDs (to prevent the user requesting a
-password reset). It can also mark the user as GDPR-erased (stopping their data
-from distributed further, and deleting it entirely if there are no other
-references to it).
+password reset).
+
+It can also mark the user as GDPR-erased. This means messages sent by the
+user will still be visible by anyone that was in the room when these messages
+were sent, but hidden from users joining the room afterwards.
 
 The api is::
 
