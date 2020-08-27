@@ -1120,7 +1120,7 @@ class DatabasePool(object):
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
     ) -> List[Any]:
         sql = ("SELECT %(retcol)s FROM %(table)s") % {"retcol": retcol, "table": table}
 
