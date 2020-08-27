@@ -12,6 +12,12 @@ from Synapse as most users have updated their client. Further context can be
 found at [\#6766](https://github.com/matrix-org/synapse/issues/6766).
 
 
+Synapse 1.19.1 (2020-08-27)
+===========================
+
+No significant changes.
+
+
 Synapse 1.19.1rc1 (2020-08-25)
 ==============================
 

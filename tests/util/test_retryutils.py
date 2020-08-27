@@ -91,7 +91,7 @@ class RetryLimiterTestCase(HomeserverTestCase):
         #
         # one more go, with success
         #
-        self.pump(MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0)
+        self.reactor.advance(MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0)
         limiter = self.get_success(get_retry_limiter("test_dest", self.clock, store))
 
         self.pump(1)
