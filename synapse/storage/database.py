@@ -1070,7 +1070,7 @@ class DatabasePool(object):
         self,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: bool = False,
         desc: str = "simple_select_one_onecol",
     ) -> Optional[Any]:
@@ -1100,7 +1100,7 @@ class DatabasePool(object):
         txn: LoggingTransaction,
         table: str,
         keyvalues: Dict[str, Any],
-        retcol: Iterable[str],
+        retcol: str,
         allow_none: bool = False,
     ) -> Optional[Any]:
         ret = cls.simple_select_onecol_txn(
