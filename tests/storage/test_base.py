@@ -66,8 +66,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_insert_1col(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_insert(
-            table="tablename", values={"columname": "Value"}
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert(
+                table="tablename", values={"columname": "Value"}
+            )
         )
 
         self.mock_txn.execute.assert_called_with(
@@ -78,10 +80,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
     def test_insert_3cols(self):
         self.mock_txn.rowcount = 1
 
-        yield self.datastore.db_pool.simple_insert(
-            table="tablename",
-            # Use OrderedDict() so we can assert on the SQL generated
-            values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)]),
+        yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_insert(
+                table="tablename",
+                # Use OrderedDict() so we can assert on the SQL generated
+                values=OrderedDict([("colA", 1), ("colB", 2), ("colC", 3)]),
+            )
         )
 
         self.mock_txn.execute.assert_called_with(
@@ -93,8 +97,10 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
         self.mock_txn.__iter__ = Mock(return_value=iter([("Value",)]))
 
-        value = yield self.datastore.db_pool.simple_select_one_onecol(
-            table="tablename", keyvalues={"keycol": "TheKey"}, retcol="retcol"
+        value = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_select_one_onecol(
+                table="tablename", keyvalues={"keycol": "TheKey"}, retcol="retcol"
+            )
         )
 
         self.assertEquals("Value", value)
@@ -107,10 +113,12 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 1
         self.mock_txn.fetchone.return_value = (1, 2, 3)
 
-        ret = yield self.datastore.db_pool.simple_select_one(
-            table="tablename",
-            keyvalues={"keycol": "TheKey"},
-            retcols=["colA", "colB", "colC"],
+        ret = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_select_one(
+                table="tablename",
+                keyvalues={"keycol": "TheKey"},
+                retcols=["colA", "colB", "colC"],
+            )
         )
 
         self.assertEquals({"colA": 1, "colB": 2, "colC": 3}, ret)
@@ -123,11 +131,13 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         self.mock_txn.rowcount = 0
         self.mock_txn.fetchone.return_value = None
 
-        ret = yield self.datastore.db_pool.simple_select_one(
-            table="tablename",
-            keyvalues={"keycol": "Not here"},
-            retcols=["colA"],
-            allow_none=True,
+        ret = yield defer.ensureDeferred(
+            self.datastore.db_pool.simple_select_one(
+                table="tablename",
+                keyvalues={"keycol": "Not here"},
+                retcols=["colA"],
+                allow_none=True,
+            )
         )
 
         self.assertFalse(ret)

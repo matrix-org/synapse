@@ -20,7 +20,7 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client.v1 import login, room
-from synapse.types import UserID
+from synapse.types import UserID, create_requester
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.test_utils import make_awaitable
@@ -175,7 +175,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
             self.get_success(
                 typing_handler.started_typing(
                     target_user=UserID.from_string(user),
-                    auth_user=UserID.from_string(user),
+                    requester=create_requester(user),
                     room_id=room,
                     timeout=20000,
                 )

@@ -40,7 +40,11 @@ class RestHelper(object):
     auth_user_id = attr.ib()
 
     def create_room_as(
-        self, room_creator: str = None, is_public: bool = True, tok: str = None
+        self,
+        room_creator: str = None,
+        is_public: bool = True,
+        tok: str = None,
+        expect_code: int = 200,
     ) -> str:
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
@@ -56,9 +60,11 @@ class RestHelper(object):
         )
         render(request, self.resource, self.hs.get_reactor())
 
-        assert channel.result["code"] == b"200", channel.result
+        assert channel.result["code"] == b"%d" % expect_code, channel.result
         self.auth_user_id = temp_id
-        return channel.json_body["room_id"]
+
+        if expect_code == 200:
+            return channel.json_body["room_id"]
 
     def invite(self, room=None, src=None, targ=None, expect_code=200, tok=None):
         self.change_membership(
