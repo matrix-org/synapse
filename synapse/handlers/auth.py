@@ -52,7 +52,9 @@ from ._base import BaseHandler
 logger = logging.getLogger(__name__)
 
 
-def convert_client_dict_legacy_fields_to_identifier(submission: JsonDict) -> Dict[str, str]:
+def convert_client_dict_legacy_fields_to_identifier(
+    submission: JsonDict,
+) -> Dict[str, str]:
     """
     Convert a legacy-formatted login submission to an identifier dict.
 
