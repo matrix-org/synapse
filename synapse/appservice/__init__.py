@@ -35,19 +35,19 @@ class AppServiceTransaction(object):
         self.id = id
         self.events = events
 
-    def send(self, as_api):
+    async def send(self, as_api) -> bool:
         """Sends this transaction using the provided AS API interface.
 
         Args:
             as_api(ApplicationServiceApi): The API to use to send.
         Returns:
-            An Awaitable which resolves to True if the transaction was sent.
+            True if the transaction was sent.
         """
-        return as_api.push_bulk(
+        return await as_api.push_bulk(
             service=self.service, events=self.events, txn_id=self.id
         )
 
-    def complete(self, store):
+    async def complete(self, store) -> None:
         """Completes this transaction as successful.
 
         Marks this transaction ID on the application service and removes the
@@ -55,10 +55,8 @@ class AppServiceTransaction(object):
 
         Args:
             store: The database store to operate on.
-        Returns:
-            A Deferred which resolves to True if the transaction was completed.
         """
-        return store.complete_appservice_txn(service=self.service, txn_id=self.id)
+        await store.complete_appservice_txn(service=self.service, txn_id=self.id)
 
 
 class ApplicationService(object):
