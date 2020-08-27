@@ -28,7 +28,6 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
-    Union,
     overload,
 )
 
@@ -1655,7 +1654,7 @@ class DatabasePool(object):
         term: Optional[str],
         col: str,
         retcols: Iterable[str],
-    ) -> Union[List[Dict[str, Any]], int]:
+    ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1667,14 +1666,14 @@ class DatabasePool(object):
             retcols: the names of the columns to return
 
         Returns:
-            0 if no term is given, otherwise a list of dictionaries.
+            None if no term is given, otherwise a list of dictionaries.
         """
         if term:
             sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
             termvalues = ["%%" + term + "%%"]
             txn.execute(sql, termvalues)
         else:
-            return 0
+            return None
 
         return cls.cursor_to_dict(txn)
 
