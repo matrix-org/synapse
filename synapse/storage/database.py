@@ -1247,7 +1247,7 @@ class DatabasePool(object):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Filters rows by whether the value of `column` is in `iterable`.
 
         Args:
             table: string giving the table name
@@ -1297,7 +1297,7 @@ class DatabasePool(object):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Filters rows by whether the value of `column` is in `iterable`.
 
         Args:
             txn: Transaction object
