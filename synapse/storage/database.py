@@ -605,7 +605,13 @@ class DatabasePool(object):
         results = [dict(zip(col_headers, row)) for row in cursor]
         return results
 
-    def execute(self, desc: str, decoder: Callable, query: str, *args: Any):
+    async def execute(
+        self,
+        desc: str,
+        decoder: Optional[Callable[[Cursor], R]],
+        query: str,
+        *args: Any
+    ) -> R:
         """Runs a single query for a result set.
 
         Args:
@@ -614,7 +620,7 @@ class DatabasePool(object):
             query - The query string to execute
             *args - Query args.
         Returns:
-            Deferred which results to the result of decoder(results)
+            The result of decoder(results)
         """
 
         def interaction(txn):
@@ -624,7 +630,7 @@ class DatabasePool(object):
             else:
                 return txn.fetchall()
 
-        return self.runInteraction(desc, interaction)
+        return await self.runInteraction(desc, interaction)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
@@ -673,15 +679,30 @@ class DatabasePool(object):
 
         txn.execute(sql, vals)
 
-    def simple_insert_many(
+    async def simple_insert_many(
         self, table: str, values: List[Dict[str, Any]], desc: str
-    ) -> defer.Deferred:
-        return self.runInteraction(desc, self.simple_insert_many_txn, table, values)
+    ) -> None:
+        """Executes an INSERT query on the named table.
+
+        Args:
+            table: string giving the table name
+            values: dict of new column names and values for them
+            desc: string giving a description of the transaction
+        """
+        await self.runInteraction(desc, self.simple_insert_many_txn, table, values)
 
     @staticmethod
     def simple_insert_many_txn(
         txn: LoggingTransaction, table: str, values: List[Dict[str, Any]]
     ) -> None:
+        """Executes an INSERT query on the named table.
+
+        Args:
+            txn: The transaction to use.
+            table: string giving the table name
+            values: dict of new column names and values for them
+            desc: string giving a description of the transaction
+        """
         if not values:
             return
 
@@ -1397,9 +1418,9 @@ class DatabasePool(object):
 
         return dict(zip(retcols, row))
 
-    def simple_delete_one(
+    async def simple_delete_one(
         self, table: str, keyvalues: Dict[str, Any], desc: str = "simple_delete_one"
-    ) -> defer.Deferred:
+    ) -> None:
         """Executes a DELETE query on the named table, expecting to delete a
         single row.
 
@@ -1407,7 +1428,7 @@ class DatabasePool(object):
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
         """
-        return self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
+        await self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
 
     @staticmethod
     def simple_delete_one_txn(
@@ -1446,15 +1467,15 @@ class DatabasePool(object):
         txn.execute(sql, list(keyvalues.values()))
         return txn.rowcount
 
-    def simple_delete_many(
+    async def simple_delete_many(
         self,
         table: str,
         column: str,
         iterable: Iterable[Any],
         keyvalues: Dict[str, Any],
         desc: str,
-    ) -> defer.Deferred:
-        return self.runInteraction(
+    ) -> int:
+        return await self.runInteraction(
             desc, self.simple_delete_many_txn, table, column, iterable, keyvalues
         )
 
@@ -1537,52 +1558,6 @@ class DatabasePool(object):
 
         return cache, min_val
 
-    def simple_select_list_paginate(
-        self,
-        table: str,
-        orderby: str,
-        start: int,
-        limit: int,
-        retcols: Iterable[str],
-        filters: Optional[Dict[str, Any]] = None,
-        keyvalues: Optional[Dict[str, Any]] = None,
-        order_direction: str = "ASC",
-        desc: str = "simple_select_list_paginate",
-    ) -> defer.Deferred:
-        """
-        Executes a SELECT query on the named table with start and limit,
-        of row numbers, which may return zero or number of rows from start to limit,
-        returning the result as a list of dicts.
-
-        Args:
-            table: the table name
-            orderby: Column to order the results by.
-            start: Index to begin the query at.
-            limit: Number of results to return.
-            retcols: the names of the columns to return
-            filters:
-                column names and values to filter the rows with, or None to not
-                apply a WHERE ? LIKE ? clause.
-            keyvalues:
-                column names and values to select the rows with, or None to not
-                apply a WHERE clause.
-            order_direction: Whether the results should be ordered "ASC" or "DESC".
-        Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
-        """
-        return self.runInteraction(
-            desc,
-            self.simple_select_list_paginate_txn,
-            table,
-            orderby,
-            start,
-            limit,
-            retcols,
-            filters=filters,
-            keyvalues=keyvalues,
-            order_direction=order_direction,
-        )
-
     @classmethod
     def simple_select_list_paginate_txn(
         cls,
@@ -1647,14 +1622,14 @@ class DatabasePool(object):
 
         return cls.cursor_to_dict(txn)
 
-    def simple_search_list(
+    async def simple_search_list(
         self,
         table: str,
         term: Optional[str],
         col: str,
         retcols: Iterable[str],
         desc="simple_search_list",
-    ):
+    ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1665,10 +1640,10 @@ class DatabasePool(object):
             retcols: the names of the columns to return
 
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]] or None
+            A list of dictionaries or None.
         """
 
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_search_list_txn, table, term, col, retcols
         )
 
