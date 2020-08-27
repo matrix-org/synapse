@@ -96,7 +96,7 @@ def convert_client_dict_legacy_fields_to_identifier(
         raise SynapseError(400, "Invalid login submission", Codes.INVALID_PARAM)
 
     # Ensure the identifier has a type
-    if "type" not in ["identifier"]:
+    if "type" not in identifier:
         raise SynapseError(
             400, "'identifier' dict has no key 'type'", errcode=Codes.MISSING_PARAM,
         )
