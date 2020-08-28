@@ -498,9 +498,7 @@ class DeviceWorkerStore(SQLBaseStore):
     ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self._device_list_id_gen.get_current_token()
 
-        devices = self._get_e2e_device_keys_txn(
-            txn, [(user_id, None)], include_all_devices=True
-        )
+        devices = self._get_e2e_device_keys_txn(txn, [(user_id, None)])
 
         if devices:
             user_devices = devices[user_id]
