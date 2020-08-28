@@ -680,7 +680,8 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         """
 
         def _get_shared_rooms_for_users_txn(txn):
-            SQL = """
+            txn.execute(
+                """
                 SELECT p1.room_id
                 FROM users_in_public_rooms as p1
                 INNER JOIN users_in_public_rooms as p2
@@ -693,13 +694,17 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 WHERE
                     user_id = ?
                     AND other_user_id = ?;
-            """
-            txn.execute(SQL)
+                """,
+                (user_id, other_user_id, user_id, other_user_id),
+            )
+            rows = self.db_pool.cursor_to_dict(txn)
+            return rows
 
         rows = await self.db_pool.runInteraction(
             "get_shared_rooms_for_users", _get_shared_rooms_for_users_txn
         )
-        return set(row[0] for row in rows)
+
+        return set(row["room_id"] for row in rows)
 
     def get_user_directory_stream_pos(self):
         return self.db_pool.simple_select_one_onecol(

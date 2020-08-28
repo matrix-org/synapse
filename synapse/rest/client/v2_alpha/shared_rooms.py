@@ -57,7 +57,6 @@ class UserSharedRoomsServlet(RestServlet):
                 msg="You cannot request a list of shared rooms with yourself",
                 errcode=Codes.FORBIDDEN,
             )
-
         rooms = await self.store.get_shared_rooms_for_users(
             requester.user.to_string(), user_id
         )
