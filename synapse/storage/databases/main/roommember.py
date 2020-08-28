@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Awaitable, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
@@ -180,14 +180,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return [r[0] for r in txn]
 
     @cached(max_entries=100000)
-    async def get_room_summary(self, room_id: str):
+    async def get_room_summary(self, room_id: str) -> Dict[str, MemberSummary]:
         """ Get the details of a room roughly suitable for use by the room
         summary extension to /sync. Useful when lazy loading room members.
         Args:
             room_id: The room ID to query
         Returns:
-            dict[str, MemberSummary]:
-                dict of membership states, pointing to a MemberSummary named tuple.
+            dict of membership states, pointing to a MemberSummary named tuple.
         """
 
         def _get_room_summary_txn(txn):
@@ -266,17 +265,17 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached()
-    def get_invited_rooms_for_local_user(self, user_id: str) -> Awaitable[RoomsForUser]:
+    async def get_invited_rooms_for_local_user(self, user_id: str) -> RoomsForUser:
         """Get all the rooms the *local* user is invited to.
 
         Args:
             user_id: The user ID.
 
         Returns:
-            A awaitable list of RoomsForUser.
+            A list of RoomsForUser.
         """
 
-        return self.get_rooms_for_local_user_where_membership_is(
+        return await self.get_rooms_for_local_user_where_membership_is(
             user_id, [Membership.INVITE]
         )
 
@@ -359,7 +358,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return results
 
     @cached(max_entries=500000, iterable=True)
-    async def get_rooms_for_user_with_stream_ordering(self, user_id: str):
+    async def get_rooms_for_user_with_stream_ordering(
+        self, user_id: str
+    ) -> frozenset[GetRoomsForUserWithStreamOrdering]:
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
@@ -369,9 +370,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_id
 
         Returns:
-            frozenset[GetRoomsForUserWithStreamOrdering]: Returns
-            the rooms the user is in currently, along with the stream ordering
-            of the most recent join for that user and room.
+            Returns the rooms the user is in currently, along with the stream
+            ordering of the most recent join for that user and room.
         """
         return await self.db_pool.runInteraction(
             "get_rooms_for_user_with_stream_ordering",
@@ -379,7 +379,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_id,
         )
 
-    def _get_rooms_for_user_with_stream_ordering_txn(self, txn, user_id: str):
+    def _get_rooms_for_user_with_stream_ordering_txn(
+        self, txn, user_id: str
+    ) -> frozenset[GetRoomsForUserWithStreamOrdering]:
         # We use `current_state_events` here and not `local_current_membership`
         # as a) this gets called with remote users and b) this only gets called
         # for rooms the server is participating in.
@@ -406,9 +408,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             """
 
         txn.execute(sql, (user_id, Membership.JOIN))
-        results = frozenset(GetRoomsForUserWithStreamOrdering(*row) for row in txn)
-
-        return results
+        return frozenset(GetRoomsForUserWithStreamOrdering(*row) for row in txn)
 
     async def get_users_server_still_shares_room_with(
         self, user_ids: Collection[str]

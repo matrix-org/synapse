@@ -610,9 +610,6 @@ class RegistrationWorkerStore(SQLBaseStore):
             medium
             address
             id_server
-
-        Returns:
-            Awaitable
         """
         await self.db_pool.simple_delete(
             table="user_threepid_id_server",
@@ -668,23 +665,28 @@ class RegistrationWorkerStore(SQLBaseStore):
         return res == 1
 
     async def get_threepid_validation_session(
-        self, medium, client_secret, address=None, sid=None, validated=True
-    ):
+        self,
+        medium: Optional[str],
+        client_secret: str,
+        address: Optional[str] = None,
+        sid: Optional[str] = None,
+        validated: Optional[bool] = True,
+    ) -> Optional[Dict[str, Any]]:
         """Gets a session_id and last_send_attempt (if available) for a
         combination of validation metadata
 
         Args:
-            medium (str|None): The medium of the 3PID
-            address (str|None): The address of the 3PID
-            sid (str|None): The ID of the validation session
-            client_secret (str): A unique string provided by the client to help identify this
+            medium: The medium of the 3PID
+            client_secret: A unique string provided by the client to help identify this
                 validation attempt
-            validated (bool|None): Whether sessions should be filtered by
+            address: The address of the 3PID
+            sid: The ID of the validation session
+            validated: Whether sessions should be filtered by
                 whether they have been validated already or not. None to
                 perform no filtering
 
         Returns:
-            dict|None: A dict containing the following:
+            A dict containing the following:
                 * address - address of the 3pid
                 * medium - medium of the 3pid
                 * client_secret - a secret provided by the client for this validation session
@@ -947,33 +949,33 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
     async def register_user(
         self,
-        user_id,
-        password_hash=None,
-        was_guest=False,
-        make_guest=False,
-        appservice_id=None,
-        create_profile_with_displayname=None,
-        admin=False,
-        user_type=None,
-        shadow_banned=False,
+        user_id: str,
+        password_hash: Optional[str] = None,
+        was_guest: bool = False,
+        make_guest: bool = False,
+        appservice_id: Optional[str] = None,
+        create_profile_with_displayname: Optional[str] = None,
+        admin: bool = False,
+        user_type: Optional[str] = None,
+        shadow_banned: bool = False,
     ) -> None:
         """Attempts to register an account.
 
         Args:
-            user_id (str): The desired user ID to register.
-            password_hash (str|None): Optional. The password hash for this user.
-            was_guest (bool): Optional. Whether this is a guest account being
-                upgraded to a non-guest account.
-            make_guest (boolean): True if the the new user should be guest,
-                false to add a regular user account.
-            appservice_id (str): The ID of the appservice registering the user.
-            create_profile_with_displayname (unicode): Optionally create a profile for
+            user_id: The desired user ID to register.
+            password_hash: Optional. The password hash for this user.
+            was_guest: Whether this is a guest account being upgraded to a
+                non-guest account.
+            make_guest: True if the the new user should be guest, false to add a
+                regular user account.
+            appservice_id: The ID of the appservice registering the user.
+            create_profile_with_displayname: Optionally create a profile for
                 the user, setting their displayname to the given value
-            admin (boolean): is an admin user?
-            user_type (str|None): type of user. One of the values from
-                api.constants.UserTypes, or None for a normal user.
-            shadow_banned (bool): Whether the user is shadow-banned,
-                i.e. they may be told their requests succeeded but we ignore them.
+            admin: is an admin user?
+            user_type: type of user. One of the values from api.constants.UserTypes,
+                or None for a normal user.
+            shadow_banned: Whether the user is shadow-banned, i.e. they may be
+                told their requests succeeded but we ignore them.
 
         Raises:
             StoreError if the user_id could not be registered.
@@ -1279,24 +1281,24 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
         )
 
     async def validate_threepid_session(
-        self, session_id, client_secret, token, current_ts
-    ):
+        self, session_id: str, client_secret: str, token: str, current_ts: int
+    ) -> Optional[str]:
         """Attempt to validate a threepid session using a token
 
         Args:
-            session_id (str): The id of a validation session
-            client_secret (str): A unique string provided by the client to
-                help identify this validation attempt
-            token (str): A validation token
-            current_ts (int): The current unix time in milliseconds. Used for
-                checking token expiry status
+            session_id: The id of a validation session
+            client_secret: A unique string provided by the client to help identify
+                this validation attempt
+            token: A validation token
+            current_ts: The current unix time in milliseconds. Used for checking
+                token expiry status
 
         Raises:
             ThreepidValidationError: if a matching validation token was not found or has
                 expired
 
         Returns:
-            str|None: A str representing a link to redirect the user to if there is one.
+            A str representing a link to redirect the user to if there is one.
         """
 
         # Insert everything into a transaction in order to run atomically
@@ -1372,30 +1374,29 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
     async def start_or_continue_validation_session(
         self,
-        medium,
-        address,
-        session_id,
-        client_secret,
-        send_attempt,
-        next_link,
-        token,
-        token_expires,
-    ):
+        medium: str,
+        address: str,
+        session_id: str,
+        client_secret: str,
+        send_attempt: int,
+        next_link: Optional[str],
+        token: str,
+        token_expires: int,
+    ) -> None:
         """Creates a new threepid validation session if it does not already
         exist and associates a new validation token with it
 
         Args:
-            medium (str): The medium of the 3PID
-            address (str): The address of the 3PID
-            session_id (str): The id of this validation session
-            client_secret (str): A unique string provided by the client to
-                help identify this validation attempt
-            send_attempt (int): The latest send_attempt on this session
-            next_link (str|None): The link to redirect the user to upon
-                successful validation
-            token (str): The validation token
-            token_expires (int): The timestamp for which after the token
-                will no longer be valid
+            medium: The medium of the 3PID
+            address: The address of the 3PID
+            session_id: The id of this validation session
+            client_secret: A unique string provided by the client to help
+                identify this validation attempt
+            send_attempt: The latest send_attempt on this session
+            next_link: The link to redirect the user to upon successful validation
+            token: The validation token
+            token_expires: The timestamp for which after the token will no
+                longer be valid
         """
 
         def start_or_continue_validation_session_txn(txn):
@@ -1429,7 +1430,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             start_or_continue_validation_session_txn,
         )
 
-    async def cull_expired_threepid_validation_tokens(self):
+    async def cull_expired_threepid_validation_tokens(self) -> None:
         """Remove threepid validation tokens with expiry dates that have passed"""
 
         def cull_expired_threepid_validation_tokens_txn(txn, ts):
@@ -1437,9 +1438,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             DELETE FROM threepid_validation_token WHERE
             expires < ?
             """
-            return txn.execute(sql, (ts,))
+            txn.execute(sql, (ts,))
 
-        return await self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "cull_expired_threepid_validation_tokens",
             cull_expired_threepid_validation_tokens_txn,
             self.clock.time_msec(),

@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import List
+from typing import Dict, List, Union
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import LoggingTransaction, SQLBaseStore, db_to_json
@@ -414,17 +414,15 @@ class EventPushActionsWorkerStore(SQLBaseStore):
             _get_if_maybe_push_in_range_for_user_txn,
         )
 
-    async def add_push_actions_to_staging(self, event_id, user_id_actions):
+    async def add_push_actions_to_staging(
+        self, event_id: str, user_id_actions: Dict[str, List[Union[dict, str]]]
+    ) -> None:
         """Add the push actions for the event to the push action staging area.
 
         Args:
-            event_id (str)
-            user_id_actions (dict[str, list[dict|str])]): A dictionary mapping
-                user_id to list of push actions, where an action can either be
-                a string or dict.
-
-        Returns:
-            Awaitable
+            event_id
+            user_id_actions: A mapping of user_id to list of push actions, where
+                an action can either be a string or dict.
         """
 
         if not user_id_actions:
