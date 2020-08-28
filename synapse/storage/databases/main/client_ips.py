@@ -396,7 +396,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         self._batch_row_update[key] = (user_agent, device_id, now)
 
     @wrap_as_background_process("update_client_ips")
-    def _update_client_ips_batch(self):
+    async def _update_client_ips_batch(self) -> None:
 
         # If the DB pool has already terminated, don't try updating
         if not self.db_pool.is_running():
@@ -405,7 +405,7 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         to_update = self._batch_row_update
         self._batch_row_update = {}
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
         )
 
