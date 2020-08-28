@@ -210,7 +210,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         if not where_clause:
             # We delegate to the cached version
-            return self.get_current_state_ids(room_id)
+            return await self.get_current_state_ids(room_id)
 
         def _get_filtered_current_state_ids_txn(txn):
             results = {}
