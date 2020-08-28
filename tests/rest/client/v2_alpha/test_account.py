@@ -20,7 +20,6 @@ from urllib.parse import urlencode
 import os
 import re
 from email.parser import Parser
-from tests.test_utils.http import convert_request_args_to_form_data
 
 import pkg_resources
 
@@ -261,15 +260,23 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         # Replace the path with the confirmation path
         path = "/_matrix/client/unstable/password_reset/email/submit_token_confirm"
 
+        form_args = []
+        for key, value_list in request.args.items():
+            for value in value_list:
+                arg = (key, value)
+                form_args.append(arg)
+
+        print("form_args:", form_args)
+        print("encoded form_args:", urlencode(form_args))
+
         # Confirm the password reset
         request, channel = self.make_request(
             "POST",
             path,
-            content=urlencode(request.args).encode("utf8"),
+            content=urlencode(form_args).encode("utf8"),
             shorthand=False,
         )
         self.render(request)
-        print(channel.json_body)
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):
