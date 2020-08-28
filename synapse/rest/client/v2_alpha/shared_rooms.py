@@ -16,6 +16,7 @@ import logging
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet
+from synapse.types import UserID
 
 from ._base import client_patterns
 
@@ -36,13 +37,24 @@ class UserSharedRoomsServlet(RestServlet):
         super(UserSharedRoomsServlet, self).__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.user_directory_active = hs.config.update_user_directory
 
     async def on_GET(self, request, user_id):
+
+        if not self.user_directory_active:
+            raise SynapseError(
+                code=400,
+                msg="The user directory is disabled on this server. Cannot determine shared rooms.",
+                errcode=Codes.FORBIDDEN,
+            )
+
+        UserID.from_string(user_id)
+
         requester = await self.auth.get_user_by_req(request)
         if user_id == requester.user.to_string():
             raise SynapseError(
                 code=400,
-                msg="'user_id' must not be the authenticated user",
+                msg="You cannot request a list of shared rooms with yourself",
                 errcode=Codes.FORBIDDEN,
             )
 
@@ -50,7 +62,7 @@ class UserSharedRoomsServlet(RestServlet):
             requester.user.to_string(), user_id
         )
 
-        return 200, {"joined": rooms}
+        return 200, {"joined": list(rooms)}
 
 
 def register_servlets(hs, http_server):

@@ -15,6 +15,7 @@
 
 import logging
 import re
+from typing import Set
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.database import DatabasePool
@@ -664,15 +665,18 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         return list(users)
 
     @cached()
-    async def get_shared_rooms_for_users(self, user_id, other_user_id):
+    async def get_shared_rooms_for_users(
+        self, user_id: str, other_user_id: str
+    ) -> Set[str]:
         """
-        Returns the rooms that a user is in.
+        Returns the rooms that a local user shares with another local or remote user.
 
         Args:
-            user_id(str): Must be a local user
+            user_id: The MXID of a local user
+            other_user_id: The MXID of the other user
 
         Returns:
-            list: user_id
+            A set of room ID's that the users share.
         """
         SQL = """
             SELECT p1.room_id
@@ -697,7 +701,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             user_id,
             other_user_id,
         )
-        return list({row[0] for row in rows})
+        return set(row[0] for row in rows)
 
     def get_user_directory_stream_pos(self):
         return self.db_pool.simple_select_one_onecol(
