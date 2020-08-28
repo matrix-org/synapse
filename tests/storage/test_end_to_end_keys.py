@@ -37,7 +37,7 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         )
 
         res = yield defer.ensureDeferred(
-            self.store.get_e2e_device_keys((("user", "device"),))
+            self.store.get_e2e_device_keys_for_cs_api((("user", "device"),))
         )
         self.assertIn("user", res)
         self.assertIn("device", res["user"])
@@ -76,7 +76,7 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         )
 
         res = yield defer.ensureDeferred(
-            self.store.get_e2e_device_keys((("user", "device"),))
+            self.store.get_e2e_device_keys_for_cs_api((("user", "device"),))
         )
         self.assertIn("user", res)
         self.assertIn("device", res["user"])
@@ -108,7 +108,9 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         )
 
         res = yield defer.ensureDeferred(
-            self.store.get_e2e_device_keys((("user1", "device1"), ("user2", "device2")))
+            self.store.get_e2e_device_keys_for_cs_api(
+                (("user1", "device1"), ("user2", "device2"))
+            )
         )
         self.assertIn("user1", res)
         self.assertIn("device1", res["user1"])
