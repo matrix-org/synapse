@@ -99,7 +99,7 @@ class RegistrationWorkerStore(SQLBaseStore):
         )
 
     @cached()
-    async def get_expiration_ts_for_user(self, user_id: str) -> Optional[None]:
+    async def get_expiration_ts_for_user(self, user_id: str) -> Optional[int]:
         """Get the expiration timestamp for the account bearing a given user ID.
 
         Args:
