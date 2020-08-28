@@ -107,9 +107,7 @@ class Transaction(JsonEncodedObject):
         if "edus" in kwargs and not kwargs["edus"]:
             del kwargs["edus"]
 
-        super(Transaction, self).__init__(
-            transaction_id=transaction_id, pdus=pdus, **kwargs
-        )
+        super().__init__(transaction_id=transaction_id, pdus=pdus, **kwargs)
 
     @staticmethod
     def create_new(pdus, **kwargs):

@@ -41,12 +41,12 @@ class SlavedAccountDataStore(TagsWorkerStore, AccountDataWorkerStore, BaseSlaved
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == TagAccountDataStream.NAME:
-            self._account_data_id_gen.advance(token)
+            self._account_data_id_gen.advance(instance_name, token)
             for row in rows:
                 self.get_tags_for_user.invalidate((row.user_id,))
                 self._account_data_stream_cache.entity_has_changed(row.user_id, token)
         elif stream_name == AccountDataStream.NAME:
-            self._account_data_id_gen.advance(token)
+            self._account_data_id_gen.advance(instance_name, token)
             for row in rows:
                 if not row.room_id:
                     self.get_global_account_data_by_type_for_user.invalidate(

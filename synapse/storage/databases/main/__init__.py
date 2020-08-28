@@ -18,6 +18,7 @@
 import calendar
 import logging
 import time
+from typing import Any, Dict, List, Optional
 
 from synapse.api.constants import PresenceState
 from synapse.config.homeserver import HomeServerConfig
@@ -476,14 +477,13 @@ class DataStore(
             "generate_user_daily_visits", _generate_user_daily_visits
         )
 
-    def get_users(self):
+    async def get_users(self) -> List[Dict[str, Any]]:
         """Function to retrieve a list of users in users table.
 
-        Args:
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            A list of dictionaries representing users.
         """
-        return self.db_pool.simple_select_list(
+        return await self.db_pool.simple_select_list(
             table="users",
             keyvalues={},
             retcols=[
@@ -498,7 +498,7 @@ class DataStore(
         )
 
     def get_users_paginate(
-        self, start, limit, name=None, guests=True, deactivated=False
+        self, start, limit, user_id=None, name=None, guests=True, deactivated=False
     ):
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -507,7 +507,8 @@ class DataStore(
         Args:
             start (int): start number to begin the query from
             limit (int): number of rows to retrieve
-            name (string): filter for user names
+            user_id (string): search for user_id. ignored if name is not None
+            name (string): search for local part of user_id or display name
             guests (bool): whether to in include guest users
             deactivated (bool): whether to include deactivated users
         Returns:
@@ -516,11 +517,14 @@ class DataStore(
 
         def get_users_paginate_txn(txn):
             filters = []
-            args = []
+            args = [self.hs.config.server_name]
 
             if name:
+                filters.append("(name LIKE ? OR displayname LIKE ?)")
+                args.extend(["@%" + name + "%:%", "%" + name + "%"])
+            elif user_id:
                 filters.append("name LIKE ?")
-                args.append("%" + name + "%")
+                args.extend(["%" + user_id + "%"])
 
             if not guests:
                 filters.append("is_guest = 0")
@@ -530,20 +534,23 @@ class DataStore(
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
-            sql = "SELECT COUNT(*) as total_users FROM users %s" % (where_clause)
-            txn.execute(sql, args)
-            count = txn.fetchone()[0]
-
-            args = [self.hs.config.server_name] + args + [limit, start]
-            sql = """
-                SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url
+            sql_base = """
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
                 {}
-                ORDER BY u.name LIMIT ? OFFSET ?
                 """.format(
                 where_clause
             )
+            sql = "SELECT COUNT(*) as total_users " + sql_base
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            sql = (
+                "SELECT name, user_type, is_guest, admin, deactivated, displayname, avatar_url "
+                + sql_base
+                + " ORDER BY u.name LIMIT ? OFFSET ?"
+            )
+            args += [limit, start]
             txn.execute(sql, args)
             users = self.db_pool.cursor_to_dict(txn)
             return users, count
@@ -552,17 +559,17 @@ class DataStore(
             "get_users_paginate_txn", get_users_paginate_txn
         )
 
-    def search_users(self, term):
+    async def search_users(self, term: str) -> Optional[List[Dict[str, Any]]]:
         """Function to search users list for one or more users with
         the matched term.
 
         Args:
-            term (str): search term
-            col (str): column to query term should be matched to
+            term: search term
+
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            A list of dictionaries or None.
         """
-        return self.db_pool.simple_search_list(
+        return await self.db_pool.simple_search_list(
             table="users",
             term=term,
             col="name",

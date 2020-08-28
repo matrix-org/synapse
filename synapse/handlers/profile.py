@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import logging
+import random
 
 from synapse.api.errors import (
     AuthError,
@@ -213,8 +214,14 @@ class BaseProfileHandler(BaseHandler):
     async def set_avatar_url(
         self, target_user, requester, new_avatar_url, by_admin=False
     ):
-        """target_user is the user whose avatar_url is to be changed;
-        auth_user is the user attempting to make this change."""
+        """Set a new avatar URL for a user.
+
+        Args:
+            target_user (UserID): the user whose avatar URL is to be changed.
+            requester (Requester): The user attempting to make this change.
+            new_avatar_url (str): The avatar URL to give this user.
+            by_admin (bool): Whether this change was made by an administrator.
+        """
         if not self.hs.is_mine(target_user):
             raise SynapseError(400, "User is not hosted on this homeserver")
 
@@ -277,6 +284,12 @@ class BaseProfileHandler(BaseHandler):
             return
 
         await self.ratelimit(requester)
+
+        # Do not actually update the room state for shadow-banned users.
+        if requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            return
 
         room_ids = await self.store.get_rooms_for_user(target_user.to_string())
 

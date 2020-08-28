@@ -73,6 +73,7 @@ class UsersRestServletV2(RestServlet):
     The parameters `from` and `limit` are required only for pagination.
     By default, a `limit` of 100 is used.
     The parameter `user_id` can be used to filter by user id.
+    The parameter `name` can be used to filter by user id or display name.
     The parameter `guests` can be used to exclude guest users.
     The parameter `deactivated` can be used to include deactivated users.
     """
@@ -89,11 +90,12 @@ class UsersRestServletV2(RestServlet):
         start = parse_integer(request, "from", default=0)
         limit = parse_integer(request, "limit", default=100)
         user_id = parse_string(request, "user_id", default=None)
+        name = parse_string(request, "name", default=None)
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
         users, total = await self.store.get_users_paginate(
-            start, limit, user_id, guests, deactivated
+            start, limit, user_id, name, guests, deactivated
         )
         ret = {"users": users, "total": total}
         if len(users) >= limit:

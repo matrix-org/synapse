@@ -1,0 +1,1 @@
+Refactor some of `LoginRestServlet`'s helper methods, and move them to `AuthHandler` for easier reuse.

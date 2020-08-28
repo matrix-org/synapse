@@ -21,15 +21,14 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from canonicaljson import json
-
 from synapse.api.constants import EventTypes
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchStore
-from synapse.types import ThirdPartyInstanceID
+from synapse.types import JsonDict, ThirdPartyInstanceID
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -74,15 +73,15 @@ class RoomWorkerStore(SQLBaseStore):
 
         self.config = hs.config
 
-    def get_room(self, room_id):
+    async def get_room(self, room_id: str) -> dict:
         """Retrieve a room.
 
         Args:
-            room_id (str): The ID of the room to retrieve.
+            room_id: The ID of the room to retrieve.
         Returns:
             A dict containing the room information, or None if the room is unknown.
         """
-        return self.db_pool.simple_select_one(
+        return await self.db_pool.simple_select_one(
             table="rooms",
             keyvalues={"room_id": room_id},
             retcols=("room_id", "is_public", "creator"),
@@ -126,8 +125,8 @@ class RoomWorkerStore(SQLBaseStore):
             "get_room_with_stats", get_room_with_stats_txn, room_id
         )
 
-    def get_public_room_ids(self):
-        return self.db_pool.simple_select_onecol(
+    async def get_public_room_ids(self) -> List[str]:
+        return await self.db_pool.simple_select_onecol(
             table="rooms",
             keyvalues={"is_public": True},
             retcol="room_id",
@@ -331,8 +330,8 @@ class RoomWorkerStore(SQLBaseStore):
         return ret_val
 
     @cached(max_entries=10000)
-    def is_room_blocked(self, room_id):
-        return self.db_pool.simple_select_one_onecol(
+    async def is_room_blocked(self, room_id: str) -> Optional[bool]:
+        return await self.db_pool.simple_select_one_onecol(
             table="blocked_rooms",
             keyvalues={"room_id": room_id},
             retcol="1",
@@ -1130,7 +1129,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                         },
                     )
 
-            with self._public_room_id_gen.get_next() as next_id:
+            with await self._public_room_id_gen.get_next() as next_id:
                 await self.db_pool.runInteraction(
                     "store_room_txn", store_room_txn, next_id
                 )
@@ -1197,7 +1196,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
 
-        with self._public_room_id_gen.get_next() as next_id:
+        with await self._public_room_id_gen.get_next() as next_id:
             await self.db_pool.runInteraction(
                 "set_room_is_public", set_room_is_public_txn, next_id
             )
@@ -1277,7 +1276,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
 
-        with self._public_room_id_gen.get_next() as next_id:
+        with await self._public_room_id_gen.get_next() as next_id:
             await self.db_pool.runInteraction(
                 "set_room_is_public_appservice",
                 set_room_is_public_appservice_txn,
@@ -1297,11 +1296,17 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         return self.db_pool.runInteraction("get_rooms", f)
 
-    def add_event_report(
-        self, room_id, event_id, user_id, reason, content, received_ts
-    ):
+    async def add_event_report(
+        self,
+        room_id: str,
+        event_id: str,
+        user_id: str,
+        reason: str,
+        content: JsonDict,
+        received_ts: int,
+    ) -> None:
         next_id = self._event_reports_id_gen.get_next()
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="event_reports",
             values={
                 "id": next_id,
@@ -1310,7 +1315,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 "event_id": event_id,
                 "user_id": user_id,
                 "reason": reason,
-                "content": json.dumps(content),
+                "content": json_encoder.encode(content),
             },
             desc="add_event_report",
         )

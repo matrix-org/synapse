@@ -19,11 +19,16 @@ ARG PYTHON_VERSION=3.7
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
-
-
 RUN apt-get update && apt-get install -y \
     build-essential \
+    libffi-dev \
+    libjpeg-dev \
     libpq-dev \
+    libssl-dev \
+    libwebp-dev \
+    libxml++2.6-dev \
+    libxslt1-dev \
+    zlib1g-dev \
  && rm -rf /var/lib/apt/lists/*
 
 # Build dependencies that are not available as wheels, to speed up rebuilds
@@ -55,9 +60,12 @@ RUN pip install --prefix="/install" --no-warn-script-location \
 FROM docker.io/python:${PYTHON_VERSION}-slim
 
 RUN apt-get update && apt-get install -y \
-    libpq5 \
-    xmlsec1 \
+    curl \
     gosu \
+    libjpeg62-turbo \
+    libpq5 \
+    libwebp6 \
+    xmlsec1 \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
@@ -69,3 +77,6 @@ VOLUME ["/data"]
 EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]
+
+HEALTHCHECK --interval=1m --timeout=5s \
+  CMD curl -fSs http://localhost:8008/health || exit 1
