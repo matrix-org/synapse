@@ -14,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -101,7 +102,7 @@ class DeviceWorkerStore(SQLBaseStore):
             update included in the response), and the list of updates, where
             each update is a pair of EDU type and EDU contents.
         """
-        now_stream_id = self._device_list_id_gen.get_current_token()
+        now_stream_id = self.get_device_stream_token()
 
         has_changed = self._device_list_federation_stream_cache.has_entity_changed(
             destination, int(from_stream_id)
@@ -412,8 +413,10 @@ class DeviceWorkerStore(SQLBaseStore):
             },
         )
 
+    @abc.abstractmethod
     def get_device_stream_token(self) -> int:
-        return self._device_list_id_gen.get_current_token()
+        """Get the current stream id from the _device_list_id_gen"""
+        ...
 
     @trace
     async def get_user_devices_from_cache(

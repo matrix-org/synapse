@@ -14,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
@@ -48,7 +49,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
     def _get_e2e_device_keys_for_federation_query(
         self, txn: LoggingTransaction, user_id: str
     ) -> Tuple[int, List[JsonDict]]:
-        now_stream_id = self._device_list_id_gen.get_current_token()
+        now_stream_id = self.get_device_stream_token()
 
         devices = self._get_e2e_device_keys_txn(txn, [(user_id, None)])
 
@@ -586,6 +587,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             "get_all_user_signature_changes_for_remotes",
             _get_all_user_signature_changes_for_remotes_txn,
         )
+
+    @abc.abstractmethod
+    def get_device_stream_token(self) -> int:
+        """Get the current stream id from the _device_list_id_gen"""
+        ...
 
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
