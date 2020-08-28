@@ -46,7 +46,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             user_id,
         )
 
-    def _get_e2e_device_keys_for_federation_query(
+    def _get_e2e_device_keys_for_federation_query_txn(
         self, txn: LoggingTransaction, user_id: str
     ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self.get_device_stream_token()
