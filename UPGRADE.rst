@@ -95,7 +95,7 @@ been emailed to them.
 
 To complete password reset, the page must include a way to make a `POST`
 request to
-``/_matrix/client/unstable/password_reset/{medium}/submit_token_confirm``
+``/_matrix/client/unstable/password_reset/{medium}/submit_token``
 with the query parameters from the original link, encoded as a URL-encoded form. See the file
 itself for more details.
 

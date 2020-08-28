@@ -255,8 +255,8 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
-        # Replace the path with the confirmation path
-        path = "/_matrix/client/unstable/password_reset/email/submit_token_confirm"
+        # Now POST to the same endpoint, mimicking the same behaviour as clicking the
+        # password reset confirm button
 
         # Send arguments as url-encoded form data, matching the template's behaviour
         form_args = []
