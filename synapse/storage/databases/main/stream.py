@@ -539,7 +539,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
 
         return rows, token
 
-    def get_room_event_before_stream_ordering(self, room_id: str, stream_ordering: int):
+    async def get_room_event_before_stream_ordering(
+        self, room_id: str, stream_ordering: int
+    ) -> Tuple[int, int, str]:
         """Gets details of the first event in a room at or before a stream ordering
 
         Args:
@@ -547,8 +549,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             stream_ordering:
 
         Returns:
-            Deferred[(int, int, str)]:
-                (stream ordering, topological ordering, event_id)
+            A tuple of (stream ordering, topological ordering, event_id)
         """
 
         def _f(txn):
@@ -563,7 +564,9 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore):
             txn.execute(sql, (room_id, stream_ordering))
             return txn.fetchone()
 
-        return self.db_pool.runInteraction("get_room_event_before_stream_ordering", _f)
+        return await self.db_pool.runInteraction(
+            "get_room_event_before_stream_ordering", _f
+        )
 
     async def get_room_events_max_id(self, room_id: Optional[str] = None) -> str:
         """Returns the current token for rooms stream.
