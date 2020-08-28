@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Set
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
@@ -360,7 +360,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     @cached(max_entries=500000, iterable=True)
     async def get_rooms_for_user_with_stream_ordering(
         self, user_id: str
-    ) -> frozenset[GetRoomsForUserWithStreamOrdering]:
+    ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
@@ -381,7 +381,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     def _get_rooms_for_user_with_stream_ordering_txn(
         self, txn, user_id: str
-    ) -> frozenset[GetRoomsForUserWithStreamOrdering]:
+    ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         # We use `current_state_events` here and not `local_current_membership`
         # as a) this gets called with remote users and b) this only gets called
         # for rooms the server is participating in.
