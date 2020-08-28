@@ -50,7 +50,6 @@ from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import (
-    Collection,
     Requester,
     RoomAlias,
     StreamToken,
@@ -446,7 +445,7 @@ class EventCreationHandler(object):
         event_dict: dict,
         token_id: Optional[str] = None,
         txn_id: Optional[str] = None,
-        prev_event_ids: Optional[Collection[str]] = None,
+        prev_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
     ) -> Tuple[EventBase, EventContext]:
         """
@@ -786,7 +785,7 @@ class EventCreationHandler(object):
         self,
         builder: EventBuilder,
         requester: Optional[Requester] = None,
-        prev_event_ids: Optional[Collection[str]] = None,
+        prev_event_ids: Optional[List[str]] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 

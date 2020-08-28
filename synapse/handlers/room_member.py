@@ -39,7 +39,6 @@ from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
 from synapse.storage.roommember import RoomsForUser
 from synapse.types import (
-    Collection,
     JsonDict,
     Requester,
     RoomAlias,
@@ -184,7 +183,7 @@ class RoomMemberHandler(object):
         target: UserID,
         room_id: str,
         membership: str,
-        prev_event_ids: Collection[str],
+        prev_event_ids: List[str],
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
