@@ -217,7 +217,7 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
         Args:
             hs: server
         """
-        super(PasswordResetConfirmationSubmitTokenServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
