@@ -48,10 +48,6 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
             "DeviceListFederationStreamChangeCache", device_list_max
         )
 
-    def _get_current_device_list_stream_id(self) -> int:
-        """Get the current stream id from the _device_list_id_gen"""
-        return self._device_list_id_gen.get_current_token()
-
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == DeviceListsStream.NAME:
             self._device_list_id_gen.advance(instance_name, token)
