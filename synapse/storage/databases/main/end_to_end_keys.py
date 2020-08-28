@@ -22,7 +22,8 @@ from twisted.enterprise.adbapi import Connection
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import make_in_list_sql_clause
+from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
@@ -32,6 +33,51 @@ if TYPE_CHECKING:
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
+    def get_devices_with_keys_by_user(self, user_id: str):
+        """Get all devices (with any device keys) for a user
+
+        Returns:
+            Deferred which resolves to (stream_id, devices)
+        """
+        return self.db_pool.runInteraction(
+            "get_devices_with_keys_by_user",
+            self._get_devices_with_keys_by_user_txn,
+            user_id,
+        )
+
+    def _get_devices_with_keys_by_user_txn(
+        self, txn: LoggingTransaction, user_id: str
+    ) -> Tuple[int, List[JsonDict]]:
+        now_stream_id = self._device_list_id_gen.get_current_token()
+
+        devices = self._get_e2e_device_keys_txn(txn, [(user_id, None)])
+
+        if devices:
+            user_devices = devices[user_id]
+            results = []
+            for device_id, device in user_devices.items():
+                result = {"device_id": device_id}
+
+                key_json = device.get("key_json", None)
+                if key_json:
+                    result["keys"] = db_to_json(key_json)
+
+                    if "signatures" in device:
+                        for sig_user_id, sigs in device["signatures"].items():
+                            result["keys"].setdefault("signatures", {}).setdefault(
+                                sig_user_id, {}
+                            ).update(sigs)
+
+                device_display_name = device.get("device_display_name", None)
+                if device_display_name:
+                    result["device_display_name"] = device_display_name
+
+                results.append(result)
+
+            return now_stream_id, results
+
+        return now_stream_id, []
+
     @trace
     async def get_e2e_device_keys(
         self, query_list, include_all_devices=False, include_deleted_devices=False
