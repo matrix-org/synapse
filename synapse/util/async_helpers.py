@@ -17,9 +17,10 @@
 import collections
 import logging
 from contextlib import contextmanager
-from typing import ContextManager, Dict, Sequence, Set, Union
+from typing import Dict, Sequence, Set, Union
 
 import attr
+from typing_extensions import ContextManager
 
 from twisted.internet import defer
 from twisted.internet.defer import CancelledError
