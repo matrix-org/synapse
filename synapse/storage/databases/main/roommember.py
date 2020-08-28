@@ -15,7 +15,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Awaitable, Iterable, List, Optional, Set
+from typing import TYPE_CHECKING, Dict, FrozenSet, Iterable, List, Optional, Set
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
@@ -152,8 +152,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             )
 
     @cached(max_entries=100000, iterable=True)
-    def get_users_in_room(self, room_id: str):
-        return self.db_pool.runInteraction(
+    async def get_users_in_room(self, room_id: str) -> List[str]:
+        return await self.db_pool.runInteraction(
             "get_users_in_room", self.get_users_in_room_txn, room_id
         )
 
@@ -180,14 +180,13 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return [r[0] for r in txn]
 
     @cached(max_entries=100000)
-    def get_room_summary(self, room_id: str):
+    async def get_room_summary(self, room_id: str) -> Dict[str, MemberSummary]:
         """ Get the details of a room roughly suitable for use by the room
         summary extension to /sync. Useful when lazy loading room members.
         Args:
             room_id: The room ID to query
         Returns:
-            Deferred[dict[str, MemberSummary]:
-                dict of membership states, pointing to a MemberSummary named tuple.
+            dict of membership states, pointing to a MemberSummary named tuple.
         """
 
         def _get_room_summary_txn(txn):
@@ -261,20 +260,22 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
             return res
 
-        return self.db_pool.runInteraction("get_room_summary", _get_room_summary_txn)
+        return await self.db_pool.runInteraction(
+            "get_room_summary", _get_room_summary_txn
+        )
 
     @cached()
-    def get_invited_rooms_for_local_user(self, user_id: str) -> Awaitable[RoomsForUser]:
+    async def get_invited_rooms_for_local_user(self, user_id: str) -> RoomsForUser:
         """Get all the rooms the *local* user is invited to.
 
         Args:
             user_id: The user ID.
 
         Returns:
-            A awaitable list of RoomsForUser.
+            A list of RoomsForUser.
         """
 
-        return self.get_rooms_for_local_user_where_membership_is(
+        return await self.get_rooms_for_local_user_where_membership_is(
             user_id, [Membership.INVITE]
         )
 
@@ -357,7 +358,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return results
 
     @cached(max_entries=500000, iterable=True)
-    def get_rooms_for_user_with_stream_ordering(self, user_id: str):
+    async def get_rooms_for_user_with_stream_ordering(
+        self, user_id: str
+    ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
@@ -367,17 +370,18 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             user_id
 
         Returns:
-            Deferred[frozenset[GetRoomsForUserWithStreamOrdering]]: Returns
-            the rooms the user is in currently, along with the stream ordering
-            of the most recent join for that user and room.
+            Returns the rooms the user is in currently, along with the stream
+            ordering of the most recent join for that user and room.
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_rooms_for_user_with_stream_ordering",
             self._get_rooms_for_user_with_stream_ordering_txn,
             user_id,
         )
 
-    def _get_rooms_for_user_with_stream_ordering_txn(self, txn, user_id: str):
+    def _get_rooms_for_user_with_stream_ordering_txn(
+        self, txn, user_id: str
+    ) -> FrozenSet[GetRoomsForUserWithStreamOrdering]:
         # We use `current_state_events` here and not `local_current_membership`
         # as a) this gets called with remote users and b) this only gets called
         # for rooms the server is participating in.
@@ -404,9 +408,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             """
 
         txn.execute(sql, (user_id, Membership.JOIN))
-        results = frozenset(GetRoomsForUserWithStreamOrdering(*row) for row in txn)
-
-        return results
+        return frozenset(GetRoomsForUserWithStreamOrdering(*row) for row in txn)
 
     async def get_users_server_still_shares_room_with(
         self, user_ids: Collection[str]
@@ -711,14 +713,14 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         return count == 0
 
     @cached()
-    def get_forgotten_rooms_for_user(self, user_id: str):
+    async def get_forgotten_rooms_for_user(self, user_id: str) -> Set[str]:
         """Gets all rooms the user has forgotten.
 
         Args:
-            user_id
+            user_id: The user ID to query the rooms of.
 
         Returns:
-            Deferred[set[str]]
+            The forgotten rooms.
         """
 
         def _get_forgotten_rooms_for_user_txn(txn):
@@ -744,7 +746,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             txn.execute(sql, (user_id,))
             return {row[0] for row in txn if row[1] == 0}
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_forgotten_rooms_for_user", _get_forgotten_rooms_for_user_txn
         )
 
@@ -973,7 +975,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super(RoomMemberStore, self).__init__(database, db_conn, hs)
 
-    def forget(self, user_id: str, room_id: str):
+    async def forget(self, user_id: str, room_id: str) -> None:
         """Indicate that user_id wishes to discard history for room_id."""
 
         def f(txn):
@@ -994,7 +996,7 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
                 txn, self.get_forgotten_rooms_for_user, (user_id,)
             )
 
-        return self.db_pool.runInteraction("forget_membership", f)
+        await self.db_pool.runInteraction("forget_membership", f)
 
 
 class _JoinedHostsCache(object):
