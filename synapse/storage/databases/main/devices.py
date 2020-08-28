@@ -291,15 +291,9 @@ class DeviceWorkerStore(SQLBaseStore):
                 prev_id = stream_id
 
                 if device is not None:
-                    key_json = device.key_json
-                    if key_json:
-                        result["keys"] = db_to_json(key_json)
-
-                        if device.signatures:
-                            for sig_user_id, sigs in device.signatures.items():
-                                result["keys"].setdefault("signatures", {}).setdefault(
-                                    sig_user_id, {}
-                                ).update(sigs)
+                    keys = device.keys
+                    if keys:
+                        result["keys"] = keys
 
                     device_display_name = device.display_name
                     if device_display_name:
