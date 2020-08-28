@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -70,7 +70,9 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_invited_users_in_group",
         )
 
-    async def get_rooms_in_group(self, group_id: str, include_private: bool = False):
+    async def get_rooms_in_group(
+        self, group_id: str, include_private: bool = False
+    ) -> List[Dict[str, Union[str, bool]]]:
         """Retrieve the rooms that belong to a given group. Does not return rooms that
         lack members.
 
@@ -79,8 +81,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             include_private: Whether to return private rooms in results
 
         Returns:
-            List[Dict[str, str|bool]]: A list of dictionaries, each in the
-            form of:
+            A list of dictionaries, each in the form of:
 
             {
               "room_id": "!a_room_id:example.com",  # The ID of the room
@@ -123,7 +124,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
     async def get_rooms_for_summary_by_category(
         self, group_id: str, include_private: bool = False,
-    ):
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """Get the rooms and categories that should be included in a summary request
 
         Args:
@@ -131,7 +132,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             include_private: Whether to return private rooms in results
 
         Returns:
-            Tuple[List, Dict]: A tuple containing:
+            A tuple containing:
 
                 * A list of dictionaries with the keys:
                     * "room_id": str, the room ID
@@ -603,8 +604,25 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     async def add_room_to_summary(
-        self, group_id, room_id, category_id, order, is_public
+        self,
+        group_id: str,
+        room_id: str,
+        category_id: str,
+        order: int,
+        is_public: Optional[bool],
     ) -> None:
+        """Add (or update) room's entry in summary.
+
+        Args:
+            group_id
+            room_id
+            category_id: If not None then adds the category to the end of
+                the summary if its not already there.
+            order: If not None inserts the room at that position, e.g. an order
+                of 1 will put the room first. Otherwise, the room gets added to
+                the end.
+            is_public
+        """
         await self.db_pool.runInteraction(
             "add_room_to_summary",
             self._add_room_to_summary_txn,
@@ -616,18 +634,26 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def _add_room_to_summary_txn(
-        self, txn, group_id, room_id, category_id, order, is_public
-    ):
+        self,
+        txn,
+        group_id: str,
+        room_id: str,
+        category_id: str,
+        order: int,
+        is_public: Optional[bool],
+    ) -> None:
         """Add (or update) room's entry in summary.
 
         Args:
-            group_id (str)
-            room_id (str)
-            category_id (str): If not None then adds the category to the end of
-                the summary if its not already there. [Optional]
-            order (int): If not None inserts the room at that position, e.g.
-                an order of 1 will put the room first. Otherwise, the room gets
-                added to the end.
+            txn
+            group_id
+            room_id
+            category_id: If not None then adds the category to the end of
+                the summary if its not already there.
+            order: If not None inserts the room at that position, e.g. an order
+                of 1 will put the room first. Otherwise, the room gets added to
+                the end.
+            is_public
         """
         room_in_group = self.db_pool.simple_select_one_onecol_txn(
             txn,
@@ -823,8 +849,25 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     async def add_user_to_summary(
-        self, group_id, user_id, role_id, order, is_public
+        self,
+        group_id: str,
+        user_id: str,
+        role_id: str,
+        order: int,
+        is_public: Optional[bool],
     ) -> None:
+        """Add (or update) user's entry in summary.
+
+        Args:
+            group_id
+            user_id
+            role_id: If not None then adds the role to the end of the summary if
+                its not already there.
+            order: If not None inserts the user at that position, e.g. an order
+                of 1 will put the user first. Otherwise, the user gets added to
+                the end.
+            is_public
+        """
         await self.db_pool.runInteraction(
             "add_user_to_summary",
             self._add_user_to_summary_txn,
@@ -836,18 +879,26 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def _add_user_to_summary_txn(
-        self, txn, group_id, user_id, role_id, order, is_public
+        self,
+        txn,
+        group_id: str,
+        user_id: str,
+        role_id: str,
+        order: int,
+        is_public: Optional[bool],
     ):
         """Add (or update) user's entry in summary.
 
         Args:
-            group_id (str)
-            user_id (str)
-            role_id (str): If not None then adds the role to the end of
-                the summary if its not already there. [Optional]
-            order (int): If not None inserts the user at that position, e.g.
-                an order of 1 will put the user first. Otherwise, the user gets
-                added to the end.
+            txn
+            group_id
+            user_id
+            role_id: If not None then adds the role to the end of the summary if
+                its not already there.
+            order: If not None inserts the user at that position, e.g. an order
+                of 1 will put the user first. Otherwise, the user gets added to
+                the end.
+            is_public
         """
         user_in_group = self.db_pool.simple_select_one_onecol_txn(
             txn,
@@ -971,25 +1022,24 @@ class GroupServerStore(GroupServerWorkerStore):
 
     async def add_user_to_group(
         self,
-        group_id,
-        user_id,
-        is_admin=False,
-        is_public=True,
-        local_attestation=None,
-        remote_attestation=None,
+        group_id: str,
+        user_id: str,
+        is_admin: bool = False,
+        is_public: bool = True,
+        local_attestation: dict = None,
+        remote_attestation: dict = None,
     ) -> None:
         """Add a user to the group server.
 
         Args:
-            group_id (str)
-            user_id (str)
-            is_admin (bool)
-            is_public (bool)
-            local_attestation (dict): The attestation the GS created to give
-                to the remote server. Optional if the user and group are on the
-                same server
-            remote_attestation (dict): The attestation given to GS by remote
+            group_id
+            user_id
+            is_admin
+            is_public
+            local_attestation: The attestation the GS created to give to the remote
                 server. Optional if the user and group are on the same server
+            remote_attestation: The attestation given to GS by remote server.
+                Optional if the user and group are on the same server
         """
 
         def _add_user_to_group_txn(txn):
@@ -1034,7 +1084,7 @@ class GroupServerStore(GroupServerWorkerStore):
 
         await self.db_pool.runInteraction("add_user_to_group", _add_user_to_group_txn)
 
-    async def remove_user_from_group(self, group_id, user_id):
+    async def remove_user_from_group(self, group_id: str, user_id: str) -> None:
         def _remove_user_from_group_txn(txn):
             self.db_pool.simple_delete_txn(
                 txn,
@@ -1085,7 +1135,7 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_room_in_group_visibility",
         )
 
-    async def remove_room_from_group(self, group_id, room_id):
+    async def remove_room_from_group(self, group_id: str, room_id: str) -> None:
         def _remove_room_from_group_txn(txn):
             self.db_pool.simple_delete_txn(
                 txn,

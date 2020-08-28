@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
@@ -56,18 +57,20 @@ class TransactionStore(SQLBaseStore):
             expiry_ms=5 * 60 * 1000,
         )
 
-    async def get_received_txn_response(self, transaction_id, origin):
+    async def get_received_txn_response(
+        self, transaction_id: str, origin: str
+    ) -> Optional[Tuple[int, JsonDict]]:
         """For an incoming transaction from a given origin, check if we have
         already responded to it. If so, return the response code and response
         body (as a dict).
 
         Args:
-            transaction_id (str)
-            origin(str)
+            transaction_id
+            origin
 
         Returns:
-            Tuple|None: None if we have not previously responded to
-            this transaction or a 2-tuple of (int, dict)
+            None if we have not previously responded to this transaction or a
+            2-tuple of (int, dict)
         """
 
         return await self.db_pool.runInteraction(
@@ -167,16 +170,20 @@ class TransactionStore(SQLBaseStore):
             return None
 
     async def set_destination_retry_timings(
-        self, destination, failure_ts, retry_last_ts, retry_interval
-    ):
+        self,
+        destination: str,
+        failure_ts: Optional[int],
+        retry_last_ts: int,
+        retry_interval: int,
+    ) -> None:
         """Sets the current retry timings for a given destination.
         Both timings should be zero if retrying is no longer occuring.
 
         Args:
-            destination (str)
-            failure_ts (int|None) - when the server started failing (ms since epoch)
-            retry_last_ts (int) - time of last retry attempt in unix epoch ms
-            retry_interval (int) - how long until next retry in ms
+            destination
+            failure_ts: when the server started failing (ms since epoch)
+            retry_last_ts: time of last retry attempt in unix epoch ms
+            retry_interval: how long until next retry in ms
         """
 
         self._destination_retry_cache.pop(destination, None)

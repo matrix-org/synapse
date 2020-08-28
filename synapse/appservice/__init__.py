@@ -14,10 +14,15 @@
 # limitations under the License.
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from synapse.api.constants import EventTypes
+from synapse.appservice.api import ApplicationServiceApi
 from synapse.types import GroupID, get_domain_from_id
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.storage.databases.main import DataStore
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +40,11 @@ class AppServiceTransaction(object):
         self.id = id
         self.events = events
 
-    async def send(self, as_api) -> bool:
+    async def send(self, as_api: ApplicationServiceApi) -> bool:
         """Sends this transaction using the provided AS API interface.
 
         Args:
-            as_api(ApplicationServiceApi): The API to use to send.
+            as_api: The API to use to send.
         Returns:
             True if the transaction was sent.
         """
@@ -47,7 +52,7 @@ class AppServiceTransaction(object):
             service=self.service, events=self.events, txn_id=self.id
         )
 
-    async def complete(self, store) -> None:
+    async def complete(self, store: "DataStore") -> None:
         """Completes this transaction as successful.
 
         Marks this transaction ID on the application service and removes the
