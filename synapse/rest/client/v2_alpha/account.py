@@ -185,6 +185,11 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "Email-based password resets are disabled on this server"
             )
+        elif self._threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            raise SynapseError(
+                400,
+                "Password resets for this homeserver are handled by a separate program",
+            )
 
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)
@@ -243,6 +248,11 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
                 )
             raise SynapseError(
                 400, "Email-based password resets are disabled on this server"
+            )
+        elif self._threepid_behaviour_email == ThreepidBehaviour.REMOTE:
+            raise SynapseError(
+                400,
+                "Password resets for this homeserver are handled by a separate program",
             )
 
         sid = parse_string(request, "sid", required=True)
