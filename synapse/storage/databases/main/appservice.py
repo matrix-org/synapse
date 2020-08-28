@@ -172,7 +172,7 @@ class ApplicationServiceTransactionWorkerStore(
             "application_services_state", {"as_id": service.id}, {"state": state}
         )
 
-    def create_appservice_txn(self, service, events):
+    async def create_appservice_txn(self, service, events):
         """Atomically creates a new transaction for this application service
         with the given list of events.
 
@@ -209,20 +209,17 @@ class ApplicationServiceTransactionWorkerStore(
             )
             return AppServiceTransaction(service=service, id=new_txn_id, events=events)
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "create_appservice_txn", _create_appservice_txn
         )
 
-    def complete_appservice_txn(self, txn_id, service):
+    async def complete_appservice_txn(self, txn_id, service) -> None:
         """Completes an application service transaction.
 
         Args:
             txn_id(str): The transaction ID being completed.
             service(ApplicationService): The application service which was sent
             this transaction.
-        Returns:
-            A Deferred which resolves if this transaction was stored
-            successfully.
         """
         txn_id = int(txn_id)
 
@@ -258,7 +255,7 @@ class ApplicationServiceTransactionWorkerStore(
                 {"txn_id": txn_id, "as_id": service.id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "complete_appservice_txn", _complete_appservice_txn
         )
 
@@ -312,13 +309,13 @@ class ApplicationServiceTransactionWorkerStore(
         else:
             return int(last_txn_id[0])  # select 'last_txn' col
 
-    def set_appservice_last_pos(self, pos):
+    async def set_appservice_last_pos(self, pos) -> None:
         def set_appservice_last_pos_txn(txn):
             txn.execute(
                 "UPDATE appservice_stream_position SET stream_ordering = ?", (pos,)
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "set_appservice_last_pos", set_appservice_last_pos_txn
         )
 
