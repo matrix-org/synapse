@@ -32,7 +32,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import EventBase
-from synapse.types import StateMap
+from synapse.types import MutableStateMap, StateMap
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ async def resolve_events_with_store(
 
 def _seperate(
     state_sets: Iterable[StateMap[str]],
-) -> Tuple[StateMap[str], StateMap[Set[str]]]:
+) -> Tuple[MutableStateMap[str], MutableStateMap[Set[str]]]:
     """Takes the state_sets and figures out which keys are conflicted and
     which aren't. i.e., which have multiple different event_ids associated
     with them in different state sets.
@@ -152,7 +152,7 @@ def _seperate(
     """
     state_set_iterator = iter(state_sets)
     unconflicted_state = dict(next(state_set_iterator))
-    conflicted_state = {}  # type: StateMap[Set[str]]
+    conflicted_state = {}  # type: MutableStateMap[Set[str]]
 
     for state_set in state_set_iterator:
         for key, value in state_set.items():
@@ -208,7 +208,7 @@ def _create_auth_events_from_maps(
 
 
 def _resolve_with_state(
-    unconflicted_state_ids: StateMap[str],
+    unconflicted_state_ids: MutableStateMap[str],
     conflicted_state_ids: StateMap[Set[str]],
     auth_event_ids: StateMap[str],
     state_map: Dict[str, EventBase],
@@ -241,7 +241,7 @@ def _resolve_with_state(
 
 
 def _resolve_state_events(
-    conflicted_state: StateMap[List[EventBase]], auth_events: StateMap[EventBase]
+    conflicted_state: StateMap[List[EventBase]], auth_events: MutableStateMap[EventBase]
 ) -> StateMap[EventBase]:
     """ This is where we actually decide which of the conflicted state to
     use.
