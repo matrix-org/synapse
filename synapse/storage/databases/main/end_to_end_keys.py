@@ -43,9 +43,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             (stream_id, devices)
         """
         now_stream_id = self._get_current_device_list_stream_id()
-        devices = await self.get_e2e_device_keys(
-            [(user_id, None)], include_all_devices=True
-        )
+        devices = await self.get_e2e_device_keys([(user_id, None)])
         user_devices = devices.get("user_id", {})
         results = []
         for device_id, device in user_devices.items():
