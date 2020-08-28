@@ -1,6 +1,7 @@
 import json
 import logging
 from io import BytesIO
+from json.decoder import JSONDecodeError
 
 import attr
 from zope.interface import implementer
@@ -195,7 +196,19 @@ def make_request(
         )
 
     if content:
-        req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
+        content_is_json = True
+        try:
+            json.loads(content)
+        except JSONDecodeError:
+            content_is_json = False
+
+        print("Content is json?", content_is_json, path)
+        if content_is_json:
+            req.requestHeaders.addRawHeader(b"Content-Type", b"application/json")
+        else:
+            req.requestHeaders.addRawHeader(
+                b"Content-Type", b"application/x-www-form-urlencoded"
+            )
 
     req.requestReceived(method, path, b"1.1")
 

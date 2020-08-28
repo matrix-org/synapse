@@ -19,6 +19,7 @@ import random
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
+from twisted.web.server import Request
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     Codes,
@@ -240,7 +241,7 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
                 hs.config.email_password_reset_template_failure_html
             )
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: Request):
         if self._threepid_behaviour_email == ThreepidBehaviour.OFF:
             if self._local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
@@ -254,6 +255,9 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
                 400,
                 "Password resets for this homeserver are handled by a separate program",
             )
+
+        logger.info("ARGS: %s, CONTENT: %s, HEADERS: %s", request.args, request.content,
+                    request.getAllHeaders())
 
         sid = parse_string(request, "sid", required=True)
         token = parse_string(request, "token", required=True)

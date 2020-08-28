@@ -16,9 +16,11 @@
 # limitations under the License.
 
 import json
+from urllib.parse import urlencode
 import os
 import re
 from email.parser import Parser
+from tests.test_utils.http import convert_request_args_to_form_data
 
 import pkg_resources
 
@@ -70,6 +72,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
+    @unittest.INFO
     def test_basic_password_reset(self):
         """Test basic password reset flow
         """
@@ -256,15 +259,17 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
         # Replace the path with the confirmation path
-        path = re.sub(
-            "^/_matrix.*submit_token",
-            "/_matrix/client/unstable/password_reset/email/submit_token_confirm",
-            path,
-        )
+        path = "/_matrix/client/unstable/password_reset/email/submit_token_confirm"
 
         # Confirm the password reset
-        request, channel = self.make_request("POST", path, shorthand=False)
+        request, channel = self.make_request(
+            "POST",
+            path,
+            content=urlencode(request.args).encode("utf8"),
+            shorthand=False,
+        )
         self.render(request)
+        print(channel.json_body)
         self.assertEquals(200, channel.code, channel.result)
 
     def _get_link_from_email(self):
