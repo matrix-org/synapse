@@ -498,9 +498,7 @@ class DeviceWorkerStore(SQLBaseStore):
     ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self._device_list_id_gen.get_current_token()
 
-        devices = self._get_e2e_device_keys_txn(
-            txn, [(user_id, None)], include_all_devices=True
-        )
+        devices = self._get_e2e_device_keys_txn(txn, [(user_id, None)])
 
         if devices:
             user_devices = devices[user_id]
@@ -716,11 +714,11 @@ class DeviceWorkerStore(SQLBaseStore):
 
         return {row["user_id"] for row in rows}
 
-    def mark_remote_user_device_cache_as_stale(self, user_id: str):
+    async def mark_remote_user_device_cache_as_stale(self, user_id: str) -> None:
         """Records that the server has reason to believe the cache of the devices
         for the remote users is out of date.
         """
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="device_lists_remote_resync",
             keyvalues={"user_id": user_id},
             values={},

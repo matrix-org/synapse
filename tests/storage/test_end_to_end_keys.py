@@ -32,7 +32,9 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
 
         yield defer.ensureDeferred(self.store.store_device("user", "device", None))
 
-        yield self.store.set_e2e_device_keys("user", "device", now, json)
+        yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user", "device", now, json)
+        )
 
         res = yield defer.ensureDeferred(
             self.store.get_e2e_device_keys((("user", "device"),))
@@ -49,12 +51,16 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
 
         yield defer.ensureDeferred(self.store.store_device("user", "device", None))
 
-        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        changed = yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user", "device", now, json)
+        )
         self.assertTrue(changed)
 
         # If we try to upload the same key then we should be told nothing
         # changed
-        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        changed = yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user", "device", now, json)
+        )
         self.assertFalse(changed)
 
     @defer.inlineCallbacks
@@ -62,7 +68,9 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         now = 1470174257070
         json = {"key": "value"}
 
-        yield self.store.set_e2e_device_keys("user", "device", now, json)
+        yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user", "device", now, json)
+        )
         yield defer.ensureDeferred(
             self.store.store_device("user", "device", "display_name")
         )
@@ -86,10 +94,18 @@ class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
         yield defer.ensureDeferred(self.store.store_device("user2", "device1", None))
         yield defer.ensureDeferred(self.store.store_device("user2", "device2", None))
 
-        yield self.store.set_e2e_device_keys("user1", "device1", now, {"key": "json11"})
-        yield self.store.set_e2e_device_keys("user1", "device2", now, {"key": "json12"})
-        yield self.store.set_e2e_device_keys("user2", "device1", now, {"key": "json21"})
-        yield self.store.set_e2e_device_keys("user2", "device2", now, {"key": "json22"})
+        yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user1", "device1", now, {"key": "json11"})
+        )
+        yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user1", "device2", now, {"key": "json12"})
+        )
+        yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user2", "device1", now, {"key": "json21"})
+        )
+        yield defer.ensureDeferred(
+            self.store.set_e2e_device_keys("user2", "device2", now, {"key": "json22"})
+        )
 
         res = yield defer.ensureDeferred(
             self.store.get_e2e_device_keys((("user1", "device1"), ("user2", "device2")))

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List
+from typing import Dict, List
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
@@ -33,11 +33,11 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         self.hs = hs
 
     @cached(num_args=0)
-    def get_monthly_active_count(self):
+    async def get_monthly_active_count(self) -> int:
         """Generates current count of monthly active users
 
         Returns:
-            Defered[int]: Number of current monthly active users
+            Number of current monthly active users
         """
 
         def _count_users(txn):
@@ -46,10 +46,10 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             (count,) = txn.fetchone()
             return count
 
-        return self.db_pool.runInteraction("count_users", _count_users)
+        return await self.db_pool.runInteraction("count_users", _count_users)
 
     @cached(num_args=0)
-    def get_monthly_active_count_by_service(self):
+    async def get_monthly_active_count_by_service(self) -> Dict[str, int]:
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
@@ -57,8 +57,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         method to return anything other than native matrix users.
 
         Returns:
-            Deferred[dict]: dict that includes a mapping between app_service_id
-                and the number of occurrences.
+            A mapping between app_service_id and the number of occurrences.
 
         """
 
@@ -74,7 +73,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
             result = txn.fetchall()
             return dict(result)
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "count_users_by_service", _count_users_by_service
         )
 

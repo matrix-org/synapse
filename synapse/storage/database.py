@@ -28,7 +28,6 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
-    Union,
     overload,
 )
 
@@ -615,6 +614,7 @@ class DatabasePool(object):
         """Runs a single query for a result set.
 
         Args:
+            desc: description of the transaction, for logging and metrics
             decoder - The function which can resolve the cursor results to
                 something meaningful.
             query - The query string to execute
@@ -650,7 +650,7 @@ class DatabasePool(object):
             or_ignore: bool stating whether an exception should be raised
                 when a conflicting row already exists. If True, False will be
                 returned by the function instead
-            desc: string giving a description of the transaction
+            desc: description of the transaction, for logging and metrics
 
         Returns:
              Whether the row was inserted or not. Only useful when `or_ignore` is True
@@ -687,7 +687,7 @@ class DatabasePool(object):
         Args:
             table: string giving the table name
             values: dict of new column names and values for them
-            desc: string giving a description of the transaction
+            desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(desc, self.simple_insert_many_txn, table, values)
 
@@ -701,7 +701,6 @@ class DatabasePool(object):
             txn: The transaction to use.
             table: string giving the table name
             values: dict of new column names and values for them
-            desc: string giving a description of the transaction
         """
         if not values:
             return
@@ -756,6 +755,7 @@ class DatabasePool(object):
             keyvalues: The unique key columns and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            desc: description of the transaction, for logging and metrics
             lock: True to lock the table when doing the upsert.
         Returns:
             Native upserts always return None. Emulated upserts return True if a
@@ -1082,6 +1082,7 @@ class DatabasePool(object):
             retcols: list of strings giving the names of the columns to return
             allow_none: If true, return None instead of failing if the SELECT
                 statement returns no rows
+            desc: description of the transaction, for logging and metrics
         """
         return await self.runInteraction(
             desc, self.simple_select_one_txn, table, keyvalues, retcols, allow_none
@@ -1167,6 +1168,7 @@ class DatabasePool(object):
             table: table name
             keyvalues: column names and values to select the rows with
             retcol: column whos value we wish to retrieve.
+            desc: description of the transaction, for logging and metrics
 
         Returns:
             Results in a list
@@ -1191,6 +1193,7 @@ class DatabasePool(object):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+            desc: description of the transaction, for logging and metrics
 
         Returns:
             A list of dictionaries.
@@ -1244,14 +1247,16 @@ class DatabasePool(object):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Filters rows by whether the value of `column` is in `iterable`.
 
         Args:
             table: string giving the table name
             column: column name to test for inclusion against `iterable`
             iterable: list
-            keyvalues: dict of column names and values to select the rows with
             retcols: list of strings giving the names of the columns to return
+            keyvalues: dict of column names and values to select the rows with
+            desc: description of the transaction, for logging and metrics
+            batch_size: the number of rows for each select query
         """
         results = []  # type: List[Dict[str, Any]]
 
@@ -1292,7 +1297,7 @@ class DatabasePool(object):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Filters rows by whether the value of `column` is in `iterable`.
 
         Args:
             txn: Transaction object
@@ -1368,6 +1373,7 @@ class DatabasePool(object):
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
             updatevalues: dict giving column names and values to update
+            desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(
             desc, self.simple_update_one_txn, table, keyvalues, updatevalues
@@ -1427,6 +1433,7 @@ class DatabasePool(object):
         Args:
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
+            desc: description of the transaction, for logging and metrics
         """
         await self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
 
@@ -1452,13 +1459,38 @@ class DatabasePool(object):
         if txn.rowcount > 1:
             raise StoreError(500, "More than one row matched (%s)" % (table,))
 
-    def simple_delete(self, table: str, keyvalues: Dict[str, Any], desc: str):
-        return self.runInteraction(desc, self.simple_delete_txn, table, keyvalues)
+    async def simple_delete(
+        self, table: str, keyvalues: Dict[str, Any], desc: str
+    ) -> int:
+        """Executes a DELETE query on the named table.
+
+        Filters rows by the key-value pairs.
+
+        Args:
+            table: string giving the table name
+            keyvalues: dict of column names and values to select the row with
+            desc: description of the transaction, for logging and metrics
+
+        Returns:
+            The number of deleted rows.
+        """
+        return await self.runInteraction(desc, self.simple_delete_txn, table, keyvalues)
 
     @staticmethod
     def simple_delete_txn(
         txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any]
     ) -> int:
+        """Executes a DELETE query on the named table.
+
+        Filters rows by the key-value pairs.
+
+        Args:
+            table: string giving the table name
+            keyvalues: dict of column names and values to select the row with
+
+        Returns:
+            The number of deleted rows.
+        """
         sql = "DELETE FROM %s WHERE %s" % (
             table,
             " AND ".join("%s = ?" % (k,) for k in keyvalues),
@@ -1475,6 +1507,20 @@ class DatabasePool(object):
         keyvalues: Dict[str, Any],
         desc: str,
     ) -> int:
+        """Executes a DELETE query on the named table.
+
+        Filters rows by if value of `column` is in `iterable`.
+
+        Args:
+            table: string giving the table name
+            column: column name to test for inclusion against `iterable`
+            iterable: list
+            keyvalues: dict of column names and values to select the rows with
+            desc: description of the transaction, for logging and metrics
+
+        Returns:
+            Number rows deleted
+        """
         return await self.runInteraction(
             desc, self.simple_delete_many_txn, table, column, iterable, keyvalues
         )
@@ -1655,7 +1701,7 @@ class DatabasePool(object):
         term: Optional[str],
         col: str,
         retcols: Iterable[str],
-    ) -> Union[List[Dict[str, Any]], int]:
+    ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1667,14 +1713,14 @@ class DatabasePool(object):
             retcols: the names of the columns to return
 
         Returns:
-            0 if no term is given, otherwise a list of dictionaries.
+            None if no term is given, otherwise a list of dictionaries.
         """
         if term:
             sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
             termvalues = ["%%" + term + "%%"]
             txn.execute(sql, termvalues)
         else:
-            return 0
+            return None
 
         return cls.cursor_to_dict(txn)
 

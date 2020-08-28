@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from synapse.api.errors import SynapseError
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -70,7 +70,9 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_invited_users_in_group",
         )
 
-    def get_rooms_in_group(self, group_id: str, include_private: bool = False):
+    async def get_rooms_in_group(
+        self, group_id: str, include_private: bool = False
+    ) -> List[Dict[str, Union[str, bool]]]:
         """Retrieve the rooms that belong to a given group. Does not return rooms that
         lack members.
 
@@ -79,8 +81,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             include_private: Whether to return private rooms in results
 
         Returns:
-            Deferred[List[Dict[str, str|bool]]]: A list of dictionaries, each in the
-            form of:
+            A list of dictionaries, each in the form of:
 
             {
               "room_id": "!a_room_id:example.com",  # The ID of the room
@@ -117,13 +118,13 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for room_id, is_public in txn
             ]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_rooms_in_group", _get_rooms_in_group_txn
         )
 
-    def get_rooms_for_summary_by_category(
+    async def get_rooms_for_summary_by_category(
         self, group_id: str, include_private: bool = False,
-    ):
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """Get the rooms and categories that should be included in a summary request
 
         Args:
@@ -131,7 +132,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             include_private: Whether to return private rooms in results
 
         Returns:
-            Deferred[Tuple[List, Dict]]: A tuple containing:
+            A tuple containing:
 
                 * A list of dictionaries with the keys:
                     * "room_id": str, the room ID
@@ -207,7 +208,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return rooms, categories
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_rooms_for_summary", _get_rooms_for_summary_txn
         )
 
@@ -281,10 +282,11 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_local_groups_for_room",
         )
 
-    def get_users_for_summary_by_role(self, group_id, include_private=False):
+    async def get_users_for_summary_by_role(self, group_id, include_private=False):
         """Get the users and roles that should be included in a summary request
 
-        Returns ([users], [roles])
+        Returns:
+            ([users], [roles])
         """
 
         def _get_users_for_summary_txn(txn):
@@ -338,7 +340,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return users, roles
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_users_for_summary_by_role", _get_users_for_summary_txn
         )
 
@@ -376,7 +378,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             allow_none=True,
         )
 
-    def get_users_membership_info_in_group(self, group_id, user_id):
+    async def get_users_membership_info_in_group(self, group_id, user_id):
         """Get a dict describing the membership of a user in a group.
 
         Example if joined:
@@ -387,7 +389,8 @@ class GroupServerWorkerStore(SQLBaseStore):
                 "is_privileged": False,
             }
 
-        Returns an empty dict if the user is not join/invite/etc
+        Returns:
+             An empty dict if the user is not join/invite/etc
         """
 
         def _get_users_membership_in_group_txn(txn):
@@ -419,7 +422,7 @@ class GroupServerWorkerStore(SQLBaseStore):
 
             return {}
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_users_membership_info_in_group", _get_users_membership_in_group_txn
         )
 
@@ -433,7 +436,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_publicised_groups_for_user",
         )
 
-    def get_attestations_need_renewals(self, valid_until_ms):
+    async def get_attestations_need_renewals(self, valid_until_ms):
         """Get all attestations that need to be renewed until givent time
         """
 
@@ -445,7 +448,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             txn.execute(sql, (valid_until_ms,))
             return self.db_pool.cursor_to_dict(txn)
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_attestations_need_renewals", _get_attestations_need_renewals_txn
         )
 
@@ -475,7 +478,7 @@ class GroupServerWorkerStore(SQLBaseStore):
             desc="get_joined_groups",
         )
 
-    def get_all_groups_for_user(self, user_id, now_token):
+    async def get_all_groups_for_user(self, user_id, now_token):
         def _get_all_groups_for_user_txn(txn):
             sql = """
                 SELECT group_id, type, membership, u.content
@@ -495,7 +498,7 @@ class GroupServerWorkerStore(SQLBaseStore):
                 for row in txn
             ]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_groups_for_user", _get_all_groups_for_user_txn
         )
 
@@ -600,8 +603,27 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="set_group_join_policy",
         )
 
-    def add_room_to_summary(self, group_id, room_id, category_id, order, is_public):
-        return self.db_pool.runInteraction(
+    async def add_room_to_summary(
+        self,
+        group_id: str,
+        room_id: str,
+        category_id: str,
+        order: int,
+        is_public: Optional[bool],
+    ) -> None:
+        """Add (or update) room's entry in summary.
+
+        Args:
+            group_id
+            room_id
+            category_id: If not None then adds the category to the end of
+                the summary if its not already there.
+            order: If not None inserts the room at that position, e.g. an order
+                of 1 will put the room first. Otherwise, the room gets added to
+                the end.
+            is_public
+        """
+        await self.db_pool.runInteraction(
             "add_room_to_summary",
             self._add_room_to_summary_txn,
             group_id,
@@ -612,18 +634,26 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def _add_room_to_summary_txn(
-        self, txn, group_id, room_id, category_id, order, is_public
-    ):
+        self,
+        txn,
+        group_id: str,
+        room_id: str,
+        category_id: str,
+        order: int,
+        is_public: Optional[bool],
+    ) -> None:
         """Add (or update) room's entry in summary.
 
         Args:
-            group_id (str)
-            room_id (str)
-            category_id (str): If not None then adds the category to the end of
-                the summary if its not already there. [Optional]
-            order (int): If not None inserts the room at that position, e.g.
-                an order of 1 will put the room first. Otherwise, the room gets
-                added to the end.
+            txn
+            group_id
+            room_id
+            category_id: If not None then adds the category to the end of
+                the summary if its not already there.
+            order: If not None inserts the room at that position, e.g. an order
+                of 1 will put the room first. Otherwise, the room gets added to
+                the end.
+            is_public
         """
         room_in_group = self.db_pool.simple_select_one_onecol_txn(
             txn,
@@ -728,11 +758,13 @@ class GroupServerStore(GroupServerWorkerStore):
                 },
             )
 
-    def remove_room_from_summary(self, group_id, room_id, category_id):
+    async def remove_room_from_summary(
+        self, group_id: str, room_id: str, category_id: str
+    ) -> int:
         if category_id is None:
             category_id = _DEFAULT_CATEGORY_ID
 
-        return self.db_pool.simple_delete(
+        return await self.db_pool.simple_delete(
             table="group_summary_rooms",
             keyvalues={
                 "group_id": group_id,
@@ -742,7 +774,13 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="remove_room_from_summary",
         )
 
-    def upsert_group_category(self, group_id, category_id, profile, is_public):
+    async def upsert_group_category(
+        self,
+        group_id: str,
+        category_id: str,
+        profile: Optional[JsonDict],
+        is_public: Optional[bool],
+    ) -> None:
         """Add/update room category for group
         """
         insertion_values = {}
@@ -758,7 +796,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             values=update_values,
@@ -766,14 +804,20 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="upsert_group_category",
         )
 
-    def remove_group_category(self, group_id, category_id):
-        return self.db_pool.simple_delete(
+    async def remove_group_category(self, group_id: str, category_id: str) -> int:
+        return await self.db_pool.simple_delete(
             table="group_room_categories",
             keyvalues={"group_id": group_id, "category_id": category_id},
             desc="remove_group_category",
         )
 
-    def upsert_group_role(self, group_id, role_id, profile, is_public):
+    async def upsert_group_role(
+        self,
+        group_id: str,
+        role_id: str,
+        profile: Optional[JsonDict],
+        is_public: Optional[bool],
+    ) -> None:
         """Add/remove user role
         """
         insertion_values = {}
@@ -789,7 +833,7 @@ class GroupServerStore(GroupServerWorkerStore):
         else:
             update_values["is_public"] = is_public
 
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             values=update_values,
@@ -797,15 +841,34 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="upsert_group_role",
         )
 
-    def remove_group_role(self, group_id, role_id):
-        return self.db_pool.simple_delete(
+    async def remove_group_role(self, group_id: str, role_id: str) -> int:
+        return await self.db_pool.simple_delete(
             table="group_roles",
             keyvalues={"group_id": group_id, "role_id": role_id},
             desc="remove_group_role",
         )
 
-    def add_user_to_summary(self, group_id, user_id, role_id, order, is_public):
-        return self.db_pool.runInteraction(
+    async def add_user_to_summary(
+        self,
+        group_id: str,
+        user_id: str,
+        role_id: str,
+        order: int,
+        is_public: Optional[bool],
+    ) -> None:
+        """Add (or update) user's entry in summary.
+
+        Args:
+            group_id
+            user_id
+            role_id: If not None then adds the role to the end of the summary if
+                its not already there.
+            order: If not None inserts the user at that position, e.g. an order
+                of 1 will put the user first. Otherwise, the user gets added to
+                the end.
+            is_public
+        """
+        await self.db_pool.runInteraction(
             "add_user_to_summary",
             self._add_user_to_summary_txn,
             group_id,
@@ -816,18 +879,26 @@ class GroupServerStore(GroupServerWorkerStore):
         )
 
     def _add_user_to_summary_txn(
-        self, txn, group_id, user_id, role_id, order, is_public
+        self,
+        txn,
+        group_id: str,
+        user_id: str,
+        role_id: str,
+        order: int,
+        is_public: Optional[bool],
     ):
         """Add (or update) user's entry in summary.
 
         Args:
-            group_id (str)
-            user_id (str)
-            role_id (str): If not None then adds the role to the end of
-                the summary if its not already there. [Optional]
-            order (int): If not None inserts the user at that position, e.g.
-                an order of 1 will put the user first. Otherwise, the user gets
-                added to the end.
+            txn
+            group_id
+            user_id
+            role_id: If not None then adds the role to the end of the summary if
+                its not already there.
+            order: If not None inserts the user at that position, e.g. an order
+                of 1 will put the user first. Otherwise, the user gets added to
+                the end.
+            is_public
         """
         user_in_group = self.db_pool.simple_select_one_onecol_txn(
             txn,
@@ -928,46 +999,47 @@ class GroupServerStore(GroupServerWorkerStore):
                 },
             )
 
-    def remove_user_from_summary(self, group_id, user_id, role_id):
+    async def remove_user_from_summary(
+        self, group_id: str, user_id: str, role_id: str
+    ) -> int:
         if role_id is None:
             role_id = _DEFAULT_ROLE_ID
 
-        return self.db_pool.simple_delete(
+        return await self.db_pool.simple_delete(
             table="group_summary_users",
             keyvalues={"group_id": group_id, "role_id": role_id, "user_id": user_id},
             desc="remove_user_from_summary",
         )
 
-    def add_group_invite(self, group_id, user_id):
+    async def add_group_invite(self, group_id: str, user_id: str) -> None:
         """Record that the group server has invited a user
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="group_invites",
             values={"group_id": group_id, "user_id": user_id},
             desc="add_group_invite",
         )
 
-    def add_user_to_group(
+    async def add_user_to_group(
         self,
-        group_id,
-        user_id,
-        is_admin=False,
-        is_public=True,
-        local_attestation=None,
-        remote_attestation=None,
-    ):
+        group_id: str,
+        user_id: str,
+        is_admin: bool = False,
+        is_public: bool = True,
+        local_attestation: dict = None,
+        remote_attestation: dict = None,
+    ) -> None:
         """Add a user to the group server.
 
         Args:
-            group_id (str)
-            user_id (str)
-            is_admin (bool)
-            is_public (bool)
-            local_attestation (dict): The attestation the GS created to give
-                to the remote server. Optional if the user and group are on the
-                same server
-            remote_attestation (dict): The attestation given to GS by remote
+            group_id
+            user_id
+            is_admin
+            is_public
+            local_attestation: The attestation the GS created to give to the remote
                 server. Optional if the user and group are on the same server
+            remote_attestation: The attestation given to GS by remote server.
+                Optional if the user and group are on the same server
         """
 
         def _add_user_to_group_txn(txn):
@@ -1010,9 +1082,9 @@ class GroupServerStore(GroupServerWorkerStore):
                     },
                 )
 
-        return self.db_pool.runInteraction("add_user_to_group", _add_user_to_group_txn)
+        await self.db_pool.runInteraction("add_user_to_group", _add_user_to_group_txn)
 
-    def remove_user_from_group(self, group_id, user_id):
+    async def remove_user_from_group(self, group_id: str, user_id: str) -> None:
         def _remove_user_from_group_txn(txn):
             self.db_pool.simple_delete_txn(
                 txn,
@@ -1040,12 +1112,14 @@ class GroupServerStore(GroupServerWorkerStore):
                 keyvalues={"group_id": group_id, "user_id": user_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "remove_user_from_group", _remove_user_from_group_txn
         )
 
-    def add_room_to_group(self, group_id, room_id, is_public):
-        return self.db_pool.simple_insert(
+    async def add_room_to_group(
+        self, group_id: str, room_id: str, is_public: bool
+    ) -> None:
+        await self.db_pool.simple_insert(
             table="group_rooms",
             values={"group_id": group_id, "room_id": room_id, "is_public": is_public},
             desc="add_room_to_group",
@@ -1061,7 +1135,7 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_room_in_group_visibility",
         )
 
-    def remove_room_from_group(self, group_id, room_id):
+    async def remove_room_from_group(self, group_id: str, room_id: str) -> None:
         def _remove_room_from_group_txn(txn):
             self.db_pool.simple_delete_txn(
                 txn,
@@ -1075,7 +1149,7 @@ class GroupServerStore(GroupServerWorkerStore):
                 keyvalues={"group_id": group_id, "room_id": room_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "remove_room_from_group", _remove_room_from_group_txn
         )
 
@@ -1250,16 +1324,16 @@ class GroupServerStore(GroupServerWorkerStore):
             desc="update_remote_attestion",
         )
 
-    def remove_attestation_renewal(self, group_id, user_id):
+    async def remove_attestation_renewal(self, group_id: str, user_id: str) -> int:
         """Remove an attestation that we thought we should renew, but actually
         shouldn't. Ideally this would never get called as we would never
         incorrectly try and do attestations for local users on local groups.
 
         Args:
-            group_id (str)
-            user_id (str)
+            group_id
+            user_id
         """
-        return self.db_pool.simple_delete(
+        return await self.db_pool.simple_delete(
             table="group_attestations_renewals",
             keyvalues={"group_id": group_id, "user_id": user_id},
             desc="remove_attestation_renewal",
@@ -1268,14 +1342,11 @@ class GroupServerStore(GroupServerWorkerStore):
     def get_group_stream_token(self):
         return self._group_updates_id_gen.get_current_token()
 
-    def delete_group(self, group_id):
+    async def delete_group(self, group_id: str) -> None:
         """Deletes a group fully from the database.
 
         Args:
-            group_id (str)
-
-        Returns:
-            Deferred
+            group_id: The group ID to delete.
         """
 
         def _delete_group_txn(txn):
@@ -1299,4 +1370,4 @@ class GroupServerStore(GroupServerWorkerStore):
                     txn, table=table, keyvalues={"group_id": group_id}
                 )
 
-        return self.db_pool.runInteraction("delete_group", _delete_group_txn)
+        await self.db_pool.runInteraction("delete_group", _delete_group_txn)

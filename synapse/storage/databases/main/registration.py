@@ -17,7 +17,7 @@
 
 import logging
 import re
-from typing import Any, Awaitable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
@@ -529,43 +529,42 @@ class RegistrationWorkerStore(SQLBaseStore):
             "user_get_threepids",
         )
 
-    def user_delete_threepid(self, user_id, medium, address):
-        return self.db_pool.simple_delete(
+    async def user_delete_threepid(self, user_id, medium, address) -> None:
+        await self.db_pool.simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
             desc="user_delete_threepid",
         )
 
-    def user_delete_threepids(self, user_id: str):
+    async def user_delete_threepids(self, user_id: str) -> None:
         """Delete all threepid this user has bound
 
         Args:
              user_id: The user id to delete all threepids of
 
         """
-        return self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id},
             desc="user_delete_threepids",
         )
 
-    def add_user_bound_threepid(self, user_id, medium, address, id_server):
+    async def add_user_bound_threepid(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ):
         """The server proxied a bind request to the given identity server on
         behalf of the given user. We need to remember this in case the user
         asks us to unbind the threepid.
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
-            id_server (str)
-
-        Returns:
-            Awaitable
+            user_id
+            medium
+            address
+            id_server
         """
         # We need to use an upsert, in case they user had already bound the
         # threepid
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="user_threepid_id_server",
             keyvalues={
                 "user_id": user_id,
@@ -598,21 +597,20 @@ class RegistrationWorkerStore(SQLBaseStore):
             desc="user_get_bound_threepids",
         )
 
-    def remove_user_bound_threepid(self, user_id, medium, address, id_server):
+    async def remove_user_bound_threepid(
+        self, user_id: str, medium: str, address: str, id_server: str
+    ) -> None:
         """The server proxied an unbind request to the given identity server on
         behalf of the given user, so we remove the mapping of threepid to
         identity server.
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
-            id_server (str)
-
-        Returns:
-            Deferred
+            user_id
+            medium
+            address
+            id_server
         """
-        return self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             table="user_threepid_id_server",
             keyvalues={
                 "user_id": user_id,
@@ -1083,9 +1081,9 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
-    def record_user_external_id(
+    async def record_user_external_id(
         self, auth_provider: str, external_id: str, user_id: str
-    ) -> Awaitable:
+    ) -> None:
         """Record a mapping from an external user id to a mxid
 
         Args:
@@ -1093,7 +1091,7 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
             external_id: id on that system
             user_id: complete mxid that it is mapped to
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="user_external_ids",
             values={
                 "auth_provider": auth_provider,
@@ -1237,25 +1235,25 @@ class RegistrationStore(RegistrationBackgroundUpdateStore):
 
         return res if res else False
 
-    def add_user_pending_deactivation(self, user_id):
+    async def add_user_pending_deactivation(self, user_id: str) -> None:
         """
         Adds a user to the table of users who need to be parted from all the rooms they're
         in
         """
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             "users_pending_deactivation",
             values={"user_id": user_id},
             desc="add_user_pending_deactivation",
         )
 
-    def del_user_pending_deactivation(self, user_id):
+    async def del_user_pending_deactivation(self, user_id: str) -> None:
         """
         Removes the given user to the table of users who need to be parted from all the
         rooms they're in, effectively marking that user as fully deactivated.
         """
         # XXX: This should be simple_delete_one but we failed to put a unique index on
         # the table, so somehow duplicate entries have ended up in it.
-        return self.db_pool.simple_delete(
+        await self.db_pool.simple_delete(
             "users_pending_deactivation",
             keyvalues={"user_id": user_id},
             desc="del_user_pending_deactivation",

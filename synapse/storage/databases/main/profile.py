@@ -66,8 +66,8 @@ class ProfileWorkerStore(SQLBaseStore):
             desc="get_from_remote_profile_cache",
         )
 
-    def create_profile(self, user_localpart):
-        return self.db_pool.simple_insert(
+    async def create_profile(self, user_localpart: str) -> None:
+        await self.db_pool.simple_insert(
             table="profiles", values={"user_id": user_localpart}, desc="create_profile"
         )
 
@@ -93,13 +93,15 @@ class ProfileWorkerStore(SQLBaseStore):
 
 
 class ProfileStore(ProfileWorkerStore):
-    def add_remote_profile_cache(self, user_id, displayname, avatar_url):
+    async def add_remote_profile_cache(
+        self, user_id: str, displayname: str, avatar_url: str
+    ) -> None:
         """Ensure we are caching the remote user's profiles.
 
         This should only be called when `is_subscribed_remote_profile_for_user`
         would return true for the user.
         """
-        return self.db_pool.simple_upsert(
+        await self.db_pool.simple_upsert(
             table="remote_profile_cache",
             keyvalues={"user_id": user_id},
             values={
