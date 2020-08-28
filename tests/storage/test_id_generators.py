@@ -267,7 +267,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
 
 class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
-    """Tests MultiWriterIdGenerator that produce *negative* results.
+    """Tests MultiWriterIdGenerator that produce *negative* stream IDs.
     """
 
     if not USE_POSTGRES_FOR_TESTS:
@@ -328,7 +328,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.assertEqual(id_gen.get_positions(), {"master": -1})
         self.assertEqual(id_gen.get_current_token_for_writer("master"), -1)
-        self.assertEqual(id_gen.get_current_token(), -1)
+        self.assertEqual(id_gen.get_persisted_upto_position(), -1)
 
         with self.get_success(id_gen.get_next_mult(3)) as stream_ids:
             for stream_id in stream_ids:
@@ -336,14 +336,14 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.assertEqual(id_gen.get_positions(), {"master": -4})
         self.assertEqual(id_gen.get_current_token_for_writer("master"), -4)
-        self.assertEqual(id_gen.get_current_token(), -4)
+        self.assertEqual(id_gen.get_persisted_upto_position(), -4)
 
         # Test loading from DB by creating a second ID gen
         second_id_gen = self._create_id_generator()
 
         self.assertEqual(second_id_gen.get_positions(), {"master": -4})
         self.assertEqual(second_id_gen.get_current_token_for_writer("master"), -4)
-        self.assertEqual(second_id_gen.get_current_token(), -4)
+        self.assertEqual(second_id_gen.get_persisted_upto_position(), -4)
 
     def test_multiple_instance(self):
         """Tests that having multiple instances that get advanced over
@@ -358,8 +358,8 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.assertEqual(id_gen_1.get_positions(), {"first": -1})
         self.assertEqual(id_gen_2.get_positions(), {"first": -1})
-        self.assertEqual(id_gen_1.get_current_token(), -1)
-        self.assertEqual(id_gen_2.get_current_token(), -1)
+        self.assertEqual(id_gen_1.get_persisted_upto_position(), -1)
+        self.assertEqual(id_gen_2.get_persisted_upto_position(), -1)
 
         with self.get_success(id_gen_2.get_next()) as stream_id:
             self._insert_row("second", stream_id)
@@ -367,5 +367,5 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         self.assertEqual(id_gen_1.get_positions(), {"first": -1, "second": -2})
         self.assertEqual(id_gen_2.get_positions(), {"first": -1, "second": -2})
-        self.assertEqual(id_gen_1.get_current_token(), -2)
-        self.assertEqual(id_gen_2.get_current_token(), -2)
+        self.assertEqual(id_gen_1.get_persisted_upto_position(), -2)
+        self.assertEqual(id_gen_2.get_persisted_upto_position(), -2)
