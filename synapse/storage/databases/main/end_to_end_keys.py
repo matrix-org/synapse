@@ -33,19 +33,19 @@ if TYPE_CHECKING:
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
-    def get_devices_with_keys_by_user(self, user_id: str):
+    def get_e2e_device_keys_for_federation_query(self, user_id: str):
         """Get all devices (with any device keys) for a user
 
         Returns:
             Deferred which resolves to (stream_id, devices)
         """
         return self.db_pool.runInteraction(
-            "get_devices_with_keys_by_user",
-            self._get_devices_with_keys_by_user_txn,
+            "get_e2e_device_keys_for_federation_query",
+            self._get_e2e_device_keys_for_federation_query_txn,
             user_id,
         )
 
-    def _get_devices_with_keys_by_user_txn(
+    def _get_e2e_device_keys_for_federation_query(
         self, txn: LoggingTransaction, user_id: str
     ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self._device_list_id_gen.get_current_token()
