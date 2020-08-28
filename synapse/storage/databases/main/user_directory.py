@@ -678,28 +678,26 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         Returns:
             A set of room ID's that the users share.
         """
-        SQL = """
-            SELECT p1.room_id
-            FROM users_in_public_rooms as p1
-            INNER JOIN users_in_public_rooms as p2
-                ON p1.room_id = p2.room_id
-                AND p1.user_id = ?
-                AND p2.user_id = ?
-            UNION
-            SELECT room_id
-            FROM users_who_share_private_rooms
-            WHERE
-                user_id = ?
-                AND other_user_id = ?;
-        """
-        rows = await self.db_pool.execute(
-            "get_shared_rooms_for_users",
-            None,
-            SQL,
-            user_id,
-            other_user_id,
-            user_id,
-            other_user_id,
+
+        def _get_shared_rooms_for_users_txn(txn):
+            SQL = """
+                SELECT p1.room_id
+                FROM users_in_public_rooms as p1
+                INNER JOIN users_in_public_rooms as p2
+                    ON p1.room_id = p2.room_id
+                    AND p1.user_id = ?
+                    AND p2.user_id = ?
+                UNION
+                SELECT room_id
+                FROM users_who_share_private_rooms
+                WHERE
+                    user_id = ?
+                    AND other_user_id = ?;
+            """
+            txn.execute(SQL)
+
+        rows = await self.db_pool.runInteraction(
+            "get_shared_rooms_for_users", _get_shared_rooms_for_users_txn
         )
         return set(row[0] for row in rows)
 
