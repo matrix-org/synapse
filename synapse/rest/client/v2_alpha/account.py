@@ -42,7 +42,7 @@ from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
-from ._base import client_patterns, interactive_auth_handler
+from ._base import client_patterns, interactive_auth_handler, synapse_client_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -151,9 +151,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
 class PasswordResetSubmitTokenServlet(RestServlet):
     """Handles 3PID validation token submission"""
 
-    PATTERNS = client_patterns(
-        "/password_reset/email/submit_token$", releases=(), unstable=True
-    )
+    PATTERNS = synapse_client_patterns("/password_reset/email/submit_token$")
 
     def __init__(self, hs: "HomeServer"):
         """
