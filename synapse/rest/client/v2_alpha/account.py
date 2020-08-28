@@ -161,11 +161,14 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             hs (synapse.server.HomeServer): server
         """
         super(PasswordResetSubmitTokenServlet, self).__init__()
-        self.config = hs.config
 
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+        self._threepid_behaviour_email = hs.config.threepid_behaviour_email
+        self._local_threepid_handling_disabled_due_to_email_config = (
+            hs.config.local_threepid_handling_disabled_due_to_email_config
+        )
+        if self._threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._confirmation_email_template = (
-                self.config.email_password_reset_template_confirmation_html
+                hs.config.email_password_reset_template_confirmation_html
             )
 
     async def on_GET(self, request, medium):
@@ -174,8 +177,8 @@ class PasswordResetSubmitTokenServlet(RestServlet):
             raise SynapseError(
                 400, "This medium is currently not supported for password resets"
             )
-        if self.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.config.local_threepid_handling_disabled_due_to_email_config:
+        if self._threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self._local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
                     "Password reset emails have been disabled due to lack of an email config"
                 )
@@ -218,20 +221,23 @@ class PasswordResetConfirmationSubmitTokenServlet(RestServlet):
             hs: server
         """
         super().__init__()
-        self.hs = hs
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
-        if hs.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self._failure_email_template = (
-                hs.config.email_password_reset_template_failure_html
-            )
+        self._threepid_behaviour_email = hs.config.threepid_behaviour_email
+        self._local_threepid_handling_disabled_due_to_email_config = (
+            hs.config.local_threepid_handling_disabled_due_to_email_config
+        )
+        if self._threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             self._email_password_reset_template_success_html = (
                 hs.config.email_password_reset_template_success_html_content
             )
+            self._failure_email_template = (
+                hs.config.email_password_reset_template_failure_html
+            )
 
     async def on_POST(self, request):
-        if self.hs.config.threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self.hs.config.local_threepid_handling_disabled_due_to_email_config:
+        if self._threepid_behaviour_email == ThreepidBehaviour.OFF:
+            if self._local_threepid_handling_disabled_due_to_email_config:
                 logger.warning(
                     "Password reset emails have been disabled due to lack of an email config"
                 )
