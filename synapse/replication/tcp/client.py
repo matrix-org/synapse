@@ -218,8 +218,6 @@ class ReplicationDataHandler:
 
         waiting_list = self._streams_to_waiters.setdefault(stream_name, [])
 
-        # We insert into the list using heapq as it is more efficient than
-        # pushing then resorting each time.
         waiting_list.append((position, deferred))
         waiting_list.sort(key=lambda t: t[0])
 
