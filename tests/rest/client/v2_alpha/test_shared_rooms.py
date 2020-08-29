@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2018 New Vector
+# Copyright 2020 Half-Shot
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,6 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.handler = hs.get_user_directory_handler()
 
     def _get_shared_rooms(self, token, other_user):
-        # Assert user directory is not empty
         request, channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/%s"
@@ -66,7 +65,6 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room, user=u2, tok=u2_token)
 
-        # Assert user directory is not empty
         request, channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 1)
@@ -86,7 +84,6 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
         self.helper.join(room, user=u2, tok=u2_token)
 
-        # Assert user directory is not empty
         request, channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 1)
@@ -102,14 +99,13 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         u2 = self.register_user("user2", "pass")
         u2_token = self.login(u2, "pass")
 
-        room_public = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
-        room_private = self.helper.create_room_as(u2, is_public=True, tok=u2_token)
+        room_public = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
+        room_private = self.helper.create_room_as(u2, is_public=False, tok=u2_token)
         self.helper.invite(room_public, src=u1, targ=u2, tok=u1_token)
         self.helper.invite(room_private, src=u2, targ=u1, tok=u2_token)
         self.helper.join(room_public, user=u2, tok=u2_token)
         self.helper.join(room_private, user=u1, tok=u1_token)
 
-        # Assert user directory is not empty
         request, channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 2)

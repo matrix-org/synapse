@@ -15,7 +15,7 @@
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.storage.database import DatabasePool
