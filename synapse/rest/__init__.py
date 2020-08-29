@@ -114,7 +114,6 @@ class ClientRestResource(JsonResource):
         devices.register_servlets(hs, client_resource)
         thirdparty.register_servlets(hs, client_resource)
         sendtodevice.register_servlets(hs, client_resource)
-        shared_rooms.register_servlets(hs, client_resource)
         user_directory.register_servlets(hs, client_resource)
         groups.register_servlets(hs, client_resource)
         room_upgrade_rest_servlet.register_servlets(hs, client_resource)
@@ -127,3 +126,6 @@ class ClientRestResource(JsonResource):
         synapse.rest.admin.register_servlets_for_client_rest_resource(
             hs, client_resource
         )
+
+        # unstable
+        shared_rooms.register_servlets(hs, client_resource)
