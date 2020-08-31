@@ -89,7 +89,7 @@ class ClientDirectoryServer(RestServlet):
         dir_handler = self.handlers.directory_handler
 
         try:
-            service = await self.auth.get_appservice_by_req(request)
+            service = self.auth.get_appservice_by_req(request)
             room_alias = RoomAlias.from_string(room_alias)
             await dir_handler.delete_appservice_association(service, room_alias)
             logger.info(

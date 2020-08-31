@@ -31,20 +31,44 @@ form {
     margin: 10px 0 0 0;
 }
 
+/*
+ * Add some padding to the viewport.
+ */
+#container {
+    padding: 10px;
+}
+/*
+ * Center all direct children of the main form.
+ */
+#container > * {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+/*
+ * A wrapper around each login flow.
+ */
 .login_flow {
     width: 300px;
     text-align: left;
     padding: 10px;
     margin-bottom: 40px;
 
-    -webkit-border-radius: 10px;
-    -moz-border-radius: 10px;
     border-radius: 10px;
-
-    -webkit-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.15);
-    -moz-box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.15);
     box-shadow: 0px 0px 20px 0px rgba(0,0,0,0.15);
 
     background-color: #f8f8f8;
     border: 1px #ccc solid;
+}
+
+/*
+ * Used to show error content.
+ */
+#feedback {
+    /* Red text. */
+    color: #ff0000;
+    /* A little space to not overlap the box-shadow. */
+    margin-bottom: 20px;
 }

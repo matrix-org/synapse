@@ -48,6 +48,14 @@ class ServerContextFactory(ContextFactory):
     connections."""
 
     def __init__(self, config):
+        # TODO: once pyOpenSSL exposes TLS_METHOD and SSL_CTX_set_min_proto_version,
+        # switch to those (see https://github.com/pyca/cryptography/issues/5379).
+        #
+        # note that, despite the confusing name, SSLv23_METHOD does *not* enforce SSLv2
+        # or v3, but is a synonym for TLS_METHOD, which allows the client and server
+        # to negotiate an appropriate version of TLS constrained by the version options
+        # set with context.set_options.
+        #
         self._context = SSL.Context(SSL.SSLv23_METHOD)
         self.configure_context(self._context, config)
 

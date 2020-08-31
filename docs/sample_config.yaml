@@ -10,6 +10,17 @@
 # homeserver.yaml. Instead, if you are starting from scratch, please generate
 # a fresh config using Synapse by following the instructions in INSTALL.md.
 
+# Configuration options that take a time period can be set using a number
+# followed by a letter. Letters have the following meanings:
+# s = second
+# m = minute
+# h = hour
+# d = day
+# w = week
+# y = year
+# For example, setting redaction_retention_period: 5m would remove redacted
+# messages from the database after 5 minutes, rather than 5 months.
+
 ################################################################################
 
 # Configuration file for Synapse.
@@ -102,7 +113,9 @@ pid_file: DATADIR/homeserver.pid
 #gc_thresholds: [700, 10, 10]
 
 # Set the limit on the returned events in the timeline in the get
-# and sync operations. The default value is -1, means no upper limit.
+# and sync operations. The default value is 100. -1 means no upper limit.
+#
+# Uncomment the following to increase the limit to 5000.
 #
 #filter_timeline_limit: 5000
 
@@ -117,38 +130,6 @@ pid_file: DATADIR/homeserver.pid
 # will receive errors when searching for messages. Defaults to enabled.
 #
 #enable_search: false
-
-# Restrict federation to the following whitelist of domains.
-# N.B. we recommend also firewalling your federation listener to limit
-# inbound federation traffic as early as possible, rather than relying
-# purely on this application-layer restriction.  If not specified, the
-# default is to whitelist everything.
-#
-#federation_domain_whitelist:
-#  - lon.example.com
-#  - nyc.example.com
-#  - syd.example.com
-
-# Prevent federation requests from being sent to the following
-# blacklist IP address CIDR ranges. If this option is not specified, or
-# specified with an empty list, no ip range blacklist will be enforced.
-#
-# As of Synapse v1.4.0 this option also affects any outbound requests to identity
-# servers provided by user input.
-#
-# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-# listed here, since they correspond to unroutable addresses.)
-#
-federation_ip_range_blacklist:
-  - '127.0.0.0/8'
-  - '10.0.0.0/8'
-  - '172.16.0.0/12'
-  - '192.168.0.0/16'
-  - '100.64.0.0/10'
-  - '169.254.0.0/16'
-  - '::1/128'
-  - 'fe80::/64'
-  - 'fc00::/7'
 
 # List of ports that Synapse should listen on, their purpose and their
 # configuration.
@@ -178,7 +159,7 @@ federation_ip_range_blacklist:
 #       names: a list of names of HTTP resources. See below for a list of
 #           valid resource names.
 #
-#       compress: set to true to enable HTTP comression for this resource.
+#       compress: set to true to enable HTTP compression for this resource.
 #
 #   additional_resources: Only valid for an 'http' listener. A map of
 #        additional endpoints which should be loaded via dynamic modules.
@@ -283,7 +264,7 @@ listeners:
 # number of monthly active users.
 #
 # 'limit_usage_by_mau' disables/enables monthly active user blocking. When
-# anabled and a limit is reached the server returns a 'ResourceLimitError'
+# enabled and a limit is reached the server returns a 'ResourceLimitError'
 # with error type Codes.RESOURCE_LIMIT_EXCEEDED
 #
 # 'max_mau_value' is the hard limit of monthly active users above which
@@ -344,6 +325,10 @@ limit_remote_rooms:
   #
   #complexity_error: "This room is too complex."
 
+  # allow server admins to join complex rooms. Default is false.
+  #
+  #admins_can_join: true
+
 # Whether to require a user to be in the room to add an alias to it.
 # Defaults to 'true'.
 #
@@ -393,11 +378,10 @@ retention:
   #  min_lifetime: 1d
   #  max_lifetime: 1y
 
-  # Retention policy limits. If set, a user won't be able to send a
-  # 'm.room.retention' event which features a 'min_lifetime' or a 'max_lifetime'
-  # that's not within this range. This is especially useful in closed federations,
-  # in which server admins can make sure every federating server applies the same
-  # rules.
+  # Retention policy limits. If set, and the state of a room contains a
+  # 'm.room.retention' event in its state which contains a 'min_lifetime' or a
+  # 'max_lifetime' that's out of these bounds, Synapse will cap the room's policy
+  # to these limits when running purge jobs.
   #
   #allowed_lifetime_min: 1d
   #allowed_lifetime_max: 1y
@@ -423,12 +407,19 @@ retention:
   # (e.g. every 12h), but not want that purge to be performed by a job that's
   # iterating over every room it knows, which could be heavy on the server.
   #
+  # If any purge job is configured, it is strongly recommended to have at least
+  # a single job with neither 'shortest_max_lifetime' nor 'longest_max_lifetime'
+  # set, or one job without 'shortest_max_lifetime' and one job without
+  # 'longest_max_lifetime' set. Otherwise some rooms might be ignored, even if
+  # 'allowed_lifetime_min' and 'allowed_lifetime_max' are set, because capping a
+  # room's policy to these values is done after the policies are retrieved from
+  # Synapse's database (which is done using the range specified in a purge job's
+  # configuration).
+  #
   #purge_jobs:
-  #  - shortest_max_lifetime: 1d
-  #    longest_max_lifetime: 3d
+  #  - longest_max_lifetime: 3d
   #    interval: 12h
   #  - shortest_max_lifetime: 3d
-  #    longest_max_lifetime: 1y
   #    interval: 1d
 
 # Inhibits the /requestToken endpoints from returning an error that might leak
@@ -608,6 +599,39 @@ acme:
 
 
 
+# Restrict federation to the following whitelist of domains.
+# N.B. we recommend also firewalling your federation listener to limit
+# inbound federation traffic as early as possible, rather than relying
+# purely on this application-layer restriction.  If not specified, the
+# default is to whitelist everything.
+#
+#federation_domain_whitelist:
+#  - lon.example.com
+#  - nyc.example.com
+#  - syd.example.com
+
+# Prevent federation requests from being sent to the following
+# blacklist IP address CIDR ranges. If this option is not specified, or
+# specified with an empty list, no ip range blacklist will be enforced.
+#
+# As of Synapse v1.4.0 this option also affects any outbound requests to identity
+# servers provided by user input.
+#
+# (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
+# listed here, since they correspond to unroutable addresses.)
+#
+federation_ip_range_blacklist:
+  - '127.0.0.0/8'
+  - '10.0.0.0/8'
+  - '172.16.0.0/12'
+  - '192.168.0.0/16'
+  - '100.64.0.0/10'
+  - '169.254.0.0/16'
+  - '::1/128'
+  - 'fe80::/64'
+  - 'fc00::/7'
+
+
 ## Caching ##
 
 # Caching can be configured through the following options.
@@ -682,7 +706,7 @@ caches:
 #database:
 #  name: psycopg2
 #  args:
-#    user: synapse
+#    user: synapse_user
 #    password: secretpassword
 #    database: synapse
 #    host: localhost
@@ -728,6 +752,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #   - one for ratelimiting redactions by room admins. If this is not explicitly
 #     set then it uses the same ratelimiting as per rc_message. This is useful
 #     to allow room admins to deal with abuse quickly.
+#   - two for ratelimiting number of rooms a user can join, "local" for when
+#     users are joining rooms the server is already in (this is cheap) vs
+#     "remote" for when users are trying to join rooms not on the server (which
+#     can be more expensive)
 #
 # The defaults are as shown below.
 #
@@ -753,6 +781,14 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_admin_redaction:
 #  per_second: 1
 #  burst_count: 50
+#
+#rc_joins:
+#  local:
+#    per_second: 0.1
+#    burst_count: 3
+#  remote:
+#    per_second: 0.01
+#    burst_count: 3
 
 
 # Ratelimiting settings for incoming federation
@@ -1142,24 +1178,6 @@ account_validity:
 #
 #default_identity_server: https://matrix.org
 
-# The list of identity servers trusted to verify third party
-# identifiers by this server.
-#
-# Also defines the ID server which will be called when an account is
-# deactivated (one will be picked arbitrarily).
-#
-# Note: This option is deprecated. Since v0.99.4, Synapse has tracked which identity
-# server a 3PID has been bound to. For 3PIDs bound before then, Synapse runs a
-# background migration script, informing itself that the identity server all of its
-# 3PIDs have been bound to is likely one of the below.
-#
-# As of Synapse v1.4.0, all other functionality of this option has been deprecated, and
-# it is now solely used for the purposes of the background migration script, and can be
-# removed once it has run.
-#trusted_third_party_id_servers:
-#  - matrix.org
-#  - vector.im
-
 # Handle threepid (email/phone etc) registration and password resets through a set of
 # *trusted* identity servers. Note that this allows the configured identity server to
 # reset passwords for accounts!
@@ -1210,7 +1228,11 @@ account_threepid_delegates:
 #enable_3pid_changes: false
 
 # Users who register on this homeserver will automatically be joined
-# to these rooms
+# to these rooms.
+#
+# By default, any room aliases included in this list will be created
+# as a publicly joinable room when the first user registers for the
+# homeserver. This behaviour can be customised with the settings below.
 #
 #auto_join_rooms:
 #  - "#example:example.com"
@@ -1218,10 +1240,62 @@ account_threepid_delegates:
 # Where auto_join_rooms are specified, setting this flag ensures that the
 # the rooms exist by creating them when the first user on the
 # homeserver registers.
+#
+# By default the auto-created rooms are publicly joinable from any federated
+# server. Use the autocreate_auto_join_rooms_federated and
+# autocreate_auto_join_room_preset settings below to customise this behaviour.
+#
 # Setting to false means that if the rooms are not manually created,
 # users cannot be auto-joined since they do not exist.
 #
-#autocreate_auto_join_rooms: true
+# Defaults to true. Uncomment the following line to disable automatically
+# creating auto-join rooms.
+#
+#autocreate_auto_join_rooms: false
+
+# Whether the auto_join_rooms that are auto-created are available via
+# federation. Only has an effect if autocreate_auto_join_rooms is true.
+#
+# Note that whether a room is federated cannot be modified after
+# creation.
+#
+# Defaults to true: the room will be joinable from other servers.
+# Uncomment the following to prevent users from other homeservers from
+# joining these rooms.
+#
+#autocreate_auto_join_rooms_federated: false
+
+# The room preset to use when auto-creating one of auto_join_rooms. Only has an
+# effect if autocreate_auto_join_rooms is true.
+#
+# This can be one of "public_chat", "private_chat", or "trusted_private_chat".
+# If a value of "private_chat" or "trusted_private_chat" is used then
+# auto_join_mxid_localpart must also be configured.
+#
+# Defaults to "public_chat", meaning that the room is joinable by anyone, including
+# federated servers if autocreate_auto_join_rooms_federated is true (the default).
+# Uncomment the following to require an invitation to join these rooms.
+#
+#autocreate_auto_join_room_preset: private_chat
+
+# The local part of the user id which is used to create auto_join_rooms if
+# autocreate_auto_join_rooms is true. If this is not provided then the
+# initial user account that registers will be used to create the rooms.
+#
+# The user id is also used to invite new users to any auto-join rooms which
+# are set to invite-only.
+#
+# It *must* be configured if autocreate_auto_join_room_preset is set to
+# "private_chat" or "trusted_private_chat".
+#
+# Note that this must be specified in order for new users to be correctly
+# invited to any auto-join rooms which have been set to invite-only (either
+# at the time of creation or subsequently).
+#
+# Note that, if the room already exists, this user must be joined and
+# have the appropriate permissions to invite new members.
+#
+#auto_join_mxid_localpart: system
 
 # When auto_join_rooms is specified, setting this flag to false prevents
 # guest accounts from being automatically joined to the rooms.
@@ -1454,7 +1528,7 @@ saml2_config:
 
   # The lifetime of a SAML session. This defines how long a user has to
   # complete the authentication process, if allow_unsolicited is unset.
-  # The default is 5 minutes.
+  # The default is 15 minutes.
   #
   #saml_session_lifetime: 5m
 
@@ -1509,6 +1583,17 @@ saml2_config:
   #
   #grandfathered_mxid_source_attribute: upn
 
+  # It is possible to configure Synapse to only allow logins if SAML attributes
+  # match particular values. The requirements can be listed under
+  # `attribute_requirements` as shown below. All of the listed attributes must
+  # match for the login to be permitted.
+  #
+  #attribute_requirements:
+  #  - attribute: userGroup
+  #    value: "staff"
+  #  - attribute: department
+  #    value: "sales"
+
   # Directory in which Synapse will try to find the template files below.
   # If not set, default templates from within the Synapse package will be used.
   #
@@ -1539,7 +1624,7 @@ saml2_config:
 # use an OpenID Connect Provider for authentication, instead of its internal
 # password database.
 #
-# See https://github.com/matrix-org/synapse/blob/master/openid.md.
+# See https://github.com/matrix-org/synapse/blob/master/docs/openid.md.
 #
 oidc_config:
   # Uncomment the following to enable authorization against an OpenID Connect
@@ -1748,12 +1833,60 @@ sso:
     #template_dir: "res/templates"
 
 
-# The JWT needs to contain a globally unique "sub" (subject) claim.
+# JSON web token integration. The following settings can be used to make
+# Synapse JSON web tokens for authentication, instead of its internal
+# password database.
+#
+# Each JSON Web Token needs to contain a "sub" (subject) claim, which is
+# used as the localpart of the mxid.
+#
+# Additionally, the expiration time ("exp"), not before time ("nbf"),
+# and issued at ("iat") claims are validated if present.
+#
+# Note that this is a non-standard login type and client support is
+# expected to be non-existant.
+#
+# See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
 #
 #jwt_config:
-#   enabled: true
-#   secret: "a secret"
-#   algorithm: "HS256"
+    # Uncomment the following to enable authorization using JSON web
+    # tokens. Defaults to false.
+    #
+    #enabled: true
+
+    # This is either the private shared secret or the public key used to
+    # decode the contents of the JSON web token.
+    #
+    # Required if 'enabled' is true.
+    #
+    #secret: "provided-by-your-issuer"
+
+    # The algorithm used to sign the JSON web token.
+    #
+    # Supported algorithms are listed at
+    # https://pyjwt.readthedocs.io/en/latest/algorithms.html
+    #
+    # Required if 'enabled' is true.
+    #
+    #algorithm: "provided-by-your-issuer"
+
+    # The issuer to validate the "iss" claim against.
+    #
+    # Optional, if provided the "iss" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    #issuer: "provided-by-your-issuer"
+
+    # A list of audiences to validate the "aud" claim against.
+    #
+    # Optional, if provided the "aud" claim will be required and
+    # validated for all JSON web tokens.
+    #
+    # Note that if the "aud" claim is included in a JSON web token then
+    # validation will fail without configuring audiences.
+    #
+    #audiences:
+    #    - "provided-by-your-issuer"
 
 
 password_config:
@@ -1844,8 +1977,8 @@ email:
   #
   #notif_from: "Your Friendly %(app)s homeserver <noreply@example.com>"
 
-  # app_name defines the default value for '%(app)s' in notif_from. It
-  # defaults to 'Matrix'.
+  # app_name defines the default value for '%(app)s' in notif_from and email
+  # subjects. It defaults to 'Matrix'.
   #
   #app_name: my_branded_matrix_server
 
@@ -1875,9 +2008,7 @@ email:
   # Directory in which Synapse will try to find the template files below.
   # If not set, default templates from within the Synapse package will be used.
   #
-  # DO NOT UNCOMMENT THIS SETTING unless you want to customise the templates.
-  # If you *do* uncomment it, you will need to make sure that all the templates
-  # below are in the directory.
+  # Do not uncomment this setting unless you want to customise the templates.
   #
   # Synapse will look for the following templates in this directory:
   #
@@ -1913,6 +2044,73 @@ email:
   # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
   #
   #template_dir: "res/templates"
+
+  # Subjects to use when sending emails from Synapse.
+  #
+  # The placeholder '%(app)s' will be replaced with the value of the 'app_name'
+  # setting above, or by a value dictated by the Matrix client application.
+  #
+  # If a subject isn't overridden in this configuration file, the value used as
+  # its example will be used.
+  #
+  #subjects:
+
+    # Subjects for notification emails.
+    #
+    # On top of the '%(app)s' placeholder, these can use the following
+    # placeholders:
+    #
+    #   * '%(person)s', which will be replaced by the display name of the user(s)
+    #      that sent the message(s), e.g. "Alice and Bob".
+    #   * '%(room)s', which will be replaced by the name of the room the
+    #      message(s) have been sent to, e.g. "My super room".
+    #
+    # See the example provided for each setting to see which placeholder can be
+    # used and how to use them.
+    #
+    # Subject to use to notify about one message from one or more user(s) in a
+    # room which has a name.
+    #message_from_person_in_room: "[%(app)s] You have a message on %(app)s from %(person)s in the %(room)s room..."
+    #
+    # Subject to use to notify about one message from one or more user(s) in a
+    # room which doesn't have a name.
+    #message_from_person: "[%(app)s] You have a message on %(app)s from %(person)s..."
+    #
+    # Subject to use to notify about multiple messages from one or more users in
+    # a room which doesn't have a name.
+    #messages_from_person: "[%(app)s] You have messages on %(app)s from %(person)s..."
+    #
+    # Subject to use to notify about multiple messages in a room which has a
+    # name.
+    #messages_in_room: "[%(app)s] You have messages on %(app)s in the %(room)s room..."
+    #
+    # Subject to use to notify about multiple messages in multiple rooms.
+    #messages_in_room_and_others: "[%(app)s] You have messages on %(app)s in the %(room)s room and others..."
+    #
+    # Subject to use to notify about multiple messages from multiple persons in
+    # multiple rooms. This is similar to the setting above except it's used when
+    # the room in which the notification was triggered has no name.
+    #messages_from_person_and_others: "[%(app)s] You have messages on %(app)s from %(person)s and others..."
+    #
+    # Subject to use to notify about an invite to a room which has a name.
+    #invite_from_person_to_room: "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s..."
+    #
+    # Subject to use to notify about an invite to a room which doesn't have a
+    # name.
+    #invite_from_person: "[%(app)s] %(person)s has invited you to chat on %(app)s..."
+
+    # Subject for emails related to account administration.
+    #
+    # On top of the '%(app)s' placeholder, these one can use the
+    # '%(server_name)s' placeholder, which will be replaced by the value of the
+    # 'server_name' setting in your Synapse configuration.
+    #
+    # Subject to use when sending a password reset email.
+    #password_reset: "[%(server_name)s] Password reset"
+    #
+    # Subject to use when sending a verification email to assert an address's
+    # ownership.
+    #email_validation: "[%(server_name)s] Validate your email"
 
 
 # Password providers allow homeserver administrators to integrate
@@ -1971,6 +2169,26 @@ spam_checker:
    #- module: "some_other_project.BadEventStopper"
    #  config:
    #    example_stop_events_from: ['@bad:example.com']
+
+
+## Rooms ##
+
+# Controls whether locally-created rooms should be end-to-end encrypted by
+# default.
+#
+# Possible options are "all", "invite", and "off". They are defined as:
+#
+# * "all": any locally-created room
+# * "invite": any room created with the "private_chat" or "trusted_private_chat"
+#             room creation presets
+# * "off": this option will take no effect
+#
+# The default value is "off".
+#
+# Note that this option will only affect rooms created after it is set. It
+# will also not affect rooms created by other servers.
+#
+#encryption_enabled_by_default_for_room_type: invite
 
 
 # Uncomment to allow non-server-admin users to create groups on this server
@@ -2204,3 +2422,57 @@ opentracing:
     #
     #  logging:
     #    false
+
+
+## Workers ##
+
+# Disables sending of outbound federation transactions on the main process.
+# Uncomment if using a federation sender worker.
+#
+#send_federation: false
+
+# It is possible to run multiple federation sender workers, in which case the
+# work is balanced across them.
+#
+# This configuration must be shared between all federation sender workers, and if
+# changed all federation sender workers must be stopped at the same time and then
+# started, to ensure that all instances are running with the same config (otherwise
+# events may be dropped).
+#
+#federation_sender_instances:
+#  - federation_sender1
+
+# When using workers this should be a map from `worker_name` to the
+# HTTP replication listener of the worker, if configured.
+#
+#instance_map:
+#  worker1:
+#    host: localhost
+#    port: 8034
+
+# Experimental: When using workers you can define which workers should
+# handle event persistence and typing notifications. Any worker
+# specified here must also be in the `instance_map`.
+#
+#stream_writers:
+#  events: worker1
+#  typing: worker1
+
+
+# Configuration for Redis when using workers. This *must* be enabled when
+# using workers (unless using old style direct TCP configuration).
+#
+redis:
+  # Uncomment the below to enable Redis support.
+  #
+  #enabled: true
+
+  # Optional host and port to use to connect to redis. Defaults to
+  # localhost and 6379
+  #
+  #host: localhost
+  #port: 6379
+
+  # Optional password if configured on the Redis instance
+  #
+  #password: <secret_password>

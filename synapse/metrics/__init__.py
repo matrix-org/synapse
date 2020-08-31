@@ -22,8 +22,6 @@ import threading
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Union
 
-import six
-
 import attr
 from prometheus_client import Counter, Gauge, Histogram
 from prometheus_client.core import (
@@ -83,7 +81,7 @@ class LaterGauge(object):
             return
 
         if isinstance(calls, dict):
-            for k, v in six.iteritems(calls):
+            for k, v in calls.items():
                 g.add_metric(k, v)
         else:
             g.add_metric([], calls)
@@ -194,7 +192,7 @@ class InFlightGauge(object):
             gauge = GaugeMetricFamily(
                 "_".join([self.name, name]), "", labels=self.labels
             )
-            for key, metrics in six.iteritems(metrics_by_key):
+            for key, metrics in metrics_by_key.items():
                 gauge.add_metric(key, getattr(metrics, name))
             yield gauge
 
@@ -464,6 +462,12 @@ event_processing_last_ts = Gauge("synapse_event_processing_last_ts", "", ["name"
 # between the last processed event's received_ts and the time it was
 # finished being processed.
 event_processing_lag = Gauge("synapse_event_processing_lag", "", ["name"])
+
+event_processing_lag_by_event = Histogram(
+    "synapse_event_processing_lag_by_event",
+    "Time between an event being persisted and it being queued up to be sent to the relevant remote servers",
+    ["name"],
+)
 
 # Build info of the running server.
 build_info = Gauge(

@@ -1,0 +1,1 @@
+Fix `Re-starting finished log context PUT-nnnn` warning when event persistence failed.

@@ -87,7 +87,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
         self.inject_room_member(self.room, self.u_charlie.to_string(), Membership.JOIN)
 
-        self.pump(20)
+        self.pump()
 
         self.assertTrue("_known_servers_count" not in self.store.__dict__.keys())
 
@@ -101,7 +101,7 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # Initialises to 1 -- itself
         self.assertEqual(self.store._known_servers_count, 1)
 
-        self.pump(20)
+        self.pump()
 
         # No rooms have been joined, so technically the SQL returns 0, but it
         # will still say it knows about itself.
@@ -111,25 +111,29 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         self.inject_room_member(self.room, self.u_bob, Membership.JOIN)
         self.inject_room_member(self.room, self.u_charlie.to_string(), Membership.JOIN)
 
-        self.pump(20)
+        self.pump(1)
 
         # It now knows about Charlie's server.
         self.assertEqual(self.store._known_servers_count, 2)
 
     def test_get_joined_users_from_context(self):
         room = self.helper.create_room_as(self.u_alice, tok=self.t_alice)
-        bob_event = event_injection.inject_member_event(
-            self.hs, room, self.u_bob, Membership.JOIN
+        bob_event = self.get_success(
+            event_injection.inject_member_event(
+                self.hs, room, self.u_bob, Membership.JOIN
+            )
         )
 
         # first, create a regular event
-        event, context = event_injection.create_event(
-            self.hs,
-            room_id=room,
-            sender=self.u_alice,
-            prev_event_ids=[bob_event.event_id],
-            type="m.test.1",
-            content={},
+        event, context = self.get_success(
+            event_injection.create_event(
+                self.hs,
+                room_id=room,
+                sender=self.u_alice,
+                prev_event_ids=[bob_event.event_id],
+                type="m.test.1",
+                content={},
+            )
         )
 
         users = self.get_success(
@@ -140,22 +144,26 @@ class RoomMemberStoreTestCase(unittest.HomeserverTestCase):
         # Regression test for #7376: create a state event whose key matches bob's
         # user_id, but which is *not* a membership event, and persist that; then check
         # that `get_joined_users_from_context` returns the correct users for the next event.
-        non_member_event = event_injection.inject_event(
-            self.hs,
-            room_id=room,
-            sender=self.u_bob,
-            prev_event_ids=[bob_event.event_id],
-            type="m.test.2",
-            state_key=self.u_bob,
-            content={},
+        non_member_event = self.get_success(
+            event_injection.inject_event(
+                self.hs,
+                room_id=room,
+                sender=self.u_bob,
+                prev_event_ids=[bob_event.event_id],
+                type="m.test.2",
+                state_key=self.u_bob,
+                content={},
+            )
         )
-        event, context = event_injection.create_event(
-            self.hs,
-            room_id=room,
-            sender=self.u_alice,
-            prev_event_ids=[non_member_event.event_id],
-            type="m.test.3",
-            content={},
+        event, context = self.get_success(
+            event_injection.create_event(
+                self.hs,
+                room_id=room,
+                sender=self.u_alice,
+                prev_event_ids=[non_member_event.event_id],
+                type="m.test.3",
+                content={},
+            )
         )
         users = self.get_success(
             self.store.get_joined_users_from_context(event, context)
@@ -171,20 +179,20 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
     def test_can_rerun_update(self):
         # First make sure we have completed all updates.
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
         # Now let's create a room, which will insert a membership
         user = UserID("alice", "test")
-        requester = Requester(user, None, False, None, None)
+        requester = Requester(user, None, False, False, None, None)
         self.get_success(self.room_creator.create_room(requester, {}))
 
         # Register the background update to run again.
         self.get_success(
-            self.store.db.simple_insert(
+            self.store.db_pool.simple_insert(
                 table="background_updates",
                 values={
                     "update_name": "current_state_events_membership",
@@ -195,12 +203,12 @@ class CurrentStateMembershipUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         # ... and tell the DataStore that it hasn't finished all updates yet
-        self.store.db.updates._all_done = False
+        self.store.db_pool.updates._all_done = False
 
         # Now let's actually drive the updates to completion
         while not self.get_success(
-            self.store.db.updates.has_completed_background_updates()
+            self.store.db_pool.updates.has_completed_background_updates()
         ):
             self.get_success(
-                self.store.db.updates.do_next_background_update(100), by=0.1
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )

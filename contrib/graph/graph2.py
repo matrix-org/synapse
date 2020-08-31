@@ -13,12 +13,13 @@
 # limitations under the License.
 
 
-import sqlite3
-import pydot
-import cgi
-import json
-import datetime
 import argparse
+import cgi
+import datetime
+import json
+import sqlite3
+
+import pydot
 
 from synapse.events import FrozenEvent
 from synapse.util.frozenutils import unfreeze
@@ -98,7 +99,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
         for prev_id, _ in event.prev_events:
             try:
                 end_node = node_map[prev_id]
-            except:
+            except Exception:
                 end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
 
                 node_map[prev_id] = end_node

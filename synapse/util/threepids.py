@@ -48,3 +48,26 @@ def check_3pid_allowed(hs, medium, address):
         return True
 
     return False
+
+
+def canonicalise_email(address: str) -> str:
+    """'Canonicalise' email address
+    Case folding of local part of email address and lowercase domain part
+    See MSC2265, https://github.com/matrix-org/matrix-doc/pull/2265
+
+    Args:
+        address: email address to be canonicalised
+    Returns:
+        The canonical form of the email address
+    Raises:
+        ValueError if the address could not be parsed.
+    """
+
+    address = address.strip()
+
+    parts = address.split("@")
+    if len(parts) != 2:
+        logger.debug("Couldn't parse email address %s", address)
+        raise ValueError("Unable to parse email address")
+
+    return parts[0].casefold() + "@" + parts[1].lower()

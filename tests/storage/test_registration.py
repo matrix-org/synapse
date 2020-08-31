@@ -17,6 +17,7 @@
 from twisted.internet import defer
 
 from synapse.api.constants import UserTypes
+from synapse.api.errors import ThreepidValidationError
 
 from tests import unittest
 from tests.utils import setup_test_homeserver
@@ -36,7 +37,7 @@ class RegistrationStoreTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_register(self):
-        yield self.store.register_user(self.user_id, self.pwhash)
+        yield defer.ensureDeferred(self.store.register_user(self.user_id, self.pwhash))
 
         self.assertEquals(
             {
@@ -52,17 +53,21 @@ class RegistrationStoreTestCase(unittest.TestCase):
                 "user_type": None,
                 "deactivated": 0,
             },
-            (yield self.store.get_user_by_id(self.user_id)),
+            (yield defer.ensureDeferred(self.store.get_user_by_id(self.user_id))),
         )
 
     @defer.inlineCallbacks
     def test_add_tokens(self):
-        yield self.store.register_user(self.user_id, self.pwhash)
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+        yield defer.ensureDeferred(self.store.register_user(self.user_id, self.pwhash))
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+            )
         )
 
-        result = yield self.store.get_user_by_access_token(self.tokens[1])
+        result = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[1])
+        )
 
         self.assertDictContainsSubset(
             {"name": self.user_id, "device_id": self.device_id}, result
@@ -73,31 +78,41 @@ class RegistrationStoreTestCase(unittest.TestCase):
     @defer.inlineCallbacks
     def test_user_delete_access_tokens(self):
         # add some tokens
-        yield self.store.register_user(self.user_id, self.pwhash)
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
+        yield defer.ensureDeferred(self.store.register_user(self.user_id, self.pwhash))
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[0], device_id=None, valid_until_ms=None
+            )
         )
-        yield self.store.add_access_token_to_user(
-            self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+        yield defer.ensureDeferred(
+            self.store.add_access_token_to_user(
+                self.user_id, self.tokens[1], self.device_id, valid_until_ms=None
+            )
         )
 
         # now delete some
-        yield self.store.user_delete_access_tokens(
-            self.user_id, device_id=self.device_id
+        yield defer.ensureDeferred(
+            self.store.user_delete_access_tokens(self.user_id, device_id=self.device_id)
         )
 
         # check they were deleted
-        user = yield self.store.get_user_by_access_token(self.tokens[1])
+        user = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[1])
+        )
         self.assertIsNone(user, "access token was not deleted by device_id")
 
         # check the one not associated with the device was not deleted
-        user = yield self.store.get_user_by_access_token(self.tokens[0])
+        user = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[0])
+        )
         self.assertEqual(self.user_id, user["name"])
 
         # now delete the rest
-        yield self.store.user_delete_access_tokens(self.user_id)
+        yield defer.ensureDeferred(self.store.user_delete_access_tokens(self.user_id))
 
-        user = yield self.store.get_user_by_access_token(self.tokens[0])
+        user = yield defer.ensureDeferred(
+            self.store.get_user_by_access_token(self.tokens[0])
+        )
         self.assertIsNone(user, "access token was not deleted without device_id")
 
     @defer.inlineCallbacks
@@ -105,14 +120,48 @@ class RegistrationStoreTestCase(unittest.TestCase):
         TEST_USER = "@test:test"
         SUPPORT_USER = "@support:test"
 
-        res = yield self.store.is_support_user(None)
+        res = yield defer.ensureDeferred(self.store.is_support_user(None))
         self.assertFalse(res)
-        yield self.store.register_user(user_id=TEST_USER, password_hash=None)
-        res = yield self.store.is_support_user(TEST_USER)
+        yield defer.ensureDeferred(
+            self.store.register_user(user_id=TEST_USER, password_hash=None)
+        )
+        res = yield defer.ensureDeferred(self.store.is_support_user(TEST_USER))
         self.assertFalse(res)
 
-        yield self.store.register_user(
-            user_id=SUPPORT_USER, password_hash=None, user_type=UserTypes.SUPPORT
+        yield defer.ensureDeferred(
+            self.store.register_user(
+                user_id=SUPPORT_USER, password_hash=None, user_type=UserTypes.SUPPORT
+            )
         )
-        res = yield self.store.is_support_user(SUPPORT_USER)
+        res = yield defer.ensureDeferred(self.store.is_support_user(SUPPORT_USER))
         self.assertTrue(res)
+
+    @defer.inlineCallbacks
+    def test_3pid_inhibit_invalid_validation_session_error(self):
+        """Tests that enabling the configuration option to inhibit 3PID errors on
+        /requestToken also inhibits validation errors caused by an unknown session ID.
+        """
+
+        # Check that, with the config setting set to false (the default value), a
+        # validation error is caused by the unknown session ID.
+        try:
+            yield defer.ensureDeferred(
+                self.store.validate_threepid_session(
+                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                )
+            )
+        except ThreepidValidationError as e:
+            self.assertEquals(e.msg, "Unknown session_id", e)
+
+        # Set the config setting to true.
+        self.store._ignore_unknown_session_error = True
+
+        # Check that now the validation error is caused by the token not matching.
+        try:
+            yield defer.ensureDeferred(
+                self.store.validate_threepid_session(
+                    "fake_sid", "fake_client_secret", "fake_token", 0,
+                )
+            )
+        except ThreepidValidationError as e:
+            self.assertEquals(e.msg, "Validation token not found or has expired", e)
