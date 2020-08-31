@@ -13,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 import platform
 import re
@@ -31,6 +30,7 @@ from synapse.rest.admin.devices import (
     DeviceRestServlet,
     DevicesRestServlet,
 )
+from synapse.rest.admin.event_reports import EventReportsRestServlet
 from synapse.rest.admin.groups import DeleteGroupAdminRestServlet
 from synapse.rest.admin.media import ListMediaInRoom, register_servlets_for_media_repo
 from synapse.rest.admin.purge_room_servlet import PurgeRoomServlet
@@ -55,7 +55,6 @@ from synapse.rest.admin.users import (
     UsersRestServletV2,
     WhoisRestServlet,
 )
-from synapse.rest.admin.event_reports import EventReportsRestServlet
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)

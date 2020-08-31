@@ -12,18 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
 
-from synapse.http.servlet import (
-    RestServlet,
-    parse_integer,
-    parse_string,
-)
-from synapse.rest.admin._base import (
-    assert_requester_is_admin,
-    admin_patterns,
-)
+from synapse.http.servlet import RestServlet, parse_integer, parse_string
+from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 
 logger = logging.getLogger(__name__)
 
