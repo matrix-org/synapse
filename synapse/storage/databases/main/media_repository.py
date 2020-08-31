@@ -83,7 +83,7 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
                 "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_repository_thumbn_media_id_thumbnail_width_thum_key"
             )
 
-        await self.db_pool.runInteraction(f)
+        await self.db_pool.runInteraction("drop_media_indices_without_method", f)
         await self.db_pool.updates._end_background_update(
             BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD
         )
