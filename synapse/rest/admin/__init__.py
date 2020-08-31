@@ -55,6 +55,7 @@ from synapse.rest.admin.users import (
     UsersRestServletV2,
     WhoisRestServlet,
 )
+from synapse.rest.admin.event_reports import EventReportsRestServlet
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
@@ -214,6 +215,7 @@ def register_servlets(hs, http_server):
     DeviceRestServlet(hs).register(http_server)
     DevicesRestServlet(hs).register(http_server)
     DeleteDevicesRestServlet(hs).register(http_server)
+    EventReportsRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):
