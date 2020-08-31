@@ -704,7 +704,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
             "get_shared_rooms_for_users", _get_shared_rooms_for_users_txn
         )
 
-        return set(row["room_id"] for row in rows)
+        return {row["room_id"] for row in rows}
 
     async def get_user_directory_stream_pos(self) -> int:
         return await self.db_pool.simple_select_one_onecol(
