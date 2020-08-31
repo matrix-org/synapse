@@ -79,8 +79,7 @@ class AdminCmdServer(HomeServer):
         pass
 
 
-@defer.inlineCallbacks
-def export_data_command(hs, args):
+async def export_data_command(hs, args):
     """Export data for a user.
 
     Args:
@@ -91,10 +90,8 @@ def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = yield defer.ensureDeferred(
-        hs.get_handlers().admin_handler.export_user_data(
-            user_id, FileExfiltrationWriter(user_id, directory=directory)
-        )
+    res = await hs.get_handlers().admin_handler.export_user_data(
+        user_id, FileExfiltrationWriter(user_id, directory=directory)
     )
     print(res)
 
@@ -232,11 +229,10 @@ def start(config_options):
     # We also make sure that `_base.start` gets run before we actually run the
     # command.
 
-    @defer.inlineCallbacks
     def run(_reactor):
         with LoggingContext("command"):
-            yield _base.start(ss, [])
-            yield args.func(ss, args)
+            _base.start(ss, [])
+            return defer.ensureDeferred(args.func(ss, args))
 
     _base.start_worker_reactor(
         "synapse-admin-cmd", config, run_command=lambda: task.react(run)
