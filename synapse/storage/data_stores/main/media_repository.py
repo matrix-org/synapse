@@ -12,10 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
-
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import Database
+
+BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD = (
+    "media_repository_drop_index_wo_method"
+)
 
 
 class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
@@ -32,6 +34,10 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             where_clause="url_cache IS NOT NULL",
         )
 
+        # The following the updates add the method to the unique constraint of
+        # the thumbnail databases. That fixes an issue, where thumbnails of the
+        # same resolution, but different methods could overwrite one another.
+        # This can happen with custom thumbnail configs or with dynamic thumbnailing.
         self.db.updates.register_background_index_update(
             update_name="local_media_repository_thumbnails_method_idx",
             index_name="local_media_repository_thumbn_media_id_width_height_method_key",
@@ -62,42 +68,22 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
         )
 
         self.db.updates.register_background_update_handler(
-            "local_media_repository_drop_index_wo_method",
-            self._drop_local_media_index_without_method,
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD,
+            self._drop_media_index_without_method,
         )
 
-        self.db.updates.register_background_update_handler(
-            "remote_media_repository_drop_index_wo_method",
-            self._drop_remote_media_index_without_method,
-        )
-
-    @defer.inlineCallbacks
-    def _drop_local_media_index_without_method(self, progress, batch_size):
-        def f(conn):
-            txn = conn.cursor()
+    async def _drop_media_index_without_method(self, progress, batch_size):
+        def f(txn):
             txn.execute(
                 "ALTER TABLE local_media_repository_thumbnails DROP CONSTRAINT IF EXISTS local_media_repository_thumbn_media_id_thumbnail_width_thum_key"
             )
-            txn.close()
-
-        yield self.db.runWithConnection(f)
-        yield self.db.updates._end_background_update(
-            "local_media_repository_drop_index_wo_method"
-        )
-        return 1
-
-    @defer.inlineCallbacks
-    def _drop_remote_media_index_without_method(self, progress, batch_size):
-        def f(conn):
-            txn = conn.cursor()
             txn.execute(
                 "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_repository_thumbn_media_id_thumbnail_width_thum_key"
             )
-            txn.close()
 
-        yield self.db.runWithConnection(f)
-        yield self.db.updates._end_background_update(
-            "remote_media_repository_drop_index_wo_method"
+        await self.db.runInteraction(f)
+        await self.db.updates._end_background_update(
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD
         )
         return 1
 
