@@ -314,7 +314,7 @@ class Linearizer(object):
             #
             # (This needs to happen while we hold the lock, and the context manager's exit
             # code must be synchronous, so this is the only sensible place.)
-            return self._clock.sleep(0)
+            return defer.ensureDeferred(self._clock.sleep(0))
 
         def eb(e):
             logger.info("defer %r got err %r", new_defer, e)

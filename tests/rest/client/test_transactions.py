@@ -45,7 +45,7 @@ class HttpTransactionCacheTestCase(unittest.TestCase):
     def test_logcontexts_with_async_result(self):
         @defer.inlineCallbacks
         def cb():
-            yield Clock(reactor).sleep(0)
+            yield defer.ensureDeferred(Clock(reactor).sleep(0))
             return "yay"
 
         @defer.inlineCallbacks

@@ -56,12 +56,11 @@ class Clock(object):
 
     _reactor = attr.ib()
 
-    @defer.inlineCallbacks
-    def sleep(self, seconds):
+    async def sleep(self, seconds):
         d = defer.Deferred()
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
-            res = yield d
+            res = await d
         return res
 
     def time(self):

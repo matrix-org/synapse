@@ -86,7 +86,7 @@ class LinearizerTestCase(unittest.TestCase):
                 with (yield linearizer.queue("")):
                     self.assertEqual(current_context(), lc)
                     if sleep:
-                        yield Clock(reactor).sleep(0)
+                        yield defer.ensureDeferred(Clock(reactor).sleep(0))
 
                 self.assertEqual(current_context(), lc)
 

@@ -134,10 +134,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
                 yield make_deferred_yieldable(res_deferreds[0])
 
-                # let verify_json_objects_for_server finish its work before we kill the
-                # logcontext
-                yield self.clock.sleep(0)
-
         d0 = first_lookup()
 
         # wait a tick for it to send the request to the perspectives server
@@ -159,10 +155,6 @@ class KeyringTestCase(unittest.HomeserverTestCase):
                 )
                 res_deferreds_2[0].addBoth(self.check_context, None)
                 yield make_deferred_yieldable(res_deferreds_2[0])
-
-                # let verify_json_objects_for_server finish its work before we kill the
-                # logcontext
-                yield self.clock.sleep(0)
 
         d2 = second_lookup()
 

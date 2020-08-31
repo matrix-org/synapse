@@ -32,14 +32,14 @@ class LoggingContextTestCase(unittest.TestCase):
         def competing_callback():
             with LoggingContext() as competing_context:
                 competing_context.request = "competing"
-                yield clock.sleep(0)
+                yield defer.ensureDeferred(clock.sleep(0))
                 self._check_test_key("competing")
 
         reactor.callLater(0, competing_callback)
 
         with LoggingContext() as context_one:
             context_one.request = "one"
-            yield clock.sleep(0)
+            yield defer.ensureDeferred(clock.sleep(0))
             self._check_test_key("one")
 
     def _test_run_in_background(self, function):
@@ -86,7 +86,7 @@ class LoggingContextTestCase(unittest.TestCase):
     def test_run_in_background_with_blocking_fn(self):
         @defer.inlineCallbacks
         def blocking_function():
-            yield Clock(reactor).sleep(0)
+            yield defer.ensureDeferred(Clock(reactor).sleep(0))
 
         return self._test_run_in_background(blocking_function)
 
@@ -109,7 +109,9 @@ class LoggingContextTestCase(unittest.TestCase):
     def test_run_in_background_with_coroutine(self):
         async def testfunc():
             self._check_test_key("one")
-            d = Clock(reactor).sleep(0)
+            # Theoretically the ensureDeferred shouldn't be necessary here, but
+            # it forces trial to fire the awaitable.
+            d = defer.ensureDeferred(Clock(reactor).sleep(0))
             self.assertIs(current_context(), SENTINEL_CONTEXT)
             await d
             self._check_test_key("one")
