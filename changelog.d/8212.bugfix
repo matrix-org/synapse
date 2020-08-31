@@ -1,0 +1,1 @@
+Do not install setuptools 50.0 on Python 3.5, which leads to a broken configuration.

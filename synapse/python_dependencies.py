@@ -74,6 +74,9 @@ REQUIREMENTS = [
     "Jinja2>=2.9",
     "bleach>=1.4.3",
     "typing-extensions>=3.7.4",
+    # setuptools is required by a variety of dependencies, unfortunately version
+    # 50.0 is incompatible with Python 3.5, see https://github.com/pypa/setuptools/issues/2352
+    'setuptools!=50.0;python_version<"3.6"',
 ]
 
 CONDITIONAL_REQUIREMENTS = {
