@@ -16,7 +16,7 @@
 import logging
 import random
 import time
-from typing import Tuple
+from typing import Callable, Dict, Optional, Tuple
 
 import attr
 
@@ -125,7 +125,9 @@ class WellKnownResolver(object):
         # requests for the same server in parallel?
         try:
             with Measure(self._clock, "get_well_known"):
-                result, cache_period = await self._fetch_well_known(server_name)
+                result, cache_period = await self._fetch_well_known(
+                    server_name
+                )  # type: Tuple[Optional[bytes], float]
 
         except _FetchWellKnownFailure as e:
             if prev_result and e.temporary:
@@ -154,7 +156,7 @@ class WellKnownResolver(object):
 
         return WellKnownLookupResult(delegated_server=result)
 
-    async def _fetch_well_known(self, server_name: bytes) -> Tuple[bytes, int]:
+    async def _fetch_well_known(self, server_name: bytes) -> Tuple[bytes, float]:
         """Actually fetch and parse a .well-known, without checking the cache
 
         Args:
@@ -268,18 +270,21 @@ class WellKnownResolver(object):
             await self._clock.sleep(0.5)
 
 
-def _cache_period_from_headers(headers, time_now=time.time):
+def _cache_period_from_headers(
+    headers: Headers, time_now: Callable[[], float] = time.time
+) -> Optional[float]:
     cache_controls = _parse_cache_control(headers)
 
     if b"no-store" in cache_controls:
         return 0
 
     if b"max-age" in cache_controls:
-        try:
-            max_age = int(cache_controls[b"max-age"])
-            return max_age
-        except ValueError:
-            pass
+        max_age = cache_controls[b"max-age"]
+        if max_age:
+            try:
+                return int(max_age)
+            except ValueError:
+                pass
 
     expires = headers.getRawHeaders(b"expires")
     if expires is not None:
@@ -295,7 +300,7 @@ def _cache_period_from_headers(headers, time_now=time.time):
     return None
 
 
-def _parse_cache_control(headers):
+def _parse_cache_control(headers: Headers) -> Dict[bytes, Optional[bytes]]:
     cache_controls = {}
     for hdr in headers.getRawHeaders(b"cache-control", []):
         for directive in hdr.split(b","):
