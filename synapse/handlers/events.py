@@ -33,15 +33,6 @@ class EventStreamHandler(BaseHandler):
     def __init__(self, hs):
         super(EventStreamHandler, self).__init__(hs)
 
-        # Count of active streams per user
-        self._streams_per_user = {}
-        # Grace timers per user to delay the "stopped" signal
-        self._stop_timer_per_user = {}
-
-        self.distributor = hs.get_distributor()
-        self.distributor.declare("started_user_eventstream")
-        self.distributor.declare("stopped_user_eventstream")
-
         self.clock = hs.get_clock()
 
         self.notifier = hs.get_notifier()
