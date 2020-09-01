@@ -19,7 +19,6 @@ import synapse.metrics
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.handlers.state_deltas import StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.roommember import ProfileInfo
 from synapse.util.metrics import Measure
 
 logger = logging.getLogger(__name__)
@@ -220,12 +219,12 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                     if change:  # The user joined
                         event = await self.store.get_event(event_id, allow_none=True)
-                        profile = ProfileInfo(
-                            avatar_url=event.content.get("avatar_url"),
-                            display_name=event.content.get("displayname"),
-                        )
+                        display_name = event.content.get("displayname")
+                        avatar_url = event.content.get("avatar_url")
 
-                        await self._handle_new_user(room_id, state_key, profile)
+                        await self._handle_new_user(
+                            room_id, state_key, display_name, avatar_url
+                        )
                     else:  # The user left
                         await self._handle_remove_user(room_id, state_key)
             else:
@@ -234,7 +233,7 @@ class UserDirectoryHandler(StateDeltasHandler):
     async def _handle_room_publicity_change(
         self, room_id, prev_event_id, event_id, typ
     ):
-        """Handle a room having potentially changed from/to world_readable/publically
+        """Handle a room having potentially changed from/to world_readable/publicly
         joinable.
 
         Args:
@@ -297,9 +296,11 @@ class UserDirectoryHandler(StateDeltasHandler):
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
         for user_id, profile in users_with_profile.items():
-            await self._handle_new_user(room_id, user_id, profile)
+            await self._handle_new_user(
+                room_id, user_id, profile.display_name, profile.avatar_url
+            )
 
-    async def _handle_new_user(self, room_id, user_id, profile):
+    async def _handle_new_user(self, room_id, user_id, display_name, avatar_url):
         """Called when we might need to add user to directory
 
         Args:
@@ -308,9 +309,13 @@ class UserDirectoryHandler(StateDeltasHandler):
         """
         logger.debug("Adding new user to dir, %r", user_id)
 
-        await self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url
-        )
+        # If the display name or avatar URL are unexpected types, overwrite them.
+        if not isinstance(display_name, str):
+            display_name = None
+        if not isinstance(avatar_url, str):
+            avatar_url = None
+
+        await self.store.update_profile_in_user_dir(user_id, display_name, avatar_url)
 
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
@@ -388,9 +393,15 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         prev_name = prev_event.content.get("displayname")
         new_name = event.content.get("displayname")
+        # If the new name is an unexpected form, do not update the directory.
+        if not isinstance(new_name, str):
+            new_name = prev_name
 
         prev_avatar = prev_event.content.get("avatar_url")
         new_avatar = event.content.get("avatar_url")
+        # If the new avatar is an unexpected form, do not update the directory.
+        if not isinstance(new_avatar, str):
+            new_avatar = prev_avatar
 
         if prev_name != new_name or prev_avatar != new_avatar:
             await self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)
