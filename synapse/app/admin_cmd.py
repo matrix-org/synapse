@@ -233,7 +233,7 @@ def start(config_options):
     def run(_reactor):
         with LoggingContext("command"):
             _base.start(ss, [])
-            yield args.func(ss, args)
+            yield defer.ensureDeferred(args.func(ss, args))
 
     _base.start_worker_reactor(
         "synapse-admin-cmd", config, run_command=lambda: task.react(run)
