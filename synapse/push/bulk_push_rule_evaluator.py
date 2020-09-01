@@ -219,6 +219,8 @@ class BulkPushRuleEvaluator(object):
                 if event.type == EventTypes.Member and event.state_key == uid:
                     display_name = event.content.get("displayname", None)
 
+            actions_by_user[uid] = []
+
             for rule in rules:
                 if "enabled" in rule and not rule["enabled"]:
                     continue
@@ -233,28 +235,12 @@ class BulkPushRuleEvaluator(object):
                         actions_by_user[uid] = actions
                     break
 
-            # If the event should be counted as unread, add mark_unread to its actions.
-            # mark_unread is an internal action we use to tell add_push_actions_to_staging
-            # that we want this event to have the unread bit set to 1 in the push action
-            # tables.
-            # The push rules endpoint on the CS API checks the actions on new push rules
-            # and limit them to spec'd ones, so we shouldn't have to worry about users
-            # changing their push rules to include this action.
-            # An alternative way to do this would be to pass count_as_unread directly to
-            # add_push_actions_to_staging, but that wouldn't work as that function relies
-            # on actions_by_user to determine the list of users to insert a row for,
-            # therefore it wouldn't add a row for any user that's in the room but doesn't
-            # get notified by the event.
-            if count_as_unread:
-                if uid in actions_by_user:
-                    actions_by_user[uid].append("mark_unread")
-                else:
-                    actions_by_user[uid] = ["mark_unread"]
-
         # Mark in the DB staging area the push actions for users who should be
         # notified for this event. (This will then get handled when we persist
         # the event)
-        await self.store.add_push_actions_to_staging(event.event_id, actions_by_user)
+        await self.store.add_push_actions_to_staging(
+            event.event_id, actions_by_user, count_as_unread,
+        )
 
 
 def _condition_checker(evaluator, conditions, uid, display_name, cache):
