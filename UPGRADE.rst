@@ -96,7 +96,7 @@ been emailed to them.
 To complete password reset, the page must include a way to make a `POST`
 request to
 ``/_synapse/client/password_reset/{medium}/submit_token``
-with the query parameters from the original link, encoded as a URL-encoded form. See the file
+with the query parameters from the original link, presented as a URL-encoded form. See the file
 itself for more details.
 
 Upgrading to v1.18.0
