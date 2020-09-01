@@ -28,10 +28,11 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
-    Union,
+    overload,
 )
 
 from prometheus_client import Histogram
+from typing_extensions import Literal
 
 from twisted.enterprise import adbapi
 from twisted.internet import defer
@@ -603,16 +604,23 @@ class DatabasePool(object):
         results = [dict(zip(col_headers, row)) for row in cursor]
         return results
 
-    def execute(self, desc: str, decoder: Callable, query: str, *args: Any):
+    async def execute(
+        self,
+        desc: str,
+        decoder: Optional[Callable[[Cursor], R]],
+        query: str,
+        *args: Any
+    ) -> R:
         """Runs a single query for a result set.
 
         Args:
+            desc: description of the transaction, for logging and metrics
             decoder - The function which can resolve the cursor results to
                 something meaningful.
             query - The query string to execute
             *args - Query args.
         Returns:
-            Deferred which results to the result of decoder(results)
+            The result of decoder(results)
         """
 
         def interaction(txn):
@@ -622,7 +630,7 @@ class DatabasePool(object):
             else:
                 return txn.fetchall()
 
-        return self.runInteraction(desc, interaction)
+        return await self.runInteraction(desc, interaction)
 
     # "Simple" SQL API methods that operate on a single table with no JOINs,
     # no complex WHERE clauses, just a dict of values for columns.
@@ -642,7 +650,7 @@ class DatabasePool(object):
             or_ignore: bool stating whether an exception should be raised
                 when a conflicting row already exists. If True, False will be
                 returned by the function instead
-            desc: string giving a description of the transaction
+            desc: description of the transaction, for logging and metrics
 
         Returns:
              Whether the row was inserted or not. Only useful when `or_ignore` is True
@@ -671,15 +679,29 @@ class DatabasePool(object):
 
         txn.execute(sql, vals)
 
-    def simple_insert_many(
+    async def simple_insert_many(
         self, table: str, values: List[Dict[str, Any]], desc: str
-    ) -> defer.Deferred:
-        return self.runInteraction(desc, self.simple_insert_many_txn, table, values)
+    ) -> None:
+        """Executes an INSERT query on the named table.
+
+        Args:
+            table: string giving the table name
+            values: dict of new column names and values for them
+            desc: description of the transaction, for logging and metrics
+        """
+        await self.runInteraction(desc, self.simple_insert_many_txn, table, values)
 
     @staticmethod
     def simple_insert_many_txn(
         txn: LoggingTransaction, table: str, values: List[Dict[str, Any]]
     ) -> None:
+        """Executes an INSERT query on the named table.
+
+        Args:
+            txn: The transaction to use.
+            table: string giving the table name
+            values: dict of new column names and values for them
+        """
         if not values:
             return
 
@@ -733,6 +755,7 @@ class DatabasePool(object):
             keyvalues: The unique key columns and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+            desc: description of the transaction, for logging and metrics
             lock: True to lock the table when doing the upsert.
         Returns:
             Native upserts always return None. Emulated upserts return True if a
@@ -1020,14 +1043,36 @@ class DatabasePool(object):
 
         return txn.execute_batch(sql, args)
 
-    def simple_select_one(
+    @overload
+    async def simple_select_one(
+        self,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcols: Iterable[str],
+        allow_none: Literal[False] = False,
+        desc: str = "simple_select_one",
+    ) -> Dict[str, Any]:
+        ...
+
+    @overload
+    async def simple_select_one(
+        self,
+        table: str,
+        keyvalues: Dict[str, Any],
+        retcols: Iterable[str],
+        allow_none: Literal[True] = True,
+        desc: str = "simple_select_one",
+    ) -> Optional[Dict[str, Any]]:
+        ...
+
+    async def simple_select_one(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
         allow_none: bool = False,
         desc: str = "simple_select_one",
-    ) -> defer.Deferred:
+    ) -> Optional[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning multiple columns from it.
 
@@ -1037,19 +1082,20 @@ class DatabasePool(object):
             retcols: list of strings giving the names of the columns to return
             allow_none: If true, return None instead of failing if the SELECT
                 statement returns no rows
+            desc: description of the transaction, for logging and metrics
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_one_txn, table, keyvalues, retcols, allow_none
         )
 
-    def simple_select_one_onecol(
+    async def simple_select_one_onecol(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         retcol: Iterable[str],
         allow_none: bool = False,
         desc: str = "simple_select_one_onecol",
-    ) -> defer.Deferred:
+    ) -> Optional[Any]:
         """Executes a SELECT query on the named table, which is expected to
         return a single row, returning a single column from it.
 
@@ -1061,7 +1107,7 @@ class DatabasePool(object):
                 statement returns no rows
             desc: description of the transaction, for logging and metrics
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc,
             self.simple_select_one_onecol_txn,
             table,
@@ -1108,13 +1154,13 @@ class DatabasePool(object):
 
         return [r[0] for r in txn]
 
-    def simple_select_onecol(
+    async def simple_select_onecol(
         self,
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcol: str,
         desc: str = "simple_select_onecol",
-    ) -> defer.Deferred:
+    ) -> List[Any]:
         """Executes a SELECT query on the named table, which returns a list
         comprising of the values of the named column from the selected rows.
 
@@ -1122,21 +1168,22 @@ class DatabasePool(object):
             table: table name
             keyvalues: column names and values to select the rows with
             retcol: column whos value we wish to retrieve.
+            desc: description of the transaction, for logging and metrics
 
         Returns:
-            Deferred: Results in a list
+            Results in a list
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_onecol_txn, table, keyvalues, retcol
         )
 
-    def simple_select_list(
+    async def simple_select_list(
         self,
         table: str,
         keyvalues: Optional[Dict[str, Any]],
         retcols: Iterable[str],
         desc: str = "simple_select_list",
-    ) -> defer.Deferred:
+    ) -> List[Dict[str, Any]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1146,10 +1193,12 @@ class DatabasePool(object):
                 column names and values to select the rows with, or None to not
                 apply a WHERE clause.
             retcols: the names of the columns to return
+            desc: description of the transaction, for logging and metrics
+
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
+            A list of dictionaries.
         """
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_select_list_txn, table, keyvalues, retcols
         )
 
@@ -1198,14 +1247,16 @@ class DatabasePool(object):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Filters rows by whether the value of `column` is in `iterable`.
 
         Args:
             table: string giving the table name
             column: column name to test for inclusion against `iterable`
             iterable: list
-            keyvalues: dict of column names and values to select the rows with
             retcols: list of strings giving the names of the columns to return
+            keyvalues: dict of column names and values to select the rows with
+            desc: description of the transaction, for logging and metrics
+            batch_size: the number of rows for each select query
         """
         results = []  # type: List[Dict[str, Any]]
 
@@ -1246,7 +1297,7 @@ class DatabasePool(object):
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Filters rows by whether the value of `column` is in `iterable`.
 
         Args:
             txn: Transaction object
@@ -1275,14 +1326,14 @@ class DatabasePool(object):
         txn.execute(sql, values)
         return cls.cursor_to_dict(txn)
 
-    def simple_update(
+    async def simple_update(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
         desc: str,
-    ) -> defer.Deferred:
-        return self.runInteraction(
+    ) -> int:
+        return await self.runInteraction(
             desc, self.simple_update_txn, table, keyvalues, updatevalues
         )
 
@@ -1308,13 +1359,13 @@ class DatabasePool(object):
 
         return txn.rowcount
 
-    def simple_update_one(
+    async def simple_update_one(
         self,
         table: str,
         keyvalues: Dict[str, Any],
         updatevalues: Dict[str, Any],
         desc: str = "simple_update_one",
-    ) -> defer.Deferred:
+    ) -> None:
         """Executes an UPDATE query on the named table, setting new values for
         columns in a row matching the key values.
 
@@ -1322,8 +1373,9 @@ class DatabasePool(object):
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
             updatevalues: dict giving column names and values to update
+            desc: description of the transaction, for logging and metrics
         """
-        return self.runInteraction(
+        await self.runInteraction(
             desc, self.simple_update_one_txn, table, keyvalues, updatevalues
         )
 
@@ -1372,17 +1424,18 @@ class DatabasePool(object):
 
         return dict(zip(retcols, row))
 
-    def simple_delete_one(
+    async def simple_delete_one(
         self, table: str, keyvalues: Dict[str, Any], desc: str = "simple_delete_one"
-    ) -> defer.Deferred:
+    ) -> None:
         """Executes a DELETE query on the named table, expecting to delete a
         single row.
 
         Args:
             table: string giving the table name
             keyvalues: dict of column names and values to select the row with
+            desc: description of the transaction, for logging and metrics
         """
-        return self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
+        await self.runInteraction(desc, self.simple_delete_one_txn, table, keyvalues)
 
     @staticmethod
     def simple_delete_one_txn(
@@ -1406,13 +1459,38 @@ class DatabasePool(object):
         if txn.rowcount > 1:
             raise StoreError(500, "More than one row matched (%s)" % (table,))
 
-    def simple_delete(self, table: str, keyvalues: Dict[str, Any], desc: str):
-        return self.runInteraction(desc, self.simple_delete_txn, table, keyvalues)
+    async def simple_delete(
+        self, table: str, keyvalues: Dict[str, Any], desc: str
+    ) -> int:
+        """Executes a DELETE query on the named table.
+
+        Filters rows by the key-value pairs.
+
+        Args:
+            table: string giving the table name
+            keyvalues: dict of column names and values to select the row with
+            desc: description of the transaction, for logging and metrics
+
+        Returns:
+            The number of deleted rows.
+        """
+        return await self.runInteraction(desc, self.simple_delete_txn, table, keyvalues)
 
     @staticmethod
     def simple_delete_txn(
         txn: LoggingTransaction, table: str, keyvalues: Dict[str, Any]
     ) -> int:
+        """Executes a DELETE query on the named table.
+
+        Filters rows by the key-value pairs.
+
+        Args:
+            table: string giving the table name
+            keyvalues: dict of column names and values to select the row with
+
+        Returns:
+            The number of deleted rows.
+        """
         sql = "DELETE FROM %s WHERE %s" % (
             table,
             " AND ".join("%s = ?" % (k,) for k in keyvalues),
@@ -1421,15 +1499,29 @@ class DatabasePool(object):
         txn.execute(sql, list(keyvalues.values()))
         return txn.rowcount
 
-    def simple_delete_many(
+    async def simple_delete_many(
         self,
         table: str,
         column: str,
         iterable: Iterable[Any],
         keyvalues: Dict[str, Any],
         desc: str,
-    ) -> defer.Deferred:
-        return self.runInteraction(
+    ) -> int:
+        """Executes a DELETE query on the named table.
+
+        Filters rows by if value of `column` is in `iterable`.
+
+        Args:
+            table: string giving the table name
+            column: column name to test for inclusion against `iterable`
+            iterable: list
+            keyvalues: dict of column names and values to select the rows with
+            desc: description of the transaction, for logging and metrics
+
+        Returns:
+            Number rows deleted
+        """
+        return await self.runInteraction(
             desc, self.simple_delete_many_txn, table, column, iterable, keyvalues
         )
 
@@ -1512,52 +1604,6 @@ class DatabasePool(object):
 
         return cache, min_val
 
-    def simple_select_list_paginate(
-        self,
-        table: str,
-        orderby: str,
-        start: int,
-        limit: int,
-        retcols: Iterable[str],
-        filters: Optional[Dict[str, Any]] = None,
-        keyvalues: Optional[Dict[str, Any]] = None,
-        order_direction: str = "ASC",
-        desc: str = "simple_select_list_paginate",
-    ) -> defer.Deferred:
-        """
-        Executes a SELECT query on the named table with start and limit,
-        of row numbers, which may return zero or number of rows from start to limit,
-        returning the result as a list of dicts.
-
-        Args:
-            table: the table name
-            orderby: Column to order the results by.
-            start: Index to begin the query at.
-            limit: Number of results to return.
-            retcols: the names of the columns to return
-            filters:
-                column names and values to filter the rows with, or None to not
-                apply a WHERE ? LIKE ? clause.
-            keyvalues:
-                column names and values to select the rows with, or None to not
-                apply a WHERE clause.
-            order_direction: Whether the results should be ordered "ASC" or "DESC".
-        Returns:
-            defer.Deferred: resolves to list[dict[str, Any]]
-        """
-        return self.runInteraction(
-            desc,
-            self.simple_select_list_paginate_txn,
-            table,
-            orderby,
-            start,
-            limit,
-            retcols,
-            filters=filters,
-            keyvalues=keyvalues,
-            order_direction=order_direction,
-        )
-
     @classmethod
     def simple_select_list_paginate_txn(
         cls,
@@ -1622,14 +1668,14 @@ class DatabasePool(object):
 
         return cls.cursor_to_dict(txn)
 
-    def simple_search_list(
+    async def simple_search_list(
         self,
         table: str,
         term: Optional[str],
         col: str,
         retcols: Iterable[str],
         desc="simple_search_list",
-    ):
+    ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1640,10 +1686,10 @@ class DatabasePool(object):
             retcols: the names of the columns to return
 
         Returns:
-            defer.Deferred: resolves to list[dict[str, Any]] or None
+            A list of dictionaries or None.
         """
 
-        return self.runInteraction(
+        return await self.runInteraction(
             desc, self.simple_search_list_txn, table, term, col, retcols
         )
 
@@ -1655,7 +1701,7 @@ class DatabasePool(object):
         term: Optional[str],
         col: str,
         retcols: Iterable[str],
-    ) -> Union[List[Dict[str, Any]], int]:
+    ) -> Optional[List[Dict[str, Any]]]:
         """Executes a SELECT query on the named table, which may return zero or
         more rows, returning the result as a list of dicts.
 
@@ -1667,14 +1713,14 @@ class DatabasePool(object):
             retcols: the names of the columns to return
 
         Returns:
-            0 if no term is given, otherwise a list of dictionaries.
+            None if no term is given, otherwise a list of dictionaries.
         """
         if term:
             sql = "SELECT %s FROM %s WHERE %s LIKE ?" % (", ".join(retcols), table, col)
             termvalues = ["%%" + term + "%%"]
             txn.execute(sql, termvalues)
         else:
-            return 0
+            return None
 
         return cls.cursor_to_dict(txn)
 

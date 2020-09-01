@@ -15,12 +15,14 @@
 
 import logging
 from collections import namedtuple
+from typing import Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool
+from synapse.types import JsonDict
 from synapse.util.caches.expiringcache import ExpiringCache
 
 db_binary_type = memoryview
@@ -55,21 +57,23 @@ class TransactionStore(SQLBaseStore):
             expiry_ms=5 * 60 * 1000,
         )
 
-    def get_received_txn_response(self, transaction_id, origin):
+    async def get_received_txn_response(
+        self, transaction_id: str, origin: str
+    ) -> Optional[Tuple[int, JsonDict]]:
         """For an incoming transaction from a given origin, check if we have
         already responded to it. If so, return the response code and response
         body (as a dict).
 
         Args:
-            transaction_id (str)
-            origin(str)
+            transaction_id
+            origin
 
         Returns:
-            tuple: None if we have not previously responded to
-            this transaction or a 2-tuple of (int, dict)
+            None if we have not previously responded to this transaction or a
+            2-tuple of (int, dict)
         """
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_received_txn_response",
             self._get_received_txn_response,
             transaction_id,
@@ -98,20 +102,21 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_received_txn_response(self, transaction_id, origin, code, response_dict):
-        """Persist the response we returened for an incoming transaction, and
+    async def set_received_txn_response(
+        self, transaction_id: str, origin: str, code: int, response_dict: JsonDict
+    ) -> None:
+        """Persist the response we returned for an incoming transaction, and
         should return for subsequent transactions with the same transaction_id
         and origin.
 
         Args:
-            txn
-            transaction_id (str)
-            origin (str)
-            code (int)
-            response_json (str)
+            transaction_id: The incoming transaction ID.
+            origin: The origin server.
+            code: The response code.
+            response_dict: The response, to be encoded into JSON.
         """
 
-        return self.db_pool.simple_insert(
+        await self.db_pool.simple_insert(
             table="received_transactions",
             values={
                 "transaction_id": transaction_id,
@@ -164,21 +169,25 @@ class TransactionStore(SQLBaseStore):
         else:
             return None
 
-    def set_destination_retry_timings(
-        self, destination, failure_ts, retry_last_ts, retry_interval
-    ):
+    async def set_destination_retry_timings(
+        self,
+        destination: str,
+        failure_ts: Optional[int],
+        retry_last_ts: int,
+        retry_interval: int,
+    ) -> None:
         """Sets the current retry timings for a given destination.
         Both timings should be zero if retrying is no longer occuring.
 
         Args:
-            destination (str)
-            failure_ts (int|None) - when the server started failing (ms since epoch)
-            retry_last_ts (int) - time of last retry attempt in unix epoch ms
-            retry_interval (int) - how long until next retry in ms
+            destination
+            failure_ts: when the server started failing (ms since epoch)
+            retry_last_ts: time of last retry attempt in unix epoch ms
+            retry_interval: how long until next retry in ms
         """
 
         self._destination_retry_cache.pop(destination, None)
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "set_destination_retry_timings",
             self._set_destination_retry_timings,
             destination,
@@ -254,13 +263,13 @@ class TransactionStore(SQLBaseStore):
             "cleanup_transactions", self._cleanup_transactions
         )
 
-    def _cleanup_transactions(self):
+    async def _cleanup_transactions(self) -> None:
         now = self._clock.time_msec()
         month_ago = now - 30 * 24 * 60 * 60 * 1000
 
         def _cleanup_transactions_txn(txn):
             txn.execute("DELETE FROM received_transactions WHERE ts < ?", (month_ago,))
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "_cleanup_transactions", _cleanup_transactions_txn
         )

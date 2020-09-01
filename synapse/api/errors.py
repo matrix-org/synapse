@@ -604,3 +604,11 @@ class HttpResponseException(CodeMessageException):
         errmsg = j.pop("error", self.msg)
 
         return ProxiedRequestError(self.code, errmsg, errcode, j)
+
+
+class ShadowBanError(Exception):
+    """
+    Raised when a shadow-banned user attempts to perform an action.
+
+    This should be caught and a proper "fake" success response sent to the user.
+    """

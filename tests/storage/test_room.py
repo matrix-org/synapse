@@ -54,12 +54,14 @@ class RoomStoreTestCase(unittest.TestCase):
                 "creator": self.u_creator.to_string(),
                 "is_public": True,
             },
-            (yield self.store.get_room(self.room.to_string())),
+            (yield defer.ensureDeferred(self.store.get_room(self.room.to_string()))),
         )
 
     @defer.inlineCallbacks
     def test_get_room_unknown_room(self):
-        self.assertIsNone((yield self.store.get_room("!uknown:test")),)
+        self.assertIsNone(
+            (yield defer.ensureDeferred(self.store.get_room("!uknown:test")))
+        )
 
     @defer.inlineCallbacks
     def test_get_room_with_stats(self):
@@ -69,12 +71,22 @@ class RoomStoreTestCase(unittest.TestCase):
                 "creator": self.u_creator.to_string(),
                 "public": True,
             },
-            (yield self.store.get_room_with_stats(self.room.to_string())),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_room_with_stats(self.room.to_string())
+                )
+            ),
         )
 
     @defer.inlineCallbacks
     def test_get_room_with_stats_unknown_room(self):
-        self.assertIsNone((yield self.store.get_room_with_stats("!uknown:test")),)
+        self.assertIsNone(
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_room_with_stats("!uknown:test")
+                )
+            ),
+        )
 
 
 class RoomEventsStoreTestCase(unittest.TestCase):

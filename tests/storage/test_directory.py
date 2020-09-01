@@ -42,7 +42,11 @@ class DirectoryStoreTestCase(unittest.TestCase):
 
         self.assertEquals(
             ["#my-room:test"],
-            (yield self.store.get_aliases_for_room(self.room.to_string())),
+            (
+                yield defer.ensureDeferred(
+                    self.store.get_aliases_for_room(self.room.to_string())
+                )
+            ),
         )
 
     @defer.inlineCallbacks
