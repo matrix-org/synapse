@@ -203,15 +203,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
                 # Update each user in the user directory.
                 for user_id, profile in users_with_profile.items():
-                    # If the display name or avatar URL are unexpected types, overwrite them.
-                    display_name, avatar_url = profile
-                    if not isinstance(display_name, str):
-                        display_name = None
-                    if not isinstance(avatar_url, str):
-                        avatar_url = None
-
                     await self.update_profile_in_user_dir(
-                        user_id, display_name, avatar_url
+                        user_id, profile.display_name, profile.avatar_url
                     )
 
                 to_insert = set()
@@ -376,6 +369,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """
         Update or add a user's profile in the user directory.
         """
+        # If the display name or avatar URL are unexpected types, overwrite them.
+        if not isinstance(display_name, str):
+            display_name = None
+        if not isinstance(avatar_url, str):
+            avatar_url = None
 
         def _update_profile_in_user_dir_txn(txn):
             new_entry = self.db_pool.simple_upsert_txn(
