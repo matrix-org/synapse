@@ -283,13 +283,12 @@ class MultiWriterIdGenerator:
         with self._lock:
             assert self._current_positions.get(self._instance_name, 0) < next_id
 
-        with self._lock:
             self._unfinished_ids.add(next_id)
 
         @contextlib.contextmanager
         def manager():
             try:
-                # Multiple by return factor so that we ID has correct sign.
+                # Multiply by the return factor so that the ID has correct sign.
                 yield self._return_factor * next_id
             finally:
                 self._mark_id_as_finished(next_id)
@@ -312,7 +311,6 @@ class MultiWriterIdGenerator:
         with self._lock:
             assert max(self._current_positions.values(), default=0) < min(next_ids)
 
-        with self._lock:
             self._unfinished_ids.update(next_ids)
 
         @contextlib.contextmanager
