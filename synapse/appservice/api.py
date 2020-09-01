@@ -14,17 +14,19 @@
 # limitations under the License.
 import logging
 import urllib
+from typing import TYPE_CHECKING, Optional
 
 from prometheus_client import Counter
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
 from synapse.events.utils import serialize_event
 from synapse.http.client import SimpleHttpClient
-from synapse.types import ThirdPartyInstanceID
+from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
+
+if TYPE_CHECKING:
+    from synapse.appservice import ApplicationService
 
 logger = logging.getLogger(__name__)
 
@@ -163,19 +165,20 @@ class ApplicationServiceApi(SimpleHttpClient):
             logger.warning("query_3pe to %s threw exception %s", uri, ex)
             return []
 
-    def get_3pe_protocol(self, service, protocol):
+    async def get_3pe_protocol(
+        self, service: "ApplicationService", protocol: str
+    ) -> Optional[JsonDict]:
         if service.url is None:
             return {}
 
-        @defer.inlineCallbacks
-        def _get():
+        async def _get() -> Optional[JsonDict]:
             uri = "%s%s/thirdparty/protocol/%s" % (
                 service.url,
                 APP_SERVICE_PREFIX,
                 urllib.parse.quote(protocol),
             )
             try:
-                info = yield defer.ensureDeferred(self.get_json(uri, {}))
+                info = await self.get_json(uri, {})
 
                 if not _is_valid_3pe_metadata(info):
                     logger.warning(
@@ -196,7 +199,7 @@ class ApplicationServiceApi(SimpleHttpClient):
                 return None
 
         key = (service.id, protocol)
-        return self.protocol_meta_cache.wrap(key, _get)
+        return await self.protocol_meta_cache.wrap(key, _get)
 
     async def push_bulk(self, service, events, txn_id=None):
         if service.url is None:
