@@ -256,8 +256,8 @@ class DeviceWorkerStore(SQLBaseStore):
         """
         devices = (
             await self.db_pool.runInteraction(
-                "_get_e2e_device_keys_txn",
-                self._get_e2e_device_keys_txn,
+                "get_e2e_device_keys_and_signatures_txn",
+                self._get_e2e_device_keys_and_signatures_txn,
                 query_map.keys(),
                 include_all_devices=True,
                 include_deleted_devices=True,
