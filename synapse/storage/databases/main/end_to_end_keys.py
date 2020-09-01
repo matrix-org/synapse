@@ -42,7 +42,7 @@ class DeviceKeyLookupResult:
 
     # the key data from e2e_device_keys_json. Typically includes fields like
     # "algorithm", "keys" (including the curve25519 identity key and the ed25519 signing
-    # key) and signatures" (a signature of the structure by the ed25519 key)
+    # key) and "signatures" (a signature of the structure by the ed25519 key)
     key_json = attr.ib(type=Optional[str])
 
     # cross-signing sigs
