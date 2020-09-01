@@ -159,9 +159,9 @@ class DirectoryStore(DirectoryWorkerStore):
 
         return room_id
 
-    def update_aliases_for_room(
+    async def update_aliases_for_room(
         self, old_room_id: str, new_room_id: str, creator: Optional[str] = None,
-    ):
+    ) -> None:
         """Repoint all of the aliases for a given room, to a different room.
 
         Args:
@@ -189,6 +189,6 @@ class DirectoryStore(DirectoryWorkerStore):
                 txn, self.get_aliases_for_room, (new_room_id,)
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "_update_aliases_for_room_txn", _update_aliases_for_room_txn
         )
