@@ -823,20 +823,24 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event_dict
 
-    def _maybe_redact_event_row(self, original_ev, redactions, event_map):
+    def _maybe_redact_event_row(
+        self,
+        original_ev: EventBase,
+        redactions: Iterable[str],
+        event_map: Dict[str, EventBase],
+    ) -> Optional[EventBase]:
         """Given an event object and a list of possible redacting event ids,
         determine whether to honour any of those redactions and if so return a redacted
         event.
 
         Args:
-             original_ev (EventBase):
-             redactions (iterable[str]): list of event ids of potential redaction events
-             event_map (dict[str, EventBase]): other events which have been fetched, in
-                 which we can look up the redaaction events. Map from event id to event.
+             original_ev: The original event.
+             redactions: list of event ids of potential redaction events
+             event_map: other events which have been fetched, in which we can
+                look up the redaaction events. Map from event id to event.
 
         Returns:
-            EventBase|None: if the event should be redacted, a pruned
-                event object. Otherwise, None.
+            If the event should be redacted, a pruned event object. Otherwise, None.
         """
         if original_ev.type == "m.room.create":
             # we choose to ignore redactions of m.room.create events.
