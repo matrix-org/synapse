@@ -249,6 +249,7 @@ class StatsStore(StateDeltasStore):
         #
         # Note that a missing value should not be overwritten (it keeps the
         # previous value).
+        sentinel = object()
         for col in (
             "join_rules",
             "history_visibility",
@@ -258,8 +259,8 @@ class StatsStore(StateDeltasStore):
             "avatar",
             "canonical_alias",
         ):
-            field = fields.get(col)
-            if field and (not isinstance(field, str) or "\0" in field):
+            field = fields.get(col, sentinel)
+            if field is not sentinel and (not isinstance(field, str) or "\0" in field):
                 fields[col] = None
 
         await self.db_pool.simple_upsert(
