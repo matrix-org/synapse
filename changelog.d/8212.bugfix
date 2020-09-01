@@ -1,0 +1,1 @@
+Do not install setuptools 50.0. It can lead to a broken configuration on some older Python versions.
