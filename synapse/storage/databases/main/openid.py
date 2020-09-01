@@ -2,8 +2,10 @@ from synapse.storage._base import SQLBaseStore
 
 
 class OpenIdStore(SQLBaseStore):
-    def insert_open_id_token(self, token, ts_valid_until_ms, user_id):
-        return self.db_pool.simple_insert(
+    async def insert_open_id_token(
+        self, token: str, ts_valid_until_ms: int, user_id: str
+    ) -> None:
+        await self.db_pool.simple_insert(
             table="open_id_tokens",
             values={
                 "token": token,

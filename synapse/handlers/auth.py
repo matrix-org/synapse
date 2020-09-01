@@ -42,13 +42,99 @@ from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
-from synapse.types import Requester, UserID
+from synapse.types import JsonDict, Requester, UserID
 from synapse.util import stringutils as stringutils
+from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.threepids import canonicalise_email
 
 from ._base import BaseHandler
 
 logger = logging.getLogger(__name__)
+
+
+def convert_client_dict_legacy_fields_to_identifier(
+    submission: JsonDict,
+) -> Dict[str, str]:
+    """
+    Convert a legacy-formatted login submission to an identifier dict.
+
+    Legacy login submissions (used in both login and user-interactive authentication)
+    provide user-identifying information at the top-level instead.
+
+    These are now deprecated and replaced with identifiers:
+    https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
+
+    Args:
+        submission: The client dict to convert
+
+    Returns:
+        The matching identifier dict
+
+    Raises:
+        SynapseError: If the format of the client dict is invalid
+    """
+    identifier = submission.get("identifier", {})
+
+    # Generate an m.id.user identifier if "user" parameter is present
+    user = submission.get("user")
+    if user:
+        identifier = {"type": "m.id.user", "user": user}
+
+    # Generate an m.id.thirdparty identifier if "medium" and "address" parameters are present
+    medium = submission.get("medium")
+    address = submission.get("address")
+    if medium and address:
+        identifier = {
+            "type": "m.id.thirdparty",
+            "medium": medium,
+            "address": address,
+        }
+
+    # We've converted valid, legacy login submissions to an identifier. If the
+    # submission still doesn't have an identifier, it's invalid
+    if not identifier:
+        raise SynapseError(400, "Invalid login submission", Codes.INVALID_PARAM)
+
+    # Ensure the identifier has a type
+    if "type" not in identifier:
+        raise SynapseError(
+            400, "'identifier' dict has no key 'type'", errcode=Codes.MISSING_PARAM,
+        )
+
+    return identifier
+
+
+def login_id_phone_to_thirdparty(identifier: JsonDict) -> Dict[str, str]:
+    """
+    Convert a phone login identifier type to a generic threepid identifier.
+
+    Args:
+        identifier: Login identifier dict of type 'm.id.phone'
+
+    Returns:
+        An equivalent m.id.thirdparty identifier dict
+    """
+    if "country" not in identifier or (
+        # The specification requires a "phone" field, while Synapse used to require a "number"
+        # field. Accept both for backwards compatibility.
+        "phone" not in identifier
+        and "number" not in identifier
+    ):
+        raise SynapseError(
+            400, "Invalid phone-type identifier", errcode=Codes.INVALID_PARAM
+        )
+
+    # Accept both "phone" and "number" as valid keys in m.id.phone
+    phone_number = identifier.get("phone", identifier["number"])
+
+    # Convert user-provided phone number to a consistent representation
+    msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
+
+    return {
+        "type": "m.id.thirdparty",
+        "medium": "msisdn",
+        "address": msisdn,
+    }
 
 
 class AuthHandler(BaseHandler):
