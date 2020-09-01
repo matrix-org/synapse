@@ -231,7 +231,8 @@ class StatsStore(StateDeltasStore):
         """
 
         # For whatever reason some of the fields may contain null bytes, which
-        # postgres isn't a fan of, so we replace those fields with null.
+        # postgres isn't a fan of, or be an unexpected type. Replace those
+        # fields with null.
         for col in (
             "join_rules",
             "history_visibility",
@@ -242,7 +243,7 @@ class StatsStore(StateDeltasStore):
             "canonical_alias",
         ):
             field = fields.get(col)
-            if field and "\0" in field:
+            if not isinstance(field, str) or "\0" in field:
                 fields[col] = None
 
         await self.db_pool.simple_upsert(
