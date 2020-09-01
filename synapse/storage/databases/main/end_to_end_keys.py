@@ -51,7 +51,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
     ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self.get_device_stream_token()
 
-        devices = self._get_e2e_device_keys_txn(txn, [(user_id, None)])
+        devices = self._get_e2e_device_keys_and_signatures_txn(txn, [(user_id, None)])
 
         if devices:
             user_devices = devices[user_id]
@@ -96,7 +96,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             return {}
 
         results = await self.db_pool.runInteraction(
-            "get_e2e_device_keys", self._get_e2e_device_keys_txn, query_list,
+            "get_e2e_device_keys_and_signatures_txn",
+            self._get_e2e_device_keys_and_signatures_txn,
+            query_list,
         )
 
         # Build the result structure, un-jsonify the results, and add the
@@ -120,9 +122,9 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         return rv
 
     @trace
-    def _get_e2e_device_keys_txn(
+    def _get_e2e_device_keys_and_signatures_txn(
         self, txn, query_list, include_all_devices=False, include_deleted_devices=False
-    ):
+    ) -> Dict[str, Dict[str, Optional[Dict]]]:
         set_tag("include_all_devices", include_all_devices)
         set_tag("include_deleted_devices", include_deleted_devices)
 
