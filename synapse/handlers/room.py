@@ -36,7 +36,10 @@ from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, Syna
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
-from synapse.events.utils import copy_power_levels_contents
+from synapse.events.utils import (
+    copy_power_levels_contents,
+    update_power_levels_contents,
+)
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
@@ -878,36 +881,32 @@ class RoomCreationHandler(BaseHandler):
                 etype=EventTypes.PowerLevels, content=pl_content
             )
         else:
-            power_level_content = {
-                "users": {creator_id: 100},
-                "users_default": 0,
-                "events": {
-                    EventTypes.Name: 50,
-                    EventTypes.PowerLevels: 100,
-                    EventTypes.RoomHistoryVisibility: 100,
-                    EventTypes.CanonicalAlias: 50,
-                    EventTypes.RoomAvatar: 50,
-                    EventTypes.Tombstone: 100,
-                    EventTypes.ServerACL: 100,
-                    EventTypes.RoomEncryption: 100,
-                },
-                "events_default": 0,
-                "state_default": 50,
-                "ban": 50,
-                "kick": 50,
-                "redact": 50,
-                "invite": 50,
-            }  # type: JsonDict
+            # Copy default power level event content from room config.
+            # This is hardcoded in the config class, not actually configurable.
+            power_level_content = copy_power_levels_contents(
+                self.config.room.power_level_content_default
+            )
+
+            if creator_id not in power_level_content["users"]:
+                power_level_content["users"][creator_id] = 100
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
                     power_level_content["users"][invitee] = 100
 
-            # Power levels overrides are defined per chat preset
-            power_level_content.update(config["power_level_content_override"])
+            # Update from internal config override, then the one from server
+            # config. Uses special update function because the contents dict
+            # has a nested events section.
 
-            if power_level_content_override:
-                power_level_content.update(power_level_content_override)
+            # Power levels overrides are defined per chat preset
+            update_power_levels_contents(
+                power_level_content, config["power_level_content_override"]
+            )
+
+            # Final override from server config.  This one isn't hardcoded.
+            update_power_levels_contents(
+                power_level_content, self.config.room.power_level_content_override
+            )
 
             last_sent_stream_id = await send(
                 etype=EventTypes.PowerLevels, content=power_level_content

@@ -15,7 +15,8 @@
 
 import logging
 
-from synapse.api.constants import RoomCreationPreset
+from synapse.api.constants import EventTypes, RoomCreationPreset
+from synapse.types import JsonDict
 
 from ._base import Config, ConfigError
 
@@ -32,6 +33,27 @@ class RoomDefaultEncryptionTypes:
 
 class RoomConfig(Config):
     section = "room"
+
+    power_level_content_default = {
+        "users": {},
+        "users_default": 0,
+        "events_default": 0,
+        "events": {
+            EventTypes.Name: 50,
+            EventTypes.PowerLevels: 100,
+            EventTypes.RoomHistoryVisibility: 100,
+            EventTypes.CanonicalAlias: 50,
+            EventTypes.RoomAvatar: 50,
+            EventTypes.Tombstone: 100,
+            EventTypes.ServerACL: 100,
+            EventTypes.RoomEncryption: 100,
+        },
+        "state_default": 50,
+        "ban": 50,
+        "kick": 50,
+        "redact": 50,
+        "invite": 50,
+    }  # type: JsonDict
 
     def read_config(self, config, **kwargs):
         # Whether new, locally-created rooms should have encryption enabled
@@ -62,7 +84,43 @@ class RoomConfig(Config):
                 "Invalid value for encryption_enabled_by_default_for_room_type"
             )
 
+        # Power level content override for locally-created rooms
+        power_level_content_override = (
+            config.get("power_level_content_override", None) or {}
+        )
+
+        invalid_keys = (
+            power_level_content_override.keys()
+            - self.power_level_content_default.keys()
+        )
+        if invalid_keys:
+            raise ConfigError(
+                "Invalid power level override keys: " + ", ".join(invalid_keys)
+            )
+
+        override_events = power_level_content_override.get("events", None) or {}
+        invalid_event_keys = (
+            override_events.keys() - self.power_level_content_default["events"].keys()
+        )
+        if invalid_event_keys:
+            raise ConfigError(
+                "Invalid power level override event keys: "
+                + ", ".join(invalid_event_keys)
+            )
+
+        self.power_level_content_override = power_level_content_override
+
     def generate_config_section(self, **kwargs):
+        pl_keys = self.power_level_content_default.keys() - {"events", "users"}
+        pl_lines_list = ["          #{}: 50".format(f) for f in sorted(pl_keys)]
+        pl_lines = "\n".join(pl_lines_list)
+
+        pl_event_keys = self.power_level_content_default["events"].keys()
+        pl_event_lines_list = [
+            "            #{}: 50".format(f) for f in sorted(pl_event_keys)
+        ]
+        pl_event_lines = "\n".join(pl_event_lines_list)
+
         return """\
         ## Rooms ##
 
@@ -82,4 +140,23 @@ class RoomConfig(Config):
         # will also not affect rooms created by other servers.
         #
         #encryption_enabled_by_default_for_room_type: invite
-        """
+
+        # Don't use this unless you are sure you know what you're doing and have
+        # a strong understanding of the matrix protocol. Here's the relevant docs:
+        # https://matrix.org/docs/spec/client_server/latest#m-room-power-levels
+        #
+        # Any values declared in this option will override the named power level
+        # event content unconditionally.
+        #
+        power_level_content_override:
+          #
+          # Power level event content fields:
+{pl_lines}
+
+          # Events list to be sent in the power level event
+          #
+          events:
+{pl_event_lines}
+        """.format(
+            pl_lines=pl_lines, pl_event_lines=pl_event_lines
+        )

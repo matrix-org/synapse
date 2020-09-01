@@ -34,7 +34,7 @@ SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
 def prune_event(event: EventBase) -> EventBase:
-    """ Returns a pruned version of the given event, which removes all keys we
+    """Returns a pruned version of the given event, which removes all keys we
     don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that
@@ -447,6 +447,35 @@ def copy_power_levels_contents(
         raise TypeError("Invalid power_levels value for %s: %r" % (k, v))
 
     return power_levels
+
+
+def update_power_levels_contents(
+    power_levels: Mapping[str, Union[int, Mapping[str, int]]],
+    power_levels_update: Mapping[str, Union[int, Mapping[str, int]]],
+):
+    """Update the content of a power_levels event
+
+    Raises:
+        TypeError if either input does not look like a valid power levels event content
+    """
+    if not isinstance(power_levels, collections.abc.Mapping):
+        raise TypeError("Not a valid power-levels content: %r" % (power_levels,))
+
+    if not isinstance(power_levels_update, collections.abc.Mapping):
+        raise TypeError("Not a valid power-levels content: %r" % (power_levels_update,))
+
+    # If there's no events section, make an empty one
+    if "events" not in power_levels:
+        power_levels["events"] = {}
+
+    # Take the events section out of the update content and do a separate update for it
+    events_update = power_levels_update.pop("events", None)
+    if events_update:
+        power_levels["events"].update(events_update)
+
+    # Do the top level update and put the events section back
+    power_levels.update(power_levels_update)
+    power_levels_update["events"] = events_update
 
 
 def validate_canonicaljson(value: Any):
