@@ -42,18 +42,13 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         Returns:
             (stream_id, devices)
         """
-        return await self.db_pool.runInteraction(
-            "get_e2e_device_keys_for_federation_query",
-            self._get_e2e_device_keys_for_federation_query_txn,
-            user_id,
-        )
-
-    def _get_e2e_device_keys_for_federation_query_txn(
-        self, txn: LoggingTransaction, user_id: str
-    ) -> Tuple[int, List[JsonDict]]:
         now_stream_id = self.get_device_stream_token()
 
-        devices = self._get_e2e_device_keys_and_signatures_txn(txn, [(user_id, None)])
+        devices = await self.db_pool.runInteraction(
+            "get_e2e_device_keys_and_signatures_txn",
+            self._get_e2e_device_keys_and_signatures_txn,
+            [(user_id, None)],
+        )
 
         if devices:
             user_devices = devices[user_id]
