@@ -13,14 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import synapse.server
 from synapse.api.constants import EventTypes
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.types import Collection
 
 """
 Utility functions for poking events into the storage of the server under test.
@@ -58,7 +57,7 @@ async def inject_member_event(
 async def inject_event(
     hs: synapse.server.HomeServer,
     room_version: Optional[str] = None,
-    prev_event_ids: Optional[Collection[str]] = None,
+    prev_event_ids: Optional[List[str]] = None,
     **kwargs
 ) -> EventBase:
     """Inject a generic event into a room
@@ -80,7 +79,7 @@ async def inject_event(
 async def create_event(
     hs: synapse.server.HomeServer,
     room_version: Optional[str] = None,
-    prev_event_ids: Optional[Collection[str]] = None,
+    prev_event_ids: Optional[List[str]] = None,
     **kwargs
 ) -> Tuple[EventBase, EventContext]:
     if room_version is None:
