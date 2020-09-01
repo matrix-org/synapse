@@ -234,7 +234,9 @@ class DeviceWorkerHandler(BaseHandler):
         return result
 
     async def on_federation_query_user_devices(self, user_id):
-        stream_id, devices = await self.store.get_devices_with_keys_by_user(user_id)
+        stream_id, devices = await self.store.get_e2e_device_keys_for_federation_query(
+            user_id
+        )
         master_key = await self.store.get_e2e_cross_signing_key(user_id, "master")
         self_signing_key = await self.store.get_e2e_cross_signing_key(
             user_id, "self_signing"
