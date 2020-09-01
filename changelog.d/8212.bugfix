@@ -1,1 +1,1 @@
-Do not install setuptools 50.0 on Python 3.5, which leads to a broken configuration.
+Do not install setuptools 50.0. It can lead to a broken configuration on some older Python versions.
