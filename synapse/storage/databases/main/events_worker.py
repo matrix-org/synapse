@@ -823,20 +823,24 @@ class EventsWorkerStore(SQLBaseStore):
 
         return event_dict
 
-    def _maybe_redact_event_row(self, original_ev, redactions, event_map):
+    def _maybe_redact_event_row(
+        self,
+        original_ev: EventBase,
+        redactions: Iterable[str],
+        event_map: Dict[str, EventBase],
+    ) -> Optional[EventBase]:
         """Given an event object and a list of possible redacting event ids,
         determine whether to honour any of those redactions and if so return a redacted
         event.
 
         Args:
-             original_ev (EventBase):
-             redactions (iterable[str]): list of event ids of potential redaction events
-             event_map (dict[str, EventBase]): other events which have been fetched, in
-                 which we can look up the redaaction events. Map from event id to event.
+             original_ev: The original event.
+             redactions: list of event ids of potential redaction events
+             event_map: other events which have been fetched, in which we can
+                look up the redaaction events. Map from event id to event.
 
         Returns:
-            Deferred[EventBase|None]: if the event should be redacted, a pruned
-                event object. Otherwise, None.
+            If the event should be redacted, a pruned event object. Otherwise, None.
         """
         if original_ev.type == "m.room.create":
             # we choose to ignore redactions of m.room.create events.
@@ -946,17 +950,17 @@ class EventsWorkerStore(SQLBaseStore):
         row = txn.fetchone()
         return row[0] if row else 0
 
-    def get_current_state_event_counts(self, room_id):
+    async def get_current_state_event_counts(self, room_id: str) -> int:
         """
         Gets the current number of state events in a room.
 
         Args:
-            room_id (str)
+            room_id: The room ID to query.
 
         Returns:
-            Deferred[int]
+            The current number of state events.
         """
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_current_state_event_counts",
             self._get_current_state_event_counts_txn,
             room_id,
@@ -991,7 +995,9 @@ class EventsWorkerStore(SQLBaseStore):
         """The current maximum token that events have reached"""
         return self._stream_id_gen.get_current_token()
 
-    def get_all_new_forward_event_rows(self, last_id, current_id, limit):
+    async def get_all_new_forward_event_rows(
+        self, last_id: int, current_id: int, limit: int
+    ) -> List[Tuple]:
         """Returns new events, for the Events replication stream
 
         Args:
@@ -999,7 +1005,7 @@ class EventsWorkerStore(SQLBaseStore):
             current_id: the maximum stream_id to return up to
             limit: the maximum number of rows to return
 
-        Returns: Deferred[List[Tuple]]
+        Returns:
             a list of events stream rows. Each tuple consists of a stream id as
             the first element, followed by fields suitable for casting into an
             EventsStreamRow.
@@ -1020,18 +1026,20 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id, limit))
             return txn.fetchall()
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_all_new_forward_event_rows", get_all_new_forward_event_rows
         )
 
-    def get_ex_outlier_stream_rows(self, last_id, current_id):
+    async def get_ex_outlier_stream_rows(
+        self, last_id: int, current_id: int
+    ) -> List[Tuple]:
         """Returns de-outliered events, for the Events replication stream
 
         Args:
             last_id: the last stream_id from the previous batch.
             current_id: the maximum stream_id to return up to
 
-        Returns: Deferred[List[Tuple]]
+        Returns:
             a list of events stream rows. Each tuple consists of a stream id as
             the first element, followed by fields suitable for casting into an
             EventsStreamRow.
@@ -1054,7 +1062,7 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(sql, (last_id, current_id))
             return txn.fetchall()
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_ex_outlier_stream_rows", get_ex_outlier_stream_rows_txn
         )
 
@@ -1226,11 +1234,11 @@ class EventsWorkerStore(SQLBaseStore):
 
         return (int(res["topological_ordering"]), int(res["stream_ordering"]))
 
-    def get_next_event_to_expire(self):
+    async def get_next_event_to_expire(self) -> Optional[Tuple[str, int]]:
         """Retrieve the entry with the lowest expiry timestamp in the event_expiry
         table, or None if there's no more event to expire.
 
-        Returns: Deferred[Optional[Tuple[str, int]]]
+        Returns:
             A tuple containing the event ID as its first element and an expiry timestamp
             as its second one, if there's at least one row in the event_expiry table.
             None otherwise.
@@ -1246,6 +1254,6 @@ class EventsWorkerStore(SQLBaseStore):
 
             return txn.fetchone()
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             desc="get_next_event_to_expire", func=get_next_event_to_expire_txn
         )
