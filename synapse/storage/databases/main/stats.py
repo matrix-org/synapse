@@ -259,7 +259,7 @@ class StatsStore(StateDeltasStore):
             "canonical_alias",
         ):
             field = fields.get(col)
-            if not isinstance(field, str) or "\0" in field:
+            if field and (not isinstance(field, str) or "\0" in field):
                 fields[col] = None
 
         await self.db_pool.simple_upsert(
