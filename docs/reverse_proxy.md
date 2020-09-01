@@ -11,7 +11,7 @@ privileges.
 
 **NOTE**: Your reverse proxy must not `canonicalise` or `normalise`
 the requested URI in any way (for example, by decoding `%xx` escapes).
-Beware that Apache *will* canonicalise URIs unless you specifify
+Beware that Apache *will* canonicalise URIs unless you specify
 `nocanon`.
 
 When setting up a reverse proxy, remember that Matrix clients and other
@@ -22,6 +22,10 @@ refer to the 'client port' and the 'federation port'. See [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names)
 for more details of the algorithm used for federation connections, and
 [delegate.md](<delegate.md>) for instructions on setting up delegation.
+
+Endpoints that are part of the standardised Matrix specification are
+located under `/_matrix`, whereas endpoints specific to Synapse are
+located under `/_synapse`.
 
 Let's assume that we expect clients to connect to our server at
 `https://matrix.example.com`, and other servers to connect at
@@ -45,7 +49,7 @@ server {
 
     server_name matrix.example.com;
 
-    location /_matrix {
+    location ~* ^(\/_matrix|\/_synapse\/client) {
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         # Nginx by default only allows file uploads up to 1M in size
@@ -65,6 +69,10 @@ matrix.example.com {
   proxy /_matrix http://localhost:8008 {
     transparent
   }
+
+  proxy /_synapse/client http://localhost:8008 {
+    transparent
+  }
 }
 
 example.com:8448 {
@@ -79,6 +87,7 @@ example.com:8448 {
 ```
 matrix.example.com {
   reverse_proxy /_matrix/* http://localhost:8008
+  reverse_proxy /_synapse/client/* http://localhost:8008
 }
 
 example.com:8448 {
@@ -96,6 +105,8 @@ example.com:8448 {
     AllowEncodedSlashes NoDecode
     ProxyPass /_matrix http://127.0.0.1:8008/_matrix nocanon
     ProxyPassReverse /_matrix http://127.0.0.1:8008/_matrix
+    ProxyPass /_synapse/client http://127.0.0.1:8008/_synapse/client nocanon
+    ProxyPassReverse /_synapse/client http://127.0.0.1:8008/_synapse/client
 </VirtualHost>
 
 <VirtualHost *:8448>
@@ -119,8 +130,9 @@ frontend https
   # Matrix client traffic
   acl matrix-host hdr(host) -i matrix.example.com
   acl matrix-path path_beg /_matrix
+  acl synapse-client-path path_beg /_matrix
 
-  use_backend matrix if matrix-host matrix-path
+  use_backend matrix if matrix-host matrix-path || matrix-host synapse-client-path
 
 frontend matrix-federation
   bind :::8448 v4v6 ssl crt /etc/ssl/haproxy/synapse.pem alpn h2,http/1.1
@@ -146,3 +158,10 @@ connecting to Synapse from a client.
 Synapse exposes a health check endpoint for use by reverse proxies.
 Each configured HTTP listener has a `/health` endpoint which always returns
 200 OK (and doesn't get logged).
+
+## Synapse administration endpoints
+
+Endpoints for administering your Synapse instance are placed under
+`/_synapse/admin`. These require authentication through an access token of an
+admin user. Nevertheless, it is not advised to expose these ports to the public
+internet.
