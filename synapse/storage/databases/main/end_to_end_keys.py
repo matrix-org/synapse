@@ -14,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
@@ -22,7 +23,7 @@ from twisted.enterprise.adbapi import Connection
 
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
-from synapse.storage.database import make_in_list_sql_clause
+from synapse.storage.database import LoggingTransaction, make_in_list_sql_clause
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
@@ -33,18 +34,60 @@ if TYPE_CHECKING:
 
 
 class EndToEndKeyWorkerStore(SQLBaseStore):
+    async def get_e2e_device_keys_for_federation_query(
+        self, user_id: str
+    ) -> Tuple[int, List[JsonDict]]:
+        """Get all devices (with any device keys) for a user
+
+        Returns:
+            (stream_id, devices)
+        """
+        return await self.db_pool.runInteraction(
+            "get_e2e_device_keys_for_federation_query",
+            self._get_e2e_device_keys_for_federation_query_txn,
+            user_id,
+        )
+
+    def _get_e2e_device_keys_for_federation_query_txn(
+        self, txn: LoggingTransaction, user_id: str
+    ) -> Tuple[int, List[JsonDict]]:
+        now_stream_id = self.get_device_stream_token()
+
+        devices = self._get_e2e_device_keys_txn(txn, [(user_id, None)])
+
+        if devices:
+            user_devices = devices[user_id]
+            results = []
+            for device_id, device in user_devices.items():
+                result = {"device_id": device_id}
+
+                key_json = device.get("key_json", None)
+                if key_json:
+                    result["keys"] = db_to_json(key_json)
+
+                    if "signatures" in device:
+                        for sig_user_id, sigs in device["signatures"].items():
+                            result["keys"].setdefault("signatures", {}).setdefault(
+                                sig_user_id, {}
+                            ).update(sigs)
+
+                device_display_name = device.get("device_display_name", None)
+                if device_display_name:
+                    result["device_display_name"] = device_display_name
+
+                results.append(result)
+
+            return now_stream_id, results
+
+        return now_stream_id, []
+
     @trace
-    async def get_e2e_device_keys(
-        self, query_list, include_all_devices=False, include_deleted_devices=False
-    ):
-        """Fetch a list of device keys.
+    async def get_e2e_device_keys_for_cs_api(
+        self, query_list: List[Tuple[str, Optional[str]]]
+    ) -> Dict[str, Dict[str, JsonDict]]:
+        """Fetch a list of device keys, formatted suitably for the C/S API.
         Args:
             query_list(list): List of pairs of user_ids and device_ids.
-            include_all_devices (bool): whether to include entries for devices
-                that don't have device keys
-            include_deleted_devices (bool): whether to include null entries for
-                devices which no longer exist (but were in the query_list).
-                This option only takes effect if include_all_devices is true.
         Returns:
             Dict mapping from user-id to dict mapping from device_id to
             key data.  The key data will be a dict in the same format as the
@@ -55,11 +98,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             return {}
 
         results = await self.db_pool.runInteraction(
-            "get_e2e_device_keys",
-            self._get_e2e_device_keys_txn,
-            query_list,
-            include_all_devices,
-            include_deleted_devices,
+            "get_e2e_device_keys", self._get_e2e_device_keys_txn, query_list,
         )
 
         # Build the result structure, un-jsonify the results, and add the
@@ -542,6 +581,11 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
             "get_all_user_signature_changes_for_remotes",
             _get_all_user_signature_changes_for_remotes_txn,
         )
+
+    @abc.abstractmethod
+    def get_device_stream_token(self) -> int:
+        """Get the current stream id from the _device_list_id_gen"""
+        ...
 
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):

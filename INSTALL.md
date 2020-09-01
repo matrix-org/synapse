@@ -73,7 +73,7 @@ mkdir -p ~/synapse
 virtualenv -p python3 ~/synapse/env
 source ~/synapse/env/bin/activate
 pip install --upgrade pip
-pip install --upgrade setuptools
+pip install --upgrade setuptools!=50.0  # setuptools==50.0 fails on some older Python versions
 pip install matrix-synapse
 ```
 
