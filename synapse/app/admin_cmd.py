@@ -229,14 +229,15 @@ def start(config_options):
     # We also make sure that `_base.start` gets run before we actually run the
     # command.
 
-    @defer.inlineCallbacks
-    def run(_reactor):
+    async def run():
         with LoggingContext("command"):
             _base.start(ss, [])
-            yield defer.ensureDeferred(args.func(ss, args))
+            await args.func(ss, args)
 
     _base.start_worker_reactor(
-        "synapse-admin-cmd", config, run_command=lambda: task.react(run)
+        "synapse-admin-cmd",
+        config,
+        run_command=lambda: task.react(lambda _reactor: defer.ensureDeferred(run())),
     )
 
 
