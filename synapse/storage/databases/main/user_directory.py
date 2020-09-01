@@ -371,6 +371,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         """
         Update or add a user's profile in the user directory.
         """
+        # If the display name or avatar URL are unexpected types, overwrite them.
+        if not isinstance(display_name, str):
+            display_name = None
+        if not isinstance(avatar_url, str):
+            avatar_url = None
 
         def _update_profile_in_user_dir_txn(txn):
             new_entry = self.db_pool.simple_upsert_txn(
