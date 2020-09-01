@@ -433,7 +433,7 @@ class BackgroundUpdater(object):
             "background_updates", keyvalues={"update_name": update_name}
         )
 
-    def _background_update_progress(self, update_name: str, progress: dict):
+    async def _background_update_progress(self, update_name: str, progress: dict):
         """Update the progress of a background update
 
         Args:
@@ -441,7 +441,7 @@ class BackgroundUpdater(object):
             progress: The progress of the update.
         """
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "background_update_progress",
             self._background_update_progress_txn,
             update_name,
