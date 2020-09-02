@@ -17,7 +17,6 @@
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
@@ -39,10 +38,7 @@ from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.stringutils import assert_valid_client_secret, random_string
 from synapse.util.threepids import canonicalise_email, check_3pid_allowed
 
-if TYPE_CHECKING:
-    from synapse.server import HomeServer
-
-from ._base import client_patterns, interactive_auth_handler, synapse_client_patterns
+from ._base import client_patterns, interactive_auth_handler
 
 logger = logging.getLogger(__name__)
 
@@ -146,117 +142,6 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
             ret = {"sid": sid}
 
         return 200, ret
-
-
-class PasswordResetSubmitTokenServlet(RestServlet):
-    """Handles 3PID validation token submission"""
-
-    PATTERNS = synapse_client_patterns("/password_reset/email/submit_token$")
-
-    def __init__(self, hs: "HomeServer"):
-        """
-        Args:
-            hs: server
-        """
-        super().__init__()
-
-        self.clock = hs.get_clock()
-        self.store = hs.get_datastore()
-
-        self._local_threepid_handling_disabled_due_to_email_config = (
-            hs.config.local_threepid_handling_disabled_due_to_email_config
-        )
-        self._threepid_behaviour_email = hs.config.threepid_behaviour_email
-        if self._threepid_behaviour_email == ThreepidBehaviour.LOCAL:
-            self._confirmation_email_template = (
-                hs.config.email_password_reset_template_confirmation_html
-            )
-            self._email_password_reset_template_success_html = (
-                hs.config.email_password_reset_template_success_html_content
-            )
-            self._failure_email_template = (
-                hs.config.email_password_reset_template_failure_html
-            )
-
-    async def on_GET(self, request):
-        self._check_threepid_behaviour()
-
-        sid = parse_string(request, "sid", required=True)
-        token = parse_string(request, "token", required=True)
-        client_secret = parse_string(request, "client_secret", required=True)
-        assert_valid_client_secret(client_secret)
-
-        # Show a confirmation page, just in case someone accidentally clicked this link when
-        # they didn't mean to
-        template_vars = {
-            "sid": sid,
-            "token": token,
-            "client_secret": client_secret,
-            "medium": "email",
-        }
-        respond_with_html(
-            request, 200, self._confirmation_email_template.render(**template_vars)
-        )
-
-    async def on_POST(self, request):
-        self._check_threepid_behaviour()
-
-        sid = parse_string(request, "sid", required=True)
-        token = parse_string(request, "token", required=True)
-        client_secret = parse_string(request, "client_secret", required=True)
-
-        # Attempt to validate a 3PID session
-        try:
-            # Mark the session as valid
-            next_link = await self.store.validate_threepid_session(
-                sid, client_secret, token, self.clock.time_msec()
-            )
-
-            # Perform a 302 redirect if next_link is set
-            if next_link:
-                if next_link.startswith("file:///"):
-                    logger.warning(
-                        "Not redirecting to next_link as it is a local file: address"
-                    )
-                else:
-                    request.setResponseCode(302)
-                    request.setHeader("Location", next_link)
-                    finish_request(request)
-                    return None
-
-            # Otherwise show the success template
-            html = self._email_password_reset_template_success_html
-            status_code = 200
-        except ThreepidValidationError as e:
-            status_code = e.code
-
-            # Show a failure page with a reason
-            template_vars = {"failure_reason": e.msg}
-            html = self._failure_email_template.render(**template_vars)
-
-        respond_with_html(request, status_code, html)
-
-    def _check_threepid_behaviour(self):
-        """
-        Ensure that ThreepidBehaviour is set to LOCAL, and handle cases where it is not
-
-        Raises:
-            SynapseError: if threepid_behaviour_email is not set to LOCAL
-        """
-        # We currently only handle threepid token submissions for email
-        if self._threepid_behaviour_email == ThreepidBehaviour.OFF:
-            if self._local_threepid_handling_disabled_due_to_email_config:
-                logger.warning(
-                    "Password reset emails have been disabled due to lack of an email config"
-                )
-            raise SynapseError(
-                400, "Email-based password resets are disabled on this server"
-            )
-        elif self._threepid_behaviour_email == ThreepidBehaviour.REMOTE:
-            raise SynapseError(
-                400,
-                "Password resets for this homeserver are handled by a separate program",
-            )
 
 
 class PasswordRestServlet(RestServlet):
@@ -930,7 +815,6 @@ class WhoamiRestServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     EmailPasswordRequestTokenRestServlet(hs).register(http_server)
-    PasswordResetSubmitTokenServlet(hs).register(http_server)
     PasswordRestServlet(hs).register(http_server)
     DeactivateAccountRestServlet(hs).register(http_server)
     EmailThreepidRequestTokenRestServlet(hs).register(http_server)
