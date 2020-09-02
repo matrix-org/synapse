@@ -2,7 +2,7 @@ Upgrading to v1.20.0
 ====================
 
 Shared rooms endpoint (MSC2666)
-------------------------------
+-------------------------------
 
 This release contains a new unstable endpoint `/_matrix/client/uk.half-shot.msc2666/user/shared_rooms/.*`
 for fetching rooms one user has in common with another. This feature requires the
