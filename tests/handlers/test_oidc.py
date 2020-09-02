@@ -75,7 +75,17 @@ COMMON_CONFIG = {
 COOKIE_NAME = b"oidc_session"
 COOKIE_PATH = "/_synapse/oidc"
 
-MockedMappingProvider = Mock(OidcMappingProvider)
+
+class TestMappingProvider(OidcMappingProvider):
+    @staticmethod
+    def parse_config(config):
+        return
+
+    def get_remote_user_id(self, userinfo):
+        return userinfo["sub"]
+
+    async def map_user_attributes(self, userinfo, token):
+        return {"localpart": userinfo["username"], "display_name": None}
 
 
 def simple_async_mock(return_value=None, raises=None):
@@ -123,7 +133,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         oidc_config["issuer"] = ISSUER
         oidc_config["scopes"] = SCOPES
         oidc_config["user_mapping_provider"] = {
-            "module": __name__ + ".MockedMappingProvider"
+            "module": __name__ + ".TestMappingProvider",
         }
         config["oidc_config"] = oidc_config
 
@@ -580,3 +590,30 @@ class OidcHandlerTestCase(HomeserverTestCase):
         with self.assertRaises(OidcError) as exc:
             yield defer.ensureDeferred(self.handler._exchange_code(code))
         self.assertEqual(exc.exception.error, "some_error")
+
+    def test_map_userinfo_to_user(self):
+        """Ensure that mapping the userinfo returned from a provider to an MXID works properly."""
+        userinfo = {
+            "sub": "test_user",
+            "username": "test_user",
+        }
+        # The token doesn't matter with the default user mapping provider.
+        token = {}
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user:test")
+
+        # Some providers return an integer ID.
+        userinfo = {
+            "sub": 1234,
+            "username": "test_user_2",
+        }
+        mxid = self.get_success(
+            self.handler._map_userinfo_to_user(
+                userinfo, token, "user-agent", "10.10.10.10"
+            )
+        )
+        self.assertEqual(mxid, "@test_user_2:test")

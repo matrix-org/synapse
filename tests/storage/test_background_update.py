@@ -1,7 +1,5 @@
 from mock import Mock
 
-from twisted.internet import defer
-
 from synapse.storage.background_updates import BackgroundUpdater
 
 from tests import unittest
@@ -38,11 +36,10 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         )
 
         # first step: make a bit of progress
-        @defer.inlineCallbacks
-        def update(progress, count):
-            yield self.clock.sleep((count * duration_ms) / 1000)
+        async def update(progress, count):
+            await self.clock.sleep((count * duration_ms) / 1000)
             progress = {"my_key": progress["my_key"] + 1}
-            yield store.db_pool.runInteraction(
+            await store.db_pool.runInteraction(
                 "update_progress",
                 self.updates._background_update_progress_txn,
                 "test_update",
@@ -67,13 +64,12 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
 
         # second step: complete the update
         # we should now get run with a much bigger number of items to update
-        @defer.inlineCallbacks
-        def update(progress, count):
+        async def update(progress, count):
             self.assertEqual(progress, {"my_key": 2})
             self.assertAlmostEqual(
                 count, target_background_update_duration_ms / duration_ms, places=0,
             )
-            yield self.updates._end_background_update("test_update")
+            await self.updates._end_background_update("test_update")
             return count
 
         self.update_handler.side_effect = update

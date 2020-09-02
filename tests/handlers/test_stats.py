@@ -81,8 +81,8 @@ class StatsRoomTests(unittest.HomeserverTestCase):
             )
         )
 
-    def get_all_room_state(self):
-        return self.store.db_pool.simple_select_list(
+    async def get_all_room_state(self):
+        return await self.store.db_pool.simple_select_list(
             "room_stats_state", None, retcols=("name", "topic", "canonical_alias")
         )
 
@@ -256,7 +256,7 @@ class StatsRoomTests(unittest.HomeserverTestCase):
         # self.handler.notify_new_event()
 
         # We need to let the delta processor advance…
-        self.pump(10 * 60)
+        self.reactor.advance(10 * 60)
 
         # Get the slices! There should be two -- day 1, and day 2.
         r = self.get_success(self.store.get_statistics_for_subject("room", room_1, 0))

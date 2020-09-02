@@ -1,0 +1,1 @@
+Fix logging in via OpenID Connect with a provider that uses integer user IDs.
