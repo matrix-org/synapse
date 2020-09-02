@@ -84,7 +84,7 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
 
             yield defer.ensureDeferred(
                 self.store.add_push_actions_to_staging(
-                    event.event_id, {user_id: action}
+                    event.event_id, {user_id: action}, False,
                 )
             )
             yield defer.ensureDeferred(

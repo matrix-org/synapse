@@ -444,7 +444,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         self,
         event_id: str,
         user_id_actions: Dict[str, List[Union[dict, str]]],
-        count_as_unread=False,
+        count_as_unread: bool,
     ) -> None:
         """Add the push actions for the event to the push action staging area.
 

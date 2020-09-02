@@ -368,7 +368,9 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         self.get_success(
             self.master_store.add_push_actions_to_staging(
-                event.event_id, {user_id: actions for user_id, actions in push_actions}
+                event.event_id,
+                {user_id: actions for user_id, actions in push_actions},
+                False,
             )
         )
         return event, context
