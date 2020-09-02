@@ -141,7 +141,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
 
             include_all_devices: whether to return devices without device keys
 
-            include_deleted_devices:whether to include null entries for
+            include_deleted_devices: whether to include null entries for
                 devices which no longer exist (but were in the query_list).
                 This option only takes effect if include_all_devices is true.
 
