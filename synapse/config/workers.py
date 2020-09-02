@@ -46,7 +46,7 @@ class WriterLocations:
 
     Attributes:
         events: The instances that write to the event and backfill streams.
-        events: The instance that writes to the typing stream.
+        typing: The instance that writes to the typing stream.
     """
 
     events = attr.ib(
@@ -119,7 +119,7 @@ class WorkerConfig(Config):
         writers = config.get("stream_writers") or {}
         self.writers = WriterLocations(**writers)
 
-        # Check that the configured writer for events and typing also appears in
+        # Check that the configured writers for events and typing also appears in
         # `instance_map`.
         for stream in ("events", "typing"):
             instances = _instance_to_list_converter(getattr(self.writers, stream))
