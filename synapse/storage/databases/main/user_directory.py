@@ -693,7 +693,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 FROM users_who_share_private_rooms
                 WHERE
                     user_id = ?
-                    AND other_user_id = ?;
+                    AND other_user_id = ?
                 """,
                 (user_id, other_user_id, user_id, other_user_id),
             )
