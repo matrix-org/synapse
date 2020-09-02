@@ -1,12 +1,5 @@
-from typing import List, Tuple
-
 from mock import Mock
 
-from twisted.internet import defer
-
-from synapse.events import EventBase
-from synapse.federation.sender import PerDestinationQueue, TransactionManager
-from synapse.federation.units import Edu
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 
