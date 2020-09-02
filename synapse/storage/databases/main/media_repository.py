@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
@@ -93,7 +93,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="mark_local_media_as_safe",
         )
 
-    def get_url_cache(self, url, ts):
+    async def get_url_cache(self, url: str, ts: int) -> Optional[Dict[str, Any]]:
         """Get the media_id and ts for a cached URL as of the given timestamp
         Returns:
             None if the URL isn't cached.
@@ -139,7 +139,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 )
             )
 
-        return self.db_pool.runInteraction("get_url_cache", get_url_cache_txn)
+        return await self.db_pool.runInteraction("get_url_cache", get_url_cache_txn)
 
     async def store_url_cache(
         self, url, response_code, etag, expires_ts, og, media_id, download_ts
@@ -237,12 +237,17 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             desc="store_cached_remote_media",
         )
 
-    def update_cached_last_access_time(self, local_media, remote_media, time_ms):
+    async def update_cached_last_access_time(
+        self,
+        local_media: Iterable[str],
+        remote_media: Iterable[Tuple[str, str]],
+        time_ms: int,
+    ):
         """Updates the last access time of the given media
 
         Args:
-            local_media (iterable[str]): Set of media_ids
-            remote_media (iterable[(str, str)]): Set of (server_name, media_id)
+            local_media: Set of media_ids
+            remote_media: Set of (server_name, media_id)
             time_ms: Current time in milliseconds
         """
 
@@ -267,7 +272,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
 
             txn.executemany(sql, ((time_ms, media_id) for media_id in local_media))
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "update_cached_last_access_time", update_cache_txn
         )
 
@@ -325,7 +330,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             "get_remote_media_before", self.db_pool.cursor_to_dict, sql, before_ts
         )
 
-    def delete_remote_media(self, media_origin, media_id):
+    async def delete_remote_media(self, media_origin: str, media_id: str) -> None:
         def delete_remote_media_txn(txn):
             self.db_pool.simple_delete_txn(
                 txn,
@@ -338,11 +343,11 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                 keyvalues={"media_origin": media_origin, "media_id": media_id},
             )
 
-        return self.db_pool.runInteraction(
+        await self.db_pool.runInteraction(
             "delete_remote_media", delete_remote_media_txn
         )
 
-    def get_expired_url_cache(self, now_ts):
+    async def get_expired_url_cache(self, now_ts: int) -> List[str]:
         sql = (
             "SELECT media_id FROM local_media_repository_url_cache"
             " WHERE expires_ts < ?"
@@ -354,7 +359,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             txn.execute(sql, (now_ts,))
             return [row[0] for row in txn]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_expired_url_cache", _get_expired_url_cache_txn
         )
 
@@ -371,7 +376,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             "delete_url_cache", _delete_url_cache_txn
         )
 
-    def get_url_cache_media_before(self, before_ts):
+    async def get_url_cache_media_before(self, before_ts: int) -> List[str]:
         sql = (
             "SELECT media_id FROM local_media_repository"
             " WHERE created_ts < ? AND url_cache IS NOT NULL"
@@ -383,7 +388,7 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             txn.execute(sql, (before_ts,))
             return [row[0] for row in txn]
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "get_url_cache_media_before", _get_url_cache_media_before_txn
         )
 

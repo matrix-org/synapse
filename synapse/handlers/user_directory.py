@@ -234,7 +234,7 @@ class UserDirectoryHandler(StateDeltasHandler):
     async def _handle_room_publicity_change(
         self, room_id, prev_event_id, event_id, typ
     ):
-        """Handle a room having potentially changed from/to world_readable/publically
+        """Handle a room having potentially changed from/to world_readable/publicly
         joinable.
 
         Args:
@@ -388,9 +388,15 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         prev_name = prev_event.content.get("displayname")
         new_name = event.content.get("displayname")
+        # If the new name is an unexpected form, do not update the directory.
+        if not isinstance(new_name, str):
+            new_name = prev_name
 
         prev_avatar = prev_event.content.get("avatar_url")
         new_avatar = event.content.get("avatar_url")
+        # If the new avatar is an unexpected form, do not update the directory.
+        if not isinstance(new_avatar, str):
+            new_avatar = prev_avatar
 
         if prev_name != new_name or prev_avatar != new_avatar:
             await self.store.update_profile_in_user_dir(user_id, new_name, new_avatar)
