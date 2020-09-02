@@ -60,7 +60,7 @@ class EndToEndKeyWorkerStore(SQLBaseStore):
         """
         now_stream_id = self.get_device_stream_token()
 
-        devices = await self._get_e2e_device_keys_and_signatures([(user_id, None)])
+        devices = await self.get_e2e_device_keys_and_signatures([(user_id, None)])
 
         if devices:
             user_devices = devices[user_id]
