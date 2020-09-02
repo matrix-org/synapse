@@ -52,7 +52,7 @@ class RoomConfig(Config):
         "kick": 50,
         "redact": 50,
         "invite": 50,
-    }
+    }  # type: JsonDict
 
     def read_config(self, config, **kwargs):
         # Whether new, locally-created rooms should have encryption enabled
@@ -84,7 +84,9 @@ class RoomConfig(Config):
             )
 
         # Power level content override for locally-created rooms
-        power_level_content_override = config.get("power_level_content_override", {})
+        power_level_content_override = (
+            config.get("power_level_content_override", None) or {}
+        )
 
         invalid_keys = (
             power_level_content_override.keys()
@@ -95,7 +97,7 @@ class RoomConfig(Config):
                 "Invalid power level override keys: " + ", ".join(invalid_keys)
             )
 
-        override_events = power_level_content_override.get("events", {})
+        override_events = power_level_content_override.get("events", None) or {}
         invalid_event_keys = (
             override_events.keys() - self.power_level_content_default["events"].keys()
         )
@@ -109,12 +111,12 @@ class RoomConfig(Config):
 
     def generate_config_section(self, **kwargs):
         pl_keys = self.power_level_content_default.keys() - {"events", "users"}
-        pl_lines = ["          #{}: 50".format(f) for f in pl_keys]
-        pl_lines = "\n".join(pl_lines)
+        pl_lines_list = ["          #{}: 50".format(f) for f in pl_keys]
+        pl_lines = "\n".join(pl_lines_list)
 
         pl_event_keys = self.power_level_content_default["events"].keys()
-        pl_event_lines = ["            #{}: 50".format(f) for f in pl_event_keys]
-        pl_event_lines = "\n".join(pl_event_lines)
+        pl_event_lines_list = ["            #{}: 50".format(f) for f in pl_event_keys]
+        pl_event_lines = "\n".join(pl_event_lines_list)
 
         return f"""\
         ## Rooms ##

@@ -36,7 +36,10 @@ from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, Syna
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
-from synapse.events.utils import copy_power_levels_contents, update_power_levels_contents
+from synapse.events.utils import (
+    copy_power_levels_contents,
+    update_power_levels_contents,
+)
 from synapse.http.endpoint import parse_and_validate_server_name
 from synapse.storage.state import StateFilter
 from synapse.types import (
