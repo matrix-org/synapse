@@ -116,7 +116,9 @@ class RoomConfig(Config):
         pl_lines = "\n".join(pl_lines_list)
 
         pl_event_keys = self.power_level_content_default["events"].keys()
-        pl_event_lines_list = ["            #{}: 50".format(f) for f in sorted(list(pl_event_keys))]
+        pl_event_lines_list = [
+            "            #{}: 50".format(f) for f in sorted(list(pl_event_keys))
+        ]
         pl_event_lines = "\n".join(pl_event_lines_list)
 
         return f"""\
