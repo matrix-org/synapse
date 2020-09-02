@@ -414,13 +414,14 @@ class BackgroundUpdater(object):
 
         self.register_background_update_handler(update_name, updater)
 
-    def _end_background_update(self, update_name):
+    async def _end_background_update(self, update_name: str) -> None:
         """Removes a completed background update task from the queue.
 
         Args:
-            update_name(str): The name of the completed task to remove
+            update_name:: The name of the completed task to remove
+
         Returns:
-            A deferred that completes once the task is removed.
+            None, completes once the task is removed.
         """
         if update_name != self._current_background_update:
             raise Exception(
@@ -428,11 +429,11 @@ class BackgroundUpdater(object):
                 % update_name
             )
         self._current_background_update = None
-        return self.db_pool.simple_delete_one(
+        await self.db_pool.simple_delete_one(
             "background_updates", keyvalues={"update_name": update_name}
         )
 
-    def _background_update_progress(self, update_name: str, progress: dict):
+    async def _background_update_progress(self, update_name: str, progress: dict):
         """Update the progress of a background update
 
         Args:
@@ -440,7 +441,7 @@ class BackgroundUpdater(object):
             progress: The progress of the update.
         """
 
-        return self.db_pool.runInteraction(
+        return await self.db_pool.runInteraction(
             "background_update_progress",
             self._background_update_progress_txn,
             update_name,

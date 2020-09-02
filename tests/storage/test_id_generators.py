@@ -58,6 +58,10 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         return self.get_success(self.db_pool.runWithConnection(_create))
 
     def _insert_rows(self, instance_name: str, number: int):
+        """Insert N rows as the given instance, inserting with stream IDs pulled
+        from the postgres sequence.
+        """
+
         def _insert(txn):
             for _ in range(number):
                 txn.execute(
@@ -65,7 +69,20 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                     (instance_name,),
                 )
 
-        self.get_success(self.db_pool.runInteraction("test_single_instance", _insert))
+        self.get_success(self.db_pool.runInteraction("_insert_rows", _insert))
+
+    def _insert_row_with_id(self, instance_name: str, stream_id: int):
+        """Insert one row as the given instance with given stream_id, updating
+        the postgres sequence position to match.
+        """
+
+        def _insert(txn):
+            txn.execute(
+                "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
+            )
+            txn.execute("SELECT setval('foobar_seq', ?)", (stream_id,))
+
+        self.get_success(self.db_pool.runInteraction("_insert_row_with_id", _insert))
 
     def test_empty(self):
         """Test an ID generator against an empty database gives sensible
@@ -188,10 +205,16 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         positions.
         """
 
-        self._insert_rows("first", 3)
-        self._insert_rows("second", 5)
+        # The following tests are a bit cheeky in that we notify about new
+        # positions via `advance` without *actually* advancing the postgres
+        # sequence.
+
+        self._insert_row_with_id("first", 3)
+        self._insert_row_with_id("second", 5)
 
         id_gen = self._create_id_generator("first")
+
+        self.assertEqual(id_gen.get_positions(), {"first": 3, "second": 5})
 
         # Min is 3 and there is a gap between 5, so we expect it to be 3.
         self.assertEqual(id_gen.get_persisted_upto_position(), 3)
@@ -218,3 +241,131 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         id_gen.advance("first", 11)
         id_gen.advance("second", 15)
         self.assertEqual(id_gen.get_persisted_upto_position(), 11)
+
+    def test_get_persisted_upto_position_get_next(self):
+        """Test that `get_persisted_upto_position` correctly tracks updates to
+        positions when `get_next` is called.
+        """
+
+        self._insert_row_with_id("first", 3)
+        self._insert_row_with_id("second", 5)
+
+        id_gen = self._create_id_generator("first")
+
+        self.assertEqual(id_gen.get_positions(), {"first": 3, "second": 5})
+
+        self.assertEqual(id_gen.get_persisted_upto_position(), 3)
+        with self.get_success(id_gen.get_next()) as stream_id:
+            self.assertEqual(stream_id, 6)
+            self.assertEqual(id_gen.get_persisted_upto_position(), 3)
+
+        self.assertEqual(id_gen.get_persisted_upto_position(), 6)
+
+        # We assume that so long as `get_next` does correctly advance the
+        # `persisted_upto_position` in this case, then it will be correct in the
+        # other cases that are tested above (since they'll hit the same code).
+
+
+class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
+    """Tests MultiWriterIdGenerator that produce *negative* stream IDs.
+    """
+
+    if not USE_POSTGRES_FOR_TESTS:
+        skip = "Requires Postgres"
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.db_pool = self.store.db_pool  # type: DatabasePool
+
+        self.get_success(self.db_pool.runInteraction("_setup_db", self._setup_db))
+
+    def _setup_db(self, txn):
+        txn.execute("CREATE SEQUENCE foobar_seq")
+        txn.execute(
+            """
+            CREATE TABLE foobar (
+                stream_id BIGINT NOT NULL,
+                instance_name TEXT NOT NULL,
+                data TEXT
+            );
+            """
+        )
+
+    def _create_id_generator(self, instance_name="master") -> MultiWriterIdGenerator:
+        def _create(conn):
+            return MultiWriterIdGenerator(
+                conn,
+                self.db_pool,
+                instance_name=instance_name,
+                table="foobar",
+                instance_column="instance_name",
+                id_column="stream_id",
+                sequence_name="foobar_seq",
+                positive=False,
+            )
+
+        return self.get_success(self.db_pool.runWithConnection(_create))
+
+    def _insert_row(self, instance_name: str, stream_id: int):
+        """Insert one row as the given instance with given stream_id.
+        """
+
+        def _insert(txn):
+            txn.execute(
+                "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
+            )
+
+        self.get_success(self.db_pool.runInteraction("_insert_row", _insert))
+
+    def test_single_instance(self):
+        """Test that reads and writes from a single process are handled
+        correctly.
+        """
+        id_gen = self._create_id_generator()
+
+        with self.get_success(id_gen.get_next()) as stream_id:
+            self._insert_row("master", stream_id)
+
+        self.assertEqual(id_gen.get_positions(), {"master": -1})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), -1)
+        self.assertEqual(id_gen.get_persisted_upto_position(), -1)
+
+        with self.get_success(id_gen.get_next_mult(3)) as stream_ids:
+            for stream_id in stream_ids:
+                self._insert_row("master", stream_id)
+
+        self.assertEqual(id_gen.get_positions(), {"master": -4})
+        self.assertEqual(id_gen.get_current_token_for_writer("master"), -4)
+        self.assertEqual(id_gen.get_persisted_upto_position(), -4)
+
+        # Test loading from DB by creating a second ID gen
+        second_id_gen = self._create_id_generator()
+
+        self.assertEqual(second_id_gen.get_positions(), {"master": -4})
+        self.assertEqual(second_id_gen.get_current_token_for_writer("master"), -4)
+        self.assertEqual(second_id_gen.get_persisted_upto_position(), -4)
+
+    def test_multiple_instance(self):
+        """Tests that having multiple instances that get advanced over
+        federation works corretly.
+        """
+        id_gen_1 = self._create_id_generator("first")
+        id_gen_2 = self._create_id_generator("second")
+
+        with self.get_success(id_gen_1.get_next()) as stream_id:
+            self._insert_row("first", stream_id)
+            id_gen_2.advance("first", stream_id)
+
+        self.assertEqual(id_gen_1.get_positions(), {"first": -1})
+        self.assertEqual(id_gen_2.get_positions(), {"first": -1})
+        self.assertEqual(id_gen_1.get_persisted_upto_position(), -1)
+        self.assertEqual(id_gen_2.get_persisted_upto_position(), -1)
+
+        with self.get_success(id_gen_2.get_next()) as stream_id:
+            self._insert_row("second", stream_id)
+            id_gen_1.advance("second", stream_id)
+
+        self.assertEqual(id_gen_1.get_positions(), {"first": -1, "second": -2})
+        self.assertEqual(id_gen_2.get_positions(), {"first": -1, "second": -2})
+        self.assertEqual(id_gen_1.get_persisted_upto_position(), -2)
+        self.assertEqual(id_gen_2.get_persisted_upto_position(), -2)

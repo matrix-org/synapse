@@ -49,14 +49,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
-from synapse.types import (
-    Collection,
-    Requester,
-    RoomAlias,
-    StreamToken,
-    UserID,
-    create_requester,
-)
+from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
 from synapse.util import json_decoder
 from synapse.util.async_helpers import Linearizer
 from synapse.util.frozenutils import frozendict_json_encoder
@@ -95,12 +88,7 @@ class MessageHandler(object):
             )
 
     async def get_room_data(
-        self,
-        user_id: str,
-        room_id: str,
-        event_type: str,
-        state_key: str,
-        is_guest: bool,
+        self, user_id: str, room_id: str, event_type: str, state_key: str,
     ) -> dict:
         """ Get data from a room.
 
@@ -109,11 +97,10 @@ class MessageHandler(object):
             room_id
             event_type
             state_key
-            is_guest
         Returns:
             The path data content.
         Raises:
-            SynapseError if something went wrong.
+            SynapseError or AuthError if the user is not in the room
         """
         (
             membership,
@@ -130,6 +117,16 @@ class MessageHandler(object):
                 [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
+        else:
+            # check_user_in_room_or_world_readable, if it doesn't raise an AuthError, should
+            # only ever return a Membership.JOIN/LEAVE object
+            #
+            # Safeguard in case it returned something else
+            logger.error(
+                "Attempted to retrieve data from a room for a user that has never been in it. "
+                "This should not have happened."
+            )
+            raise SynapseError(403, "User not in room", errcode=Codes.FORBIDDEN)
 
         return data
 
@@ -442,7 +439,7 @@ class EventCreationHandler(object):
         event_dict: dict,
         token_id: Optional[str] = None,
         txn_id: Optional[str] = None,
-        prev_event_ids: Optional[Collection[str]] = None,
+        prev_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
     ) -> Tuple[EventBase, EventContext]:
         """
@@ -782,7 +779,7 @@ class EventCreationHandler(object):
         self,
         builder: EventBuilder,
         requester: Optional[Requester] = None,
-        prev_event_ids: Optional[Collection[str]] = None,
+        prev_event_ids: Optional[List[str]] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 

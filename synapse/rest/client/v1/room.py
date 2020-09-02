@@ -171,7 +171,6 @@ class RoomStateEventRestServlet(TransactionRestServlet):
             room_id=room_id,
             event_type=event_type,
             state_key=state_key,
-            is_guest=requester.is_guest,
         )
 
         if not data:
@@ -869,17 +868,21 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
-        if content["typing"]:
-            await self.typing_handler.started_typing(
-                target_user=target_user,
-                auth_user=requester.user,
-                room_id=room_id,
-                timeout=timeout,
-            )
-        else:
-            await self.typing_handler.stopped_typing(
-                target_user=target_user, auth_user=requester.user, room_id=room_id
-            )
+        try:
+            if content["typing"]:
+                await self.typing_handler.started_typing(
+                    target_user=target_user,
+                    requester=requester,
+                    room_id=room_id,
+                    timeout=timeout,
+                )
+            else:
+                await self.typing_handler.stopped_typing(
+                    target_user=target_user, requester=requester, room_id=room_id
+                )
+        except ShadowBanError:
+            # Pretend this worked without error.
+            pass
 
         return 200, {}
 
