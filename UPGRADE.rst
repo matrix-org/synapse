@@ -4,7 +4,7 @@ Upgrading to v1.20.0
 Shared rooms endpoint (MSC2666)
 -------------------------------
 
-This release contains a new unstable endpoint `/_matrix/client/uk.half-shot.msc2666/user/shared_rooms/.*`
+This release contains a new unstable endpoint `/_matrix/client/unstable/uk.half-shot.msc2666/user/shared_rooms/.*`
 for fetching rooms one user has in common with another. This feature requires the
 `update_user_directory` config flag to be `True`. If you are you are using a `synapse.app.user_dir`
 worker, requests to this endpoint must be handled by that worker. 
